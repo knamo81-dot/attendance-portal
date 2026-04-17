@@ -2534,6 +2534,7 @@ body.real-modal-open{overflow:hidden}
       memoSortedView: false,
 
       selectedDate: '2026-04-12',
+      calendarMonth: '2026-04-01',
       plannerMode: 'schedule',
       activeReservationTab: 0,
       selectedPanelRangeFilter: '전체',
@@ -2635,6 +2636,7 @@ body.real-modal-open{overflow:hidden}
       state.memoSortedView = false;
 
       state.selectedDate = '2026-04-12';
+      state.calendarMonth = '2026-04-01';
       state.plannerMode = 'schedule';
       state.activeReservationTab = 0;
       state.selectedPanelRangeFilter = '전체';
@@ -3675,9 +3677,48 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       `;
     }
 
+    function getCalendarMonthDate() {
+      const base = new Date(`${state.calendarMonth || '2026-04-01'}T00:00:00`);
+      if (Number.isNaN(base.getTime())) return new Date('2026-04-01T00:00:00');
+      return new Date(base.getFullYear(), base.getMonth(), 1);
+    }
+
+    function formatCalendarMonthLabel(date) {
+      return `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
+    }
+
+    function shiftCalendarMonth(offset) {
+      const current = getCalendarMonthDate();
+      const shifted = new Date(current.getFullYear(), current.getMonth() + offset, 1);
+      state.calendarMonth = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-01`;
+
+      const selected = new Date(`${state.selectedDate}T00:00:00`);
+      if (Number.isNaN(selected.getTime()) || selected.getFullYear() !== shifted.getFullYear() || selected.getMonth() !== shifted.getMonth()) {
+        const fallbackDay = Math.min(1, new Date(shifted.getFullYear(), shifted.getMonth() + 1, 0).getDate());
+        state.selectedDate = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-${String(fallbackDay).padStart(2, '0')}`;
+      }
+      renderScheduleTab();
+    }
+
+    function buildCalendarCells(date) {
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const firstWeekday = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const totalCells = Math.ceil((firstWeekday + daysInMonth) / 7) * 7;
+      return Array.from({ length: totalCells }, (_, index) => {
+        const dayNumber = index - firstWeekday + 1;
+        if (dayNumber < 1 || dayNumber > daysInMonth) return null;
+        return dayNumber;
+      });
+    }
+
     function renderScheduleTab() {
       const weekNames = ['일', '월', '화', '수', '목', '금', '토'];
-      const cells = Array.from({ length: 35 }, (_, i) => i + 1);
+      const currentMonthDate = getCalendarMonthDate();
+      const currentMonthLabel = formatCalendarMonthLabel(currentMonthDate);
+      const currentMonthPrefix = `${currentMonthDate.getFullYear()}-${String(currentMonthDate.getMonth() + 1).padStart(2, '0')}`;
+      const cells = buildCalendarCells(currentMonthDate);
 
       const isReservationMode = state.plannerMode === 'reservation';
       const selectedSchedules = filterSchedulesByStatus(sortSchedulesForPanel(getSchedulesForSelectedPanel()));
@@ -3707,9 +3748,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
                 ` : ``}
               </div>
               <div style="display:flex;gap:8px;">
-                <button class="small-btn">이전달</button>
-                <button class="small-btn dark">2026년 4월</button>
-                <button class="small-btn">다음달</button>
+                <button class="small-btn" type="button" id="calendar-prev-month">이전달</button>
+                <button class="small-btn dark" type="button" id="calendar-current-month">${currentMonthLabel}</button>
+                <button class="small-btn" type="button" id="calendar-next-month">다음달</button>
               </div>
             </div>
 
@@ -3719,8 +3760,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
             <div class="calendar-grid">
               ${cells.map(cell => {
-                const day = cell <= 30 ? cell : null;
-                const dateKey = day ? `2026-04-${String(day).padStart(2, '0')}` : '';
+                const day = Number.isInteger(cell) ? cell : null;
+                const dateKey = day ? `${currentMonthPrefix}-${String(day).padStart(2, '0')}` : '';
                 const isSelected = dateKey === state.selectedDate;
 
                 if (isReservationMode) {
@@ -3893,6 +3934,21 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
       document.getElementById('schedule-today')?.addEventListener('click', () => {
         state.selectedDate = '2026-04-12';
+        state.calendarMonth = '2026-04-01';
+        renderScheduleTab();
+      });
+
+      document.getElementById('calendar-prev-month')?.addEventListener('click', () => {
+        shiftCalendarMonth(-1);
+      });
+
+      document.getElementById('calendar-next-month')?.addEventListener('click', () => {
+        shiftCalendarMonth(1);
+      });
+
+      document.getElementById('calendar-current-month')?.addEventListener('click', () => {
+        state.calendarMonth = '2026-04-01';
+        if (!state.selectedDate.startsWith('2026-04-')) state.selectedDate = '2026-04-12';
         renderScheduleTab();
       });
 
