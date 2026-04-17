@@ -5252,52 +5252,25 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
   }
 
   async function loadSpecialNotes(){
-    const SPECIAL_NOTES_KEY = 'attendance_special_notes_v1';
-    let localItems = [];
-    try{
-      const raw = localStorage.getItem(SPECIAL_NOTES_KEY);
-      localItems = raw ? JSON.parse(raw) : [];
-      if(!Array.isArray(localItems)) localItems = [];
-    }catch(e){
-      localItems = [];
+    const {data,error}=await safeSelect('employee_special_notes','*');
+
+    if(error){
+      dataState.specialNotes = [];
+      $('realIssueCount').textContent = '총 0건';
+      $('realIssueTbody').innerHTML = '<tr><td colspan="10" class="real-empty-row">' + esc(error.message) + '</td></tr>';
+      return;
     }
 
-    const normalizedLocal = localItems.map(item => ({
-      id: item.id,
-      division_code: item.divisionCode || null,
-      division_name: item.division || null,
-      team_code: item.teamCode || null,
-      team_name: item.team || null,
-      employee_no: item.employeeId || null,
-      employee_name: item.employeeName || null,
-      issue_type: item.specialType || null,
-      start_date: item.startDate || null,
-      end_date: item.endDate || null,
-      total_work_hours: item.standardTime || null,
-      note: item.remark || null,
-      created_at: item.updatedAt || item.createdAt || null,
-      source: 'local'
-    }));
+    dataState.specialNotes = (data || [])
+      .map(r => ({ ...r, source:'db' }))
+      .sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
 
-    const {data,error}=await safeSelect('employee_special_notes','*');
-    const normalizedDb = (data || []).map(r => ({...r, source:'db'}));
-
-    const merged = [...normalizedLocal];
-    normalizedDb.forEach(dbItem => {
-      const exists = merged.some(localItem =>
-        String(localItem.employee_no||'') === String(dbItem.employee_no||'') &&
-        String(localItem.issue_type||'') === String(dbItem.issue_type||'') &&
-        String(localItem.start_date||'') === String(dbItem.start_date||'') &&
-        String(localItem.end_date||'') === String(dbItem.end_date||'')
-      );
-      if(!exists) merged.push(dbItem);
-    });
-
-    dataState.specialNotes = merged.sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
     $('realIssueCount').textContent = `총 ${dataState.specialNotes.length}건`;
     if(!dataState.specialNotes.length){
-      $('realIssueTbody').innerHTML='<tr><td colspan="10" class="real-empty-row">등록된 특이사항이 없습니다.</td></tr>'; return;
+      $('realIssueTbody').innerHTML='<tr><td colspan="10" class="real-empty-row">등록된 특이사항이 없습니다.</td></tr>';
+      return;
     }
+
     $('realIssueTbody').innerHTML = dataState.specialNotes.map(r=>{
       const rowDivisionName = r.division_name || dataState.divisions.find(d => String(d.division_code||'') === String(r.division_code||''))?.division_name || r.division_code || '-';
       const rowTeamName = r.team_name || dataState.teams.find(t => String(t.team_code||'') === String(r.team_code||''))?.team_name || r.team_code || '-';
@@ -5344,12 +5317,10 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
   }
 
   async function saveIssue(){
-    const SPECIAL_NOTES_KEY = 'attendance_special_notes_v1';
     const employeeNo = $('realIssueEmployee').value;
     const emp = dataState.employees.find(e=>e.employee_no===employeeNo);
     if(!emp){ setFeedback('realIssueFeedback','담당자를 선택하세요.'); return; }
-    const div = dataState.divisions.find(d=>d.division_code===emp.division_code);
-    const team = dataState.teams.find(t=>t.team_code===emp.team_code);
+
     const payload = {
       division_code: emp.division_code || null,
       team_code: emp.team_code || null,
@@ -5361,72 +5332,44 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       total_work_hours: $('realIssueWorkHours').value || null,
       note: $('realIssueNote').value.trim() || null
     };
-    const displayDivisionName = div ? div.division_name : null;
-    const displayTeamName = team ? team.team_name : null;
-    const displayEmployeeName = emp.name || null;
 
-    let localItems = [];
-    try{
-      localItems = JSON.parse(localStorage.getItem(SPECIAL_NOTES_KEY) || '[]');
-      if(!Array.isArray(localItems)) localItems = [];
-    }catch(e){ localItems = []; }
-
-    const localRecord = {
-      id: dataState.editingIssueSource === 'local' && dataState.editingIssueId ? dataState.editingIssueId : ('sp_' + Date.now()),
-      divisionCode: payload.division_code,
-      division: displayDivisionName,
-      teamCode: payload.team_code,
-      team: displayTeamName,
-      employeeId: payload.employee_no,
-      employeeName: displayEmployeeName,
-      specialType: payload.issue_type,
-      startDate: payload.start_date,
-      endDate: payload.end_date,
-      standardTime: payload.total_work_hours,
-      remark: payload.note,
-      createdAt: new Date().toISOString(),
-      createdAtLabel: new Date().toISOString().slice(0,16).replace('T',' '),
-      updatedAt: new Date().toISOString(),
-      updatedAtLabel: new Date().toISOString().slice(0,16).replace('T',' ')
-    };
-
-    if(dataState.editingIssueSource === 'local' && dataState.editingIssueId){
-      localItems = localItems.map(item => String(item.id)===String(dataState.editingIssueId) ? {...item, ...localRecord, id:item.id} : item);
-    }else{
-      localItems.push(localRecord);
-    }
-    localStorage.setItem(SPECIAL_NOTES_KEY, JSON.stringify(localItems));
-
-    const dbExists = dataState.specialNotes.some(r => String(r.id)===String(dataState.editingIssueId) && r.source==='db');
+    const dbExists = dataState.specialNotes.some(r => String(r.id)===String(dataState.editingIssueId));
     let res;
-    if(dbExists){
+    if(dbExists && dataState.editingIssueId){
       res = await sb.from('employee_special_notes').update(payload).eq('id', dataState.editingIssueId);
     }else{
       res = await sb.from('employee_special_notes').insert([payload]);
     }
+
     if(res.error){
-      setFeedback('realIssueFeedback','로컬에는 저장했고 DB 저장은 실패했습니다: ' + res.error.message, false);
-    }else{
-      setFeedback('realIssueFeedback','특이사항을 저장했습니다.', true);
+      setFeedback('realIssueFeedback','DB 저장 실패: ' + res.error.message, false);
+      return;
     }
+
+    setFeedback('realIssueFeedback','특이사항을 저장했습니다.', true);
     resetIssueForm();
     await loadSpecialNotes();
+
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'special-notes-updated' }, '*');
+    }
+    window.postMessage({ type: 'special-notes-updated' }, '*');
   }
 
   async function deleteIssue(id){
-    const SPECIAL_NOTES_KEY = 'attendance_special_notes_v1';
-    try{
-      let localItems = JSON.parse(localStorage.getItem(SPECIAL_NOTES_KEY) || '[]');
-      if(!Array.isArray(localItems)) localItems = [];
-      localItems = localItems.filter(item => String(item.id)!==String(id));
-      localStorage.setItem(SPECIAL_NOTES_KEY, JSON.stringify(localItems));
-    }catch(e){}
     const item = dataState.specialNotes.find(r=>String(r.id)===String(id));
-    if(item && item.source === 'db'){
-      const {error}=await sb.from('employee_special_notes').delete().eq('id', id);
-      if(error){ setFeedback('realIssueFeedback', error.message); return; }
-    }
+    if(!item) return;
+
+    const {error}=await sb.from('employee_special_notes').delete().eq('id', id);
+    if(error){ setFeedback('realIssueFeedback', error.message, false); return; }
+
+    setFeedback('realIssueFeedback','특이사항을 삭제했습니다.', true);
     await loadSpecialNotes();
+
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'special-notes-updated' }, '*');
+    }
+    window.postMessage({ type: 'special-notes-updated' }, '*');
   }
 
   async function loadUsers(){
