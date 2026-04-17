@@ -7389,6 +7389,11 @@ window.addEventListener('resize', renderLightweight);
         console.error('attendance_records 로딩 오류', error);
         loadUploadedAttendanceData();
       }
+      try{
+        await loadSpecialNotes();
+      }catch(error){
+        console.error('employee_special_notes 로딩 오류', error);
+      }
       window.__empMasterInitialized = true;
     }
     dedupeEmpMasterByName();
