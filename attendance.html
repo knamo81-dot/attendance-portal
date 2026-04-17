@@ -4760,11 +4760,14 @@ function bindTransferTabEvents(){
 const SPECIAL_NOTES_KEY = 'attendance_special_notes_v1';
 let specialNotes = [];
 
-function loadSpecialNotes(){
+function saveSpecialNotesLocal(){
+  localStorage.setItem(SPECIAL_NOTES_KEY, JSON.stringify(specialNotes));
+}
+function loadSpecialNotesLocal(){
   const raw = localStorage.getItem(SPECIAL_NOTES_KEY);
   if(raw === null){
     specialNotes = [];
-    saveSpecialNotes();
+    saveSpecialNotesLocal();
     return;
   }
   try{
@@ -4772,11 +4775,56 @@ function loadSpecialNotes(){
     if(!Array.isArray(specialNotes)) specialNotes = [];
   }catch(e){
     specialNotes = [];
-    saveSpecialNotes();
+    saveSpecialNotesLocal();
   }
 }
-function saveSpecialNotes(){
-  localStorage.setItem(SPECIAL_NOTES_KEY, JSON.stringify(specialNotes));
+function mapDbSpecialNote(row){
+  const divisionCode = String(row?.division_code || '').trim();
+  const teamCode = String(row?.team_code || '').trim();
+  const employeeId = String(row?.employee_no || '').trim();
+  const mappedDivision = getDivisionByCode(divisionCode);
+  const mappedTeam = getTeamByCode(divisionCode, teamCode);
+  const mappedEmp = empMaster.find(x => String(x.id || '').trim() === employeeId);
+  const createdAt = row?.created_at || '';
+  return {
+    id: String(row?.id ?? ''),
+    divisionCode,
+    division: mappedDivision?.divisionName || String(row?.division_name || '').trim() || divisionCode,
+    teamCode,
+    team: mappedTeam?.teamName || String(row?.team_name || '').trim() || teamCode,
+    employeeId,
+    employeeName: normalizeEmployeeName(row?.employee_name || mappedEmp?.name || ''),
+    startDate: String(row?.start_date || '').trim(),
+    endDate: String(row?.end_date || '').trim(),
+    specialType: String(row?.issue_type || '').trim(),
+    standardTime: String(row?.total_work_hours || '').trim(),
+    remark: String(row?.note || '').trim(),
+    createdAt,
+    createdAtLabel: createdAt ? String(createdAt).replace('T',' ').slice(0,16) : '',
+    updatedAt: String(row?.updated_at || '').trim(),
+    updatedAtLabel: row?.updated_at ? String(row.updated_at).replace('T',' ').slice(0,16) : ''
+  };
+}
+async function loadSpecialNotes(){
+  if(!supabaseClient){
+    loadSpecialNotesLocal();
+    return;
+  }
+  try{
+    const { data, error } = await supabaseClient
+      .from('employee_special_notes')
+      .select('*')
+      .order('created_at', { ascending:false });
+    if(error) throw error;
+    specialNotes = Array.isArray(data) ? data.map(mapDbSpecialNote) : [];
+    saveSpecialNotesLocal();
+  }catch(e){
+    console.error('employee_special_notes 조회 실패:', e);
+    loadSpecialNotesLocal();
+  }
+}
+async function saveSpecialNotes(){
+  saveSpecialNotesLocal();
 }
 function getActiveEmployeesForSpecial(divisionCode='', teamCode=''){
   return empMaster
@@ -4950,15 +4998,30 @@ function renderSpecialNotes(){
       </tr>
     `).join('');
 }
-window.deleteSpecialNote = function(id){
+window.deleteSpecialNote = async function(id){
   const item = specialNotes.find(x => x.id === id);
   if(!item) return;
   if(!confirm(`${item.employeeName} / ${item.specialType} 특이사항을 삭제할까요?`)) return;
-  specialNotes = specialNotes.filter(x => x.id !== id);
-  saveSpecialNotes();
+
+  if(supabaseClient && String(id).trim() && /^\d+$/.test(String(id).trim())){
+    try{
+      const { error } = await supabaseClient
+        .from('employee_special_notes')
+        .delete()
+        .eq('id', Number(id));
+      if(error) throw error;
+    }catch(e){
+      console.error('employee_special_notes 삭제 실패:', e);
+      alert('DB 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+  }
+
+  specialNotes = specialNotes.filter(x => String(x.id) !== String(id));
+  await saveSpecialNotes();
   renderSpecialNotes();
 }
-function saveSpecialNoteEntry(){
+async function saveSpecialNoteEntry(){
   const divisionCode = ($('#specialDivision')?.value || '').trim();
   const teamCode = ($('#specialTeam')?.value || '').trim();
   const employeeId = ($('#specialEmployee')?.value || '').trim();
@@ -5011,8 +5074,39 @@ function saveSpecialNoteEntry(){
 
   const editId = ($('#specialEditId')?.value || '').trim();
   const now = new Date();
+  const payload = {
+    division_code: divisionCode,
+    team_code: teamCode,
+    employee_no: emp.id,
+    employee_name: emp.name || null,
+    issue_type: specialType,
+    start_date: startDate,
+    end_date: endDate,
+    total_work_hours: standardTime || null,
+    note: remark || null
+  };
+
+  if(supabaseClient && editId && /^\d+$/.test(editId)){
+    try{
+      const { error } = await supabaseClient
+        .from('employee_special_notes')
+        .update(payload)
+        .eq('id', Number(editId));
+      if(error) throw error;
+      await loadSpecialNotes();
+      renderSpecialNotes();
+      alert('특이사항이 수정되었습니다.');
+      resetSpecialForm();
+      return;
+    }catch(e){
+      console.error('employee_special_notes 수정 실패:', e);
+      alert('DB 수정에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+  }
+
   if(editId){
-    const idx = specialNotes.findIndex(x => x.id === editId);
+    const idx = specialNotes.findIndex(x => String(x.id) === String(editId));
     if(idx > -1){
       specialNotes[idx] = {
         ...specialNotes[idx],
@@ -5030,13 +5124,39 @@ function saveSpecialNoteEntry(){
         updatedAt: now.toISOString(),
         updatedAtLabel: `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
       };
-      saveSpecialNotes();
+      await saveSpecialNotes();
       renderSpecialNotes();
       alert('특이사항이 수정되었습니다.');
       resetSpecialForm();
       return;
     }
   }
+
+  if(supabaseClient){
+    try{
+      const { data, error } = await supabaseClient
+        .from('employee_special_notes')
+        .insert(payload)
+        .select('*')
+        .single();
+      if(error) throw error;
+      if(data){
+        specialNotes.unshift(mapDbSpecialNote(data));
+      }else{
+        await loadSpecialNotes();
+      }
+      await saveSpecialNotes();
+      renderSpecialNotes();
+      alert('특이사항이 저장되었습니다.');
+      resetSpecialForm();
+      return;
+    }catch(e){
+      console.error('employee_special_notes 저장 실패:', e);
+      alert('DB 저장에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+  }
+
   specialNotes.push({
     id: `SN_${now.getTime()}_${Math.random().toString(36).slice(2,8)}`,
     divisionCode,
@@ -5051,15 +5171,15 @@ function saveSpecialNoteEntry(){
     standardTime,
     remark,
     createdAt: now.toISOString(),
-    createdAtLabel: `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+    createdAtLabel: `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`.replace(/-(\d{2}:\d{2})$/, ' $1')
   });
-  saveSpecialNotes();
+  await saveSpecialNotes();
   renderSpecialNotes();
   alert('특이사항이 저장되었습니다.');
   resetSpecialForm();
 }
-function bindSpecialTabEvents(){
-  loadSpecialNotes();
+async function bindSpecialTabEvents(){
+  await loadSpecialNotes();
   populateSpecialDivisionOptions();
   populateSpecialTeamOptions('');
   populateSpecialEmployeeOptions();
