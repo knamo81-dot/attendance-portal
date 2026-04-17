@@ -4859,39 +4859,55 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     async function handleSession(user) {
       currentUser = user || null;
       currentProfile = null;
+      currentProfileTable = '';
 
       if (!user) {
         showLogin('');
         return;
       }
 
+      let profile = null;
       try {
-        const profile = await fetchProfile(user.email);
-        if (!profile) {
-          await supabaseClient.auth.signOut();
-          showLogin('등록된 사용자 정보를 찾지 못했습니다. users 또는 employees 테이블의 이메일, 권한, 사용 여부를 확인해 주세요.');
-          return;
-        }
-        if (profile.is_active === false) {
-          await supabaseClient.auth.signOut();
-          showLogin('비활성화된 계정입니다. 관리자에게 문의해 주세요.');
-          return;
-        }
-
-        currentProfile = { ...profile, role: normalizeRole(profile.role) };
-        applyRoleUI(currentProfile);
-
-        if (profile.must_change_password) {
-          showPasswordChange('');
-          return;
-        }
-
-        showPortal();
-        await loadPortalHomeFromServer(true);
+        profile = await fetchProfile(user.email);
       } catch (error) {
-        console.error('handleSession error:', error);
+        console.error('handleSession profile error:', error);
         await supabaseClient.auth.signOut();
         showLogin('사용자 권한 정보를 확인하지 못했습니다. users 또는 employees 테이블의 이메일과 권한 정보를 확인해 주세요.');
+        return;
+      }
+
+      if (!profile) {
+        await supabaseClient.auth.signOut();
+        showLogin('등록된 사용자 정보를 찾지 못했습니다. users 또는 employees 테이블의 이메일, 권한, 사용 여부를 확인해 주세요.');
+        return;
+      }
+      if (profile.is_active === false) {
+        await supabaseClient.auth.signOut();
+        showLogin('비활성화된 계정입니다. 관리자에게 문의해 주세요.');
+        return;
+      }
+
+      currentProfile = { ...profile, role: normalizeRole(profile.role) };
+
+      try {
+        applyRoleUI(currentProfile);
+      } catch (error) {
+        console.error('applyRoleUI error:', error);
+      }
+
+      if (currentProfile.must_change_password) {
+        showPasswordChange('');
+        return;
+      }
+
+      showPortal();
+
+      try {
+        if (typeof loadPortalHomeFromServer === 'function') {
+          await loadPortalHomeFromServer(true);
+        }
+      } catch (error) {
+        console.error('post-login portal home load error:', error);
       }
     }
 
