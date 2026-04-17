@@ -2219,6 +2219,7 @@ body.real-modal-open{overflow:hidden}
                     <select id="realEmpAuthorityFilter" class="real-select"><option value="">전체 직책</option></select>
                     <button id="realEmpAddBtn" class="real-btn ghost">+ 사원 추가</button>
                     <button id="realEmpResetBtn" class="real-btn ghost">사원정보 비우기</button>
+                    <button id="realEmpRefreshBtn" class="real-btn ghost">목록 새로고침</button>
                   </div>
                   <div class="real-toolbar-stats">
                     <div id="realEmpTotalStat" class="real-chip-outline">전체 0명</div>
@@ -2388,8 +2389,17 @@ body.real-modal-open{overflow:hidden}
 
               <div id="adminSectionAccount" class="admin-section-panel" hidden>
                 <div class="real-card">
-                  <div class="real-box-title">계정 / 권한관리</div>
-                  <div class="real-box-sub">users 테이블 기준이며, 사원 등록 시 Edge Function으로 Auth 계정을 함께 생성하도록 연결되어 있습니다.</div>
+                  <div class="real-box-head">
+                    <div>
+                      <div class="real-box-title">계정 / 권한관리</div>
+                      <div class="real-box-sub">users 테이블 기준이며, 사원 등록 시 Edge Function으로 Auth 계정을 함께 생성하도록 연결되어 있습니다.</div>
+                    </div>
+                    <div class="real-actions left" style="margin-top:0">
+                      <button id="realBulkAccountSyncBtn" class="real-btn ghost">전체 계정 등록</button>
+                      <button id="realUsersReloadBtn" class="real-btn ghost">계정 새로고침</button>
+                    </div>
+                  </div>
+                  <div id="realAccountFeedback" class="real-feedback"></div>
                   <div id="realUsersWrap"><div class="real-empty">불러오는 중입니다.</div></div>
                 </div>
               </div>
@@ -4876,6 +4886,55 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     el.className = 'real-feedback' + (msg ? (ok ? ' ok' : ' error') : '');
   };
 
+
+  function syncLocalEmployeeRow(payload){
+    const managedCodes = ($('realEmpManagedTeams')?.value || '').split(',').map(v=>v.trim()).filter(Boolean).join(', ');
+    const row = {
+      employee_no: payload.employee_no,
+      name: payload.name,
+      sort_order: payload.sort_order,
+      division_code: payload.division_code,
+      team_code: payload.team_code,
+      grade: payload.grade,
+      authority: payload.authority,
+      email: payload.email,
+      managed_team_codes: managedCodes || null,
+      attendance_target: !!payload.attendance_target,
+      status: payload.status,
+      join_date: payload.join_date,
+      leave_date: payload.leave_date,
+      leave_reason: payload.leave_reason,
+      memo: payload.memo
+    };
+    const idx = dataState.employees.findIndex(e => String(e.employee_no) === String(payload.employee_no));
+    if(idx >= 0) dataState.employees[idx] = { ...dataState.employees[idx], ...row };
+    else dataState.employees.unshift(row);
+    renderEmployees();
+  }
+
+  async function ensurePortalUserRow(payload){
+    try{
+      const portalUser = {
+        email: payload.email,
+        name: payload.name,
+        role: payload.role || 'viewer',
+        is_active: payload.is_active !== false,
+        must_change_password: true,
+        employee_no: payload.employee_no,
+        updated_at: new Date().toISOString()
+      };
+      const res = await sb.from('users').upsert(portalUser, { onConflict: 'email' }).select();
+      if(res.error) return { ok:false, error: res.error };
+      dataState.users = (dataState.users || []).filter(u => String(u.email||'').toLowerCase() !== String(portalUser.email||'').toLowerCase());
+      dataState.users.push({ ...(res.data && res.data[0] ? res.data[0] : portalUser) });
+      dataState.users.sort((a,b)=>String(a.email||'').localeCompare(String(b.email||'')));
+      renderUsers();
+      return { ok:true };
+    }catch(err){
+      return { ok:false, error: err };
+    }
+  }
+
   async function safeSelect(table, query){
     try{
       let q = sb.from(table).select(query || '*');
@@ -5274,6 +5333,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         <td>
           <div class="real-actions left" style="margin-top:0;">
             <button class="real-btn ghost" data-emp-edit="${esc(e.employee_no)}">수정</button>
+            <button class="real-btn danger" data-emp-delete="${esc(e.employee_no)}">삭제</button>
           </div>
         </td>
       </tr>`;
@@ -5358,17 +5418,100 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     if(error){ setFeedback('realEmployeeFeedback', error.message || '계정 생성 호출에 실패했습니다.'); return; }
     if(!data?.ok){ setFeedback('realEmployeeFeedback', data?.error || '사원정보 저장에 실패했습니다.'); return; }
 
+    const userSync = await ensurePortalUserRow(payload);
+    if(!userSync.ok){
+      const syncMsg = userSync.error?.message || 'users 동기화에 실패했습니다.';
+      setFeedback('realEmployeeFeedback', `Auth 계정은 생성되었지만 users 동기화에 실패했습니다. ${syncMsg}`);
+      return;
+    }
+
     const managedCodes = ($('realEmpManagedTeams').value || '').split(',').map(v=>v.trim()).filter(Boolean);
-    await sb.from('managed_teams').delete().eq('manager_employee_no', employeeNo);
+    const managedDelete = await sb.from('managed_teams').delete().eq('manager_employee_no', employeeNo);
+    if(managedDelete.error){ setFeedback('realEmployeeFeedback', managedDelete.error.message); return; }
     if(managedCodes.length){
       const rows = managedCodes.map(code => ({ manager_employee_no: employeeNo, team_code: code }));
       const managedInsert = await sb.from('managed_teams').insert(rows);
       if(managedInsert.error){ setFeedback('realEmployeeFeedback', managedInsert.error.message); return; }
     }
 
+    syncLocalEmployeeRow(payload);
     setFeedback('realEmployeeFeedback', data.message || '사원정보와 로그인 계정을 저장했습니다.', true);
-    await loadEmployees();
-    await loadUsers();
+    await Promise.allSettled([loadEmployees(), loadUsers()]);
+  }
+
+  async function deleteEmployee(employeeNo){
+    const row = dataState.employees.find(e => String(e.employee_no) === String(employeeNo));
+    if(!row) return;
+    if(!confirm(`사원 ${row.name || employeeNo} 을(를) 삭제할까요?
+포털 기준정보와 users 프로필에서 제거되며, 기존 Auth 계정은 남을 수 있습니다.`)) return;
+
+    setFeedback('realEmployeeFeedback', '사원정보를 삭제하는 중입니다...', true);
+    const managedRes = await sb.from('managed_teams').delete().eq('manager_employee_no', employeeNo);
+    if(managedRes.error){ setFeedback('realEmployeeFeedback', managedRes.error.message); return; }
+
+    if(row.email){
+      const userDelete = await sb.from('users').delete().eq('email', row.email);
+      if(userDelete.error){ setFeedback('realEmployeeFeedback', userDelete.error.message); return; }
+      dataState.users = dataState.users.filter(u => String(u.email||'').toLowerCase() !== String(row.email||'').toLowerCase());
+      renderUsers();
+    }
+
+    const empDelete = await sb.from('employees').delete().eq('employee_no', employeeNo);
+    if(empDelete.error){ setFeedback('realEmployeeFeedback', empDelete.error.message); return; }
+
+    dataState.employees = dataState.employees.filter(e => String(e.employee_no) !== String(employeeNo));
+    renderEmployees();
+    fillEmployeeForm('');
+    setFeedback('realEmployeeFeedback', '사원정보를 삭제했습니다. 기존 Auth 계정은 남아 있어도 포털 접근은 차단됩니다.', true);
+  }
+
+  async function bulkSyncEmployeeAccounts(){
+    const candidates = dataState.employees.filter(e => String(e.email||'').trim());
+    if(!candidates.length){ setFeedback('realAccountFeedback', '이메일이 등록된 사원이 없습니다.'); return; }
+    if(!confirm(`이메일이 있는 사원 ${candidates.length}명의 계정/권한을 일괄 등록할까요?`)) return;
+
+    setFeedback('realAccountFeedback', '전체 계정 등록을 진행하는 중입니다...', true);
+    let success = 0;
+    let failed = [];
+
+    for(const emp of candidates){
+      const payload = {
+        employee_no: emp.employee_no,
+        name: emp.name || '',
+        sort_order: Number(emp.sort_order || 1),
+        division_code: emp.division_code || '',
+        team_code: emp.team_code || '',
+        grade: emp.grade || null,
+        authority: emp.authority || null,
+        email: String(emp.email||'').trim().toLowerCase(),
+        attendance_target: !!emp.attendance_target,
+        status: emp.status || '재직',
+        join_date: emp.join_date || null,
+        leave_date: emp.leave_date || null,
+        leave_reason: emp.leave_reason || null,
+        memo: emp.memo || null,
+        is_active: (emp.status || '재직') !== '퇴사',
+        role: 'viewer'
+      };
+      const { data, error } = await sb.functions.invoke('create-employee-account', { body: payload });
+      if(error || !data?.ok){
+        failed.push(`${emp.name || emp.employee_no}: ${(error && error.message) || data?.error || '등록 실패'}`);
+        continue;
+      }
+      const userSync = await ensurePortalUserRow(payload);
+      if(!userSync.ok){
+        failed.push(`${emp.name || emp.employee_no}: ${(userSync.error && userSync.error.message) || 'users 동기화 실패'}`);
+        continue;
+      }
+      success += 1;
+    }
+
+    await Promise.allSettled([loadEmployees(), loadUsers()]);
+    if(failed.length){
+      setFeedback('realAccountFeedback', `전체 계정 등록 완료: 성공 ${success}건, 실패 ${failed.length}건 / ${failed.slice(0,3).join(' | ')}`);
+    }else{
+      setFeedback('realAccountFeedback', `전체 계정 등록이 완료되었습니다. 성공 ${success}건`, true);
+    }
   }
 
   async function toggleEmployeeStatus(employeeNo){
@@ -5584,7 +5727,11 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     if(!dataState.users.length){ wrap.innerHTML='<div class="real-empty">등록된 계정이 없습니다.</div>'; return; }
     wrap.innerHTML = '<div class="real-users-list">' + dataState.users.map(u=>`
       <div class="real-user-item">
-        <div class="real-user-main"><strong>${esc(u.name || u.email || '-')}</strong><div class="real-box-sub">${esc(u.email || '-')}</div></div>
+        <div class="real-user-main">
+          <strong>${esc(u.name || u.email || '-')}</strong>
+          <div class="real-box-sub">${esc(u.email || '-')}</div>
+          <div class="real-box-sub">${u.is_active === false ? '비활성' : '사용중'} · ${u.must_change_password ? '최초 비밀번호 변경 필요' : '비밀번호 변경 완료'}</div>
+        </div>
         <select class="real-select" data-user-role="${esc(u.email)}" style="min-width:140px">
           <option value="admin" ${u.role==='admin'?'selected':''}>관리자</option>
           <option value="operator" ${u.role==='operator'?'selected':''}>운영자</option>
@@ -5620,6 +5767,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     $('realEmpSaveBtn')?.addEventListener('click', saveEmployee);
     $('realEmpAddBtn')?.addEventListener('click', ()=>fillEmployeeForm(''));
     $('realEmpResetBtn')?.addEventListener('click', ()=>fillEmployeeForm(''));
+    $('realEmpRefreshBtn')?.addEventListener('click', async ()=>{ await Promise.allSettled([loadEmployees(), loadUsers()]); setFeedback('realEmployeeFeedback','목록을 새로고침했습니다.', true); });
+    $('realBulkAccountSyncBtn')?.addEventListener('click', bulkSyncEmployeeAccounts);
+    $('realUsersReloadBtn')?.addEventListener('click', async ()=>{ await loadUsers(); setFeedback('realAccountFeedback','계정 목록을 새로고침했습니다.', true); });
 
     $('realBeforeDivision')?.addEventListener('change', ()=>{ fillTeamSelect('realBeforeTeam', $('realBeforeDivision').value); renderTeamCandidates(); });
     $('realBeforeTeam')?.addEventListener('change', renderTeamCandidates);
@@ -5646,6 +5796,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       const teamToggle = e.target.closest('[data-team-toggle]'); if(teamToggle) return toggleTeam(teamToggle.dataset.teamToggle, teamToggle.textContent.trim()==='사용');
       const teamDelete = e.target.closest('[data-team-delete]'); if(teamDelete) return deleteTeam(teamDelete.dataset.teamDelete);
       const empEdit = e.target.closest('[data-emp-edit]'); if(empEdit) return fillEmployeeForm(empEdit.dataset.empEdit);
+      const empDelete = e.target.closest('[data-emp-delete]'); if(empDelete) return deleteEmployee(empDelete.dataset.empDelete);
       const empStat = e.target.closest('[data-emp-status]'); if(empStat) return toggleEmployeeStatus(empStat.dataset.empStatus);
       const teamChk = e.target.closest('[data-team-move-no]'); if(teamChk) return;
       const issueEdit = e.target.closest('[data-issue-edit]'); if(issueEdit) return fillIssueEdit(issueEdit.dataset.issueEdit);
@@ -5712,7 +5863,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       setTimeout(function(){
         const fb = el('realEmployeeFeedback');
         if(fb && fb.classList.contains('ok')) closeEmpModal();
-      }, 350);
+      }, 800);
     }
     if(e.target && e.target.id === 'realEmployeeModal'){
       closeEmpModal();
