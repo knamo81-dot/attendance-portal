@@ -2389,7 +2389,7 @@ body.real-modal-open{overflow:hidden}
               <div id="adminSectionAccount" class="admin-section-panel" hidden>
                 <div class="real-card">
                   <div class="real-box-title">계정 / 권한관리</div>
-                  <div class="real-box-sub">users / employees 테이블 기준입니다. Auth 자동 생성/초기화는 다음 단계에서 붙일 수 있습니다.</div>
+                  <div class="real-box-sub">users 테이블 기준입니다. Auth 자동 생성/초기화는 다음 단계에서 붙일 수 있습니다.</div>
                   <div id="realUsersWrap"><div class="real-empty">불러오는 중입니다.</div></div>
                 </div>
               </div>
@@ -2410,7 +2410,12 @@ body.real-modal-open{overflow:hidden}
       { id: 'supplies', name: '시약·초자 주문/분석', status: '추가예정', desc: '주문현황 · 비용분석', color: '#f8fafc' },
     ];
 
-    const baseMemoItems = [];
+    const baseMemoItems = [
+      { title: '이번 주 점검자료 확인', tag: '점검', pinned: true, content: '' },
+      { title: '4월 폐수 결재 마감', tag: '결재', pinned: true, content: '' },
+      { title: '수거 등록 누락 여부 점검', tag: '폐수', pinned: false, content: '' },
+      { title: '운영자료 PDF 문구 수정', tag: '문서', pinned: false, content: '' },
+    ];
     const todayDate = new Date();
     const todayDateKey = [
       todayDate.getFullYear(),
@@ -2510,291 +2515,6 @@ body.real-modal-open{overflow:hidden}
       adminSection: 'org',
       organizationsData: []
     };
-
-
-let portalHomeDataLoaded = false;
-let portalHomeDataLoading = false;
-const portalSyncAlertState = {
-  auth: false,
-  memos: false,
-  schedules: false
-};
-
-function makePortalId(prefix) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-async function getPortalDbContext(showAlert = false) {
-  const sb = window.portalSupabase;
-  if (!sb) {
-    if (showAlert && !portalSyncAlertState.auth) {
-      portalSyncAlertState.auth = true;
-      window.alert('포털 DB 연결이 아직 준비되지 않았습니다. 로그인 상태와 Supabase 연결을 확인해 주세요.');
-    }
-    return null;
-  }
-  try {
-    const { data, error } = await sb.auth.getUser();
-    if (error) throw error;
-    const email = data?.user?.email || '';
-    if (!email) {
-      if (showAlert && !portalSyncAlertState.auth) {
-        portalSyncAlertState.auth = true;
-        window.alert('로그인 사용자 정보를 확인하지 못했습니다. 다시 로그인해 주세요.');
-      }
-      return null;
-    }
-    portalSyncAlertState.auth = false;
-    return { sb, email };
-  } catch (error) {
-    console.error('getPortalDbContext error:', error);
-    if (showAlert && !portalSyncAlertState.auth) {
-      portalSyncAlertState.auth = true;
-      window.alert('포털 인증 정보를 읽지 못했습니다. 다시 로그인해 주세요.');
-    }
-    return null;
-  }
-}
-
-function mapMemoRowToState(row) {
-  const layout = row.layout && typeof row.layout === 'object' ? row.layout : {};
-  const originalLayout = row.original_layout && typeof row.original_layout === 'object' ? row.original_layout : {};
-  const fallbackLayout = initialLayouts[0] || { x: 40, y: 40, rotate: 0, color: '#fef3c7' };
-  return {
-    id: row.id,
-    title: row.title || '',
-    tag: row.tag || '메모',
-    pinned: !!row.pinned,
-    imageOnly: !!row.image_only,
-    content: row.content || '',
-    image: row.image || '',
-    expandedWidth: Number(row.expanded_width || 420),
-    z: Number(row.z_index || 1),
-    createdAt: row.created_at || new Date().toISOString(),
-    updatedAt: row.updated_at || new Date().toISOString(),
-    layout: {
-      x: Number(layout.x ?? fallbackLayout.x),
-      y: Number(layout.y ?? fallbackLayout.y),
-      rotate: Number(layout.rotate ?? fallbackLayout.rotate ?? 0),
-      color: layout.color || fallbackLayout.color || '#fef3c7'
-    },
-    originalLayout: {
-      x: Number(originalLayout.x ?? layout.x ?? fallbackLayout.x),
-      y: Number(originalLayout.y ?? layout.y ?? fallbackLayout.y),
-      rotate: Number(originalLayout.rotate ?? layout.rotate ?? fallbackLayout.rotate ?? 0),
-      color: originalLayout.color || layout.color || fallbackLayout.color || '#fef3c7'
-    },
-    deletedAt: row.deleted_at || null
-  };
-}
-
-function mapMemoStateToRow(note, email, isDeleted = false) {
-  return {
-    id: note.id || makePortalId('memo'),
-    user_email: email,
-    title: note.title || '',
-    tag: note.tag || '메모',
-    pinned: !!note.pinned,
-    image_only: !!note.imageOnly,
-    content: note.content || '',
-    image: note.image || '',
-    expanded_width: Number(note.expandedWidth || 420),
-    z_index: Number(note.z || 1),
-    created_at: note.createdAt || new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    deleted_at: isDeleted ? (note.deletedAt || new Date().toISOString()) : null,
-    layout: note.layout || null,
-    original_layout: note.originalLayout || note.layout || null
-  };
-}
-
-function flattenScheduleMapForServer(email) {
-  const rows = [];
-  Object.entries(state.scheduleMap || {}).forEach(([dateKey, items]) => {
-    (items || []).forEach((item, index) => {
-      rows.push({
-        id: item.id || makePortalId('schedule'),
-        user_email: email,
-        date_key: dateKey,
-        sort_order: index,
-        completed: !!item.completed,
-        display_mode: item.displayMode || 'start',
-        start_time: item.startTime || null,
-        end_time: item.endTime || null,
-        type: item.type || '업무',
-        app: item.app || '-',
-        scope: item.scope || '연구소',
-        text: item.text || '',
-        description: item.description || '',
-        created_at: item.createdAt || new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-    });
-  });
-  return rows;
-}
-
-function rebuildScheduleMapFromRows(rows) {
-  const nextMap = {};
-  (rows || []).forEach((row) => {
-    const dateKey = row.date_key;
-    if (!dateKey) return;
-    if (!nextMap[dateKey]) nextMap[dateKey] = [];
-    nextMap[dateKey].push({
-      id: row.id,
-      completed: !!row.completed,
-      displayMode: row.display_mode || 'start',
-      startTime: row.start_time || '',
-      endTime: row.end_time || '',
-      type: row.type || '업무',
-      app: row.app || '-',
-      scope: row.scope || '연구소',
-      text: row.text || '',
-      description: row.description || '',
-      createdAt: row.created_at || new Date().toISOString(),
-      updatedAt: row.updated_at || new Date().toISOString()
-    });
-  });
-  Object.keys(nextMap).forEach((dateKey) => {
-    nextMap[dateKey].sort((a, b) => {
-      const timeA = a.displayMode === 'allDay' ? '00:00' : (a.startTime || '23:59');
-      const timeB = b.displayMode === 'allDay' ? '00:00' : (b.startTime || '23:59');
-      return timeA.localeCompare(timeB);
-    });
-  });
-  return nextMap;
-}
-
-async function loadPortalHomeFromServer(force = false) {
-  if (portalHomeDataLoading) return;
-  if (portalHomeDataLoaded && !force) return;
-  const ctx = await getPortalDbContext(false);
-  if (!ctx) return;
-  portalHomeDataLoading = true;
-  try {
-    const memoPromise = ctx.sb
-      .from('portal_memos')
-      .select('id,user_email,title,tag,pinned,image_only,content,image,expanded_width,z_index,created_at,updated_at,deleted_at,layout,original_layout')
-      .eq('user_email', ctx.email)
-      .order('z_index', { ascending: true })
-      .order('created_at', { ascending: true });
-    const schedulePromise = ctx.sb
-      .from('portal_schedules')
-      .select('id,user_email,date_key,sort_order,completed,display_mode,start_time,end_time,type,app,scope,text,description,created_at,updated_at')
-      .eq('user_email', ctx.email)
-      .order('date_key', { ascending: true })
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true });
-    const [{ data: memoRows, error: memoError }, { data: scheduleRows, error: scheduleError }] = await Promise.all([memoPromise, schedulePromise]);
-    if (memoError) throw memoError;
-    if (scheduleError) throw scheduleError;
-
-    const activeMemos = (memoRows || []).filter(row => !row.deleted_at).map(mapMemoRowToState);
-    const deletedMemos = (memoRows || []).filter(row => !!row.deleted_at).map(mapMemoRowToState);
-    state.notes = activeMemos;
-    state.trash = deletedMemos.sort((a, b) => String(b.deletedAt || '').localeCompare(String(a.deletedAt || '')));
-    state.memoExpandedId = null;
-    state.memoEditingId = null;
-    state.memoDraggingId = null;
-    state.newMemoOpen = false;
-    state.trashOpen = false;
-    state.memoSortedView = false;
-    state.scheduleMap = rebuildScheduleMapFromRows(scheduleRows || []);
-    state.scheduleExpandedIndex = null;
-    state.scheduleEditorOpen = false;
-    state.scheduleEditingIndex = null;
-    portalHomeDataLoaded = true;
-    portalSyncAlertState.memos = false;
-    portalSyncAlertState.schedules = false;
-    if (state.page === 'home' && typeof render === 'function') {
-      render();
-      if (typeof applyZIndexControl === 'function') applyZIndexControl();
-    }
-  } catch (error) {
-    console.error('loadPortalHomeFromServer error:', error);
-    const message = error?.message || '';
-    if ((message.includes('portal_memos') || message.includes('portal_schedules')) && !portalSyncAlertState.memos) {
-      portalSyncAlertState.memos = true;
-      portalSyncAlertState.schedules = true;
-      window.alert('메모/일정 서버 테이블(portal_memos, portal_schedules)을 먼저 만들어야 합니다. 현재는 빈 화면으로 시작합니다.');
-    }
-  } finally {
-    portalHomeDataLoading = false;
-  }
-}
-
-async function syncPortalMemosToServer() {
-  const ctx = await getPortalDbContext(true);
-  if (!ctx) return false;
-  try {
-    const rows = [
-      ...(state.notes || []).map(note => mapMemoStateToRow(note, ctx.email, false)),
-      ...(state.trash || []).map(note => mapMemoStateToRow(note, ctx.email, true))
-    ];
-    if (rows.length) {
-      const { error: upsertError } = await ctx.sb.from('portal_memos').upsert(rows, { onConflict: 'id' });
-      if (upsertError) throw upsertError;
-      const keepIds = rows.map(row => row.id);
-      const { error: cleanupError } = await ctx.sb
-        .from('portal_memos')
-        .delete()
-        .eq('user_email', ctx.email)
-        .not('id', 'in', `(${keepIds.map(id => `"${String(id).replace(/"/g, '\"')}"`).join(',')})`);
-      if (cleanupError && !String(cleanupError.message || '').includes('Results contain 0 rows')) throw cleanupError;
-    } else {
-      const { error: deleteError } = await ctx.sb.from('portal_memos').delete().eq('user_email', ctx.email);
-      if (deleteError) throw deleteError;
-    }
-    portalHomeDataLoaded = true;
-    portalSyncAlertState.memos = false;
-    return true;
-  } catch (error) {
-    console.error('syncPortalMemosToServer error:', error);
-    if (!portalSyncAlertState.memos) {
-      portalSyncAlertState.memos = true;
-      window.alert('메모를 서버에 저장하지 못했습니다. portal_memos 테이블/RLS 설정을 확인해 주세요.');
-    }
-    return false;
-  }
-}
-
-async function syncPortalSchedulesToServer() {
-  const ctx = await getPortalDbContext(true);
-  if (!ctx) return false;
-  try {
-    const rows = flattenScheduleMapForServer(ctx.email);
-    if (rows.length) {
-      const { error: upsertError } = await ctx.sb.from('portal_schedules').upsert(rows, { onConflict: 'id' });
-      if (upsertError) throw upsertError;
-      const keepIds = rows.map(row => row.id);
-      const { error: cleanupError } = await ctx.sb
-        .from('portal_schedules')
-        .delete()
-        .eq('user_email', ctx.email)
-        .not('id', 'in', `(${keepIds.map(id => `"${String(id).replace(/"/g, '\"')}"`).join(',')})`);
-      if (cleanupError && !String(cleanupError.message || '').includes('Results contain 0 rows')) throw cleanupError;
-    } else {
-      const { error: deleteError } = await ctx.sb.from('portal_schedules').delete().eq('user_email', ctx.email);
-      if (deleteError) throw deleteError;
-    }
-    portalHomeDataLoaded = true;
-    portalSyncAlertState.schedules = false;
-    return true;
-  } catch (error) {
-    console.error('syncPortalSchedulesToServer error:', error);
-    if (!portalSyncAlertState.schedules) {
-      portalSyncAlertState.schedules = true;
-      window.alert('일정을 서버에 저장하지 못했습니다. portal_schedules 테이블/RLS 설정을 확인해 주세요.');
-    }
-    return false;
-  }
-}
-
-if (typeof window !== 'undefined') {
-  window.loadPortalHomeFromServer = loadPortalHomeFromServer;
-  window.syncPortalMemosToServer = syncPortalMemosToServer;
-  window.syncPortalSchedulesToServer = syncPortalSchedulesToServer;
-}
 
     const tabContent = document.getElementById('tab-content');
     const tabButtons = Array.from(document.querySelectorAll('.pill'));
@@ -2897,7 +2617,7 @@ if (typeof window !== 'undefined') {
 
     function bindNavEvents() {
       navButtons.forEach(btn => {
-        btn.addEventListener('click', async () => {
+        btn.addEventListener('click', () => {
           const nextPage = btn.dataset.page;
           if (!nextPage) return;
           if (nextPage === 'home') {
@@ -2907,9 +2627,6 @@ if (typeof window !== 'undefined') {
           updateActiveNav();
           render();
           applyZIndexControl();
-          if (nextPage === 'home') {
-            await loadPortalHomeFromServer(true);
-          }
         });
       });
     }
@@ -3494,13 +3211,12 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           e.stopPropagation();
           state.memoEditingId = null;
           normalizeSortedMemoStack();
-          await syncPortalMemosToServer();
           renderMemoTab();
         });
       });
 
       board.querySelectorAll('[data-memo-save]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
+        btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const id = btn.dataset.memoSave;
           const currentTarget = state.notes.find(n => n.id === id);
@@ -3532,7 +3248,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       });
 
       board.querySelectorAll('[data-memo-delete]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
+        btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const id = btn.dataset.memoDelete;
           const target = state.notes.find(n => n.id === id);
@@ -3542,7 +3258,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           state.notes = state.notes.filter(n => n.id !== id);
           if (state.memoExpandedId === id) state.memoExpandedId = null;
           if (state.memoEditingId === id) state.memoEditingId = null;
-          await syncPortalMemosToServer();
           renderMemoTab();
         });
       });
@@ -3589,7 +3304,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         state.newMemoOpen = false;
         renderMemoTab();
       });
-      document.getElementById('new-save')?.addEventListener('click', async (e) => {
+      document.getElementById('new-save')?.addEventListener('click', (e) => {
         e.stopPropagation();
         const fileInput = document.getElementById('new-image');
         const hasImage = !!(fileInput && fileInput.files[0]);
@@ -3631,7 +3346,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         });
         state.newMemo = { title: '', tag: '메모', pinned: false, imageOnly: false, color: '#fef3c7', content: '', expandedWidth: 420 };
         state.newMemoOpen = false;
-        await syncPortalMemosToServer();
         renderMemoTab();
       });
 
@@ -3642,7 +3356,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       });
 
       board.querySelectorAll('[data-trash-restore]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
+        btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const id = btn.dataset.trashRestore;
           const target = state.trash.find(t => t.id === id);
@@ -3664,18 +3378,16 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           state.memoSortedView = false;
           state.notes.push(restored);
           state.trash = state.trash.filter(t => t.id !== id);
-          await syncPortalMemosToServer();
           renderMemoTab();
         });
       });
 
       board.querySelectorAll('[data-trash-delete]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
+        btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const id = btn.dataset.trashDelete;
           if (!window.confirm('휴지통에서 완전히 삭제하시겠습니까?')) return;
           state.trash = state.trash.filter(t => t.id !== id);
-          await syncPortalMemosToServer();
           renderMemoTab();
         });
       });
@@ -4350,13 +4062,12 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
       tabContent.querySelectorAll('[data-schedule-complete]').forEach(chk => {
         chk.addEventListener('click', (e) => e.stopPropagation());
-        chk.addEventListener('change', async () => {
+        chk.addEventListener('change', () => {
           const { dateKey, index } = parseSchedulePanelKey(chk.dataset.scheduleComplete);
           const list = [...(state.scheduleMap[dateKey] || [])];
           if (!list[index]) return;
-          list[index] = { ...list[index], completed: !list[index].completed, updatedAt: new Date().toISOString() };
+          list[index] = { ...list[index], completed: !list[index].completed };
           state.scheduleMap[dateKey] = list;
-          await syncPortalSchedulesToServer();
           renderScheduleTab();
         });
       });
@@ -4386,13 +4097,12 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       });
 
       tabContent.querySelectorAll('[data-schedule-delete]').forEach(btn => {
-        btn.addEventListener('click', async () => {
+        btn.addEventListener('click', () => {
           const { dateKey, index } = parseSchedulePanelKey(btn.dataset.scheduleDelete);
           state.scheduleMap[dateKey] = (state.scheduleMap[dateKey] || []).filter((_, i) => i !== index);
           if (state.scheduleExpandedIndex === buildSchedulePanelKey(dateKey, index)) {
             state.scheduleExpandedIndex = null;
           }
-          await syncPortalSchedulesToServer();
           renderScheduleTab();
         });
       });
@@ -4444,16 +4154,13 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         autoGrowTextarea(e.target);
       });
 
-      document.getElementById('schedule-save')?.addEventListener('click', async () => {
+      document.getElementById('schedule-save')?.addEventListener('click', () => {
         if (!state.scheduleForm.text.trim()) {
           window.alert('일정 제목을 입력해주세요.');
           return;
         }
-        const currentList = [...(state.scheduleMap[state.selectedDate] || [])];
-        const existingItem = state.scheduleEditingIndex === null ? null : currentList[state.scheduleEditingIndex] || null;
         const nextItem = {
-          id: existingItem?.id || makePortalId('schedule'),
-          completed: existingItem?.completed || false,
+          completed: false,
           displayMode: state.scheduleForm.displayMode,
           startTime: state.scheduleForm.displayMode === 'allDay' ? '' : state.scheduleForm.startTime,
           endTime: state.scheduleForm.displayMode === 'range' ? state.scheduleForm.endTime : '',
@@ -4462,9 +4169,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           scope: state.scheduleForm.scope || '연구소',
           text: state.scheduleForm.text.trim(),
           description: state.scheduleForm.description.trim(),
-          createdAt: existingItem?.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
         };
+        const currentList = [...(state.scheduleMap[state.selectedDate] || [])];
         if (state.scheduleEditingIndex === null) {
           currentList.push(nextItem);
         } else {
@@ -4478,7 +4184,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         state.scheduleMap[state.selectedDate] = currentList;
         state.scheduleEditorOpen = false;
         state.scheduleEditingIndex = null;
-        await syncPortalSchedulesToServer();
         renderScheduleTab();
       });
     }
@@ -4722,7 +4427,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
     let currentProfile = null;
     let currentUser = null;
-    let currentProfileTable = null;
     let authBusy = false;
 
     function setBoxMessage(target, message) {
@@ -4731,18 +4435,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       target.classList.toggle('show', !!message);
     }
 
-    function normalizeRole(role) {
-      const value = String(role || '').trim().toLowerCase();
-      if (value === 'admin' || value === '관리자') return 'admin';
-      if (value === 'operator' || value === '운영자') return 'operator';
-      if (value === 'viewer' || value === '일반사용자' || value === 'user') return 'viewer';
-      return value || 'viewer';
-    }
-
     function roleLabel(role) {
-      const normalized = normalizeRole(role);
-      if (normalized === 'admin') return '관리자';
-      if (normalized === 'operator') return '운영자';
+      if (role === 'admin') return '관리자';
+      if (role === 'operator') return '운영자';
       return '일반사용자';
     }
 
@@ -4774,7 +4469,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     }
 
     function applyRoleUI(profile) {
-      const role = normalizeRole(profile?.role || 'viewer');
+      const role = profile?.role || 'viewer';
 
       if (els.settingsNavBtn) els.settingsNavBtn.hidden = role !== 'admin';
 
@@ -4808,106 +4503,51 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       }
     }
 
-    function normalizeProfileRow(row, sourceTable) {
-      if (!row) return null;
-      const email = String(row.email || row.user_email || '').trim().toLowerCase();
-      return {
-        ...row,
-        email,
-        name: row.name || row.user_name || row.employee_name || row.employee_no || email,
-        role: normalizeRole(row.role || row.authority || row.user_role || 'viewer'),
-        is_active: typeof row.is_active === 'boolean' ? row.is_active : !(row.active === false || row.use_yn === 'N'),
-        must_change_password: !!(row.must_change_password || row.force_password_change || row.first_login_required),
-        _source_table: sourceTable
-      };
-    }
-
     async function fetchProfile(email) {
-      const normalizedEmail = String(email || '').trim().toLowerCase();
-      const candidates = [
-        { table: 'users', select: '*' },
-        { table: 'employees', select: '*' }
-      ];
-      let lastError = null;
-
-      for (const candidate of candidates) {
-        try {
-          const { data, error } = await supabaseClient
-            .from(candidate.table)
-            .select(candidate.select)
-            .ilike('email', normalizedEmail)
-            .limit(1)
-            .maybeSingle();
-          if (error) {
-            lastError = error;
-            continue;
-          }
-          const profile = normalizeProfileRow(data, candidate.table);
-          if (profile) {
-            currentProfileTable = candidate.table;
-            return profile;
-          }
-        } catch (error) {
-          lastError = error;
-        }
-      }
-
-      if (lastError) throw lastError;
-      return null;
+      const { data, error } = await supabaseClient
+        .from('users')
+        .select('email,name,role,is_active,must_change_password')
+        .eq('email', email)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
     }
 
     async function handleSession(user) {
       currentUser = user || null;
       currentProfile = null;
-      currentProfileTable = '';
 
       if (!user) {
         showLogin('');
         return;
       }
 
-      let profile = null;
       try {
-        profile = await fetchProfile(user.email);
-      } catch (error) {
-        console.error('handleSession profile error:', error);
-        await supabaseClient.auth.signOut();
-        showLogin('사용자 권한 정보를 확인하지 못했습니다. users 또는 employees 테이블의 이메일과 권한 정보를 확인해 주세요.');
-        return;
-      }
-
-      if (!profile) {
-        await supabaseClient.auth.signOut();
-        showLogin('등록된 사용자 정보를 찾지 못했습니다. users 또는 employees 테이블의 이메일, 권한, 사용 여부를 확인해 주세요.');
-        return;
-      }
-      if (profile.is_active === false) {
-        await supabaseClient.auth.signOut();
-        showLogin('비활성화된 계정입니다. 관리자에게 문의해 주세요.');
-        return;
-      }
-
-      currentProfile = { ...profile, role: normalizeRole(profile.role) };
-
-      try {
-        applyRoleUI(currentProfile);
-      } catch (error) {
-        console.error('applyRoleUI error:', error);
-      }
-
-      if (currentProfile.must_change_password) {
-        showPasswordChange('');
-        return;
-      }
-
-      showPortal();
-
-      try {
-        if (typeof loadPortalHomeFromServer === 'function') {
-          await loadPortalHomeFromServer(true);
+        const profile = await fetchProfile(user.email);
+        if (!profile) {
+          await supabaseClient.auth.signOut();
+          showLogin('users 테이블에 등록되지 않은 이메일입니다. 관리자에게 계정 등록을 요청해 주세요.');
+          return;
         }
+        if (profile.is_active === false) {
+          await supabaseClient.auth.signOut();
+          showLogin('비활성화된 계정입니다. 관리자에게 문의해 주세요.');
+          return;
+        }
+
+        currentProfile = profile;
+        applyRoleUI(profile);
+
+        if (profile.must_change_password) {
+          showPasswordChange('');
+          return;
+        }
+
+        showPortal();
       } catch (error) {
-        console.error('post-login portal home load error:', error);
+        console.error('handleSession error:', error);
+        await supabaseClient.auth.signOut();
+        showLogin('사용자 권한 정보를 확인하지 못했습니다. users 테이블의 이메일과 권한 정보를 확인해 주세요.');
       }
     }
 
@@ -4965,11 +4605,10 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         if (pwError) throw pwError;
 
         if (currentUser?.email) {
-          const targetTable = currentProfileTable || currentProfile?._source_table || 'users';
           const { error: profileError } = await supabaseClient
-            .from(targetTable)
+            .from('users')
             .update({ must_change_password: false })
-            .ilike('email', currentUser.email);
+            .eq('email', currentUser.email);
           if (profileError) throw profileError;
         }
 
@@ -5097,7 +4736,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         },
         account: {
           title: '계정/권한관리',
-          desc: 'users 또는 employees 테이블과 Auth 계정을 포털에서 관리하는 화면입니다.'
+          desc: 'users 테이블과 Auth 계정을 포털에서 관리하는 화면입니다.'
         }
       };
       document.querySelectorAll('.admin-subnav-btn').forEach(btn => {
@@ -5194,7 +4833,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       });
 
     window.portalSupabase = supabaseClient;
-    window.getPortalAuthProfile = () => ({ user: currentUser, profile: currentProfile });
   }
 
   if (document.readyState === 'loading') {
@@ -5260,7 +4898,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           employee:['사원정보 관리','사원정보는 일별 업로드보다 여기서 기준정보로 관리합니다. 사번 중복 방지와 수정이 가능하며, 퇴사 처리는 사원 입력 / 수정에서 퇴사일과 퇴사사유를 함께 기록하는 방식으로 관리합니다.'],
           team:['팀변경 관리','변경 전 조직에서 사원을 검색한 뒤 체크하고, 변경 후 조직을 선택해서 일괄 변경합니다.'],
           issue:['특이사항 관리','단축근무, 파견처럼 세금 출퇴근 기록 분석에 영향을 줄 수 있는 특이사항을 별도로 기록합니다.'],
-          account:['계정/권한 관리','users 또는 employees 테이블 기준으로 계정 권한과 사용 여부를 관리합니다.']
+          account:['계정/권한 관리','users 테이블 기준으로 계정 권한과 사용 여부를 관리합니다.']
         };
         document.querySelectorAll('.admin-section-panel').forEach(p=>p.hidden=true);
         const panel = $('adminSection' + sec.charAt(0).toUpperCase() + sec.slice(1));
@@ -5924,17 +5562,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
   }
 
   async function loadUsers(){
-    let data = null;
-    let error = null;
-    let sourceTable = 'users';
-
-    ({ data, error } = await sb.from('users').select('*').order('email'));
-    if(error){
-      ({ data, error } = await sb.from('employees').select('*').order('email'));
-      sourceTable = 'employees';
-    }
+    const {data,error}=await sb.from('users').select('*').order('email');
     if(error){ $('realUsersWrap').innerHTML='<div class="real-empty">'+esc(error.message)+'</div>'; return; }
-    dataState.users = (data || []).map(row => ({ ...row, _source_table: sourceTable, role: (row.role || row.authority || 'viewer') }));
+    dataState.users = data || [];
     renderUsers();
   }
 
@@ -5956,10 +5586,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
   async function saveUser(email){
     const role = document.querySelector(`[data-user-role="${CSS.escape(email)}"]`)?.value;
     if(!role) return;
-    const found = (dataState.users || []).find(u => String(u.email || '').toLowerCase() === String(email || '').toLowerCase());
-    const targetTable = found?._source_table || 'users';
-    const payload = found && 'authority' in found && !('role' in found) ? { authority: role } : { role };
-    const {error}=await sb.from(targetTable).update(payload).ilike('email', email);
+    const {error}=await sb.from('users').update({role}).eq('email', email);
     if(error) return alert(error.message);
     await loadUsers();
   }
