@@ -2416,22 +2416,19 @@ body.real-modal-open{overflow:hidden}
       { title: '수거 등록 누락 여부 점검', tag: '폐수', pinned: false, content: '' },
       { title: '운영자료 PDF 문구 수정', tag: '문서', pinned: false, content: '' },
     ];
+    const todayDate = new Date();
+    const todayDateKey = [
+      todayDate.getFullYear(),
+      String(todayDate.getMonth() + 1).padStart(2, '0'),
+      String(todayDate.getDate()).padStart(2, '0')
+    ].join('-');
+    const todayMonthKey = [
+      todayDate.getFullYear(),
+      String(todayDate.getMonth() + 1).padStart(2, '0'),
+      '01'
+    ].join('-');
 
-    const initialScheduleByDate = {
-      '2026-04-12': [
-        { displayMode: 'start', startTime: '09:00', endTime: '', scope: '연구소', text: '폐수 입력 확인', description: '현장 입력값과 전일 데이터 확인', type: '업무', app: '-', completed: false, author: '홍길동', lab: '중앙연구소', teamName: '환경안전팀' },
-        { displayMode: 'range', startTime: '10:30', endTime: '11:30', scope: '전체', text: '수거 내역 검토', description: '최근 수거 등록 누락 여부 점검', type: '업무', app: '-', completed: false, author: '김대리', lab: '중앙연구소', teamName: '환경안전팀' },
-        { displayMode: 'start', startTime: '16:30', endTime: '', scope: '팀', text: '결재 진행상황 확인', description: '', type: '업무', app: '-', completed: false, author: '박과장', lab: '중앙연구소', teamName: '환경안전팀' },
-      ],
-      '2026-04-15': [
-        { displayMode: 'range', startTime: '09:30', endTime: '10:30', scope: '연구소', text: '폐수 점검', description: '체크리스트 기준 확인', type: '업무', app: '폐수관리', completed: false, author: '홍길동', lab: '중앙연구소', teamName: '환경안전팀' },
-        { displayMode: 'start', startTime: '14:00', endTime: '', scope: '전체', text: '점검 대응자료 정리', description: '문구 수정 및 출력본 확인', type: '문서', app: '문서함', completed: false, author: '이주임', lab: '글로벌연구소', teamName: '품질전략팀' },
-      ],
-      '2026-04-22': [
-        { displayMode: 'allDay', startTime: '', endTime: '', scope: '개인', text: '개인 일정', description: '', type: '개인', app: '개인', completed: false, author: '홍길동', lab: '중앙연구소', teamName: '환경안전팀' },
-        { displayMode: 'start', startTime: '15:00', endTime: '', scope: '팀', text: '월간 운영자료 점검', description: '', type: '업무', app: '-', completed: false, author: '최차장', lab: '중앙연구소', teamName: '환경안전팀' },
-      ],
-    };
+    const initialScheduleByDate = {};
 
 
     const reservationResources = [
@@ -2451,48 +2448,7 @@ body.real-modal-open{overflow:hidden}
       return reservationResources[state.activeReservationTab] || reservationResources[0];
     }
 
-    const initialReservationsByTab = [
-      {
-        '2026-04-12': [
-          { startTime: '09:00', endTime: '10:00', title: '주간 운영회의', teamName: '환경안전팀', reserver: '홍길동', status: 'full', description: '정기 주간회의' },
-          { startTime: '13:30', endTime: '14:30', title: '원료사 미팅', teamName: '품질전략팀', reserver: '이주임', status: 'partial', description: '외부 미팅 예정, 확정 전' }
-        ],
-        '2026-04-15': [
-          { startTime: '10:00', endTime: '11:30', title: '시제품 리뷰', teamName: '환경안전팀', reserver: '박과장', status: 'full', description: '시제품 리뷰 회의' },
-          { startTime: '15:00', endTime: '16:00', title: '교육 일정', teamName: '운영관리팀', reserver: '관리자', status: 'partial', description: '사내 교육 예약 요청' }
-        ],
-        '2026-04-22': [
-          { startTime: '09:30', endTime: '10:30', title: '월간 실적 공유', teamName: '환경안전팀', reserver: '최차장', status: 'full', description: '월간 실적 공유' },
-          { startTime: '11:00', endTime: '12:00', title: '면접 일정', teamName: '운영관리팀', reserver: '관리자', status: 'partial', description: '채용 면접 시간 블록' },
-          { startTime: '15:00', endTime: '16:30', title: '고객사 방문 대응', teamName: '품질전략팀', reserver: '이주임', status: 'full', description: '방문 대응 회의' }
-        ],
-        '2026-04-25': [
-          { startTime: '13:00', endTime: '15:00', title: '대형 워크숍', teamName: '중앙연구소', reserver: '홍길동', status: 'full', description: '워크숍 예약' }
-        ]
-      },
-      {
-        '2026-04-12': [
-          { startTime: '10:00', endTime: '11:00', title: '중회의실 팀미팅', teamName: '환경안전팀', reserver: '박과장', status: 'partial', description: '주간 팀미팅' },
-          { startTime: '15:00', endTime: '17:00', title: '벤더 화상회의', teamName: '품질전략팀', reserver: '이주임', status: 'full', description: '공급사 협의' }
-        ]
-      },
-      {
-        '2026-04-12': [
-          { startTime: '08:30', endTime: '09:30', title: '소회의실 1:1 미팅', teamName: '운영관리팀', reserver: '김대리', status: 'full', description: '면담' }
-        ]
-      },
-      {
-        '2026-04-12': [
-          { startTime: '14:00', endTime: '16:00', title: '교육실 안전교육', teamName: '환경안전팀', reserver: '최차장', status: 'full', description: '신규 입사자 교육' }
-        ]
-      },
-      {
-        '2026-04-12': [
-          { startTime: '11:00', endTime: '12:30', title: '촬영실 콘텐츠 촬영', teamName: '품질전략팀', reserver: '홍길동', status: 'partial', description: '제품 촬영' }
-        ]
-      },
-      {}, {}, {}, {}, {}
-    ];
+    const initialReservationsByTab = reservationResources.map(() => ({}));
 
     const notices = [
       { title: '폐수 운영일지 4월 결재 요청', level: '긴급', app: '-' },
@@ -2533,8 +2489,8 @@ body.real-modal-open{overflow:hidden}
       memoBoardHeight: 720,
       memoSortedView: false,
 
-      selectedDate: '2026-04-12',
-      calendarMonth: '2026-04-01',
+      selectedDate: todayDateKey,
+      calendarMonth: todayMonthKey,
       plannerMode: 'schedule',
       activeReservationTab: 0,
       selectedPanelRangeFilter: '전체',
@@ -2635,8 +2591,8 @@ body.real-modal-open{overflow:hidden}
       state.memoBoardHeight = 720;
       state.memoSortedView = false;
 
-      state.selectedDate = '2026-04-12';
-      state.calendarMonth = '2026-04-01';
+      state.selectedDate = todayDateKey;
+      state.calendarMonth = todayMonthKey;
       state.plannerMode = 'schedule';
       state.activeReservationTab = 0;
       state.selectedPanelRangeFilter = '전체';
@@ -4009,8 +3965,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       });
 
       document.getElementById('schedule-today')?.addEventListener('click', () => {
-        state.selectedDate = '2026-04-12';
-        state.calendarMonth = '2026-04-01';
+        state.selectedDate = todayDateKey;
+        state.calendarMonth = todayMonthKey;
         renderScheduleTab();
       });
 
@@ -4023,8 +3979,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       });
 
       document.getElementById('calendar-current-month')?.addEventListener('click', () => {
-        state.calendarMonth = '2026-04-01';
-        if (!state.selectedDate.startsWith('2026-04-')) state.selectedDate = '2026-04-12';
+        state.calendarMonth = todayMonthKey;
+        if (!state.selectedDate.startsWith('2026-04-')) state.selectedDate = todayDateKey;
         renderScheduleTab();
       });
 
