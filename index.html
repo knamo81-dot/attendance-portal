@@ -5281,6 +5281,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
   }
 
   function fillEmployeeForm(employeeNo=''){
+    setFeedback('realEmployeeFeedback','');
     populateEmployeeModalSelectOptions();
     const row = dataState.employees.find(e=>e.employee_no===employeeNo);
     if(!row){
