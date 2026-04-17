@@ -2389,7 +2389,7 @@ body.real-modal-open{overflow:hidden}
               <div id="adminSectionAccount" class="admin-section-panel" hidden>
                 <div class="real-card">
                   <div class="real-box-title">계정 / 권한관리</div>
-                  <div class="real-box-sub">users 테이블 기준입니다. Auth 자동 생성/초기화는 다음 단계에서 붙일 수 있습니다.</div>
+                  <div class="real-box-sub">users 테이블 기준이며, 사원 등록 시 Edge Function으로 Auth 계정을 함께 생성하도록 연결되어 있습니다.</div>
                   <div id="realUsersWrap"><div class="real-empty">불러오는 중입니다.</div></div>
                 </div>
               </div>
@@ -5310,7 +5310,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
   async function saveEmployee(){
     const employeeNo = $('realEmpNo').value.trim();
-    if(!employeeNo || !$('realEmpName').value.trim()){ setFeedback('realEmployeeFeedback','사번과 이름을 입력하세요.'); return; }
+    const employeeName = $('realEmpName').value.trim();
+    const email = $('realEmpEmail').value.trim().toLowerCase();
+    if(!employeeNo || !employeeName){ setFeedback('realEmployeeFeedback','사번과 이름을 입력하세요.'); return; }
 
     const divisionCode = $('realEmpDivisionSelect').value || '';
     const teamCode = $('realEmpTeamSelect').value || '';
@@ -5325,28 +5327,35 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       $('realEmpTeamSelect')?.focus();
       return;
     }
+    if(!email){
+      setFeedback('realEmployeeFeedback','로그인에 사용할 이메일을 입력하세요.');
+      $('realEmpEmail')?.focus();
+      return;
+    }
 
     const payload = {
       employee_no: employeeNo,
-      name: $('realEmpName').value.trim(),
+      name: employeeName,
       sort_order: Number($('realEmpSort').value || 1),
       division_code: divisionCode,
       team_code: teamCode,
       grade: $('realEmpGrade').value.trim() || null,
       authority: $('realEmpAuthority').value.trim() || null,
-      email: $('realEmpEmail').value.trim() || null,
+      email,
       attendance_target: $('realEmpAttendance').value === 'true',
       status: $('realEmpStatus').value,
       join_date: $('realEmpJoinDate').value || null,
       leave_date: $('realEmpLeaveDate').value || null,
       leave_reason: $('realEmpLeaveReason').value.trim() || null,
       memo: $('realEmpMemo').value.trim() || null,
-      is_active: $('realEmpStatus').value !== '퇴사'
+      is_active: $('realEmpStatus').value !== '퇴사',
+      role: 'viewer'
     };
-    const exists = dataState.employees.some(e=>e.employee_no===employeeNo);
-    const q = exists ? sb.from('employees').update(payload).eq('employee_no', employeeNo) : sb.from('employees').insert([payload]);
-    const {error}= await q;
-    if(error){ setFeedback('realEmployeeFeedback', error.message); return; }
+
+    setFeedback('realEmployeeFeedback','사원정보와 로그인 계정을 저장하는 중입니다...', true);
+    const { data, error } = await sb.functions.invoke('create-employee-account', { body: payload });
+    if(error){ setFeedback('realEmployeeFeedback', error.message || '계정 생성 호출에 실패했습니다.'); return; }
+    if(!data?.ok){ setFeedback('realEmployeeFeedback', data?.error || '사원정보 저장에 실패했습니다.'); return; }
 
     const managedCodes = ($('realEmpManagedTeams').value || '').split(',').map(v=>v.trim()).filter(Boolean);
     await sb.from('managed_teams').delete().eq('manager_employee_no', employeeNo);
@@ -5356,8 +5365,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       if(managedInsert.error){ setFeedback('realEmployeeFeedback', managedInsert.error.message); return; }
     }
 
-    setFeedback('realEmployeeFeedback','사원정보를 저장했습니다.', true);
+    setFeedback('realEmployeeFeedback', data.message || '사원정보와 로그인 계정을 저장했습니다.', true);
     await loadEmployees();
+    await loadUsers();
   }
 
   async function toggleEmployeeStatus(employeeNo){
