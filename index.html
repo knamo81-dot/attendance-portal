@@ -2389,7 +2389,7 @@ body.real-modal-open{overflow:hidden}
               <div id="adminSectionAccount" class="admin-section-panel" hidden>
                 <div class="real-card">
                   <div class="real-box-title">계정 / 권한관리</div>
-                  <div class="real-box-sub">users 테이블 기준입니다. Auth 자동 생성/초기화는 다음 단계에서 붙일 수 있습니다.</div>
+                  <div class="real-box-sub">users / employees 테이블 기준입니다. Auth 자동 생성/초기화는 다음 단계에서 붙일 수 있습니다.</div>
                   <div id="realUsersWrap"><div class="real-empty">불러오는 중입니다.</div></div>
                 </div>
               </div>
@@ -4722,6 +4722,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
     let currentProfile = null;
     let currentUser = null;
+    let currentProfileTable = null;
     let authBusy = false;
 
     function setBoxMessage(target, message) {
@@ -4730,9 +4731,18 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       target.classList.toggle('show', !!message);
     }
 
+    function normalizeRole(role) {
+      const value = String(role || '').trim().toLowerCase();
+      if (value === 'admin' || value === '관리자') return 'admin';
+      if (value === 'operator' || value === '운영자') return 'operator';
+      if (value === 'viewer' || value === '일반사용자' || value === 'user') return 'viewer';
+      return value || 'viewer';
+    }
+
     function roleLabel(role) {
-      if (role === 'admin') return '관리자';
-      if (role === 'operator') return '운영자';
+      const normalized = normalizeRole(role);
+      if (normalized === 'admin') return '관리자';
+      if (normalized === 'operator') return '운영자';
       return '일반사용자';
     }
 
@@ -4764,7 +4774,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     }
 
     function applyRoleUI(profile) {
-      const role = profile?.role || 'viewer';
+      const role = normalizeRole(profile?.role || 'viewer');
 
       if (els.settingsNavBtn) els.settingsNavBtn.hidden = role !== 'admin';
 
@@ -4798,14 +4808,52 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       }
     }
 
+    function normalizeProfileRow(row, sourceTable) {
+      if (!row) return null;
+      const email = String(row.email || row.user_email || '').trim().toLowerCase();
+      return {
+        ...row,
+        email,
+        name: row.name || row.user_name || row.employee_name || row.employee_no || email,
+        role: normalizeRole(row.role || row.authority || row.user_role || 'viewer'),
+        is_active: typeof row.is_active === 'boolean' ? row.is_active : !(row.active === false || row.use_yn === 'N'),
+        must_change_password: !!(row.must_change_password || row.force_password_change || row.first_login_required),
+        _source_table: sourceTable
+      };
+    }
+
     async function fetchProfile(email) {
-      const { data, error } = await supabaseClient
-        .from('users')
-        .select('email,name,role,is_active,must_change_password')
-        .eq('email', email)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      const normalizedEmail = String(email || '').trim().toLowerCase();
+      const candidates = [
+        { table: 'users', select: '*' },
+        { table: 'employees', select: '*' }
+      ];
+      let lastError = null;
+
+      for (const candidate of candidates) {
+        try {
+          const { data, error } = await supabaseClient
+            .from(candidate.table)
+            .select(candidate.select)
+            .ilike('email', normalizedEmail)
+            .limit(1)
+            .maybeSingle();
+          if (error) {
+            lastError = error;
+            continue;
+          }
+          const profile = normalizeProfileRow(data, candidate.table);
+          if (profile) {
+            currentProfileTable = candidate.table;
+            return profile;
+          }
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      if (lastError) throw lastError;
+      return null;
     }
 
     async function handleSession(user) {
@@ -4821,7 +4869,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         const profile = await fetchProfile(user.email);
         if (!profile) {
           await supabaseClient.auth.signOut();
-          showLogin('users 테이블에 등록되지 않은 이메일입니다. 관리자에게 계정 등록을 요청해 주세요.');
+          showLogin('등록된 사용자 정보를 찾지 못했습니다. users 또는 employees 테이블의 이메일, 권한, 사용 여부를 확인해 주세요.');
           return;
         }
         if (profile.is_active === false) {
@@ -4830,8 +4878,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           return;
         }
 
-        currentProfile = profile;
-        applyRoleUI(profile);
+        currentProfile = { ...profile, role: normalizeRole(profile.role) };
+        applyRoleUI(currentProfile);
 
         if (profile.must_change_password) {
           showPasswordChange('');
@@ -4843,7 +4891,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       } catch (error) {
         console.error('handleSession error:', error);
         await supabaseClient.auth.signOut();
-        showLogin('사용자 권한 정보를 확인하지 못했습니다. users 테이블의 이메일과 권한 정보를 확인해 주세요.');
+        showLogin('사용자 권한 정보를 확인하지 못했습니다. users 또는 employees 테이블의 이메일과 권한 정보를 확인해 주세요.');
       }
     }
 
@@ -4901,10 +4949,11 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         if (pwError) throw pwError;
 
         if (currentUser?.email) {
+          const targetTable = currentProfileTable || currentProfile?._source_table || 'users';
           const { error: profileError } = await supabaseClient
-            .from('users')
+            .from(targetTable)
             .update({ must_change_password: false })
-            .eq('email', currentUser.email);
+            .ilike('email', currentUser.email);
           if (profileError) throw profileError;
         }
 
@@ -5032,7 +5081,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         },
         account: {
           title: '계정/권한관리',
-          desc: 'users 테이블과 Auth 계정을 포털에서 관리하는 화면입니다.'
+          desc: 'users 또는 employees 테이블과 Auth 계정을 포털에서 관리하는 화면입니다.'
         }
       };
       document.querySelectorAll('.admin-subnav-btn').forEach(btn => {
@@ -5195,7 +5244,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           employee:['사원정보 관리','사원정보는 일별 업로드보다 여기서 기준정보로 관리합니다. 사번 중복 방지와 수정이 가능하며, 퇴사 처리는 사원 입력 / 수정에서 퇴사일과 퇴사사유를 함께 기록하는 방식으로 관리합니다.'],
           team:['팀변경 관리','변경 전 조직에서 사원을 검색한 뒤 체크하고, 변경 후 조직을 선택해서 일괄 변경합니다.'],
           issue:['특이사항 관리','단축근무, 파견처럼 세금 출퇴근 기록 분석에 영향을 줄 수 있는 특이사항을 별도로 기록합니다.'],
-          account:['계정/권한 관리','users 테이블 기준으로 계정 권한과 사용 여부를 관리합니다.']
+          account:['계정/권한 관리','users 또는 employees 테이블 기준으로 계정 권한과 사용 여부를 관리합니다.']
         };
         document.querySelectorAll('.admin-section-panel').forEach(p=>p.hidden=true);
         const panel = $('adminSection' + sec.charAt(0).toUpperCase() + sec.slice(1));
@@ -5859,9 +5908,17 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
   }
 
   async function loadUsers(){
-    const {data,error}=await sb.from('users').select('*').order('email');
+    let data = null;
+    let error = null;
+    let sourceTable = 'users';
+
+    ({ data, error } = await sb.from('users').select('*').order('email'));
+    if(error){
+      ({ data, error } = await sb.from('employees').select('*').order('email'));
+      sourceTable = 'employees';
+    }
     if(error){ $('realUsersWrap').innerHTML='<div class="real-empty">'+esc(error.message)+'</div>'; return; }
-    dataState.users = data || [];
+    dataState.users = (data || []).map(row => ({ ...row, _source_table: sourceTable, role: (row.role || row.authority || 'viewer') }));
     renderUsers();
   }
 
@@ -5883,7 +5940,10 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
   async function saveUser(email){
     const role = document.querySelector(`[data-user-role="${CSS.escape(email)}"]`)?.value;
     if(!role) return;
-    const {error}=await sb.from('users').update({role}).eq('email', email);
+    const found = (dataState.users || []).find(u => String(u.email || '').toLowerCase() === String(email || '').toLowerCase());
+    const targetTable = found?._source_table || 'users';
+    const payload = found && 'authority' in found && !('role' in found) ? { authority: role } : { role };
+    const {error}=await sb.from(targetTable).update(payload).ilike('email', email);
     if(error) return alert(error.message);
     await loadUsers();
   }
