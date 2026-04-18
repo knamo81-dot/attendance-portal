@@ -2871,8 +2871,27 @@ body.real-modal-open{overflow:hidden}
       return portalAuth().name;
     }
 
+    let portalMemoFeedbackHideTimer = null;
+    const PORTAL_MEMO_FEEDBACK_HIDE_MS = 1800;
+
     function setPortalMemoFeedback(msg, kind) {
-      state.portalMemoFeedback = { msg: msg || '', kind: kind || '' };
+      if (portalMemoFeedbackHideTimer != null) {
+        clearTimeout(portalMemoFeedbackHideTimer);
+        portalMemoFeedbackHideTimer = null;
+      }
+      const nextMsg = msg != null ? String(msg) : '';
+      const nextKind = kind != null ? String(kind) : '';
+      state.portalMemoFeedback = { msg: nextMsg, kind: nextKind };
+      if (!nextMsg.trim()) return;
+      const snapMsg = nextMsg;
+      const snapKind = nextKind;
+      portalMemoFeedbackHideTimer = setTimeout(() => {
+        portalMemoFeedbackHideTimer = null;
+        if (state.portalMemoFeedback.msg === snapMsg && state.portalMemoFeedback.kind === snapKind) {
+          state.portalMemoFeedback = { msg: '', kind: '' };
+        }
+        if (typeof render === 'function') render();
+      }, PORTAL_MEMO_FEEDBACK_HIDE_MS);
     }
 
     function setPortalPlannerFeedback(msg, kind) {
@@ -3068,7 +3087,11 @@ body.real-modal-open{overflow:hidden}
       return data;
     }
 
-    async function updateMemoOnServer(id, partialUiNote) {
+    /**
+     * @param {object} [options]
+     * @param {boolean} [options.silent] true면 위치·크기 등 조용한 저장: 이 함수 및 호출부에서 토스트를 띄우지 않음.
+     */
+    async function updateMemoOnServer(id, partialUiNote, options = {}) {
       const { sb, email, name } = portalAuth();
       if (!sb || !email) throw new Error('로그인이 필요합니다.');
       const base = state.notes.find(n => String(n.serverId || n.id) === String(id));
@@ -3156,7 +3179,7 @@ body.real-modal-open{overflow:hidden}
         layout_w: w,
         layout_h: h,
         z: moved.z
-      });
+      }, { silent: true });
     }
 
     function packScheduleDescription(userText, meta) {
@@ -3456,6 +3479,7 @@ body.real-modal-open{overflow:hidden}
     }
 
     function resetHomeState() {
+      setPortalMemoFeedback('', '');
       state.tab = 'memo';
       tabButtons.forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === 'memo');
@@ -4000,15 +4024,14 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             }
           : note);
         const moved = state.notes.find(n => String(n.id) === String(id));
+        const layoutSaveSilent = { silent: true };
         try {
           await updateMemoOnServer(moved.serverId, {
             layout: moved.layout,
             originalLayout: moved.originalLayout
-          });
-          showPortalDataMessage('메모가 저장되었습니다.', 'success', 'memo');
+          }, layoutSaveSilent);
         } catch (err) {
           console.error(err);
-          showPortalDataMessage(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error', 'memo');
           try {
             await loadMemosFromServer();
           } catch (_) { /* ignore */ }
