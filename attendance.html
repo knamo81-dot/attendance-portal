@@ -1488,7 +1488,10 @@ function hasOvertimeLikeBundle(text){
 
   const SUPABASE_URL = "https://mbqpsovlwvedwrtbbauj.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY";
-  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  if(!window.__attendanceSupabaseClient && window.supabase){
+    window.__attendanceSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }
+  const supabaseClient = window.__attendanceSupabaseClient || null;
 
 
 function getBusinessDaysForPeriod(){
@@ -2457,18 +2460,37 @@ function createUploadBatchId(){
 }
 async function createServerUploadBatchMeta(batchId, meta){
   if(!supabaseClient) return batchId;
-  const payload = {
-    id: batchId,
-    batch_name: meta?.batchName || `근태업로드_${new Date().toISOString()}`,
-    secom_filename: meta?.secomFilename || null,
-    erp_filename: meta?.erpFilename || null,
-    uploaded_by: meta?.uploadedBy || null,
-    note: meta?.note || '관리자 화면 업로드 원본 백업'
-  };
-  const { error } = await supabaseClient
-    .from('attendance_upload_batches')
-    .upsert([payload], { onConflict: 'id' });
-  if(error) throw error;
+
+  const candidates = [
+    {
+      id: batchId,
+      secom_filename: meta?.secomFilename || null,
+      erp_filename: meta?.erpFilename || null,
+      uploaded_by: meta?.uploadedBy || null,
+      note: meta?.note || '관리자 화면 업로드 원본 백업'
+    },
+    {
+      id: batchId,
+      note: meta?.note || '관리자 화면 업로드 원본 백업'
+    },
+    {
+      id: batchId
+    }
+  ];
+
+  for(const payload of candidates){
+    try{
+      const { error } = await supabaseClient
+        .from('attendance_upload_batches')
+        .upsert([payload], { onConflict: 'id' });
+      if(!error) return batchId;
+      console.warn('[ATTENDANCE BATCH META RETRY]', error);
+    }catch(err){
+      console.warn('[ATTENDANCE BATCH META EXCEPTION]', err);
+    }
+  }
+
+  console.warn('[ATTENDANCE BATCH META SKIPPED] schema mismatch or optional table issue');
   return batchId;
 }
 async function insertRowsInChunks(tableName, rows, chunkSize = 500){
@@ -2934,8 +2956,8 @@ async function applyUploadedFiles(){
     render();
 
     const batchId = createUploadBatchId();
-    let backupMessage = '
-서버 백업은 비활성 상태라 브라우저 반영만 완료되었습니다.';
+    let backupMessage = `
+서버 백업은 비활성 상태라 브라우저 반영만 완료되었습니다.`;
     try{
       const backupResult = await backupUploadedAttendanceRawToSupabase({
         batchId,
@@ -7227,9 +7249,10 @@ window.addEventListener('resize', renderLightweight);
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
 
   const hasConfig = !SUPABASE_URL.includes('YOUR_PROJECT') && !SUPABASE_ANON_KEY.includes('YOUR_ANON_KEY');
-  const supabaseClient = (window.supabase && hasConfig)
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
+  if(!window.__attendanceSupabaseClient && window.supabase && hasConfig){
+    window.__attendanceSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  const supabaseClient = window.__attendanceSupabaseClient || null;
 
   let syncChain = Promise.resolve();
   let fallbackWarned = false;
