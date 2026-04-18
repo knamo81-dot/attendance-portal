@@ -177,13 +177,47 @@
       align-items: center;
     }
     .memo-board {
-      position: relative;
+      position: relative !important;
       min-height: 720px;
       margin: 20px;
       border-radius: 24px;
       background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%);
       border: 1px solid #dbeafe;
       overflow: hidden;
+      contain: layout;
+    }
+    .memo-board-bg {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .memo-board-notes {
+      position: absolute;
+      left: 0;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .memo-board-notes > .memo-note,
+    .memo-board-notes > .memo-pop {
+      pointer-events: auto;
+    }
+    .memo-board-status {
+      position: absolute;
+      left: 50%;
+      top: 24px;
+      transform: translateX(-50%);
+      z-index: 4;
+      pointer-events: none;
+      max-width: calc(100% - 48px);
+      text-align: center;
+    }
+    .memo-board .memo-note {
+      position: absolute !important;
+      margin: 0 !important;
     }
     .memo-grid {
       position: absolute;
@@ -981,6 +1015,7 @@ html, body {
 
 .memo-board {
   min-width: 0 !important;
+  position: relative !important;
 }
 
     .planner-switch-wrap {
@@ -3515,6 +3550,17 @@ body.real-modal-open{overflow:hidden}
       return stored;
     }
 
+    function memoNotePositionPx(item) {
+      const x = Number(item?.layout?.x);
+      const y = Number(item?.layout?.y);
+      return {
+        x: Number.isFinite(x) ? Math.max(0, Math.round(x)) : 40,
+        y: Number.isFinite(y) ? Math.max(0, Math.round(y)) : 40
+      };
+    }
+
+    let memoPointerDrag = null;
+    let lastMemoDragMoved = false;
 
     
 function sortMemosByColorAndDate() {
@@ -3701,20 +3747,23 @@ function render() {
           </div>
 
           <div class="memo-board" id="memo-board" style="min-height:${state.memoBoardHeight}px;height:${state.memoBoardHeight}px;">
-            <div class="memo-grid"></div>
-
-            <div class="board-dots">
-              <div class="dot" style="background:#f87171"></div>
-              <div class="dot" style="background:#fbbf24"></div>
-              <div class="dot" style="background:#34d399"></div>
+            <div class="memo-board-bg" aria-hidden="true">
+              <div class="memo-grid"></div>
+              <div class="board-dots">
+                <div class="dot" style="background:#f87171"></div>
+                <div class="dot" style="background:#fbbf24"></div>
+                <div class="dot" style="background:#34d399"></div>
+              </div>
             </div>
 
-            ${state.memoLoading ? `<div style="padding:12px 16px;color:#64748b;font-size:13px;">불러오는 중...</div>` : ''}
-            ${!state.memoLoading && !notes.length ? `<div style="padding:12px 16px;color:#94a3b8;font-size:13px;">등록된 메모가 없습니다.</div>` : ''}
+            ${state.memoLoading ? `<div class="memo-board-status" style="padding:12px 16px;color:#64748b;font-size:13px;">불러오는 중...</div>` : ''}
+            ${!state.memoLoading && !notes.length ? `<div class="memo-board-status" style="padding:12px 16px;color:#94a3b8;font-size:13px;">등록된 메모가 없습니다.</div>` : ''}
 
+            <div class="memo-board-notes" id="memo-board-notes">
             ${notes.map((item, idx) => {
               const isExpanded = state.memoExpandedId === item.id;
               const isEditing = state.memoEditingId === item.id;
+              const pos = memoNotePositionPx(item);
               const noteWidth = getMemoDisplayWidth(item, isExpanded || isEditing, isEditing);
               const baseMinH = item.imageOnly ? null : getMemoCollapsedMinHeight(item);
               const noteMinH = item.imageOnly
@@ -3726,8 +3775,8 @@ function render() {
                   class="memo-note ${item.imageOnly ? 'image-only' : ''} ${isExpanded || isEditing ? 'expanded' : ''} ${state.memoDraggingId === item.id ? 'dragging' : ''}"
                   data-note-id="${item.id}"
                   style="
-                    left:${item.layout.x}px;
-                    top:${item.layout.y}px;
+                    left:${pos.x}px;
+                    top:${pos.y}px;
                     width:${noteW}px;
                     min-height:${noteMinH};
                     background:${item.layout.color || '#fef3c7'};
@@ -3874,6 +3923,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
               </div>
             ` : ''}
 
+            </div>
+
             <div class="memo-board-resize-handle" id="memo-board-resize-handle" title="메모 보드 높이 조절"></div>
           </div>
         </div>
@@ -3990,32 +4041,69 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         renderMemoTab();
       });
 
-      board.addEventListener('dragover', (e) => e.preventDefault());
-      board.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const id = e.dataTransfer.getData('text/plain');
-        if (!id) return;
-        const rect = board.getBoundingClientRect();
-        const x = e.clientX - rect.left - 110;
-        const y = e.clientY - rect.top - 45;
+      function onMemoPointerMove(ev) {
+        if (!memoPointerDrag) return;
+        const { board, noteEl, grabOX, grabOY } = memoPointerDrag;
+        const br = board.getBoundingClientRect();
+        let x = ev.clientX - br.left - grabOX;
+        let y = ev.clientY - br.top - grabOY;
+        x = Math.max(0, Math.round(x));
+        y = Math.max(0, Math.round(y));
+        noteEl.style.left = `${x}px`;
+        noteEl.style.top = `${y}px`;
+        const dx = ev.clientX - memoPointerDrag.startX;
+        const dy = ev.clientY - memoPointerDrag.startY;
+        if (dx * dx + dy * dy > 16) memoPointerDrag.moved = true;
+      }
+
+      async function onMemoPointerUp() {
+        if (!memoPointerDrag) return;
+        const { id, board, noteEl, pointerId } = memoPointerDrag;
+        const moved = !!memoPointerDrag.moved;
+        memoPointerDrag = null;
+        document.removeEventListener('pointermove', onMemoPointerMove);
+        document.removeEventListener('pointerup', onMemoPointerUp);
+        document.removeEventListener('pointercancel', onMemoPointerUp);
+        try {
+          const h = noteEl.querySelector('[data-drag-id]');
+          if (h && pointerId != null) h.releasePointerCapture(pointerId);
+        } catch (_) { /* ignore */ }
+        const nx = Math.max(0, Math.round(parseFloat(noteEl.style.left) || 0));
+        const ny = Math.max(0, Math.round(parseFloat(noteEl.style.top) || 0));
         state.notes = state.notes.map(note =>
           note.id === id
             ? {
                 ...note,
-                layout: { ...note.layout, x: Math.max(0, x), y: Math.max(0, y) },
-                originalLayout: { ...(note.originalLayout || note.layout), x: Math.max(0, x), y: Math.max(0, y) }
+                layout: { ...note.layout, x: nx, y: ny },
+                originalLayout: { ...(note.originalLayout || note.layout), x: nx, y: ny }
               }
             : note
         );
         state.memoDraggingId = null;
+        if (moved) lastMemoDragMoved = true;
+        if (moved) {
+          try {
+            if (state.notes.find(n => n.id === id)?.serverId) {
+              await persistMemoLayoutFromDom(board, id);
+              showPortalDataMessage('메모가 저장되었습니다.', 'success', 'memo');
+            }
+          } catch (err) {
+            console.error(err);
+            showPortalDataMessage(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error', 'memo');
+          }
+        }
         renderMemoTab();
-      });
+      }
 
       board.querySelectorAll('[data-note-id]').forEach(noteEl => {
         const noteId = noteEl.dataset.noteId;
 
         noteEl.addEventListener('click', (e) => {
           e.stopPropagation();
+          if (lastMemoDragMoved) {
+            lastMemoDragMoved = false;
+            return;
+          }
           if (state.memoEditingId === noteId) return;
           if (state.memoDraggingId === noteId) return;
 
@@ -4038,30 +4126,38 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
       board.querySelectorAll('[data-drag-id]').forEach(handle => {
         const id = handle.dataset.dragId;
-        handle.closest('[data-note-id]').setAttribute('draggable', state.memoEditingId === id ? 'false' : 'true');
-        handle.closest('[data-note-id]').addEventListener('dragstart', (e) => {
-          if (state.memoEditingId === id) {
-            e.preventDefault();
-            return;
-          }
-          e.dataTransfer.setData('text/plain', id);
-          e.dataTransfer.effectAllowed = 'move';
+        const noteEl = handle.closest('[data-note-id]');
+        if (!noteEl) return;
+        noteEl.setAttribute('draggable', 'false');
+        handle.addEventListener('click', (e) => e.stopPropagation());
+        handle.addEventListener('mousedown', (e) => e.stopPropagation());
+        handle.addEventListener('pointerdown', (e) => {
+          if (e.button !== 0) return;
+          if (state.memoEditingId === id) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const nr = noteEl.getBoundingClientRect();
+          const grabOX = e.clientX - nr.left;
+          const grabOY = e.clientY - nr.top;
+          memoPointerDrag = {
+            id,
+            board,
+            noteEl,
+            grabOX,
+            grabOY,
+            startX: e.clientX,
+            startY: e.clientY,
+            moved: false,
+            pointerId: e.pointerId
+          };
           state.memoDraggingId = id;
           bringToFront(id);
-        });
-        handle.closest('[data-note-id]').addEventListener('dragend', async () => {
-          const nid = id;
-          state.memoDraggingId = null;
           try {
-            if (state.notes.find(n => n.id === nid)?.serverId) {
-              await persistMemoLayoutFromDom(board, nid);
-              showPortalDataMessage('메모가 저장되었습니다.', 'success', 'memo');
-            }
-          } catch (err) {
-            console.error(err);
-            showPortalDataMessage(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error', 'memo');
-          }
-          renderMemoTab();
+            handle.setPointerCapture(e.pointerId);
+          } catch (_) { /* ignore */ }
+          document.addEventListener('pointermove', onMemoPointerMove);
+          document.addEventListener('pointerup', onMemoPointerUp);
+          document.addEventListener('pointercancel', onMemoPointerUp);
         });
       });
 
