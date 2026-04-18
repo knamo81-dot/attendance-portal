@@ -709,51 +709,21 @@ body{
   <div class="portal-layout">
     <div class="portal-sidenav">
       <div>
-        <!-- 홈 -->
-        <button class="portal-nav-btn home" onclick="location.href='index.html'">
-          홈
-        </button>
-    
+        <button class="portal-nav-btn home" onclick="location.href='index.html'">홈</button>
         <div class="portal-nav-group">
-          <!-- 폐수 -->
-          <button class="portal-nav-btn" onclick="location.href='wastewater.html'">
-            폐수
-          </button>
-    
-          <!-- 근태 (현재 페이지) -->
-          <button class="portal-nav-btn active" onclick="location.href='attendance.html'">
-            근태
-          </button>
-    
-          <!-- 식대 -->
-          <button class="portal-nav-btn" onclick="location.href='meal.html'">
-            식대
-          </button>
-    
-          <!-- 시약 -->
-          <button class="portal-nav-btn" onclick="location.href='reagent.html'">
-            시약
-          </button>
-    
-          <!-- 문서 -->
-          <button class="portal-nav-btn" onclick="location.href='documents.html'">
-            문서
-          </button>
+          <button class="portal-nav-btn" type="button">폐수</button>
+          <button class="portal-nav-btn active" onclick="location.href='attendance.html'">근태</button>
+          <button class="portal-nav-btn" type="button">식대</button>
+          <button class="portal-nav-btn" type="button">시약</button>
+          <button class="portal-nav-btn" type="button">문서</button>
         </div>
       </div>
-    
       <div class="portal-nav-group">
-        <!-- 설정 -->
-        <button class="portal-nav-btn" onclick="location.href='settings.html'">
-          설정
-        </button>
-    
-        <!-- 종료 -->
-        <button class="portal-nav-btn" onclick="location.href='index.html'">
-          종료
-        </button>
+        <button class="portal-nav-btn" type="button">설정</button>
+        <button class="portal-nav-btn" type="button">종료</button>
       </div>
     </div>
+    <div class="portal-main">
 
 
 
@@ -5964,15 +5934,28 @@ function decorateAttendanceRow(row, metaByName){
     }
   }
 
+  const hasMissingClock = (displayStart === '출근누락' || displayEnd === '퇴근누락');
+  const missingClockReason = (displayStart === '출근누락' && displayEnd === '퇴근누락')
+    ? '출퇴근미입력'
+    : (displayStart === '출근누락' ? '출근미입력' : (displayEnd === '퇴근누락' ? '퇴근미입력' : ''));
+
   // 저장된/선택된 OT확인 값은 연장근로가 있을 때만 상태에 반영
   if (dispatchRule || workFromHomeRule) {
     statusLabel = '';
-  } else if (erpOT > 0 && overtimeCheck === '미인정') {
+  } else if (erpOT > 0 && overtimeCheck === '미인정' && !hasMissingClock) {
     bucket = '문제';
     statusLabel = '문제';
   } else if (erpOT > 0 && (overtimeCheck === '인정' || overtimeCheck === '부분인정')) {
     bucket = '주의';
     statusLabel = '주의';
+  } else if (hasMissingClock) {
+    bucket = '주의';
+    statusLabel = '주의';
+    if (missingClockReason && !['연장근무','공휴일근무','휴일근무'].includes(primaryReason)) {
+      primaryReason = missingClockReason;
+      displayReason = missingClockReason;
+      reason = missingClockReason;
+    }
   } else if (judgedReasonsWarning.includes(displayReason)) {
     bucket = '주의';
     statusLabel = '주의';
@@ -6261,29 +6244,10 @@ function renderAttendanceInsights(rows){
     });
   }
   if(warns.length){
-    const wc = warnCounts;
-    let n연장 = wc['연장근무'] || 0;
-    let n공휴 = wc['공휴일근무'] || 0;
-    let n퇴근 = wc['퇴근미입력'] || 0;
-    let n출근 = (wc['출근미입력'] || 0) + (wc['출퇴근미입력'] || 0);
-    for (let i = 0; i < warns.length; i++) {
-      const r = warns[i];
-      const erpOT = Number(r.erpActualOvertime || r.erpAppliedOvertime || 0);
-      if (erpOT > 0) continue;
-      const k = normalizeAttendanceReasonKey(r.reason, 'warning');
-      if (r.displayStart === '출근누락' && k !== '출근미입력' && k !== '출퇴근미입력') n출근++;
-      if (r.displayEnd === '퇴근누락' && k !== '퇴근미입력' && k !== '출퇴근미입력') n퇴근++;
-    }
-    const warnParts = [];
-    if (n연장) warnParts.push(`연장근무 ${n연장}`);
-    if (n공휴) warnParts.push(`공휴일근무 ${n공휴}`);
-    if (n퇴근) warnParts.push(`퇴근미입력 ${n퇴근}`);
-    if (n출근) warnParts.push(`출근미입력 ${n출근}`);
-    const warnDetailStr = warnParts.join(' | ');
     msgs.push({
       title: `주의 ${warns.length}건`,
       desc: '출퇴근 미입력이나 연장근무처럼 확인이 필요한 건입니다.',
-      detail: warnDetailStr ? `<div class="sub" style="margin-top:8px;line-height:1.6">${warnDetailStr}</div>` : ''
+      detail: formatDetail(warnCounts, ['출근미입력','퇴근미입력','출퇴근미입력','연장근무','휴일근무','공휴일근무'])
     });
   }
   if(Object.keys(reasonCounts).length){
@@ -7490,3 +7454,4 @@ window.addEventListener('resize', renderLightweight);
 </div>
 </body>
 </html>
+
