@@ -4910,10 +4910,12 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
   async function ensurePortalUserRow(payload){
     try{
+      const email = String(payload.email || '').trim().toLowerCase();
+      const role = payload.role || 'viewer';
       const portalUser = {
-        email: payload.email,
+        email,
         name: payload.name,
-        role: payload.role || 'viewer',
+        role,
         is_active: payload.is_active !== false,
         must_change_password: true,
         employee_no: payload.employee_no,
@@ -4921,8 +4923,11 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       };
       const res = await sb.from('users').upsert(portalUser, { onConflict: 'email' }).select();
       if(res.error) return { ok:false, error: res.error };
-      dataState.users = (dataState.users || []).filter(u => String(u.email||'').toLowerCase() !== String(portalUser.email||'').toLowerCase());
-      dataState.users.push({ ...(res.data && res.data[0] ? res.data[0] : portalUser) });
+      const roleRes = await sb.from('users').update({ role }).eq('email', email).select();
+      if(roleRes.error) return { ok:false, error: roleRes.error };
+      const row = (roleRes.data && roleRes.data[0]) || (res.data && res.data[0]) || { ...portalUser, role };
+      dataState.users = (dataState.users || []).filter(u => String(u.email||'').toLowerCase() !== email);
+      dataState.users.push(row);
       dataState.users.sort((a,b)=>String(a.email||'').localeCompare(String(b.email||'')));
       return { ok:true };
     }catch(err){
