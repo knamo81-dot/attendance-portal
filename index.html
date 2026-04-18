@@ -1510,6 +1510,7 @@ html, body {
 .real-feedback{margin-top:10px;font-size:13px;font-weight:700}
 .real-feedback.ok{color:#15803d}
 .real-feedback.error{color:#b91c1c}
+.real-feedback.loading{color:#475569;font-weight:600}
 .real-tree-wrap{display:grid;gap:12px}
 .real-division-card{border:1px solid #dbe3ef;border-radius:18px;padding:14px;background:#fff}
 .real-division-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
@@ -4877,10 +4878,16 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     if(!team) return false;
     return !!team.is_virtual || String(team.team_code || '') === String(team.division_code || '');
   };
-  const setFeedback = (id, msg, ok=false) => {
+  const setFeedback = (id, msg, variant=false) => {
     const el=$(id); if(!el) return;
     el.textContent = msg || '';
-    el.className = 'real-feedback' + (msg ? (ok ? ' ok' : ' error') : '');
+    let cls = 'real-feedback';
+    if(msg){
+      if(variant === 'loading') cls += ' loading';
+      else if(variant === true) cls += ' ok';
+      else cls += ' error';
+    }
+    el.className = cls;
   };
 
 
@@ -5466,7 +5473,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     const isExistingEmployee = dataState.employees.some(e => String(e.employee_no) === String(employeeNo));
     const isNewEmployee = !isExistingEmployee;
 
-    setFeedback('realEmployeeFeedback','사원정보와 로그인 계정을 저장하는 중입니다...', true);
+    setFeedback('realEmployeeFeedback','사원정보와 로그인 계정을 저장하는 중입니다...', 'loading');
     const { data, error } = await sb.functions.invoke('create-employee-account', { body: payload });
     const edgeOk = !error && data && data.ok === true;
     const edgeMsg = (error && error.message) || (data && data.error) || '계정/사원 저장 Edge Function 호출에 실패했습니다.';
@@ -5496,12 +5503,21 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     }
 
     syncLocalEmployeeRow(payload);
+    await Promise.allSettled([loadEmployees(), loadUsers()]);
+    const emailKey = String(payload.email || '').trim().toLowerCase();
+    const uRow = (dataState.users || []).find(x => String(x.email || '').trim().toLowerCase() === emailKey);
+    const wantRole = String(payload.role || 'viewer');
+    const gotRole = uRow ? String(uRow.role || 'viewer') : '';
+    if(!uRow || gotRole !== wantRole){
+      setFeedback('realEmployeeFeedback', `저장 후 public.users.role 확인: 기대 ${wantRole}, 실제 ${uRow ? gotRole : 'users 행 없음'}`, false);
+      return;
+    }
     if(edgeOk){
       setFeedback('realEmployeeFeedback', (data && data.message) || '사원정보와 로그인 계정을 저장했습니다.', true);
     }else{
       setFeedback('realEmployeeFeedback', 'public.users 프로필(role·이메일·이름·활성)은 반영했습니다. Edge Function 오류로 사원/Auth 쪽은 확인이 필요할 수 있습니다.', true);
     }
-    await Promise.allSettled([loadEmployees(), loadUsers()]);
+    if(typeof window.closeEmployeeModal === 'function') window.closeEmployeeModal();
   }
 
   async function deleteEmployee(employeeNo){
@@ -5510,7 +5526,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     if(!confirm(`사원 ${row.name || employeeNo} (${row.employee_no || '-'} / ${row.email || '-'}) 을(를) 삭제할까요?
 포털 기준정보와 users 프로필에서 제거되며, 기존 Auth 계정은 남을 수 있습니다.`)) return;
 
-    setFeedback('realEmployeeFeedback', '사원정보를 삭제하는 중입니다...', true);
+    setFeedback('realEmployeeFeedback', '사원정보를 삭제하는 중입니다...', 'loading');
     const managedRes = await sb.from('managed_teams').delete().eq('manager_employee_no', employeeNo);
     if(managedRes.error){ setFeedback('realEmployeeFeedback', managedRes.error.message); return; }
 
@@ -5534,7 +5550,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     if(!candidates.length){ setFeedback('realEmployeeFeedback', '이메일이 등록된 사원이 없습니다.'); return; }
     if(!confirm(`이메일이 있는 사원 ${candidates.length}명의 계정/권한을 일괄 등록할까요?`)) return;
 
-    setFeedback('realEmployeeFeedback', '전체 계정 등록을 진행하는 중입니다...', true);
+    setFeedback('realEmployeeFeedback', '전체 계정 등록을 진행하는 중입니다...', 'loading');
     let success = 0;
     let failed = [];
 
@@ -5898,6 +5914,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     modal.setAttribute('aria-hidden','true');
     document.body.classList.remove('real-modal-open');
   }
+  window.closeEmployeeModal = closeEmpModal;
   document.addEventListener('click', function(e){
     if(e.target && e.target.id === 'realEmpAddBtn'){
       setTimeout(openEmpModal, 0);
@@ -5911,12 +5928,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         return; // keep reset behavior only
       }
       closeEmpModal();
-    }
-    if(e.target && e.target.id === 'realEmpSaveBtn'){
-      setTimeout(function(){
-        const fb = el('realEmployeeFeedback');
-        if(fb && fb.classList.contains('ok')) closeEmpModal();
-      }, 800);
     }
     if(e.target && e.target.id === 'realEmployeeModal'){
       closeEmpModal();
