@@ -5473,6 +5473,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     const isExistingEmployee = dataState.employees.some(e => String(e.employee_no) === String(employeeNo));
     const isNewEmployee = !isExistingEmployee;
 
+    const fbPre = $('realEmployeeFeedback');
+    if(fbPre){ fbPre.classList.remove('ok'); }
     setFeedback('realEmployeeFeedback','사원정보와 로그인 계정을 저장하는 중입니다...', 'loading');
     const { data, error } = await sb.functions.invoke('create-employee-account', { body: payload });
     const edgeOk = !error && data && data.ok === true;
@@ -5899,6 +5901,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
 <script id="employee-modal-popup-script">
 (function(){
+  /* 사원 모달 닫기: 저장 버튼 클릭 후 ok 클래스 감지·setTimeout 자동 닫기 금지(저장 중에도 ok로 오인됨).
+     닫힘은 saveEmployee() 최종 성공 시에만 window.closeEmployeeModal() 호출로 처리합니다. */
   function el(id){ return document.getElementById(id); }
   function openEmpModal(){
     const modal = el('realEmployeeModal');
