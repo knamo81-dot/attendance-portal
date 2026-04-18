@@ -2448,6 +2448,90 @@ function saveUploadedAttendanceData(){
     localStorage.setItem(ATTENDANCE_UPLOAD_STORAGE_KEY, JSON.stringify(REAL_ATTENDANCE_DATA || []));
   }catch(e){}
 }
+
+function createUploadBatchId(){
+  try{
+    if(window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+  }catch(e){}
+  return `batch_${Date.now()}_${Math.random().toString(36).slice(2,10)}`;
+}
+async function createServerUploadBatchMeta(batchId, meta){
+  if(!supabaseClient) return batchId;
+  const payload = {
+    id: batchId,
+    batch_name: meta?.batchName || `근태업로드_${new Date().toISOString()}`,
+    secom_filename: meta?.secomFilename || null,
+    erp_filename: meta?.erpFilename || null,
+    uploaded_by: meta?.uploadedBy || null,
+    note: meta?.note || '관리자 화면 업로드 원본 백업'
+  };
+  const { error } = await supabaseClient
+    .from('attendance_upload_batches')
+    .upsert([payload], { onConflict: 'id' });
+  if(error) throw error;
+  return batchId;
+}
+async function insertRowsInChunks(tableName, rows, chunkSize = 500){
+  if(!supabaseClient || !Array.isArray(rows) || !rows.length) return;
+  for(let i = 0; i < rows.length; i += chunkSize){
+    const chunk = rows.slice(i, i + chunkSize);
+    const { error } = await supabaseClient.from(tableName).insert(chunk);
+    if(error) throw error;
+  }
+}
+async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], erpRows = [], secomFilename = '', erpFilename = '' }){
+  if(!supabaseClient) return { ok:false, skipped:true, reason:'supabase-disabled' };
+
+  const uploadedBy = (() => {
+    try{
+      const currentUser = window.__portalCurrentUser || window.currentUser || null;
+      if(currentUser && typeof currentUser === 'object'){
+        return String(currentUser.email || currentUser.user_email || currentUser.name || '').trim() || null;
+      }
+    }catch(e){}
+    return null;
+  })();
+
+  await createServerUploadBatchMeta(batchId, {
+    batchName: `근태업로드_${new Date().toISOString()}`,
+    secomFilename,
+    erpFilename,
+    uploadedBy,
+    note: '관리자 화면 업로드 원본 백업'
+  });
+
+  const secomPayload = (secomRows || []).map(row => ({
+    upload_batch_id: batchId,
+    work_date: row.date || null,
+    emp_no: String(row.employeeId || '').trim() || null,
+    name: row.name || null,
+    in_time: row.start || null,
+    out_time: row.end || null,
+    raw_data: row
+  }));
+
+  const erpPayload = (erpRows || []).map(row => ({
+    upload_batch_id: batchId,
+    work_date: row.date || null,
+    emp_no: String(row.employeeId || '').trim() || null,
+    name: row.name || null,
+    erp_start: row.start || null,
+    erp_end: row.end || null,
+    overtime: Number(row.erpActualOvertime || row.erpAppliedOvertime || 0),
+    raw_data: row
+  }));
+
+  await insertRowsInChunks('attendance_secom_raw', secomPayload);
+  await insertRowsInChunks('attendance_erp_raw', erpPayload);
+
+  return {
+    ok: true,
+    skipped: false,
+    batchId,
+    secomCount: secomPayload.length,
+    erpCount: erpPayload.length
+  };
+}
 function loadUploadedAttendanceData(){
   try{
     const raw = localStorage.getItem(ATTENDANCE_UPLOAD_STORAGE_KEY);
@@ -2829,16 +2913,56 @@ async function applyUploadedFiles(){
     alert('엑셀 라이브러리를 불러오지 못했습니다. 인터넷 연결 상태를 확인해주세요.');
     return;
   }
-  const [secomWb, erpWb] = await Promise.all([readWorkbook(secomFile), readWorkbook(erpFile)]);
-  const secomRows = parseSecomWorkbookRows(firstSheetRows(secomWb));
-  const erpRows = parseErpWorkbookRows(firstSheetRows(erpWb));
-  REAL_ATTENDANCE_DATA = [...secomRows, ...erpRows];
-  HOLIDAY_DATE_SET = buildHolidayDateSet();
-  rebuildDerivedMetricsFromAttendance();
-  saveUploadedAttendanceData();
-  updateUploadStatus();
-  render();
-  alert('업로드 데이터 반영이 완료되었습니다. 조직관리와 사원정보관리는 유지되었습니다.');
+
+  const applyBtn = $('#applyUploadBtn');
+  const originalBtnText = applyBtn ? applyBtn.textContent : '';
+  if(applyBtn){
+    applyBtn.disabled = true;
+    applyBtn.textContent = '업로드 처리 중...';
+  }
+
+  try{
+    const [secomWb, erpWb] = await Promise.all([readWorkbook(secomFile), readWorkbook(erpFile)]);
+    const secomRows = parseSecomWorkbookRows(firstSheetRows(secomWb));
+    const erpRows = parseErpWorkbookRows(firstSheetRows(erpWb));
+
+    REAL_ATTENDANCE_DATA = [...secomRows, ...erpRows];
+    HOLIDAY_DATE_SET = buildHolidayDateSet();
+    rebuildDerivedMetricsFromAttendance();
+    saveUploadedAttendanceData();
+    updateUploadStatus();
+    render();
+
+    const batchId = createUploadBatchId();
+    let backupMessage = '
+서버 백업은 비활성 상태라 브라우저 반영만 완료되었습니다.';
+    try{
+      const backupResult = await backupUploadedAttendanceRawToSupabase({
+        batchId,
+        secomRows,
+        erpRows,
+        secomFilename: secomFile.name,
+        erpFilename: erpFile.name
+      });
+      if(backupResult && backupResult.ok){
+        backupMessage = `
+서버 원본 백업 완료 · Batch: ${backupResult.batchId}`;
+      }
+    }catch(serverError){
+      console.error('[ATTENDANCE RAW BACKUP FAILED]', serverError);
+      const detail = serverError?.message || serverError?.details || serverError?.hint || '';
+      backupMessage = `
+서버 백업 실패 · 브라우저 반영은 완료됨${detail ? `
+(${detail})` : ''}`;
+    }
+
+    alert(`업로드 데이터 반영이 완료되었습니다. 조직관리와 사원정보관리는 유지되었습니다.${backupMessage}`);
+  } finally {
+    if(applyBtn){
+      applyBtn.disabled = false;
+      applyBtn.textContent = originalBtnText || '업로드 데이터 반영';
+    }
+  }
 }
 function bindUploadRuntimeEvents(){
   $('#applyUploadBtn')?.addEventListener('click', () => {
