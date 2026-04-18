@@ -709,21 +709,51 @@ body{
   <div class="portal-layout">
     <div class="portal-sidenav">
       <div>
-        <button class="portal-nav-btn home" onclick="location.href='index.html'">홈</button>
+        <!-- 홈 -->
+        <button class="portal-nav-btn home" onclick="location.href='index.html'">
+          홈
+        </button>
+    
         <div class="portal-nav-group">
-          <button class="portal-nav-btn" type="button">폐수</button>
-          <button class="portal-nav-btn active" onclick="location.href='attendance.html'">근태</button>
-          <button class="portal-nav-btn" type="button">식대</button>
-          <button class="portal-nav-btn" type="button">시약</button>
-          <button class="portal-nav-btn" type="button">문서</button>
+          <!-- 폐수 -->
+          <button class="portal-nav-btn" onclick="location.href='wastewater.html'">
+            폐수
+          </button>
+    
+          <!-- 근태 (현재 페이지) -->
+          <button class="portal-nav-btn active" onclick="location.href='attendance.html'">
+            근태
+          </button>
+    
+          <!-- 식대 -->
+          <button class="portal-nav-btn" onclick="location.href='meal.html'">
+            식대
+          </button>
+    
+          <!-- 시약 -->
+          <button class="portal-nav-btn" onclick="location.href='reagent.html'">
+            시약
+          </button>
+    
+          <!-- 문서 -->
+          <button class="portal-nav-btn" onclick="location.href='documents.html'">
+            문서
+          </button>
         </div>
       </div>
+    
       <div class="portal-nav-group">
-        <button class="portal-nav-btn" type="button">설정</button>
-        <button class="portal-nav-btn" type="button">종료</button>
+        <!-- 설정 -->
+        <button class="portal-nav-btn" onclick="location.href='settings.html'">
+          설정
+        </button>
+    
+        <!-- 종료 -->
+        <button class="portal-nav-btn" onclick="location.href='index.html'">
+          종료
+        </button>
       </div>
     </div>
-    <div class="portal-main">
 
 
 
