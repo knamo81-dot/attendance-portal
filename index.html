@@ -268,9 +268,9 @@
     .memo-note {
       position: absolute;
       box-sizing: border-box;
-      width: auto;
-      min-width: 220px;
-      max-width: min(1100px, calc(100% - 24px));
+      width: 260px;
+      min-width: 240px;
+      max-width: 280px;
       min-height: 170px;
       padding: 16px;
       border-radius: 18px;
@@ -284,8 +284,9 @@
       transition: width 0.15s ease, min-height 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
     }
     .memo-note.expanded {
+      width: auto;
       min-width: 420px;
-      max-width: min(720px, calc(100vw - 80px));
+      max-width: min(1100px, calc(100vw - 80px));
       z-index: 200 !important;
     }
     .memo-note-main {
@@ -327,7 +328,7 @@
       font-weight: 800;
       color: #0f172a;
       line-height: 1.4;
-      word-break: normal;
+      word-break: break-word;
       overflow-wrap: anywhere;
     }
     .memo-content-view {
@@ -2884,6 +2885,33 @@ body.real-modal-open{overflow:hidden}
       else setPortalMemoFeedback(msg, k);
     }
 
+    function memoBoardHeightStorageKey() {
+      try {
+        const em = String(portalAuth().email || '').trim().toLowerCase();
+        return em ? `memoBoardHeight:${em}` : 'memoBoardHeight';
+      } catch (_) {
+        return 'memoBoardHeight';
+      }
+    }
+
+    function hydrateMemoBoardHeightFromStorage() {
+      try {
+        const raw = localStorage.getItem(memoBoardHeightStorageKey());
+        const n = Number(raw);
+        if (Number.isFinite(n) && n >= 720 && n <= 2200) {
+          state.memoBoardHeight = Math.round(n);
+        }
+      } catch (_) { /* ignore */ }
+    }
+
+    function persistMemoBoardHeightToStorage(px) {
+      try {
+        const n = Math.round(Number(px));
+        if (!Number.isFinite(n) || n < 720 || n > 2200) return;
+        localStorage.setItem(memoBoardHeightStorageKey(), String(n));
+      } catch (_) { /* ignore */ }
+    }
+
     function parseLegacyMemoContentJson(raw) {
       if (!raw || !String(raw).trim().startsWith('{')) return null;
       try {
@@ -3439,7 +3467,7 @@ body.real-modal-open{overflow:hidden}
       state.newMemoOpen = false;
       state.trashOpen = false;
       state.newMemo = { title: '', tag: '메모', pinned: false, imageOnly: false, color: '#fef3c7', content: '', expandedWidth: 420 };
-      state.memoBoardHeight = 720;
+      hydrateMemoBoardHeightFromStorage();
 
       state.selectedDate = todayDateKey;
       state.calendarMonth = todayMonthKey;
@@ -3547,9 +3575,13 @@ body.real-modal-open{overflow:hidden}
       return Math.max(320, Math.min(1100, calculated));
     }
 
+    const MEMO_CARD_COLLAPSED_W = 260;
+    const MEMO_CARD_COLLAPSED_MIN = 240;
+    const MEMO_CARD_COLLAPSED_MAX = 280;
+
     function getMemoStoredCardWidth(item) {
       const raw = Number(item?.layout?.w ?? item?.layout_w);
-      if (!Number.isFinite(raw) || raw < 40) return 260;
+      if (!Number.isFinite(raw) || raw < 40) return MEMO_CARD_COLLAPSED_W;
       return Math.round(Math.max(220, Math.min(560, raw)));
     }
 
@@ -3560,16 +3592,15 @@ body.real-modal-open{overflow:hidden}
     }
 
     function getMemoDisplayWidth(item, isExpanded, isEditing) {
-      const stored = getMemoStoredCardWidth(item);
       if (isEditing && state.editMemo) {
         const ew = Number(state.editMemo.expandedWidth) || getMemoAutoWidth(state.editMemo.title, state.editMemo.content);
-        return Math.round(Math.max(420, Math.min(1100, Math.max(stored, ew))));
+        return Math.round(Math.max(420, Math.min(1100, ew)));
       }
       if (isExpanded) {
         const ew = Number(item.expandedWidth) || getMemoAutoWidth(item.title, item.content);
-        return Math.round(Math.max(420, Math.min(1100, Math.max(stored, ew))));
+        return Math.round(Math.max(420, Math.min(1100, ew)));
       }
-      return stored;
+      return MEMO_CARD_COLLAPSED_W;
     }
 
     function freezeMemoLayoutSnapshot(note) {
@@ -3635,6 +3666,7 @@ function render() {
     }
 
     function renderMemoTab() {
+      hydrateMemoBoardHeightFromStorage();
       const pinned = state.notes.filter(n => n.pinned);
       const recent = state.notes.filter(n => !n.pinned);
       const notes = [...pinned, ...recent];
@@ -3675,7 +3707,9 @@ function render() {
               const noteMinH = item.imageOnly
                 ? 'auto'
                 : `${Math.max(baseMinH, (isExpanded || isEditing) ? 240 : baseMinH)}px`;
-              const noteW = item.imageOnly ? Math.max(220, Math.min(noteWidth, 360)) : noteWidth;
+              const noteW = (isExpanded || isEditing)
+                ? (item.imageOnly ? Math.max(220, Math.min(noteWidth, 360)) : noteWidth)
+                : Math.max(MEMO_CARD_COLLAPSED_MIN, Math.min(MEMO_CARD_COLLAPSED_MAX, MEMO_CARD_COLLAPSED_W));
               const memoCanDrag = !isEditing;
               return `
                 <div
@@ -3865,6 +3899,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           board.classList.remove('resizing');
           window.removeEventListener('mousemove', onMouseMove);
           window.removeEventListener('mouseup', onMouseUp);
+          persistMemoBoardHeightToStorage(state.memoBoardHeight);
           renderMemoTab();
         }
 
@@ -3873,9 +3908,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       });
 
       function applyLiveMemoWidth(noteId, title, content) {
-        const base = state.notes.find(n => n.id === noteId);
-        const stored = base ? getMemoStoredCardWidth(base) : 260;
-        const width = Math.max(420, Math.min(1100, Math.max(stored, getMemoAutoWidth(title, content))));
+        const width = Math.max(420, Math.min(1100, getMemoAutoWidth(title, content)));
         if (state.memoEditingId === noteId && state.editMemo) {
           state.editMemo.expandedWidth = width;
         }
