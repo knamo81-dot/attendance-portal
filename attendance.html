@@ -5935,9 +5935,6 @@ function decorateAttendanceRow(row, metaByName){
   }
 
   const hasMissingClock = (displayStart === '출근누락' || displayEnd === '퇴근누락');
-  const missingClockReason = (displayStart === '출근누락' && displayEnd === '퇴근누락')
-    ? '출퇴근미입력'
-    : (displayStart === '출근누락' ? '출근미입력' : (displayEnd === '퇴근누락' ? '퇴근미입력' : ''));
 
   // 저장된/선택된 OT확인 값은 연장근로가 있을 때만 상태에 반영
   if (dispatchRule || workFromHomeRule) {
@@ -5951,11 +5948,6 @@ function decorateAttendanceRow(row, metaByName){
   } else if (hasMissingClock) {
     bucket = '주의';
     statusLabel = '주의';
-    if (missingClockReason && !['연장근무','공휴일근무','휴일근무'].includes(primaryReason)) {
-      primaryReason = missingClockReason;
-      displayReason = missingClockReason;
-      reason = missingClockReason;
-    }
   } else if (judgedReasonsWarning.includes(displayReason)) {
     bucket = '주의';
     statusLabel = '주의';
