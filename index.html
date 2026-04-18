@@ -205,23 +205,6 @@
       height: 12px;
       border-radius: 999px;
     }
-    .board-label {
-      position: absolute;
-      right: 18px;
-      top: 16px;
-      z-index: 2;
-      font-size: 12px;
-      color: #64748b;
-      font-weight: 600;
-    }
-    .board-help {
-      position: absolute;
-      left: 24px;
-      bottom: 20px;
-      font-size: 12px;
-      color: #64748b;
-      z-index: 2;
-    }
     .memo-board-resize-handle {
       position: absolute;
       left: 50%;
@@ -250,16 +233,33 @@
     }
     .memo-note {
       position: absolute;
-      width: 260px;
+      box-sizing: border-box;
+      width: auto;
+      min-width: 220px;
+      max-width: min(1100px, calc(100% - 24px));
       min-height: 170px;
       padding: 16px;
       border-radius: 18px;
       box-shadow: 0 12px 24px rgba(15,23,42,0.14);
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: flex-start;
+      align-items: stretch;
+      gap: 0;
       user-select: none;
       transition: width 0.15s ease, min-height 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+    }
+    .memo-note.expanded {
+      min-width: 420px;
+      max-width: min(720px, calc(100vw - 80px));
+      z-index: 200 !important;
+    }
+    .memo-note-main {
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
     }
     .memo-note:hover {
       box-shadow: 0 18px 30px rgba(15,23,42,0.20);
@@ -293,7 +293,8 @@
       font-weight: 800;
       color: #0f172a;
       line-height: 1.4;
-      word-break: keep-all;
+      word-break: normal;
+      overflow-wrap: anywhere;
     }
     .memo-content-view {
       margin-top: 12px;
@@ -301,23 +302,33 @@
       color: #334155;
       line-height: 1.6;
       white-space: pre-wrap;
+      word-break: normal;
+      overflow-wrap: break-word;
     }
     .memo-footer {
-      margin-top: 18px;
+      margin-top: auto;
+      padding-top: 12px;
+      flex-shrink: 0;
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      gap: 8px;
+      align-items: flex-start;
+      gap: 10px;
+      flex-wrap: wrap;
     }
     .memo-meta {
       font-size: 11px;
       color: #64748b;
+      flex: 1 1 140px;
+      min-width: 0;
+      line-height: 1.45;
     }
     .memo-actions {
       display: flex;
       gap: 6px;
       flex-wrap: wrap;
       justify-content: flex-end;
+      flex: 0 0 auto;
+      min-width: 0;
     }
     .memo-pop {
       position: absolute;
@@ -360,12 +371,13 @@
     }
     .field textarea {
       min-height: 100px;
-      resize: none;
+      resize: vertical;
       line-height: 1.5;
-      white-space: pre;
-      overflow-wrap: normal;
-      word-break: keep-all;
-      overflow: hidden;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      word-break: normal;
+      overflow-x: hidden;
+      overflow-y: auto;
     }
     .color-row {
       display: flex;
@@ -712,12 +724,6 @@
       border-radius: 16px;
       padding: 14px;
     }
-    .footer-card {
-      margin-top: 16px;
-      background: #0f172a;
-      color: #fff;
-    }
-
     @media (max-width: 1100px) {
       .layout { grid-template-columns: 1fr; }
       .sidenav { display: none; }
@@ -870,6 +876,10 @@
     .memo-note.image-only.expanded .memo-footer .memo-actions {
       display: flex;
     }
+    .memo-note.image-only.expanded {
+      min-width: 220px;
+      max-width: min(360px, calc(100vw - 80px));
+    }
 
 
 /* ===== FULL WIDTH LAYOUT ===== */
@@ -884,14 +894,18 @@
   width: 100% !important;
 }
 
-/* ===== Z-INDEX IMPROVEMENT ===== */
+/* ===== Z-INDEX (메모 겹침) ===== */
 .memo-note {
   position: absolute;
   z-index: 1;
 }
 
 .memo-note:hover {
-  z-index: 10;
+  z-index: 50;
+}
+
+.memo-note.expanded:hover {
+  z-index: 200 !important;
 }
 
 
@@ -959,7 +973,6 @@ html, body {
 .card,
 .header-card,
 .memo-wrap,
-.footer-card,
 .content,
 .memo-board {
   width: 100% !important;
@@ -2125,7 +2138,6 @@ body.real-modal-open{overflow:hidden}
         <div class="card header-card">
           <div class="header-top">Research Lab Integrated Portal</div>
           <div class="title">연구소 운영 통합 메인</div>
-          <div class="subtitle">개인 메모, 스케줄, 연구소 운영 통합 정보를 분리한 전체 포털 미리보기입니다.</div>
           <div class="tabs">
             <button class="pill active" data-tab="memo">개인 메모</button>
             <button class="pill" data-tab="schedule">스케줄</button>
@@ -2135,16 +2147,12 @@ body.real-modal-open{overflow:hidden}
 
         <div id="tab-content" class="content"></div>
 
-        <div class="card footer-card">
-          지금은 폐수관리 웹앱을 중심으로 시작하고, 이후 근태관리·식대계산·시약초자 주문/분석을 같은 포털 안에 순차적으로 추가하는 구조를 가정한 시안입니다.
-        </div>
         </div>
 
         <div id="wastewater-page" class="page-panel">
           <div class="card header-card">
             <div class="header-top">Wastewater Page</div>
             <div class="title">폐수관리</div>
-            <div class="subtitle">폐수 화면 자리입니다. 다음 단계에서 실제 폐수관리 웹앱을 붙일 수 있도록 자리만 먼저 만들어 두었습니다.</div>
           </div>
         </div>
 
@@ -2152,7 +2160,6 @@ body.real-modal-open{overflow:hidden}
           <div class="card header-card">
             <div class="header-top">Meal Page</div>
             <div class="title">식대관리</div>
-            <div class="subtitle">식대관리 화면 자리입니다.</div>
           </div>
         </div>
 
@@ -2160,7 +2167,6 @@ body.real-modal-open{overflow:hidden}
           <div class="card header-card">
             <div class="header-top">Supplies Page</div>
             <div class="title">시약·초자</div>
-            <div class="subtitle">시약·초자 화면 자리입니다.</div>
           </div>
         </div>
 
@@ -2168,7 +2174,6 @@ body.real-modal-open{overflow:hidden}
           <div class="card header-card">
             <div class="header-top">Document Page</div>
             <div class="title">문서함</div>
-            <div class="subtitle">문서함 화면 자리입니다.</div>
           </div>
         </div>
 
@@ -2514,9 +2519,9 @@ body.real-modal-open{overflow:hidden}
   <script>
     const apps = [
       { id: 'wastewater', name: '폐수배출시설 운영일지', status: '운영중', desc: '일일입력 · 수거등록 · 운영일지', color: '#e0f2fe' },
-      { id: 'attendance', name: '근태관리', status: '추가예정', desc: '출퇴근 · OT · 위험분석', color: '#f8fafc' },
-      { id: 'meal', name: '식대계산', status: '추가예정', desc: '식대정산 · 월별집계', color: '#f8fafc' },
-      { id: 'supplies', name: '시약·초자 주문/분석', status: '추가예정', desc: '주문현황 · 비용분석', color: '#f8fafc' },
+      { id: 'attendance', name: '근태관리', status: '별도', desc: '출퇴근 · OT · 위험분석', color: '#f8fafc' },
+      { id: 'meal', name: '식대계산', status: '준비', desc: '식대정산 · 월별집계', color: '#f8fafc' },
+      { id: 'supplies', name: '시약·초자 주문/분석', status: '준비', desc: '주문현황 · 비용분석', color: '#f8fafc' },
     ];
 
     const todayDate = new Date();
@@ -3044,15 +3049,15 @@ body.real-modal-open{overflow:hidden}
       const n = state.notes.find(x => String(x.id) === sid);
       if (!noteEl || !n || !n.serverId) return;
       const r = noteEl.getBoundingClientRect();
-      const w = Math.max(80, Math.round(r.width));
-      const h = Math.max(60, Math.round(r.height));
+      const w = Math.max(220, Math.round(r.width));
+      const h = Math.max(120, Math.round(r.height));
       const x = Math.max(0, Math.round(parseFloat(noteEl.style.left) || n.layout?.x || 0));
       const y = Math.max(0, Math.round(parseFloat(noteEl.style.top) || n.layout?.y || 0));
       state.notes = state.notes.map(note => String(note.id) === sid
         ? {
             ...note,
-            layout: { ...note.layout, x, y },
-            originalLayout: { ...(note.originalLayout || note.layout), x, y },
+            layout: { ...note.layout, x, y, w, h },
+            originalLayout: { ...(note.originalLayout || note.layout), x, y, w, h },
             layout_w: w,
             layout_h: h,
             expandedWidth: w
@@ -3485,12 +3490,29 @@ body.real-modal-open{overflow:hidden}
       return Math.max(320, Math.min(1100, calculated));
     }
 
+    function getMemoStoredCardWidth(item) {
+      const raw = Number(item?.layout?.w ?? item?.layout_w);
+      if (!Number.isFinite(raw) || raw < 40) return 260;
+      return Math.round(Math.max(220, Math.min(560, raw)));
+    }
+
+    function getMemoCollapsedMinHeight(item) {
+      const raw = Number(item?.layout?.h ?? item?.layout_h);
+      if (!Number.isFinite(raw) || raw < 80) return 170;
+      return Math.round(Math.max(120, Math.min(900, raw)));
+    }
+
     function getMemoDisplayWidth(item, isExpanded, isEditing) {
-      if (!isExpanded) return 260;
+      const stored = getMemoStoredCardWidth(item);
       if (isEditing && state.editMemo) {
-        return state.editMemo.expandedWidth || getMemoAutoWidth(state.editMemo.title, state.editMemo.content);
+        const ew = Number(state.editMemo.expandedWidth) || getMemoAutoWidth(state.editMemo.title, state.editMemo.content);
+        return Math.round(Math.max(420, Math.min(1100, Math.max(stored, ew))));
       }
-      return item.expandedWidth || getMemoAutoWidth(item.title, item.content);
+      if (isExpanded) {
+        const ew = Number(item.expandedWidth) || getMemoAutoWidth(item.title, item.content);
+        return Math.round(Math.max(420, Math.min(1100, Math.max(stored, ew))));
+      }
+      return stored;
     }
 
 
@@ -3670,7 +3692,6 @@ function render() {
           <div class="memo-top">
             <div>
               <div style="font-size:18px;font-weight:700;">개인 메모</div>
-              <div style="font-size:13px;color:#64748b;margin-top:4px;">윈도우 화면에 붙인 스티커 메모처럼 자유롭게 배치하는 메모 보드입니다.</div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
               <button class="small-btn" id="memo-sort-toggle">${state.memoSortedView ? '정렬 해제' : '정렬'}</button>
@@ -3688,32 +3709,34 @@ function render() {
               <div class="dot" style="background:#34d399"></div>
             </div>
 
-            <div class="board-label">My Sticky Board</div>
-
             ${state.memoLoading ? `<div style="padding:12px 16px;color:#64748b;font-size:13px;">불러오는 중...</div>` : ''}
             ${!state.memoLoading && !notes.length ? `<div style="padding:12px 16px;color:#94a3b8;font-size:13px;">등록된 메모가 없습니다.</div>` : ''}
 
             ${notes.map((item, idx) => {
               const isExpanded = state.memoExpandedId === item.id;
               const isEditing = state.memoEditingId === item.id;
-              const noteHeight = isExpanded ? 300 : 170;
-              const noteWidth = getMemoDisplayWidth(item, isExpanded, isEditing);
+              const noteWidth = getMemoDisplayWidth(item, isExpanded || isEditing, isEditing);
+              const baseMinH = item.imageOnly ? null : getMemoCollapsedMinHeight(item);
+              const noteMinH = item.imageOnly
+                ? 'auto'
+                : `${Math.max(baseMinH, (isExpanded || isEditing) ? 240 : baseMinH)}px`;
+              const noteW = item.imageOnly ? Math.max(220, Math.min(noteWidth, 360)) : noteWidth;
               return `
                 <div
-                  class="memo-note ${item.imageOnly ? 'image-only' : ''} ${isExpanded ? 'expanded' : ''} ${state.memoDraggingId === item.id ? 'dragging' : ''}"
+                  class="memo-note ${item.imageOnly ? 'image-only' : ''} ${isExpanded || isEditing ? 'expanded' : ''} ${state.memoDraggingId === item.id ? 'dragging' : ''}"
                   data-note-id="${item.id}"
                   style="
                     left:${item.layout.x}px;
                     top:${item.layout.y}px;
-                    width:${item.imageOnly ? Math.max(220, Math.min(noteWidth, 320)) : noteWidth}px;
-                    min-height:${item.imageOnly ? 'auto' : noteHeight + 'px'};
+                    width:${noteW}px;
+                    min-height:${noteMinH};
                     background:${item.layout.color || '#fef3c7'};
                     transform:rotate(${item.layout.rotate}deg);
                     z-index:${item.z || idx + 1};
                     cursor:${isEditing ? 'default' : 'grab'};
                   "
                 >
-                  <div>
+                  <div class="memo-note-main">
                     <div class="memo-drag-handle" data-drag-id="${item.id}">
                       <div class="memo-tag">#${escapeHtml(isEditing ? state.editMemo?.tag || item.tag : item.tag)}</div>
                       <div class="${item.pinned ? 'memo-state pin' : 'memo-state'}">${item.pinned ? 'PIN' : 'MEMO'}</div>
@@ -3735,7 +3758,7 @@ function render() {
                         <input type="text" id="edit-tag" value="${escapeAttr(state.editMemo.tag)}" placeholder="태그" />
                       </div>
                       <div class="field">
-                        <textarea id="edit-content" rows="5" wrap="off" spellcheck="false" placeholder="메모 내용">${escapeHtml(state.editMemo.content)}</textarea>
+                        <textarea id="edit-content" rows="6" wrap="soft" spellcheck="false" placeholder="메모 내용">${escapeHtml(state.editMemo.content)}</textarea>
                       </div>
                       <label class="checkbox-row">
                         <input type="checkbox" id="edit-pinned" ${state.editMemo.pinned ? 'checked' : ''} />
@@ -3813,7 +3836,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
                 </div>
                 <div class="field">
                   <label>내용</label>
-                  <textarea id="new-content" rows="4" wrap="off" spellcheck="false" placeholder="메모 내용을 입력하세요">${escapeHtml(state.newMemo.content)}</textarea>
+                  <textarea id="new-content" rows="5" wrap="soft" spellcheck="false" placeholder="메모 내용을 입력하세요">${escapeHtml(state.newMemo.content)}</textarea>
                 </div>
                 <label class="checkbox-row">
                   <input type="checkbox" id="new-pinned" ${state.newMemo.pinned ? 'checked' : ''} />
@@ -3851,7 +3874,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
               </div>
             ` : ''}
 
-            <div class="board-help">메모를 드래그해서 자유롭게 옮길 수 있고, 일부 겹쳐도 유지되는 데스크톱형 보드 미리보기</div>
             <div class="memo-board-resize-handle" id="memo-board-resize-handle" title="메모 보드 높이 조절"></div>
           </div>
         </div>
@@ -3892,7 +3914,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       });
 
       function applyLiveMemoWidth(noteId, title, content) {
-        const width = getMemoAutoWidth(title, content);
+        const base = state.notes.find(n => n.id === noteId);
+        const stored = base ? getMemoStoredCardWidth(base) : 260;
+        const width = Math.max(420, Math.min(1100, Math.max(stored, getMemoAutoWidth(title, content))));
         if (state.memoEditingId === noteId && state.editMemo) {
           state.editMemo.expandedWidth = width;
         }
@@ -3903,7 +3927,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         const textarea = document.getElementById('edit-content');
         if (textarea) {
           textarea.style.width = '100%';
-          textarea.style.overflow = 'hidden';
+          textarea.style.overflow = 'auto';
         }
       }
 
@@ -3917,7 +3941,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         const textarea = document.getElementById('new-content');
         if (textarea) {
           textarea.style.width = '100%';
-          textarea.style.overflow = 'hidden';
+          textarea.style.overflow = 'auto';
         }
       }
 
@@ -4056,7 +4080,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             color: target.layout?.color || (target.imageOnly ? '#f8fafc' : '#fef3c7'),
             imageOnly: !!target.imageOnly,
             content: target.content || '',
-            expandedWidth: target.expandedWidth || getMemoAutoWidth(target.title, target.content),
+            expandedWidth: Math.max(420, Number(target.expandedWidth) || getMemoAutoWidth(target.title, target.content)),
           };
           bringToFront(id);
           renderMemoTab();
@@ -4094,7 +4118,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             tag: state.editMemo.tag.trim() || '메모',
             pinned: !!state.editMemo.pinned,
             content: state.editMemo.content.trim(),
-            expandedWidth: state.editMemo.expandedWidth || getMemoAutoWidth(state.editMemo.title, state.editMemo.content),
+            expandedWidth: Math.max(420, Number(state.editMemo.expandedWidth) || getMemoAutoWidth(state.editMemo.title, state.editMemo.content)),
             layout: { ...currentTarget.layout, color: state.editMemo.color || currentTarget.layout.color || '#fef3c7' },
             originalLayout: { ...(currentTarget.originalLayout || currentTarget.layout), color: state.editMemo.color || currentTarget.layout.color || '#fef3c7' }
           };
@@ -4211,7 +4235,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             imageOnly: !!state.newMemo.imageOnly,
             content: state.newMemo.imageOnly ? '' : state.newMemo.content.trim(),
             image: imageData,
-            expandedWidth: state.newMemo.expandedWidth || getMemoAutoWidth(state.newMemo.title, state.newMemo.content),
+            expandedWidth: Math.max(420, Number(state.newMemo.expandedWidth) || getMemoAutoWidth(state.newMemo.title, state.newMemo.content)),
             z: getNextZ(),
             layout: {
               x: baseLayout.x + (nextIndex % 3) * 18,
@@ -4939,7 +4963,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             </div>
 
             <div class="card">
-              <div style="font-size:16px;font-weight:700;margin-bottom:10px;">${isReservationMode ? '예약 운영 기준 예시' : '활용 팁'}</div>
+              <div style="font-size:16px;font-weight:700;margin-bottom:10px;">${isReservationMode ? '예약 이용 안내' : '스케줄 안내'}</div>
               <div class="tips">
                 ${isReservationMode ? `
                 • 장소 탭은 관리자가 등록한 예약 장소 목록입니다<br />
@@ -5570,7 +5594,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
                 <div>
                   <div style="font-size:18px;font-weight:700;">연구소 운영 통합 정보</div>
-                  <div style="font-size:13px;color:#64748b;margin-top:4px;">폐수관리 중심으로 시작하고 추후 다른 앱을 추가하는 구조</div>
                 </div>
                 <div style="display:flex;gap:8px;">
                   <button class="small-btn">오늘 업무</button>
@@ -6107,11 +6130,11 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       const sectionMap = {
         org: {
           title: '조직관리',
-          desc: '사원정보 입력 시 사용할 본부/팀 기준정보를 먼저 관리하는 화면입니다. 실제 데이터 연결까지는 포털 뼈대와 입력 위치를 먼저 고정합니다.'
+          desc: '본부·팀 기준정보를 등록하고 정렬·사용 여부를 관리합니다.'
         },
         employee: {
           title: '사원정보관리',
-          desc: '조직관리에서 등록한 본부/팀 기준정보를 드롭다운으로 불러와 사원정보를 관리합니다. 로그인 이메일과 포털 권한은 사원 입력/수정에서 함께 저장합니다.'
+          desc: '사원 정보와 로그인 이메일·포털 권한을 등록·수정합니다.'
         },
         team: {
           title: '팀변경관리',
@@ -7460,3 +7483,4 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 </script>
 
 </body>
+</html>
