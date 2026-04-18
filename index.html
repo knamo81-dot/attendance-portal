@@ -3632,11 +3632,9 @@ body.real-modal-open{overflow:hidden}
     let lastMemoDragMoved = false;
 
     /**
-     * 정렬 격자만 다시 계산한다.
-     * @param {boolean} refreshSnapshots true면 정렬 진입: 현재 layout 기준으로 originalLayout 스냅(자유 좌표 보존용).
-     *   false면 서버 재로딩 등: 기존 originalLayout 유지, 격자만 재배치.
+     * 정렬 보기: state.layout만 격자 좌표로 덮어쓴다. originalLayout·DB 값은 건드리지 않는다.
      */
-    function repackMemoSortedLayoutFromState(refreshSnapshots) {
+    function repackMemoSortedLayoutFromState() {
       const colorOrder = colorOptions.reduce((acc, color, idx) => {
         acc[color] = idx;
         return acc;
@@ -3655,17 +3653,12 @@ body.real-modal-open{overflow:hidden}
         return String(a.id).localeCompare(String(b.id));
       });
 
-      const working = refreshSnapshots
-        ? sorted.map(note => {
-            const snap = freezeMemoLayoutSnapshot(note);
-            return { ...note, originalLayout: { ...snap } };
-          })
-        : sorted.map(note => ({
-            ...note,
-            originalLayout: note.originalLayout
-              ? { ...note.originalLayout }
-              : { ...freezeMemoLayoutSnapshot(note) }
-          }));
+      const working = sorted.map(note => ({
+        ...note,
+        originalLayout: note.originalLayout
+          ? { ...note.originalLayout }
+          : { ...freezeMemoLayoutSnapshot(note) }
+      }));
 
       const leftPadding = 28;
       const topPadding = 56;
@@ -3702,69 +3695,32 @@ body.real-modal-open{overflow:hidden}
       state.notes = newNotes;
     }
 
-    async function persistAllMemoLayoutsForSort(options = {}) {
-      const quiet = !!options.quiet;
-      const skipRender = !!options.skipRender;
-      for (const n of state.notes) {
-        if (!n.serverId) continue;
-        const lw = Math.round(n.layout?.w || n.layout_w || 260);
-        const lh = Math.round(n.layout?.h || n.layout_h || 170);
-        await updateMemoOnServer(n.serverId, {
-          layout: n.layout,
-          originalLayout: n.originalLayout,
-          z: n.z,
-          layout_w: lw,
-          layout_h: lh
-        });
-      }
-      if (!quiet) setPortalMemoFeedback('메모가 저장되었습니다.', 'success');
-      if (!skipRender && typeof renderMemoTab === 'function') renderMemoTab();
-    }
-
     function sortMemosByColorAndDate() {
-      repackMemoSortedLayoutFromState(true);
+      repackMemoSortedLayoutFromState();
       state.memoSortedView = true;
       normalizeSortedMemoStack();
       try { localStorage.setItem('portal_memo_sorted_view', '1'); } catch (_) { /* ignore */ }
-      (async () => {
-        try {
-          await persistAllMemoLayoutsForSort({ quiet: false });
-        } catch (e) {
-          console.error(e);
-          setPortalMemoFeedback(e?.message || '서버 저장 중 오류가 발생했습니다.', 'error');
-          if (typeof renderMemoTab === 'function') renderMemoTab();
-        }
-      })();
     }
 
-    async function syncMemoSortedStateAfterReload() {
+    /** 서버 재로딩 후에도 정렬 보기면 메모리에서만 격자를 다시 씌운다(DB 호출 없음). */
+    function reapplyMemoSortedViewAfterReload() {
       if (!state.memoSortedView) return;
-      repackMemoSortedLayoutFromState(false);
+      repackMemoSortedLayoutFromState();
       normalizeSortedMemoStack();
-      await persistAllMemoLayoutsForSort({ quiet: true, skipRender: true });
     }
 
     function restoreMemoOriginalLayout() {
       state.notes = state.notes.map((note, idx) => {
-        const L = { ...(note.originalLayout || note.layout) };
+        const freeSrc = note.originalLayout || note.layout;
+        const snap = freezeMemoLayoutSnapshot({ ...note, layout: { ...note.layout, ...freeSrc } });
         return {
           ...note,
           z: idx + 1,
-          layout: { ...L },
-          originalLayout: { ...L }
+          layout: { ...note.layout, ...snap }
         };
       });
       state.memoSortedView = false;
       try { localStorage.setItem('portal_memo_sorted_view', '0'); } catch (_) { /* ignore */ }
-      (async () => {
-        try {
-          await persistAllMemoLayoutsForSort({ quiet: false });
-        } catch (e) {
-          console.error(e);
-          setPortalMemoFeedback(e?.message || '서버 저장 중 오류가 발생했습니다.', 'error');
-          if (typeof renderMemoTab === 'function') renderMemoTab();
-        }
-      })();
     }
 
 
@@ -4329,6 +4285,11 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             renderMemoTab();
             return;
           }
+          const color = state.editMemo.color || currentTarget.layout?.color || '#fef3c7';
+          const freeSnap = freezeMemoLayoutSnapshot({
+            ...currentTarget,
+            layout: { ...(currentTarget.originalLayout || currentTarget.layout), color }
+          });
           const next = {
             ...currentTarget,
             title: state.editMemo.title.trim(),
@@ -4336,13 +4297,17 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             pinned: !!state.editMemo.pinned,
             content: state.editMemo.content.trim(),
             expandedWidth: Math.max(420, Number(state.editMemo.expandedWidth) || getMemoAutoWidth(state.editMemo.title, state.editMemo.content)),
-            layout: { ...currentTarget.layout, color: state.editMemo.color || currentTarget.layout.color || '#fef3c7' },
-            originalLayout: { ...(currentTarget.originalLayout || currentTarget.layout), color: state.editMemo.color || currentTarget.layout.color || '#fef3c7' }
+            layout: state.memoSortedView
+              ? { ...currentTarget.layout, ...freeSnap }
+              : { ...currentTarget.layout, color },
+            originalLayout: state.memoSortedView
+              ? { ...freeSnap }
+              : { ...(currentTarget.originalLayout || currentTarget.layout), color }
           };
           try {
             await updateMemoOnServer(currentTarget.serverId, next);
             await loadMemosFromServer();
-            if (state.memoSortedView) await syncMemoSortedStateAfterReload();
+            if (state.memoSortedView) reapplyMemoSortedViewAfterReload();
             setPortalMemoFeedback('메모가 수정되었습니다.', 'success');
             state.memoEditingId = null;
             renderMemoTab();
@@ -4369,7 +4334,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           try {
             await softDeleteMemoOnServer(target.serverId);
             await Promise.all([loadMemosFromServer(), loadTrashMemosFromServer()]);
-            if (state.memoSortedView) await syncMemoSortedStateAfterReload();
+            if (state.memoSortedView) reapplyMemoSortedViewAfterReload();
             setPortalMemoFeedback('휴지통으로 이동했습니다.', 'success');
             if (state.memoExpandedId === id) state.memoExpandedId = null;
             if (state.memoEditingId === id) state.memoEditingId = null;
@@ -4468,7 +4433,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           };
           await createMemoOnServer(draft);
           await loadMemosFromServer();
-          if (state.memoSortedView) await syncMemoSortedStateAfterReload();
+          if (state.memoSortedView) reapplyMemoSortedViewAfterReload();
           setPortalMemoFeedback('메모가 저장되었습니다.', 'success');
           state.newMemo = { title: '', tag: '메모', pinned: false, imageOnly: false, color: '#fef3c7', content: '', expandedWidth: 420 };
           state.newMemoOpen = false;
@@ -4496,7 +4461,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           try {
             await restoreMemoOnServer(target.serverId);
             await Promise.all([loadMemosFromServer(), loadTrashMemosFromServer()]);
-            if (state.memoSortedView) await syncMemoSortedStateAfterReload();
+            if (state.memoSortedView) reapplyMemoSortedViewAfterReload();
             setPortalMemoFeedback('복원되었습니다.', 'success');
             renderMemoTab();
           } catch (err) {
