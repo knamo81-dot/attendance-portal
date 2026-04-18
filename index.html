@@ -219,20 +219,6 @@
       position: absolute !important;
       margin: 0 !important;
     }
-    .memo-board.memo-board--sorted {
-      outline: 2px dashed rgba(99, 102, 241, 0.65);
-      outline-offset: -2px;
-    }
-    .memo-sorted-banner {
-      margin: 0 20px 10px 20px;
-      padding: 10px 14px;
-      border-radius: 12px;
-      background: #eef2ff;
-      border: 1px solid #c7d2fe;
-      color: #3730a3;
-      font-size: 13px;
-      line-height: 1.45;
-    }
     .memo-grid {
       position: absolute;
       inset: 0;
@@ -2666,7 +2652,6 @@ body.real-modal-open{overflow:hidden}
       trashOpen: false,
       newMemo: { title: '', tag: '메모', pinned: false, imageOnly: false, color: '#fef3c7', content: '', expandedWidth: 420 },
       memoBoardHeight: 720,
-      memoSortedView: false,
       portalMemoFeedback: { msg: '', kind: '' },
       memoLoading: false,
       scheduleLoading: false,
@@ -2929,24 +2914,6 @@ body.real-modal-open{overflow:hidden}
         rotate: Number(row.rotate) || 0,
         color
       };
-      const rawOl = row.original_layout;
-      let originalLayout;
-      if (rawOl && typeof rawOl === 'object' && !Array.isArray(rawOl)) {
-        const ox = Number(rawOl.x);
-        const oy = Number(rawOl.y);
-        const ow = Number(rawOl.w);
-        const oh = Number(rawOl.h);
-        originalLayout = {
-          x: Number.isFinite(ox) ? Math.max(0, Math.round(ox)) : layout.x,
-          y: Number.isFinite(oy) ? Math.max(0, Math.round(oy)) : layout.y,
-          w: Number.isFinite(ow) ? Math.max(120, Math.round(ow)) : layout.w,
-          h: Number.isFinite(oh) ? Math.max(80, Math.round(oh)) : layout.h,
-          rotate: Number(rawOl.rotate) || layout.rotate,
-          color: rawOl.color || layout.color
-        };
-      } else {
-        originalLayout = { x: layout.x, y: layout.y, rotate: layout.rotate, color: layout.color, w: layout.w, h: layout.h };
-      }
       return {
         id: String(row.id),
         serverId: row.id,
@@ -2967,8 +2934,7 @@ body.real-modal-open{overflow:hidden}
         is_deleted: !!row.is_deleted,
         deletedAt: row.deleted_at || null,
         deletedBy: row.deleted_by || null,
-        layout: { x: layout.x, y: layout.y, rotate: layout.rotate, color: layout.color, w: layout.w, h: layout.h },
-        originalLayout
+        layout: { x: layout.x, y: layout.y, rotate: layout.rotate, color: layout.color, w: layout.w, h: layout.h }
       };
     }
 
@@ -2997,16 +2963,6 @@ body.real-modal-open{overflow:hidden}
         deleted_at: null,
         deleted_by: null
       };
-      if (note.originalLayout) {
-        payload.original_layout = {
-          x: Math.round(note.originalLayout.x ?? note.layout?.x ?? 40),
-          y: Math.round(note.originalLayout.y ?? note.layout?.y ?? 40),
-          w: note.originalLayout.w != null ? Math.round(note.originalLayout.w) : Math.round(note.layout?.w ?? 260),
-          h: note.originalLayout.h != null ? Math.round(note.originalLayout.h) : Math.round(note.layout?.h ?? 170),
-          rotate: Number(note.originalLayout.rotate) || 0,
-          color: note.originalLayout.color || note.layout?.color || '#fef3c7'
-        };
-      }
       return payload;
     }
 
@@ -3016,7 +2972,6 @@ body.real-modal-open{overflow:hidden}
         const { sb, email } = portalAuth();
         if (!sb || !email) {
           state.notes = [];
-          state.memoSortedView = false;
           return;
         }
         const { data, error } = await sb.from('portal_memos')
@@ -3028,15 +2983,10 @@ body.real-modal-open{overflow:hidden}
           .order('created_at', { ascending: true });
         if (error) throw error;
         state.notes = (data || []).map(mapMemoRowToState);
-        try {
-          const v = localStorage.getItem('portal_memo_sorted_view');
-          if (v === '1' || v === '0') state.memoSortedView = v === '1';
-        } catch (_) { /* keep current */ }
       } catch (e) {
         console.error('loadMemosFromServer', e);
         showPortalDataMessage(e?.message || '메모를 불러오지 못했습니다.', 'error', 'memo');
         state.notes = [];
-        state.memoSortedView = false;
       } finally {
         state.memoLoading = false;
       }
@@ -3082,12 +3032,6 @@ body.real-modal-open{overflow:hidden}
         ...partialUiNote,
         layout: { ...base.layout, ...(partialUiNote.layout || {}) }
       };
-      if (partialUiNote.originalLayout != null) {
-        merged.originalLayout = {
-          ...(base.originalLayout || base.layout || {}),
-          ...partialUiNote.originalLayout
-        };
-      }
       if (partialUiNote.layout_w != null) merged.layout_w = partialUiNote.layout_w;
       if (partialUiNote.layout_h != null) merged.layout_h = partialUiNote.layout_h;
       const payload = memoStateToDbPayload(merged, email, name);
@@ -3134,7 +3078,6 @@ body.real-modal-open{overflow:hidden}
     }
 
     async function persistMemoLayoutFromDom(board, id) {
-      if (state.memoSortedView) return;
       const sid = String(id);
       const noteEl = board.querySelector(`[data-note-id="${CSS.escape(sid)}"]`);
       const n = state.notes.find(x => String(x.id) === sid);
@@ -3148,7 +3091,6 @@ body.real-modal-open{overflow:hidden}
         ? {
             ...note,
             layout: { ...note.layout, x, y, w, h },
-            originalLayout: { ...(note.originalLayout || note.layout), x, y, w, h },
             layout_w: w,
             layout_h: h,
             expandedWidth: w
@@ -3157,7 +3099,6 @@ body.real-modal-open{overflow:hidden}
       const moved = state.notes.find(x => String(x.id) === sid);
       await updateMemoOnServer(moved.serverId, {
         layout: moved.layout,
-        originalLayout: moved.originalLayout,
         layout_w: w,
         layout_h: h,
         z: moved.z
@@ -3473,8 +3414,6 @@ body.real-modal-open{overflow:hidden}
       state.trashOpen = false;
       state.newMemo = { title: '', tag: '메모', pinned: false, imageOnly: false, color: '#fef3c7', content: '', expandedWidth: 420 };
       state.memoBoardHeight = 720;
-      state.memoSortedView = false;
-      try { localStorage.setItem('portal_memo_sorted_view', '0'); } catch (_) { /* ignore */ }
 
       state.selectedDate = todayDateKey;
       state.calendarMonth = todayMonthKey;
@@ -3631,117 +3570,6 @@ body.real-modal-open{overflow:hidden}
     let memoPointerDrag = null;
     let lastMemoDragMoved = false;
 
-    /**
-     * 정렬 보기: state.layout만 격자 좌표로 덮어쓴다. originalLayout·DB 값은 건드리지 않는다.
-     */
-    function repackMemoSortedLayoutFromState() {
-      const colorOrder = colorOptions.reduce((acc, color, idx) => {
-        acc[color] = idx;
-        return acc;
-      }, {});
-
-      const sorted = [...state.notes].sort((a, b) => {
-        const colorA = a.layout?.color || '#fef3c7';
-        const colorB = b.layout?.color || '#fef3c7';
-        const colorDiff = (colorOrder[colorA] ?? 999) - (colorOrder[colorB] ?? 999);
-        if (colorDiff !== 0) return colorDiff;
-
-        const timeA = new Date(a.createdAt || 0).getTime();
-        const timeB = new Date(b.createdAt || 0).getTime();
-        if (timeA !== timeB) return timeA - timeB;
-
-        return String(a.id).localeCompare(String(b.id));
-      });
-
-      const working = sorted.map(note => ({
-        ...note,
-        originalLayout: note.originalLayout
-          ? { ...note.originalLayout }
-          : { ...freezeMemoLayoutSnapshot(note) }
-      }));
-
-      const leftPadding = 28;
-      const topPadding = 56;
-      const noteWidth = 260;
-      const noteHeight = 170;
-      const overlapX = 110;
-      const overlapY = 78;
-
-      const groups = {};
-      working.forEach(note => {
-        const color = note.layout?.color || '#fef3c7';
-        if (!groups[color]) groups[color] = [];
-        groups[color].push(note);
-      });
-
-      const orderedColors = Object.keys(groups).sort((a, b) => (colorOrder[a] ?? 999) - (colorOrder[b] ?? 999));
-
-      const newNotes = [];
-      orderedColors.forEach((color, colorIdx) => {
-        groups[color].forEach((note, idx) => {
-          newNotes.push({
-            ...note,
-            z: newNotes.length + 1,
-            layout: {
-              ...note.layout,
-              x: leftPadding + colorIdx * (noteWidth - overlapX),
-              y: topPadding + idx * (noteHeight - overlapY),
-              rotate: 0
-            }
-          });
-        });
-      });
-
-      state.notes = newNotes;
-    }
-
-    function sortMemosByColorAndDate() {
-      repackMemoSortedLayoutFromState();
-      state.memoSortedView = true;
-      normalizeSortedMemoStack();
-      try { localStorage.setItem('portal_memo_sorted_view', '1'); } catch (_) { /* ignore */ }
-    }
-
-    /** 서버 재로딩 후에도 정렬 보기면 메모리에서만 격자를 다시 씌운다(DB 호출 없음). */
-    function reapplyMemoSortedViewAfterReload() {
-      if (!state.memoSortedView) return;
-      repackMemoSortedLayoutFromState();
-      normalizeSortedMemoStack();
-    }
-
-    function restoreMemoOriginalLayout() {
-      state.notes = state.notes.map((note, idx) => {
-        const freeSrc = note.originalLayout || note.layout;
-        const snap = freezeMemoLayoutSnapshot({ ...note, layout: { ...note.layout, ...freeSrc } });
-        return {
-          ...note,
-          z: idx + 1,
-          layout: { ...note.layout, ...snap }
-        };
-      });
-      state.memoSortedView = false;
-      try { localStorage.setItem('portal_memo_sorted_view', '0'); } catch (_) { /* ignore */ }
-    }
-
-
-    function normalizeSortedMemoStack() {
-      if (!state.memoSortedView) return;
-
-      const sortedByPosition = [...state.notes].sort((a, b) => {
-        const xDiff = (a.layout?.x ?? 0) - (b.layout?.x ?? 0);
-        if (xDiff !== 0) return xDiff;
-        const yDiff = (a.layout?.y ?? 0) - (b.layout?.y ?? 0);
-        if (yDiff !== 0) return yDiff;
-        return String(a.id).localeCompare(String(b.id));
-      });
-
-      const zMap = new Map(sortedByPosition.map((note, idx) => [note.id, idx + 1]));
-      state.notes = state.notes.map(note => ({
-        ...note,
-        z: zMap.get(note.id) ?? note.z ?? 1
-      }));
-    }
-
     
 /* ===== Z-INDEX CLICK PRIORITY ===== */
 let zIndexCounter = 100;
@@ -3793,15 +3621,12 @@ function render() {
               <div style="font-size:18px;font-weight:700;">개인 메모</div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-              <button type="button" class="small-btn ${state.memoSortedView ? 'dark' : ''}" id="memo-sort-toggle" aria-pressed="${state.memoSortedView ? 'true' : 'false'}">${state.memoSortedView ? '정렬 해제' : '정렬'}</button>
               <button class="small-btn" id="trash-toggle">휴지통 ${state.trash.length > 0 ? `(${state.trash.length})` : ''}</button>
               <button class="small-btn dark" id="new-memo-toggle">메모 추가</button>
             </div>
           </div>
 
-          ${state.memoSortedView ? `<div class="memo-sorted-banner" role="status">색상·등록 순서로 정렬해 보는 중입니다. 자유 배치로 돌아가려면 <strong>정렬 해제</strong>를 누르세요. (이동·드래그는 정렬 해제 후 가능합니다)</div>` : ''}
-
-          <div class="memo-board${state.memoSortedView ? ' memo-board--sorted' : ''}" id="memo-board" style="min-height:${state.memoBoardHeight}px;height:${state.memoBoardHeight}px;">
+          <div class="memo-board" id="memo-board" style="min-height:${state.memoBoardHeight}px;height:${state.memoBoardHeight}px;">
             <div class="memo-board-bg" aria-hidden="true">
               <div class="memo-grid"></div>
               <div class="board-dots">
@@ -4060,16 +3885,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       });
 
 
-      document.getElementById('memo-sort-toggle')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (state.memoSortedView) {
-          restoreMemoOriginalLayout();
-        } else {
-          sortMemosByColorAndDate();
-        }
-        renderMemoTab();
-      });
-
       document.getElementById('trash-toggle')?.addEventListener('click', async (e) => {
         e.stopPropagation();
         state.trashOpen = !state.trashOpen;
@@ -4092,13 +3907,11 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         if (e.target.closest('.memo-pop')) return;
         state.memoExpandedId = null;
         state.memoEditingId = null;
-        if (state.memoSortedView) normalizeSortedMemoStack();
         renderMemoTab();
       });
 
       function onMemoPointerMove(ev) {
         if (!memoPointerDrag) return;
-        if (state.memoSortedView) return;
         const { board, noteEl, grabOX, grabOY } = memoPointerDrag;
         const br = board.getBoundingClientRect();
         let x = ev.clientX - br.left - grabOX;
@@ -4116,20 +3929,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         if (!memoPointerDrag) return;
         const { noteEl, pointerId } = memoPointerDrag;
         const moved = !!memoPointerDrag.moved;
-        if (state.memoSortedView) {
-          const snap = memoPointerDrag;
-          memoPointerDrag = null;
-          document.removeEventListener('pointermove', onMemoPointerMove);
-          document.removeEventListener('pointerup', onMemoPointerUp);
-          document.removeEventListener('pointercancel', onMemoPointerUp);
-          try {
-            const h = snap.noteEl.querySelector('[data-drag-id]');
-            if (h && snap.pointerId != null) h.releasePointerCapture(snap.pointerId);
-          } catch (_) { /* ignore */ }
-          state.memoDraggingId = null;
-          renderMemoTab();
-          return;
-        }
         const { id, board } = memoPointerDrag;
         memoPointerDrag = null;
         document.removeEventListener('pointermove', onMemoPointerMove);
@@ -4143,11 +3942,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         const ny = Math.max(0, Math.round(parseFloat(noteEl.style.top) || 0));
         state.notes = state.notes.map(note =>
           note.id === id
-            ? {
-                ...note,
-                layout: { ...note.layout, x: nx, y: ny },
-                originalLayout: { ...(note.originalLayout || note.layout), x: nx, y: ny }
-              }
+            ? { ...note, layout: { ...note.layout, x: nx, y: ny } }
             : note
         );
         state.memoDraggingId = null;
@@ -4185,8 +3980,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
           if (!isClosing) {
             bringToFront(noteId);
-          } else if (state.memoSortedView) {
-            normalizeSortedMemoStack();
           }
 
           renderMemoTab();
@@ -4205,13 +3998,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         handle.addEventListener('pointerdown', (e) => {
           if (e.button !== 0) return;
           if (state.memoEditingId === id) return;
-          if (state.memoSortedView) {
-            e.preventDefault();
-            e.stopPropagation();
-            setPortalMemoFeedback('정렬 보기 중에는 메모를 옮길 수 없습니다. 먼저 정렬 해제를 눌러 주세요.', 'error');
-            renderMemoTab();
-            return;
-          }
           e.preventDefault();
           e.stopPropagation();
           const nr = noteEl.getBoundingClientRect();
@@ -4265,7 +4051,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           state.memoEditingId = null;
-          if (state.memoSortedView) normalizeSortedMemoStack();
           renderMemoTab();
         });
       });
@@ -4285,11 +4070,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             renderMemoTab();
             return;
           }
-          const color = state.editMemo.color || currentTarget.layout?.color || '#fef3c7';
-          const freeSnap = freezeMemoLayoutSnapshot({
-            ...currentTarget,
-            layout: { ...(currentTarget.originalLayout || currentTarget.layout), color }
-          });
           const next = {
             ...currentTarget,
             title: state.editMemo.title.trim(),
@@ -4297,17 +4077,11 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             pinned: !!state.editMemo.pinned,
             content: state.editMemo.content.trim(),
             expandedWidth: Math.max(420, Number(state.editMemo.expandedWidth) || getMemoAutoWidth(state.editMemo.title, state.editMemo.content)),
-            layout: state.memoSortedView
-              ? { ...currentTarget.layout, ...freeSnap }
-              : { ...currentTarget.layout, color },
-            originalLayout: state.memoSortedView
-              ? { ...freeSnap }
-              : { ...(currentTarget.originalLayout || currentTarget.layout), color }
+            layout: { ...currentTarget.layout, color: state.editMemo.color || currentTarget.layout?.color || '#fef3c7' }
           };
           try {
             await updateMemoOnServer(currentTarget.serverId, next);
             await loadMemosFromServer();
-            if (state.memoSortedView) reapplyMemoSortedViewAfterReload();
             setPortalMemoFeedback('메모가 수정되었습니다.', 'success');
             state.memoEditingId = null;
             renderMemoTab();
@@ -4334,7 +4108,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           try {
             await softDeleteMemoOnServer(target.serverId);
             await Promise.all([loadMemosFromServer(), loadTrashMemosFromServer()]);
-            if (state.memoSortedView) reapplyMemoSortedViewAfterReload();
             setPortalMemoFeedback('휴지통으로 이동했습니다.', 'success');
             if (state.memoExpandedId === id) state.memoExpandedId = null;
             if (state.memoEditingId === id) state.memoEditingId = null;
@@ -4423,17 +4196,10 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
               y: baseLayout.y + (nextIndex % 4) * 16,
               rotate: baseLayout.rotate,
               color: state.newMemo.color || (state.newMemo.imageOnly ? '#f8fafc' : baseLayout.color),
-            },
-            originalLayout: {
-              x: baseLayout.x + (nextIndex % 3) * 18,
-              y: baseLayout.y + (nextIndex % 4) * 16,
-              rotate: baseLayout.rotate,
-              color: state.newMemo.color || (state.newMemo.imageOnly ? '#f8fafc' : baseLayout.color),
-            },
+            }
           };
           await createMemoOnServer(draft);
           await loadMemosFromServer();
-          if (state.memoSortedView) reapplyMemoSortedViewAfterReload();
           setPortalMemoFeedback('메모가 저장되었습니다.', 'success');
           state.newMemo = { title: '', tag: '메모', pinned: false, imageOnly: false, color: '#fef3c7', content: '', expandedWidth: 420 };
           state.newMemoOpen = false;
@@ -4461,7 +4227,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           try {
             await restoreMemoOnServer(target.serverId);
             await Promise.all([loadMemosFromServer(), loadTrashMemosFromServer()]);
-            if (state.memoSortedView) reapplyMemoSortedViewAfterReload();
             setPortalMemoFeedback('복원되었습니다.', 'success');
             renderMemoTab();
           } catch (err) {
