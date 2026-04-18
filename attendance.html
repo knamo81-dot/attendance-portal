@@ -702,6 +702,33 @@ body{
 .portal-main .hero{margin-bottom:16px}
 .portal-main .card{width:100%}
 .portal-main .tabs{margin-top:16px}
+
+
+/* 출퇴근 누락 분석 */
+.missingSummaryGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:16px}
+.missingMiniGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.missingMiniCard{border:1px solid var(--line);border-radius:16px;background:#fff;padding:16px}
+.missingMiniTitle{font-size:13px;color:var(--muted);font-weight:800;margin-bottom:10px}
+.missingTopRow{background:#fffaf0}
+.missingRank{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;border:1px solid var(--line);background:#f8fafc;font-weight:800}
+.missingCount{font-variant-numeric:tabular-nums;font-weight:800}
+.missingCount.zero{color:#94a3b8}
+.missingCount.warn{color:#d97706}
+.missingCount.danger{color:#ef4444}
+.missingTotalPill{display:inline-flex;justify-content:center;align-items:center;min-width:44px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:#f8fafc;font-weight:800}
+.missingTotalPill.warn{background:#fffbeb;border-color:#fde68a;color:#b45309}
+.missingTotalPill.danger{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
+.missingStatePill{display:inline-flex;justify-content:center;align-items:center;min-width:72px;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:800}
+.missingStatePill.normal{background:#dcfce7;color:#15803d}
+.missingStatePill.warn{background:#fef3c7;color:#b45309}
+.missingStatePill.danger{background:#fee2e2;color:#b91c1c}
+.missingBarRow{display:grid;grid-template-columns:110px 1fr 44px;gap:10px;align-items:center;margin-bottom:10px;font-size:13px}
+.missingBarBg{height:10px;background:#e2e8f0;border-radius:999px;overflow:hidden}
+.missingBarFill{height:100%;background:#0f172a}
+@media (max-width:1100px){
+  .missingSummaryGrid,.missingMiniGrid{grid-template-columns:1fr}
+}
+
 </style>
 </head>
 <body>
@@ -755,6 +782,7 @@ body{
     <button class="mainTab active" data-main="attendance">근태관리</button>
     <button class="mainTab" data-main="dashboard">분석대시보드</button>
     <button class="mainTab" data-main="deep-analysis">심층분석</button>
+    <button class="mainTab" data-main="attendance-missing">출퇴근 누락 분석</button>
     <div class="spacer"></div>
     <button class="mainTab" data-main="admin">관리자 기능</button>
   </div>
@@ -1188,6 +1216,60 @@ body{
   </div>
 
 
+  </div>
+
+
+  <div id="main-attendance-missing" class="mainPanel">
+    <div class="card" style="margin-top:16px">
+      <div class="title">출퇴근 누락 분석</div>
+      <div class="desc">기존 근태관리·분석대시보드·심층분석과 별도로, 출근/퇴근 컬럼에 실제 표시된 누락값만 담당자 기준으로 누적 집계하는 전용 화면입니다.</div>
+      <div class="attLegend">
+        <span class="dot" style="background:#16a34a"></span>정상 0~1건
+        <span class="dot" style="background:#d97706"></span>주의 2~3건
+        <span class="dot" style="background:#ef4444"></span>문제 4건 이상
+      </div>
+    </div>
+
+    <div id="attendanceMissingSummary" class="missingSummaryGrid"></div>
+
+    <div class="missingMiniGrid">
+      <div class="missingMiniCard">
+        <div class="missingMiniTitle">누락 상위 담당자 TOP 5</div>
+        <div id="attendanceMissingTop5"></div>
+      </div>
+      <div class="missingMiniCard">
+        <div class="missingMiniTitle">집계 기준</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <span class="badge green">정상 0~1건</span>
+          <span class="badge amber">주의 2~3건</span>
+          <span class="badge red">문제 4건 이상</span>
+        </div>
+        <div class="desc" style="margin-bottom:0">이 화면은 근태관리의 주의/문제 판정과 별도로, 출근/퇴근 컬럼에 보이는 누락값만 따로 누적해 보여줍니다.</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="title">담당자별 누락 현황</div>
+      <div class="desc">총 누락 기준 내림차순으로 정렬되며, 출근누락과 퇴근누락을 각각 분리해서 확인할 수 있습니다.</div>
+      <div class="attTableWrap" style="max-height:none">
+        <table class="attTable" style="min-width:1100px;font-size:14px">
+          <thead>
+            <tr>
+              <th style="width:72px">순위</th>
+              <th>담당자</th>
+              <th>본부</th>
+              <th>팀</th>
+              <th>출근누락</th>
+              <th>퇴근누락</th>
+              <th>총 누락</th>
+              <th>상태</th>
+            </tr>
+          </thead>
+          <tbody id="attendanceMissingTbody"></tbody>
+        </table>
+        <div id="attendanceMissingEmpty" class="employeeEmpty" style="display:none;">출퇴근 누락 현황이 없습니다.</div>
+      </div>
+    </div>
   </div>
 
 <div id="main-admin" class="mainPanel">
@@ -5934,18 +6016,13 @@ function decorateAttendanceRow(row, metaByName){
     }
   }
 
-  const hasMissingClock = (displayStart === '출근누락' || displayEnd === '퇴근누락');
-
   // 저장된/선택된 OT확인 값은 연장근로가 있을 때만 상태에 반영
   if (dispatchRule || workFromHomeRule) {
     statusLabel = '';
-  } else if (erpOT > 0 && overtimeCheck === '미인정' && !hasMissingClock) {
+  } else if (erpOT > 0 && overtimeCheck === '미인정') {
     bucket = '문제';
     statusLabel = '문제';
   } else if (erpOT > 0 && (overtimeCheck === '인정' || overtimeCheck === '부분인정')) {
-    bucket = '주의';
-    statusLabel = '주의';
-  } else if (hasMissingClock) {
     bucket = '주의';
     statusLabel = '주의';
   } else if (judgedReasonsWarning.includes(displayReason)) {
@@ -6176,16 +6253,64 @@ function getAttendanceReasonCount(list){
     ATTENDANCE_REASON_EXCLUDE
   )).reduce((sum, value) => sum + value, 0);
 }
+function getAttendanceWarningEventSummary(list){
+  const summary = {
+    overtime: 0,
+    holiday: 0,
+    holidayWeekend: 0,
+    pureMissingStart: 0,
+    pureMissingEnd: 0,
+    allMissingStart: 0,
+    allMissingEnd: 0
+  };
+
+  (list || []).forEach(row => {
+    const reasonKey = normalizeAttendanceReasonKey(row.reason, 'warning');
+    const isOvertime = reasonKey === '연장근무';
+    const isHoliday = reasonKey === '공휴일근무';
+    const isWeekendHoliday = reasonKey === '휴일근무';
+    const isMissingStart = String(row.displayStart || '').trim() === '출근누락';
+    const isMissingEnd = String(row.displayEnd || '').trim() === '퇴근누락';
+    const hasPriorityWork = isOvertime || isHoliday || isWeekendHoliday;
+
+    if (isOvertime) summary.overtime += 1;
+    if (isHoliday) summary.holiday += 1;
+    if (isWeekendHoliday) summary.holidayWeekend += 1;
+
+    if (isMissingStart) {
+      summary.allMissingStart += 1;
+      if (!hasPriorityWork) summary.pureMissingStart += 1;
+    }
+    if (isMissingEnd) {
+      summary.allMissingEnd += 1;
+      if (!hasPriorityWork) summary.pureMissingEnd += 1;
+    }
+  });
+
+  summary.total = summary.overtime + summary.holiday + summary.holidayWeekend + summary.pureMissingStart + summary.pureMissingEnd;
+  return summary;
+}
+function formatAttendanceWarningDetail(summary){
+  const parts = [];
+  if (summary.pureMissingStart || summary.allMissingStart) parts.push(`출근미입력 ${summary.pureMissingStart}(${summary.allMissingStart})`);
+  if (summary.pureMissingEnd || summary.allMissingEnd) parts.push(`퇴근미입력 ${summary.pureMissingEnd}(${summary.allMissingEnd})`);
+  if (summary.overtime) parts.push(`연장근무 ${summary.overtime}`);
+  if (summary.holidayWeekend) parts.push(`휴일근무 ${summary.holidayWeekend}`);
+  if (summary.holiday) parts.push(`공휴일근무 ${summary.holiday}`);
+  return parts.join(' | ');
+}
 function renderAttendanceKpis(rows){
-  const warn = rows.filter(r => r.bucket === '주의').length;
+  const warnSummary = getAttendanceWarningEventSummary(rows);
+  const warn = warnSummary.total;
   const issue = rows.filter(r => r.bucket === '문제').length;
-  const total = warn + issue < rows.length ? rows.length : rows.length;
+  const total = rows.length;
   const normal = Math.max(0, total - warn - issue);
   const reason = getAttendanceReasonCount(rows);
+  const warningDetail = formatAttendanceWarningDetail(warnSummary);
   $('#attendanceKpis').innerHTML = [
-    ['전체 표시건', `${total}건`, '현재 화면에 표시된 유효 근태 건수 (정상 처리 + 주의 + 문제)'],
-    ['정상', `${normal}건`, '일반근무와 승인된 사유근태를 포함한 정상 처리 건'],
-    ['주의', `${warn}건`, '출퇴근 미입력, 연장근무 등 확인이 필요한 건'],
+    ['전체 표시건', `${total}건`, '현재 화면에 표시된 유효 근태 행 수입니다.'],
+    ['정상', `${normal}건`, '전체 표시건에서 주의/문제를 제외한 정상 처리 건'],
+    ['주의', `${warn}건`, warningDetail || '연장근무, 휴일/공휴일근무, 출퇴근 미입력 등 확인이 필요한 건'],
     ['문제', `${issue}건`, '결근·근무시간 부족·단축근무 미달'],
     ['사유', `${reason}건`, '정상 처리 건 중 사유 상세로 별도 표시한 인정 근태']
   ].map(([label, value, sub]) => `<div class="card"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`).join('');
@@ -6195,7 +6320,7 @@ function renderAttendanceChart(rows){
   const grouped = groupBy(rows, byKey);
   const data = Object.entries(grouped).map(([name, list]) => {
     const reason = getAttendanceReasonCount(list);
-    const warn = list.filter(x => x.bucket === '주의').length;
+    const warn = getAttendanceWarningEventSummary(list).total;
     const issue = list.filter(x => x.bucket === '문제').length;
     const total = list.length;
     const normal = Math.max(0, total - warn - issue);
@@ -6215,7 +6340,7 @@ function renderAttendanceInsights(rows){
   const reasons = rows.filter(r => r.bucket === '근태사유');
 
   const issueCounts = countAttendanceReasonMap(issues);
-  const warnCounts = countAttendanceReasonMap(warns, [], 'warning');
+  const warnSummary = getAttendanceWarningEventSummary(rows);
   const reasonCounts = countAttendanceReasonMap(reasons, ATTENDANCE_REASON_EXCLUDE);
   const reasonTotal = Object.values(reasonCounts).reduce((sum, value) => sum + value, 0);
 
@@ -6235,11 +6360,11 @@ function renderAttendanceInsights(rows){
       detail: formatDetail(issueCounts, ['결근','근무시간 부족','단축근무 부족'])
     });
   }
-  if(warns.length){
+  if(warnSummary.total){
     msgs.push({
-      title: `주의 ${warns.length}건`,
-      desc: '출퇴근 미입력이나 연장근무처럼 확인이 필요한 건입니다.',
-      detail: formatDetail(warnCounts, ['출근미입력','퇴근미입력','출퇴근미입력','연장근무','휴일근무','공휴일근무'])
+      title: `주의 ${warnSummary.total}건`,
+      desc: '연장근무·휴일/공휴일근무는 우선 집계하고, 출퇴근 미입력은 순수 건수(괄호 안은 전체 발생건수)로 표시합니다.',
+      detail: formatAttendanceWarningDetail(warnSummary) ? `<div class="sub" style="margin-top:8px;line-height:1.6">${formatAttendanceWarningDetail(warnSummary)}</div>` : ''
     });
   }
   if(Object.keys(reasonCounts).length){
@@ -6497,6 +6622,103 @@ function renderAttendanceTab(){
   renderAttendanceInsights(rows);
   renderAttendanceTable(rows);
 }
+
+function renderAttendanceMissingAnalysis(){
+  const summaryEl = document.getElementById('attendanceMissingSummary');
+  const top5El = document.getElementById('attendanceMissingTop5');
+  const tbody = document.getElementById('attendanceMissingTbody');
+  const emptyEl = document.getElementById('attendanceMissingEmpty');
+  if(!summaryEl || !top5El || !tbody || !emptyEl) return;
+
+  const rows = getAttendanceManagementRows(buildAttendanceRows());
+  const byPerson = new Map();
+
+  (rows || []).forEach(row => {
+    const name = String(row.name || '').trim();
+    if(!name) return;
+    const current = byPerson.get(name) || {
+      name,
+      division: row.division || '',
+      team: row.team || '',
+      startMissing: 0,
+      endMissing: 0
+    };
+    if(row.displayStart === '출근누락') current.startMissing += 1;
+    if(row.displayEnd === '퇴근누락') current.endMissing += 1;
+    if(!current.division && row.division) current.division = row.division;
+    if(!current.team && row.team) current.team = row.team;
+    byPerson.set(name, current);
+  });
+
+  const list = Array.from(byPerson.values())
+    .map(item => {
+      const total = item.startMissing + item.endMissing;
+      let status = '정상';
+      let tone = 'normal';
+      if(total >= 4){
+        status = '문제';
+        tone = 'danger';
+      } else if(total >= 2){
+        status = '주의';
+        tone = 'warn';
+      }
+      return { ...item, total, status, tone };
+    })
+    .filter(item => item.total > 0)
+    .sort((a,b) => {
+      if(b.total !== a.total) return b.total - a.total;
+      if(b.endMissing !== a.endMissing) return b.endMissing - a.endMissing;
+      if(b.startMissing !== a.startMissing) return b.startMissing - a.startMissing;
+      return a.name.localeCompare(b.name, 'ko');
+    });
+
+  const totalStart = list.reduce((sum, item) => sum + item.startMissing, 0);
+  const totalEnd = list.reduce((sum, item) => sum + item.endMissing, 0);
+  const totalPeople = list.length;
+  const topPerson = list[0];
+
+  summaryEl.innerHTML = [
+    ['출근누락 총건수', `${totalStart}건`, '출근 컬럼에 표시된 누락 건수'],
+    ['퇴근누락 총건수', `${totalEnd}건`, '퇴근 컬럼에 표시된 누락 건수'],
+    ['누락 발생 인원', `${totalPeople}명`, '출근/퇴근 누락이 1건 이상 있는 담당자'],
+    ['최다 누락 담당자', topPerson ? `${topPerson.name} ${topPerson.total}건` : '-', topPerson ? `출근 ${topPerson.startMissing} · 퇴근 ${topPerson.endMissing}` : '']
+  ].map(([label, value, sub]) => `
+    <div class="card" style="padding:18px;border-radius:18px;box-shadow:none">
+      <div class="label">${label}</div>
+      <div class="value" style="font-size:28px">${value}</div>
+      <div class="sub">${sub}</div>
+    </div>
+  `).join('');
+
+  const top5 = list.slice(0,5);
+  const maxTotal = Math.max(...top5.map(item => item.total), 1);
+  top5El.innerHTML = top5.length ? top5.map(item => `
+    <div class="missingBarRow">
+      <strong>${item.name}</strong>
+      <div class="missingBarBg">
+        <div class="missingBarFill" style="width:${(item.total / maxTotal) * 100}%"></div>
+      </div>
+      <span>${item.total}건</span>
+    </div>
+  `).join('') : '<div class="employeeEmpty" style="padding:20px 0">누락 데이터가 없습니다.</div>';
+
+  tbody.innerHTML = list.map((item, idx) => `
+    <tr class="${idx < 2 ? 'missingTopRow' : ''}">
+      <td><span class="missingRank">${idx + 1}</span></td>
+      <td style="text-align:left"><strong>${item.name}</strong></td>
+      <td>${item.division || '-'}</td>
+      <td style="text-align:left">${item.team || '-'}</td>
+      <td><span class="missingCount ${item.startMissing >= 4 ? 'danger' : item.startMissing >= 1 ? 'warn' : 'zero'}">${item.startMissing}</span></td>
+      <td><span class="missingCount ${item.endMissing >= 4 ? 'danger' : item.endMissing >= 1 ? 'warn' : 'zero'}">${item.endMissing}</span></td>
+      <td><span class="missingTotalPill ${item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : ''}">${item.total}</span></td>
+      <td><span class="missingStatePill ${item.tone}">${item.status}</span></td>
+    </tr>
+  `).join('');
+
+  emptyEl.style.display = list.length ? 'none' : 'block';
+}
+
+
 function rerenderDashboardVisibleCharts(){
   const rerender = () => {
     const months = periodMonths();
@@ -6586,6 +6808,7 @@ function render(){
   renderSummary(months);
   renderAlerts(months);
   renderAttendanceTab();
+  renderAttendanceMissingAnalysis();
   renderTopCharts(scoped, months);
   renderInsight(scoped, months);
   renderRisk(scoped);
@@ -7446,4 +7669,3 @@ window.addEventListener('resize', renderLightweight);
 </div>
 </body>
 </html>
-
