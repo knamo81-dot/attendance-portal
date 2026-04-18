@@ -2122,7 +2122,6 @@ body.real-modal-open{overflow:hidden}
                 <button class="admin-subnav-btn" data-admin-section="employee">사원정보 관리</button>
                 <button class="admin-subnav-btn" data-admin-section="team">팀변경 관리</button>
                 <button class="admin-subnav-btn" data-admin-section="issue">특이사항 관리</button>
-                <button type="button" class="admin-subnav-btn" data-admin-section="account" hidden aria-hidden="true">계정/권한 관리</button>
               </div>
               <div class="admin-header-title" id="adminSectionTitle">조직 관리</div>
               <div class="admin-header-desc" id="adminSectionDesc">조직 개편에 대비해 본부와 팀을 코드 + 이름 + 사용여부로 관리합니다. 이름 오타 수정은 기존 조직 수정, 구조가 바뀌는 조직개편은 기존 조직을 미사용 처리하고 새로 생성하는 방식으로 운영합니다.</div>
@@ -2398,24 +2397,6 @@ body.real-modal-open{overflow:hidden}
                   </div>
                 </div>
                 <div id="realIssueFeedback" class="real-feedback"></div>
-              </div>
-
-              <!-- 백업용 섹션: 탭은 hidden. 권한은 사원 입력/수정에서 관리 -->
-              <div id="adminSectionAccount" class="admin-section-panel" hidden>
-                <div class="real-card">
-                  <div class="real-box-head">
-                    <div>
-                      <div class="real-box-title">계정 / 권한관리 (백업 UI)</div>
-                      <div class="real-box-sub">일반 운영에서는 사용하지 않습니다. 권한은 사원정보 관리 &gt; 사원 입력/수정에서 저장합니다.</div>
-                    </div>
-                    <div class="real-actions left" style="margin-top:0">
-                      <button id="realBulkAccountSyncBtn" class="real-btn ghost">전체 계정 등록</button>
-                      <button id="realUsersReloadBtn" class="real-btn ghost">계정 새로고침</button>
-                    </div>
-                  </div>
-                  <div id="realAccountFeedback" class="real-feedback"></div>
-                  <div id="realUsersWrap"><div class="real-empty">불러오는 중입니다.</div></div>
-                </div>
               </div>
             </div>
           </div>
@@ -4284,7 +4265,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             <div class="card">
               <div style="font-size:18px;font-weight:700;margin-bottom:12px;">빠른 메뉴</div>
               <div class="stack-list">
-                ${['월별 결재 현황', '최근 수거 내역', '운영 관련자료', '저장/삭제 로그', '사용자 권한관리'].map(item => `
+                ${['월별 결재 현황', '최근 수거 내역', '운영 관련자료', '저장/삭제 로그'].map(item => `
                   <div class="stack-item" style="font-weight:600;">${item}</div>
                 `).join('')}
               </div>
@@ -4741,6 +4722,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     }
 
     function renderAdminSection() {
+      const validAdminSections = ['org', 'employee', 'team', 'issue'];
+      if (!validAdminSections.includes(state.adminSection)) state.adminSection = 'org';
       const sectionMap = {
         org: {
           title: '조직관리',
@@ -4757,21 +4740,14 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         issue: {
           title: '특이사항관리',
           desc: '사원별 특이사항을 기준정보로 관리하고, 근태에서는 조회 중심으로 활용하는 화면입니다.'
-        },
-        account: {
-          title: '계정/권한관리',
-          desc: '권한은 사원정보 관리의 사원 입력/수정에서 저장합니다. (이 섹션은 백업용으로 비표시입니다.)'
         }
       };
-      if (state.adminSection === 'account') state.adminSection = 'employee';
       document.querySelectorAll('.admin-subnav-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.adminSection === state.adminSection);
       });
       document.querySelectorAll('.admin-section-panel').forEach(panel => {
         panel.hidden = panel.id !== `adminSection${state.adminSection.charAt(0).toUpperCase()}${state.adminSection.slice(1)}`;
       });
-      const accountPanelBackup = document.getElementById('adminSectionAccount');
-      if (accountPanelBackup) accountPanelBackup.hidden = true;
       const meta = sectionMap[state.adminSection] || sectionMap.org;
       const titleEl = document.getElementById('adminSectionTitle');
       const descEl = document.getElementById('adminSectionDesc');
@@ -4790,9 +4766,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     document.addEventListener('click', (event) => {
       const btn = event.target.closest('.admin-subnav-btn');
       if (!btn) return;
-      let nextSec = btn.dataset.adminSection || 'org';
-      if (nextSec === 'account') nextSec = 'employee';
-      state.adminSection = nextSec;
+      const sec = btn.dataset.adminSection || 'org';
+      const validAdminSections = ['org', 'employee', 'team', 'issue'];
+      state.adminSection = validAdminSections.includes(sec) ? sec : 'org';
       renderAdminSection();
       if (state.adminSection === 'org') loadOrganizations();
     });
@@ -4948,7 +4924,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       dataState.users = (dataState.users || []).filter(u => String(u.email||'').toLowerCase() !== String(portalUser.email||'').toLowerCase());
       dataState.users.push({ ...(res.data && res.data[0] ? res.data[0] : portalUser) });
       dataState.users.sort((a,b)=>String(a.email||'').localeCompare(String(b.email||'')));
-      renderUsers();
       return { ok:true };
     }catch(err){
       return { ok:false, error: err };
@@ -4964,31 +4939,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     }catch(err){
       return { data: [], error: err };
     }
-  }
-
-  function wireAdminTabs(){
-    document.querySelectorAll('.admin-subnav-btn').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        document.querySelectorAll('.admin-subnav-btn').forEach(b=>b.classList.remove('active'));
-        btn.classList.add('active');
-        const titleMap = {
-          org:['조직 관리','조직 개편에 대비해 본부와 팀을 코드 + 이름 + 사용여부로 관리합니다. 이름 오타 수정은 기존 조직 수정, 구조가 바뀌는 조직개편은 기존 조직을 미사용 처리하고 새로 생성하는 방식으로 운영합니다.'],
-          employee:['사원정보 관리','사원정보는 일별 업로드보다 여기서 기준정보로 관리합니다. 사번 중복 방지와 수정이 가능하며, 퇴사 처리는 사원 입력 / 수정에서 퇴사일과 퇴사사유를 함께 기록하는 방식으로 관리합니다. 로그인 권한(admin / 일반)은 같은 화면의 사원 입력/수정에서 이메일과 함께 저장합니다.'],
-          team:['팀변경 관리','변경 전 조직에서 사원을 검색한 뒤 체크하고, 변경 후 조직을 선택해서 일괄 변경합니다.'],
-          issue:['특이사항 관리','단축근무, 파견처럼 세금 출퇴근 기록 분석에 영향을 줄 수 있는 특이사항을 별도로 기록합니다.'],
-          account:['계정/권한 관리','권한은 사원 입력/수정에서 저장합니다. (백업 UI)']
-        };
-        let sec = btn.dataset.adminSection;
-        if (sec === 'account') sec = 'employee';
-        document.querySelectorAll('.admin-section-panel').forEach(p=>p.hidden=true);
-        const panel = $('adminSection' + sec.charAt(0).toUpperCase() + sec.slice(1));
-        if(panel) panel.hidden = false;
-        const accBk = $('adminSectionAccount');
-        if (accBk) accBk.hidden = true;
-        $('adminSectionTitle').textContent = titleMap[sec][0];
-        $('adminSectionDesc').textContent = titleMap[sec][1];
-      });
-    });
   }
 
   function fillDivisionSelects(){
@@ -5247,7 +5197,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       managed_team_codes: (managedMap.get(String(e.employee_no)) || []).join(', ')
     }));
     renderEmployees();
-    renderUsers(); 
     renderTeamCandidates();
     renderSpecialEmployeeOptions();
   }
@@ -5487,7 +5436,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       const userDelete = await sb.from('users').delete().eq('email', row.email);
       if(userDelete.error){ setFeedback('realEmployeeFeedback', userDelete.error.message); return; }
       dataState.users = dataState.users.filter(u => String(u.email||'').toLowerCase() !== String(row.email||'').toLowerCase());
-      renderUsers();
     }
 
     const empDelete = await sb.from('employees').delete().eq('employee_no', employeeNo);
@@ -5501,10 +5449,10 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
   async function bulkSyncEmployeeAccounts(){
     const candidates = dataState.employees.filter(e => String(e.email||'').trim());
-    if(!candidates.length){ setFeedback('realAccountFeedback', '이메일이 등록된 사원이 없습니다.'); return; }
+    if(!candidates.length){ setFeedback('realEmployeeFeedback', '이메일이 등록된 사원이 없습니다.'); return; }
     if(!confirm(`이메일이 있는 사원 ${candidates.length}명의 계정/권한을 일괄 등록할까요?`)) return;
 
-    setFeedback('realAccountFeedback', '전체 계정 등록을 진행하는 중입니다...', true);
+    setFeedback('realEmployeeFeedback', '전체 계정 등록을 진행하는 중입니다...', true);
     let success = 0;
     let failed = [];
 
@@ -5547,9 +5495,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
     await Promise.allSettled([loadEmployees(), loadUsers()]);
     if(failed.length){
-      setFeedback('realAccountFeedback', `전체 계정 등록 완료: 성공 ${success}건, 실패 ${failed.length}건 / ${failed.slice(0,3).join(' | ')}`);
+      setFeedback('realEmployeeFeedback', `전체 계정 등록 완료: 성공 ${success}건, 실패 ${failed.length}건 / ${failed.slice(0,3).join(' | ')}`);
     }else{
-      setFeedback('realAccountFeedback', `전체 계정 등록이 완료되었습니다. 성공 ${success}건`, true);
+      setFeedback('realEmployeeFeedback', `전체 계정 등록이 완료되었습니다. 성공 ${success}건`, true);
     }
   }
 
@@ -5756,36 +5704,12 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
   async function loadUsers(){
     const {data,error}=await sb.from('users').select('*').order('email');
-    if(error){ $('realUsersWrap').innerHTML='<div class="real-empty">'+esc(error.message)+'</div>'; return; }
+    if(error){
+      dataState.users = [];
+      console.error('loadUsers', error);
+      return;
+    }
     dataState.users = data || [];
-    renderUsers();
-  }
-
-  function renderUsers(){
-    const wrap=$('realUsersWrap');
-    if(!dataState.users.length){ wrap.innerHTML='<div class="real-empty">등록된 계정이 없습니다.</div>'; return; }
-    wrap.innerHTML = '<div class="real-users-list">' + dataState.users.map(u=>`
-      <div class="real-user-item">
-        <div class="real-user-main">
-          <strong>${esc(u.name || u.email || '-')}</strong>
-          <div class="real-box-sub">${esc(u.email || '-')}</div>
-          <div class="real-box-sub">${u.is_active === false ? '비활성' : '사용중'} · ${u.must_change_password ? '최초 비밀번호 변경 필요' : '비밀번호 변경 완료'}</div>
-        </div>
-        <select class="real-select" data-user-role="${esc(u.email)}" style="min-width:140px">
-          <option value="admin" ${u.role==='admin'?'selected':''}>관리자</option>
-          <option value="operator" ${u.role==='operator'?'selected':''}>운영자</option>
-          <option value="viewer" ${u.role==='viewer'?'selected':''}>일반사용자</option>
-        </select>
-        <button class="real-btn" data-user-save="${esc(u.email)}">저장</button>
-      </div>`).join('') + '</div>';
-  }
-
-  async function saveUser(email){
-    const role = document.querySelector(`[data-user-role="${CSS.escape(email)}"]`)?.value;
-    if(!role) return;
-    const {error}=await sb.from('users').update({role}).eq('email', email);
-    if(error) return alert(error.message);
-    await loadUsers();
   }
 
   function bindStaticEvents(){
@@ -5807,8 +5731,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     $('realEmpAddBtn')?.addEventListener('click', ()=>fillEmployeeForm(''));
     $('realEmpResetBtn')?.addEventListener('click', ()=>fillEmployeeForm(''));
     $('realEmpRefreshBtn')?.addEventListener('click', async ()=>{ await Promise.allSettled([loadEmployees(), loadUsers()]); setFeedback('realEmployeeFeedback','목록을 새로고침했습니다.', true); });
-    $('realBulkAccountSyncBtn')?.addEventListener('click', bulkSyncEmployeeAccounts);
-    $('realUsersReloadBtn')?.addEventListener('click', async ()=>{ await loadUsers(); setFeedback('realAccountFeedback','계정 목록을 새로고침했습니다.', true); });
 
     $('realBeforeDivision')?.addEventListener('change', ()=>{ fillTeamSelect('realBeforeTeam', $('realBeforeDivision').value); renderTeamCandidates(); });
     $('realBeforeTeam')?.addEventListener('change', renderTeamCandidates);
@@ -5840,7 +5762,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       const teamChk = e.target.closest('[data-team-move-no]'); if(teamChk) return;
       const issueEdit = e.target.closest('[data-issue-edit]'); if(issueEdit) return fillIssueEdit(issueEdit.dataset.issueEdit);
       const issueDelete = e.target.closest('[data-issue-delete]'); if(issueDelete) return deleteIssue(issueDelete.dataset.issueDelete);
-      const userSave = e.target.closest('[data-user-save]'); if(userSave) return saveUser(userSave.dataset.userSave);
     });
 
     document.addEventListener('change', (e)=>{
@@ -5853,7 +5774,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
   }
 
   async function initRealAdmin(){
-    wireAdminTabs();
     bindStaticEvents();
     await loadOrgData();
     await loadEmployees();
