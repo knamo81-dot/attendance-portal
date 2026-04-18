@@ -2934,7 +2934,15 @@ body.real-modal-open{overflow:hidden}
         is_deleted: !!row.is_deleted,
         deletedAt: row.deleted_at || null,
         deletedBy: row.deleted_by || null,
-        layout: { x: layout.x, y: layout.y, rotate: layout.rotate, color: layout.color, w: layout.w, h: layout.h }
+        layout: { x: layout.x, y: layout.y, rotate: layout.rotate, color: layout.color, w: layout.w, h: layout.h },
+        originalLayout: {
+          x: layout.x,
+          y: layout.y,
+          rotate: layout.rotate,
+          color: layout.color,
+          w: layout.w,
+          h: layout.h
+        }
       };
     }
 
@@ -2963,6 +2971,16 @@ body.real-modal-open{overflow:hidden}
         deleted_at: null,
         deleted_by: null
       };
+      if (note.originalLayout) {
+        payload.original_layout = {
+          x: Math.round(note.originalLayout.x ?? note.layout?.x ?? 40),
+          y: Math.round(note.originalLayout.y ?? note.layout?.y ?? 40),
+          w: note.originalLayout.w != null ? Math.round(note.originalLayout.w) : Math.round(note.layout?.w ?? 260),
+          h: note.originalLayout.h != null ? Math.round(note.originalLayout.h) : Math.round(note.layout?.h ?? 170),
+          rotate: Number(note.originalLayout.rotate) || 0,
+          color: note.originalLayout.color || note.layout?.color || '#fef3c7'
+        };
+      }
       return payload;
     }
 
@@ -3032,6 +3050,12 @@ body.real-modal-open{overflow:hidden}
         ...partialUiNote,
         layout: { ...base.layout, ...(partialUiNote.layout || {}) }
       };
+      if (partialUiNote.originalLayout != null) {
+        merged.originalLayout = {
+          ...(base.originalLayout || base.layout || {}),
+          ...partialUiNote.originalLayout
+        };
+      }
       if (partialUiNote.layout_w != null) merged.layout_w = partialUiNote.layout_w;
       if (partialUiNote.layout_h != null) merged.layout_h = partialUiNote.layout_h;
       const payload = memoStateToDbPayload(merged, email, name);
@@ -3091,6 +3115,7 @@ body.real-modal-open{overflow:hidden}
         ? {
             ...note,
             layout: { ...note.layout, x, y, w, h },
+            originalLayout: { ...(note.originalLayout || note.layout), x, y, w, h },
             layout_w: w,
             layout_h: h,
             expandedWidth: w
@@ -3099,6 +3124,7 @@ body.real-modal-open{overflow:hidden}
       const moved = state.notes.find(x => String(x.id) === sid);
       await updateMemoOnServer(moved.serverId, {
         layout: moved.layout,
+        originalLayout: moved.originalLayout,
         layout_w: w,
         layout_h: h,
         z: moved.z
@@ -3567,8 +3593,8 @@ body.real-modal-open{overflow:hidden}
       return { x: s.x, y: s.y };
     }
 
-    let memoPointerDrag = null;
     let lastMemoDragMoved = false;
+    let memoDragOffset = { x: 0, y: 0 };
 
     
 /* ===== Z-INDEX CLICK PRIORITY ===== */
@@ -3650,10 +3676,12 @@ function render() {
                 ? 'auto'
                 : `${Math.max(baseMinH, (isExpanded || isEditing) ? 240 : baseMinH)}px`;
               const noteW = item.imageOnly ? Math.max(220, Math.min(noteWidth, 360)) : noteWidth;
+              const memoCanDrag = !isEditing;
               return `
                 <div
                   class="memo-note ${item.imageOnly ? 'image-only' : ''} ${isExpanded || isEditing ? 'expanded' : ''} ${state.memoDraggingId === item.id ? 'dragging' : ''}"
                   data-note-id="${item.id}"
+                  draggable="${memoCanDrag ? 'true' : 'false'}"
                   style="
                     left:${pos.x}px;
                     top:${pos.y}px;
@@ -3697,14 +3725,14 @@ function render() {
                       ${item.imageOnly ? `
                         ${item.image ? `
                           <div class="memo-image-frame">
-                            <img src="${item.image}" alt="memo image" />
+                            <img src="${item.image}" alt="memo image" draggable="false" />
                           </div>
                         ` : ``}
                       ` : `
                         ${item.title ? `<div class="memo-title">${escapeHtml(item.title)}</div>` : ``}
                         ${item.image ? `
                           <div class="memo-image-frame" style="${isExpanded ? 'margin-top:10px;' : 'margin-top:10px;'}">
-                            <img src="${item.image}" alt="memo image" style="${isExpanded ? 'max-height:280px;' : 'max-height:150px;'}" />
+                            <img src="${item.image}" alt="memo image" draggable="false" style="${isExpanded ? 'max-height:280px;' : 'max-height:150px;'}" />
                           </div>
                         ` : ``}
                         ${isExpanded && item.content ? `<div class="memo-content-view">${escapeHtml(item.content)}</div>` : ``}
@@ -3720,12 +3748,12 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 </div>
                     <div class="memo-actions">
                       ${isEditing ? `
-                        <button class="small-btn" data-memo-cancel="${item.id}">취소</button>
-                        <button class="small-btn dark" data-memo-save="${item.id}">저장</button>
+                        <button type="button" class="small-btn" draggable="false" data-memo-cancel="${item.id}">취소</button>
+                        <button type="button" class="small-btn dark" draggable="false" data-memo-save="${item.id}">저장</button>
                       ` : `
                         ${isExpanded ? `
-                          <button class="small-btn" data-memo-edit="${item.id}">수정</button>
-                          <button class="small-btn" data-memo-delete="${item.id}" style="color:#b91c1c;border-color:#fecaca;background:#fff5f5;">삭제</button>
+                          <button type="button" class="small-btn" draggable="false" data-memo-edit="${item.id}">수정</button>
+                          <button type="button" class="small-btn" draggable="false" data-memo-delete="${item.id}" style="color:#b91c1c;border-color:#fecaca;background:#fff5f5;">삭제</button>
                         ` : ``}
                       `}
                     </div>
@@ -3910,59 +3938,76 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         renderMemoTab();
       });
 
-      function onMemoPointerMove(ev) {
-        if (!memoPointerDrag) return;
-        const { board, noteEl, grabOX, grabOY } = memoPointerDrag;
-        const br = board.getBoundingClientRect();
-        let x = ev.clientX - br.left - grabOX;
-        let y = ev.clientY - br.top - grabOY;
-        x = Math.max(0, Math.round(x));
-        y = Math.max(0, Math.round(y));
-        noteEl.style.left = `${x}px`;
-        noteEl.style.top = `${y}px`;
-        const dx = ev.clientX - memoPointerDrag.startX;
-        const dy = ev.clientY - memoPointerDrag.startY;
-        if (dx * dx + dy * dy > 16) memoPointerDrag.moved = true;
-      }
+      board.addEventListener('dragover', (e) => {
+        const dt = e.dataTransfer;
+        const types = dt && dt.types ? Array.from(dt.types) : [];
+        if (!types.includes('text/plain')) return;
+        e.preventDefault();
+        dt.dropEffect = 'move';
+      }, true);
 
-      async function onMemoPointerUp() {
-        if (!memoPointerDrag) return;
-        const { noteEl, pointerId } = memoPointerDrag;
-        const moved = !!memoPointerDrag.moved;
-        const { id, board } = memoPointerDrag;
-        memoPointerDrag = null;
-        document.removeEventListener('pointermove', onMemoPointerMove);
-        document.removeEventListener('pointerup', onMemoPointerUp);
-        document.removeEventListener('pointercancel', onMemoPointerUp);
-        try {
-          const h = noteEl.querySelector('[data-drag-id]');
-          if (h && pointerId != null) h.releasePointerCapture(pointerId);
-        } catch (_) { /* ignore */ }
-        const nx = Math.max(0, Math.round(parseFloat(noteEl.style.left) || 0));
-        const ny = Math.max(0, Math.round(parseFloat(noteEl.style.top) || 0));
-        state.notes = state.notes.map(note =>
-          note.id === id
-            ? { ...note, layout: { ...note.layout, x: nx, y: ny } }
-            : note
-        );
-        state.memoDraggingId = null;
-        if (moved) lastMemoDragMoved = true;
-        if (moved) {
-          try {
-            if (state.notes.find(n => n.id === id)?.serverId) {
-              await persistMemoLayoutFromDom(board, id);
-              showPortalDataMessage('메모가 저장되었습니다.', 'success', 'memo');
+      board.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = e.dataTransfer.getData('text/plain');
+        if (!id) return;
+        const notesLayer = board.querySelector('#memo-board-notes');
+        const br = (notesLayer || board).getBoundingClientRect();
+        let x = Math.round(e.clientX - br.left - memoDragOffset.x);
+        let y = Math.round(e.clientY - br.top - memoDragOffset.y);
+        x = Math.max(0, x);
+        y = Math.max(0, y);
+        const before = state.notes.find(n => String(n.id) === String(id));
+        if (!before || !before.serverId) return;
+        state.notes = state.notes.map(note => String(note.id) === String(id)
+          ? {
+              ...note,
+              layout: { ...note.layout, x, y },
+              originalLayout: { ...(note.originalLayout || note.layout), x, y }
             }
-          } catch (err) {
-            console.error(err);
-            showPortalDataMessage(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error', 'memo');
-          }
+          : note);
+        const moved = state.notes.find(n => String(n.id) === String(id));
+        try {
+          await updateMemoOnServer(moved.serverId, {
+            layout: moved.layout,
+            originalLayout: moved.originalLayout
+          });
+          showPortalDataMessage('메모가 저장되었습니다.', 'success', 'memo');
+        } catch (err) {
+          console.error(err);
+          showPortalDataMessage(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error', 'memo');
+          try {
+            await loadMemosFromServer();
+          } catch (_) { /* ignore */ }
         }
         renderMemoTab();
-      }
+      }, true);
 
       board.querySelectorAll('[data-note-id]').forEach(noteEl => {
         const noteId = noteEl.dataset.noteId;
+
+        noteEl.addEventListener('dragstart', (e) => {
+          if (state.memoEditingId === noteId) {
+            e.preventDefault();
+            return;
+          }
+          e.stopPropagation();
+          const rect = noteEl.getBoundingClientRect();
+          memoDragOffset.x = e.clientX - rect.left;
+          memoDragOffset.y = e.clientY - rect.top;
+          e.dataTransfer.setData('text/plain', String(noteId));
+          e.dataTransfer.effectAllowed = 'move';
+          try {
+            e.dataTransfer.setData('application/x-memo-id', String(noteId));
+          } catch (_) { /* ignore */ }
+          state.memoDraggingId = noteId;
+          bringToFront(noteId);
+        });
+
+        noteEl.addEventListener('dragend', (e) => {
+          state.memoDraggingId = null;
+          if (e.dataTransfer && e.dataTransfer.dropEffect === 'move') lastMemoDragMoved = true;
+        });
 
         noteEl.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -3971,7 +4016,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             return;
           }
           if (state.memoEditingId === noteId) return;
-          if (state.memoDraggingId === noteId) return;
 
           const isClosing = state.memoExpandedId === noteId;
           state.memoExpandedId = isClosing ? null : noteId;
@@ -3986,43 +4030,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         });
 
         noteEl.addEventListener('mousedown', () => bringToFront(noteId));
-      });
-
-      board.querySelectorAll('[data-drag-id]').forEach(handle => {
-        const id = handle.dataset.dragId;
-        const noteEl = handle.closest('[data-note-id]');
-        if (!noteEl) return;
-        noteEl.setAttribute('draggable', 'false');
-        handle.addEventListener('click', (e) => e.stopPropagation());
-        handle.addEventListener('mousedown', (e) => e.stopPropagation());
-        handle.addEventListener('pointerdown', (e) => {
-          if (e.button !== 0) return;
-          if (state.memoEditingId === id) return;
-          e.preventDefault();
-          e.stopPropagation();
-          const nr = noteEl.getBoundingClientRect();
-          const grabOX = e.clientX - nr.left;
-          const grabOY = e.clientY - nr.top;
-          memoPointerDrag = {
-            id,
-            board,
-            noteEl,
-            grabOX,
-            grabOY,
-            startX: e.clientX,
-            startY: e.clientY,
-            moved: false,
-            pointerId: e.pointerId
-          };
-          state.memoDraggingId = id;
-          bringToFront(id);
-          try {
-            handle.setPointerCapture(e.pointerId);
-          } catch (_) { /* ignore */ }
-          document.addEventListener('pointermove', onMemoPointerMove);
-          document.addEventListener('pointerup', onMemoPointerUp);
-          document.addEventListener('pointercancel', onMemoPointerUp);
-        });
       });
 
       board.querySelectorAll('[data-memo-edit]').forEach(btn => {
@@ -4070,6 +4077,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             renderMemoTab();
             return;
           }
+          const color = state.editMemo.color || currentTarget.layout?.color || '#fef3c7';
           const next = {
             ...currentTarget,
             title: state.editMemo.title.trim(),
@@ -4077,7 +4085,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             pinned: !!state.editMemo.pinned,
             content: state.editMemo.content.trim(),
             expandedWidth: Math.max(420, Number(state.editMemo.expandedWidth) || getMemoAutoWidth(state.editMemo.title, state.editMemo.content)),
-            layout: { ...currentTarget.layout, color: state.editMemo.color || currentTarget.layout?.color || '#fef3c7' }
+            layout: { ...currentTarget.layout, color },
+            originalLayout: { ...(currentTarget.originalLayout || currentTarget.layout), color }
           };
           try {
             await updateMemoOnServer(currentTarget.serverId, next);
@@ -4182,6 +4191,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         try {
           let imageData = '';
           if (hasImage) imageData = await readFileAsDataUrl();
+          const lx = baseLayout.x + (nextIndex % 3) * 18;
+          const ly = baseLayout.y + (nextIndex % 4) * 16;
+          const lc = state.newMemo.color || (state.newMemo.imageOnly ? '#f8fafc' : baseLayout.color);
           const draft = {
             title: state.newMemo.imageOnly ? '' : state.newMemo.title.trim(),
             tag: state.newMemo.tag.trim() || '메모',
@@ -4192,10 +4204,16 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             expandedWidth: Math.max(420, Number(state.newMemo.expandedWidth) || getMemoAutoWidth(state.newMemo.title, state.newMemo.content)),
             z: getNextZ(),
             layout: {
-              x: baseLayout.x + (nextIndex % 3) * 18,
-              y: baseLayout.y + (nextIndex % 4) * 16,
+              x: lx,
+              y: ly,
               rotate: baseLayout.rotate,
-              color: state.newMemo.color || (state.newMemo.imageOnly ? '#f8fafc' : baseLayout.color),
+              color: lc
+            },
+            originalLayout: {
+              x: lx,
+              y: ly,
+              rotate: baseLayout.rotate,
+              color: lc
             }
           };
           await createMemoOnServer(draft);
