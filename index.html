@@ -2122,7 +2122,7 @@ body.real-modal-open{overflow:hidden}
                 <button class="admin-subnav-btn" data-admin-section="employee">사원정보 관리</button>
                 <button class="admin-subnav-btn" data-admin-section="team">팀변경 관리</button>
                 <button class="admin-subnav-btn" data-admin-section="issue">특이사항 관리</button>
-                <button class="admin-subnav-btn" data-admin-section="account">계정/권한 관리</button>
+                <button type="button" class="admin-subnav-btn" data-admin-section="account" hidden aria-hidden="true">계정/권한 관리</button>
               </div>
               <div class="admin-header-title" id="adminSectionTitle">조직 관리</div>
               <div class="admin-header-desc" id="adminSectionDesc">조직 개편에 대비해 본부와 팀을 코드 + 이름 + 사용여부로 관리합니다. 이름 오타 수정은 기존 조직 수정, 구조가 바뀌는 조직개편은 기존 조직을 미사용 처리하고 새로 생성하는 방식으로 운영합니다.</div>
@@ -2204,7 +2204,7 @@ body.real-modal-open{overflow:hidden}
               </div>
 
               <div id="adminSectionEmployee" class="admin-section-panel" hidden>
-                <div class="real-admin-top-note">사원정보는 삭제하지 않고 관리합니다. 퇴사 처리는 이 화면의 버튼이 아니라 사원 입력 / 수정에서 상태를 퇴사로 변경하고 퇴사일·퇴사사유를 함께 기록하는 방식으로 관리합니다. 담당의 경우 관리팀코드에는 현재는 자기 팀코드 1개를 넣고, 추후 여러 팀을 맡으면 쉼표로 추가할 수 있습니다.</div>
+                <div class="real-admin-top-note">사원정보는 삭제하지 않고 관리합니다. 퇴사 처리는 이 화면의 버튼이 아니라 사원 입력 / 수정에서 상태를 퇴사로 변경하고 퇴사일·퇴사사유를 함께 기록하는 방식으로 관리합니다. 로그인 계정과 포털 권한(admin / 일반)은 같은 화면의 사원 입력 / 수정에서 이메일과 함께 저장하며, 저장 시 Auth·public.users와 동기화됩니다. 담당의 경우 관리팀코드에는 현재는 자기 팀코드 1개를 넣고, 추후 여러 팀을 맡으면 쉼표로 추가할 수 있습니다.</div>
                 <div class="real-toolbar between">
                   <div class="real-toolbar-left">
                     <input id="realEmpSearch" class="real-input real-search" placeholder="이름 / 사번 검색">
@@ -2271,11 +2271,24 @@ body.real-modal-open{overflow:hidden}
                     <div class="real-field"><label>사번</label><input id="realEmpNo" class="real-input"></div>
                     <div class="real-field"><label>이름</label><input id="realEmpName" class="real-input"></div>
                     <div class="real-field"><label>순번</label><input id="realEmpSort" class="real-input" type="number" value="1"></div>
-                    <div class="real-field"><label>이메일</label><input id="realEmpEmail" class="real-input"></div>
+                    <div class="real-field"><label>이메일</label><input id="realEmpEmail" class="real-input" placeholder="로그인에 사용"></div>
+                    <div class="real-field">
+                      <label>권한</label>
+                      <select id="realEmpRole" class="real-select" title="public.users.role 및 설정 화면 접근과 연동됩니다.">
+                        <option value="viewer">일반사용자</option>
+                        <option value="admin">관리자</option>
+                      </select>
+                      <div class="real-box-sub" style="margin-top:6px;line-height:1.35;">설정 메뉴 편집이 필요하면 관리자로 지정합니다. 저장 시 계정과 동일하게 반영됩니다.</div>
+                    </div>
                     <div class="real-field"><label>본부</label><select id="realEmpDivisionSelect" class="real-select"><option value="">선택</option></select></div>
                     <div class="real-field"><label>팀</label><select id="realEmpTeamSelect" class="real-select"><option value="">선택</option></select></div>
                     <div class="real-field"><label>직급</label><select id="realEmpGrade" class="real-select"><option value="">선택</option></select></div>
-                    <div class="real-field"><label>직책</label><select id="realEmpAuthority" class="real-select"><option value="">선택</option></select></div>
+                    <div class="real-field">
+                      <label>직책</label>
+                      <select id="realEmpAuthority" class="real-select">
+                        <option value="">선택</option>
+                      </select>
+                    </div>
                     <div class="real-field"><label>관리팀코드</label><input id="realEmpManagedTeams" class="real-input" placeholder="예: AA01-01"></div>
                     <div class="real-field"><label>근태대상</label><select id="realEmpAttendance" class="real-select"><option value="true">Y</option><option value="false">N</option></select></div>
                     <div class="real-field"><label>상태</label><select id="realEmpStatus" class="real-select"><option value="재직">재직</option><option value="퇴사">퇴사</option></select></div>
@@ -2387,12 +2400,13 @@ body.real-modal-open{overflow:hidden}
                 <div id="realIssueFeedback" class="real-feedback"></div>
               </div>
 
+              <!-- 백업용 섹션: 탭은 hidden. 권한은 사원 입력/수정에서 관리 -->
               <div id="adminSectionAccount" class="admin-section-panel" hidden>
                 <div class="real-card">
                   <div class="real-box-head">
                     <div>
-                      <div class="real-box-title">계정 / 권한관리</div>
-                      <div class="real-box-sub">users 테이블 기준이며, 사원 등록 시 Edge Function으로 Auth 계정을 함께 생성하도록 연결되어 있습니다.</div>
+                      <div class="real-box-title">계정 / 권한관리 (백업 UI)</div>
+                      <div class="real-box-sub">일반 운영에서는 사용하지 않습니다. 권한은 사원정보 관리 &gt; 사원 입력/수정에서 저장합니다.</div>
                     </div>
                     <div class="real-actions left" style="margin-top:0">
                       <button id="realBulkAccountSyncBtn" class="real-btn ghost">전체 계정 등록</button>
@@ -4734,7 +4748,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         },
         employee: {
           title: '사원정보관리',
-          desc: '조직관리에서 등록한 본부/팀 기준정보를 드롭다운으로 불러와 사원정보를 관리하는 화면입니다.'
+          desc: '조직관리에서 등록한 본부/팀 기준정보를 드롭다운으로 불러와 사원정보를 관리합니다. 로그인 이메일과 포털 권한은 사원 입력/수정에서 함께 저장합니다.'
         },
         team: {
           title: '팀변경관리',
@@ -4746,15 +4760,18 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         },
         account: {
           title: '계정/권한관리',
-          desc: 'users 테이블과 Auth 계정을 포털에서 관리하는 화면입니다.'
+          desc: '권한은 사원정보 관리의 사원 입력/수정에서 저장합니다. (이 섹션은 백업용으로 비표시입니다.)'
         }
       };
+      if (state.adminSection === 'account') state.adminSection = 'employee';
       document.querySelectorAll('.admin-subnav-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.adminSection === state.adminSection);
       });
       document.querySelectorAll('.admin-section-panel').forEach(panel => {
         panel.hidden = panel.id !== `adminSection${state.adminSection.charAt(0).toUpperCase()}${state.adminSection.slice(1)}`;
       });
+      const accountPanelBackup = document.getElementById('adminSectionAccount');
+      if (accountPanelBackup) accountPanelBackup.hidden = true;
       const meta = sectionMap[state.adminSection] || sectionMap.org;
       const titleEl = document.getElementById('adminSectionTitle');
       const descEl = document.getElementById('adminSectionDesc');
@@ -4773,7 +4790,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     document.addEventListener('click', (event) => {
       const btn = event.target.closest('.admin-subnav-btn');
       if (!btn) return;
-      state.adminSection = btn.dataset.adminSection || 'org';
+      let nextSec = btn.dataset.adminSection || 'org';
+      if (nextSec === 'account') nextSec = 'employee';
+      state.adminSection = nextSec;
       renderAdminSection();
       if (state.adminSection === 'org') loadOrganizations();
     });
@@ -4904,7 +4923,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       join_date: payload.join_date,
       leave_date: payload.leave_date,
       leave_reason: payload.leave_reason,
-      memo: payload.memo
+      memo: payload.memo,
+      role: payload.role || 'viewer'
     };
     const idx = dataState.employees.findIndex(e => String(e.employee_no) === String(payload.employee_no));
     if(idx >= 0) dataState.employees[idx] = { ...dataState.employees[idx], ...row };
@@ -4951,17 +4971,20 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       btn.addEventListener('click', ()=>{
         document.querySelectorAll('.admin-subnav-btn').forEach(b=>b.classList.remove('active'));
         btn.classList.add('active');
-        const sec = btn.dataset.adminSection;
         const titleMap = {
           org:['조직 관리','조직 개편에 대비해 본부와 팀을 코드 + 이름 + 사용여부로 관리합니다. 이름 오타 수정은 기존 조직 수정, 구조가 바뀌는 조직개편은 기존 조직을 미사용 처리하고 새로 생성하는 방식으로 운영합니다.'],
-          employee:['사원정보 관리','사원정보는 일별 업로드보다 여기서 기준정보로 관리합니다. 사번 중복 방지와 수정이 가능하며, 퇴사 처리는 사원 입력 / 수정에서 퇴사일과 퇴사사유를 함께 기록하는 방식으로 관리합니다.'],
+          employee:['사원정보 관리','사원정보는 일별 업로드보다 여기서 기준정보로 관리합니다. 사번 중복 방지와 수정이 가능하며, 퇴사 처리는 사원 입력 / 수정에서 퇴사일과 퇴사사유를 함께 기록하는 방식으로 관리합니다. 로그인 권한(admin / 일반)은 같은 화면의 사원 입력/수정에서 이메일과 함께 저장합니다.'],
           team:['팀변경 관리','변경 전 조직에서 사원을 검색한 뒤 체크하고, 변경 후 조직을 선택해서 일괄 변경합니다.'],
           issue:['특이사항 관리','단축근무, 파견처럼 세금 출퇴근 기록 분석에 영향을 줄 수 있는 특이사항을 별도로 기록합니다.'],
-          account:['계정/권한 관리','users 테이블 기준으로 계정 권한과 사용 여부를 관리합니다.']
+          account:['계정/권한 관리','권한은 사원 입력/수정에서 저장합니다. (백업 UI)']
         };
+        let sec = btn.dataset.adminSection;
+        if (sec === 'account') sec = 'employee';
         document.querySelectorAll('.admin-section-panel').forEach(p=>p.hidden=true);
         const panel = $('adminSection' + sec.charAt(0).toUpperCase() + sec.slice(1));
         if(panel) panel.hidden = false;
+        const accBk = $('adminSectionAccount');
+        if (accBk) accBk.hidden = true;
         $('adminSectionTitle').textContent = titleMap[sec][0];
         $('adminSectionDesc').textContent = titleMap[sec][1];
       });
@@ -5349,6 +5372,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       $('realEmpDivisionSelect').value=''; fillTeamSelect('realEmpTeamSelect','');
       $('realEmpGrade').value=''; $('realEmpAuthority').value=''; $('realEmpManagedTeams').value=''; $('realEmpAttendance').value='true';
       $('realEmpStatus').value='재직'; $('realEmpJoinDate').value=''; $('realEmpLeaveDate').value=''; $('realEmpLeaveReason').value=''; $('realEmpMemo').value='';
+      const newRoleEl = document.getElementById('realEmpRole');
+      if (newRoleEl) newRoleEl.value = 'viewer';
       return;
     }
     $('realEmpNo').value=row.employee_no||'';
@@ -5367,6 +5392,15 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     $('realEmpLeaveDate').value=row.leave_date||'';
     $('realEmpLeaveReason').value=row.leave_reason||'';
     $('realEmpMemo').value=row.memo||'';
+    const roleEl = document.getElementById('realEmpRole');
+    if (roleEl) {
+      const emailKey = String(row.email || '').trim().toLowerCase();
+      const userRow = emailKey && Array.isArray(dataState.users)
+        ? dataState.users.find(u => String(u.email || '').trim().toLowerCase() === emailKey)
+        : null;
+      const portalRole = userRow?.role ?? row?.role;
+      roleEl.value = portalRole === 'admin' ? 'admin' : 'viewer';
+    }
   }
 
   async function saveEmployee(){
@@ -5410,7 +5444,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       leave_reason: $('realEmpLeaveReason').value.trim() || null,
       memo: $('realEmpMemo').value.trim() || null,
       is_active: $('realEmpStatus').value !== '퇴사',
-      role: 'viewer'
+      role: document.getElementById('realEmpRole')?.value || 'viewer',
     };
 
     setFeedback('realEmployeeFeedback','사원정보와 로그인 계정을 저장하는 중입니다...', true);
@@ -5475,6 +5509,11 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     let failed = [];
 
     for(const emp of candidates){
+      const emailKey = String(emp.email || '').trim().toLowerCase();
+      const uRow = emailKey && Array.isArray(dataState.users)
+        ? dataState.users.find(u => String(u.email || '').trim().toLowerCase() === emailKey)
+        : null;
+      const bulkRole = uRow && uRow.role === 'admin' ? 'admin' : 'viewer';
       const payload = {
         employee_no: emp.employee_no,
         name: emp.name || '',
@@ -5483,7 +5522,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         team_code: emp.team_code || '',
         grade: emp.grade || null,
         authority: emp.authority || null,
-        email: String(emp.email||'').trim().toLowerCase(),
+        email: emailKey,
         attendance_target: !!emp.attendance_target,
         status: emp.status || '재직',
         join_date: emp.join_date || null,
@@ -5491,7 +5530,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         leave_reason: emp.leave_reason || null,
         memo: emp.memo || null,
         is_active: (emp.status || '재직') !== '퇴사',
-        role: 'viewer'
+        role: bulkRole,
       };
       const { data, error } = await sb.functions.invoke('create-employee-account', { body: payload });
       if(error || !data?.ok){
