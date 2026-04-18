@@ -5516,7 +5516,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     const userSync = await ensurePortalUserRow(payload);
     if(!userSync.ok){
       const syncMsg = userSync.error?.message || 'users 동기화에 실패했습니다.';
-      setFeedback('realEmployeeFeedback', syncMsg);
+      setFeedback('realEmployeeFeedback', syncMsg, false);
       return;
     }
 
@@ -5544,7 +5544,11 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     }else{
       setFeedback('realEmployeeFeedback', '사원정보와 사용자 권한(public.users)을 저장했습니다.', true);
     }
-    if(typeof window.closeEmployeeModal === 'function') window.closeEmployeeModal();
+    if(window.__empSaveCloseTimer) clearTimeout(window.__empSaveCloseTimer);
+    window.__empSaveCloseTimer = setTimeout(()=>{
+      window.__empSaveCloseTimer = null;
+      if(typeof window.closeEmployeeModal === 'function') window.closeEmployeeModal();
+    }, 2200);
   }
 
   async function deleteEmployee(employeeNo){
@@ -5926,10 +5930,10 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
 <script id="employee-modal-popup-script">
 (function(){
-  /* 사원 모달 닫기: 저장 버튼 클릭 후 ok 클래스 감지·setTimeout 자동 닫기 금지(저장 중에도 ok로 오인됨).
-     닫힘은 saveEmployee() 최종 성공 시에만 window.closeEmployeeModal() 호출로 처리합니다. */
+  /* 저장 버튼으로 ok 클래스 감지·800ms 자동 닫기 금지. 닫힘은 saveEmployee() 성공 후 약 2.2초 뒤에만 호출되어 성공 메시지를 읽을 수 있습니다. */
   function el(id){ return document.getElementById(id); }
   function openEmpModal(){
+    if(window.__empSaveCloseTimer){ clearTimeout(window.__empSaveCloseTimer); window.__empSaveCloseTimer = null; }
     const modal = el('realEmployeeModal');
     if(!modal) return;
     modal.classList.add('show');
