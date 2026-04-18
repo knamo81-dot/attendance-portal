@@ -2206,7 +2206,7 @@ body.real-modal-open{overflow:hidden}
                 <div class="real-admin-top-note">사원정보는 삭제하지 않고 관리합니다. 퇴사 처리는 이 화면의 버튼이 아니라 사원 입력 / 수정에서 상태를 퇴사로 변경하고 퇴사일·퇴사사유를 함께 기록하는 방식으로 관리합니다. 로그인 계정과 포털 권한(admin / 일반)은 같은 화면의 사원 입력 / 수정에서 이메일과 함께 저장하며, 저장 시 Auth·public.users와 동기화됩니다. 담당의 경우 관리팀코드에는 현재는 자기 팀코드 1개를 넣고, 추후 여러 팀을 맡으면 쉼표로 추가할 수 있습니다.</div>
                 <div class="real-toolbar between">
                   <div class="real-toolbar-left">
-                    <input id="realEmpSearch" class="real-input real-search" placeholder="이름 / 사번 검색">
+                    <input id="realEmpSearch" class="real-input real-search" placeholder="이름 / 사번 / 이메일 검색">
                     <select id="realEmpDivisionFilter" class="real-select"><option value="">전체 본부</option></select>
                     <select id="realEmpTeamFilter" class="real-select"><option value="">전체 팀</option></select>
                     <select id="realEmpStatusFilter" class="real-select">
@@ -2264,6 +2264,7 @@ body.real-modal-open{overflow:hidden}
                       <div class="real-modal-title">사원 입력 / 수정</div>
                       <button id="realEmployeeModalClose" class="real-modal-close" type="button">×</button>
                     </div>
+                    <div id="realEmployeeModalSummary" class="real-employee-modal-summary" style="margin:12px 0 0;padding:12px 14px;border:1px solid #e2e8f0;border-radius:14px;background:#f8fafc;font-size:13px;line-height:1.5;color:#0f172a;"></div>
                     <div class="real-form-card" style="margin-top:0;border:none;padding:0;background:transparent;box-shadow:none;">
                       
                   <div class="real-inline-grid four">
@@ -2277,7 +2278,8 @@ body.real-modal-open{overflow:hidden}
                         <option value="viewer">일반사용자</option>
                         <option value="admin">관리자</option>
                       </select>
-                      <div class="real-box-sub" style="margin-top:6px;line-height:1.35;">설정 메뉴 편집이 필요하면 관리자로 지정합니다. 저장 시 계정과 동일하게 반영됩니다.</div>
+                      <div id="realEmpRoleLinkHint" class="real-box-sub" style="margin-top:6px;line-height:1.35;"></div>
+                      <div class="real-box-sub" style="margin-top:4px;line-height:1.35;">설정 메뉴 편집이 필요하면 관리자로 지정합니다. 현재는 로그인 이메일과 동일한 키로 public.users에 반영되며, 향후 employee_no 우선 연동은 검토할 수 있습니다.</div>
                     </div>
                     <div class="real-field"><label>본부</label><select id="realEmpDivisionSelect" class="real-select"><option value="">선택</option></select></div>
                     <div class="real-field"><label>팀</label><select id="realEmpTeamSelect" class="real-select"><option value="">선택</option></select></div>
@@ -2316,7 +2318,7 @@ body.real-modal-open{overflow:hidden}
                     <div class="real-inline-grid four">
                       <div class="real-field"><label>변경 전 본부</label><select id="realBeforeDivision" class="real-select"><option value="">선택</option></select></div>
                       <div class="real-field"><label>변경 전 팀</label><select id="realBeforeTeam" class="real-select"><option value="">선택</option></select></div>
-                      <div class="real-field"><label>이름/사번 검색</label><input id="realTeamSearchText" class="real-input" placeholder="예: 김민수 / E001"></div>
+                      <div class="real-field"><label>이름·사번·이메일 검색</label><input id="realTeamSearchText" class="real-input" placeholder="예: 김민수 / E001 / user@corp.com"></div>
                       <div class="real-field real-field-actions"><label>&nbsp;</label><button id="realTeamSearchBtn" class="real-btn ghost">검색</button></div>
                     </div>
                     <div class="real-actions left" style="margin-top:10px;">
@@ -5258,7 +5260,14 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     const gradeFilter=($('realEmpGradeFilter')?.value || '');
     const authorityFilter=($('realEmpAuthorityFilter')?.value || '');
     let rows = dataState.employees.slice();
-    if(search) rows = rows.filter(e=>String(e.name||'').toLowerCase().includes(search) || String(e.employee_no||'').toLowerCase().includes(search));
+    if(search){
+      rows = rows.filter(e=>{
+        const n = String(e.name||'').toLowerCase();
+        const no = String(e.employee_no||'').toLowerCase();
+        const em = String(e.email||'').toLowerCase();
+        return n.includes(search) || no.includes(search) || em.includes(search);
+      });
+    }
     if(div) rows = rows.filter(e=>e.division_code===div);
     if(team) rows = rows.filter(e=>e.team_code===team);
     if(status) rows = rows.filter(e=>e.status===status);
@@ -5293,7 +5302,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       const teamName = dataState.teams.find(t=>t.team_code===e.team_code)?.team_name || e.team_code || '-';
       return `<tr>
         <td>${esc(e.employee_no)}</td>
-        <td><strong>${esc(e.name)}</strong></td>
+        <td><div><strong>${esc(e.name)}</strong></div><div class="real-box-sub" style="font-size:12px;margin-top:2px;line-height:1.35;">${esc(e.employee_no || '-')} / ${esc(e.email || '-')}</div></td>
         <td>${esc(e.sort_order ?? '-')}</td>
         <td>${esc(divName)}<br>${esc(e.division_code || '')}</td>
         <td>${esc(teamName)}<br>${esc(e.team_code || '')}</td>
@@ -5317,17 +5326,42 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     }).join('');
   }
 
+  function updateEmpRoleHint(){
+    const hint = $('realEmpRoleLinkHint');
+    if(!hint) return;
+    const em = ($('realEmpEmail')?.value || '').trim();
+    hint.textContent = em
+      ? `이 권한은 아래 이메일과 같은 public.users 행의 role에 저장됩니다. (${em})`
+      : '이메일을 입력한 뒤 저장하면 해당 이메일 기준 public.users.role에 반영됩니다.';
+  }
+
+  function setEmployeeModalSummary(row){
+    const box = $('realEmployeeModalSummary');
+    if(!box) return;
+    if(!row){
+      box.innerHTML = '<div><strong>신규 등록</strong></div><div class="real-box-sub" style="margin-top:6px;">employees는 <strong>사번</strong>, 로그인·권한(public.users)은 <strong>이메일</strong> 기준으로 연결됩니다. 동명이인·비슷한 이름은 사번·이메일로 구분하세요.</div>';
+      return;
+    }
+    box.innerHTML = '<div style="margin-bottom:6px;"><strong>현재 수정 대상</strong> <span class="real-box-sub">(사번·이메일·이름)</span></div>'
+      + `<div><strong>사번</strong> ${esc(String(row.employee_no||'-'))}</div>`
+      + `<div><strong>이메일</strong> ${esc(String(row.email||'-'))}</div>`
+      + `<div><strong>이름</strong> ${esc(String(row.name||'-'))}</div>`
+      + '<div class="real-box-sub" style="margin-top:8px;">권한(users.role)은 위 이메일과 동일한 public.users 행에만 반영됩니다.</div>';
+  }
+
   function fillEmployeeForm(employeeNo=''){
     setFeedback('realEmployeeFeedback','');
     populateEmployeeModalSelectOptions();
     const row = dataState.employees.find(e=>e.employee_no===employeeNo);
     if(!row){
+      setEmployeeModalSummary(null);
       $('realEmpNo').value=''; $('realEmpName').value=''; $('realEmpSort').value='1'; $('realEmpEmail').value='';
       $('realEmpDivisionSelect').value=''; fillTeamSelect('realEmpTeamSelect','');
       $('realEmpGrade').value=''; $('realEmpAuthority').value=''; $('realEmpManagedTeams').value=''; $('realEmpAttendance').value='true';
       $('realEmpStatus').value='재직'; $('realEmpJoinDate').value=''; $('realEmpLeaveDate').value=''; $('realEmpLeaveReason').value=''; $('realEmpMemo').value='';
       const newRoleEl = document.getElementById('realEmpRole');
       if (newRoleEl) newRoleEl.value = 'viewer';
+      updateEmpRoleHint();
       return;
     }
     $('realEmpNo').value=row.employee_no||'';
@@ -5355,6 +5389,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       const portalRole = userRow?.role ?? row?.role;
       roleEl.value = portalRole === 'admin' ? 'admin' : 'viewer';
     }
+    setEmployeeModalSummary(row);
+    updateEmpRoleHint();
   }
 
   async function saveEmployee(){
@@ -5445,7 +5481,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
   async function deleteEmployee(employeeNo){
     const row = dataState.employees.find(e => String(e.employee_no) === String(employeeNo));
     if(!row) return;
-    if(!confirm(`사원 ${row.name || employeeNo} 을(를) 삭제할까요?
+    if(!confirm(`사원 ${row.name || employeeNo} (${row.employee_no || '-'} / ${row.email || '-'}) 을(를) 삭제할까요?
 포털 기준정보와 users 프로필에서 제거되며, 기존 Auth 계정은 남을 수 있습니다.`)) return;
 
     setFeedback('realEmployeeFeedback', '사원정보를 삭제하는 중입니다...', true);
@@ -5536,7 +5572,14 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     const team = $('realBeforeTeam').value;
     const search = ($('realTeamSearchText').value || '').trim().toLowerCase();
     if(!div || !team) return [];
-    return dataState.employees.filter(e => e.status !== '퇴사' && e.division_code===div && e.team_code===team && (!search || String(e.name||'').toLowerCase().includes(search) || String(e.employee_no||'').toLowerCase().includes(search)));
+    return dataState.employees.filter(e => {
+      if(e.status === '퇴사' || e.division_code!==div || e.team_code!==team) return false;
+      if(!search) return true;
+      const n = String(e.name||'').toLowerCase();
+      const no = String(e.employee_no||'').toLowerCase();
+      const em = String(e.email||'').toLowerCase();
+      return n.includes(search) || no.includes(search) || em.includes(search);
+    });
   }
 
   function renderTeamCandidates(){
@@ -5548,7 +5591,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     if(!rows.length){
       box.innerHTML='검색 결과가 없습니다.'; $('realSelectedCountBox').textContent='선택 인원 0명'; return;
     }
-    box.innerHTML = rows.map(e=>`<label class="real-selection-row"><input type="checkbox" data-team-move-no="${esc(e.employee_no)}" ${dataState.selectedTeamChangeNos.has(e.employee_no)?'checked':''}><span>${esc(e.employee_no)}</span><span>${esc(e.name)}</span><span>${esc(e.grade || '-')}</span></label>`).join('');
+    box.innerHTML = rows.map(e=>`<label class="real-selection-row"><input type="checkbox" data-team-move-no="${esc(e.employee_no)}" ${dataState.selectedTeamChangeNos.has(e.employee_no)?'checked':''}><span>${esc(e.employee_no)}</span><span><strong>${esc(e.name)}</strong> <span class="real-box-sub" style="font-size:11px;">/ ${esc(e.email || '-')}</span></span><span>${esc(e.grade || '-')}</span></label>`).join('');
     $('realSelectedCountBox').textContent = `선택 인원 ${dataState.selectedTeamChangeNos.size}명`;
   }
 
@@ -5595,7 +5638,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     if(team) rows = rows.filter(e=>e.team_code===team);
     const sel = $('realIssueEmployee'); if(!sel) return;
     const current = sel.value;
-    sel.innerHTML = '<option value="">선택</option>' + rows.map(e=>`<option value="${esc(e.employee_no)}">${esc(e.name)} (${esc(e.employee_no)})</option>`).join('');
+    sel.innerHTML = '<option value="">선택</option>' + rows.map(e=>`<option value="${esc(e.employee_no)}">${esc(e.name)} (${esc(e.employee_no)} / ${esc(e.email || '-')})</option>`).join('');
     if(rows.some(r=>r.employee_no===current)) sel.value=current;
     const emp = rows.find(r=>r.employee_no===sel.value);
     $('realIssueEmployeeNo').value = emp ? emp.employee_no : '';
@@ -5624,13 +5667,16 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     $('realIssueTbody').innerHTML = dataState.specialNotes.map(r=>{
       const rowDivisionName = r.division_name || dataState.divisions.find(d => String(d.division_code||'') === String(r.division_code||''))?.division_name || r.division_code || '-';
       const rowTeamName = r.team_name || dataState.teams.find(t => String(t.team_code||'') === String(r.team_code||''))?.team_name || r.team_code || '-';
-      const rowEmployeeName = r.employee_name || dataState.employees.find(e => String(e.employee_no||'') === String(r.employee_no||''))?.name || '-';
+      const empForNote = dataState.employees.find(e => String(e.employee_no||'') === String(r.employee_no||''));
+      const rowEmployeeLabel = empForNote
+        ? `${empForNote.name || '-'} (${empForNote.employee_no || '-'} / ${empForNote.email || '-'})`
+        : (r.employee_name ? `${r.employee_name} (${r.employee_no || '-'})` : String(r.employee_no || '-'));
       return `
       <tr>
         <td>${esc(rowDivisionName)}</td>
         <td>${esc(rowTeamName)}</td>
         <td>${esc(r.employee_no || '-')}</td>
-        <td>${esc(rowEmployeeName)}</td>
+        <td>${esc(rowEmployeeLabel)}</td>
         <td>${esc(r.issue_type || '-')}</td>
         <td>${esc(r.start_date || '-')} ~ ${esc(r.end_date || '-')}</td>
         <td>${esc(r.total_work_hours || '-')}</td>
@@ -5747,6 +5793,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     $('realEmpAuthorityFilter')?.addEventListener('change', renderEmployees);
     $('realEmpSearch')?.addEventListener('input', renderEmployees);
     $('realEmpDivisionSelect')?.addEventListener('change', ()=>fillTeamSelect('realEmpTeamSelect', $('realEmpDivisionSelect').value));
+    $('realEmpEmail')?.addEventListener('input', updateEmpRoleHint);
     $('realEmpSaveBtn')?.addEventListener('click', saveEmployee);
     $('realEmpAddBtn')?.addEventListener('click', ()=>fillEmployeeForm(''));
     $('realEmpResetBtn')?.addEventListener('click', ()=>fillEmployeeForm(''));
