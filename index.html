@@ -5476,16 +5476,41 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     const fbPre = $('realEmployeeFeedback');
     if(fbPre){ fbPre.classList.remove('ok'); }
     setFeedback('realEmployeeFeedback','사원정보와 로그인 계정을 저장하는 중입니다...', 'loading');
-    const { data, error } = await sb.functions.invoke('create-employee-account', { body: payload });
-    const edgeOk = !error && data && data.ok === true;
-    const edgeMsg = (error && error.message) || (data && data.error) || '계정/사원 저장 Edge Function 호출에 실패했습니다.';
 
-    if(!edgeOk && isNewEmployee){
-      setFeedback('realEmployeeFeedback', edgeMsg);
-      return;
-    }
-    if(!edgeOk && isExistingEmployee){
-      setFeedback('realEmployeeFeedback', `${edgeMsg} (기존 사원: public.users 프로필은 계속 동기화합니다.)`, false);
+    let edgeData = null;
+    let edgeOk = false;
+    if(isNewEmployee){
+      const { data, error } = await sb.functions.invoke('create-employee-account', { body: payload });
+      edgeData = data;
+      edgeOk = !error && data && data.ok === true;
+      const edgeMsg = (error && error.message) || (data && data.error) || '계정/사원 저장 Edge Function 호출에 실패했습니다.';
+      if(!edgeOk){
+        setFeedback('realEmployeeFeedback', edgeMsg, false);
+        return;
+      }
+    }else{
+      const empUpdate = {
+        name: payload.name,
+        sort_order: payload.sort_order,
+        division_code: payload.division_code,
+        team_code: payload.team_code,
+        grade: payload.grade,
+        authority: payload.authority,
+        email: payload.email,
+        attendance_target: payload.attendance_target,
+        status: payload.status,
+        join_date: payload.join_date,
+        leave_date: payload.leave_date,
+        leave_reason: payload.leave_reason,
+        memo: payload.memo,
+        is_active: payload.is_active
+      };
+      const empRes = await sb.from('employees').update(empUpdate).eq('employee_no', payload.employee_no);
+      if(empRes.error){
+        setFeedback('realEmployeeFeedback', empRes.error.message, false);
+        return;
+      }
+      edgeOk = true;
     }
 
     const userSync = await ensurePortalUserRow(payload);
@@ -5514,10 +5539,10 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       setFeedback('realEmployeeFeedback', `저장 후 public.users.role 확인: 기대 ${wantRole}, 실제 ${uRow ? gotRole : 'users 행 없음'}`, false);
       return;
     }
-    if(edgeOk){
-      setFeedback('realEmployeeFeedback', (data && data.message) || '사원정보와 로그인 계정을 저장했습니다.', true);
+    if(isNewEmployee){
+      setFeedback('realEmployeeFeedback', (edgeData && edgeData.message) || '사원정보와 로그인 계정을 저장했습니다.', true);
     }else{
-      setFeedback('realEmployeeFeedback', 'public.users 프로필(role·이메일·이름·활성)은 반영했습니다. Edge Function 오류로 사원/Auth 쪽은 확인이 필요할 수 있습니다.', true);
+      setFeedback('realEmployeeFeedback', '사원정보와 사용자 권한(public.users)을 저장했습니다.', true);
     }
     if(typeof window.closeEmployeeModal === 'function') window.closeEmployeeModal();
   }
