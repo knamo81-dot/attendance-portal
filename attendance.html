@@ -6261,10 +6261,29 @@ function renderAttendanceInsights(rows){
     });
   }
   if(warns.length){
+    const wc = warnCounts;
+    let n연장 = wc['연장근무'] || 0;
+    let n공휴 = wc['공휴일근무'] || 0;
+    let n퇴근 = wc['퇴근미입력'] || 0;
+    let n출근 = (wc['출근미입력'] || 0) + (wc['출퇴근미입력'] || 0);
+    for (let i = 0; i < warns.length; i++) {
+      const r = warns[i];
+      const erpOT = Number(r.erpActualOvertime || r.erpAppliedOvertime || 0);
+      if (erpOT > 0) continue;
+      const k = normalizeAttendanceReasonKey(r.reason, 'warning');
+      if (r.displayStart === '출근누락' && k !== '출근미입력' && k !== '출퇴근미입력') n출근++;
+      if (r.displayEnd === '퇴근누락' && k !== '퇴근미입력' && k !== '출퇴근미입력') n퇴근++;
+    }
+    const warnParts = [];
+    if (n연장) warnParts.push(`연장근무 ${n연장}`);
+    if (n공휴) warnParts.push(`공휴일근무 ${n공휴}`);
+    if (n퇴근) warnParts.push(`퇴근미입력 ${n퇴근}`);
+    if (n출근) warnParts.push(`출근미입력 ${n출근}`);
+    const warnDetailStr = warnParts.join(' | ');
     msgs.push({
       title: `주의 ${warns.length}건`,
       desc: '출퇴근 미입력이나 연장근무처럼 확인이 필요한 건입니다.',
-      detail: formatDetail(warnCounts, ['출근미입력','퇴근미입력','출퇴근미입력','연장근무','휴일근무','공휴일근무'])
+      detail: warnDetailStr ? `<div class="sub" style="margin-top:8px;line-height:1.6">${warnDetailStr}</div>` : ''
     });
   }
   if(Object.keys(reasonCounts).length){
