@@ -4912,10 +4912,21 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
   async function ensurePortalUserRow(payload){
     try{
-      const email = String(payload.email || '').trim().toLowerCase();
+      const emailLower = String(payload.email || '').trim().toLowerCase();
+      const emailRaw = String(payload.email_raw || payload.email || '').trim();
       const role = payload.role || 'viewer';
+      const empNo = String(payload.employee_no || '').trim();
+
+      let canonicalEmail = emailLower;
+      const hitLower = await sb.from('users').select('email').eq('email', emailLower).maybeSingle();
+      if(!hitLower.error && hitLower.data && hitLower.data.email) canonicalEmail = hitLower.data.email;
+      else if(emailRaw && emailRaw !== emailLower){
+        const hitRaw = await sb.from('users').select('email').eq('email', emailRaw).maybeSingle();
+        if(!hitRaw.error && hitRaw.data && hitRaw.data.email) canonicalEmail = hitRaw.data.email;
+      }
+
       const portalUser = {
-        email,
+        email: canonicalEmail,
         name: payload.name,
         role,
         is_active: payload.is_active !== false,
@@ -4925,10 +4936,23 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       };
       const res = await sb.from('users').upsert(portalUser, { onConflict: 'email' }).select();
       if(res.error) return { ok:false, error: res.error };
-      const roleRes = await sb.from('users').update({ role }).eq('email', email).select();
+
+      let roleRes = await sb.from('users').update({ role }).eq('email', canonicalEmail).select();
+      if((!roleRes.data || !roleRes.data.length) && empNo && !roleRes.error){
+        roleRes = await sb.from('users').update({ role }).eq('employee_no', empNo).select();
+      }
       if(roleRes.error) return { ok:false, error: roleRes.error };
-      const row = (roleRes.data && roleRes.data[0]) || (res.data && res.data[0]) || { ...portalUser, role };
-      dataState.users = (dataState.users || []).filter(u => String(u.email||'').toLowerCase() !== email);
+
+      const row = (roleRes.data && roleRes.data[0]) || (res.data && res.data[0]) || null;
+      if(!row){
+        return { ok:false, error: { message: 'public.users에 반영된 행을 찾지 못했습니다. email·employee_no 매칭·RLS(select/update)를 확인하세요.' } };
+      }
+      if(String(row.role || '') !== String(role)){
+        return { ok:false, error: { message: `users.role이 ${role}(으)로 저장되지 않았습니다(현재 ${row.role}). Edge Function·DB 트리거·다른 동기화가 덮어쓰는지 확인하세요.` } };
+      }
+
+      const rowEmailKey = String(row.email || '').toLowerCase();
+      dataState.users = (dataState.users || []).filter(u => String(u.email||'').toLowerCase() !== rowEmailKey);
       dataState.users.push(row);
       dataState.users.sort((a,b)=>String(a.email||'').localeCompare(String(b.email||'')));
       return { ok:true };
@@ -5396,7 +5420,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
   async function saveEmployee(){
     const employeeNo = $('realEmpNo').value.trim();
     const employeeName = $('realEmpName').value.trim();
-    const email = $('realEmpEmail').value.trim().toLowerCase();
+    const emailRaw = $('realEmpEmail').value.trim();
+    const email = emailRaw.toLowerCase();
     if(!employeeNo || !employeeName){ setFeedback('realEmployeeFeedback','사번과 이름을 입력하세요.'); return; }
 
     const divisionCode = $('realEmpDivisionSelect').value || '';
@@ -5427,6 +5452,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       grade: $('realEmpGrade').value.trim() || null,
       authority: $('realEmpAuthority').value.trim() || null,
       email,
+      email_raw: emailRaw || email,
       attendance_target: $('realEmpAttendance').value === 'true',
       status: $('realEmpStatus').value,
       join_date: $('realEmpJoinDate').value || null,
@@ -5527,6 +5553,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         grade: emp.grade || null,
         authority: emp.authority || null,
         email: emailKey,
+        email_raw: String(emp.email || '').trim() || emailKey,
         attendance_target: !!emp.attendance_target,
         status: emp.status || '재직',
         join_date: emp.join_date || null,
