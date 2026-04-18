@@ -1397,6 +1397,32 @@ html, body {
       font-size: 12px;
       color: #64748b;
     }
+    .rsv-slot-cell {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      height: 28px;
+      box-sizing: border-box;
+      border-bottom: 1px dashed #e2e8f0;
+      cursor: pointer;
+      z-index: 1;
+    }
+    .rsv-slot-cell:hover:not(.booked):not(.disabled) {
+      background: rgba(59, 130, 246, 0.08);
+    }
+    .rsv-slot-cell.booked,
+    .rsv-slot-cell.disabled {
+      background: #f1f5f9;
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+    .rsv-slot-cell.drag-range {
+      background: rgba(59, 130, 246, 0.18);
+    }
+    .reservation-time-block.mine {
+      background: #eff6ff;
+      border-color: #93c5fd;
+    }
 
 
 /* hide attendance outer header */
@@ -2443,7 +2469,17 @@ body.real-modal-open{overflow:hidden}
       { name: '', location: '', capacity: '' },
     ];
 
+    function firstReservationResourceName() {
+      const hit = reservationResources.find(x => x && String(x.name || '').trim());
+      return hit ? String(hit.name).trim() : '';
+    }
+
     function getActiveReservationResource() {
+      const byName = String(state.selectedReservationResourceName || '').trim();
+      if (byName) {
+        const found = reservationResources.find(x => String(x.name || '').trim() === byName);
+        if (found && found.name) return found;
+      }
       return reservationResources[state.activeReservationTab] || reservationResources[0];
     }
 
@@ -2481,6 +2517,10 @@ body.real-modal-open{overflow:hidden}
       memoLoading: false,
       scheduleLoading: false,
       reservationLoading: false,
+      portalUserEmployee: null,
+      reservationsAll: [],
+      selectedReservationResourceName: firstReservationResourceName(),
+      reservationReadonly: false,
 
       selectedDate: todayDateKey,
       calendarMonth: todayMonthKey,
@@ -2488,13 +2528,14 @@ body.real-modal-open{overflow:hidden}
       activeReservationTab: 0,
       selectedPanelRangeFilter: '전체',
       selectedPanelStatusFilter: '진행',
-      scheduleScopeFilters: ['전체', '연구소', '팀', '개인'],
+      scheduleScopeFilters: ['all', 'lab', 'team', 'personal'],
       schedules: [],
       reservations: [],
       scheduleExpandedIndex: null,
       scheduleEditorOpen: false,
       scheduleEditingId: null,
       reservationEditingId: null,
+      reservationViewId: null,
       portalPlannerFeedback: { msg: '', kind: '' },
       reservationForm: { startTime: '09:00', endTime: '10:00', title: '', description: '' },
       scheduleForm: {
@@ -2503,7 +2544,7 @@ body.real-modal-open{overflow:hidden}
         endTime: '10:00',
         type: '업무',
         app: '-',
-        scope: '연구소',
+        scope: 'lab',
         text: '',
         description: '',
       },
@@ -2523,6 +2564,154 @@ body.real-modal-open{overflow:hidden}
       const hh = String(Math.floor(t / 60)).padStart(2, '0');
       const mm = String(t % 60).padStart(2, '0');
       return `${hh}:${mm}`;
+    }
+
+    function normalizeScopeCode(raw) {
+      const s = String(raw || '').trim();
+      const lower = s.toLowerCase();
+      if (['all', 'lab', 'team', 'personal'].includes(lower)) return lower;
+      if (s === '전체' || s === '공지') return 'all';
+      if (s === '연구소') return 'lab';
+      if (s === '팀') return 'team';
+      if (s === '개인') return 'personal';
+      return 'lab';
+    }
+
+    function scopeLabelFromCode(code) {
+      const c = normalizeScopeCode(code);
+      if (c === 'all') return '전체';
+      if (c === 'lab') return '연구소';
+      if (c === 'team') return '팀';
+      return '개인';
+    }
+
+    function isPortalAdminRole() {
+      const p = portalAuth().profile;
+      return String(p?.role || '') === 'admin';
+    }
+
+    function scheduleRowVisibleToCurrentUser(row) {
+      if (!row) return false;
+      const scope = normalizeScopeCode(row.scope);
+      const email = String(portalAuth().email || '').trim().toLowerCase();
+      const authorEmail = String(row.created_by_email || '').trim().toLowerCase();
+      const { meta } = unpackScheduleDescription(row.description || '');
+      const authTeam = String(meta.author_team_code || '').trim();
+      const authDiv = String(meta.author_division_code || '').trim();
+      if (scope === 'personal') return authorEmail === email;
+      if (scope === 'all') return true;
+      const me = state.portalUserEmployee;
+      const myTeam = String(me?.team_code || '').trim();
+      const myDiv = String(me?.division_code || '').trim();
+      if (scope === 'team') {
+        if (!authTeam) return authorEmail === email;
+        return myTeam !== '' && myTeam === authTeam;
+      }
+      if (scope === 'lab') {
+        if (!authDiv) return authorEmail === email;
+        return myDiv !== '' && myDiv === authDiv;
+      }
+      return false;
+    }
+
+    function canMutateScheduleRow(row) {
+      if (!row) return false;
+      const email = String(portalAuth().email || '').trim().toLowerCase();
+      const authorEmail = String(row.created_by_email || '').trim().toLowerCase();
+      if (authorEmail === email) return true;
+      return isPortalAdminRole();
+    }
+
+    function canMutateReservationRow(row) {
+      if (!row) return false;
+      const email = String(portalAuth().email || '').trim().toLowerCase();
+      const authorEmail = String(row.created_by_email || '').trim().toLowerCase();
+      if (authorEmail === email) return true;
+      return isPortalAdminRole();
+    }
+
+    async function loadPortalUserEmployee() {
+      try {
+        const { sb, email } = portalAuth();
+        if (!sb || !email) {
+          state.portalUserEmployee = null;
+          return;
+        }
+        let { data, error } = await sb.from('employees')
+          .select('email,team_code,division_code,team_name,division_name,employee_no')
+          .eq('email', email)
+          .maybeSingle();
+        if (error) throw error;
+        if (!data) {
+          const alt = await sb.from('employees')
+            .select('email,team_code,division_code,team_name,division_name,employee_no')
+            .ilike('email', email)
+            .maybeSingle();
+          if (alt.error) throw alt.error;
+          data = alt.data;
+        }
+        state.portalUserEmployee = data || null;
+      } catch (e) {
+        console.error('loadPortalUserEmployee', e);
+        state.portalUserEmployee = null;
+      }
+    }
+
+    function getMonthReservationRange(monthKey) {
+      const prefix = String(monthKey || '').slice(0, 7);
+      const base = new Date(`${prefix}-01T12:00:00`);
+      if (Number.isNaN(base.getTime())) {
+        const t = todayDateKey.split('-');
+        const y = Number(t[0]), m = Number(t[1]);
+        const pad = n => String(n).padStart(2, '0');
+        const lastD = new Date(y, m, 0).getDate();
+        return { first: `${y}-${pad(m)}-01`, last: `${y}-${pad(m)}-${pad(lastD)}` };
+      }
+      const y = base.getFullYear();
+      const m = base.getMonth();
+      const pad = n => String(n).padStart(2, '0');
+      const first = `${y}-${pad(m + 1)}-01`;
+      const lastD = new Date(y, m + 1, 0).getDate();
+      const last = `${y}-${pad(m + 1)}-${pad(lastD)}`;
+      return { first, last };
+    }
+
+    async function loadReservationsForMonth(monthKey) {
+      state.reservationLoading = true;
+      try {
+        const { sb, email } = portalAuth();
+        if (!sb || !email) {
+          state.reservationsAll = [];
+          applyReservationFilter();
+          return;
+        }
+        const { first, last } = getMonthReservationRange(monthKey);
+        const { data, error } = await sb.from('portal_reservations')
+          .select('*')
+          .gte('reserve_date', first)
+          .lte('reserve_date', last)
+          .order('reserve_date', { ascending: true })
+          .order('start_time', { ascending: true })
+          .order('id', { ascending: true });
+        if (error) throw error;
+        state.reservationsAll = data || [];
+        applyReservationFilter();
+      } catch (e) {
+        console.error('loadReservationsForMonth', e);
+        showPortalDataMessage(e?.message || '예약을 불러오지 못했습니다.', 'error', 'planner');
+        state.reservationsAll = [];
+        applyReservationFilter();
+      } finally {
+        state.reservationLoading = false;
+      }
+    }
+
+    function applyReservationFilter() {
+      const d = state.selectedDate;
+      const rn = String(state.selectedReservationResourceName || '').trim();
+      state.reservations = (state.reservationsAll || []).filter(r =>
+        r.reserve_date === d && String(r.resource_name || '').trim() === rn
+      );
     }
 
     function portalAuth() {
@@ -2600,6 +2789,9 @@ body.real-modal-open{overflow:hidden}
         expandedWidth: row.layout_w || 320,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        is_deleted: !!row.is_deleted,
+        deletedAt: row.deleted_at || null,
+        deletedBy: row.deleted_by || null,
         layout: { x: layout.x, y: layout.y, rotate: layout.rotate, color: layout.color, w: layout.w, h: layout.h },
         originalLayout: { x: layout.x, y: layout.y, rotate: layout.rotate, color: layout.color, w: layout.w, h: layout.h }
       };
@@ -2625,7 +2817,10 @@ body.real-modal-open{overflow:hidden}
         memo_date: note.memoDate || todayDateKey,
         is_image_only: !!note.imageOnly,
         image_url: note.image ? String(note.image) : null,
-        board_type: note.boardType || 'personal'
+        board_type: note.boardType || 'personal',
+        is_deleted: note.is_deleted === true,
+        deleted_at: null,
+        deleted_by: null
       };
     }
 
@@ -2640,6 +2835,7 @@ body.real-modal-open{overflow:hidden}
         const { data, error } = await sb.from('portal_memos')
           .select('*')
           .eq('created_by_email', email)
+          .eq('is_deleted', false)
           .order('pinned', { ascending: false })
           .order('z_index', { ascending: false })
           .order('created_at', { ascending: true });
@@ -2651,6 +2847,27 @@ body.real-modal-open{overflow:hidden}
         state.notes = [];
       } finally {
         state.memoLoading = false;
+      }
+    }
+
+    async function loadTrashMemosFromServer() {
+      try {
+        const { sb, email } = portalAuth();
+        if (!sb || !email) {
+          state.trash = [];
+          return;
+        }
+        const { data, error } = await sb.from('portal_memos')
+          .select('*')
+          .eq('created_by_email', email)
+          .eq('is_deleted', true)
+          .order('updated_at', { ascending: false });
+        if (error) throw error;
+        state.trash = (data || []).map(mapMemoRowToState);
+      } catch (e) {
+        console.error('loadTrashMemosFromServer', e);
+        showPortalDataMessage(e?.message || '휴지통 메모를 불러오지 못했습니다.', 'error', 'memo');
+        state.trash = [];
       }
     }
 
@@ -2678,12 +2895,40 @@ body.real-modal-open{overflow:hidden}
       const payload = memoStateToDbPayload(merged, email, name);
       delete payload.created_by_email;
       delete payload.created_by_name;
+      delete payload.deleted_at;
+      delete payload.deleted_by;
       const { data, error } = await sb.from('portal_memos').update(payload).eq('id', id).eq('created_by_email', email).select('*').single();
       if (error) throw error;
       return data;
     }
 
-    async function deleteMemoOnServer(id) {
+    async function patchMemoOnServer(id, patch) {
+      const { sb, email } = portalAuth();
+      if (!sb || !email) throw new Error('로그인이 필요합니다.');
+      const { data, error } = await sb.from('portal_memos').update(patch).eq('id', id).eq('created_by_email', email).select('*').single();
+      if (error) throw error;
+      return data;
+    }
+
+    async function softDeleteMemoOnServer(id) {
+      const { email } = portalAuth();
+      const em = String(email || '').trim().toLowerCase();
+      await patchMemoOnServer(id, {
+        is_deleted: true,
+        deleted_at: new Date().toISOString(),
+        deleted_by: em || null
+      });
+    }
+
+    async function restoreMemoOnServer(id) {
+      await patchMemoOnServer(id, {
+        is_deleted: false,
+        deleted_at: null,
+        deleted_by: null
+      });
+    }
+
+    async function permanentDeleteMemoOnServer(id) {
       const { sb, email } = portalAuth();
       if (!sb || !email) throw new Error('로그인이 필요합니다.');
       const { error } = await sb.from('portal_memos').delete().eq('id', id).eq('created_by_email', email);
@@ -2724,7 +2969,9 @@ body.real-modal-open{overflow:hidden}
       const tail = SCHEDULE_META_MARK + encodeURIComponent(JSON.stringify({
         type: meta.type || '업무',
         app: meta.app || '-',
-        displayMode: meta.displayMode || 'start'
+        displayMode: meta.displayMode || 'start',
+        author_team_code: meta.author_team_code || '',
+        author_division_code: meta.author_division_code || ''
       }));
       return (userText || '') + tail;
     }
@@ -2753,6 +3000,7 @@ body.real-modal-open{overflow:hidden}
     function mapScheduleRowToState(row) {
       const { clean, meta } = unpackScheduleDescription(row.description || '');
       const displayMode = inferDisplayModeFromTimes(row.start_time, row.end_time, meta.displayMode);
+      const scopeCode = normalizeScopeCode(row.scope);
       return {
         id: row.id,
         panelDate: row.schedule_date,
@@ -2762,17 +3010,19 @@ body.real-modal-open{overflow:hidden}
         endTime: row.end_time || '',
         type: meta.type || '업무',
         app: meta.app || '-',
-        scope: row.scope || '연구소',
+        scopeCode,
+        scope: scopeLabelFromCode(scopeCode),
         text: row.title || '',
         description: clean,
         author: row.created_by_name || row.created_by_email || '',
-        teamName: '-',
-        lab: '연구소'
+        teamName: String(meta.author_team_code || '').trim() || '-',
+        lab: String(meta.author_division_code || '').trim() || '-',
+        canMutate: canMutateScheduleRow(row)
       };
     }
 
     function scheduleRowsForDate(dateKey) {
-      return state.schedules.filter(r => r.schedule_date === dateKey);
+      return state.schedules.filter(r => r.schedule_date === dateKey && scheduleRowVisibleToCurrentUser(r));
     }
 
     function buildSchedulePayloadFromForm(isCompleted) {
@@ -2795,11 +3045,13 @@ body.real-modal-open{overflow:hidden}
         description: packScheduleDescription((f.description || '').trim(), {
           type: f.type,
           app: f.app,
-          displayMode: dm
+          displayMode: dm,
+          author_team_code: String(state.portalUserEmployee?.team_code || '').trim(),
+          author_division_code: String(state.portalUserEmployee?.division_code || '').trim()
         }),
         start_time: startTime,
         end_time: endTime,
-        scope: f.scope || '연구소',
+        scope: normalizeScopeCode(f.scope || 'lab'),
         is_completed: !!isCompleted,
         status
       };
@@ -2841,7 +3093,10 @@ body.real-modal-open{overflow:hidden}
     async function updateScheduleOnServer(id, patch) {
       const { sb, email } = portalAuth();
       if (!sb) throw new Error('로그인이 필요합니다.');
-      const { data, error } = await sb.from('portal_schedules').update(patch).eq('id', id).eq('created_by_email', email).select('*').single();
+      const isAdmin = isPortalAdminRole();
+      let q = sb.from('portal_schedules').update(patch).eq('id', id);
+      if (!isAdmin) q = q.eq('created_by_email', email);
+      const { data, error } = await q.select('*').single();
       if (error) throw error;
       return data;
     }
@@ -2849,13 +3104,18 @@ body.real-modal-open{overflow:hidden}
     async function deleteScheduleOnServer(id) {
       const { sb, email } = portalAuth();
       if (!sb) throw new Error('로그인이 필요합니다.');
-      const { error } = await sb.from('portal_schedules').delete().eq('id', id).eq('created_by_email', email);
+      const isAdmin = isPortalAdminRole();
+      let q = sb.from('portal_schedules').delete().eq('id', id);
+      if (!isAdmin) q = q.eq('created_by_email', email);
+      const { error } = await q;
       if (error) throw error;
     }
 
     function mapReservationRowToState(row) {
       const st = row.status || 'active';
       const uiStatus = st === 'full' ? 'full' : (st === 'partial' || st === 'active' ? 'partial' : 'available');
+      const me = String(portalAuth().email || '').trim().toLowerCase();
+      const author = String(row.created_by_email || '').trim().toLowerCase();
       return {
         id: row.id,
         startTime: row.start_time || '09:00',
@@ -2864,14 +3124,21 @@ body.real-modal-open{overflow:hidden}
         reserver: row.created_by_name || row.created_by_email || '',
         teamName: '-',
         status: uiStatus,
-        dbStatus: st
+        dbStatus: st,
+        isMine: !!me && author === me,
+        createdByEmail: author,
+        description: row.description || '',
+        reserveDate: row.reserve_date,
+        resourceName: row.resource_name,
+        canMutate: canMutateReservationRow(row)
       };
     }
 
     function getReservationOverlapList(dateKey, resourceName, excludeId) {
+      const rn = String(resourceName || '').trim();
       return state.reservations.filter(r =>
         r.reserve_date === dateKey &&
-        r.resource_name === resourceName &&
+        String(r.resource_name || '').trim() === rn &&
         (excludeId == null || Number(r.id) !== Number(excludeId))
       );
     }
@@ -2895,27 +3162,7 @@ body.real-modal-open{overflow:hidden}
     }
 
     async function loadReservationsFromServer() {
-      state.reservationLoading = true;
-      try {
-        const { sb, email } = portalAuth();
-        if (!sb || !email) {
-          state.reservations = [];
-          return;
-        }
-        const { data, error } = await sb.from('portal_reservations')
-          .select('*')
-          .order('reserve_date', { ascending: true })
-          .order('start_time', { ascending: true })
-          .order('id', { ascending: true });
-        if (error) throw error;
-        state.reservations = data || [];
-      } catch (e) {
-        console.error('loadReservationsFromServer', e);
-        showPortalDataMessage(e?.message || '예약을 불러오지 못했습니다.', 'error', 'planner');
-        state.reservations = [];
-      } finally {
-        state.reservationLoading = false;
-      }
+      await loadReservationsForMonth(state.calendarMonth);
     }
 
     async function createReservationOnServer(payload) {
@@ -2927,25 +3174,34 @@ body.real-modal-open{overflow:hidden}
 
     async function updateReservationOnServer(id, patch) {
       const { sb, email } = portalAuth();
-      const { data, error } = await sb.from('portal_reservations').update(patch).eq('id', id).eq('created_by_email', email).select('*').single();
+      const isAdmin = isPortalAdminRole();
+      let q = sb.from('portal_reservations').update(patch).eq('id', id);
+      if (!isAdmin) q = q.eq('created_by_email', email);
+      const { data, error } = await q.select('*').single();
       if (error) throw error;
       return data;
     }
 
     async function deleteReservationOnServer(id) {
       const { sb, email } = portalAuth();
-      const { error } = await sb.from('portal_reservations').delete().eq('id', id).eq('created_by_email', email);
+      const isAdmin = isPortalAdminRole();
+      let q = sb.from('portal_reservations').delete().eq('id', id);
+      if (!isAdmin) q = q.eq('created_by_email', email);
+      const { error } = await q;
       if (error) throw error;
     }
 
     async function loadPortalServerData() {
       const { sb } = portalAuth();
       if (!sb) return;
+      await loadPortalUserEmployee();
       await Promise.all([
         loadMemosFromServer(),
+        loadTrashMemosFromServer(),
         loadSchedulesFromServer(),
-        loadReservationsFromServer()
+        loadReservationsForMonth(state.calendarMonth)
       ]);
+      applyReservationFilter();
       if (typeof render === 'function') render();
     }
 
@@ -3025,20 +3281,25 @@ body.real-modal-open{overflow:hidden}
       state.activeReservationTab = 0;
       state.selectedPanelRangeFilter = '전체';
       state.selectedPanelStatusFilter = '진행';
-      state.scheduleScopeFilters = ['전체', '연구소', '팀', '개인'];
+      state.scheduleScopeFilters = ['all', 'lab', 'team', 'personal'];
       state.scheduleExpandedIndex = null;
       state.scheduleEditorOpen = false;
       state.scheduleEditingId = null;
       state.reservationEditingId = null;
+      state.reservationViewId = null;
+      state.reservationReadonly = false;
       state.portalPlannerFeedback = { msg: '', kind: '' };
       state.reservationForm = { startTime: '09:00', endTime: '10:00', title: '', description: '' };
+      state.reservationsAll = [];
+      state.selectedReservationResourceName = firstReservationResourceName();
+      state.portalUserEmployee = null;
       state.scheduleForm = {
         displayMode: 'start',
         startTime: '09:00',
         endTime: '10:00',
         type: '업무',
         app: '-',
-        scope: '연구소',
+        scope: 'lab',
         text: '',
         description: '',
       };
@@ -3088,7 +3349,7 @@ body.real-modal-open{overflow:hidden}
         endTime: '10:00',
         type: '업무',
         app: '-',
-        scope: '연구소',
+        scope: 'lab',
         text: '',
         description: '',
       };
@@ -3572,9 +3833,16 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         renderMemoTab();
       });
 
-      document.getElementById('trash-toggle')?.addEventListener('click', (e) => {
+      document.getElementById('trash-toggle')?.addEventListener('click', async (e) => {
         e.stopPropagation();
         state.trashOpen = !state.trashOpen;
+        if (state.trashOpen) {
+          try {
+            await loadTrashMemosFromServer();
+          } catch (err) {
+            console.error(err);
+          }
+        }
         renderMemoTab();
       });
       document.getElementById('new-memo-toggle')?.addEventListener('click', (e) => {
@@ -3744,7 +4012,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           const id = btn.dataset.memoDelete;
           const target = state.notes.find(n => n.id === id);
           if (!target) return;
-          if (!window.confirm('메모를 삭제할까요? 서버에서도 삭제됩니다.')) return;
+          if (!window.confirm('메모를 휴지통으로 이동할까요?')) return;
           if (!target.serverId) {
             state.notes = state.notes.filter(n => n.id !== id);
             renderMemoTab();
@@ -3752,9 +4020,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           }
           state.memoSortedView = false;
           try {
-            await deleteMemoOnServer(target.serverId);
-            await loadMemosFromServer();
-            setPortalMemoFeedback('메모가 삭제되었습니다.', 'success');
+            await softDeleteMemoOnServer(target.serverId);
+            await Promise.all([loadMemosFromServer(), loadTrashMemosFromServer()]);
+            setPortalMemoFeedback('휴지통으로 이동했습니다.', 'success');
             if (state.memoExpandedId === id) state.memoExpandedId = null;
             if (state.memoEditingId === id) state.memoEditingId = null;
             renderMemoTab();
@@ -3872,39 +4140,42 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       });
 
       board.querySelectorAll('[data-trash-restore]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', async (e) => {
           e.stopPropagation();
           const id = btn.dataset.trashRestore;
           const target = state.trash.find(t => t.id === id);
-          if (!target) return;
-          const restoredLayout = {
-              ...(target.originalLayout || target.layout || initialLayouts[0]),
-              x: ((target.originalLayout?.x ?? target.layout?.x) ?? 40) + 18,
-              y: ((target.originalLayout?.y ?? target.layout?.y) ?? 40) + 18,
-            };
-          const restored = {
-            ...target,
-            z: getNextZ(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            layout: { ...restoredLayout },
-            originalLayout: { ...restoredLayout }
-          };
-          delete restored.deletedAt;
+          if (!target || !target.serverId) return;
           state.memoSortedView = false;
-          state.notes.push(restored);
-          state.trash = state.trash.filter(t => t.id !== id);
-          renderMemoTab();
+          try {
+            await restoreMemoOnServer(target.serverId);
+            await Promise.all([loadMemosFromServer(), loadTrashMemosFromServer()]);
+            setPortalMemoFeedback('복원되었습니다.', 'success');
+            renderMemoTab();
+          } catch (err) {
+            console.error(err);
+            setPortalMemoFeedback(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error');
+            renderMemoTab();
+          }
         });
       });
 
       board.querySelectorAll('[data-trash-delete]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', async (e) => {
           e.stopPropagation();
           const id = btn.dataset.trashDelete;
+          const target = state.trash.find(t => t.id === id);
+          if (!target || !target.serverId) return;
           if (!window.confirm('휴지통에서 완전히 삭제하시겠습니까?')) return;
-          state.trash = state.trash.filter(t => t.id !== id);
-          renderMemoTab();
+          try {
+            await permanentDeleteMemoOnServer(target.serverId);
+            await loadTrashMemosFromServer();
+            setPortalMemoFeedback('삭제되었습니다.', 'success');
+            renderMemoTab();
+          } catch (err) {
+            console.error(err);
+            setPortalMemoFeedback(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error');
+            renderMemoTab();
+          }
         });
       });
 
@@ -3926,14 +4197,15 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
 
     function getScopeClass(scope) {
-      if (scope === '전체') return 'all';
-      if (scope === '연구소') return 'lab';
-      if (scope === '팀') return 'team';
+      const c = normalizeScopeCode(scope);
+      if (c === 'all') return 'all';
+      if (c === 'lab') return 'lab';
+      if (c === 'team') return 'team';
       return 'personal';
     }
 
     function renderScopeCheck(label, value) {
-      const active = (state.scheduleForm.scope || '연구소') === value;
+      const active = normalizeScopeCode(state.scheduleForm.scope || 'lab') === normalizeScopeCode(value);
 
       let cls = 'scope-check';
       if (value === '전체') cls += ' scope-all';
@@ -3953,17 +4225,14 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
 
     function getScopeFilterClass(scope) {
-      if (scope === '전체') return 'all';
-      if (scope === '연구소') return 'lab';
-      if (scope === '팀') return 'team';
-      return 'personal';
+      return getScopeClass(scope);
     }
 
     function getFilteredSchedulesForDate(dateKey) {
       const filters = state.scheduleScopeFilters || [];
       const list = scheduleRowsForDate(dateKey).map(mapScheduleRowToState);
       if (!filters.length) return [];
-      return list.filter(item => filters.includes(item.scope || '연구소'));
+      return list.filter(item => filters.includes(item.scopeCode || 'lab'));
     }
 
     function getSchedulesForSelectedPanel() {
@@ -3972,7 +4241,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         return getFilteredSchedulesForDate(state.selectedDate);
       }
 
-      const allDates = [...new Set(state.schedules.map(s => s.schedule_date).filter(Boolean))].sort();
+      const visibleRows = (state.schedules || []).filter(scheduleRowVisibleToCurrentUser);
+      const allDates = [...new Set(visibleRows.map(s => s.schedule_date).filter(Boolean))].sort();
       const combined = [];
       for (const dateKey of allDates) {
         const dayItems = getFilteredSchedulesForDate(dateKey).map(item => ({
@@ -4011,13 +4281,13 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
 
     function getOwnerLabel(item) {
-      const scope = item.scope || '연구소';
+      const code = item.scopeCode || normalizeScopeCode(item.scope);
       const author = item.author || '작성자';
       const teamName = item.teamName || '팀';
       const lab = item.lab || '연구소';
-      if (scope === '전체') return `전체 · ${author}`;
-      if (scope === '연구소') return `${lab} · ${author}`;
-      if (scope === '팀') return `${teamName} · ${author}`;
+      if (code === 'all') return `전체 · ${author}`;
+      if (code === 'lab') return `${lab} · ${author}`;
+      if (code === 'team') return `${teamName} · ${author}`;
       return `${author}`;
     }
 
@@ -4032,16 +4302,17 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
     function getScopePriority(scope, item) {
       if (isNoticeItem(item)) return 0;
-      if (scope === '개인') return 1;
-      if (scope === '팀') return 2;
-      if (scope === '연구소') return 3;
+      const c = normalizeScopeCode(scope);
+      if (c === 'personal') return 1;
+      if (c === 'team') return 2;
+      if (c === 'lab') return 3;
       return 4;
     }
 
     function sortSchedulesForPanel(list) {
       return [...list].sort((a, b) => {
-        const priorityA = getScopePriority(a.scope || '연구소', a);
-        const priorityB = getScopePriority(b.scope || '연구소', b);
+        const priorityA = getScopePriority(a.scopeCode || 'lab', a);
+        const priorityB = getScopePriority(b.scopeCode || 'lab', b);
         if (priorityA !== priorityB) return priorityA - priorityB;
         const timeA = a.displayMode === 'allDay' ? '00:00' : (a.startTime || '23:59');
         const timeB = b.displayMode === 'allDay' ? '00:00' : (b.startTime || '23:59');
@@ -4058,12 +4329,12 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
 
     function getReservationListForDate(dateKey) {
-      const resName = (reservationResources[state.activeReservationTab] || {}).name;
+      const resName = String(state.selectedReservationResourceName || '').trim();
       if (!resName) return [];
       return state.reservations
-        .filter(r => r.reserve_date === dateKey && r.resource_name === resName)
+        .filter(r => r.reserve_date === dateKey && String(r.resource_name || '').trim() === resName)
         .map(mapReservationRowToState)
-        .sort((a, b) => (a.startTime || '23:59').localeCompare(b.startTime || '23:59'));
+        .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
     }
 
     function getReservationStatusClass(status) {
@@ -4073,18 +4344,23 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     }
 
     function getReservationDaySummary(dateKey) {
-      const items = getReservationListForDate(dateKey);
-      if (!items.length) return { text: '예약 가능', cls: 'available', count: 0 };
+      const rows = (state.reservationsAll || []).filter(r => r.reserve_date === dateKey);
+      const count = rows.length;
+      if (!count) return { text: '예약 가능', cls: 'available', count: 0 };
+      const items = rows.map(mapReservationRowToState);
       const fullCount = items.filter(i => i.status === 'full').length;
       const partialCount = items.filter(i => i.status === 'partial').length;
-      if (fullCount >= 2) return { text: `${items.length}건 예약`, cls: 'full', count: items.length };
-      if (partialCount || fullCount) return { text: `${items.length}건 예약`, cls: 'partial', count: items.length };
-      return { text: '예약 가능', cls: 'available', count: 0 };
+      if (fullCount >= 2) return { text: `${count}건 예약`, cls: 'full', count };
+      if (partialCount || fullCount) return { text: `${count}건 예약`, cls: 'partial', count };
+      return { text: `${count}건 예약`, cls: 'partial', count };
     }
 
-    function setPlannerMode(mode) {
+    async function setPlannerMode(mode) {
       state.plannerMode = mode;
       state.portalPlannerFeedback = { msg: '', kind: '' };
+      if (mode === 'reservation') {
+        await loadReservationsForMonth(state.calendarMonth);
+      }
       renderScheduleTab();
     }
 
@@ -4092,20 +4368,49 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
 
 
+    const rsvPointerState = { active: false, anchorIdx: null, lastIdx: null, moved: false };
+
+    function isReservationSlotBooked(slotStartMin, rows, excludeId) {
+      const slotEnd = slotStartMin + 30;
+      const list = rows || state.reservations || [];
+      for (const r of list) {
+        if (excludeId != null && Number(r.id) === Number(excludeId)) continue;
+        const a = timeToMinutes(r.start_time);
+        let b = timeToMinutes(r.end_time || r.start_time);
+        if (b <= a) b = a + 30;
+        if (slotStartMin < b && slotEnd > a) return true;
+      }
+      return false;
+    }
+
+    function reservationSlotIndexRangeFree(i0, i1, excludeId) {
+      const a = Math.min(i0, i1);
+      const b = Math.max(i0, i1);
+      for (let k = a; k <= b; k++) {
+        if (isReservationSlotBooked(k * 30, state.reservations, excludeId)) return false;
+      }
+      return true;
+    }
+
     function getReservationTabLabels() {
       return reservationResources.map(item => item.name || '');
     }
 
     function renderReservationTabs() {
       const labels = getReservationTabLabels();
+      const sel = String(state.selectedReservationResourceName || '').trim();
       return `
         <div class="reservation-tabs-wrap">
           <div class="reservation-tabs">
-            ${labels.map((label, idx) => `
-              <button type="button" class="reservation-tab ${state.activeReservationTab === idx ? 'active' : ''}" data-reservation-tab="${idx}">
-                ${label ? escapeHtml(label) : ''}
-              </button>
-            `).join('')}
+            ${labels.map((label, idx) => {
+              const nm = String(label || '').trim();
+              if (!nm) return '';
+              const active = nm === sel;
+              return `
+              <button type="button" class="reservation-tab ${active ? 'active' : ''}" data-reservation-tab="${idx}" data-reservation-name="${escapeAttr(nm)}">
+                ${escapeHtml(nm)}
+              </button>`;
+            }).join('')}
           </div>
         </div>
       `;
@@ -4120,15 +4425,27 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       });
 
       const activeResource = getActiveReservationResource();
-      const reservations = getReservationListForDate(state.selectedDate);
-      const blocks = reservations.map((item, idx) => {
-        const start = timeToMinutes(item.startTime);
-        const end = timeToMinutes(item.endTime || item.startTime);
+      const rawList = state.reservations || [];
+      const exId = state.reservationEditingId;
+
+      const slotsHtml = rows.map((label, i) => {
+        const startMin = i * 30;
+        const booked = isReservationSlotBooked(startMin, rawList, exId);
+        const cls = booked ? 'rsv-slot-cell booked' : 'rsv-slot-cell';
+        return `<div class="${cls}" data-rsv-slot="${i}" data-rsv-min="${startMin}" style="top:${i * 28}px;"></div>`;
+      }).join('');
+
+      const blocks = rawList.map((row) => {
+        const item = mapReservationRowToState(row);
+        const start = timeToMinutes(row.start_time);
+        let end = timeToMinutes(row.end_time || row.start_time);
+        if (end <= start) end = start + 30;
         const top = (start / 30) * 28;
-        const height = Math.max(28, ((Math.max(end, start + 30) - start) / 30) * 28 - 2);
-        const cls = getReservationStatusClass(item.status);
+        const height = Math.max(28, ((end - start) / 30) * 28 - 2);
+        let cls = getReservationStatusClass(item.status);
+        if (item.isMine) cls += ' mine';
         return `
-          <div class="reservation-time-block ${cls}" style="top:${top}px;height:${height}px;">
+          <div class="reservation-time-block ${cls}" data-reservation-block-id="${row.id}" style="top:${top}px;height:${height}px;z-index:4;">
             <div class="reservation-time-block-time">${escapeHtml(item.startTime)} - ${escapeHtml(item.endTime)}</div>
             <div class="reservation-time-block-title">${escapeHtml(item.title)}</div>
             <div class="reservation-time-block-meta">${escapeHtml(item.reserver)} · ${escapeHtml(item.teamName)}</div>
@@ -4147,8 +4464,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
                 ${rows.map(label => `<div class="reservation-time-row reservation-time-label">${label}</div>`).join('')}
               </div>
               <div class="reservation-time-slots">
-                <div class="reservation-time-slots-inner">
+                <div class="reservation-time-slots-inner" id="reservation-slots-inner">
                   ${rows.map(() => `<div class="reservation-time-row reservation-time-slot"></div>`).join('')}
+                  ${slotsHtml}
                   ${blocks}
                 </div>
               </div>
@@ -4169,7 +4487,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       return `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
     }
 
-    function shiftCalendarMonth(offset) {
+    async function shiftCalendarMonth(offset) {
       const current = getCalendarMonthDate();
       const shifted = new Date(current.getFullYear(), current.getMonth() + offset, 1);
       state.calendarMonth = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-01`;
@@ -4179,6 +4497,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         const fallbackDay = Math.min(1, new Date(shifted.getFullYear(), shifted.getMonth() + 1, 0).getDate());
         state.selectedDate = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-${String(fallbackDay).padStart(2, '0')}`;
       }
+      await loadReservationsForMonth(state.calendarMonth);
+      applyReservationFilter();
       renderScheduleTab();
     }
 
@@ -4200,8 +4520,13 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       if (!state.scheduleEditorOpen) return '';
       const form = state.scheduleForm || {};
       const isEdit = state.scheduleEditingId !== null;
-      const scopeOptions = ['전체', '연구소', '팀', '개인'];
-      const scopeClassMap = { '전체': 'all', '연구소': 'lab', '팀': 'team', '개인': 'private' };
+      const scopeOptions = [
+        { label: '전체', value: 'all' },
+        { label: '연구소', value: 'lab' },
+        { label: '팀', value: 'team' },
+        { label: '개인', value: 'personal' }
+      ];
+      const scopeClassMap = { all: 'all', lab: 'lab', team: 'team', personal: 'private' };
       return `
         <div class="card" style="border:1px solid #dbeafe;background:#f8fbff;">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;">
@@ -4251,9 +4576,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             <label>공개 범위</label>
             <div class="scope-check-grid">
               ${scopeOptions.map(opt => {
-                const active = (form.scope || '연구소') === opt;
-                const cls = scopeClassMap[opt] || 'all';
-                return `<label class="scope-check scope-${cls} ${active ? 'active' : ''}"><input type="radio" name="schedule-scope" value="${opt}" ${active ? 'checked' : ''} />${opt}</label>`;
+                const active = normalizeScopeCode(form.scope || 'lab') === opt.value;
+                const cls = scopeClassMap[opt.value] || 'all';
+                return `<label class="scope-check scope-${cls} ${active ? 'active' : ''}"><input type="radio" name="schedule-scope" value="${opt.value}" ${active ? 'checked' : ''} />${escapeHtml(opt.label)}</label>`;
               }).join('')}
             </div>
           </div>
@@ -4270,6 +4595,10 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     }
 
     function renderScheduleTab() {
+      const resNm = String(state.selectedReservationResourceName || '').trim();
+      const idxFound = reservationResources.findIndex(r => String(r.name || '').trim() === resNm);
+      if (idxFound >= 0) state.activeReservationTab = idxFound;
+
       const weekNames = ['일', '월', '화', '수', '목', '금', '토'];
       const currentMonthDate = getCalendarMonthDate();
       const currentMonthLabel = formatCalendarMonthLabel(currentMonthDate);
@@ -4296,10 +4625,10 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
                 </div>
                 ${!isReservationMode ? `
                   <div class="month-scope-filter-row">
-                    ${renderMonthScopeFilter('전체', '전체')}
-                    ${renderMonthScopeFilter('연구소', '연구소')}
-                    ${renderMonthScopeFilter('팀', '팀')}
-                    ${renderMonthScopeFilter('개인', '개인')}
+                    ${renderMonthScopeFilter('전체', 'all')}
+                    ${renderMonthScopeFilter('연구소', 'lab')}
+                    ${renderMonthScopeFilter('팀', 'team')}
+                    ${renderMonthScopeFilter('개인', 'personal')}
                   </div>
                 ` : ``}
               </div>
@@ -4337,7 +4666,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
                     <div class="day-num">${day || ''}${day ? `<span class="day-count">${count}건</span>` : ''}</div>
                     ${count
                       ? filteredDayItems.slice(0, 3).map(item => {
-                          const cls = getScopeClass(item.scope || '연구소');
+                          const cls = getScopeClass(item.scopeCode || 'lab');
                           return `<div class="scope-badge ${cls}" style="margin-bottom:4px;">${escapeHtml(item.text)}</div>`;
                         }).join('')
                       : (day ? `<div class="muted-mini">일정 없음</div>` : ``)}
@@ -4390,17 +4719,25 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
               ${isReservationMode ? `
               <div style="margin-top:12px;padding:14px;border:1px solid #e0e7ff;border-radius:14px;background:#fafbff;">
-                <div style="font-size:15px;font-weight:700;margin-bottom:10px;">${state.reservationEditingId ? '예약 수정' : '예약 추가'}</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="field"><label for="rf-start">시작</label><input type="time" id="rf-start" value="${escapeAttr(state.reservationForm.startTime || '09:00')}" /></div>
-                  <div class="field"><label for="rf-end">종료</label><input type="time" id="rf-end" value="${escapeAttr(state.reservationForm.endTime || '10:00')}" /></div>
+                <div style="font-size:15px;font-weight:700;margin-bottom:10px;">${state.reservationViewId ? '예약 상세' : (state.reservationEditingId ? '예약 수정' : '예약 추가')}</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                  <div class="field"><label>날짜</label><input type="text" readonly style="background:#f8fafc;" value="${escapeAttr(formatDateLabel(state.selectedDate))}" /></div>
+                  <div class="field"><label>장소</label><input type="text" readonly style="background:#f8fafc;" value="${escapeAttr(String(state.selectedReservationResourceName || ''))}" /></div>
                 </div>
-                <div class="field"><label for="rf-title">제목</label><input type="text" id="rf-title" value="${escapeAttr(state.reservationForm.title || '')}" placeholder="예약 제목" autocomplete="off" /></div>
-                <div class="field"><label for="rf-desc">설명</label><textarea id="rf-desc" rows="2" placeholder="설명(선택)">${escapeHtml(state.reservationForm.description || '')}</textarea></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="field"><label for="rf-start">시작</label><select id="rf-start" ${state.reservationReadonly ? 'disabled' : ''}></select></div>
+                  <div class="field"><label for="rf-end">종료</label><select id="rf-end" ${state.reservationReadonly ? 'disabled' : ''}></select></div>
+                </div>
+                <div class="field"><label for="rf-title">제목</label><input type="text" id="rf-title" value="${escapeAttr(state.reservationForm.title || '')}" placeholder="예약 제목" autocomplete="off" ${state.reservationReadonly ? 'readonly' : ''} /></div>
+                <div class="field"><label for="rf-desc">설명</label><textarea id="rf-desc" rows="2" placeholder="설명(선택)" ${state.reservationReadonly ? 'readonly' : ''}>${escapeHtml(state.reservationForm.description || '')}</textarea></div>
+                ${state.reservationReadonly ? `
+                <div class="row-end" style="margin-top:10px;">
+                  <button type="button" class="small-btn dark" id="reservation-close-view-btn">닫기</button>
+                </div>` : `
                 <div class="row-end" style="margin-top:10px;">
                   ${state.reservationEditingId ? `<button type="button" class="small-btn" id="reservation-cancel-btn">취소</button>` : ``}
                   <button type="button" class="small-btn dark" id="reservation-save-btn">${state.reservationEditingId ? '수정 저장' : '예약 저장'}</button>
-                </div>
+                </div>`}
               </div>
               <div style="margin-top:14px;font-size:14px;font-weight:700;">${formatDateLabel(state.selectedDate)} · 예약 목록</div>
               <div class="schedule-list" style="margin-top:8px;">
@@ -4408,11 +4745,15 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
                   <div class="schedule-item">
                     <div class="schedule-main" style="flex:1;">
                       <div class="schedule-title">${escapeHtml(r.title || '(제목 없음)')}</div>
-                      <div class="schedule-meta">${escapeHtml(r.startTime)} – ${escapeHtml(r.endTime)} · ${escapeHtml(r.reserver)}</div>
+                      <div class="schedule-meta">${escapeHtml(r.startTime)} – ${escapeHtml(r.endTime)} · ${escapeHtml(r.reserver)}${r.isMine ? ' · 내 예약' : ''}</div>
                     </div>
                     <div class="memo-actions" style="align-self:center;">
+                      ${r.canMutate ? `
                       <button type="button" class="small-btn" data-reservation-edit-id="${r.id}">수정</button>
                       <button type="button" class="small-btn" data-reservation-delete-id="${r.id}" style="color:#b91c1c;border-color:#fecaca;background:#fff5f5;">삭제</button>
+                      ` : `
+                      <button type="button" class="small-btn dark" data-reservation-view-id="${r.id}">상세</button>
+                      `}
                     </div>
                   </div>
                 `).join('')}
@@ -4428,14 +4769,14 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
                     const panelKey = buildSchedulePanelKeyById(item.id);
                     const isExpanded = state.scheduleExpandedIndex === panelKey;
                     return `
-                      <div class="schedule-item scope-${getScopeClass(item.scope || '연구소')} ${item.completed ? 'completed' : ''}">
+                      <div class="schedule-item scope-${getScopeClass(item.scopeCode || 'lab')} ${item.completed ? 'completed' : ''}">
                         <button class="schedule-head" data-schedule-expand="${escapeAttr(panelKey)}">
                           <div onclick="event.stopPropagation()" style="display:flex;align-items:flex-start;padding-top:2px;">
-                            <input type="checkbox" data-schedule-complete="${escapeAttr(panelKey)}" ${item.completed ? 'checked' : ''} style="margin-top:2px;" />
+                            <input type="checkbox" data-schedule-complete="${escapeAttr(panelKey)}" ${item.completed ? 'checked' : ''} style="margin-top:2px;" ${item.canMutate ? '' : 'disabled title="작성자만 완료 처리할 수 있습니다."'} />
                           </div>
                           <div class="schedule-time">
                             <strong>${escapeHtml(getScheduleTimeLabel(item))}</strong>
-                            <div class="scope-badge ${getScopeClass(item.scope || '연구소')}">${escapeHtml(item.scope || '연구소')}</div>
+                            <div class="scope-badge ${getScopeClass(item.scopeCode || 'lab')}">${escapeHtml(item.scope || '연구소')}</div>
                             ${item.completed ? `<div class="done-label">완료</div>` : ``}
                           </div>
                           <div class="schedule-main" style="position:relative;">
@@ -4458,8 +4799,10 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
                             <div class="schedule-desc">${escapeHtml(item.description || '상세 내용 없음')}</div>
                             <div class="memo-actions">
                               ${item.app && item.app !== '-' ? `<button class="small-btn dark">바로가기</button>` : ``}
+                              ${item.canMutate ? `
                               <button class="small-btn" data-schedule-edit="${escapeAttr(panelKey)}">수정</button>
                               <button class="small-btn" data-schedule-delete="${escapeAttr(panelKey)}" style="color:#b91c1c;border-color:#fecaca;background:#fff5f5;">삭제</button>
+                              ` : `<span style="font-size:12px;color:#94a3b8;">작성자만 수정·삭제할 수 있습니다.</span>`}
                             </div>
                           </div>
                         ` : ``}
@@ -4474,10 +4817,10 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
               <div style="font-size:16px;font-weight:700;margin-bottom:10px;">${isReservationMode ? '예약 운영 기준 예시' : '활용 팁'}</div>
               <div class="tips">
                 ${isReservationMode ? `
-                • 각 탭은 서로 다른 예약 자원을 의미합니다<br />
-                • 탭 아래 타임테이블은 해당 자원의 일일 예약판입니다<br />
-                • 시간 표기는 00:00 형식, 30분 단위로 구성됩니다<br />
-                • 추후 예약 블록을 이 타임테이블 위에 직접 배치할 수 있습니다
+                • 장소(탭)를 선택하면 해당 날짜·장소의 예약만 불러옵니다<br />
+                • 빈 칸을 클릭하면 30분 예약, 드래그하면 연속 시간 예약이 시작됩니다<br />
+                • 이미 예약된 칸은 선택할 수 없으며, 저장 전·후로 시간 겹침을 검사합니다<br />
+                • 예약 블록을 클릭하면 내 예약은 수정·삭제, 타인 예약은 상세 보기만 가능합니다
                 ` : `
                 • 달력은 마감일, 점검일, 반복 일정을 한눈에 보는 용도<br />
                 • 오른쪽 일정은 선택한 날짜의 실제 실행 목록<br />
@@ -4491,18 +4834,185 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
       bindScheduleEvents();
     }
+    function populateReservationTimeSelects() {
+      if (state.plannerMode !== 'reservation') return;
+      const startSel = document.getElementById('rf-start');
+      const endSel = document.getElementById('rf-end');
+      if (!startSel || !endSel) return;
+      const excludeId = state.reservationEditingId;
+      if (state.reservationReadonly) {
+        const s = state.reservationForm.startTime || '09:00';
+        const e = state.reservationForm.endTime || '10:00';
+        startSel.innerHTML = `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`;
+        endSel.innerHTML = `<option value="${escapeAttr(e)}">${escapeHtml(e)}</option>`;
+        return;
+      }
+      startSel.innerHTML = '';
+      for (let i = 0; i < 49; i++) {
+        const sm = i * 30;
+        if (!isReservationSlotBooked(sm, state.reservations, excludeId)) {
+          const o = document.createElement('option');
+          o.value = minutesToTime(sm);
+          o.textContent = minutesToTime(sm);
+          startSel.appendChild(o);
+        }
+      }
+      const wantS = state.reservationForm.startTime || '09:00';
+      if ([...startSel.options].some(o => o.value === wantS)) startSel.value = wantS;
+      else if (startSel.options.length) startSel.value = startSel.options[0].value;
+
+      const refillEnds = () => {
+        const startMin = timeToMinutes(startSel.value || '00:00');
+        endSel.innerHTML = '';
+        const resName = String(state.selectedReservationResourceName || '').trim();
+        for (let end = startMin + 30; end <= 24 * 60; end += 30) {
+          if (checkReservationOverlap(state.selectedDate, resName, minutesToTime(startMin), minutesToTime(end), excludeId)) break;
+          const o = document.createElement('option');
+          o.value = minutesToTime(end);
+          o.textContent = minutesToTime(end);
+          endSel.appendChild(o);
+        }
+        if (!endSel.options.length) {
+          const o = document.createElement('option');
+          o.value = minutesToTime(startMin + 30);
+          o.textContent = minutesToTime(startMin + 30);
+          endSel.appendChild(o);
+        }
+        const wantE = state.reservationForm.endTime || '10:00';
+        if ([...endSel.options].some(o => o.value === wantE)) endSel.value = wantE;
+        else endSel.value = endSel.options[endSel.options.length - 1].value;
+      };
+      refillEnds();
+      startSel.onchange = () => {
+        refillEnds();
+        state.reservationForm.startTime = startSel.value;
+        state.reservationForm.endTime = endSel.value;
+      };
+      endSel.onchange = () => {
+        state.reservationForm.endTime = endSel.value;
+      };
+    }
+
+    function bindReservationSlotPointer() {
+      const inner = document.getElementById('reservation-slots-inner');
+      if (!inner || state.plannerMode !== 'reservation' || state.reservationReadonly) return;
+
+      const onUp = () => {
+        if (!rsvPointerState.active) return;
+        rsvPointerState.active = false;
+        window.removeEventListener('mouseup', onUp);
+        const a = rsvPointerState.anchorIdx;
+        const b = rsvPointerState.lastIdx;
+        if (a == null || b == null) return;
+        const moved = !!rsvPointerState.moved;
+        rsvPointerState.moved = false;
+        let i0 = a;
+        let i1 = moved ? b : a;
+        if (!reservationSlotIndexRangeFree(i0, i1, state.reservationEditingId)) {
+          setPortalPlannerFeedback('이미 예약된 시간과 겹칩니다.', 'error');
+          renderScheduleTab();
+          return;
+        }
+        const lo = Math.min(i0, i1);
+        const hi = Math.max(i0, i1);
+        const startMin = lo * 30;
+        const endMin = (hi + 1) * 30;
+        state.reservationViewId = null;
+        state.reservationEditingId = null;
+        state.reservationReadonly = false;
+        state.reservationForm = {
+          startTime: minutesToTime(startMin),
+          endTime: minutesToTime(endMin),
+          title: '',
+          description: ''
+        };
+        if (checkReservationOverlap(
+          state.selectedDate,
+          String(state.selectedReservationResourceName || '').trim(),
+          state.reservationForm.startTime,
+          state.reservationForm.endTime,
+          null
+        )) {
+          setPortalPlannerFeedback('이미 예약된 시간과 겹칩니다.', 'error');
+          renderScheduleTab();
+          return;
+        }
+        setPortalPlannerFeedback('', '');
+        renderScheduleTab();
+      };
+
+      inner.querySelectorAll('[data-rsv-slot]:not(.booked)').forEach(el => {
+        el.addEventListener('mousedown', (e) => {
+          if (e.button !== 0) return;
+          const idx = Number(el.dataset.rsvSlot);
+          if (!Number.isFinite(idx)) return;
+          rsvPointerState.active = true;
+          rsvPointerState.anchorIdx = idx;
+          rsvPointerState.lastIdx = idx;
+          rsvPointerState.moved = false;
+          window.addEventListener('mouseup', onUp);
+        });
+        el.addEventListener('mouseenter', () => {
+          if (!rsvPointerState.active) return;
+          const idx = Number(el.dataset.rsvSlot);
+          if (!Number.isFinite(idx)) return;
+          if (el.classList.contains('booked')) return;
+          if (idx !== rsvPointerState.anchorIdx) rsvPointerState.moved = true;
+          rsvPointerState.lastIdx = idx;
+        });
+      });
+
+      inner.querySelectorAll('[data-reservation-block-id]').forEach(block => {
+        block.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = Number(block.dataset.reservationBlockId);
+          const row = state.reservations.find(r => Number(r.id) === id);
+          if (!row) return;
+          if (canMutateReservationRow(row)) {
+            state.reservationViewId = null;
+            state.reservationReadonly = false;
+            state.reservationEditingId = id;
+            state.reservationForm = {
+              startTime: row.start_time || '09:00',
+              endTime: row.end_time || '10:00',
+              title: row.title || '',
+              description: row.description || ''
+            };
+          } else {
+            state.reservationEditingId = null;
+            state.reservationViewId = id;
+            state.reservationReadonly = true;
+            state.reservationForm = {
+              startTime: row.start_time || '09:00',
+              endTime: row.end_time || '10:00',
+              title: row.title || '',
+              description: row.description || ''
+            };
+          }
+          renderScheduleTab();
+        });
+      });
+    }
+
     function bindScheduleEvents() {
       tabContent.querySelectorAll('[data-planner-mode]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          setPlannerMode(btn.dataset.plannerMode);
+        btn.addEventListener('click', async () => {
+          await setPlannerMode(btn.dataset.plannerMode);
         });
       });
 
       tabContent.querySelectorAll('[data-reservation-tab]').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
+          const name = String(btn.dataset.reservationName || '').trim();
+          if (!name) return;
           state.activeReservationTab = Number(btn.dataset.reservationTab);
+          state.selectedReservationResourceName = name;
           state.reservationEditingId = null;
+          state.reservationViewId = null;
+          state.reservationReadonly = false;
           state.reservationForm = { startTime: '09:00', endTime: '10:00', title: '', description: '' };
+          await loadReservationsForMonth(state.calendarMonth);
+          applyReservationFilter();
           renderScheduleTab();
         });
       });
@@ -4514,7 +5024,10 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           state.selectedPanelStatusFilter = '전체';
           state.scheduleExpandedIndex = null;
           state.reservationEditingId = null;
+          state.reservationViewId = null;
+          state.reservationReadonly = false;
           state.reservationForm = { startTime: '09:00', endTime: '10:00', title: '', description: '' };
+          applyReservationFilter();
           renderScheduleTab();
         });
       });
@@ -4525,19 +5038,21 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         renderScheduleTab();
       });
 
-      document.getElementById('calendar-prev-month')?.addEventListener('click', () => {
-        shiftCalendarMonth(-1);
+      document.getElementById('calendar-prev-month')?.addEventListener('click', async () => {
+        await shiftCalendarMonth(-1);
       });
 
-      document.getElementById('calendar-next-month')?.addEventListener('click', () => {
-        shiftCalendarMonth(1);
+      document.getElementById('calendar-next-month')?.addEventListener('click', async () => {
+        await shiftCalendarMonth(1);
       });
 
-      document.getElementById('calendar-current-month')?.addEventListener('click', () => {
+      document.getElementById('calendar-current-month')?.addEventListener('click', async () => {
         state.calendarMonth = todayMonthKey;
         const selPrefix = state.selectedDate.slice(0, 7);
         const todayPrefix = todayDateKey.slice(0, 7);
         if (selPrefix !== todayPrefix) state.selectedDate = todayDateKey;
+        await loadReservationsForMonth(state.calendarMonth);
+        applyReservationFilter();
         renderScheduleTab();
       });
 
@@ -4590,13 +5105,36 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           const { id } = parseSchedulePanelKey(chk.dataset.scheduleComplete);
           const row = state.schedules.find(s => Number(s.id) === Number(id));
           if (!row) return;
+          if (!canMutateScheduleRow(row)) {
+            chk.checked = !!row.is_completed;
+            setPortalPlannerFeedback('작성자만 완료 처리할 수 있습니다.', 'error');
+            renderScheduleTab();
+            return;
+          }
+          const nextDone = !row.is_completed;
+          const { email, name } = portalAuth();
+          const patch = { is_completed: nextDone };
+          if (nextDone) {
+            patch.completed_at = new Date().toISOString();
+            patch.completed_by_email = email;
+            patch.completed_by_name = name;
+          } else {
+            patch.completed_at = null;
+            patch.completed_by_email = null;
+            patch.completed_by_name = null;
+          }
           try {
-            await updateScheduleOnServer(id, { is_completed: !row.is_completed });
+            try {
+              await updateScheduleOnServer(id, patch);
+            } catch (e0) {
+              await updateScheduleOnServer(id, { is_completed: nextDone });
+            }
             await loadSchedulesFromServer();
-            setPortalPlannerFeedback(row.is_completed ? '진행 상태로 변경했습니다.' : '완료 처리했습니다.', 'success');
+            setPortalPlannerFeedback(nextDone ? '완료 처리했습니다.' : '진행 상태로 변경했습니다.', 'success');
             renderScheduleTab();
           } catch (e) {
             console.error(e);
+            chk.checked = !!row.is_completed;
             setPortalPlannerFeedback(e?.message || '상태 저장에 실패했습니다.', 'error');
             renderScheduleTab();
           }
@@ -4609,6 +5147,11 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           const { id } = parseSchedulePanelKey(btn.dataset.scheduleEdit);
           const row = state.schedules.find(s => Number(s.id) === Number(id));
           if (!row) return;
+          if (!canMutateScheduleRow(row)) {
+            setPortalPlannerFeedback('작성자만 수정할 수 있습니다.', 'error');
+            renderScheduleTab();
+            return;
+          }
           const ui = mapScheduleRowToState(row);
           state.selectedDate = row.schedule_date;
           state.scheduleEditingId = id;
@@ -4619,7 +5162,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             endTime: ui.endTime || '10:00',
             type: ui.type || '업무',
             app: ui.app || '-',
-            scope: ui.scope || '연구소',
+            scope: ui.scopeCode || 'lab',
             text: ui.text || '',
             description: ui.description || '',
           };
@@ -4633,11 +5176,17 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           e.stopPropagation();
           const { id } = parseSchedulePanelKey(btn.dataset.scheduleDelete);
           if (!id || !Number.isFinite(id)) return;
+          const row = state.schedules.find(s => Number(s.id) === Number(id));
+          if (!row || !canMutateScheduleRow(row)) {
+            setPortalPlannerFeedback('작성자만 삭제할 수 있습니다.', 'error');
+            renderScheduleTab();
+            return;
+          }
           if (!window.confirm('일정을 삭제할까요?')) return;
           try {
             await deleteScheduleOnServer(id);
             await loadSchedulesFromServer();
-            setPortalPlannerFeedback('일정이 삭제되었습니다.', 'success');
+            setPortalPlannerFeedback('삭제되었습니다.', 'success');
             state.scheduleExpandedIndex = null;
             renderScheduleTab();
           } catch (err) {
@@ -4703,14 +5252,14 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         try {
           if (state.scheduleEditingId == null) {
             await createScheduleOnServer(buildSchedulePayloadFromForm(false));
-            showPortalDataMessage('일정이 저장되었습니다.', 'success', 'planner');
+            showPortalDataMessage('저장되었습니다.', 'success', 'planner');
           } else {
             const existing = state.schedules.find(s => Number(s.id) === Number(state.scheduleEditingId));
             const payload = buildSchedulePayloadFromForm(!!existing?.is_completed);
             delete payload.created_by_email;
             delete payload.created_by_name;
             await updateScheduleOnServer(state.scheduleEditingId, payload);
-            showPortalDataMessage('일정이 수정되었습니다.', 'success', 'planner');
+            showPortalDataMessage('수정되었습니다.', 'success', 'planner');
           }
           await loadSchedulesFromServer();
           state.scheduleEditorOpen = false;
@@ -4724,9 +5273,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       });
 
       document.getElementById('reservation-save-btn')?.addEventListener('click', async () => {
-        const resName = (reservationResources[state.activeReservationTab] || {}).name;
+        const resName = String(state.selectedReservationResourceName || '').trim();
         if (!resName) {
-          setPortalPlannerFeedback('자원(탭) 이름이 비어 있어 예약할 수 없습니다.', 'error');
+          setPortalPlannerFeedback('예약 장소를 선택해 주세요.', 'error');
           renderScheduleTab();
           return;
         }
@@ -4736,6 +5285,11 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         const desc = (document.getElementById('rf-desc')?.value || '').trim();
         if (!title) {
           window.alert('예약 제목을 입력해 주세요.');
+          return;
+        }
+        if (timeToMinutes(en) <= timeToMinutes(st)) {
+          setPortalPlannerFeedback('종료 시간은 시작 시간 이후여야 합니다.', 'error');
+          renderScheduleTab();
           return;
         }
         const { email, name } = portalAuth();
@@ -4751,6 +5305,11 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         }
         try {
           if (state.reservationEditingId == null) {
+            if (checkReservationOverlap(state.selectedDate, resName, st, en, null)) {
+              setPortalPlannerFeedback('이미 예약된 시간과 겹칩니다.', 'error');
+              renderScheduleTab();
+              return;
+            }
             await createReservationOnServer({
               reserve_date: state.selectedDate,
               start_time: st,
@@ -4762,8 +5321,13 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
               created_by_email: email,
               created_by_name: name
             });
-            setPortalPlannerFeedback('예약이 저장되었습니다.', 'success');
+            setPortalPlannerFeedback('저장되었습니다.', 'success');
           } else {
+            if (checkReservationOverlap(state.selectedDate, resName, st, en, state.reservationEditingId)) {
+              setPortalPlannerFeedback('이미 예약된 시간과 겹칩니다.', 'error');
+              renderScheduleTab();
+              return;
+            }
             await updateReservationOnServer(state.reservationEditingId, {
               reserve_date: state.selectedDate,
               start_time: st,
@@ -4773,10 +5337,13 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
               description: desc,
               status: 'active'
             });
-            setPortalPlannerFeedback('예약을 수정했습니다.', 'success');
+            setPortalPlannerFeedback('수정되었습니다.', 'success');
           }
-          await loadReservationsFromServer();
+          await loadReservationsForMonth(state.calendarMonth);
+          applyReservationFilter();
           state.reservationEditingId = null;
+          state.reservationViewId = null;
+          state.reservationReadonly = false;
           state.reservationForm = { startTime: '09:00', endTime: '10:00', title: '', description: '' };
           renderScheduleTab();
         } catch (err) {
@@ -4788,6 +5355,15 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
       document.getElementById('reservation-cancel-btn')?.addEventListener('click', () => {
         state.reservationEditingId = null;
+        state.reservationViewId = null;
+        state.reservationReadonly = false;
+        state.reservationForm = { startTime: '09:00', endTime: '10:00', title: '', description: '' };
+        renderScheduleTab();
+      });
+
+      document.getElementById('reservation-close-view-btn')?.addEventListener('click', () => {
+        state.reservationViewId = null;
+        state.reservationReadonly = false;
         state.reservationForm = { startTime: '09:00', endTime: '10:00', title: '', description: '' };
         renderScheduleTab();
       });
@@ -4797,7 +5373,27 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           const id = Number(btn.dataset.reservationEditId);
           const row = state.reservations.find(r => Number(r.id) === id);
           if (!row) return;
+          state.reservationViewId = null;
+          state.reservationReadonly = false;
           state.reservationEditingId = id;
+          state.reservationForm = {
+            startTime: row.start_time || '09:00',
+            endTime: row.end_time || '10:00',
+            title: row.title || '',
+            description: row.description || ''
+          };
+          renderScheduleTab();
+        });
+      });
+
+      tabContent.querySelectorAll('[data-reservation-view-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = Number(btn.dataset.reservationViewId);
+          const row = state.reservations.find(r => Number(r.id) === id);
+          if (!row) return;
+          state.reservationEditingId = null;
+          state.reservationViewId = id;
+          state.reservationReadonly = true;
           state.reservationForm = {
             startTime: row.start_time || '09:00',
             endTime: row.end_time || '10:00',
@@ -4814,11 +5410,16 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           if (!window.confirm('예약을 삭제할까요?')) return;
           try {
             await deleteReservationOnServer(id);
-            await loadReservationsFromServer();
-            setPortalPlannerFeedback('예약이 삭제되었습니다.', 'success');
+            await loadReservationsForMonth(state.calendarMonth);
+            applyReservationFilter();
+            setPortalPlannerFeedback('삭제되었습니다.', 'success');
             if (state.reservationEditingId === id) {
               state.reservationEditingId = null;
               state.reservationForm = { startTime: '09:00', endTime: '10:00', title: '', description: '' };
+            }
+            if (state.reservationViewId === id) {
+              state.reservationViewId = null;
+              state.reservationReadonly = false;
             }
             renderScheduleTab();
           } catch (err) {
@@ -4828,6 +5429,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           }
         });
       });
+
+      populateReservationTimeSelects();
+      bindReservationSlotPointer();
     }
 
 
