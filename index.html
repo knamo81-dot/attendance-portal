@@ -2418,12 +2418,6 @@ body.real-modal-open{overflow:hidden}
       { id: 'supplies', name: '시약·초자 주문/분석', status: '추가예정', desc: '주문현황 · 비용분석', color: '#f8fafc' },
     ];
 
-    const baseMemoItems = [
-      { title: '이번 주 점검자료 확인', tag: '점검', pinned: true, content: '' },
-      { title: '4월 폐수 결재 마감', tag: '결재', pinned: true, content: '' },
-      { title: '수거 등록 누락 여부 점검', tag: '폐수', pinned: false, content: '' },
-      { title: '운영자료 PDF 문구 수정', tag: '문서', pinned: false, content: '' },
-    ];
     const todayDate = new Date();
     const todayDateKey = [
       todayDate.getFullYear(),
@@ -2435,9 +2429,6 @@ body.real-modal-open{overflow:hidden}
       String(todayDate.getMonth() + 1).padStart(2, '0'),
       '01'
     ].join('-');
-
-    const initialScheduleByDate = {};
-
 
     const reservationResources = [
       { name: '대회의실', location: '연구소 2층', capacity: '12명' },
@@ -2455,8 +2446,6 @@ body.real-modal-open{overflow:hidden}
     function getActiveReservationResource() {
       return reservationResources[state.activeReservationTab] || reservationResources[0];
     }
-
-    const initialReservationsByTab = reservationResources.map(() => ({}));
 
     const notices = [
       { title: '폐수 운영일지 4월 결재 요청', level: '긴급', app: '-' },
@@ -2478,15 +2467,7 @@ body.real-modal-open{overflow:hidden}
     const state = {
       page: 'home',
       tab: 'memo',
-      notes: baseMemoItems.map((item, idx) => ({
-        ...item,
-        id: `${item.title}-${idx}`,
-        z: idx + 1,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        layout: { ...initialLayouts[idx % initialLayouts.length] },
-        originalLayout: { ...initialLayouts[idx % initialLayouts.length] },
-      })),
+      notes: [],
       trash: [],
       memoExpandedId: null,
       memoEditingId: null,
@@ -2496,6 +2477,10 @@ body.real-modal-open{overflow:hidden}
       newMemo: { title: '', tag: '메모', pinned: false, imageOnly: false, color: '#fef3c7', content: '', expandedWidth: 420 },
       memoBoardHeight: 720,
       memoSortedView: false,
+      portalMemoFeedback: { msg: '', kind: '' },
+      memoLoading: false,
+      scheduleLoading: false,
+      reservationLoading: false,
 
       selectedDate: todayDateKey,
       calendarMonth: todayMonthKey,
@@ -2504,11 +2489,14 @@ body.real-modal-open{overflow:hidden}
       selectedPanelRangeFilter: '전체',
       selectedPanelStatusFilter: '진행',
       scheduleScopeFilters: ['전체', '연구소', '팀', '개인'],
-      scheduleMap: JSON.parse(JSON.stringify(initialScheduleByDate)),
-      reservationMapsByTab: JSON.parse(JSON.stringify(initialReservationsByTab)),
+      schedules: [],
+      reservations: [],
       scheduleExpandedIndex: null,
       scheduleEditorOpen: false,
-      scheduleEditingIndex: null,
+      scheduleEditingId: null,
+      reservationEditingId: null,
+      portalPlannerFeedback: { msg: '', kind: '' },
+      reservationForm: { startTime: '09:00', endTime: '10:00', title: '', description: '' },
       scheduleForm: {
         displayMode: 'start',
         startTime: '09:00',
@@ -2518,11 +2506,452 @@ body.real-modal-open{overflow:hidden}
         scope: '연구소',
         text: '',
         description: '',
-        scope: '연구소',
       },
       adminSection: 'org',
       organizationsData: []
     };
+
+    const SCHEDULE_META_MARK = '\n[[PORTAL_SCHEDULE_META]]';
+
+    function timeToMinutes(value) {
+      const [hh, mm] = String(value || '00:00').split(':').map(Number);
+      return (hh || 0) * 60 + (mm || 0);
+    }
+
+    function minutesToTime(total) {
+      const t = Math.max(0, Math.min(24 * 60 - 1, Math.round(Number(total) || 0)));
+      const hh = String(Math.floor(t / 60)).padStart(2, '0');
+      const mm = String(t % 60).padStart(2, '0');
+      return `${hh}:${mm}`;
+    }
+
+    function portalAuth() {
+      const ctx = typeof window.getPortalAuthContext === 'function' ? window.getPortalAuthContext() : {};
+      const sb = ctx.supabase || window.portalSupabase;
+      const email = String(ctx.user?.email || '').trim().toLowerCase();
+      const profile = ctx.profile || null;
+      const name = String(profile?.name || profile?.employee_name || profile?.username || '').trim()
+        || (email ? email.split('@')[0] : '사용자');
+      return { sb, email, name, user: ctx.user, profile };
+    }
+
+    function getCurrentUserDisplayName() {
+      return portalAuth().name;
+    }
+
+    function setPortalMemoFeedback(msg, kind) {
+      state.portalMemoFeedback = { msg: msg || '', kind: kind || '' };
+    }
+
+    function setPortalPlannerFeedback(msg, kind) {
+      state.portalPlannerFeedback = { msg: msg || '', kind: kind || '' };
+    }
+
+    function showPortalDataMessage(msg, kind, area) {
+      const k = kind || 'success';
+      if (area === 'planner') setPortalPlannerFeedback(msg, k);
+      else setPortalMemoFeedback(msg, k);
+    }
+
+    function parseLegacyMemoContentJson(raw) {
+      if (!raw || !String(raw).trim().startsWith('{')) return null;
+      try {
+        const o = JSON.parse(raw);
+        if (o && o.v === 1) {
+          return { content: o.txt || '', image: o.img || '', imageOnly: !!o.imageOnly };
+        }
+      } catch (_) { /* ignore */ }
+      return null;
+    }
+
+    function mapMemoRowToState(row) {
+      let contentText = row.content != null ? String(row.content) : '';
+      let imageUrl = row.image_url ? String(row.image_url) : '';
+      let imageOnly = !!row.is_image_only;
+      const legacy = parseLegacyMemoContentJson(contentText);
+      if (legacy) {
+        contentText = legacy.content;
+        if (!imageUrl && legacy.image) imageUrl = legacy.image;
+        imageOnly = legacy.imageOnly;
+      }
+      const color = row.color || '#fef3c7';
+      const layout = {
+        x: row.layout_x ?? 40,
+        y: row.layout_y ?? 40,
+        w: row.layout_w ?? 260,
+        h: row.layout_h ?? (imageOnly ? 120 : 170),
+        rotate: Number(row.rotate) || 0,
+        color
+      };
+      return {
+        id: String(row.id),
+        serverId: row.id,
+        memoDate: row.memo_date || todayDateKey,
+        boardType: row.board_type || 'personal',
+        title: row.title || '',
+        tag: row.tag || '메모',
+        pinned: !!row.pinned,
+        imageOnly,
+        content: contentText,
+        image: imageUrl,
+        z: row.z_index ?? 1,
+        layout_w: row.layout_w,
+        layout_h: row.layout_h,
+        expandedWidth: row.layout_w || 320,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        layout: { x: layout.x, y: layout.y, rotate: layout.rotate, color: layout.color, w: layout.w, h: layout.h },
+        originalLayout: { x: layout.x, y: layout.y, rotate: layout.rotate, color: layout.color, w: layout.w, h: layout.h }
+      };
+    }
+
+    function memoStateToDbPayload(note, email, name) {
+      const lw = Math.round(note.layout_w ?? note.layout?.w ?? note.expandedWidth ?? getMemoAutoWidth(note.title, note.content) ?? 320);
+      const lh = Math.round(note.layout_h ?? note.layout?.h ?? (note.imageOnly ? 120 : 170));
+      return {
+        created_by_email: email,
+        created_by_name: name,
+        title: note.title || '',
+        content: note.content || '',
+        tag: note.tag || '메모',
+        color: note.layout?.color || note.color || '#fef3c7',
+        pinned: !!note.pinned,
+        layout_x: Math.round(note.layout?.x ?? 40),
+        layout_y: Math.round(note.layout?.y ?? 40),
+        layout_w: lw,
+        layout_h: lh,
+        rotate: Number(note.layout?.rotate) || 0,
+        z_index: Math.round(note.z || 1),
+        memo_date: note.memoDate || todayDateKey,
+        is_image_only: !!note.imageOnly,
+        image_url: note.image ? String(note.image) : null,
+        board_type: note.boardType || 'personal'
+      };
+    }
+
+    async function loadMemosFromServer() {
+      state.memoLoading = true;
+      try {
+        const { sb, email } = portalAuth();
+        if (!sb || !email) {
+          state.notes = [];
+          return;
+        }
+        const { data, error } = await sb.from('portal_memos')
+          .select('*')
+          .eq('created_by_email', email)
+          .order('pinned', { ascending: false })
+          .order('z_index', { ascending: false })
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+        state.notes = (data || []).map(mapMemoRowToState);
+      } catch (e) {
+        console.error('loadMemosFromServer', e);
+        showPortalDataMessage(e?.message || '메모를 불러오지 못했습니다.', 'error', 'memo');
+        state.notes = [];
+      } finally {
+        state.memoLoading = false;
+      }
+    }
+
+    async function createMemoOnServer(payload) {
+      const { sb, email, name } = portalAuth();
+      if (!sb || !email) throw new Error('로그인이 필요합니다.');
+      const insertRow = payload.created_by_email != null ? payload : memoStateToDbPayload(payload, email, name);
+      const { data, error } = await sb.from('portal_memos').insert([insertRow]).select('*').single();
+      if (error) throw error;
+      return data;
+    }
+
+    async function updateMemoOnServer(id, partialUiNote) {
+      const { sb, email, name } = portalAuth();
+      if (!sb || !email) throw new Error('로그인이 필요합니다.');
+      const base = state.notes.find(n => String(n.serverId || n.id) === String(id));
+      if (!base) throw new Error('메모를 찾을 수 없습니다.');
+      const merged = {
+        ...base,
+        ...partialUiNote,
+        layout: { ...base.layout, ...(partialUiNote.layout || {}) }
+      };
+      if (partialUiNote.layout_w != null) merged.layout_w = partialUiNote.layout_w;
+      if (partialUiNote.layout_h != null) merged.layout_h = partialUiNote.layout_h;
+      const payload = memoStateToDbPayload(merged, email, name);
+      delete payload.created_by_email;
+      delete payload.created_by_name;
+      const { data, error } = await sb.from('portal_memos').update(payload).eq('id', id).eq('created_by_email', email).select('*').single();
+      if (error) throw error;
+      return data;
+    }
+
+    async function deleteMemoOnServer(id) {
+      const { sb, email } = portalAuth();
+      if (!sb || !email) throw new Error('로그인이 필요합니다.');
+      const { error } = await sb.from('portal_memos').delete().eq('id', id).eq('created_by_email', email);
+      if (error) throw error;
+    }
+
+    async function persistMemoLayoutFromDom(board, id) {
+      const sid = String(id);
+      const noteEl = board.querySelector(`[data-note-id="${CSS.escape(sid)}"]`);
+      const n = state.notes.find(x => String(x.id) === sid);
+      if (!noteEl || !n || !n.serverId) return;
+      const r = noteEl.getBoundingClientRect();
+      const w = Math.max(80, Math.round(r.width));
+      const h = Math.max(60, Math.round(r.height));
+      const x = Math.max(0, Math.round(parseFloat(noteEl.style.left) || n.layout?.x || 0));
+      const y = Math.max(0, Math.round(parseFloat(noteEl.style.top) || n.layout?.y || 0));
+      state.notes = state.notes.map(note => String(note.id) === sid
+        ? {
+            ...note,
+            layout: { ...note.layout, x, y },
+            originalLayout: { ...(note.originalLayout || note.layout), x, y },
+            layout_w: w,
+            layout_h: h,
+            expandedWidth: w
+          }
+        : note);
+      const moved = state.notes.find(x => String(x.id) === sid);
+      await updateMemoOnServer(moved.serverId, {
+        layout: moved.layout,
+        originalLayout: moved.originalLayout,
+        layout_w: w,
+        layout_h: h,
+        z: moved.z
+      });
+    }
+
+    function packScheduleDescription(userText, meta) {
+      const tail = SCHEDULE_META_MARK + encodeURIComponent(JSON.stringify({
+        type: meta.type || '업무',
+        app: meta.app || '-',
+        displayMode: meta.displayMode || 'start'
+      }));
+      return (userText || '') + tail;
+    }
+
+    function unpackScheduleDescription(raw) {
+      const s = String(raw || '');
+      const idx = s.indexOf(SCHEDULE_META_MARK);
+      if (idx === -1) return { clean: s.trim(), meta: {} };
+      const clean = s.slice(0, idx).trimEnd();
+      let meta = {};
+      try {
+        meta = JSON.parse(decodeURIComponent(s.slice(idx + SCHEDULE_META_MARK.length)));
+      } catch (_) { /* ignore */ }
+      return { clean, meta };
+    }
+
+    function inferDisplayModeFromTimes(startTime, endTime, metaDm) {
+      if (metaDm) return metaDm;
+      const st = (startTime || '').trim();
+      const en = (endTime || '').trim();
+      if (!st && !en) return 'allDay';
+      if (st && en) return 'range';
+      return 'start';
+    }
+
+    function mapScheduleRowToState(row) {
+      const { clean, meta } = unpackScheduleDescription(row.description || '');
+      const displayMode = inferDisplayModeFromTimes(row.start_time, row.end_time, meta.displayMode);
+      return {
+        id: row.id,
+        panelDate: row.schedule_date,
+        completed: !!row.is_completed,
+        displayMode,
+        startTime: row.start_time || '',
+        endTime: row.end_time || '',
+        type: meta.type || '업무',
+        app: meta.app || '-',
+        scope: row.scope || '연구소',
+        text: row.title || '',
+        description: clean,
+        author: row.created_by_name || row.created_by_email || '',
+        teamName: '-',
+        lab: '연구소'
+      };
+    }
+
+    function scheduleRowsForDate(dateKey) {
+      return state.schedules.filter(r => r.schedule_date === dateKey);
+    }
+
+    function buildSchedulePayloadFromForm(isCompleted) {
+      const { sb, email, name } = portalAuth();
+      if (!sb || !email) throw new Error('로그인이 필요합니다.');
+      const f = state.scheduleForm;
+      const dm = f.displayMode;
+      const startTime = dm === 'allDay' ? '' : (f.startTime || '');
+      const endTime = dm === 'range' ? (f.endTime || '') : '';
+      let status = 'planned';
+      if (state.scheduleEditingId != null) {
+        const ex = state.schedules.find(s => Number(s.id) === Number(state.scheduleEditingId));
+        if (ex && ex.status) status = ex.status;
+      }
+      return {
+        created_by_email: email,
+        created_by_name: name,
+        schedule_date: state.selectedDate,
+        title: (f.text || '').trim(),
+        description: packScheduleDescription((f.description || '').trim(), {
+          type: f.type,
+          app: f.app,
+          displayMode: dm
+        }),
+        start_time: startTime,
+        end_time: endTime,
+        scope: f.scope || '연구소',
+        is_completed: !!isCompleted,
+        status
+      };
+    }
+
+    async function loadSchedulesFromServer() {
+      state.scheduleLoading = true;
+      try {
+        const { sb, email } = portalAuth();
+        if (!sb || !email) {
+          state.schedules = [];
+          return;
+        }
+        const { data, error } = await sb.from('portal_schedules')
+          .select('*')
+          .order('schedule_date', { ascending: true })
+          .order('start_time', { ascending: true })
+          .order('id', { ascending: true });
+        if (error) throw error;
+        state.schedules = data || [];
+      } catch (e) {
+        console.error('loadSchedulesFromServer', e);
+        showPortalDataMessage(e?.message || '일정을 불러오지 못했습니다.', 'error', 'planner');
+        state.schedules = [];
+      } finally {
+        state.scheduleLoading = false;
+      }
+    }
+
+    async function createScheduleOnServer(payload) {
+      const { sb } = portalAuth();
+      if (!sb) throw new Error('로그인이 필요합니다.');
+      const row = payload || buildSchedulePayloadFromForm(false);
+      const { data, error } = await sb.from('portal_schedules').insert([row]).select('*').single();
+      if (error) throw error;
+      return data;
+    }
+
+    async function updateScheduleOnServer(id, patch) {
+      const { sb, email } = portalAuth();
+      if (!sb) throw new Error('로그인이 필요합니다.');
+      const { data, error } = await sb.from('portal_schedules').update(patch).eq('id', id).eq('created_by_email', email).select('*').single();
+      if (error) throw error;
+      return data;
+    }
+
+    async function deleteScheduleOnServer(id) {
+      const { sb, email } = portalAuth();
+      if (!sb) throw new Error('로그인이 필요합니다.');
+      const { error } = await sb.from('portal_schedules').delete().eq('id', id).eq('created_by_email', email);
+      if (error) throw error;
+    }
+
+    function mapReservationRowToState(row) {
+      const st = row.status || 'active';
+      const uiStatus = st === 'full' ? 'full' : (st === 'partial' || st === 'active' ? 'partial' : 'available');
+      return {
+        id: row.id,
+        startTime: row.start_time || '09:00',
+        endTime: row.end_time || row.start_time || '10:00',
+        title: row.title || '',
+        reserver: row.created_by_name || row.created_by_email || '',
+        teamName: '-',
+        status: uiStatus,
+        dbStatus: st
+      };
+    }
+
+    function getReservationOverlapList(dateKey, resourceName, excludeId) {
+      return state.reservations.filter(r =>
+        r.reserve_date === dateKey &&
+        r.resource_name === resourceName &&
+        (excludeId == null || Number(r.id) !== Number(excludeId))
+      );
+    }
+
+    function reservationIntervalsOverlap(s1, e1, s2, e2) {
+      const a1 = timeToMinutes(s1);
+      let b1 = timeToMinutes(e1 || s1);
+      if (b1 <= a1) b1 = a1 + 30;
+      const a2 = timeToMinutes(s2);
+      let b2 = timeToMinutes(e2 || s2);
+      if (b2 <= a2) b2 = a2 + 30;
+      return a1 < b2 && b1 > a2;
+    }
+
+    function checkReservationOverlap(dateKey, resourceName, startTime, endTime, excludeId) {
+      const list = getReservationOverlapList(dateKey, resourceName, excludeId);
+      for (const r of list) {
+        if (reservationIntervalsOverlap(startTime, endTime, r.start_time, r.end_time)) return true;
+      }
+      return false;
+    }
+
+    async function loadReservationsFromServer() {
+      state.reservationLoading = true;
+      try {
+        const { sb, email } = portalAuth();
+        if (!sb || !email) {
+          state.reservations = [];
+          return;
+        }
+        const { data, error } = await sb.from('portal_reservations')
+          .select('*')
+          .order('reserve_date', { ascending: true })
+          .order('start_time', { ascending: true })
+          .order('id', { ascending: true });
+        if (error) throw error;
+        state.reservations = data || [];
+      } catch (e) {
+        console.error('loadReservationsFromServer', e);
+        showPortalDataMessage(e?.message || '예약을 불러오지 못했습니다.', 'error', 'planner');
+        state.reservations = [];
+      } finally {
+        state.reservationLoading = false;
+      }
+    }
+
+    async function createReservationOnServer(payload) {
+      const { sb } = portalAuth();
+      const { data, error } = await sb.from('portal_reservations').insert([payload]).select('*').single();
+      if (error) throw error;
+      return data;
+    }
+
+    async function updateReservationOnServer(id, patch) {
+      const { sb, email } = portalAuth();
+      const { data, error } = await sb.from('portal_reservations').update(patch).eq('id', id).eq('created_by_email', email).select('*').single();
+      if (error) throw error;
+      return data;
+    }
+
+    async function deleteReservationOnServer(id) {
+      const { sb, email } = portalAuth();
+      const { error } = await sb.from('portal_reservations').delete().eq('id', id).eq('created_by_email', email);
+      if (error) throw error;
+    }
+
+    async function loadPortalServerData() {
+      const { sb } = portalAuth();
+      if (!sb) return;
+      await Promise.all([
+        loadMemosFromServer(),
+        loadSchedulesFromServer(),
+        loadReservationsFromServer()
+      ]);
+      if (typeof render === 'function') render();
+    }
+
+    if (typeof window !== 'undefined') {
+      window.loadPortalServerData = loadPortalServerData;
+    }
 
     const tabContent = document.getElementById('tab-content');
     const tabButtons = Array.from(document.querySelectorAll('.pill'));
@@ -2580,15 +3009,6 @@ body.real-modal-open{overflow:hidden}
       tabButtons.forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === 'memo');
       });
-      state.notes = baseMemoItems.map((item, idx) => ({
-        ...item,
-        id: `${item.title}-${idx}`,
-        z: idx + 1,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        layout: { ...initialLayouts[idx % initialLayouts.length] },
-        originalLayout: { ...initialLayouts[idx % initialLayouts.length] },
-      }));
       state.trash = [];
       state.memoExpandedId = null;
       state.memoEditingId = null;
@@ -2606,11 +3026,12 @@ body.real-modal-open{overflow:hidden}
       state.selectedPanelRangeFilter = '전체';
       state.selectedPanelStatusFilter = '진행';
       state.scheduleScopeFilters = ['전체', '연구소', '팀', '개인'];
-      state.scheduleMap = JSON.parse(JSON.stringify(initialScheduleByDate));
-      state.reservationMapsByTab = JSON.parse(JSON.stringify(initialReservationsByTab));
       state.scheduleExpandedIndex = null;
       state.scheduleEditorOpen = false;
-      state.scheduleEditingIndex = null;
+      state.scheduleEditingId = null;
+      state.reservationEditingId = null;
+      state.portalPlannerFeedback = { msg: '', kind: '' };
+      state.reservationForm = { startTime: '09:00', endTime: '10:00', title: '', description: '' };
       state.scheduleForm = {
         displayMode: 'start',
         startTime: '09:00',
@@ -2670,7 +3091,6 @@ body.real-modal-open{overflow:hidden}
         scope: '연구소',
         text: '',
         description: '',
-        scope: '연구소',
       };
     }
 
@@ -2761,6 +3181,26 @@ function sortMemosByColorAndDate() {
   state.notes = newNotes;
   state.memoSortedView = true;
   normalizeSortedMemoStack();
+  (async () => {
+    try {
+      for (const n of state.notes) {
+        if (!n.serverId) continue;
+        await updateMemoOnServer(n.serverId, {
+          layout: n.layout,
+          originalLayout: n.originalLayout,
+          z: n.z,
+          layout_w: 260,
+          layout_h: 170
+        });
+      }
+      setPortalMemoFeedback('메모가 저장되었습니다.', 'success');
+      if (typeof renderMemoTab === 'function') renderMemoTab();
+    } catch (e) {
+      console.error(e);
+      setPortalMemoFeedback(e?.message || '서버 저장 중 오류가 발생했습니다.', 'error');
+      if (typeof renderMemoTab === 'function') renderMemoTab();
+    }
+  })();
 }
 
 
@@ -2772,6 +3212,26 @@ function sortMemosByColorAndDate() {
         layout: { ...(note.originalLayout || note.layout) }
       }));
       state.memoSortedView = false;
+      (async () => {
+        try {
+          for (const n of state.notes) {
+            if (!n.serverId) continue;
+            await updateMemoOnServer(n.serverId, {
+              layout: n.layout,
+              originalLayout: n.originalLayout,
+              z: n.z,
+              layout_w: n.layout?.w || n.layout_w || 260,
+              layout_h: n.layout?.h || n.layout_h || 170
+            });
+          }
+          setPortalMemoFeedback('메모가 저장되었습니다.', 'success');
+          if (typeof renderMemoTab === 'function') renderMemoTab();
+        } catch (e) {
+          console.error(e);
+          setPortalMemoFeedback(e?.message || '서버 저장 중 오류가 발생했습니다.', 'error');
+          if (typeof renderMemoTab === 'function') renderMemoTab();
+        }
+      })();
     }
 
 
@@ -2838,6 +3298,7 @@ function render() {
 
       tabContent.innerHTML = `
         <div class="card memo-wrap">
+          <div id="portalMemoFeedback" style="width:100%;font-size:13px;margin-bottom:10px;padding:8px 10px;border-radius:10px;display:${state.portalMemoFeedback?.msg ? 'block' : 'none'};background:${state.portalMemoFeedback?.kind === 'error' ? '#fef2f2' : '#ecfdf5'};color:${state.portalMemoFeedback?.kind === 'error' ? '#991b1b' : '#166534'};">${state.portalMemoFeedback?.msg ? escapeHtml(state.portalMemoFeedback.msg) : ''}</div>
           <div class="memo-top">
             <div>
               <div style="font-size:18px;font-weight:700;">개인 메모</div>
@@ -2860,6 +3321,9 @@ function render() {
             </div>
 
             <div class="board-label">My Sticky Board</div>
+
+            ${state.memoLoading ? `<div style="padding:12px 16px;color:#64748b;font-size:13px;">불러오는 중...</div>` : ''}
+            ${!state.memoLoading && !notes.length ? `<div style="padding:12px 16px;color:#94a3b8;font-size:13px;">등록된 메모가 없습니다.</div>` : ''}
 
             ${notes.map((item, idx) => {
               const isExpanded = state.memoExpandedId === item.id;
@@ -3186,8 +3650,18 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           state.memoDraggingId = id;
           bringToFront(id);
         });
-        handle.closest('[data-note-id]').addEventListener('dragend', () => {
+        handle.closest('[data-note-id]').addEventListener('dragend', async () => {
+          const nid = id;
           state.memoDraggingId = null;
+          try {
+            if (state.notes.find(n => n.id === nid)?.serverId) {
+              await persistMemoLayoutFromDom(board, nid);
+              showPortalDataMessage('메모가 저장되었습니다.', 'success', 'memo');
+            }
+          } catch (err) {
+            console.error(err);
+            showPortalDataMessage(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error', 'memo');
+          }
           renderMemoTab();
         });
       });
@@ -3224,7 +3698,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       });
 
       board.querySelectorAll('[data-memo-save]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', async (e) => {
           e.stopPropagation();
           const id = btn.dataset.memoSave;
           const currentTarget = state.notes.find(n => n.id === id);
@@ -3233,40 +3707,62 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
             window.alert('제목, 내용, 이미지 중 하나는 남겨주세요.');
             return;
           }
+          if (!currentTarget || !currentTarget.serverId) {
+            setPortalMemoFeedback('저장할 메모를 찾을 수 없습니다.', 'error');
+            renderMemoTab();
+            return;
+          }
           state.memoSortedView = false;
-          state.notes = state.notes.map(item =>
-            item.id === id
-              ? {
-                  ...item,
-                  title: state.editMemo.title.trim(),
-                  tag: state.editMemo.tag.trim() || '메모',
-                  pinned: !!state.editMemo.pinned,
-                  content: state.editMemo.content.trim(),
-                  expandedWidth: state.editMemo.expandedWidth || getMemoAutoWidth(state.editMemo.title, state.editMemo.content),
-                  updatedAt: new Date().toISOString(),
-                  layout: { ...item.layout, color: state.editMemo.color || item.layout.color || '#fef3c7' },
-                  originalLayout: { ...(item.originalLayout || item.layout), color: state.editMemo.color || item.layout.color || '#fef3c7' }
-                }
-              : item
-          );
-          state.memoEditingId = null;
-          normalizeSortedMemoStack();
-          renderMemoTab();
+          const next = {
+            ...currentTarget,
+            title: state.editMemo.title.trim(),
+            tag: state.editMemo.tag.trim() || '메모',
+            pinned: !!state.editMemo.pinned,
+            content: state.editMemo.content.trim(),
+            expandedWidth: state.editMemo.expandedWidth || getMemoAutoWidth(state.editMemo.title, state.editMemo.content),
+            layout: { ...currentTarget.layout, color: state.editMemo.color || currentTarget.layout.color || '#fef3c7' },
+            originalLayout: { ...(currentTarget.originalLayout || currentTarget.layout), color: state.editMemo.color || currentTarget.layout.color || '#fef3c7' }
+          };
+          try {
+            await updateMemoOnServer(currentTarget.serverId, next);
+            await loadMemosFromServer();
+            setPortalMemoFeedback('메모가 수정되었습니다.', 'success');
+            state.memoEditingId = null;
+            normalizeSortedMemoStack();
+            renderMemoTab();
+          } catch (err) {
+            console.error(err);
+            setPortalMemoFeedback(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error');
+            renderMemoTab();
+          }
         });
       });
 
       board.querySelectorAll('[data-memo-delete]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', async (e) => {
           e.stopPropagation();
           const id = btn.dataset.memoDelete;
           const target = state.notes.find(n => n.id === id);
           if (!target) return;
+          if (!window.confirm('메모를 삭제할까요? 서버에서도 삭제됩니다.')) return;
+          if (!target.serverId) {
+            state.notes = state.notes.filter(n => n.id !== id);
+            renderMemoTab();
+            return;
+          }
           state.memoSortedView = false;
-          state.trash.unshift({ ...target, deletedAt: Date.now() });
-          state.notes = state.notes.filter(n => n.id !== id);
-          if (state.memoExpandedId === id) state.memoExpandedId = null;
-          if (state.memoEditingId === id) state.memoEditingId = null;
-          renderMemoTab();
+          try {
+            await deleteMemoOnServer(target.serverId);
+            await loadMemosFromServer();
+            setPortalMemoFeedback('메모가 삭제되었습니다.', 'success');
+            if (state.memoExpandedId === id) state.memoExpandedId = null;
+            if (state.memoEditingId === id) state.memoEditingId = null;
+            renderMemoTab();
+          } catch (err) {
+            console.error(err);
+            setPortalMemoFeedback(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error');
+            renderMemoTab();
+          }
         });
       });
 
@@ -3312,7 +3808,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         state.newMemoOpen = false;
         renderMemoTab();
       });
-      document.getElementById('new-save')?.addEventListener('click', (e) => {
+      document.getElementById('new-save')?.addEventListener('click', async (e) => {
         e.stopPropagation();
         const fileInput = document.getElementById('new-image');
         const hasImage = !!(fileInput && fileInput.files[0]);
@@ -3323,38 +3819,50 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         const nextIndex = state.notes.length;
         const baseLayout = initialLayouts[nextIndex % initialLayouts.length];
         state.memoSortedView = false;
-        let imageData = '';
-        if (fileInput && fileInput.files[0]) {
-          imageData = URL.createObjectURL(fileInput.files[0]);
-        }
-        state.notes.push({
-          id: `${(state.newMemo.title.trim() || 'image-memo')}-${Date.now()}`,
-          title: state.newMemo.imageOnly ? '' : state.newMemo.title.trim(),
-          tag: state.newMemo.tag.trim() || '메모',
-          pinned: state.newMemo.pinned,
-          imageOnly: !!state.newMemo.imageOnly,
-          content: state.newMemo.imageOnly ? '' : state.newMemo.content.trim(),
-          image: imageData,
-          expandedWidth: state.newMemo.expandedWidth || getMemoAutoWidth(state.newMemo.title, state.newMemo.content),
-          z: getNextZ(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          layout: {
-            x: baseLayout.x + (nextIndex % 3) * 18,
-            y: baseLayout.y + (nextIndex % 4) * 16,
-            rotate: baseLayout.rotate,
-            color: state.newMemo.color || (state.newMemo.imageOnly ? '#f8fafc' : baseLayout.color),
-          },
-          originalLayout: {
-            x: baseLayout.x + (nextIndex % 3) * 18,
-            y: baseLayout.y + (nextIndex % 4) * 16,
-            rotate: baseLayout.rotate,
-            color: state.newMemo.color || (state.newMemo.imageOnly ? '#f8fafc' : baseLayout.color),
-          },
+        const readFileAsDataUrl = () => new Promise((resolve, reject) => {
+          if (!fileInput || !fileInput.files[0]) return resolve('');
+          const fr = new FileReader();
+          fr.onload = () => resolve(String(fr.result || ''));
+          fr.onerror = () => reject(new Error('이미지를 읽지 못했습니다.'));
+          fr.readAsDataURL(fileInput.files[0]);
         });
-        state.newMemo = { title: '', tag: '메모', pinned: false, imageOnly: false, color: '#fef3c7', content: '', expandedWidth: 420 };
-        state.newMemoOpen = false;
-        renderMemoTab();
+        try {
+          let imageData = '';
+          if (hasImage) imageData = await readFileAsDataUrl();
+          const draft = {
+            title: state.newMemo.imageOnly ? '' : state.newMemo.title.trim(),
+            tag: state.newMemo.tag.trim() || '메모',
+            pinned: state.newMemo.pinned,
+            imageOnly: !!state.newMemo.imageOnly,
+            content: state.newMemo.imageOnly ? '' : state.newMemo.content.trim(),
+            image: imageData,
+            expandedWidth: state.newMemo.expandedWidth || getMemoAutoWidth(state.newMemo.title, state.newMemo.content),
+            z: getNextZ(),
+            layout: {
+              x: baseLayout.x + (nextIndex % 3) * 18,
+              y: baseLayout.y + (nextIndex % 4) * 16,
+              rotate: baseLayout.rotate,
+              color: state.newMemo.color || (state.newMemo.imageOnly ? '#f8fafc' : baseLayout.color),
+            },
+            originalLayout: {
+              x: baseLayout.x + (nextIndex % 3) * 18,
+              y: baseLayout.y + (nextIndex % 4) * 16,
+              rotate: baseLayout.rotate,
+              color: state.newMemo.color || (state.newMemo.imageOnly ? '#f8fafc' : baseLayout.color),
+            },
+          };
+          await createMemoOnServer(draft);
+          await loadMemosFromServer();
+          setPortalMemoFeedback('메모가 저장되었습니다.', 'success');
+          state.newMemo = { title: '', tag: '메모', pinned: false, imageOnly: false, color: '#fef3c7', content: '', expandedWidth: 420 };
+          state.newMemoOpen = false;
+          if (fileInput) fileInput.value = '';
+          renderMemoTab();
+        } catch (err) {
+          console.error(err);
+          setPortalMemoFeedback(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error');
+          renderMemoTab();
+        }
       });
 
       document.getElementById('trash-close')?.addEventListener('click', (e) => {
@@ -3453,7 +3961,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
     function getFilteredSchedulesForDate(dateKey) {
       const filters = state.scheduleScopeFilters || [];
-      const list = state.scheduleMap[dateKey] || [];
+      const list = scheduleRowsForDate(dateKey).map(mapScheduleRowToState);
       if (!filters.length) return [];
       return list.filter(item => filters.includes(item.scope || '연구소'));
     }
@@ -3464,7 +3972,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         return getFilteredSchedulesForDate(state.selectedDate);
       }
 
-      const allDates = Object.keys(state.scheduleMap || {}).sort();
+      const allDates = [...new Set(state.schedules.map(s => s.schedule_date).filter(Boolean))].sort();
       const combined = [];
       for (const dateKey of allDates) {
         const dayItems = getFilteredSchedulesForDate(dateKey).map(item => ({
@@ -3480,34 +3988,14 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       return item?.panelDate || state.selectedDate;
     }
 
-    function getScheduleOriginalIndex(item, dateKey) {
-      const targetDate = dateKey || getSchedulePanelDate(item);
-      const targetList = state.scheduleMap[targetDate] || [];
-      return targetList.findIndex(entry =>
-        entry === item || (
-          entry.displayMode === item.displayMode &&
-          (entry.startTime || '') === (item.startTime || '') &&
-          (entry.endTime || '') === (item.endTime || '') &&
-          (entry.scope || '') === (item.scope || '') &&
-          (entry.text || '') === (item.text || '') &&
-          (entry.author || '') === (item.author || '') &&
-          (entry.description || '') === (item.description || '')
-        )
-      );
-    }
-
-    function buildSchedulePanelKey(dateKey, index) {
-      return `${dateKey}__${index}`;
+    function buildSchedulePanelKeyById(id) {
+      return `sid-${id}`;
     }
 
     function parseSchedulePanelKey(key) {
       const raw = String(key || '');
-      const pivot = raw.lastIndexOf('__');
-      if (pivot === -1) return { dateKey: state.selectedDate, index: Number(raw) };
-      return {
-        dateKey: raw.slice(0, pivot),
-        index: Number(raw.slice(pivot + 2))
-      };
+      if (raw.startsWith('sid-')) return { id: Number(raw.slice(4)) };
+      return { id: NaN };
     }
 
 
@@ -3535,7 +4023,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
 
     function getAllSchedulesForDate(dateKey) {
-      return state.scheduleMap[dateKey] || [];
+      return scheduleRowsForDate(dateKey).map(mapScheduleRowToState);
     }
 
     function isNoticeItem(item) {
@@ -3570,12 +4058,12 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
 
     function getReservationListForDate(dateKey) {
-      const currentMap = state.reservationMapsByTab?.[state.activeReservationTab] || {};
-      return [...(currentMap[dateKey] || [])].sort((a, b) => {
-        const timeA = a.startTime || '23:59';
-        const timeB = b.startTime || '23:59';
-        return timeA.localeCompare(timeB);
-      });
+      const resName = (reservationResources[state.activeReservationTab] || {}).name;
+      if (!resName) return [];
+      return state.reservations
+        .filter(r => r.reserve_date === dateKey && r.resource_name === resName)
+        .map(mapReservationRowToState)
+        .sort((a, b) => (a.startTime || '23:59').localeCompare(b.startTime || '23:59'));
     }
 
     function getReservationStatusClass(status) {
@@ -3585,8 +4073,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     }
 
     function getReservationDaySummary(dateKey) {
-      const currentMap = state.reservationMapsByTab?.[state.activeReservationTab] || {};
-      const items = currentMap[dateKey] || [];
+      const items = getReservationListForDate(dateKey);
       if (!items.length) return { text: '예약 가능', cls: 'available', count: 0 };
       const fullCount = items.filter(i => i.status === 'full').length;
       const partialCount = items.filter(i => i.status === 'partial').length;
@@ -3597,6 +4084,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
     function setPlannerMode(mode) {
       state.plannerMode = mode;
+      state.portalPlannerFeedback = { msg: '', kind: '' };
       renderScheduleTab();
     }
 
@@ -3621,11 +4109,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           </div>
         </div>
       `;
-    }
-
-    function timeToMinutes(value) {
-      const [hh, mm] = String(value || '00:00').split(':').map(Number);
-      return (hh || 0) * 60 + (mm || 0);
     }
 
     function renderReservationTimeTable() {
@@ -3676,8 +4159,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     }
 
     function getCalendarMonthDate() {
-      const base = new Date(`${state.calendarMonth || '2026-04-01'}T00:00:00`);
-      if (Number.isNaN(base.getTime())) return new Date('2026-04-01T00:00:00');
+      const key = state.calendarMonth || todayMonthKey;
+      const base = new Date(`${key}T00:00:00`);
+      if (Number.isNaN(base.getTime())) return new Date(`${todayMonthKey}T00:00:00`);
       return new Date(base.getFullYear(), base.getMonth(), 1);
     }
 
@@ -3715,7 +4199,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     function renderScheduleEditor() {
       if (!state.scheduleEditorOpen) return '';
       const form = state.scheduleForm || {};
-      const isEdit = state.scheduleEditingIndex !== null;
+      const isEdit = state.scheduleEditingId !== null;
       const scopeOptions = ['전체', '연구소', '팀', '개인'];
       const scopeClassMap = { '전체': 'all', '연구소': 'lab', '팀': 'team', '개인': 'private' };
       return `
@@ -3865,6 +4349,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
           <div class="reservation-panel" style="display:flex;flex-direction:column;gap:20px;">
             <div class="card">
+              <div style="font-size:13px;margin-bottom:10px;padding:8px 10px;border-radius:10px;display:${state.portalPlannerFeedback?.msg ? 'block' : 'none'};background:${state.portalPlannerFeedback?.kind === 'error' ? '#fef2f2' : '#ecfdf5'};color:${state.portalPlannerFeedback?.kind === 'error' ? '#991b1b' : '#166534'};">${state.portalPlannerFeedback?.msg ? escapeHtml(state.portalPlannerFeedback.msg) : ''}</div>
+              ${(state.scheduleLoading || state.reservationLoading) ? `<div style="font-size:12px;color:#64748b;margin-bottom:8px;">불러오는 중...</div>` : ``}
               <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:12px;">
                 <div class="reservation-header-main">
                   ${isReservationMode ? `
@@ -3902,14 +4388,44 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
               ${!isReservationMode ? renderScheduleEditor() : ``}
 
-              <div class="schedule-list">
-                ${isReservationMode ? `` : (
+              ${isReservationMode ? `
+              <div style="margin-top:12px;padding:14px;border:1px solid #e0e7ff;border-radius:14px;background:#fafbff;">
+                <div style="font-size:15px;font-weight:700;margin-bottom:10px;">${state.reservationEditingId ? '예약 수정' : '예약 추가'}</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="field"><label for="rf-start">시작</label><input type="time" id="rf-start" value="${escapeAttr(state.reservationForm.startTime || '09:00')}" /></div>
+                  <div class="field"><label for="rf-end">종료</label><input type="time" id="rf-end" value="${escapeAttr(state.reservationForm.endTime || '10:00')}" /></div>
+                </div>
+                <div class="field"><label for="rf-title">제목</label><input type="text" id="rf-title" value="${escapeAttr(state.reservationForm.title || '')}" placeholder="예약 제목" autocomplete="off" /></div>
+                <div class="field"><label for="rf-desc">설명</label><textarea id="rf-desc" rows="2" placeholder="설명(선택)">${escapeHtml(state.reservationForm.description || '')}</textarea></div>
+                <div class="row-end" style="margin-top:10px;">
+                  ${state.reservationEditingId ? `<button type="button" class="small-btn" id="reservation-cancel-btn">취소</button>` : ``}
+                  <button type="button" class="small-btn dark" id="reservation-save-btn">${state.reservationEditingId ? '수정 저장' : '예약 저장'}</button>
+                </div>
+              </div>
+              <div style="margin-top:14px;font-size:14px;font-weight:700;">${formatDateLabel(state.selectedDate)} · 예약 목록</div>
+              <div class="schedule-list" style="margin-top:8px;">
+                ${getReservationListForDate(state.selectedDate).length === 0 ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px;color:#94a3b8;font-size:13px;">등록된 예약이 없습니다.</div>` : getReservationListForDate(state.selectedDate).map(r => `
+                  <div class="schedule-item">
+                    <div class="schedule-main" style="flex:1;">
+                      <div class="schedule-title">${escapeHtml(r.title || '(제목 없음)')}</div>
+                      <div class="schedule-meta">${escapeHtml(r.startTime)} – ${escapeHtml(r.endTime)} · ${escapeHtml(r.reserver)}</div>
+                    </div>
+                    <div class="memo-actions" style="align-self:center;">
+                      <button type="button" class="small-btn" data-reservation-edit-id="${r.id}">수정</button>
+                      <button type="button" class="small-btn" data-reservation-delete-id="${r.id}" style="color:#b91c1c;border-color:#fecaca;background:#fff5f5;">삭제</button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+              ` : ``}
+
+              ${!isReservationMode ? `<div class="schedule-list">
+                ${(
                   selectedSchedules.length === 0 ? `
-                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:18px;color:#94a3b8;font-size:13px;">등록된 일정 없음</div>
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:18px;color:#94a3b8;font-size:13px;">등록된 일정이 없습니다.</div>
                   ` : selectedSchedules.map((item, index) => {
                     const itemDateKey = getSchedulePanelDate(item);
-                    const originalIndex = getScheduleOriginalIndex(item, itemDateKey);
-                    const panelKey = buildSchedulePanelKey(itemDateKey, originalIndex);
+                    const panelKey = buildSchedulePanelKeyById(item.id);
                     const isExpanded = state.scheduleExpandedIndex === panelKey;
                     return `
                       <div class="schedule-item scope-${getScopeClass(item.scope || '연구소')} ${item.completed ? 'completed' : ''}">
@@ -3951,7 +4467,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
                     `;
                   }).join('')
                 )}
-              </div>
+              </div>` : ``}
             </div>
 
             <div class="card">
@@ -3985,10 +4501,11 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       tabContent.querySelectorAll('[data-reservation-tab]').forEach(btn => {
         btn.addEventListener('click', () => {
           state.activeReservationTab = Number(btn.dataset.reservationTab);
+          state.reservationEditingId = null;
+          state.reservationForm = { startTime: '09:00', endTime: '10:00', title: '', description: '' };
           renderScheduleTab();
         });
       });
-
 
       tabContent.querySelectorAll('[data-date]').forEach(cell => {
         cell.addEventListener('click', () => {
@@ -3996,6 +4513,8 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           state.selectedPanelRangeFilter = '선택일';
           state.selectedPanelStatusFilter = '전체';
           state.scheduleExpandedIndex = null;
+          state.reservationEditingId = null;
+          state.reservationForm = { startTime: '09:00', endTime: '10:00', title: '', description: '' };
           renderScheduleTab();
         });
       });
@@ -4016,7 +4535,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
       document.getElementById('calendar-current-month')?.addEventListener('click', () => {
         state.calendarMonth = todayMonthKey;
-        if (!state.selectedDate.startsWith('2026-04-')) state.selectedDate = todayDateKey;
+        const selPrefix = state.selectedDate.slice(0, 7);
+        const todayPrefix = todayDateKey.slice(0, 7);
+        if (selPrefix !== todayPrefix) state.selectedDate = todayDateKey;
         renderScheduleTab();
       });
 
@@ -4048,16 +4569,11 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         });
       });
 
-
       document.getElementById('schedule-add')?.addEventListener('click', () => {
-        state.scheduleEditingIndex = null;
+        state.scheduleEditingId = null;
         resetScheduleForm();
         state.scheduleEditorOpen = true;
         renderScheduleTab();
-      });
-
-      document.getElementById('reservation-add')?.addEventListener('click', () => {
-        window.alert('다음 단계에서 대회의실 예약 추가 폼을 연결하면 됩니다.');
       });
 
       tabContent.querySelectorAll('[data-schedule-expand]').forEach(btn => {
@@ -4070,34 +4586,42 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
       tabContent.querySelectorAll('[data-schedule-complete]').forEach(chk => {
         chk.addEventListener('click', (e) => e.stopPropagation());
-        chk.addEventListener('change', () => {
-          const { dateKey, index } = parseSchedulePanelKey(chk.dataset.scheduleComplete);
-          const list = [...(state.scheduleMap[dateKey] || [])];
-          if (!list[index]) return;
-          list[index] = { ...list[index], completed: !list[index].completed };
-          state.scheduleMap[dateKey] = list;
-          renderScheduleTab();
+        chk.addEventListener('change', async () => {
+          const { id } = parseSchedulePanelKey(chk.dataset.scheduleComplete);
+          const row = state.schedules.find(s => Number(s.id) === Number(id));
+          if (!row) return;
+          try {
+            await updateScheduleOnServer(id, { is_completed: !row.is_completed });
+            await loadSchedulesFromServer();
+            setPortalPlannerFeedback(row.is_completed ? '진행 상태로 변경했습니다.' : '완료 처리했습니다.', 'success');
+            renderScheduleTab();
+          } catch (e) {
+            console.error(e);
+            setPortalPlannerFeedback(e?.message || '상태 저장에 실패했습니다.', 'error');
+            renderScheduleTab();
+          }
         });
       });
 
       tabContent.querySelectorAll('[data-schedule-edit]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const { dateKey, index } = parseSchedulePanelKey(btn.dataset.scheduleEdit);
-          const current = (state.scheduleMap[dateKey] || [])[index];
-          if (!current) return;
-          state.selectedDate = dateKey;
-          state.scheduleEditingIndex = index;
-          state.scheduleExpandedIndex = buildSchedulePanelKey(dateKey, index);
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const { id } = parseSchedulePanelKey(btn.dataset.scheduleEdit);
+          const row = state.schedules.find(s => Number(s.id) === Number(id));
+          if (!row) return;
+          const ui = mapScheduleRowToState(row);
+          state.selectedDate = row.schedule_date;
+          state.scheduleEditingId = id;
+          state.scheduleExpandedIndex = buildSchedulePanelKeyById(id);
           state.scheduleForm = {
-            displayMode: current.displayMode || (current.endTime ? 'range' : current.startTime ? 'start' : 'allDay'),
-            startTime: current.startTime || '09:00',
-            endTime: current.endTime || '10:00',
-            type: current.type || '업무',
-            app: current.app || '-',
-            scope: current.scope || '연구소',
-            text: current.text || '',
-            description: current.description || '',
-            scope: current.scope || '연구소',
+            displayMode: ui.displayMode || 'start',
+            startTime: ui.startTime || '09:00',
+            endTime: ui.endTime || '10:00',
+            type: ui.type || '업무',
+            app: ui.app || '-',
+            scope: ui.scope || '연구소',
+            text: ui.text || '',
+            description: ui.description || '',
           };
           state.scheduleEditorOpen = true;
           renderScheduleTab();
@@ -4105,24 +4629,33 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       });
 
       tabContent.querySelectorAll('[data-schedule-delete]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const { dateKey, index } = parseSchedulePanelKey(btn.dataset.scheduleDelete);
-          state.scheduleMap[dateKey] = (state.scheduleMap[dateKey] || []).filter((_, i) => i !== index);
-          if (state.scheduleExpandedIndex === buildSchedulePanelKey(dateKey, index)) {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const { id } = parseSchedulePanelKey(btn.dataset.scheduleDelete);
+          if (!id || !Number.isFinite(id)) return;
+          if (!window.confirm('일정을 삭제할까요?')) return;
+          try {
+            await deleteScheduleOnServer(id);
+            await loadSchedulesFromServer();
+            setPortalPlannerFeedback('일정이 삭제되었습니다.', 'success');
             state.scheduleExpandedIndex = null;
+            renderScheduleTab();
+          } catch (err) {
+            console.error(err);
+            setPortalPlannerFeedback(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error');
+            renderScheduleTab();
           }
-          renderScheduleTab();
         });
       });
 
       document.getElementById('schedule-close')?.addEventListener('click', () => {
         state.scheduleEditorOpen = false;
-        state.scheduleEditingIndex = null;
+        state.scheduleEditingId = null;
         renderScheduleTab();
       });
       document.getElementById('schedule-cancel')?.addEventListener('click', () => {
         state.scheduleEditorOpen = false;
-        state.scheduleEditingIndex = null;
+        state.scheduleEditingId = null;
         renderScheduleTab();
       });
 
@@ -4162,37 +4695,138 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         autoGrowTextarea(e.target);
       });
 
-      document.getElementById('schedule-save')?.addEventListener('click', () => {
+      document.getElementById('schedule-save')?.addEventListener('click', async () => {
         if (!state.scheduleForm.text.trim()) {
           window.alert('일정 제목을 입력해주세요.');
           return;
         }
-        const nextItem = {
-          completed: false,
-          displayMode: state.scheduleForm.displayMode,
-          startTime: state.scheduleForm.displayMode === 'allDay' ? '' : state.scheduleForm.startTime,
-          endTime: state.scheduleForm.displayMode === 'range' ? state.scheduleForm.endTime : '',
-          type: state.scheduleForm.type,
-          app: state.scheduleForm.app,
-          scope: state.scheduleForm.scope || '연구소',
-          text: state.scheduleForm.text.trim(),
-          description: state.scheduleForm.description.trim(),
-        };
-        const currentList = [...(state.scheduleMap[state.selectedDate] || [])];
-        if (state.scheduleEditingIndex === null) {
-          currentList.push(nextItem);
-        } else {
-          currentList[state.scheduleEditingIndex] = nextItem;
+        try {
+          if (state.scheduleEditingId == null) {
+            await createScheduleOnServer(buildSchedulePayloadFromForm(false));
+            showPortalDataMessage('일정이 저장되었습니다.', 'success', 'planner');
+          } else {
+            const existing = state.schedules.find(s => Number(s.id) === Number(state.scheduleEditingId));
+            const payload = buildSchedulePayloadFromForm(!!existing?.is_completed);
+            delete payload.created_by_email;
+            delete payload.created_by_name;
+            await updateScheduleOnServer(state.scheduleEditingId, payload);
+            showPortalDataMessage('일정이 수정되었습니다.', 'success', 'planner');
+          }
+          await loadSchedulesFromServer();
+          state.scheduleEditorOpen = false;
+          state.scheduleEditingId = null;
+          renderScheduleTab();
+        } catch (err) {
+          console.error(err);
+          setPortalPlannerFeedback(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error');
+          renderScheduleTab();
         }
-        currentList.sort((a, b) => {
-          const timeA = a.displayMode === 'allDay' ? '00:00' : (a.startTime || '23:59');
-          const timeB = b.displayMode === 'allDay' ? '00:00' : (b.startTime || '23:59');
-          return timeA.localeCompare(timeB);
-        });
-        state.scheduleMap[state.selectedDate] = currentList;
-        state.scheduleEditorOpen = false;
-        state.scheduleEditingIndex = null;
+      });
+
+      document.getElementById('reservation-save-btn')?.addEventListener('click', async () => {
+        const resName = (reservationResources[state.activeReservationTab] || {}).name;
+        if (!resName) {
+          setPortalPlannerFeedback('자원(탭) 이름이 비어 있어 예약할 수 없습니다.', 'error');
+          renderScheduleTab();
+          return;
+        }
+        const st = document.getElementById('rf-start')?.value || '09:00';
+        const en = document.getElementById('rf-end')?.value || '10:00';
+        const title = (document.getElementById('rf-title')?.value || '').trim();
+        const desc = (document.getElementById('rf-desc')?.value || '').trim();
+        if (!title) {
+          window.alert('예약 제목을 입력해 주세요.');
+          return;
+        }
+        const { email, name } = portalAuth();
+        if (!email) {
+          setPortalPlannerFeedback('로그인이 필요합니다.', 'error');
+          renderScheduleTab();
+          return;
+        }
+        if (checkReservationOverlap(state.selectedDate, resName, st, en, state.reservationEditingId)) {
+          setPortalPlannerFeedback('이미 예약된 시간과 겹칩니다.', 'error');
+          renderScheduleTab();
+          return;
+        }
+        try {
+          if (state.reservationEditingId == null) {
+            await createReservationOnServer({
+              reserve_date: state.selectedDate,
+              start_time: st,
+              end_time: en,
+              resource_name: resName,
+              title,
+              description: desc,
+              status: 'active',
+              created_by_email: email,
+              created_by_name: name
+            });
+            setPortalPlannerFeedback('예약이 저장되었습니다.', 'success');
+          } else {
+            await updateReservationOnServer(state.reservationEditingId, {
+              reserve_date: state.selectedDate,
+              start_time: st,
+              end_time: en,
+              resource_name: resName,
+              title,
+              description: desc,
+              status: 'active'
+            });
+            setPortalPlannerFeedback('예약을 수정했습니다.', 'success');
+          }
+          await loadReservationsFromServer();
+          state.reservationEditingId = null;
+          state.reservationForm = { startTime: '09:00', endTime: '10:00', title: '', description: '' };
+          renderScheduleTab();
+        } catch (err) {
+          console.error(err);
+          setPortalPlannerFeedback(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error');
+          renderScheduleTab();
+        }
+      });
+
+      document.getElementById('reservation-cancel-btn')?.addEventListener('click', () => {
+        state.reservationEditingId = null;
+        state.reservationForm = { startTime: '09:00', endTime: '10:00', title: '', description: '' };
         renderScheduleTab();
+      });
+
+      tabContent.querySelectorAll('[data-reservation-edit-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = Number(btn.dataset.reservationEditId);
+          const row = state.reservations.find(r => Number(r.id) === id);
+          if (!row) return;
+          state.reservationEditingId = id;
+          state.reservationForm = {
+            startTime: row.start_time || '09:00',
+            endTime: row.end_time || '10:00',
+            title: row.title || '',
+            description: row.description || ''
+          };
+          renderScheduleTab();
+        });
+      });
+
+      tabContent.querySelectorAll('[data-reservation-delete-id]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = Number(btn.dataset.reservationDeleteId);
+          if (!window.confirm('예약을 삭제할까요?')) return;
+          try {
+            await deleteReservationOnServer(id);
+            await loadReservationsFromServer();
+            setPortalPlannerFeedback('예약이 삭제되었습니다.', 'success');
+            if (state.reservationEditingId === id) {
+              state.reservationEditingId = null;
+              state.reservationForm = { startTime: '09:00', endTime: '10:00', title: '', description: '' };
+            }
+            renderScheduleTab();
+          } catch (err) {
+            console.error(err);
+            setPortalPlannerFeedback(err?.message || '서버 저장 중 오류가 발생했습니다.', 'error');
+            renderScheduleTab();
+          }
+        });
       });
     }
 
@@ -4407,7 +5041,19 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       return;
     }
 
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let supabaseClient = window.portalSupabase;
+    if (!supabaseClient) {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      window.portalSupabase = supabaseClient;
+    }
+
+    window.getPortalAuthContext = function getPortalAuthContext() {
+      return {
+        user: currentUser,
+        profile: currentProfile,
+        supabase: supabaseClient
+      };
+    };
     const els = {
       overlay: document.getElementById('authOverlay'),
       loginCard: document.getElementById('loginCard'),
@@ -4552,6 +5198,13 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         }
 
         showPortal();
+        try {
+          if (typeof window.loadPortalServerData === 'function') {
+            await window.loadPortalServerData();
+          }
+        } catch (loadErr) {
+          console.error('loadPortalServerData', loadErr);
+        }
       } catch (error) {
         console.error('handleSession error:', error);
         await supabaseClient.auth.signOut();
@@ -4623,7 +5276,12 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         currentProfile = { ...(currentProfile || {}), must_change_password: false };
         applyRoleUI(currentProfile);
         setBoxMessage(els.passwordSuccess, '비밀번호가 변경되었습니다. 포털로 이동합니다.');
-        setTimeout(() => showPortal(), 700);
+        setTimeout(() => {
+          showPortal();
+          if (typeof window.loadPortalServerData === 'function') {
+            window.loadPortalServerData().catch((e) => console.error(e));
+          }
+        }, 700);
       } catch (error) {
         console.error('changePassword error:', error);
         setBoxMessage(els.passwordError, error?.message || '비밀번호 변경 중 오류가 발생했습니다.');
@@ -4857,7 +5515,10 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
   const URL = "https://mbqpsovlwvedwrtbbauj.supabase.co";
   const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY";
   if(!window.supabase || !window.supabase.createClient) return;
-  const sb = window.supabase.createClient(URL, KEY);
+  if (!window.portalSupabase) {
+    window.portalSupabase = window.supabase.createClient(URL, KEY);
+  }
+  const sb = window.portalSupabase;
 
   const dataState = {
     divisions: [],
