@@ -2199,12 +2199,29 @@ body.real-modal-open{overflow:hidden}
           </div>
         </div>
 
+        
         <div id="supplies-page" class="page-panel">
           <div class="card header-card">
             <div class="header-top">Supplies Page</div>
             <div class="title">시약·초자</div>
+            <div class="subtitle">포탈 내부 iframe으로 시약·초자 신청 웹앱을 연결한 화면입니다.</div>
+          </div>
+
+          <div class="embedded-app-wrap">
+            <div id="reagentEmbeddedNote" class="embedded-app-note">
+              시약·초자 앱을 포탈 내부에서 바로 사용합니다. 아래 스크립트의 REAGENT_APP_URL 값을 실제 Vercel 주소로 바꾸면 바로 연결됩니다.
+            </div>
+            <iframe
+              id="reagent-embedded-frame"
+              class="embedded-app-frame"
+              title="시약·초자 신청"
+              src="about:blank"
+              loading="lazy"
+              referrerpolicy="strict-origin-when-cross-origin"
+            ></iframe>
           </div>
         </div>
+
 
         <div id="docs-page" class="page-panel">
           <div class="card header-card">
@@ -7502,6 +7519,119 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
   });
 })();
 </script>
+
+
+<script>
+(function(){
+  const REAGENT_APP_URL = "https://reagent-app-xxxx.vercel.app";
+
+  function setReagentFrameSource() {
+    const frame = document.getElementById('reagent-embedded-frame');
+    const note = document.getElementById('reagentEmbeddedNote');
+    if (!frame) return;
+
+    if (!REAGENT_APP_URL || REAGENT_APP_URL.includes('xxxx')) {
+      frame.style.display = 'none';
+      if (note) {
+        note.innerHTML = '시약·초자 iframe 연결 전입니다. <strong>REAGENT_APP_URL</strong> 값을 실제 Vercel 주소로 바꿔주세요.';
+      }
+      return;
+    }
+
+    frame.src = REAGENT_APP_URL;
+    frame.style.display = 'block';
+  }
+
+  function resizeReagentFrame() {
+    const frame = document.getElementById('reagent-embedded-frame');
+    if (!frame) return;
+
+    try {
+      const doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+      if (!doc || !doc.body) return;
+
+      const body = doc.body;
+      const html = doc.documentElement;
+
+      const h = Math.max(
+        body ? body.scrollHeight : 0,
+        body ? body.offsetHeight : 0,
+        html ? html.clientHeight : 0,
+        html ? html.scrollHeight : 0,
+        html ? html.offsetHeight : 0,
+        1200
+      );
+
+      if (h && isFinite(h)) {
+        frame.style.height = (h + 40) + 'px';
+      }
+    } catch (e) {
+      frame.style.height = '1400px';
+    }
+  }
+
+  function bindReagentFrame() {
+    const frame = document.getElementById('reagent-embedded-frame');
+    if (!frame || frame.dataset.bound === 'true') return;
+    frame.dataset.bound = 'true';
+
+    frame.addEventListener('load', function () {
+      resizeReagentFrame();
+
+      try {
+        const doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+        if (!doc) return;
+
+        if ('ResizeObserver' in window) {
+          const ro = new ResizeObserver(function () {
+            resizeReagentFrame();
+          });
+
+          if (doc.body) ro.observe(doc.body);
+          if (doc.documentElement) ro.observe(doc.documentElement);
+        }
+
+        setTimeout(resizeReagentFrame, 100);
+        setTimeout(resizeReagentFrame, 400);
+        setTimeout(resizeReagentFrame, 1000);
+        setTimeout(resizeReagentFrame, 2000);
+      } catch (e) {
+        console.warn('reagent iframe observer skipped:', e);
+      }
+    });
+
+    window.addEventListener('resize', function () {
+      setTimeout(resizeReagentFrame, 60);
+      setTimeout(resizeReagentFrame, 220);
+    });
+
+    document.addEventListener('click', function () {
+      setTimeout(resizeReagentFrame, 100);
+      setTimeout(resizeReagentFrame, 320);
+    });
+
+    document.addEventListener('change', function () {
+      setTimeout(resizeReagentFrame, 100);
+      setTimeout(resizeReagentFrame, 320);
+    });
+
+    setTimeout(resizeReagentFrame, 100);
+    setTimeout(resizeReagentFrame, 500);
+    setTimeout(resizeReagentFrame, 1200);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      setReagentFrameSource();
+      bindReagentFrame();
+    });
+  } else {
+    setReagentFrameSource();
+    bindReagentFrame();
+  }
+})();
+</script>
+
 
 </body>
 </html>
