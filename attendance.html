@@ -2481,7 +2481,6 @@ function clearTestData(){
 }
 
 const ATTENDANCE_UPLOAD_STORAGE_KEY = 'attendance_upload_runtime_v1';
-// 업로드 근태 데이터는 브라우저에 남기지 않고 항상 서버 기준으로만 표시
 
 function updateUploadStatus(){
   const label = $('#uploadStatusLabel');
@@ -2501,7 +2500,8 @@ function updateUploadStatus(){
 }
 
 function saveUploadedAttendanceData(){
-  try{ localStorage.removeItem(ATTENDANCE_UPLOAD_STORAGE_KEY); }catch(e){}
+  // 업로드 근태 데이터는 브라우저 저장소에 보관하지 않는다.
+  // 서버 기준 화면을 유지하고, PC별 잔존 데이터 차이를 막기 위해 no-op 처리.
 }
 
 function createUploadBatchId(){
@@ -2607,8 +2607,8 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
   };
 }
 function loadUploadedAttendanceData(){
-  REAL_ATTENDANCE_DATA = [];
-  try{ localStorage.removeItem(ATTENDANCE_UPLOAD_STORAGE_KEY); }catch(e){}
+  // 서버 데이터가 없을 때도 브라우저 저장소의 예전 업로드 데이터를 복원하지 않는다.
+  // 런타임 메모리 기준으로만 유지하고, 새로고침 시 서버 상태를 그대로 따른다.
   HOLIDAY_DATE_SET = buildHolidayDateSet();
 }
 function clearUploadedAttendanceData(){
@@ -3026,7 +3026,11 @@ async function applyUploadedFiles(){
 (${detail})` : ''}`;
     }
 
-    await refreshAdminUploadManagement(true);
+    if(typeof window.refreshAdminUploadManagement === 'function'){
+      await window.refreshAdminUploadManagement(true);
+    }else if(typeof refreshAdminUploadManagement === 'function'){
+      await refreshAdminUploadManagement(true);
+    }
     alert(`업로드 데이터 반영이 완료되었습니다. 조직관리와 사원정보관리는 유지되었습니다.${backupMessage}`);
   } finally {
     if(applyBtn){
@@ -7390,8 +7394,7 @@ window.addEventListener('resize', renderLightweight);
 
   async function loadAttendanceFromSupabase(){
     if(!supabaseClient){
-      REAL_ATTENDANCE_DATA = [];
-      try{ localStorage.removeItem(ATTENDANCE_UPLOAD_STORAGE_KEY); }catch(e){}
+      loadUploadedAttendanceData();
       HOLIDAY_DATE_SET = buildHolidayDateSet();
       return;
     }
@@ -7429,8 +7432,7 @@ window.addEventListener('resize', renderLightweight);
       return;
     }
 
-    REAL_ATTENDANCE_DATA = [];
-    try{ localStorage.removeItem(ATTENDANCE_UPLOAD_STORAGE_KEY); }catch(e){}
+    loadUploadedAttendanceData();
     HOLIDAY_DATE_SET = buildHolidayDateSet();
   }
 
@@ -8302,7 +8304,7 @@ async function deleteAdminBatchData(batchId){
     alert(`배치 삭제 중 오류가 발생했습니다.\n${error?.message || error}`);
   }
 }
-async function refreshAdminUploadManagement(forceYearReload = false){
+window.refreshAdminUploadManagement = async function refreshAdminUploadManagement(forceYearReload = false){
   const grid = document.getElementById('adminUploadMonthGrid');
   const historyBody = document.getElementById('adminBatchHistoryBody');
   if(!grid || !historyBody){
@@ -8375,9 +8377,7 @@ async function refreshAdminUploadManagement(forceYearReload = false){
         await loadAttendanceFromSupabase();
       }catch(error){
         console.error('attendance_records 로딩 오류', error);
-        REAL_ATTENDANCE_DATA = [];
-        try{ localStorage.removeItem(ATTENDANCE_UPLOAD_STORAGE_KEY); }catch(e){}
-        HOLIDAY_DATE_SET = buildHolidayDateSet();
+        loadUploadedAttendanceData();
       }
       try{
         await loadSpecialNotes();
