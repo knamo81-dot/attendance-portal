@@ -2500,7 +2500,6 @@ function updateUploadStatus(){
 }
 
 function saveUploadedAttendanceData(){
-  // 업로드 근태 데이터는 브라우저 저장소에 보관하지 않는다.
   // 서버 기준 화면을 유지하고, PC별 잔존 데이터 차이를 막기 위해 no-op 처리.
 }
 
@@ -2511,38 +2510,8 @@ function createUploadBatchId(){
   return `batch_${Date.now()}_${Math.random().toString(36).slice(2,10)}`;
 }
 async function createServerUploadBatchMeta(batchId, meta){
-  if(!supabaseClient) return batchId;
-
-  const candidates = [
-    {
-      id: batchId,
-      secom_filename: meta?.secomFilename || null,
-      erp_filename: meta?.erpFilename || null,
-      uploaded_by: meta?.uploadedBy || null,
-      note: meta?.note || '관리자 화면 업로드 원본 백업'
-    },
-    {
-      id: batchId,
-      note: meta?.note || '관리자 화면 업로드 원본 백업'
-    },
-    {
-      id: batchId
-    }
-  ];
-
-  for(const payload of candidates){
-    try{
-      const { error } = await supabaseClient
-        .from('attendance_upload_batches')
-        .upsert([payload], { onConflict: 'id' });
-      if(!error) return batchId;
-      console.warn('[ATTENDANCE BATCH META RETRY]', error);
-    }catch(err){
-      console.warn('[ATTENDANCE BATCH META EXCEPTION]', err);
-    }
-  }
-
-  console.warn('[ATTENDANCE BATCH META SKIPPED] schema mismatch or optional table issue');
+  // attendance_upload_batches 스키마 불일치로 업로드 전체가 흔들리는 문제를 막기 위해
+  // 현재는 메타 저장을 생략하고 raw/records 반영을 우선한다.
   return batchId;
 }
 async function insertRowsInChunks(tableName, rows, chunkSize = 500){
@@ -2553,8 +2522,91 @@ async function insertRowsInChunks(tableName, rows, chunkSize = 500){
     if(error) throw error;
   }
 }
+function addDaysToDateText(dateText, days){
+  const s = String(dateText || '').trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
+  const d = new Date(`${s}T00:00:00`);
+  if(Number.isNaN(d.getTime())) return '';
+  d.setDate(d.getDate() + Number(days || 0));
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+function getUploadDateRangeFromRows(secomRows = [], erpRows = []){
+  const dates = [...secomRows, ...erpRows]
+    .map(row => String(row?.date || '').trim())
+    .filter(v => /^\d{4}-\d{2}-\d{2}$/.test(v))
+    .sort();
+  if(!dates.length) return null;
+  const start = dates[0];
+  const endInclusive = dates[dates.length - 1];
+  const endExclusive = addDaysToDateText(endInclusive, 1);
+  if(!endExclusive) return null;
+  return { start, endInclusive, endExclusive };
+}
+async function clearServerAttendanceRange(start, endExclusive){
+  if(!supabaseClient || !start || !endExclusive) return;
+
+  const targets = [
+    'attendance_records',
+    'attendance_secom_raw',
+    'attendance_erp_raw'
+  ];
+
+  for(const tableName of targets){
+    const { error } = await supabaseClient
+      .from(tableName)
+      .delete()
+      .gte('work_date', start)
+      .lt('work_date', endExclusive);
+    if(error) throw error;
+  }
+}
+function stripHtmlToPlainText(v){
+  return String(v || '')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function buildAttendanceRecordsPayloadFromRuntime(){
+  const metaByName = new Map(empMaster.map(e => [normalizeEmployeeName(e.name), e]));
+  return getMergedRawAttendanceData()
+    .map(row => decorateAttendanceRow(row, metaByName))
+    .filter(Boolean)
+    .filter(row => isAttendanceTargetIncludedRow(row, metaByName))
+    .filter(row => !isDisplayExcludedAttendance(row))
+    .map(row => ({
+      work_date: String(row.date || '').trim() || null,
+      employee_no: String(row.employeeId || row.id || '').trim() || null,
+      employee_name: normalizeEmployeeName(row.name || '') || null,
+      division_name: String(row.division || '').trim() || null,
+      team_name: String(row.team || '').trim() || null,
+      grade: String(row.grade || '').trim() || null,
+      clock_in: (String(row.displayStart || '').trim() && String(row.displayStart || '').trim() !== '-' && !String(row.displayStart || '').includes('누락')) ? String(row.displayStart).trim() : null,
+      clock_out: (String(row.displayEnd || '').trim() && String(row.displayEnd || '').trim() !== '-' && !String(row.displayEnd || '').includes('누락')) ? String(row.displayEnd).trim() : null,
+      work_hours: (String(row.totalWork || '').trim() && String(row.totalWork || '').trim() !== '-' && String(row.totalWork || '').trim() !== '미계산') ? String(row.totalWork).trim() : null,
+      overtime_hours: Number(row.erpActualOvertime || row.erpAppliedOvertime || 0) || 0,
+      reason: stripHtmlToPlainText(row.reason || row.primaryReason || row.secondaryReason || '' ) || null,
+      overtime_check_result: String(row.overtimeCheckResult || row.overtime_check_result || row.overtimeCheck || '').trim() || null,
+      status: String(row.statusLabel || row.bucket || '').trim() || null
+    }))
+    .filter(row => row.work_date && row.employee_name);
+}
+async function replaceAttendanceRecordsFromRuntime(start, endExclusive){
+  if(!supabaseClient) return { ok:false, skipped:true, reason:'supabase-disabled' };
+  const recordsPayload = buildAttendanceRecordsPayloadFromRuntime();
+  const filtered = recordsPayload.filter(row => row.work_date >= start && row.work_date < endExclusive);
+  if(!filtered.length) return { ok:true, skipped:false, count:0 };
+  await insertRowsInChunks('attendance_records', filtered, 500);
+  return { ok:true, skipped:false, count:filtered.length };
+}
 async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], erpRows = [], secomFilename = '', erpFilename = '' }){
   if(!supabaseClient) return { ok:false, skipped:true, reason:'supabase-disabled' };
+
+  const range = getUploadDateRangeFromRows(secomRows, erpRows);
+  if(!range) throw new Error('업로드 파일에서 유효한 날짜를 찾지 못했습니다.');
 
   const uploadedBy = (() => {
     try{
@@ -2573,6 +2625,8 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
     uploadedBy,
     note: '관리자 화면 업로드 원본 백업'
   });
+
+  await clearServerAttendanceRange(range.start, range.endExclusive);
 
   const secomPayload = (secomRows || []).map(row => ({
     upload_batch_id: batchId,
@@ -2597,13 +2651,17 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
 
   await insertRowsInChunks('attendance_secom_raw', secomPayload);
   await insertRowsInChunks('attendance_erp_raw', erpPayload);
+  const recordResult = await replaceAttendanceRecordsFromRuntime(range.start, range.endExclusive);
 
   return {
     ok: true,
     skipped: false,
     batchId,
     secomCount: secomPayload.length,
-    erpCount: erpPayload.length
+    erpCount: erpPayload.length,
+    recordCount: Number(recordResult?.count || 0),
+    start: range.start,
+    end: range.endInclusive
   };
 }
 function loadUploadedAttendanceData(){
@@ -2622,7 +2680,7 @@ function clearUploadedAttendanceData(){
   try{ localStorage.removeItem(ATTENDANCE_UPLOAD_STORAGE_KEY); }catch(e){}
   updateUploadStatus();
   render();
-  alert('업로드 데이터가 비워졌습니다.');
+  alert('브라우저 메모리의 업로드 데이터가 비워졌습니다. 서버 데이터는 유지됩니다.');
 }
 function parseExcelDateValue(v){
   if(v === undefined || v === null || v === '') return '';
@@ -3026,11 +3084,7 @@ async function applyUploadedFiles(){
 (${detail})` : ''}`;
     }
 
-    if(typeof window.refreshAdminUploadManagement === 'function'){
-      await window.refreshAdminUploadManagement(true);
-    }else if(typeof refreshAdminUploadManagement === 'function'){
-      await refreshAdminUploadManagement(true);
-    }
+    await refreshAdminUploadManagement(true);
     alert(`업로드 데이터 반영이 완료되었습니다. 조직관리와 사원정보관리는 유지되었습니다.${backupMessage}`);
   } finally {
     if(applyBtn){
@@ -8304,7 +8358,7 @@ async function deleteAdminBatchData(batchId){
     alert(`배치 삭제 중 오류가 발생했습니다.\n${error?.message || error}`);
   }
 }
-window.refreshAdminUploadManagement = async function refreshAdminUploadManagement(forceYearReload = false){
+async function refreshAdminUploadManagement(forceYearReload = false){
   const grid = document.getElementById('adminUploadMonthGrid');
   const historyBody = document.getElementById('adminBatchHistoryBody');
   if(!grid || !historyBody){
