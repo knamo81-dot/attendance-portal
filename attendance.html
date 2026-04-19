@@ -2481,6 +2481,7 @@ function clearTestData(){
 }
 
 const ATTENDANCE_UPLOAD_STORAGE_KEY = 'attendance_upload_runtime_v1';
+// 업로드 근태 데이터는 브라우저에 남기지 않고 항상 서버 기준으로만 표시
 
 function updateUploadStatus(){
   const label = $('#uploadStatusLabel');
@@ -2500,9 +2501,7 @@ function updateUploadStatus(){
 }
 
 function saveUploadedAttendanceData(){
-  try{
-    localStorage.setItem(ATTENDANCE_UPLOAD_STORAGE_KEY, JSON.stringify(REAL_ATTENDANCE_DATA || []));
-  }catch(e){}
+  try{ localStorage.removeItem(ATTENDANCE_UPLOAD_STORAGE_KEY); }catch(e){}
 }
 
 function createUploadBatchId(){
@@ -2608,12 +2607,8 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
   };
 }
 function loadUploadedAttendanceData(){
-  try{
-    const raw = localStorage.getItem(ATTENDANCE_UPLOAD_STORAGE_KEY);
-    if(!raw) return;
-    const parsed = JSON.parse(raw);
-    if(Array.isArray(parsed)) REAL_ATTENDANCE_DATA = parsed;
-  }catch(e){}
+  REAL_ATTENDANCE_DATA = [];
+  try{ localStorage.removeItem(ATTENDANCE_UPLOAD_STORAGE_KEY); }catch(e){}
   HOLIDAY_DATE_SET = buildHolidayDateSet();
 }
 function clearUploadedAttendanceData(){
@@ -7395,7 +7390,8 @@ window.addEventListener('resize', renderLightweight);
 
   async function loadAttendanceFromSupabase(){
     if(!supabaseClient){
-      loadUploadedAttendanceData();
+      REAL_ATTENDANCE_DATA = [];
+      try{ localStorage.removeItem(ATTENDANCE_UPLOAD_STORAGE_KEY); }catch(e){}
       HOLIDAY_DATE_SET = buildHolidayDateSet();
       return;
     }
@@ -7433,7 +7429,8 @@ window.addEventListener('resize', renderLightweight);
       return;
     }
 
-    loadUploadedAttendanceData();
+    REAL_ATTENDANCE_DATA = [];
+    try{ localStorage.removeItem(ATTENDANCE_UPLOAD_STORAGE_KEY); }catch(e){}
     HOLIDAY_DATE_SET = buildHolidayDateSet();
   }
 
@@ -8378,7 +8375,9 @@ async function refreshAdminUploadManagement(forceYearReload = false){
         await loadAttendanceFromSupabase();
       }catch(error){
         console.error('attendance_records 로딩 오류', error);
-        loadUploadedAttendanceData();
+        REAL_ATTENDANCE_DATA = [];
+        try{ localStorage.removeItem(ATTENDANCE_UPLOAD_STORAGE_KEY); }catch(e){}
+        HOLIDAY_DATE_SET = buildHolidayDateSet();
       }
       try{
         await loadSpecialNotes();
