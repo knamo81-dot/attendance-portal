@@ -1,1 +1,115 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>관리자</title><link rel="stylesheet" href="style.css"><script defer src="split-shell.js"></script></head><body data-feature="admin"><div class="shell"><aside class="sidebar"><div><div class="brand">근태</div><nav class="nav"><a href="index.html">메인</a><a href="attendance-detail.html">근태관리</a><a href="attendance-dashboard.html">대시보드</a><a href="attendance-deep.html">심층분석</a><a href="attendance-missing.html">누락분석</a><a class="active" href="attendance-admin.html">관리자</a></nav></div></aside><main class="main"><section class="topbar"><div><h1 class="title">관리자</h1><p class="desc">ERP/세콤 업로드, 월 삭제, 연도별 업로드 현황을 분리 진입하는 화면입니다. 서버 연결 문제는 이 화면 기준으로 먼저 안정화하는 것이 가장 빠릅니다.</p></div><div class="badge">분리 진입 화면</div></section><section class="contentCard"><iframe id="featureFrame" class="viewer" title="관리자"></iframe></section></main></div></body></html>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>근태 관리자</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<style>
+body {
+  font-family: Arial;
+  padding: 20px;
+  background: #f5f7fb;
+}
+.card {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+button {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 6px;
+  background: #1f3c88;
+  color: white;
+  cursor: pointer;
+}
+button.danger {
+  background: #d63031;
+}
+</style>
+</head>
+
+<body>
+
+<h2>관리자 (업로드 / 삭제)</h2>
+
+<div class="card">
+  <h3>월 데이터 삭제</h3>
+  <select id="year">
+    <option value="2026">2026</option>
+  </select>
+  <select id="month">
+    <option value="1">1월</option>
+    <option value="2">2월</option>
+    <option value="3">3월</option>
+    <option value="4">4월</option>
+    <option value="5">5월</option>
+    <option value="6">6월</option>
+    <option value="7">7월</option>
+    <option value="8">8월</option>
+    <option value="9">9월</option>
+    <option value="10">10월</option>
+    <option value="11">11월</option>
+    <option value="12">12월</option>
+  </select>
+  <button class="danger" onclick="deleteMonth()">삭제</button>
+</div>
+
+<div class="card">
+  <h3>ERP 업로드</h3>
+  <input type="file" id="file">
+  <button onclick="upload()">업로드</button>
+</div>
+
+<script>
+const supabase = window.supabase.createClient(
+  "https://YOUR_PROJECT.supabase.co",
+  "YOUR_ANON_KEY"
+);
+
+// 🔥 월 삭제 (확실하게 동작)
+async function deleteMonth() {
+  const year = document.getElementById("year").value;
+  const month = document.getElementById("month").value;
+
+  const start = `${year}-${month.padStart(2,'0')}-01`;
+  const endMonth = String(Number(month)+1).padStart(2,'0');
+  const end = `${year}-${endMonth}-01`;
+
+  console.log("삭제 범위:", start, end);
+
+  // ERP raw 삭제
+  const { error: err1 } = await supabase
+    .from("attendance_erp_raw")
+    .delete()
+    .gte("work_date", start)
+    .lt("work_date", end);
+
+  console.log("ERP 삭제:", err1);
+
+  // records 삭제
+  const { error: err2 } = await supabase
+    .from("attendance_records")
+    .delete()
+    .gte("work_date", start)
+    .lt("work_date", end);
+
+  console.log("records 삭제:", err2);
+
+  alert("삭제 완료");
+}
+
+// 🔥 업로드 (임시)
+async function upload() {
+  const file = document.getElementById("file").files[0];
+  if (!file) return alert("파일 선택");
+
+  console.log("파일:", file.name);
+
+  alert("업로드 로직은 다음 단계에서 연결");
+}
+</script>
+
+</body>
+</html>
