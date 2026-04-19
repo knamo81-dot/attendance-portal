@@ -2500,7 +2500,9 @@ function updateUploadStatus(){
 }
 
 function saveUploadedAttendanceData(){
-  // 서버 기준 화면을 유지하고, PC별 잔존 데이터 차이를 막기 위해 no-op 처리.
+  try{
+    localStorage.setItem(ATTENDANCE_UPLOAD_STORAGE_KEY, JSON.stringify(REAL_ATTENDANCE_DATA || []));
+  }catch(e){}
 }
 
 function createUploadBatchId(){
@@ -2510,8 +2512,38 @@ function createUploadBatchId(){
   return `batch_${Date.now()}_${Math.random().toString(36).slice(2,10)}`;
 }
 async function createServerUploadBatchMeta(batchId, meta){
-  // attendance_upload_batches 스키마 불일치로 업로드 전체가 흔들리는 문제를 막기 위해
-  // 현재는 메타 저장을 생략하고 raw/records 반영을 우선한다.
+  if(!supabaseClient) return batchId;
+
+  const candidates = [
+    {
+      id: batchId,
+      secom_filename: meta?.secomFilename || null,
+      erp_filename: meta?.erpFilename || null,
+      uploaded_by: meta?.uploadedBy || null,
+      note: meta?.note || '관리자 화면 업로드 원본 백업'
+    },
+    {
+      id: batchId,
+      note: meta?.note || '관리자 화면 업로드 원본 백업'
+    },
+    {
+      id: batchId
+    }
+  ];
+
+  for(const payload of candidates){
+    try{
+      const { error } = await supabaseClient
+        .from('attendance_upload_batches')
+        .upsert([payload], { onConflict: 'id' });
+      if(!error) return batchId;
+      console.warn('[ATTENDANCE BATCH META RETRY]', error);
+    }catch(err){
+      console.warn('[ATTENDANCE BATCH META EXCEPTION]', err);
+    }
+  }
+
+  console.warn('[ATTENDANCE BATCH META SKIPPED] schema mismatch or optional table issue');
   return batchId;
 }
 async function insertRowsInChunks(tableName, rows, chunkSize = 500){
@@ -2522,91 +2554,8 @@ async function insertRowsInChunks(tableName, rows, chunkSize = 500){
     if(error) throw error;
   }
 }
-function addDaysToDateText(dateText, days){
-  const s = String(dateText || '').trim();
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
-  const d = new Date(`${s}T00:00:00`);
-  if(Number.isNaN(d.getTime())) return '';
-  d.setDate(d.getDate() + Number(days || 0));
-  const yy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yy}-${mm}-${dd}`;
-}
-function getUploadDateRangeFromRows(secomRows = [], erpRows = []){
-  const dates = [...secomRows, ...erpRows]
-    .map(row => String(row?.date || '').trim())
-    .filter(v => /^\d{4}-\d{2}-\d{2}$/.test(v))
-    .sort();
-  if(!dates.length) return null;
-  const start = dates[0];
-  const endInclusive = dates[dates.length - 1];
-  const endExclusive = addDaysToDateText(endInclusive, 1);
-  if(!endExclusive) return null;
-  return { start, endInclusive, endExclusive };
-}
-async function clearServerAttendanceRange(start, endExclusive){
-  if(!supabaseClient || !start || !endExclusive) return;
-
-  const targets = [
-    'attendance_records',
-    'attendance_secom_raw',
-    'attendance_erp_raw'
-  ];
-
-  for(const tableName of targets){
-    const { error } = await supabaseClient
-      .from(tableName)
-      .delete()
-      .gte('work_date', start)
-      .lt('work_date', endExclusive);
-    if(error) throw error;
-  }
-}
-function stripHtmlToPlainText(v){
-  return String(v || '')
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-function buildAttendanceRecordsPayloadFromRuntime(){
-  const metaByName = new Map(empMaster.map(e => [normalizeEmployeeName(e.name), e]));
-  return getMergedRawAttendanceData()
-    .map(row => decorateAttendanceRow(row, metaByName))
-    .filter(Boolean)
-    .filter(row => isAttendanceTargetIncludedRow(row, metaByName))
-    .filter(row => !isDisplayExcludedAttendance(row))
-    .map(row => ({
-      work_date: String(row.date || '').trim() || null,
-      employee_no: String(row.employeeId || row.id || '').trim() || null,
-      employee_name: normalizeEmployeeName(row.name || '') || null,
-      division_name: String(row.division || '').trim() || null,
-      team_name: String(row.team || '').trim() || null,
-      grade: String(row.grade || '').trim() || null,
-      clock_in: (String(row.displayStart || '').trim() && String(row.displayStart || '').trim() !== '-' && !String(row.displayStart || '').includes('누락')) ? String(row.displayStart).trim() : null,
-      clock_out: (String(row.displayEnd || '').trim() && String(row.displayEnd || '').trim() !== '-' && !String(row.displayEnd || '').includes('누락')) ? String(row.displayEnd).trim() : null,
-      work_hours: (String(row.totalWork || '').trim() && String(row.totalWork || '').trim() !== '-' && String(row.totalWork || '').trim() !== '미계산') ? String(row.totalWork).trim() : null,
-      overtime_hours: Number(row.erpActualOvertime || row.erpAppliedOvertime || 0) || 0,
-      reason: stripHtmlToPlainText(row.reason || row.primaryReason || row.secondaryReason || '' ) || null,
-      overtime_check_result: String(row.overtimeCheckResult || row.overtime_check_result || row.overtimeCheck || '').trim() || null,
-      status: String(row.statusLabel || row.bucket || '').trim() || null
-    }))
-    .filter(row => row.work_date && row.employee_name);
-}
-async function replaceAttendanceRecordsFromRuntime(start, endExclusive){
-  if(!supabaseClient) return { ok:false, skipped:true, reason:'supabase-disabled' };
-  const recordsPayload = buildAttendanceRecordsPayloadFromRuntime();
-  const filtered = recordsPayload.filter(row => row.work_date >= start && row.work_date < endExclusive);
-  if(!filtered.length) return { ok:true, skipped:false, count:0 };
-  await insertRowsInChunks('attendance_records', filtered, 500);
-  return { ok:true, skipped:false, count:filtered.length };
-}
 async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], erpRows = [], secomFilename = '', erpFilename = '' }){
   if(!supabaseClient) return { ok:false, skipped:true, reason:'supabase-disabled' };
-
-  const range = getUploadDateRangeFromRows(secomRows, erpRows);
-  if(!range) throw new Error('업로드 파일에서 유효한 날짜를 찾지 못했습니다.');
 
   const uploadedBy = (() => {
     try{
@@ -2625,8 +2574,6 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
     uploadedBy,
     note: '관리자 화면 업로드 원본 백업'
   });
-
-  await clearServerAttendanceRange(range.start, range.endExclusive);
 
   const secomPayload = (secomRows || []).map(row => ({
     upload_batch_id: batchId,
@@ -2651,22 +2598,22 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
 
   await insertRowsInChunks('attendance_secom_raw', secomPayload);
   await insertRowsInChunks('attendance_erp_raw', erpPayload);
-  const recordResult = await replaceAttendanceRecordsFromRuntime(range.start, range.endExclusive);
 
   return {
     ok: true,
     skipped: false,
     batchId,
     secomCount: secomPayload.length,
-    erpCount: erpPayload.length,
-    recordCount: Number(recordResult?.count || 0),
-    start: range.start,
-    end: range.endInclusive
+    erpCount: erpPayload.length
   };
 }
 function loadUploadedAttendanceData(){
-  // 서버 데이터가 없을 때도 브라우저 저장소의 예전 업로드 데이터를 복원하지 않는다.
-  // 런타임 메모리 기준으로만 유지하고, 새로고침 시 서버 상태를 그대로 따른다.
+  try{
+    const raw = localStorage.getItem(ATTENDANCE_UPLOAD_STORAGE_KEY);
+    if(!raw) return;
+    const parsed = JSON.parse(raw);
+    if(Array.isArray(parsed)) REAL_ATTENDANCE_DATA = parsed;
+  }catch(e){}
   HOLIDAY_DATE_SET = buildHolidayDateSet();
 }
 function clearUploadedAttendanceData(){
@@ -2680,7 +2627,7 @@ function clearUploadedAttendanceData(){
   try{ localStorage.removeItem(ATTENDANCE_UPLOAD_STORAGE_KEY); }catch(e){}
   updateUploadStatus();
   render();
-  alert('브라우저 메모리의 업로드 데이터가 비워졌습니다. 서버 데이터는 유지됩니다.');
+  alert('업로드 데이터가 비워졌습니다.');
 }
 function parseExcelDateValue(v){
   if(v === undefined || v === null || v === '') return '';
@@ -8246,74 +8193,124 @@ async function deleteAdminMonthData(month){
     alert('Supabase 연결이 필요합니다.');
     return;
   }
+
   const year = Number(ADMIN_UPLOAD_MANAGEMENT.selectedYear || new Date().getFullYear());
   const m = Number(month);
+
   if(!Number.isFinite(year) || !Number.isFinite(m) || m < 1 || m > 12){
     console.error('[ADMIN DELETE MONTH] invalid year/month', { year, month });
     alert('연도 또는 월 값이 올바르지 않습니다.');
     return;
   }
-  const { start, end, endExclusive } = getMonthRange(year, m);
-  if(!confirm(`${year}년 ${m}월 데이터를 삭제할까요?
-raw + attendance_records가 함께 삭제됩니다.`)) return;
 
-  const countInMonth = async (table) => {
-    const { count, error } = await supabaseClient.from(table).select('*', { count: 'exact', head: true }).gte('work_date', start).lt('work_date', endExclusive);
-    if(error) return { error, count: null };
-    return { count: count ?? 0 };
-  };
-  const countBatchRowsForMonth = async () => {
+  const mm = String(m).padStart(2, '0');
+  const start = `${year}-${mm}-01`;
+  const endExclusive = m === 12
+    ? `${year + 1}-01-01`
+    : `${year}-${String(m + 1).padStart(2, '0')}-01`;
+
+  if(!confirm(`${year}년 ${m}월 데이터를 삭제할까요?
+ERP raw + 세콤 raw + attendance_records가 함께 삭제됩니다.`)) return;
+
+  const countMonth = async (tableName) => {
     const { count, error } = await supabaseClient
-      .from('attendance_upload_batches')
+      .from(tableName)
       .select('*', { count: 'exact', head: true })
-      .eq('target_year', year)
-      .eq('target_month', m);
-    if(error) return { error, count: null };
-    return { count: count ?? 0 };
+      .gte('work_date', start)
+      .lt('work_date', endExclusive);
+
+    if(error){
+      console.warn(`[ADMIN DELETE MONTH COUNT FAILED] ${tableName}`, error);
+      return null;
+    }
+    return count ?? 0;
   };
 
   try{
-    console.log('[ADMIN DELETE MONTH] range', { year, month: m, start, end, endExclusive, deleteMode: 'work_date-range-only' });
+    console.log('[ADMIN DELETE MONTH] start', { year, month: m, start, endExclusive });
 
-    const beforeRec = await countInMonth('attendance_records');
-    let result = await supabaseClient.from('attendance_records').delete().gte('work_date', start).lt('work_date', endExclusive);
+    const beforeErp = await countMonth('attendance_erp_raw');
+    const beforeSecom = await countMonth('attendance_secom_raw');
+    const beforeRec = await countMonth('attendance_records');
+
+    console.log('[ADMIN DELETE MONTH] before counts', {
+      attendance_erp_raw: beforeErp,
+      attendance_secom_raw: beforeSecom,
+      attendance_records: beforeRec
+    });
+
+    let result = await supabaseClient
+      .from('attendance_records')
+      .delete()
+      .gte('work_date', start)
+      .lt('work_date', endExclusive);
     if(result.error) throw result.error;
-    const afterRec = await countInMonth('attendance_records');
-    console.log('[ADMIN DELETE MONTH] attendance_records delete result', { beforeRangeCount: beforeRec.count, afterRangeCount: afterRec.count, range: { start, endExclusive } });
 
-    const beforeSecom = await countInMonth('attendance_secom_raw');
-    result = await supabaseClient.from('attendance_secom_raw').delete().gte('work_date', start).lt('work_date', endExclusive);
-    if(result.error) throw result.error;
-    const afterSecom = await countInMonth('attendance_secom_raw');
-    console.log('[ADMIN DELETE MONTH] attendance_secom_raw delete result', { beforeRangeCount: beforeSecom.count, afterRangeCount: afterSecom.count, range: { start, endExclusive }, batchPass: false, note: 'upload_batch_id 기준 삭제 제거' });
-
-    const beforeErp = await countInMonth('attendance_erp_raw');
-    result = await supabaseClient.from('attendance_erp_raw').delete().gte('work_date', start).lt('work_date', endExclusive);
-    if(result.error) throw result.error;
-    const afterErp = await countInMonth('attendance_erp_raw');
-    console.log('[ADMIN DELETE MONTH] attendance_erp_raw delete result', { beforeRangeCount: beforeErp.count, afterRangeCount: afterErp.count, range: { start, endExclusive }, batchPass: false, note: 'upload_batch_id 기준 삭제 제거' });
-
-    const beforeBatch = await countBatchRowsForMonth();
     result = await supabaseClient
+      .from('attendance_secom_raw')
+      .delete()
+      .gte('work_date', start)
+      .lt('work_date', endExclusive);
+    if(result.error) throw result.error;
+
+    result = await supabaseClient
+      .from('attendance_erp_raw')
+      .delete()
+      .gte('work_date', start)
+      .lt('work_date', endExclusive);
+    if(result.error) throw result.error;
+
+    const batchDelete = await supabaseClient
       .from('attendance_upload_batches')
       .delete()
       .eq('target_year', year)
       .eq('target_month', m);
-    if(result.error) console.warn('[ADMIN DELETE MONTH BATCH META]', result.error);
-    const afterBatch = await countBatchRowsForMonth();
-    console.log('[ADMIN DELETE MONTH] attendance_upload_batches delete result', {
-      batchIdCount: null,
-      beforeMatchingCount: beforeBatch.count,
-      afterMatchingCount: afterBatch.count,
-      deleteMode: 'target_year-target_month'
+
+    if(batchDelete.error){
+      console.warn('[ADMIN DELETE MONTH BATCH META]', batchDelete.error);
+    }
+
+    const afterErp = await countMonth('attendance_erp_raw');
+    const afterSecom = await countMonth('attendance_secom_raw');
+    const afterRec = await countMonth('attendance_records');
+
+    console.log('[ADMIN DELETE MONTH] after counts', {
+      attendance_erp_raw: afterErp,
+      attendance_secom_raw: afterSecom,
+      attendance_records: afterRec
     });
 
-    if(typeof loadAttendanceFromSupabase === 'function'){
-      try{ await loadAttendanceFromSupabase(); }catch(e){ console.warn(e); }
+    if((afterErp ?? 0) !== 0 || (afterSecom ?? 0) !== 0 || (afterRec ?? 0) !== 0){
+      throw new Error(`삭제 검증 실패: ERP ${afterErp ?? 'null'}건 / 세콤 ${afterSecom ?? 'null'}건 / records ${afterRec ?? 'null'}건 남음`);
     }
-    updateUploadStatus();
-    await refreshAdminUploadManagement(true);
-    await render();
+
+    if(Array.isArray(REAL_ATTENDANCE_DATA)){
+      REAL_ATTENDANCE_DATA = REAL_ATTENDANCE_DATA.filter(row => {
+        const d = row?.work_date || row?.date || '';
+        return !(d >= start && d < endExclusive);
+      });
+    }
+
+    if(typeof loadAttendanceFromSupabase === 'function'){
+      try{
+        await loadAttendanceFromSupabase();
+      }catch(e){
+        console.warn('[ADMIN DELETE MONTH] loadAttendanceFromSupabase warn', e);
+      }
+    }
+
+    if(typeof refreshAdminUploadManagement === 'function'){
+      await refreshAdminUploadManagement(true);
+    }
+
+    if(typeof updateUploadStatus === 'function'){
+      updateUploadStatus();
+    }
+
+    if(typeof render === 'function'){
+      await render();
+    }
+
     alert(`${year}년 ${m}월 데이터 삭제가 완료되었습니다.`);
   }catch(error){
     console.error('[ADMIN DELETE MONTH FAILED]', error);
