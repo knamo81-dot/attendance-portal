@@ -729,6 +729,49 @@ body{
   .missingSummaryGrid,.missingMiniGrid{grid-template-columns:1fr}
 }
 
+
+/* admin upload management */
+.adminUploadLayout{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
+.adminYearBar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.adminYearControls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.adminYearSelect{min-width:120px}
+.adminSummaryPills{display:flex;gap:8px;flex-wrap:wrap}
+.adminSummaryPill{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:13px;font-weight:700;color:var(--text)}
+.adminSummaryPill .subtxt{font-size:12px;color:var(--muted);font-weight:600}
+.adminMonthGrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.adminMonthCard{border:1px solid var(--line);border-radius:18px;background:#fff;padding:14px;display:flex;flex-direction:column;gap:10px;min-height:196px;transition:transform .15s ease,box-shadow .18s ease,border-color .18s ease}
+.adminMonthCard:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(15,23,42,.08)}
+.adminMonthCard.ok{border-color:#86efac;background:#f0fdf4}
+.adminMonthCard.partial{border-color:#fcd34d;background:#fffbeb}
+.adminMonthCard.empty{border-color:#e2e8f0;background:#fff}
+.adminMonthCard.dup{border-color:#93c5fd;background:#eff6ff}
+.adminMonthHead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.adminMonthTitle{font-size:18px;font-weight:800;color:var(--text)}
+.adminMonthState{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:800}
+.adminMonthState.ok{background:#16a34a;color:#fff}
+.adminMonthState.partial{background:#d97706;color:#fff}
+.adminMonthState.empty{background:#e2e8f0;color:#475569}
+.adminMonthState.dup{background:#2563eb;color:#fff}
+.adminMonthMetrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.adminMetricMini{border:1px solid rgba(148,163,184,.22);border-radius:12px;padding:8px 10px;background:rgba(255,255,255,.82)}
+.adminMetricMini .k{font-size:12px;color:var(--muted);margin-bottom:4px}
+.adminMetricMini .v{font-size:15px;font-weight:800;color:var(--text)}
+.adminMonthMeta{display:grid;gap:6px;font-size:12px;color:var(--muted)}
+.adminMonthActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+.adminActionBtn{padding:9px 12px;border-radius:10px;font-size:13px;font-weight:700;border:1px solid var(--line);background:#fff;cursor:pointer}
+.adminActionBtn.primary{background:#0f172a;color:#fff;border-color:#0f172a}
+.adminActionBtn.danger{background:#fff1f2;color:#b91c1c;border-color:#fecdd3}
+.adminActionBtn:disabled{opacity:.45;cursor:not-allowed}
+.adminHistoryTableWrap{overflow:auto;border:1px solid var(--line);border-radius:18px;background:#fff}
+.adminHistoryTable{width:100%;border-collapse:collapse;min-width:880px;font-size:13px}
+.adminHistoryTable th,.adminHistoryTable td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+.adminHistoryTable th{background:#f8fafc;color:var(--muted);font-size:12px;position:sticky;top:0;z-index:1}
+.adminHistoryEmpty{padding:24px;text-align:center;color:var(--muted)}
+.adminInfoStack{display:none}
+.adminMute{font-size:12px;color:var(--muted)}
+@media (max-width:1440px){.adminMonthGrid{grid-template-columns:repeat(4,minmax(0,1fr));}}
+@media (max-width:1100px){.adminUploadLayout{grid-template-columns:1fr;}.adminMonthGrid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media (max-width:700px){.adminMonthGrid{grid-template-columns:1fr;}.adminYearBar{align-items:flex-start}}
 </style>
 </head>
 <body>
@@ -1273,13 +1316,14 @@ body{
   </div>
 
 <div id="main-admin" class="mainPanel">
-    <div class="uploadGrid">
+  <div class="adminUploadLayout">
+    <div>
       <div class="card">
         <div class="title">관리자 전용 데이터 업로드</div>
-        <div class="desc">일반 사용자는 분석만 보고, 엑셀 업로드와 재처리는 여기서만 수행합니다.</div>
+        <div class="desc">월별 누적 운영 기준입니다. 세콤DB와 ERP 근태 파일을 각각 업로드한 뒤 반영하세요. 아래 연도별 업로드 현황과 배치 이력에서 업로드 상태를 확인하고 잘못 올린 데이터는 삭제할 수 있습니다.</div>
         <div class="uploadBox">
           <div style="font-size:36px">📁</div>
-          <div style="margin:8px 0 14px">세콤DB와 ERP 근태 파일을 각각 업로드한 뒤 반영하세요. 조직·사원·팀변경·특이사항 기준정보는 포털 설정에서만 관리합니다.</div>
+          <div style="margin:8px 0 14px">조직·사원·팀변경·특이사항 기준정보는 포털 설정에서만 관리합니다. 이 화면은 업로드와 DB 운영 관리 전용입니다.</div>
           <div style="display:grid;gap:12px;max-width:860px;margin:0 auto">
             <div class="mini" style="text-align:left">
               <strong>세콤DB 업로드</strong>
@@ -1294,45 +1338,54 @@ body{
             <div class="filters" style="justify-content:center">
               <button id="applyUploadBtn">업로드 데이터 반영</button>
               <button id="clearUploadBtn">업로드 데이터 비우기</button>
-              <button id="seedTestDataBtn">테스트 데이터 생성</button>
-              <button id="clearTestDataBtn">테스트 데이터 삭제</button>
-            </div>
+                          </div>
           </div>
         </div>
         <div style="display:grid;gap:10px;margin-top:14px">
           <div class="uploadItem"><strong>현재 반영 상태</strong><div id="uploadStatusLabel" class="label">업로드된 근태 데이터가 없습니다. 파일을 직접 올려서 반영하세요.</div><div class="progress"><div id="uploadStatusBar" style="width:0%"></div></div></div>
         </div>
-
       </div>
-      <div>
-        <div class="card" style="margin-bottom:16px">
-          <div class="title">업로드 후 검증 항목</div>
-          <div class="mini">사번 누락 여부</div>
-          <div class="mini">본부 / 팀 매핑 불일치</div>
-          <div class="mini">직급 값 표준화 확인</div>
-          <div class="mini">퇴사자 근태 중복 여부</div>
-          <div class="mini">날짜 형식 오류</div>
-          <div class="mini">중복 업로드 여부</div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="adminYearBar">
+          <div>
+            <div class="title">연도별 업로드 현황</div>
+            <div class="desc">선택한 연도의 1~12월 업로드 상태를 한눈에 확인합니다. 완료/일부완료/미업로드/중복주의를 색상으로 구분합니다.</div>
+          </div>
+          <div class="adminYearControls">
+            <select id="adminUploadYear" class="adminYearSelect"></select>
+            <button id="adminRefreshBtn" class="adminActionBtn primary" type="button">조회</button>
+          </div>
         </div>
-        <div class="card">
-          <div class="title">회사 직급 체계 기준</div>
-          <div class="mini">사원 → 주임 → 대리 → 과장 → 차장 → 부장 → 이사부장</div>
-          <div class="mini">부장대우와 부장은 보고서에서 모두 ‘부장’으로 통합 표기합니다.</div>
-          <div class="mini">이사부장은 임원이 아닌 정규직 승진의 최종 단계이며, 그 이후부터는 임원으로 구분합니다.</div>
+        <div id="adminUploadYearSummary" class="adminSummaryPills"></div>
+        <div id="adminUploadMonthGrid" class="adminMonthGrid" style="margin-top:14px"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="title">업로드 배치 이력</div>
+        <div class="desc">선택한 연도 기준으로 최근 배치를 확인합니다. 잘못 업로드한 경우 배치 단위 삭제를 사용할 수 있습니다.</div>
+        <div class="adminHistoryTableWrap" style="margin-top:12px">
+          <table class="adminHistoryTable">
+            <thead>
+              <tr>
+                <th style="width:110px">기준월</th>
+                <th style="width:170px">업로드일시</th>
+                <th>ERP 파일</th>
+                <th>세콤 파일</th>
+                <th style="width:90px">ERP 건수</th>
+                <th style="width:90px">세콤 건수</th>
+                <th style="width:210px">Batch ID</th>
+                <th style="width:96px">관리</th>
+              </tr>
+            </thead>
+            <tbody id="adminBatchHistoryBody"></tbody>
+          </table>
+          <div id="adminBatchHistoryEmpty" class="adminHistoryEmpty" style="display:none;">선택한 연도의 업로드 이력이 없습니다.</div>
         </div>
       </div>
     </div>
-    <div class="card" style="margin-top:16px">
-      <div class="title">기준정보 관리 안내</div>
-      <div class="desc">조직 관리, 사원정보 관리, 팀변경 관리, 특이사항 관리는 이제 포털 설정에서만 관리합니다. 근태 관리자 기능은 업로드 / 반영 / 검증 전용으로 사용하세요.</div>
-      <div class="guideGrid">
-        <div class="mini"><strong>포털에서 관리</strong><div class="label" style="margin-top:8px">조직, 사원, 팀변경, 특이사항</div></div>
-        <div class="mini"><strong>근태에서 관리</strong><div class="label" style="margin-top:8px">세콤 업로드, ERP 업로드, 반영, 초기화</div></div>
-        <div class="mini"><strong>반영 확인</strong><div class="label" style="margin-top:8px">포털에서 수정한 기준정보가 근태 필터와 분석에 반영되는지 확인</div></div>
-        <div class="mini"><strong>운영 원칙</strong><div class="label" style="margin-top:8px">기준정보는 포털 단일 기준, 근태는 운영 데이터 처리 전용</div></div>
-      </div>
-    </div>
 
+  </div>
 </div>
 
 <div id="empModalBg" class="modalBg">
@@ -2978,6 +3031,7 @@ async function applyUploadedFiles(){
 (${detail})` : ''}`;
     }
 
+    await refreshAdminUploadManagement(true);
     alert(`업로드 데이터 반영이 완료되었습니다. 조직관리와 사원정보관리는 유지되었습니다.${backupMessage}`);
   } finally {
     if(applyBtn){
@@ -7749,6 +7803,390 @@ window.addEventListener('resize', renderLightweight);
   window.addEventListener('scroll', updateFloatingFilterVisibility, { passive:true });
   window.addEventListener('resize', updateFloatingFilterVisibility);
 
+  
+
+const ADMIN_UPLOAD_MANAGEMENT = {
+  years: [],
+  selectedYear: null,
+  monthStats: [],
+  batchRows: []
+};
+
+function formatAdminDateTime(value){
+  if(!value) return '-';
+  const d = new Date(value);
+  if(Number.isNaN(d.getTime())) return String(value);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mi = String(d.getMinutes()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+}
+function getMonthRange(year, month){
+  const start = `${year}-${String(month).padStart(2,'0')}-01`;
+  const endDate = new Date(year, month, 0).getDate();
+  const end = `${year}-${String(month).padStart(2,'0')}-${String(endDate).padStart(2,'0')}`;
+  return { start, end };
+}
+function deriveMonthState(stat){
+  const hasErp = Number(stat.erpCount || 0) > 0;
+  const hasSecom = Number(stat.secomCount || 0) > 0;
+  const hasRecords = Number(stat.recordCount || 0) > 0;
+  const batchCount = Number(stat.batchCount || 0);
+  if(batchCount > 1) return { key:'dup', label:'중복주의' };
+  if(hasErp && hasSecom && hasRecords) return { key:'ok', label:'완료' };
+  if(hasErp || hasSecom || hasRecords) return { key:'partial', label:'일부완료' };
+  return { key:'empty', label:'미업로드' };
+}
+async function fetchAdminUploadYears(){
+  if(!supabaseClient) return [];
+  const years = new Set();
+  const nowYear = new Date().getFullYear();
+  years.add(nowYear);
+  try{
+    const { data, error } = await supabaseClient.from('attendance_records').select('work_date').order('work_date', { ascending:false }).limit(4000);
+    if(error) throw error;
+    (data || []).forEach(row => {
+      const m = String(row.work_date || '').match(/^(\d{4})-/);
+      if(m) years.add(Number(m[1]));
+    });
+  }catch(err){
+    console.warn('[ADMIN YEARS attendance_records]', err);
+  }
+  try{
+    const { data, error } = await supabaseClient.from('attendance_upload_batches').select('*').limit(500);
+    if(error) throw error;
+    (data || []).forEach(row => {
+      const combined = [row.created_at, row.uploaded_at, row.secom_filename, row.erp_filename, row.note, row.id].filter(Boolean).join(' ');
+      const matches = String(combined).match(/20\d{2}/g) || [];
+      matches.forEach(y => years.add(Number(y)));
+    });
+  }catch(err){
+    console.warn('[ADMIN YEARS batches]', err);
+  }
+  return [...years].filter(Number.isFinite).sort((a,b) => b-a);
+}
+async function fetchMonthCountMap(tableName, year){
+  const start = `${year}-01-01`;
+  const end = `${year}-12-31`;
+  const map = new Map();
+  const batchDateMap = new Map();
+  if(!supabaseClient) return { countMap: map, batchDateMap };
+  const columns = tableName === 'attendance_records' ? 'work_date' : 'work_date, upload_batch_id';
+  try{
+    const { data, error } = await supabaseClient.from(tableName).select(columns).gte('work_date', start).lte('work_date', end).limit(50000);
+    if(error) throw error;
+    (data || []).forEach(row => {
+      const workDate = String(row.work_date || '');
+      const m = workDate.match(/^\d{4}-(\d{2})-/);
+      if(!m) return;
+      const month = Number(m[1]);
+      map.set(month, (map.get(month) || 0) + 1);
+      if('upload_batch_id' in row && row.upload_batch_id){
+        if(!batchDateMap.has(row.upload_batch_id)) batchDateMap.set(row.upload_batch_id, []);
+        batchDateMap.get(row.upload_batch_id).push(workDate);
+      }
+    });
+  }catch(err){
+    console.warn(`[ADMIN MONTH MAP ${tableName}]`, err);
+  }
+  return { countMap: map, batchDateMap };
+}
+function extractBatchYearMonth(row){
+  const filenameJoined = [row.erp_filename, row.secom_filename, row.note].filter(Boolean).join(' ');
+  const fileMatch = filenameJoined.match(/(20\d{2})[^\d]?(0[1-9]|1[0-2])/);
+  if(fileMatch) return { year:Number(fileMatch[1]), month:Number(fileMatch[2]) };
+  const created = String(row.created_at || row.uploaded_at || '');
+  const createdMatch = created.match(/^(20\d{2})-(\d{2})/);
+  if(createdMatch) return { year:Number(createdMatch[1]), month:Number(createdMatch[2]) };
+  return { year:null, month:null };
+}
+async function fetchAdminBatchRows(year, secomBatchDateMap, erpBatchDateMap){
+  if(!supabaseClient) return [];
+  const rows = [];
+  try{
+    const { data, error } = await supabaseClient.from('attendance_upload_batches').select('*').order('created_at', { ascending:false }).limit(1000);
+    if(error) throw error;
+    (data || []).forEach(row => {
+      const inferred = extractBatchYearMonth(row);
+      const secomDates = secomBatchDateMap.get(row.id) || [];
+      const erpDates = erpBatchDateMap.get(row.id) || [];
+      const allDates = [...secomDates, ...erpDates].sort();
+      const monthSource = allDates[0] || '';
+      const dateMatch = monthSource.match(/^(\d{4})-(\d{2})/);
+      const rowYear = dateMatch ? Number(dateMatch[1]) : inferred.year;
+      const rowMonth = dateMatch ? Number(dateMatch[2]) : inferred.month;
+      if(rowYear !== year) return;
+      rows.push({
+        id: row.id,
+        created_at: row.created_at || row.uploaded_at || null,
+        secom_filename: row.secom_filename || '',
+        erp_filename: row.erp_filename || '',
+        note: row.note || '',
+        month: rowMonth,
+        secomCount: secomDates.length,
+        erpCount: erpDates.length,
+        minDate: allDates[0] || null,
+        maxDate: allDates[allDates.length - 1] || null
+      });
+    });
+  }catch(err){
+    console.warn('[ADMIN BATCH ROWS]', err);
+  }
+  rows.sort((a,b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+  return rows;
+}
+function renderAdminYearOptions(){
+  const select = document.getElementById('adminUploadYear');
+  if(!select) return;
+  const years = ADMIN_UPLOAD_MANAGEMENT.years.length ? ADMIN_UPLOAD_MANAGEMENT.years : [new Date().getFullYear()];
+  const current = ADMIN_UPLOAD_MANAGEMENT.selectedYear || years[0];
+  select.innerHTML = years.map(y => `<option value="${y}">${y}년</option>`).join('');
+  select.value = String(current);
+}
+function renderAdminYearSummary(){
+  const wrap = document.getElementById('adminUploadYearSummary');
+  if(!wrap) return;
+  const stats = ADMIN_UPLOAD_MANAGEMENT.monthStats || [];
+  const summary = { ok:0, partial:0, dup:0, empty:0 };
+  stats.forEach(stat => {
+    const state = deriveMonthState(stat).key;
+    summary[state] = (summary[state] || 0) + 1;
+  });
+  wrap.innerHTML = `
+    <div class="adminSummaryPill">선택 연도 <span>${ADMIN_UPLOAD_MANAGEMENT.selectedYear || '-'}</span></div>
+    <div class="adminSummaryPill">완료 <span>${summary.ok}개월</span></div>
+    <div class="adminSummaryPill">일부완료 <span>${summary.partial}개월</span></div>
+    <div class="adminSummaryPill">중복주의 <span>${summary.dup}개월</span></div>
+    <div class="adminSummaryPill">미업로드 <span>${summary.empty}개월</span></div>`;
+}
+function renderAdminMonthCards(){
+  const grid = document.getElementById('adminUploadMonthGrid');
+  if(!grid) return;
+  const stats = ADMIN_UPLOAD_MANAGEMENT.monthStats || [];
+  grid.innerHTML = stats.map(stat => {
+    const state = deriveMonthState(stat);
+    const latestText = stat.latestUploadedAt ? formatAdminDateTime(stat.latestUploadedAt) : '-';
+    const deleteDisabled = (!stat.erpCount && !stat.secomCount && !stat.recordCount) ? 'disabled' : '';
+    return `
+      <div class="adminMonthCard ${state.key}">
+        <div class="adminMonthHead">
+          <div class="adminMonthTitle">${stat.month}월</div>
+          <span class="adminMonthState ${state.key}">${state.label}</span>
+        </div>
+        <div class="adminMonthMetrics">
+          <div class="adminMetricMini"><div class="k">ERP raw</div><div class="v">${stat.erpCount || 0}건</div></div>
+          <div class="adminMetricMini"><div class="k">세콤 raw</div><div class="v">${stat.secomCount || 0}건</div></div>
+          <div class="adminMetricMini"><div class="k">records</div><div class="v">${stat.recordCount || 0}건</div></div>
+          <div class="adminMetricMini"><div class="k">배치</div><div class="v">${stat.batchCount || 0}건</div></div>
+        </div>
+        <div class="adminMonthMeta">
+          <div>최근 업로드: <strong style="color:var(--text)">${latestText}</strong></div>
+          <div>파일: ERP ${stat.erpFileNames.length ? stat.erpFileNames[0] : '-'} / 세콤 ${stat.secomFileNames.length ? stat.secomFileNames[0] : '-'}</div>
+        </div>
+        <div class="adminMonthActions">
+          <button type="button" class="adminActionBtn primary" data-admin-detail-month="${stat.month}">상세</button>
+          <button type="button" class="adminActionBtn danger" data-admin-delete-month="${stat.month}" ${deleteDisabled}>월 삭제</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+function renderAdminBatchHistory(){
+  const body = document.getElementById('adminBatchHistoryBody');
+  const empty = document.getElementById('adminBatchHistoryEmpty');
+  if(!body || !empty) return;
+  const rows = ADMIN_UPLOAD_MANAGEMENT.batchRows || [];
+  if(!rows.length){
+    body.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+  body.innerHTML = rows.map(row => `
+    <tr>
+      <td>${row.month ? `${row.month}월` : '-'}</td>
+      <td>${formatAdminDateTime(row.created_at)}</td>
+      <td title="${row.erp_filename || ''}">${row.erp_filename || '-'}</td>
+      <td title="${row.secom_filename || ''}">${row.secom_filename || '-'}</td>
+      <td>${row.erpCount || 0}</td>
+      <td>${row.secomCount || 0}</td>
+      <td style="font-family:monospace;font-size:12px">${row.id}</td>
+      <td><button type="button" class="adminActionBtn danger" data-admin-delete-batch="${row.id}">삭제</button></td>
+    </tr>`).join('');
+}
+function bindAdminManagementEvents(){
+  const yearSelect = document.getElementById('adminUploadYear');
+  const refreshBtn = document.getElementById('adminRefreshBtn');
+  if(yearSelect && yearSelect.dataset.bound !== 'Y'){
+    yearSelect.addEventListener('change', async (e) => {
+      ADMIN_UPLOAD_MANAGEMENT.selectedYear = Number(e.target.value) || new Date().getFullYear();
+      await refreshAdminUploadManagement();
+    });
+    yearSelect.dataset.bound = 'Y';
+  }
+  if(refreshBtn && refreshBtn.dataset.bound !== 'Y'){
+    refreshBtn.addEventListener('click', async () => {
+      ADMIN_UPLOAD_MANAGEMENT.selectedYear = Number(document.getElementById('adminUploadYear')?.value) || new Date().getFullYear();
+      await refreshAdminUploadManagement(true);
+    });
+    refreshBtn.dataset.bound = 'Y';
+  }
+  document.querySelectorAll('[data-admin-detail-month]').forEach(btn => {
+    if(btn.dataset.bound === 'Y') return;
+    btn.addEventListener('click', () => showAdminMonthDetail(Number(btn.dataset.adminDetailMonth)));
+    btn.dataset.bound = 'Y';
+  });
+  document.querySelectorAll('[data-admin-delete-month]').forEach(btn => {
+    if(btn.dataset.bound === 'Y') return;
+    btn.addEventListener('click', async () => { await deleteAdminMonthData(Number(btn.dataset.adminDeleteMonth)); });
+    btn.dataset.bound = 'Y';
+  });
+  document.querySelectorAll('[data-admin-delete-batch]').forEach(btn => {
+    if(btn.dataset.bound === 'Y') return;
+    btn.addEventListener('click', async () => { await deleteAdminBatchData(btn.dataset.adminDeleteBatch); });
+    btn.dataset.bound = 'Y';
+  });
+}
+function showAdminMonthDetail(month){
+  const stat = (ADMIN_UPLOAD_MANAGEMENT.monthStats || []).find(x => Number(x.month) === Number(month));
+  if(!stat){
+    alert('월 상세 정보를 찾을 수 없습니다.');
+    return;
+  }
+  const detailLines = [
+    `${ADMIN_UPLOAD_MANAGEMENT.selectedYear}년 ${month}월 업로드 현황`,
+    `상태: ${deriveMonthState(stat).label}`,
+    `ERP raw: ${stat.erpCount || 0}건`,
+    `세콤 raw: ${stat.secomCount || 0}건`,
+    `최종 records: ${stat.recordCount || 0}건`,
+    `배치 수: ${stat.batchCount || 0}건`,
+    `최근 업로드: ${stat.latestUploadedAt ? formatAdminDateTime(stat.latestUploadedAt) : '-'}`
+  ];
+  if(stat.erpFileNames.length) detailLines.push(`ERP 파일: ${stat.erpFileNames.join(', ')}`);
+  if(stat.secomFileNames.length) detailLines.push(`세콤 파일: ${stat.secomFileNames.join(', ')}`);
+  const monthRows = (ADMIN_UPLOAD_MANAGEMENT.batchRows || []).filter(row => Number(row.month) === Number(month));
+  if(monthRows.length){
+    detailLines.push('');
+    detailLines.push('배치 목록');
+    monthRows.forEach(row => detailLines.push(`- ${formatAdminDateTime(row.created_at)} | ${row.id}`));
+  }
+  alert(detailLines.join('\n'));
+}
+async function deleteAdminMonthData(month){
+  if(!supabaseClient) return alert('Supabase 연결이 필요합니다.');
+  const year = ADMIN_UPLOAD_MANAGEMENT.selectedYear || new Date().getFullYear();
+  const { start, end } = getMonthRange(year, month);
+  if(!confirm(`${year}년 ${month}월 데이터를 삭제할까요?\nraw + attendance_records가 함께 삭제됩니다.`)) return;
+  try{
+    const { data: rawIds1 } = await supabaseClient.from('attendance_secom_raw').select('upload_batch_id').gte('work_date', start).lte('work_date', end);
+    const { data: rawIds2 } = await supabaseClient.from('attendance_erp_raw').select('upload_batch_id').gte('work_date', start).lte('work_date', end);
+    const batchIds = [...new Set([...(rawIds1||[]).map(x=>x.upload_batch_id).filter(Boolean), ...(rawIds2||[]).map(x=>x.upload_batch_id).filter(Boolean)])];
+    let result = await supabaseClient.from('attendance_records').delete().gte('work_date', start).lte('work_date', end);
+    if(result.error) throw result.error;
+    result = await supabaseClient.from('attendance_secom_raw').delete().gte('work_date', start).lte('work_date', end);
+    if(result.error) throw result.error;
+    result = await supabaseClient.from('attendance_erp_raw').delete().gte('work_date', start).lte('work_date', end);
+    if(result.error) throw result.error;
+    if(batchIds.length){
+      result = await supabaseClient.from('attendance_upload_batches').delete().in('id', batchIds);
+      if(result.error) console.warn('[ADMIN DELETE MONTH BATCH META]', result.error);
+    }
+    if(typeof loadAttendanceFromSupabase === 'function'){
+      try{ await loadAttendanceFromSupabase(); }catch(e){ console.warn(e); }
+    }
+    updateUploadStatus();
+    await refreshAdminUploadManagement(true);
+    await render();
+    alert(`${year}년 ${month}월 데이터 삭제가 완료되었습니다.`);
+  }catch(error){
+    console.error('[ADMIN DELETE MONTH FAILED]', error);
+    alert(`월 삭제 중 오류가 발생했습니다.\n${error?.message || error}`);
+  }
+}
+async function deleteAdminBatchData(batchId){
+  if(!supabaseClient || !batchId) return alert('Supabase 연결이 필요합니다.');
+  if(!confirm(`선택한 배치(${batchId})를 삭제할까요?\n해당 배치 raw와 같은 날짜 범위의 attendance_records도 함께 삭제됩니다.`)) return;
+  try{
+    const { data: secomRows, error: secomReadError } = await supabaseClient.from('attendance_secom_raw').select('work_date').eq('upload_batch_id', batchId).limit(50000);
+    if(secomReadError) throw secomReadError;
+    const { data: erpRows, error: erpReadError } = await supabaseClient.from('attendance_erp_raw').select('work_date').eq('upload_batch_id', batchId).limit(50000);
+    if(erpReadError) throw erpReadError;
+    const dates = [...new Set([...(secomRows||[]).map(x=>x.work_date).filter(Boolean), ...(erpRows||[]).map(x=>x.work_date).filter(Boolean)])].sort();
+    const minDate = dates[0] || null;
+    const maxDate = dates[dates.length - 1] || null;
+    let result = await supabaseClient.from('attendance_secom_raw').delete().eq('upload_batch_id', batchId);
+    if(result.error) throw result.error;
+    result = await supabaseClient.from('attendance_erp_raw').delete().eq('upload_batch_id', batchId);
+    if(result.error) throw result.error;
+    result = await supabaseClient.from('attendance_upload_batches').delete().eq('id', batchId);
+    if(result.error) console.warn('[ADMIN DELETE BATCH META]', result.error);
+    if(minDate && maxDate){
+      result = await supabaseClient.from('attendance_records').delete().gte('work_date', minDate).lte('work_date', maxDate);
+      if(result.error) console.warn('[ADMIN DELETE BATCH RECORDS]', result.error);
+    }
+    if(typeof loadAttendanceFromSupabase === 'function'){
+      try{ await loadAttendanceFromSupabase(); }catch(e){ console.warn(e); }
+    }
+    updateUploadStatus();
+    await refreshAdminUploadManagement(true);
+    await render();
+    alert('배치 삭제가 완료되었습니다.');
+  }catch(error){
+    console.error('[ADMIN DELETE BATCH FAILED]', error);
+    alert(`배치 삭제 중 오류가 발생했습니다.\n${error?.message || error}`);
+  }
+}
+async function refreshAdminUploadManagement(forceYearReload = false){
+  const grid = document.getElementById('adminUploadMonthGrid');
+  const historyBody = document.getElementById('adminBatchHistoryBody');
+  if(!grid || !historyBody) return;
+  if(!supabaseClient){
+    grid.innerHTML = '<div class="adminHistoryEmpty" style="grid-column:1/-1">Supabase 연결 후 사용할 수 있습니다.</div>';
+    historyBody.innerHTML = '';
+    document.getElementById('adminBatchHistoryEmpty').style.display = '';
+    return;
+  }
+  if(forceYearReload || !ADMIN_UPLOAD_MANAGEMENT.years.length){
+    ADMIN_UPLOAD_MANAGEMENT.years = await fetchAdminUploadYears();
+  }
+  if(!ADMIN_UPLOAD_MANAGEMENT.selectedYear){
+    ADMIN_UPLOAD_MANAGEMENT.selectedYear = ADMIN_UPLOAD_MANAGEMENT.years[0] || new Date().getFullYear();
+  }
+  renderAdminYearOptions();
+  const year = Number(document.getElementById('adminUploadYear')?.value) || ADMIN_UPLOAD_MANAGEMENT.selectedYear;
+  ADMIN_UPLOAD_MANAGEMENT.selectedYear = year;
+
+  const [{ countMap: recordMap }, { countMap: secomMap, batchDateMap: secomBatchDateMap }, { countMap: erpMap, batchDateMap: erpBatchDateMap }] = await Promise.all([
+    fetchMonthCountMap('attendance_records', year),
+    fetchMonthCountMap('attendance_secom_raw', year),
+    fetchMonthCountMap('attendance_erp_raw', year)
+  ]);
+
+  const batchRows = await fetchAdminBatchRows(year, secomBatchDateMap, erpBatchDateMap);
+  ADMIN_UPLOAD_MANAGEMENT.batchRows = batchRows;
+  ADMIN_UPLOAD_MANAGEMENT.monthStats = Array.from({ length:12 }, (_, idx) => {
+    const month = idx + 1;
+    const monthBatchRows = batchRows.filter(row => Number(row.month) === month);
+    return {
+      month,
+      recordCount: recordMap.get(month) || 0,
+      secomCount: secomMap.get(month) || 0,
+      erpCount: erpMap.get(month) || 0,
+      batchCount: monthBatchRows.length,
+      latestUploadedAt: monthBatchRows[0]?.created_at || null,
+      erpFileNames: [...new Set(monthBatchRows.map(row => row.erp_filename).filter(Boolean))],
+      secomFileNames: [...new Set(monthBatchRows.map(row => row.secom_filename).filter(Boolean))]
+    };
+  });
+
+  renderAdminYearSummary();
+  renderAdminMonthCards();
+  renderAdminBatchHistory();
+  bindAdminManagementEvents();
+}
+
+
   window.render = async function(){
     if(!window.__empMasterInitialized){
       try{
@@ -7793,6 +8231,7 @@ window.addEventListener('resize', renderLightweight);
     renderPeople(scoped);
     bindMainTabs();
     renderTabs();
+    await refreshAdminUploadManagement();
     };
 
 })();
