@@ -3069,12 +3069,44 @@ function renderEmptyChart(el, message='데이터 없음'){
 
 function avg(arr, key){ return arr.length ? arr.reduce((s,x)=>s+(x[key]||0),0)/arr.length : 0; }
 function groupBy(arr, key){ return arr.reduce((a,c)=>((a[c[key]]??=[]).push(c),a),{}); }
-function periodLabel(){ return '26.03'; }
+function getAvailableAttendancePeriodOptions(){
+  const monthSet = new Set(
+    (Array.isArray(REAL_ATTENDANCE_DATA) ? REAL_ATTENDANCE_DATA : [])
+      .map(row => String(row?.date || '').trim().slice(0, 7))
+      .filter(value => /^\d{4}-\d{2}$/.test(value))
+  );
+  return Array.from(monthSet)
+    .sort((a,b) => a.localeCompare(b, 'ko'))
+    .map(value => ({
+      value,
+      label: `${value.slice(2,4)}.${value.slice(5,7)}`,
+      monthText: `${parseInt(value.slice(5,7), 10)}월`
+    }));
+}
+function getSelectedAttendancePeriodMeta(){
+  const options = getAvailableAttendancePeriodOptions();
+  if(!options.length){
+    return { value:'ALL', label:'전체', monthText:'전체' };
+  }
+  const matched = options.find(item => item.value === STATE.period);
+  if(matched) return matched;
+  return options[options.length - 1];
+}
+function rowMatchesSelectedPeriod(dateText){
+  const date = String(dateText || '').trim();
+  if(!date) return false;
+  const selected = getSelectedAttendancePeriodMeta();
+  if(!selected || selected.value === 'ALL') return true;
+  return date.startsWith(`${selected.value}-`);
+}
+function periodLabel(){
+  return String(getSelectedAttendancePeriodMeta()?.label || '전체');
+}
 function buildScopedPeriodMonths(list){
   const scoped = Array.isArray(list) ? list : [];
+  const selected = getSelectedAttendancePeriodMeta();
   if(!scoped.length){
-    const fallback = MONTHLY.slice(-1);
-    return fallback.length ? fallback : [{month:'3월', overtime:0, avgDailyOvertime:0, avgOvertimePerPerson:0, highRisk:0, leaveZero:0, avgDailyHours:0, avgAdjustedWorkHours:0, avgBaseWorkHours:0, avgHiddenOvertime:0, concentration:0, riskScore:0}];
+    return [{month:selected.monthText || '전체', overtime:0, avgDailyOvertime:0, avgOvertimePerPerson:0, highRisk:0, leaveZero:0, avgDailyHours:0, avgAdjustedWorkHours:0, avgBaseWorkHours:0, avgHiddenOvertime:0, concentration:0, riskScore:0, avgTotalLoad:0, totalMonthlyOvertime:0}];
   }
   const totalMonthlyOT = scoped.reduce((sum, item) => sum + Number(item.scopedMonthlyOvertime || 0), 0);
   const avgDailyHours = avg(scoped, 'scopedDailyHours');
@@ -3087,7 +3119,7 @@ function buildScopedPeriodMonths(list){
   const concentration = Math.min(100, Math.round(Number(workConMetrics.workConcentrationRate || 0)));
   const riskScore = Math.min(100, Math.round(avg(scoped, 'scopedRisk')));
   return [{
-    month:'3월',
+    month:selected.monthText || '전체',
     overtime:+avgDailyOvertime.toFixed(1),
     avgDailyOvertime:+avgDailyOvertime.toFixed(1),
     avgTotalLoad:+avgTotalLoad.toFixed(1),
@@ -3455,11 +3487,20 @@ function recoveryBadge(score){
 }
 
 function renderFilters(){
-  $('#period').innerHTML = '<option value="M">26.03</option>';
-  STATE.period = 'M';
+  const periodOptions = getAvailableAttendancePeriodOptions();
+  const fallbackPeriod = periodOptions.length ? periodOptions[periodOptions.length - 1].value : 'ALL';
+  if(!periodOptions.some(item => item.value === STATE.period)){
+    STATE.period = fallbackPeriod;
+  }
   STATE.leaveCauseFocus = '';
-  $('#period').value = 'M';
-  $('#period').onchange = () => { STATE.period = 'M'; render(); };
+  $('#period').innerHTML = periodOptions.length
+    ? periodOptions.map(item => `<option value="${item.value}">${item.label}</option>`).join('')
+    : '<option value="ALL">전체</option>';
+  $('#period').value = STATE.period;
+  $('#period').onchange = e => {
+    STATE.period = (e.target.value || fallbackPeriod || 'ALL').trim() || 'ALL';
+    render();
+  };
 
   const divisionMetaByName = new Map(orgMaster.map(div => [div.divisionName, div]));
   const employeeDivisionNames = [...new Set(EMPLOYEES.map(e => e.division).filter(Boolean))];
@@ -6369,6 +6410,7 @@ function buildAttendanceRows(){
     .filter(Boolean)
     .filter(row => isAttendanceTargetIncludedRow(row, metaByName))
     .filter(row => row.bucket !== '제외')
+    .filter(row => rowMatchesSelectedPeriod(row.date))
     .filter(row => !isDisplayExcludedAttendance(row))
     .filter(row => (STATE.division === '전체' || row.division === STATE.division) && (STATE.team === '전체' || row.team === STATE.team))
     .filter(matchesAttendanceFilters)
@@ -6390,6 +6432,7 @@ buildAttendanceRows.unfiltered = function(){
     .filter(Boolean)
     .filter(row => isAttendanceTargetIncludedRow(row, metaByName))
     .filter(row => row.bucket !== '제외')
+    .filter(row => rowMatchesSelectedPeriod(row.date))
     .filter(row => !isDisplayExcludedAttendance(row))
     .filter(row => (STATE.division === '전체' || row.division === STATE.division) && (STATE.team === '전체' || row.team === STATE.team))
     .sort((a,b) => (a.date + a.name).localeCompare(b.date + b.name));
@@ -7224,10 +7267,16 @@ buildAttendanceRows.unfiltered = function(){
 // 최종 판정 로직 재정의: 카드/지문 중복 통합 + 사유/주의/문제 기준 반영
 buildAttendanceRows = function(){
   const metaByName = new Map(empMaster.map(e => [normalizeEmployeeName(e.name), e]));
-  return getMergedRawAttendanceData()
-    .map(row => decorateAttendanceRow(row, metaByName))
+  const mergedRows = getMergedRawAttendanceData();
+  const sourceRows = Array.isArray(mergedRows) && mergedRows.length ? mergedRows : (Array.isArray(REAL_ATTENDANCE_DATA) ? REAL_ATTENDANCE_DATA : []);
+  const mapper = Array.isArray(mergedRows) && mergedRows.length
+    ? (row => decorateAttendanceRow(row, metaByName))
+    : (row => deriveAttendanceRow(row, metaByName));
+  return sourceRows
+    .map(mapper)
     .filter(Boolean)
     .filter(row => isAttendanceTargetIncludedRow(row, metaByName))
+    .filter(row => rowMatchesSelectedPeriod(row.date))
     .filter(row => !isDisplayExcludedAttendance(row))
     .filter(row => (STATE.division === '전체' || row.division === STATE.division) && (STATE.team === '전체' || row.team === STATE.team))
     .filter(matchesAttendanceFilters)
@@ -7236,10 +7285,16 @@ buildAttendanceRows = function(){
 
 buildAttendanceRows.unfiltered = function(){
   const metaByName = new Map(empMaster.map(e => [normalizeEmployeeName(e.name), e]));
-  return getMergedRawAttendanceData()
-    .map(row => decorateAttendanceRow(row, metaByName))
+  const mergedRows = getMergedRawAttendanceData();
+  const sourceRows = Array.isArray(mergedRows) && mergedRows.length ? mergedRows : (Array.isArray(REAL_ATTENDANCE_DATA) ? REAL_ATTENDANCE_DATA : []);
+  const mapper = Array.isArray(mergedRows) && mergedRows.length
+    ? (row => decorateAttendanceRow(row, metaByName))
+    : (row => deriveAttendanceRow(row, metaByName));
+  return sourceRows
+    .map(mapper)
     .filter(Boolean)
     .filter(row => isAttendanceTargetIncludedRow(row, metaByName))
+    .filter(row => rowMatchesSelectedPeriod(row.date))
     .filter(row => !isDisplayExcludedAttendance(row))
     .sort(compareAttendanceRows);
 };
