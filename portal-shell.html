@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab Operations Portal (shell)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+    .app {
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .layout {
+      width: 100%;
+      margin: 0;
+      min-height: calc(100vh - 32px);
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .sidenav {
+      width: 72px;
+      background: #0f172a;
+      color: #fff;
+      border-radius: 24px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: calc(100vh - 32px);
+      height: calc(100vh - 32px);
+      position: sticky;
+      top: 16px;
+      align-self: start;
+      overflow: hidden;
+    }
+    .nav-btn {
+      height: 44px;
+      width: 44px;
+      border-radius: 14px;
+      border: none;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .nav-btn.home { background: rgba(255,255,255,0.18); margin-bottom: 18px; }
+    .nav-btn.active {
+      background: #ffffff;
+      color: #0f172a;
+      font-weight: 800;
+      box-shadow: 0 6px 18px rgba(15,23,42,0.18);
+    }
+    .nav-btn.nav-btn--soon {
+      cursor: not-allowed;
+      opacity: 0.38;
+      background: rgba(255,255,255,0.05);
+      color: rgba(255,255,255,0.65);
+      font-size: 10px;
+      line-height: 1.1;
+      padding: 2px;
+    }
+    .nav-btn.nav-btn--soon.active {
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.75);
+      box-shadow: none;
+    }
+    .nav-group { display: flex; flex-direction: column; gap: 8px; }
+    .portal-main {
+      min-width: 0;
+      height: auto;
+      overflow: hidden;
+    }
+    #portalFrame {
+  width: 100%;
+  min-height: calc(100vh - 32px);
+  height: auto;   /* ← 이걸로 변경 */
+  border: none;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+  display: block;
+}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="layout">
+      <div class="sidenav">
+        <div>
+          <button type="button" id="homeNavBtn" class="nav-btn home active" data-portal-src="portal-home.html" title="홈">홈</button>
+          <div class="nav-group">
+            <button type="button" id="wastewaterNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
+            <button type="button" id="attendanceNavBtn" class="nav-btn" data-portal-src="attendance.html" title="근태">근태</button>
+            <button type="button" id="mealNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
+            <button type="button" id="suppliesNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
+            <button type="button" id="docsNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" id="settingsNavBtn" class="nav-btn" data-portal-src="settings.html" title="설정">설정</button>
+          <button type="button" id="logoutNavBtn" class="nav-btn" title="로그아웃 안내">종료</button>
+        </div>
+      </div>
+      <div class="portal-main">
+        <iframe id="portalFrame" title="포털 본문" src="portal-home.html"></iframe>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var frame = document.getElementById('portalFrame');
+      var navButtons = Array.prototype.slice.call(document.querySelectorAll('.nav-btn[data-portal-src]'));
+
+      function setActiveNav(activeBtn) {
+        navButtons.forEach(function (b) {
+          b.classList.toggle('active', b === activeBtn);
+        });
+      }
+
+      function navigate(btn) {
+        var src = btn.getAttribute('data-portal-src');
+        if (!src || !frame) return;
+        frame.src = src;
+        setActiveNav(btn);
+      }
+
+      navButtons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          navigate(btn);
+        });
+      });
+
+      document.getElementById('logoutNavBtn').addEventListener('click', function () {
+        window.alert('로그아웃은 본문(홈) 화면에서 진행해 주세요. 필요하면 홈으로 돌아갑니다.');
+        var home = document.getElementById('homeNavBtn');
+        if (home) navigate(home);
+      });
+    })();
+  </script>
+</body>
+</html>
