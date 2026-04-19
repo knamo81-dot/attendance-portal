@@ -1509,6 +1509,26 @@ html, body {
 /* hide attendance outer header */
 #attendance-page .header-card{display:none !important;}
 
+
+/* reagent iframe fit */
+#supplies-page{
+  width:100% !important;
+  min-width:0 !important;
+}
+#supplies-page .embedded-app-frame{
+  width:100% !important;
+  min-width:0 !important;
+  min-height:calc(100vh - 56px) !important;
+  height:calc(100vh - 56px) !important;
+  border-radius:22px !important;
+  display:block !important;
+}
+#supplies-page,
+#supplies-page.active{
+  padding:0 !important;
+  margin:0 !important;
+}
+
 </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -7545,14 +7565,15 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         html ? html.clientHeight : 0,
         html ? html.scrollHeight : 0,
         html ? html.offsetHeight : 0,
+        window.innerHeight - 56,
         1200
       );
 
       if (h && isFinite(h)) {
-        frame.style.height = (h + 40) + 'px';
+        frame.style.height = Math.max(h + 24, window.innerHeight - 56, 1200) + 'px';
       }
     } catch (e) {
-      frame.style.height = '1400px';
+      frame.style.height = Math.max(window.innerHeight - 56, 1200) + 'px';
     }
   }
 
