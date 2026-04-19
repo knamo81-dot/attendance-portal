@@ -1511,22 +1511,24 @@ html, body {
 
 
 /* reagent iframe fit */
-#supplies-page{
+#supplies-page,
+#supplies-page.active{
   width:100% !important;
   min-width:0 !important;
+  padding:0 !important;
+  margin:0 !important;
+  display:block !important;
 }
 #supplies-page .embedded-app-frame{
   width:100% !important;
   min-width:0 !important;
-  min-height:calc(100vh - 56px) !important;
-  height:calc(100vh - 56px) !important;
+  min-height:calc(100vh - 24px) !important;
+  height:calc(100vh - 24px) !important;
+  border:none !important;
   border-radius:22px !important;
+  background:transparent !important;
+  box-shadow:none !important;
   display:block !important;
-}
-#supplies-page,
-#supplies-page.active{
-  padding:0 !important;
-  margin:0 !important;
 }
 
 </style>
@@ -7565,15 +7567,15 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         html ? html.clientHeight : 0,
         html ? html.scrollHeight : 0,
         html ? html.offsetHeight : 0,
-        window.innerHeight - 56,
+        window.innerHeight - 24,
         1200
       );
 
       if (h && isFinite(h)) {
-        frame.style.height = Math.max(h + 24, window.innerHeight - 56, 1200) + 'px';
+        frame.style.height = Math.max(h + 12, window.innerHeight - 24, 1200) + 'px';
       }
     } catch (e) {
-      frame.style.height = Math.max(window.innerHeight - 56, 1200) + 'px';
+      frame.style.height = Math.max(window.innerHeight - 24, 1200) + 'px';
     }
   }
 
