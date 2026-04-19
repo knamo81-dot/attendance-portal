@@ -8070,42 +8070,96 @@ function renderAdminBatchHistory(){
       <td><button type="button" class="adminActionBtn danger" data-admin-delete-batch="${row.id}">삭제</button></td>
     </tr>`).join('');
 }
+function initAdminManagementEventDelegation(){
+  const root = document.getElementById('main-admin');
+  if(!root || root.dataset.adminDelegated === 'Y') return;
+  root.addEventListener('click', (e) => {
+    const refreshBtn = e.target.closest('#adminRefreshBtn');
+    if(refreshBtn){
+      e.preventDefault();
+      (async () => {
+        try{
+          ADMIN_UPLOAD_MANAGEMENT.selectedYear = Number(document.getElementById('adminUploadYear')?.value) || new Date().getFullYear();
+          await refreshAdminUploadManagement(true);
+        }catch(err){
+          console.error('[ADMIN REFRESH BTN]', err);
+        }
+      })();
+      return;
+    }
+    const detailBtn = e.target.closest('[data-admin-detail-month]');
+    if(detailBtn){
+      if(detailBtn.disabled) return;
+      const month = Number(detailBtn.getAttribute('data-admin-detail-month'));
+      console.log('admin detail month', month);
+      if(!Number.isFinite(month)){
+        console.error('[ADMIN DETAIL] invalid month attribute', detailBtn.getAttribute('data-admin-detail-month'));
+        return;
+      }
+      try{
+        showAdminMonthDetail(month);
+      }catch(err){
+        console.error('[ADMIN DETAIL FAILED]', err);
+        alert('월 상세 표시 중 오류가 발생했습니다.');
+      }
+      return;
+    }
+    const delMonthBtn = e.target.closest('[data-admin-delete-month]');
+    if(delMonthBtn){
+      if(delMonthBtn.disabled) return;
+      const month = Number(delMonthBtn.getAttribute('data-admin-delete-month'));
+      console.log('admin delete month', month);
+      if(!Number.isFinite(month)){
+        console.error('[ADMIN DELETE MONTH] invalid month attribute', delMonthBtn.getAttribute('data-admin-delete-month'));
+        return;
+      }
+      (async () => {
+        try{
+          await deleteAdminMonthData(month);
+        }catch(err){
+          console.error('[ADMIN DELETE MONTH CLICK]', err);
+        }
+      })();
+      return;
+    }
+    const delBatchBtn = e.target.closest('[data-admin-delete-batch]');
+    if(delBatchBtn){
+      const batchId = delBatchBtn.getAttribute('data-admin-delete-batch');
+      console.log('admin delete batch', batchId);
+      if(!batchId){
+        console.error('[ADMIN DELETE BATCH] missing batch id on button');
+        return;
+      }
+      (async () => {
+        try{
+          await deleteAdminBatchData(batchId);
+        }catch(err){
+          console.error('[ADMIN DELETE BATCH CLICK]', err);
+        }
+      })();
+    }
+  });
+  root.addEventListener('change', (e) => {
+    const sel = e.target;
+    if(!sel || sel.id !== 'adminUploadYear') return;
+    (async () => {
+      try{
+        ADMIN_UPLOAD_MANAGEMENT.selectedYear = Number(sel.value) || new Date().getFullYear();
+        await refreshAdminUploadManagement();
+      }catch(err){
+        console.error('[ADMIN YEAR CHANGE]', err);
+      }
+    })();
+  });
+  root.dataset.adminDelegated = 'Y';
+}
 function bindAdminManagementEvents(){
-  const yearSelect = document.getElementById('adminUploadYear');
-  const refreshBtn = document.getElementById('adminRefreshBtn');
-  if(yearSelect && yearSelect.dataset.bound !== 'Y'){
-    yearSelect.addEventListener('change', async (e) => {
-      ADMIN_UPLOAD_MANAGEMENT.selectedYear = Number(e.target.value) || new Date().getFullYear();
-      await refreshAdminUploadManagement();
-    });
-    yearSelect.dataset.bound = 'Y';
-  }
-  if(refreshBtn && refreshBtn.dataset.bound !== 'Y'){
-    refreshBtn.addEventListener('click', async () => {
-      ADMIN_UPLOAD_MANAGEMENT.selectedYear = Number(document.getElementById('adminUploadYear')?.value) || new Date().getFullYear();
-      await refreshAdminUploadManagement(true);
-    });
-    refreshBtn.dataset.bound = 'Y';
-  }
-  document.querySelectorAll('[data-admin-detail-month]').forEach(btn => {
-    if(btn.dataset.bound === 'Y') return;
-    btn.addEventListener('click', () => showAdminMonthDetail(Number(btn.dataset.adminDetailMonth)));
-    btn.dataset.bound = 'Y';
-  });
-  document.querySelectorAll('[data-admin-delete-month]').forEach(btn => {
-    if(btn.dataset.bound === 'Y') return;
-    btn.addEventListener('click', async () => { await deleteAdminMonthData(Number(btn.dataset.adminDeleteMonth)); });
-    btn.dataset.bound = 'Y';
-  });
-  document.querySelectorAll('[data-admin-delete-batch]').forEach(btn => {
-    if(btn.dataset.bound === 'Y') return;
-    btn.addEventListener('click', async () => { await deleteAdminBatchData(btn.dataset.adminDeleteBatch); });
-    btn.dataset.bound = 'Y';
-  });
+  initAdminManagementEventDelegation();
 }
 function showAdminMonthDetail(month){
   const stat = (ADMIN_UPLOAD_MANAGEMENT.monthStats || []).find(x => Number(x.month) === Number(month));
   if(!stat){
+    console.error('[ADMIN MONTH DETAIL] stat not found for month', month);
     alert('월 상세 정보를 찾을 수 없습니다.');
     return;
   }
@@ -8129,7 +8183,11 @@ function showAdminMonthDetail(month){
   alert(detailLines.join('\n'));
 }
 async function deleteAdminMonthData(month){
-  if(!supabaseClient) return alert('Supabase 연결이 필요합니다.');
+  if(!supabaseClient){
+    console.error('[ADMIN DELETE MONTH] supabaseClient missing');
+    alert('Supabase 연결이 필요합니다.');
+    return;
+  }
   const year = ADMIN_UPLOAD_MANAGEMENT.selectedYear || new Date().getFullYear();
   const { start, end } = getMonthRange(year, month);
   if(!confirm(`${year}년 ${month}월 데이터를 삭제할까요?\nraw + attendance_records가 함께 삭제됩니다.`)) return;
@@ -8160,7 +8218,11 @@ async function deleteAdminMonthData(month){
   }
 }
 async function deleteAdminBatchData(batchId){
-  if(!supabaseClient || !batchId) return alert('Supabase 연결이 필요합니다.');
+  if(!supabaseClient || !batchId){
+    console.error('[ADMIN DELETE BATCH] supabaseClient or batchId missing', { batchId });
+    alert('Supabase 연결이 필요합니다.');
+    return;
+  }
   if(!confirm(`선택한 배치(${batchId})를 삭제할까요?\n해당 배치 raw와 같은 날짜 범위의 attendance_records도 함께 삭제됩니다.`)) return;
   try{
     const { data: secomRows, error: secomReadError } = await supabaseClient.from('attendance_secom_raw').select('work_date').eq('upload_batch_id', batchId).limit(50000);
@@ -8195,50 +8257,60 @@ async function deleteAdminBatchData(batchId){
 async function refreshAdminUploadManagement(forceYearReload = false){
   const grid = document.getElementById('adminUploadMonthGrid');
   const historyBody = document.getElementById('adminBatchHistoryBody');
-  if(!grid || !historyBody) return;
+  if(!grid || !historyBody){
+    bindAdminManagementEvents();
+    return;
+  }
   if(!supabaseClient){
     grid.innerHTML = '<div class="adminHistoryEmpty" style="grid-column:1/-1">Supabase 연결 후 사용할 수 있습니다.</div>';
     historyBody.innerHTML = '';
-    document.getElementById('adminBatchHistoryEmpty').style.display = '';
+    const emptyEl = document.getElementById('adminBatchHistoryEmpty');
+    if(emptyEl) emptyEl.style.display = '';
+    bindAdminManagementEvents();
     return;
   }
-  if(forceYearReload || !ADMIN_UPLOAD_MANAGEMENT.years.length){
-    ADMIN_UPLOAD_MANAGEMENT.years = await fetchAdminUploadYears();
+  try{
+    if(forceYearReload || !ADMIN_UPLOAD_MANAGEMENT.years.length){
+      ADMIN_UPLOAD_MANAGEMENT.years = await fetchAdminUploadYears();
+    }
+    if(!ADMIN_UPLOAD_MANAGEMENT.selectedYear){
+      ADMIN_UPLOAD_MANAGEMENT.selectedYear = ADMIN_UPLOAD_MANAGEMENT.years[0] || new Date().getFullYear();
+    }
+    renderAdminYearOptions();
+    const year = Number(document.getElementById('adminUploadYear')?.value) || ADMIN_UPLOAD_MANAGEMENT.selectedYear;
+    ADMIN_UPLOAD_MANAGEMENT.selectedYear = year;
+
+    const [{ countMap: recordMap }, { countMap: secomMap, batchDateMap: secomBatchDateMap }, { countMap: erpMap, batchDateMap: erpBatchDateMap }] = await Promise.all([
+      fetchMonthCountMap('attendance_records', year),
+      fetchMonthCountMap('attendance_secom_raw', year),
+      fetchMonthCountMap('attendance_erp_raw', year)
+    ]);
+
+    const batchRows = await fetchAdminBatchRows(year, secomBatchDateMap, erpBatchDateMap);
+    ADMIN_UPLOAD_MANAGEMENT.batchRows = batchRows;
+    ADMIN_UPLOAD_MANAGEMENT.monthStats = Array.from({ length:12 }, (_, idx) => {
+      const month = idx + 1;
+      const monthBatchRows = batchRows.filter(row => Number(row.month) === month);
+      return {
+        month,
+        recordCount: recordMap.get(month) || 0,
+        secomCount: secomMap.get(month) || 0,
+        erpCount: erpMap.get(month) || 0,
+        batchCount: monthBatchRows.length,
+        latestUploadedAt: monthBatchRows[0]?.created_at || null,
+        erpFileNames: [...new Set(monthBatchRows.map(row => row.erp_filename).filter(Boolean))],
+        secomFileNames: [...new Set(monthBatchRows.map(row => row.secom_filename).filter(Boolean))]
+      };
+    });
+
+    renderAdminYearSummary();
+    renderAdminMonthCards();
+    renderAdminBatchHistory();
+  }catch(err){
+    console.error('[REFRESH ADMIN UPLOAD MANAGEMENT]', err);
+  }finally{
+    bindAdminManagementEvents();
   }
-  if(!ADMIN_UPLOAD_MANAGEMENT.selectedYear){
-    ADMIN_UPLOAD_MANAGEMENT.selectedYear = ADMIN_UPLOAD_MANAGEMENT.years[0] || new Date().getFullYear();
-  }
-  renderAdminYearOptions();
-  const year = Number(document.getElementById('adminUploadYear')?.value) || ADMIN_UPLOAD_MANAGEMENT.selectedYear;
-  ADMIN_UPLOAD_MANAGEMENT.selectedYear = year;
-
-  const [{ countMap: recordMap }, { countMap: secomMap, batchDateMap: secomBatchDateMap }, { countMap: erpMap, batchDateMap: erpBatchDateMap }] = await Promise.all([
-    fetchMonthCountMap('attendance_records', year),
-    fetchMonthCountMap('attendance_secom_raw', year),
-    fetchMonthCountMap('attendance_erp_raw', year)
-  ]);
-
-  const batchRows = await fetchAdminBatchRows(year, secomBatchDateMap, erpBatchDateMap);
-  ADMIN_UPLOAD_MANAGEMENT.batchRows = batchRows;
-  ADMIN_UPLOAD_MANAGEMENT.monthStats = Array.from({ length:12 }, (_, idx) => {
-    const month = idx + 1;
-    const monthBatchRows = batchRows.filter(row => Number(row.month) === month);
-    return {
-      month,
-      recordCount: recordMap.get(month) || 0,
-      secomCount: secomMap.get(month) || 0,
-      erpCount: erpMap.get(month) || 0,
-      batchCount: monthBatchRows.length,
-      latestUploadedAt: monthBatchRows[0]?.created_at || null,
-      erpFileNames: [...new Set(monthBatchRows.map(row => row.erp_filename).filter(Boolean))],
-      secomFileNames: [...new Set(monthBatchRows.map(row => row.secom_filename).filter(Boolean))]
-    };
-  });
-
-  renderAdminYearSummary();
-  renderAdminMonthCards();
-  renderAdminBatchHistory();
-  bindAdminManagementEvents();
 }
 
 
@@ -8289,6 +8361,8 @@ async function refreshAdminUploadManagement(forceYearReload = false){
     await refreshAdminUploadManagement();
     };
 
+  bindAdminManagementEvents();
+
 })();
 
 
@@ -8310,3 +8384,4 @@ async function refreshAdminUploadManagement(forceYearReload = false){
 </div>
 </body>
 </html>
+
