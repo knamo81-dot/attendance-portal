@@ -1514,14 +1514,15 @@ html, body {
 #supplies-page{
   width:100% !important;
   min-width:0 !important;
+  min-height:calc(100vh - 12px) !important;
   padding:0 !important;
   margin:0 !important;
 }
 #supplies-page .embedded-app-frame{
   width:100% !important;
   min-width:0 !important;
-  min-height:calc(100vh - 24px) !important;
-  height:calc(100vh - 24px) !important;
+  min-height:calc(100vh - 12px) !important;
+  height:calc(100vh - 12px) !important;
   border:none !important;
   border-radius:22px !important;
   background:transparent !important;
@@ -7563,15 +7564,15 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         html ? html.clientHeight : 0,
         html ? html.scrollHeight : 0,
         html ? html.offsetHeight : 0,
-        window.innerHeight - 24,
+        window.innerHeight - 12,
         1200
       );
 
       if (h && isFinite(h)) {
-        frame.style.height = Math.max(h + 12, window.innerHeight - 24, 1200) + 'px';
+        frame.style.height = Math.max(h + 12, window.innerHeight - 12, 1200) + 'px';
       }
     } catch (e) {
-      frame.style.height = Math.max(window.innerHeight - 24, 1200) + 'px';
+      frame.style.height = Math.max(window.innerHeight - 12, 1200) + 'px';
     }
   }
 
