@@ -8188,30 +8188,77 @@ async function deleteAdminMonthData(month){
     alert('Supabase 연결이 필요합니다.');
     return;
   }
-  const year = ADMIN_UPLOAD_MANAGEMENT.selectedYear || new Date().getFullYear();
-  const { start, end } = getMonthRange(year, month);
-  if(!confirm(`${year}년 ${month}월 데이터를 삭제할까요?\nraw + attendance_records가 함께 삭제됩니다.`)) return;
+  const year = Number(ADMIN_UPLOAD_MANAGEMENT.selectedYear || new Date().getFullYear());
+  const m = Number(month);
+  if(!Number.isFinite(year) || !Number.isFinite(m) || m < 1 || m > 12){
+    console.error('[ADMIN DELETE MONTH] invalid year/month', { year, month });
+    alert('연도 또는 월 값이 올바르지 않습니다.');
+    return;
+  }
+  const { start, end } = getMonthRange(year, m);
+  if(!confirm(`${year}년 ${m}월 데이터를 삭제할까요?\nraw + attendance_records가 함께 삭제됩니다.`)) return;
+
+  const countInMonth = async (table) => {
+    const { count, error } = await supabaseClient.from(table).select('*', { count: 'exact', head: true }).gte('work_date', start).lte('work_date', end);
+    if(error) return { error, count: null };
+    return { count: count ?? 0 };
+  };
+  const countBatches = async (ids) => {
+    if(!ids.length) return { count: 0 };
+    const { count, error } = await supabaseClient.from('attendance_upload_batches').select('*', { count: 'exact', head: true }).in('id', ids);
+    if(error) return { error, count: null };
+    return { count: count ?? 0 };
+  };
+
   try{
-    const { data: rawIds1 } = await supabaseClient.from('attendance_secom_raw').select('upload_batch_id').gte('work_date', start).lte('work_date', end);
-    const { data: rawIds2 } = await supabaseClient.from('attendance_erp_raw').select('upload_batch_id').gte('work_date', start).lte('work_date', end);
-    const batchIds = [...new Set([...(rawIds1||[]).map(x=>x.upload_batch_id).filter(Boolean), ...(rawIds2||[]).map(x=>x.upload_batch_id).filter(Boolean)])];
+    const { data: rawIds1, error: rawErr1 } = await supabaseClient.from('attendance_secom_raw').select('upload_batch_id').gte('work_date', start).lte('work_date', end);
+    if(rawErr1) throw rawErr1;
+    const { data: rawIds2, error: rawErr2 } = await supabaseClient.from('attendance_erp_raw').select('upload_batch_id').gte('work_date', start).lte('work_date', end);
+    if(rawErr2) throw rawErr2;
+    const batchIds = [...new Set([
+      ...(rawIds1 || []).map(x => x.upload_batch_id).filter(Boolean),
+      ...(rawIds2 || []).map(x => x.upload_batch_id).filter(Boolean)
+    ])];
+
+    console.log('[ADMIN DELETE MONTH] range', { year, month: m, start, end, batchIdCount: batchIds.length });
+
     let result = await supabaseClient.from('attendance_records').delete().gte('work_date', start).lte('work_date', end);
     if(result.error) throw result.error;
+    console.log('[ADMIN DELETE MONTH] attendance_records', await countInMonth('attendance_records'));
+
     result = await supabaseClient.from('attendance_secom_raw').delete().gte('work_date', start).lte('work_date', end);
     if(result.error) throw result.error;
+    if(batchIds.length){
+      result = await supabaseClient.from('attendance_secom_raw').delete().in('upload_batch_id', batchIds);
+      if(result.error) throw result.error;
+    }
+    console.log('[ADMIN DELETE MONTH] attendance_secom_raw', await countInMonth('attendance_secom_raw'));
+
     result = await supabaseClient.from('attendance_erp_raw').delete().gte('work_date', start).lte('work_date', end);
     if(result.error) throw result.error;
     if(batchIds.length){
+      result = await supabaseClient.from('attendance_erp_raw').delete().in('upload_batch_id', batchIds);
+      if(result.error) throw result.error;
+    }
+    console.log('[ADMIN DELETE MONTH] attendance_erp_raw', await countInMonth('attendance_erp_raw'));
+
+    if(batchIds.length){
+      const beforeB = await countBatches(batchIds);
+      console.log('[ADMIN DELETE MONTH] attendance_upload_batches (before)', beforeB);
       result = await supabaseClient.from('attendance_upload_batches').delete().in('id', batchIds);
       if(result.error) console.warn('[ADMIN DELETE MONTH BATCH META]', result.error);
+      console.log('[ADMIN DELETE MONTH] attendance_upload_batches (after)', await countBatches(batchIds));
+    }else{
+      console.log('[ADMIN DELETE MONTH] attendance_upload_batches', { count: 0, note: 'no batch ids in range' });
     }
+
     if(typeof loadAttendanceFromSupabase === 'function'){
       try{ await loadAttendanceFromSupabase(); }catch(e){ console.warn(e); }
     }
     updateUploadStatus();
     await refreshAdminUploadManagement(true);
     await render();
-    alert(`${year}년 ${month}월 데이터 삭제가 완료되었습니다.`);
+    alert(`${year}년 ${m}월 데이터 삭제가 완료되었습니다.`);
   }catch(error){
     console.error('[ADMIN DELETE MONTH FAILED]', error);
     alert(`월 삭제 중 오류가 발생했습니다.\n${error?.message || error}`);
