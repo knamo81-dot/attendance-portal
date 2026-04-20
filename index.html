@@ -154,29 +154,25 @@
     });
   });
 
-  logoutBtn.addEventListener('click', async function () {
-    try {
-      await supabaseClient.auth.signOut();
+logoutBtn.addEventListener('click', async function () {
+  try {
+    await supabaseClient.auth.signOut();
 
-      if (frame) {
-        frame.src = 'https://reagent-app-phi.vercel.app/?forceLogout=1';
-      }
-
-      setTimeout(function () {
-        if (frame) {
-          frame.src = 'portal-home.html';
-        }
-        if (homeBtn) {
-          setActiveNav(homeBtn);
-        }
-        window.location.reload();
-      }, 1500);
-
-    } catch (e) {
-      console.error('logout failed:', e);
-      alert('로그아웃 중 오류가 발생했습니다.');
+    if (frame) {
+      frame.src = 'portal-home.html';
     }
-  });
+
+    if (homeBtn) {
+      setActiveNav(homeBtn);
+    }
+
+    window.location.reload();
+
+  } catch (e) {
+    console.error('logout failed:', e);
+    alert('로그아웃 중 오류가 발생했습니다.');
+  }
+});
 })();
 </script>
 </body>
