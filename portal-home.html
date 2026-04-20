@@ -4992,14 +4992,15 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       }
     }
 
-    async function logout() {
-      await supabaseClient.auth.signOut();
-      currentUser = null;
-      currentProfile = null;
-      if (els.topUserBar) els.topUserBar.hidden = true;
-      showLogin('로그아웃되었습니다.');
-    }
+async function logout() {
+  await supabaseClient.auth.signOut();
+  currentUser = null;
+  currentProfile = null;
+  if (els.topUserBar) els.topUserBar.hidden = true;
+  showLogin('로그아웃되었습니다.');
+}
 
+window.portalLogout = logout;
 
     els.loginButton?.addEventListener('click', login);
     els.loginPassword?.addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
