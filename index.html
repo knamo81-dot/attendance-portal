@@ -146,10 +146,18 @@
       });
 
       document.getElementById('logoutNavBtn').addEventListener('click', function () {
-        window.alert('로그아웃은 본문(홈) 화면에서 진행해 주세요. 필요하면 홈으로 돌아갑니다.');
-        var home = document.getElementById('homeNavBtn');
-        if (home) navigate(home);
-      });
+  try {
+    if (frame && frame.contentWindow && typeof frame.contentWindow.portalLogout === 'function') {
+      frame.contentWindow.portalLogout();
+      return;
+    }
+  } catch (e) {
+    console.error('iframe logout call failed:', e);
+  }
+
+  var home = document.getElementById('homeNavBtn');
+  if (home) navigate(home);
+});
     })();
   </script>
 </body>
