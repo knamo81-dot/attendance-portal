@@ -156,15 +156,12 @@
 
   logoutBtn.addEventListener('click', async function () {
     try {
-      // 1) 포털 세션 로그아웃
       await supabaseClient.auth.signOut();
 
-      // 2) 시약 앱도 실제 페이지 실행 방식으로 강제 로그아웃
       if (frame) {
         frame.src = 'https://reagent-app-phi.vercel.app/?forceLogout=1';
       }
 
-      // 3) 잠깐 뒤 홈으로 복귀
       setTimeout(function () {
         if (frame) {
           frame.src = 'portal-home.html';
@@ -173,7 +170,7 @@
           setActiveNav(homeBtn);
         }
         window.location.reload();
-      }, 800);
+      }, 1500);
 
     } catch (e) {
       console.error('logout failed:', e);
