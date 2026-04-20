@@ -96,6 +96,8 @@
   display: block;
 }
   </style>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div class="app">
@@ -121,44 +123,59 @@
       </div>
     </div>
   </div>
-  <script>
-    (function () {
-      var frame = document.getElementById('portalFrame');
-      var navButtons = Array.prototype.slice.call(document.querySelectorAll('.nav-btn[data-portal-src]'));
+ <script>
+(function () {
+  const SUPABASE_URL = '여기에_URL';
+  const SUPABASE_ANON_KEY = '여기에_KEY';
 
-      function setActiveNav(activeBtn) {
-        navButtons.forEach(function (b) {
-          b.classList.toggle('active', b === activeBtn);
-        });
-      }
+  const frame = document.getElementById('portalFrame');
+  const navButtons = Array.prototype.slice.call(document.querySelectorAll('.nav-btn[data-portal-src]'));
+  const logoutBtn = document.getElementById('logoutNavBtn');
 
-      function navigate(btn) {
-        var src = btn.getAttribute('data-portal-src');
-        if (!src || !frame) return;
-        frame.src = src;
-        setActiveNav(btn);
-      }
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      navButtons.forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          navigate(btn);
-        });
-      });
-
-      document.getElementById('logoutNavBtn').addEventListener('click', function () {
-  try {
-    if (frame && frame.contentWindow && typeof frame.contentWindow.portalLogout === 'function') {
-      frame.contentWindow.portalLogout();
-      return;
-    }
-  } catch (e) {
-    console.error('iframe logout call failed:', e);
+  function setActiveNav(activeBtn) {
+    navButtons.forEach(function (b) {
+      b.classList.toggle('active', b === activeBtn);
+    });
   }
 
-  var home = document.getElementById('homeNavBtn');
-  if (home) navigate(home);
-});
-    })();
-  </script>
+  function navigate(btn) {
+    var src = btn.getAttribute('data-portal-src');
+    if (!src || !frame) return;
+    frame.src = src;
+    setActiveNav(btn);
+  }
+
+  navButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      navigate(btn);
+    });
+  });
+
+  // 🔥 여기 핵심 (iframe 의존 제거)
+  logoutBtn.addEventListener('click', async function () {
+    try {
+      await supabaseClient.auth.signOut();
+
+      // 홈으로 이동
+      if (frame) {
+        frame.src = 'portal-home.html';
+      }
+
+      const home = document.getElementById('homeNavBtn');
+      if (home) setActiveNav(home);
+
+      // 새로고침으로 상태 초기화
+      window.location.reload();
+
+    } catch (e) {
+      console.error('logout failed:', e);
+      alert('로그아웃 중 오류가 발생했습니다.');
+    }
+  });
+
+})();
+</script>
 </body>
 </html>
