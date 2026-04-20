@@ -1411,7 +1411,7 @@
 #supplies-page{
   width:100% !important;
   min-width:0 !important;
-  min-height:calc(100vh - 12px) !important;
+  min-height:100%;
   padding:0 !important;
   margin:0 !important;
 }
@@ -1425,6 +1425,20 @@
   background:transparent !important;
   box-shadow:none !important;
   display:block !important;
+}
+html.embed-mode body{
+  margin:0 !important;
+}
+
+html.embed-mode .app{
+  padding:0 !important;
+  min-height:100%;
+}
+html.embed-mode .layout{
+  gap:0 !important;
+}
+html.embed-mode .header-card{
+  margin-top:0 !important;
 }
 </style>
 
@@ -1453,6 +1467,15 @@
     .top-user-bar{display:flex;justify-content:flex-end;margin-bottom:12px}
     .nav-btn[hidden], .pill[hidden], .top-user-bar[hidden]{display:none !important}
   </style>
+  <script>
+    (function(){
+      var embed = false;
+      try { embed = window.self !== window.top; } catch(e) { embed = true; }
+      var q = new URLSearchParams(location.search);
+      if (q.get('embed') === '1' || q.get('embed') === 'true') embed = true;
+      if (embed) document.documentElement.classList.add('embed-mode');
+    })();
+    </script>
 </head>
 <body class="auth-loading">
 
