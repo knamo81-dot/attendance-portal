@@ -123,10 +123,10 @@
       </div>
     </div>
   </div>
- <script>
+<script>
 (function () {
   const SUPABASE_URL = 'https://mbqpsovlwvedwrtbbauj.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
+  const SUPABASE_ANON_KEY = '현재 anon key';
 
   const frame = document.getElementById('portalFrame');
   const navButtons = Array.prototype.slice.call(document.querySelectorAll('.nav-btn[data-portal-src]'));
@@ -153,12 +153,20 @@
     });
   });
 
-  // 🔥 여기 핵심 (iframe 의존 제거)
   logoutBtn.addEventListener('click', async function () {
     try {
+      // 1. 포털 로그아웃
       await supabaseClient.auth.signOut();
 
-      // 홈으로 이동
+      // 2. 시약 앱에도 강제 로그아웃 요청
+      try {
+        await fetch('https://reagent-app-phi.vercel.app/?forceLogout=1', {
+          mode: 'no-cors',
+          credentials: 'include'
+        });
+      } catch (_) {}
+
+      // 3. 홈으로 복귀
       if (frame) {
         frame.src = 'portal-home.html';
       }
@@ -166,15 +174,12 @@
       const home = document.getElementById('homeNavBtn');
       if (home) setActiveNav(home);
 
-      // 새로고침으로 상태 초기화
       window.location.reload();
-
     } catch (e) {
       console.error('logout failed:', e);
       alert('로그아웃 중 오류가 발생했습니다.');
     }
   });
-
 })();
 </script>
 </body>
