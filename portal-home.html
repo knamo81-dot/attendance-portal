@@ -1440,6 +1440,36 @@ html.embed-mode .layout{
 html.embed-mode .header-card{
   margin-top:0 !important;
 }
+/* ===== 포탈 홈 헤더 → 삼천당 레드 ===== */
+.header-card{
+  background: linear-gradient(135deg, #c8102e 0%, #e11d2e 100%) !important;
+  color:#fff !important;
+  border: none !important;
+}
+
+/* 상단 작은 텍스트 */
+.header-card .header-top{
+  color: rgba(255,255,255,0.75) !important;
+}
+
+/* 메인 타이틀 */
+.header-card .title{
+  color:#fff !important;
+}
+
+/* 탭 버튼 기본 */
+.header-card .pill{
+  background: rgba(255,255,255,0.15) !important;
+  color:#fff !important;
+  border:1px solid rgba(255,255,255,0.25) !important;
+}
+
+/* 선택된 탭 */
+.header-card .pill.active{
+  background:#fff !important;
+  color:#c8102e !important;
+  font-weight:800;
+} 
 </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1466,35 +1496,6 @@ html.embed-mode .header-card{
     .user-chip .role{display:inline-flex;padding:4px 8px;border-radius:999px;background:#0f172a;color:#fff;font-size:11px}
     .top-user-bar{display:flex;justify-content:flex-end;margin-bottom:12px}
     .nav-btn[hidden], .pill[hidden], .top-user-bar[hidden]{display:none !important}
-  /* ===== 헤더 → 삼천당 레드 적용 ===== */
-.hero{
-  background: linear-gradient(135deg, #c8102e 0%, #e11d2e 100%) !important;
-  color:#fff !important;
-  border:none !important;
-  box-shadow:0 10px 30px rgba(200,16,46,0.25) !important;
-}
-
-/* 작은 텍스트 */
-.hero .label{
-  color:rgba(255,255,255,0.75) !important;
-}
-
-/* 제목 */
-.hero > div > div:nth-child(2){
-  color:#ffffff !important;
-}
-
-/* 설명 */
-.hero .desc{
-  color:rgba(255,255,255,0.85) !important;
-}
-
-/* select (필터) */
-.hero select{
-  background:rgba(255,255,255,0.15) !important;
-  color:#fff !important;
-  border:1px solid rgba(255,255,255,0.3) !important;
-}
   </style>
   <script>
     (function(){
