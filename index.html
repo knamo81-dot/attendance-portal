@@ -131,6 +131,7 @@
   const frame = document.getElementById('portalFrame');
   const navButtons = Array.prototype.slice.call(document.querySelectorAll('.nav-btn[data-portal-src]'));
   const logoutBtn = document.getElementById('logoutNavBtn');
+  const homeBtn = document.getElementById('homeNavBtn');
 
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -155,26 +156,25 @@
 
   logoutBtn.addEventListener('click', async function () {
     try {
-      // 1. 포털 로그아웃
+      // 1) 포털 세션 로그아웃
       await supabaseClient.auth.signOut();
 
-      // 2. 시약 앱에도 강제 로그아웃 요청
-      try {
-        await fetch('https://reagent-app-phi.vercel.app/?forceLogout=1', {
-          mode: 'no-cors',
-          credentials: 'include'
-        });
-      } catch (_) {}
-
-      // 3. 홈으로 복귀
+      // 2) 시약 앱도 실제 페이지 실행 방식으로 강제 로그아웃
       if (frame) {
-        frame.src = 'portal-home.html';
+        frame.src = 'https://reagent-app-phi.vercel.app/?forceLogout=1';
       }
 
-      const home = document.getElementById('homeNavBtn');
-      if (home) setActiveNav(home);
+      // 3) 잠깐 뒤 홈으로 복귀
+      setTimeout(function () {
+        if (frame) {
+          frame.src = 'portal-home.html';
+        }
+        if (homeBtn) {
+          setActiveNav(homeBtn);
+        }
+        window.location.reload();
+      }, 800);
 
-      window.location.reload();
     } catch (e) {
       console.error('logout failed:', e);
       alert('로그아웃 중 오류가 발생했습니다.');
