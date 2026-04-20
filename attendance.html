@@ -927,7 +927,7 @@ html.embed-mode #main-dashboard .kpis{
   const { data } = await supabase.auth.getSession();
 
   if (!data.session) {
-    window.top.location.href = 'portal-shell.html';
+    window.top.location.href = 'https://attendance-portal-roan.vercel.app/portal-shell.html';
     return;
   }
 
