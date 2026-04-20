@@ -1,183 +1,97 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lab Operations Portal (shell)</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f1f5f9;
-      color: #0f172a;
-    }
-    .app {
-      min-height: 100vh;
-      padding: 16px;
-    }
-    .layout {
-      width: 100%;
-      margin: 0;
-      min-height: calc(100vh - 32px);
-      display: grid;
-      grid-template-columns: 72px minmax(0, 1fr);
-      gap: 16px;
-      align-items: start;
-    }
-    .sidenav {
-      width: 72px;
-      background: #0f172a;
-      color: #fff;
-      border-radius: 24px;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      min-height: calc(100vh - 32px);
-      height: calc(100vh - 32px);
-      position: sticky;
-      top: 16px;
-      align-self: start;
-      overflow: hidden;
-    }
-    .nav-btn {
-      height: 44px;
-      width: 44px;
-      border-radius: 14px;
-      border: none;
-      background: rgba(255,255,255,0.08);
-      color: #fff;
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 700;
-      line-height: 1;
-      white-space: nowrap;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-    }
-    .nav-btn.home { background: rgba(255,255,255,0.18); margin-bottom: 18px; }
-    .nav-btn.active {
-      background: #ffffff;
-      color: #0f172a;
-      font-weight: 800;
-      box-shadow: 0 6px 18px rgba(15,23,42,0.18);
-    }
-    .nav-btn.nav-btn--soon {
-      cursor: not-allowed;
-      opacity: 0.38;
-      background: rgba(255,255,255,0.05);
-      color: rgba(255,255,255,0.65);
-      font-size: 10px;
-      line-height: 1.1;
-      padding: 2px;
-    }
-    .nav-btn.nav-btn--soon.active {
-      background: rgba(255,255,255,0.12);
-      color: rgba(255,255,255,0.75);
-      box-shadow: none;
-    }
-    .nav-group { display: flex; flex-direction: column; gap: 8px; }
-    .portal-main {
-      min-width: 0;
-      height: auto;
-      overflow: hidden;
-    }
-    #portalFrame {
-  width: 100%;
-  min-height: calc(100vh - 32px);
-  height: auto;   /* ← 이걸로 변경 */
-  border: none;
-  border-radius: 22px;
-  background: #fff;
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
-  display: block;
-}
-  </style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>시약·초자 신청/취합</title>
+<link rel="stylesheet" href="style.css"/>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body>
-  <div class="app">
-    <div class="layout">
-      <div class="sidenav">
-        <div>
-          <button type="button" id="homeNavBtn" class="nav-btn home active" data-portal-src="portal-home.html" title="홈">홈</button>
-          <div class="nav-group">
-            <button type="button" id="wastewaterNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
-            <button type="button" id="attendanceNavBtn" class="nav-btn" data-portal-src="attendance.html" title="근태">근태</button>
-            <button type="button" id="mealNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
-            <button type="button" id="suppliesNavBtn" class="nav-btn" data-portal-src="https://reagent-app-phi.vercel.app/" title="시약">시약</button>
-            <button type="button" id="docsNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
-          </div>
-        </div>
-        <div class="nav-group">
-          <button type="button" id="settingsNavBtn" class="nav-btn" data-portal-src="settings.html" title="설정">설정</button>
-          <button type="button" id="logoutNavBtn" class="nav-btn" title="로그아웃 안내">종료</button>
-        </div>
-      </div>
-      <div class="portal-main">
-        <iframe id="portalFrame" title="포털 본문" src="portal-home.html"></iframe>
-      </div>
-    </div>
-  </div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>       
+    
 <script>
-(function () {
+    (function(){
+      var embed = false;
+      try { embed = window.self !== window.top; } catch(e) { embed = true; }
+      var q = new URLSearchParams(location.search);
+      if (q.get('embed') === '1' || q.get('embed') === 'true') embed = true;
+      if (embed) document.documentElement.classList.add('embed-mode');
+    })();
+    </script>
+
+<script>
+(async function(){
   const SUPABASE_URL = 'https://mbqpsovlwvedwrtbbauj.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
+  const PORTAL_URL = 'https://attendance-portal-roan.vercel.app/';
 
-  const frame = document.getElementById('portalFrame');
-  const navButtons = Array.prototype.slice.call(document.querySelectorAll('.nav-btn[data-portal-src]'));
-  const logoutBtn = document.getElementById('logoutNavBtn');
-  const homeBtn = document.getElementById('homeNavBtn');
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const q = new URLSearchParams(location.search);
 
-  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  function setActiveNav(activeBtn) {
-    navButtons.forEach(function (b) {
-      b.classList.toggle('active', b === activeBtn);
-    });
+  if (q.get('forceLogout') === '1') {
+    await supabase.auth.signOut();
+    window.top.location.href = PORTAL_URL;
+    return;
   }
 
-  function navigate(btn) {
-    var src = btn.getAttribute('data-portal-src');
-    if (!src || !frame) return;
-    frame.src = src;
-    setActiveNav(btn);
+  function goPortalHome() {
+    window.top.location.href = PORTAL_URL;
   }
 
-  navButtons.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      navigate(btn);
-    });
-  });
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) {
+    goPortalHome();
+    return;
+  }
 
-  logoutBtn.addEventListener('click', async function () {
-    try {
-      await supabaseClient.auth.signOut();
-
-      if (frame) {
-        frame.src = 'https://reagent-app-phi.vercel.app/?forceLogout=1';
-      }
-
-      setTimeout(function () {
-        if (frame) {
-          frame.src = 'portal-home.html';
-        }
-        if (homeBtn) {
-          setActiveNav(homeBtn);
-        }
-        window.location.reload();
-      }, 1500);
-
-    } catch (e) {
-      console.error('logout failed:', e);
-      alert('로그아웃 중 오류가 발생했습니다.');
+  supabase.auth.onAuthStateChange(function (event, session) {
+    if (!session) {
+      goPortalHome();
     }
   });
 })();
 </script>
-</body>
-</html>
+    
+</head>
+<body>
+<input id="productKeyword" type="hidden"/>
+<div class="shell">
+<!-- ✅ 카드형 헤더 (topbar 제거 버전) -->
+<section class="card">
+  <div class="card-head reagent-header-card">
+    <div>
+      <div class="sub-title">Research Lab Integrated Portal</div>
+      <h2>시약·초자 신청 / 제품 취합 </h2>
+    </div>
+  </div>
+</section>
+<div class="tabs"><button class="tab-btn active" data-tab="request">제품신청</button><button class="tab-btn" data-tab="collect">제품취합</button></div>
+<section class="page active" id="page-request"><section class="card"><div class="card-head"><div><h2>제품 신청</h2><p>제품은 검색해서 선택하고 수량/용도만 입력합니다.</p></div><div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><button class="btn primary" id="openSearch" style="width:auto; padding:10px 14px; white-space:nowrap;">제품검색</button><span class="badge blue">검색 → 자동입력 → 수량/용도</span></div></div>
+<div class="card-body"><div class="form-grid">
+<div class="field"><label>분류</label><input id="category" placeholder="자동입력" readonly/></div>
+<div class="field"><label>품명</label><input id="productName" placeholder="자동입력" readonly/></div>
+<div class="field"><label>제조사</label><input id="maker" placeholder="자동입력" readonly/></div>
+<div class="field"><label>제품코드</label><input id="code" placeholder="자동입력" readonly/></div>
+<div class="field"><label>제품용량</label><input id="capacity" placeholder="자동입력" readonly/></div>
+<div class="field"><label>CAS 번호</label><input id="cas" placeholder="자동입력" readonly/></div>
+<div class="field"><label>등급</label><input id="grade" placeholder="자동입력" readonly/></div>
+<div class="field"><label>수량</label><input id="qty" max="999" min="1" placeholder="수량" step="1" type="number"/></div>
+<div class="field usage-field"><label>용도</label><input id="usage" placeholder="예: 효능평가 전처리용"/></div></div>
+<div class="actions"><button class="btn primary" id="addItem">신청 추가</button><button class="btn" id="clearForm">입력 초기화</button><button class="btn" id="requestNew">제품 등록 요청</button><button class="btn" id="loadSample">샘플 3건 자동입력</button></div></div></section>
+<section class="card"><div class="card-head"><div><h3>신청 목록</h3><p>체크한 품목만 취합 탭으로 반영됩니다.</p></div><span class="badge orange" id="draftCountBadge">통합 항목 0건</span></div>
+<div class="card-body"><div class="summary"><div class="tile"><div class="k">통합 품목 수</div><div class="v" id="sumDraftCount">0</div></div><div class="tile"><div class="k">시약</div><div class="v" id="sumReagent">0</div></div><div class="tile"><div class="k">초자/소모품</div><div class="v" id="sumGlass">0</div></div><div class="tile"><div class="k">안전용품</div><div class="v" id="sumSafety">0</div></div></div>
+<div class="actions" style="margin-top:16px;"><button class="btn" id="clearDraft">전체 데이터 비우기</button><button class="btn primary" id="addToCollect">취합추가</button></div>
+<div class="small" style="margin-top:10px;">체크박스 선택 후 취합추가를 눌러야 제품취합에 반영됩니다.</div>
+<div class="table-wrap" style="margin-top:16px;"><table><thead><tr><th>선택</th><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>용량</th><th>CAS</th><th>등급</th><th>총수량</th><th>신청자수</th><th>용도</th><th>작업</th></tr></thead><tbody id="draftTableBody"><tr><td class="empty" colspan="12">아직 추가된 신청 항목이 없습니다.</td></tr></tbody></table></div></div></section></section>
+<section class="page" id="page-collect"><section class="card"><div class="card-head"><div><h2>제품 취합</h2><p>신청 목록에서 체크 후 취합추가한 항목만 표시됩니다.</p></div><span class="badge blue">신청 데이터 연동</span></div>
+<div class="card-body"><div class="collect-filters"><div class="field"><label>구분</label><select id="collectCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div><div class="field"><label>검색</label><input id="collectKeyword" placeholder="품명 / 제조사 / 코드 검색"/></div><div class="field"><label>&nbsp;</label><button class="btn primary" id="confirmSelectedCollect">선택 거래처 확정</button></div><div class="field"><label>&nbsp;</label><button class="btn" id="excludeSelectedCollect">선택 취합 제외</button></div></div>
+<div class="summary" style="margin-top:16px;"><div class="tile"><div class="k">통합 품목 수</div><div class="v" id="collectCount">0</div></div><div class="tile"><div class="k">취합 총수량</div><div class="v" id="collectQty">0</div></div><div class="tile"><div class="k">시약 / 초자 / 안전</div><div class="v" id="collectMix">0 / 0 / 0</div></div><div class="tile"><div class="k">견적 비교 시안</div><div class="v">2 SET</div></div></div>
+<div class="table-wrap" style="margin-top:16px;"><table><thead><tr><th>선택</th><th>품명</th><th>제조사</th><th>제품코드</th><th>용량</th><th>CAS</th><th>등급</th><th>총수량</th><th>상세</th><th>단가</th><th>가격</th><th>거래처1</th><th>단가</th><th>가격</th><th>거래처2</th></tr></thead><tbody id="collectList"><tr><td class="empty" colspan="15">취합할 항목이 없습니다.</td></tr></tbody></table></div></div></section></section></div>
+<div class="modal-backdrop" id="searchModal"><div class="modal"><div class="modal-head"><div><h3>제품 검색</h3><div class="small">품명, 제품코드, 제조사, CAS 번호로 검색할 수 있습니다.</div></div><button class="btn" id="closeSearch">닫기</button></div>
+<div class="modal-search"><div class="field"><label>키워드</label><input id="searchInput" placeholder="예: ethanol, 459844, Sigma, 64-17-5"/><div class="search-hint">부분 검색 가능</div></div><div class="field"><label>분류</label><select id="searchCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div><div class="field"><label>제조사</label><select id="searchMaker"><option value="">전체</option></select></div><div class="field"><label>정렬</label><select id="sortMode"><option value="relevance">관련도순</option><option value="name">품명순</option><option value="maker">제조사순</option></select></div></div>
+<div class="modal-body" id="searchResults"></div><div class="modal-foot"><div class="small" id="resultInfo">검색 결과 0건</div><div class="small">원하는 제품이 없으면 <span class="product-link" id="inlineRequest">제품 등록 요청</span>으로 넘길 수 있습니다.</div></div></div></div>
+<div class="toast-wrap" id="toastWrap"></div>
+<script src="supabase.js"></script>
+<script src="request.js"></script>
+<script src="collect.js"></script>
+<script src="app.js"></script>
+</body></html>
