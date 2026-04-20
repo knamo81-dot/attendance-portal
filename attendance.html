@@ -915,6 +915,24 @@ html.embed-mode #main-dashboard .kpis{
   }
 })();
 </script>
+  
+<script>
+(async function(){
+
+  const SUPABASE_URL = 'https://mbqpsovlwvedwrtbbauj.supabase.co';
+  const SUPABASE_ANON_KEY = '여기에_anon_key';
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const { data } = await supabase.auth.getSession();
+
+  if (!data.session) {
+    window.top.location.href = 'portal-shell.html';
+    return;
+  }
+
+})();
+</script>  
 <div class="app">
   <div class="layout">
     <div class="container">
