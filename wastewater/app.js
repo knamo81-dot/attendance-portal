@@ -219,7 +219,198 @@ if(!pickupYearFilter) pickupYearFilter=getDefaultPickupYear();
 if(!yearlyReportFilter) yearlyReportFilter=getDefaultYearlyReportYear();
 renderApp(message,cls);
 }
-function getDerivedStats(){const ordered=[...dailyRows].sort((a,b)=>new Date(a.date)-new Date(b.date)); let prevMeter=0,prevGuideline=0,totalWaterUse=0,overCount=0,latestStatus='정상',latestStatusClass='ok'; const pickupMap=new Map(); for(const p of pickupRows) if((p.pickup_type||'폐수')==='폐수') pickupMap.set(p.pickup_date,p); const enriched=ordered.map((row,idx)=>{const isAutoHoliday=!!row.final_is_holiday; const isManualHoliday=!!row.is_holiday; const isHoliday=isAutoHoliday||isManualHoliday; const isMissing=!row.id && !isHoliday; const previousActual=idx===0?null:[...ordered].slice(0,idx).reverse().find(r=>r && r.id); const waterPrev=previousActual?Number(previousActual.usage||0):0; const meter=isHoliday||isMissing?prevMeter:Number(row.usage||0); const waterUsed=isHoliday?0:(isMissing?null:(idx===0?meter:round2(meter-prevMeter))); if(waterUsed!==null) totalWaterUse+=Math.max(waterUsed,0); const externalCm=isHoliday||isMissing?0:(row.has_external?Number(row.external_cm||(Number(row.external_ton||0)*TON_TO_CM)):0); const totalCm=isHoliday||isMissing?0:round2(Number(row.height||0)+externalCm); const guidelineText=isHoliday?'휴일':(isMissing?'미입력':getTodayGuidelineText(totalCm)); const guidelineValue=isHoliday||isMissing?prevGuideline:(totalCm>CM_LIMIT?null:cmToM3(totalCm)); const generated=isHoliday?0:(isMissing?null:(guidelineValue===null?null:round2(guidelineValue-prevGuideline))); const pickup=pickupMap.get(row.date); if(isHoliday){latestStatus='휴일';latestStatusClass='ok';} else if(isMissing){latestStatus='미입력';latestStatusClass='ok';} else if(totalCm>CM_LIMIT){overCount+=1;latestStatus=`OVER ${CM_LIMIT}`;latestStatusClass='danger';} else {latestStatus='정상';latestStatusClass='ok';} prevMeter=meter; prevGuideline=isHoliday||isMissing?prevGuideline:(pickup?.after_pickup_cm!=null?cmToM3(Number(pickup.after_pickup_cm)):(guidelineValue??prevGuideline)); return {...row,water_prev:waterPrev,water_used:waterUsed,external_cm:externalCm,total_cm:totalCm,guideline_text:guidelineText,generated_text:isHoliday?'휴일':(isMissing?'미입력':(generated===null?'Unverified':`${formatNum(generated,2)} m³`)),pickup,is_display_holiday:isHoliday,is_missing_day:isMissing}; }); const totalEntrusted=pickupRows.filter(p=>(p.pickup_type||'폐수')==='폐수').reduce((s,p)=>s+Number(p.entrusted_amount||0),0); return {enrichedDaily:enriched,totalWaterUse,totalEntrusted,overCount,latestStatus,latestStatusClass,latest:enriched.length?enriched[enriched.length-1]:null};}
+
+function buildMonthDateRange(monthKey){
+  if(!monthKey || monthKey.length < 7) return [];
+
+  const year = Number(monthKey.slice(0,4));
+  const month = Number(monthKey.slice(5,7));
+  if(!year || !month) return [];
+
+  const end = new Date(year, month, 0);
+
+  const today = new Date();
+  const todayKey = today.toISOString().slice(0,10);
+  const currentMonthKey = todayKey.slice(0,7);
+
+  const lastDate =
+    monthKey === currentMonthKey
+      ? Math.min(end.getDate(), today.getDate())
+      : end.getDate();
+
+  const dates = [];
+  for(let d = 1; d <= lastDate; d++){
+    const dt = new Date(year, month - 1, d);
+    const yyyy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    dates.push(`${yyyy}-${mm}-${dd}`);
+  }
+  return dates;
+}
+
+function buildExpandedDailyRows(){
+  const rowMap = new Map();
+  dailyRows.forEach(row => {
+    if(row?.date) rowMap.set(row.date, row);
+  });
+
+  const monthKeys = [...new Set(dailyRows.map(r => monthKeyFromDate(r.date)).filter(Boolean))].sort();
+  const expanded = [];
+
+  monthKeys.forEach(monthKey => {
+    const dates = buildMonthDateRange(monthKey);
+
+    dates.forEach(date => {
+      const existing = rowMap.get(date);
+      if(existing){
+        expanded.push(existing);
+        return;
+      }
+
+      const dow = new Date(date).getDay();
+      const isWeekend = (dow === 0 || dow === 6);
+
+      expanded.push({
+        id: null,
+        date,
+        usage: null,
+        height: null,
+        note: null,
+        has_external: false,
+        external_ton: null,
+        external_cm: null,
+        is_holiday: false,
+        holiday_reason: null,
+        created_at: null,
+        final_is_holiday: isWeekend,
+        final_holiday_reason:
+          dow === 0 ? '일요일' :
+          dow === 6 ? '토요일' :
+          null
+      });
+    });
+  });
+
+  return expanded.sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
+function getDerivedStats(){
+  const ordered = buildExpandedDailyRows();
+
+  let prevMeter = 0;
+  let prevGuideline = 0;
+  let totalWaterUse = 0;
+  let overCount = 0;
+  let latestStatus = '정상';
+  let latestStatusClass = 'ok';
+
+  const pickupMap = new Map();
+  for(const p of pickupRows){
+    if((p.pickup_type || '폐수') === '폐수'){
+      pickupMap.set(p.pickup_date, p);
+    }
+  }
+
+  const enriched = ordered.map((row, idx) => {
+    const isAutoHoliday = !!row.final_is_holiday;
+    const isManualHoliday = !!row.is_holiday;
+    const isHoliday = isAutoHoliday || isManualHoliday;
+    const isMissing = !row.id && !isHoliday;
+
+    const previousActual = idx === 0
+      ? null
+      : [...ordered].slice(0, idx).reverse().find(r => r && r.id);
+
+    const waterPrev = previousActual ? Number(previousActual.usage || 0) : 0;
+    const meter = isHoliday || isMissing ? prevMeter : Number(row.usage || 0);
+
+    const waterUsed = isHoliday
+      ? 0
+      : (isMissing ? null : (idx === 0 ? meter : round2(meter - prevMeter)));
+
+    if(waterUsed !== null){
+      totalWaterUse += Math.max(waterUsed, 0);
+    }
+
+    const externalCm = isHoliday || isMissing
+      ? 0
+      : (row.has_external
+          ? Number(row.external_cm || (Number(row.external_ton || 0) * TON_TO_CM))
+          : 0);
+
+    const totalCm = isHoliday || isMissing
+      ? 0
+      : round2(Number(row.height || 0) + externalCm);
+
+    const guidelineText = isHoliday
+      ? '휴일'
+      : (isMissing ? '미입력' : getTodayGuidelineText(totalCm));
+
+    const guidelineValue = isHoliday || isMissing
+      ? prevGuideline
+      : (totalCm > CM_LIMIT ? null : cmToM3(totalCm));
+
+    const generated = isHoliday
+      ? 0
+      : (isMissing ? null : (guidelineValue === null ? null : round2(guidelineValue - prevGuideline)));
+
+    const pickup = pickupMap.get(row.date);
+
+    if(isHoliday){
+      latestStatus = '휴일';
+      latestStatusClass = 'ok';
+    }else if(isMissing){
+      latestStatus = '미입력';
+      latestStatusClass = 'ok';
+    }else if(totalCm > CM_LIMIT){
+      overCount += 1;
+      latestStatus = `OVER ${CM_LIMIT}`;
+      latestStatusClass = 'danger';
+    }else{
+      latestStatus = '정상';
+      latestStatusClass = 'ok';
+    }
+
+    prevMeter = meter;
+    prevGuideline = isHoliday || isMissing
+      ? prevGuideline
+      : (
+          pickup?.after_pickup_cm != null
+            ? cmToM3(Number(pickup.after_pickup_cm))
+            : (guidelineValue ?? prevGuideline)
+        );
+
+    return {
+      ...row,
+      water_prev: waterPrev,
+      water_used: waterUsed,
+      external_cm: externalCm,
+      total_cm: totalCm,
+      guideline_text: guidelineText,
+      generated_text: isHoliday
+        ? '휴일'
+        : (isMissing ? '미입력' : (generated === null ? 'Unverified' : `${formatNum(generated, 2)} m³`)),
+      pickup,
+      is_display_holiday: isHoliday,
+      is_missing_day: isMissing
+    };
+  });
+
+  const totalEntrusted = pickupRows
+    .filter(p => (p.pickup_type || '폐수') === '폐수')
+    .reduce((s, p) => s + Number(p.entrusted_amount || 0), 0);
+
+  return {
+    enrichedDaily: enriched,
+    totalWaterUse,
+    totalEntrusted,
+    overCount,
+    latestStatus,
+    latestStatusClass,
+    latest: enriched.length ? enriched[enriched.length - 1] : null
+  };
+}
 
 function getClosedYearMonths(year){
   const now = new Date();
