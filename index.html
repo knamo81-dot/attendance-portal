@@ -173,15 +173,15 @@ async function navigate(btn) {
   frame.onload = () => {
     if (!user) return;
 
-    frame.contentWindow.postMessage(
-      {
-        type: 'PORTAL_AUTH',
-        payload: {
-          email: user.email
-        }
-      },
-      '*'
-    );
+frame.contentWindow.postMessage(
+  {
+    type: 'portal-auth',
+    user: {
+      email: user.email
+    }
+  },
+  '*'
+);
   };
 
   setActiveNav(btn);
