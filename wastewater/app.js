@@ -607,8 +607,7 @@ function renderReferenceContent(){
     <div class="toolbar-row">
       <div>
         <div class="section-title">📚 폐수배출시설 운영 관련자료</div>
-        <div class="doc-meta-top">${escapeHtml(title)} / 원본: ${escapeHtml(sourceText)}</div>
-      </div>
+       </div>
       <div class="toolbar-right">
         <input class="input search-input" placeholder="키워드 검색" value="${escapeHtml(refSearch)}" oninput="changeRefSearch(this.value)">
       </div>
