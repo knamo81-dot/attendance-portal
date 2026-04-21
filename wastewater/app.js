@@ -825,16 +825,6 @@ async function deleteReferenceDoc(){
   await loadAll('운영 관련자료 삭제 완료. 빈 기본 상태로 복원되었습니다.','ok');
 }
 
-function renderReferenceContent(){
-  const doc = getReferenceDoc();
-  const title = doc.title || '';
-  const body = doc.body || '';
-  const sourceText = doc.source || '';
-  const updatedText = doc.updated_at ? new Date(doc.updated_at).toLocaleString('ko-KR') : '-';
-  const updatedByText = doc.updated_by || '-';
-  const hasCustomDoc = !!referenceDocs.find(d=>d.doc_key===refTab)?.id;
-  const docBodyHtml = renderDocBodyFromText(body);
-
   return `<div class="toolbar-row">
       <div>
         <div class="section-title">📚 폐수배출시설 운영 관련자료</div>
