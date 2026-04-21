@@ -504,19 +504,113 @@ function getYearApprovalSummary(year){
 
 function renderPickupRows(rows){if(!rows.length)return `<tr><td colspan="7">선택한 조건의 수거 내역이 없습니다.</td></tr>`; return rows.map(row=>`<tr><td>${escapeHtml(row.pickup_date)}</td><td>${getPickupTypeBadge(row.pickup_type||'폐수')}</td><td>${escapeHtml(getPickupDetailText(row))}</td><td>${escapeHtml(row.certificate_no||'')}</td><td>${escapeHtml(row.contractor||'')}</td><td>${escapeHtml(row.note||'')}</td><td>${canDelete()?`<button class="small-btn danger" onclick="deletePickupRow(${row.id})">삭제</button>`:'-'}</td></tr>`).join('');}
 function renderLedgerRows(rows){const sorted=[...rows].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.created_at||'').localeCompare(String(a.created_at||''))); if(!sorted.length) return `<tr><td colspan="12">운영일지 데이터가 없습니다.</td></tr>`; return sorted.map(row=>{if(row.is_display_holiday){return `<tr><td>${escapeHtml(row.date)}</td><td class="num">휴일</td><td class="num">휴일</td><td class="num">휴일</td><td class="num">휴일</td><td>-</td><td class="num">휴일</td><td>휴일</td><td>휴일</td><td>-</td><td>${escapeHtml(row.final_holiday_reason||row.holiday_reason||row.note||'휴일')}</td><td>${row.id&&canDelete()?`<button class="small-btn danger" onclick="deleteDailyRow(${row.id})">삭제</button>`:'-'}</td></tr>`;} if(row.is_missing_day){return `<tr><td>${escapeHtml(row.date)}</td><td class="num">${formatNum(row.water_prev,2)}</td><td class="num">-</td><td class="num">미입력</td><td class="num">-</td><td>-</td><td class="num">-</td><td>미입력</td><td>미입력</td><td>-</td><td>평일 미입력</td><td>-</td></tr>`;} const rowClass=safeNumber(row.total_cm)>CM_LIMIT?'over-row':''; return `<tr class="${rowClass}"><td>${escapeHtml(row.date)}</td><td class="num">${formatNum(row.water_prev,2)}</td><td class="num">${formatNum(row.usage,2)}</td><td class="num">${formatNum(row.water_used,2)}</td><td class="num">${formatNum(row.height,1)} cm</td><td>${row.has_external?`${formatNum(row.external_ton||0,1)}T / ${formatNum(row.external_cm,1)}cm`:'-'}</td><td class="num">${formatNum(row.total_cm,1)} cm</td><td>${escapeHtml(row.guideline_text)}</td><td>${escapeHtml(row.generated_text)}</td><td>${row.pickup?`위탁 ${formatNum(row.pickup.entrusted_amount,2)}m³<br>후높이 ${escapeHtml(String(row.pickup.after_pickup_cm??'-'))}cm`:'-'}</td><td>${escapeHtml(row.note||'')}</td><td>${canDelete()?`<button class="small-btn danger" onclick="deleteDailyRow(${row.id})">삭제</button>`:'-'}</td></tr>`;}).join('');}
-function getReferenceDoc(){
-  const dbDoc = referenceDocs.find(d=>d.doc_key===refTab);
-  if(dbDoc) return dbDoc;
 
-  const defaultMeta = DEFAULT_REFERENCE_DOCS[refTab] || {title:'', source:''};
-  return {
-    doc_key: refTab,
-    title: defaultMeta.title || '',
-    body: '',
-    source: '',
-    updated_at: null,
-    updated_by: null
-  };
+function renderReferenceContent(){
+  const doc = getReferenceDoc();
+  const title = doc.title || '';
+  const body = doc.body || '';
+  const sourceText = doc.source || '기본 내장 문서';
+  const updatedText = doc.updated_at ? new Date(doc.updated_at).toLocaleString('ko-KR') : '-';
+  const updatedByText = doc.updated_by || '-';
+  const hasCustomDoc = !!referenceDocs.find(d => d.doc_key === refTab)?.id;
+  const docBodyHtml = renderDocBodyFromText(body);
+
+  const readerHtml = `
+    <div class="doc-container">
+      <div class="doc-title">${escapeHtml(title)}</div>
+      <div class="doc-meta">
+        최종 수정: ${escapeHtml(updatedText)}${updatedByText !== '-' ? ` / 수정자: ${escapeHtml(updatedByText)}` : ''}
+      </div>
+      <div class="doc-body">${docBodyHtml}</div>
+    </div>
+  `;
+
+  const editorHtml = canAdmin() ? `
+    <div class="doc-editor card">
+      <div class="section-title">✍️ 관리자 문서 편집</div>
+      <div class="field">
+        <label>문서 제목</label>
+        <input id="ref-title-input" class="input" value="${escapeHtml(title)}">
+      </div>
+      <div class="field">
+        <label>문서 본문</label>
+        <div class="rich-toolbar">
+          <div class="rich-toolbar-group">
+            <button type="button" class="btn soft icon" onclick="editorUndo()" title="뒤로가기">↶</button>
+            <button type="button" class="btn soft icon" onclick="editorRedo()" title="앞으로가기">↷</button>
+            <button type="button" class="btn soft icon" onclick="formatText('bold')"><b>B</b></button>
+          </div>
+          <div class="rich-toolbar-group">
+            <select class="select editor-select" onchange="applyEditorFontSize(this.value)">
+              <option value="">폰트크기</option>
+              <option value="12px">12</option>
+              <option value="13px">13</option>
+              <option value="14px">14</option>
+              <option value="15px">15</option>
+              <option value="16px">16</option>
+              <option value="18px">18</option>
+              <option value="20px">20</option>
+              <option value="24px">24</option>
+              <option value="28px">28</option>
+              <option value="32px">32</option>
+            </select>
+            <select class="select editor-select" onchange="applyEditorLineHeight(this.value)">
+              <option value="">줄간격</option>
+              <option value="1.2">1.2</option>
+              <option value="1.4">1.4</option>
+              <option value="1.6">1.6</option>
+              <option value="1.8">1.8</option>
+              <option value="2.0">2.0</option>
+              <option value="2.3">2.3</option>
+            </select>
+          </div>
+          <div class="rich-toolbar-group">
+            <button type="button" class="btn soft" onclick="formatText('left')">좌측</button>
+            <button type="button" class="btn soft" onclick="formatText('center')">가운데</button>
+            <button type="button" class="btn soft" onclick="formatText('right')">우측</button>
+          </div>
+          <div class="rich-toolbar-group">
+            <button type="button" class="btn soft" onclick="insertEditorLink()">링크</button>
+            <button type="button" class="btn soft" onclick="triggerEditorImageUpload()">이미지</button>
+            <input id="ref-image-upload" type="file" accept="image/*" style="display:none" onchange="handleEditorImage(this.files[0]); this.value='';">
+          </div>
+        </div>
+        <div id="ref-body-input" class="rich-editor" contenteditable="true" data-placeholder="문서 내용을 입력하세요.">${normalizeReferenceBodyForEditor(body)}</div>
+      </div>
+      <div class="toolbar-row" style="margin-bottom:0;">
+        <div class="doc-meta-top">최종 수정: ${escapeHtml(updatedText)} / 수정자: ${escapeHtml(updatedByText)}</div>
+        <div class="toolbar-right">
+          <button class="btn primary" onclick="saveReferenceDoc()">문서 저장</button>
+          <button class="btn danger" onclick="deleteReferenceDoc()" ${hasCustomDoc ? '' : 'disabled'}>${hasCustomDoc ? '문서 삭제' : '삭제 없음'}</button>
+        </div>
+      </div>
+    </div>
+  ` : '';
+
+  return `
+    <div class="toolbar-row">
+      <div>
+        <div class="section-title">📚 폐수배출시설 운영 관련자료</div>
+        <div class="doc-meta-top">${escapeHtml(title)} / 원본: ${escapeHtml(sourceText)}</div>
+      </div>
+      <div class="toolbar-right">
+        <input class="input search-input" placeholder="키워드 검색" value="${escapeHtml(refSearch)}" oninput="changeRefSearch(this.value)">
+      </div>
+    </div>
+
+    <div class="ref-layout">
+      <div class="ref-menu">
+        ${Object.entries(DEFAULT_REFERENCE_DOCS).map(([key, val]) =>
+          `<button class="ref-btn ${refTab===key?'active':''}" onclick="changeRefTab('${key}')">${escapeHtml(val.title)}</button>`
+        ).join('')}
+      </div>
+
+      <div class="ref-content">
+        ${readerHtml}
+        ${editorHtml}
+      </div>
+    </div>
+  `;
 }
 
 
