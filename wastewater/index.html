@@ -1,4 +1,4 @@
-DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
@@ -13,8 +13,8 @@ DOCTYPE html>
   --amber-soft:#fff4e5; --amber-text:#b54708; --indigo-soft:#eef2ff; --indigo-text:#3538cd;
   --green-soft:#ecfdf3; --green-text:#027a48; --rose-soft:#fff1f3; --rose-text:#c01048;
 }
-*{box-sizing:border-box} body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}
-button,input,textarea,select{font:inherit} .app-shell{max-width:1560px;margin:0 auto;padding:18px}
+*{box-sizing:border-box} body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
+button,input,textarea,select{font:inherit} .app-shell{width:100%;max-width:none;margin:0;padding:16px;min-height:100vh}
 .card{background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}
 .topbar{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
 .title-wrap h1{margin:0;font-size:32px;font-weight:800;letter-spacing:-.02em}
@@ -153,6 +153,8 @@ tr.over-row td{background:#fff1f3}
 .approval-alert-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #dbe4ee;border-radius:999px;background:#fff}
 .approval-alert-month{font-weight:800;color:var(--navy)}
 .approval-alert-foot{display:flex;justify-content:flex-end;gap:10px;padding:0 24px 22px}
+.portal-header,.stats,.tabs-wrap,.tab-panel{width:100%}
+
 @media (max-width:720px){.approval-alert-modal{border-radius:20px}.approval-alert-title{font-size:22px}.approval-alert-foot{flex-direction:column}.approval-alert-foot .btn{width:100%;justify-content:center}}
 
 </style>
@@ -1176,6 +1178,8 @@ function getReportBaseStyle(){return `<style>@page{size:A4 portrait;margin:14mm;
 .approval-alert-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #dbe4ee;border-radius:999px;background:#fff}
 .approval-alert-month{font-weight:800;color:var(--navy)}
 .approval-alert-foot{display:flex;justify-content:flex-end;gap:10px;padding:0 24px 22px}
+.portal-header,.stats,.tabs-wrap,.tab-panel{width:100%}
+
 @media (max-width:720px){.approval-alert-modal{border-radius:20px}.approval-alert-title{font-size:22px}.approval-alert-foot{flex-direction:column}.approval-alert-foot .btn{width:100%;justify-content:center}}
 
 </style>`;}
