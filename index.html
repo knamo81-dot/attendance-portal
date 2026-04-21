@@ -135,24 +135,43 @@
 
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+ async function ensureAuthenticated() {
+  const { data } = await supabaseClient.auth.getSession();
+
+  if (!data.session) {
+    if (frame) {
+      frame.src = 'portal-home.html';
+    }
+    if (homeBtn) {
+      setActiveNav(homeBtn);
+    }
+    return false;
+  }
+
+  return true;
+}
+  
   function setActiveNav(activeBtn) {
     navButtons.forEach(function (b) {
       b.classList.toggle('active', b === activeBtn);
     });
   }
 
-  function navigate(btn) {
-    var src = btn.getAttribute('data-portal-src');
-    if (!src || !frame) return;
-    frame.src = src;
-    setActiveNav(btn);
-  }
+async function navigate(btn) {
+  const ok = await ensureAuthenticated();
+  if (!ok) return;
 
-  navButtons.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      navigate(btn);
-    });
+  var src = btn.getAttribute('data-portal-src');
+  if (!src || !frame) return;
+  frame.src = src;
+  setActiveNav(btn);
+}
+
+navButtons.forEach(function (btn) {
+  btn.addEventListener('click', async function () {
+    await navigate(btn);
   });
+});
 
 logoutBtn.addEventListener('click', async function () {
   try {
