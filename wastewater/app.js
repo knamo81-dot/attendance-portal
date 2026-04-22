@@ -503,7 +503,75 @@ function getYearApprovalSummary(year){
 }
 
 function renderPickupRows(rows){if(!rows.length)return `<tr><td colspan="7">선택한 조건의 수거 내역이 없습니다.</td></tr>`; return rows.map(row=>`<tr><td>${escapeHtml(row.pickup_date)}</td><td>${getPickupTypeBadge(row.pickup_type||'폐수')}</td><td>${escapeHtml(getPickupDetailText(row))}</td><td>${escapeHtml(row.certificate_no||'')}</td><td>${escapeHtml(row.contractor||'')}</td><td>${escapeHtml(row.note||'')}</td><td>${canDelete()?`<button class="small-btn danger" onclick="deletePickupRow(${row.id})">삭제</button>`:'-'}</td></tr>`).join('');}
-function renderLedgerRows(rows){const sorted=[...rows].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.created_at||'').localeCompare(String(a.created_at||''))); if(!sorted.length) return `<tr><td colspan="12">운영일지 데이터가 없습니다.</td></tr>`; return sorted.map(row=>{if(row.is_display_holiday){return `<tr><td>${escapeHtml(row.date)}</td><td class="num">휴일</td><td class="num">휴일</td><td class="num">휴일</td><td class="num">휴일</td><td>-</td><td class="num">휴일</td><td>휴일</td><td>휴일</td><td>-</td><td>${escapeHtml(row.final_holiday_reason||row.holiday_reason||row.note||'휴일')}</td><td>${row.id&&canDelete()?`<button class="small-btn danger" onclick="deleteDailyRow(${row.id})">삭제</button>`:'-'}</td></tr>`;} if(row.is_missing_day){return `<tr><td>${escapeHtml(row.date)}</td><td class="num">${formatNum(row.water_prev,2)}</td><td class="num">-</td><td class="num">미입력</td><td class="num">-</td><td>-</td><td class="num">-</td><td>미입력</td><td>미입력</td><td>-</td><td>평일 미입력</td><td>-</td></tr>`;} const rowClass=safeNumber(row.total_cm)>CM_LIMIT?'over-row':''; return `<tr class="${rowClass}"><td>${escapeHtml(row.date)}</td><td class="num">${formatNum(row.water_prev,2)}</td><td class="num">${formatNum(row.usage,2)}</td><td class="num">${formatNum(row.water_used,2)}</td><td class="num">${formatNum(row.height,1)} cm</td><td>${row.has_external?`${formatNum(row.external_ton||0,1)}T / ${formatNum(row.external_cm,1)}cm`:'-'}</td><td class="num">${formatNum(row.total_cm,1)} cm</td><td>${escapeHtml(row.guideline_text)}</td><td>${escapeHtml(row.generated_text)}</td><td>${row.pickup?`위탁 ${formatNum(row.pickup.entrusted_amount,2)}m³<br>후높이 ${escapeHtml(String(row.pickup.after_pickup_cm??'-'))}cm`:'-'}</td><td>${escapeHtml(row.note||'')}</td><td>${canDelete()?`<button class="small-btn danger" onclick="deleteDailyRow(${row.id})">삭제</button>`:'-'}</td></tr>`;}).join('');}
+
+function renderLedgerRows(rows){
+  const sorted = [...rows].sort(
+    (a,b)=>
+      String(b.date||'').localeCompare(String(a.date||'')) ||
+      String(b.created_at||'').localeCompare(String(a.created_at||''))
+  );
+
+  if(!sorted.length){
+    return `<tr><td colspan="12">운영일지 데이터가 없습니다.</td></tr>`;
+  }
+
+  return sorted.map(row=>{
+    if(row.is_display_holiday){
+      return `<tr>
+        <td>${escapeHtml(row.date)}</td>
+        <td class="num">휴일</td>
+        <td class="num">휴일</td>
+        <td class="num">휴일</td>
+        <td class="num">휴일</td>
+        <td>-</td>
+        <td class="num">휴일</td>
+        <td>휴일</td>
+        <td>휴일</td>
+        <td class="col-pickup">-</td>
+        <td class="col-note">${escapeHtml(row.final_holiday_reason||row.holiday_reason||row.note||'휴일')}</td>
+        <td>${row.id && canDelete() ? `<button class="small-btn danger" onclick="deleteDailyRow(${row.id})">삭제</button>` : '-'}</td>
+      </tr>`;
+    }
+
+    if(row.is_missing_day){
+      return `<tr>
+        <td>${escapeHtml(row.date)}</td>
+        <td class="num">${formatNum(row.water_prev,2)}</td>
+        <td class="num">-</td>
+        <td class="num">미입력</td>
+        <td class="num">-</td>
+        <td>-</td>
+        <td class="num">-</td>
+        <td>미입력</td>
+        <td>미입력</td>
+        <td class="col-pickup">-</td>
+        <td class="col-note">평일 미입력</td>
+        <td>-</td>
+      </tr>`;
+    }
+
+    const rowClass = safeNumber(row.total_cm) > CM_LIMIT ? 'over-row' : '';
+
+    return `<tr class="${rowClass}">
+      <td>${escapeHtml(row.date)}</td>
+      <td class="num">${formatNum(row.water_prev,2)}</td>
+      <td class="num">${formatNum(row.usage,2)}</td>
+      <td class="num">${formatNum(row.water_used,2)}</td>
+      <td class="num">${formatNum(row.height,1)} cm</td>
+      <td>${row.has_external ? `${formatNum(row.external_ton||0,1)}T / ${formatNum(row.external_cm,1)}cm` : '-'}</td>
+      <td class="num">${formatNum(row.total_cm,1)} cm</td>
+      <td>${escapeHtml(row.guideline_text)}</td>
+      <td>${escapeHtml(row.generated_text)}</td>
+      <td class="col-pickup">
+        ${row.pickup
+          ? `위탁 ${formatNum(row.pickup.entrusted_amount,2)}m³<br>후높이 ${escapeHtml(String(row.pickup.after_pickup_cm??'-'))}cm`
+          : '-'}
+      </td>
+      <td class="col-note">${escapeHtml(row.note||'')}</td>
+      <td>${canDelete() ? `<button class="small-btn danger" onclick="deleteDailyRow(${row.id})">삭제</button>` : '-'}</td>
+    </tr>`;
+  }).join('');
+}
 
 function getReferenceDoc(){
   const dbDoc = referenceDocs.find(d => d.doc_key === refTab);
