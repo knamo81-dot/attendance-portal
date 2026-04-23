@@ -2734,16 +2734,29 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
     return null;
   })();
 
-  await createServerUploadBatchMeta(batchId, {
-    batchName: `근태업로드_${new Date().toISOString()}`,
-    secomFilename,
-    erpFilename,
-    uploadedBy,
-    note: '관리자 화면 업로드 원본 백업'
-  });
+ async function createServerUploadBatchMeta(batchId, meta){
+  if(!supabaseClient) return null;
+
+  const payload = {
+    batch_id: batchId,
+    upload_type: 'manual_upload',
+    secom_file_name: meta?.secomFilename || null,
+    erp_file_name: meta?.erpFilename || null
+  };
+
+  const { data, error } = await supabaseClient
+    .from('attendance_upload_batches')
+    .insert([payload])
+    .select()
+    .single();
+
+  if(error) throw error;
+
+  return data?.id ?? null;
+}
 
   const secomPayload = (secomRows || []).map(row => ({
-    upload_batch_id: batchId,
+    upload_batch_id: batchRowId,
     work_date: row.date || null,
     emp_no: String(row.employeeId || '').trim() || null,
     name: row.name || null,
@@ -2753,7 +2766,7 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
   }));
 
   const erpPayload = (erpRows || []).map(row => ({
-    upload_batch_id: batchId,
+    upload_batch_id: batchRowId,
     work_date: row.date || null,
     emp_no: String(row.employeeId || '').trim() || null,
     name: row.name || null,
