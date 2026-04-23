@@ -504,6 +504,29 @@ function getYearApprovalSummary(year){
 
 function renderPickupRows(rows){if(!rows.length)return `<tr><td colspan="7">선택한 조건의 수거 내역이 없습니다.</td></tr>`; return rows.map(row=>`<tr><td>${escapeHtml(row.pickup_date)}</td><td>${getPickupTypeBadge(row.pickup_type||'폐수')}</td><td>${escapeHtml(getPickupDetailText(row))}</td><td>${escapeHtml(row.certificate_no||'')}</td><td>${escapeHtml(row.contractor||'')}</td><td>${escapeHtml(row.note||'')}</td><td>${canDelete()?`<button class="small-btn danger" onclick="deletePickupRow(${row.id})">삭제</button>`:'-'}</td></tr>`).join('');}
 
+function formatContractorMultiline(text){
+  const value = String(text || '').trim();
+  if(!value) return '-';
+
+  const idx = value.indexOf('(');
+  if(idx === -1) return escapeHtml(value);
+
+  const first = value.slice(0, idx).trim();
+  const second = value.slice(idx).trim();
+
+  return `${escapeHtml(first)}<br>${escapeHtml(second)}`;
+}
+
+function formatCertificateMultiline(text){
+  const value = String(text || '').trim();
+  if(!value) return '-';
+
+  const parts = value.split('/').map(v => v.trim()).filter(Boolean);
+  if(parts.length <= 1) return escapeHtml(value);
+
+  return parts.map(v => escapeHtml(v)).join('<br>');
+}
+
 function renderLedgerRows(rows){
   const sorted = [...rows].sort(
     (a,b)=>
