@@ -2656,6 +2656,114 @@ function createUploadBatchId(){
   }catch(e){}
   return `batch_${Date.now()}_${Math.random().toString(36).slice(2,10)}`;
 }
+function collectUploadMonthKeys(rows){
+  return Array.from(new Set((rows || [])
+    .map(row => String(row?.date || '').trim().slice(0, 7))
+    .filter(v => /^\d{4}-\d{2}$/.test(v))));
+}
+function getNextMonthStart(monthKey){
+  const [y, m] = String(monthKey || '').split('-').map(Number);
+  if(!Number.isFinite(y) || !Number.isFinite(m)) return '';
+  if(m >= 12) return `${y + 1}-01-01`;
+  return `${y}-${String(m + 1).padStart(2, '0')}-01`;
+}
+async function deleteAttendanceServerDataByMonthKeys(monthKeys){
+  if(!supabaseClient) return;
+  const uniqueKeys = Array.from(new Set((monthKeys || []).filter(v => /^\d{4}-\d{2}$/.test(String(v || ''))))).sort();
+  for(const key of uniqueKeys){
+    const start = `${key}-01`;
+    const endExclusive = getNextMonthStart(key);
+    if(!endExclusive) continue;
+
+    let result = await supabaseClient
+      .from('attendance_records')
+      .delete()
+      .gte('work_date', start)
+      .lt('work_date', endExclusive);
+    if(result.error) throw result.error;
+
+    result = await supabaseClient
+      .from('attendance_secom_raw')
+      .delete()
+      .gte('work_date', start)
+      .lt('work_date', endExclusive);
+    if(result.error) throw result.error;
+
+    result = await supabaseClient
+      .from('attendance_erp_raw')
+      .delete()
+      .gte('work_date', start)
+      .lt('work_date', endExclusive);
+    if(result.error) throw result.error;
+  }
+}
+function buildAttendanceRecordPayload(sourceRows){
+  const metaByName = new Map((empMaster || []).map(e => [normalizeEmployeeName(e.name), e]));
+  const mergedRows = (() => {
+    const merged = new Map();
+    for(const row of (sourceRows || [])){
+      const cleanName = normalizeEmployeeName(row?.name || '');
+      const key = `${String(row?.date || '').trim()}__${cleanName}`;
+      const current = merged.get(key);
+      if(!current){
+        merged.set(key, { ...row, name: cleanName });
+        continue;
+      }
+      const currentReason = String(current.erpReason || current.reason || '').trim();
+      const nextReason = String(row.erpReason || row.reason || '').trim();
+      const currentHasWork = !!(current.start || current.end || current.workHours || Number(current.erpActualOvertime || 0) > 0 || Number(current.seccomOvertimeHours || 0) > 0);
+      const nextHasWork = !!(row.start || row.end || row.workHours || Number(row.erpActualOvertime || 0) > 0 || Number(row.seccomOvertimeHours || 0) > 0);
+      merged.set(key, {
+        ...current,
+        ...row,
+        name: cleanName,
+        employeeId: pickFilledValue(current.employeeId, row.employeeId),
+        division: pickFilledValue(currentHasWork ? current.division : '', nextHasWork ? row.division : '', current.division, row.division),
+        team: pickFilledValue(currentHasWork ? current.team : '', nextHasWork ? row.team : '', current.team, row.team),
+        grade: pickFilledValue(current.grade, row.grade),
+        start: mergeClockStart(current.start, row.start),
+        end: mergeClockEnd(current.end, row.end),
+        workHours: mergeWorkDuration(current.workHours, row.workHours),
+        realWorkHours: mergeWorkDuration(current.realWorkHours, row.realWorkHours),
+        seccomOvertimeHours: Math.max(Number(current.seccomOvertimeHours || 0), Number(row.seccomOvertimeHours || 0)),
+        erpAppliedOvertime: Math.max(Number(current.erpAppliedOvertime || 0), Number(row.erpAppliedOvertime || 0)),
+        erpActualOvertime: Math.max(Number(current.erpActualOvertime || 0), Number(row.erpActualOvertime || 0)),
+        erpReason: pickFilledValue(currentReason, nextReason),
+        reason: pickFilledValue(currentReason, nextReason),
+        overtimeCheck: pickFilledValue(current.overtimeCheckResult, row.overtimeCheckResult, current.overtime_check_result, row.overtime_check_result, current.overtimeCheck, row.overtimeCheck),
+        overtimeCheckResult: pickFilledValue(current.overtimeCheckResult, row.overtimeCheckResult, current.overtime_check_result, row.overtime_check_result),
+        overtime_check_result: pickFilledValue(current.overtimeCheckResult, row.overtimeCheckResult, current.overtime_check_result, row.overtime_check_result),
+        recordId: pickFilledValue(current.recordId, row.recordId),
+        jobName: pickFilledValue(current.jobName, row.jobName)
+      });
+    }
+    return Array.from(merged.values());
+  })();
+
+  return mergedRows
+    .map(row => {
+      const decorated = decorateAttendanceRow(row, metaByName);
+      if(!decorated) return null;
+      if(isDisplayExcludedAttendance(decorated)) return null;
+      if(!isAttendanceTargetIncludedRow(decorated, metaByName)) return null;
+      if(decorated.bucket === '제외') return null;
+      return {
+        work_date: String(decorated.date || '').trim() || null,
+        employee_no: String(decorated.employeeId || decorated.id || '').trim() || null,
+        employee_name: normalizeEmployeeName(decorated.name || '') || null,
+        division_name: String(decorated.division || '').trim() || null,
+        team_name: String(decorated.team || '').trim() || null,
+        clock_in: String(row.start || '').trim() || null,
+        clock_out: String(row.end || '').trim() || null,
+        work_hours: String(row.workHours || '').trim() || null,
+        overtime_hours: Number(decorated.erpActualOvertime || decorated.erpAppliedOvertime || 0) || 0,
+        reason: String(decorated.originalErpReason || decorated.erpReason || decorated.reason || '').trim() || null,
+        overtime_check_result: String(decorated.overtime_check_result || '').trim() || null,
+        status: String(decorated.statusLabel || decorated.bucket || '').trim() || null
+      };
+    })
+    .filter(Boolean);
+}
 async function createServerUploadBatchMeta(batchId, meta){
   if(!supabaseClient) return batchId;
 
@@ -2676,20 +2784,23 @@ async function createServerUploadBatchMeta(batchId, meta){
     }
   ];
 
+  let lastError = null;
   for(const payload of candidates){
     try{
       const { error } = await supabaseClient
         .from('attendance_upload_batches')
         .upsert([payload], { onConflict: 'id' });
       if(!error) return batchId;
+      lastError = error;
       console.warn('[ATTENDANCE BATCH META RETRY]', error);
     }catch(err){
+      lastError = err;
       console.warn('[ATTENDANCE BATCH META EXCEPTION]', err);
     }
   }
 
-  console.warn('[ATTENDANCE BATCH META SKIPPED] schema mismatch or optional table issue');
-  return batchId;
+  const detail = lastError?.message || lastError?.details || lastError?.hint || 'attendance_upload_batches 저장 실패';
+  throw new Error(detail);
 }
 async function insertRowsInChunks(tableName, rows, chunkSize = 500){
   if(!supabaseClient || !Array.isArray(rows) || !rows.length) return;
@@ -2711,6 +2822,10 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
     }catch(e){}
     return null;
   })();
+
+  const sourceRows = [...(secomRows || []), ...(erpRows || [])];
+  const monthKeys = collectUploadMonthKeys(sourceRows);
+  await deleteAttendanceServerDataByMonthKeys(monthKeys);
 
   await createServerUploadBatchMeta(batchId, {
     batchName: `근태업로드_${new Date().toISOString()}`,
@@ -2744,15 +2859,19 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
   await insertRowsInChunks('attendance_secom_raw', secomPayload);
   await insertRowsInChunks('attendance_erp_raw', erpPayload);
 
+  const recordsPayload = buildAttendanceRecordPayload(sourceRows);
+  await insertRowsInChunks('attendance_records', recordsPayload);
+
   return {
     ok: true,
     skipped: false,
     batchId,
     secomCount: secomPayload.length,
-    erpCount: erpPayload.length
+    erpCount: erpPayload.length,
+    recordCount: recordsPayload.length,
+    monthKeys
   };
-}
-function loadUploadedAttendanceData(){
+}function loadUploadedAttendanceData(){
   try{
     const raw = localStorage.getItem(ATTENDANCE_UPLOAD_STORAGE_KEY);
     if(!raw) return;
@@ -3155,7 +3274,7 @@ async function applyUploadedFiles(){
 
     const batchId = createUploadBatchId();
     let backupMessage = `
-서버 백업은 비활성 상태라 브라우저 반영만 완료되었습니다.`;
+서버 업로드는 비활성 상태라 브라우저 반영만 완료되었습니다.`;
     try{
       const backupResult = await backupUploadedAttendanceRawToSupabase({
         batchId,
@@ -3165,14 +3284,19 @@ async function applyUploadedFiles(){
         erpFilename: erpFile.name
       });
       if(backupResult && backupResult.ok){
+        await loadAttendanceFromSupabase();
+        HOLIDAY_DATE_SET = buildHolidayDateSet();
+        rebuildDerivedMetricsFromAttendance();
+        updateUploadStatus();
+        render();
         backupMessage = `
-서버 원본 백업 완료 · Batch: ${backupResult.batchId}`;
+서버 저장 완료 · Batch: ${backupResult.batchId} · records: ${backupResult.recordCount || 0}건`;
       }
     }catch(serverError){
       console.error('[ATTENDANCE RAW BACKUP FAILED]', serverError);
       const detail = serverError?.message || serverError?.details || serverError?.hint || '';
       backupMessage = `
-서버 백업 실패 · 브라우저 반영은 완료됨${detail ? `
+서버 저장 실패 · 브라우저 반영은 완료됨${detail ? `
 (${detail})` : ''}`;
     }
 
@@ -3185,6 +3309,7 @@ async function applyUploadedFiles(){
     }
   }
 }
+
 function bindUploadRuntimeEvents(){
   $('#applyUploadBtn')?.addEventListener('click', () => {
     applyUploadedFiles().catch(err => {
