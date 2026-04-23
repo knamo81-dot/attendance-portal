@@ -986,7 +986,7 @@ function renderApp(message='',cls='muted'){const stats=getDerivedStats(); const 
 document.getElementById('app').innerHTML=`<div class="app-shell">
 <div class="portal-header">
   <div class="portal-eyebrow">Research Lab Integrated Portal</div>
-  <h1 class="portal-title">폐수/폐기물 관리 대시보드</h1>
+  <h1 class="portal-title">폐수/폐기물 운영일지</h1>
 </div>
 <div class="stats">
 <div class="card stat-box"><div class="stat-label">누적 당일 용수사용량</div><div class="stat-value">${formatNum(stats.totalWaterUse,2)} m³</div></div>
