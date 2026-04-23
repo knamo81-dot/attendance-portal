@@ -2657,25 +2657,60 @@ function createUploadBatchId(){
   return `batch_${Date.now()}_${Math.random().toString(36).slice(2,10)}`;
 }
 
-async function createServerUploadBatchMeta(batchId, meta){
-  if(!supabaseClient) return null;
+async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], erpRows = [], secomFilename = '', erpFilename = '' }){
+  if(!supabaseClient) return { ok:false, skipped:true, reason:'supabase-disabled' };
 
-  const payload = {
-    batch_id: batchId,
-    upload_type: 'manual_upload',
-    secom_file_name: meta?.secomFilename || null,
-    erp_file_name: meta?.erpFilename || null
+  const uploadedBy = (() => {
+    try{
+      const currentUser = window.__portalCurrentUser || window.currentUser || null;
+      if(currentUser && typeof currentUser === 'object'){
+        return String(currentUser.email || currentUser.user_email || currentUser.name || '').trim() || null;
+      }
+    }catch(e){}
+    return null;
+  })();
+
+  const batchRowId = await createServerUploadBatchMeta(batchId, {
+    secomFilename,
+    erpFilename,
+    uploadedBy
+  });
+
+  const secomPayload = (secomRows || []).map(row => ({
+    upload_batch_id: batchRowId,
+    work_date: row.date || null,
+    emp_no: String(row.employeeId || '').trim() || null,
+    name: row.name || null,
+    in_time: row.start || null,
+    out_time: row.end || null,
+    raw_data: row
+  }));
+
+  const erpPayload = (erpRows || []).map(row => ({
+    upload_batch_id: batchRowId,
+    work_date: row.date || null,
+    emp_no: String(row.employeeId || '').trim() || null,
+    name: row.name || null,
+    erp_start: row.start || null,
+    erp_end: row.end || null,
+    overtime: Number(row.erpActualOvertime || row.erpAppliedOvertime || 0),
+    raw_data: row
+  }));
+
+  if(secomPayload.length){
+    await insertRowsInChunks('attendance_secom_raw', secomPayload);
+  }
+  if(erpPayload.length){
+    await insertRowsInChunks('attendance_erp_raw', erpPayload);
+  }
+
+  return {
+    ok: true,
+    batchId,
+    batchRowId,
+    secomCount: secomPayload.length,
+    erpCount: erpPayload.length
   };
-
-  const { data, error } = await supabaseClient
-    .from('attendance_upload_batches')
-    .insert([payload])
-    .select()
-    .single();
-
-  if(error) throw error;
-
-  return data?.id ?? null;
 }
   
 async function insertRowsInChunks(tableName, rows, chunkSize = 500){
