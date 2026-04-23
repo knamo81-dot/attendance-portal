@@ -3213,7 +3213,14 @@ async function applyUploadedFiles(){
     alert(`업로드 데이터 반영이 완료되었습니다. 조직관리와 사원정보관리는 유지되었습니다.
 서버 저장 완료 · Batch: ${backupResult.batchId}`);
   }catch(error){
-    console.error('[ATTENDANCE UPLOAD FAILED]', error);
+    console.error('[ATTENDANCE UPLOAD FAILED]', {
+  message: error?.message,
+  name: error?.name,
+  stack: error?.stack,
+  error
+});
+
+alert('업로드 실패 상세: ' + (error?.message || JSON.stringify(error)));
     resetAttendanceClientState();
     try{
       await loadAttendanceFromSupabase();
