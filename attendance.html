@@ -2677,7 +2677,7 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
   });
 
   const secomPayload = (secomRows || []).map(row => ({
-    upload_batch_id: batchRowId,
+    upload_batch_id: batchId,
     work_date: row.date || null,
     emp_no: String(row.employeeId || '').trim() || null,
     name: row.name || null,
@@ -2687,7 +2687,7 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
   }));
 
   const erpPayload = (erpRows || []).map(row => ({
-    upload_batch_id: batchRowId,
+    upload_batch_id: batchId,
     work_date: row.date || null,
     emp_no: String(row.employeeId || '').trim() || null,
     name: row.name || null,
@@ -2756,7 +2756,7 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
 }
 
   const secomPayload = (secomRows || []).map(row => ({
-    upload_batch_id: batchRowId,
+    upload_batch_id: batchId,
     work_date: row.date || null,
     emp_no: String(row.employeeId || '').trim() || null,
     name: row.name || null,
@@ -2766,7 +2766,7 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
   }));
 
   const erpPayload = (erpRows || []).map(row => ({
-    upload_batch_id: batchRowId,
+    upload_batch_id: batchId,
     work_date: row.date || null,
     emp_no: String(row.employeeId || '').trim() || null,
     name: row.name || null,
