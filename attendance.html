@@ -3207,7 +3207,9 @@ async function applyUploadedFiles(){
     rebuildDerivedMetricsFromAttendance();
     saveUploadedAttendanceData();
     updateUploadStatus();
-    await refreshAdminUploadManagement(true);
+    if (typeof refreshAdminUploadManagement === 'function') {
+  await refreshAdminUploadManagement(true);
+}
     render();
 
     alert(`업로드 데이터 반영이 완료되었습니다. 조직관리와 사원정보관리는 유지되었습니다.
