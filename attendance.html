@@ -2656,41 +2656,28 @@ function createUploadBatchId(){
   }catch(e){}
   return `batch_${Date.now()}_${Math.random().toString(36).slice(2,10)}`;
 }
+
 async function createServerUploadBatchMeta(batchId, meta){
-  if(!supabaseClient) return batchId;
+  if(!supabaseClient) return null;
 
-  const candidates = [
-    {
-      id: batchId,
-      secom_filename: meta?.secomFilename || null,
-      erp_filename: meta?.erpFilename || null,
-      uploaded_by: meta?.uploadedBy || null,
-      note: meta?.note || '관리자 화면 업로드 원본 백업'
-    },
-    {
-      id: batchId,
-      note: meta?.note || '관리자 화면 업로드 원본 백업'
-    },
-    {
-      id: batchId
-    }
-  ];
+  const payload = {
+    batch_id: batchId,
+    upload_type: 'manual_upload',
+    secom_file_name: meta?.secomFilename || null,
+    erp_file_name: meta?.erpFilename || null
+  };
 
-  for(const payload of candidates){
-    try{
-      const { error } = await supabaseClient
-        .from('attendance_upload_batches')
-        .upsert([payload], { onConflict: 'id' });
-      if(!error) return batchId;
-      console.warn('[ATTENDANCE BATCH META RETRY]', error);
-    }catch(err){
-      console.warn('[ATTENDANCE BATCH META EXCEPTION]', err);
-    }
-  }
+  const { data, error } = await supabaseClient
+    .from('attendance_upload_batches')
+    .insert([payload])
+    .select()
+    .single();
 
-  console.warn('[ATTENDANCE BATCH META SKIPPED] schema mismatch or optional table issue');
-  return batchId;
+  if(error) throw error;
+
+  return data?.id ?? null;
 }
+  
 async function insertRowsInChunks(tableName, rows, chunkSize = 500){
   if(!supabaseClient || !Array.isArray(rows) || !rows.length) return;
   for(let i = 0; i < rows.length; i += chunkSize){
