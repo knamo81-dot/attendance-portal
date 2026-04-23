@@ -1799,20 +1799,29 @@ html.embed-mode .header-card{
           state.portalUserEmployee = null;
           return;
         }
-        let { data, error } = await sb.from('employees')
-          .select('email,team_code,division_code,team_name,division_name,employee_no')
-          .eq('email', email)
-          .maybeSingle();
-        if (error) throw error;
-        if (!data) {
-          const alt = await sb.from('employees')
-            .select('email,team_code,division_code,team_name,division_name,employee_no')
-            .ilike('email', email)
-            .maybeSingle();
-          if (alt.error) throw alt.error;
-          data = alt.data;
-        }
-        state.portalUserEmployee = data || null;
+let { data, error } = await sb.from('employees')
+  .select('email,team,department,employee_no,name,role')
+  .eq('email', email)
+  .maybeSingle();
+
+if (error) throw error;
+
+if (!data) {
+  const alt = await sb.from('employees')
+    .select('email,team,department,employee_no,name,role')
+    .ilike('email', email)
+    .maybeSingle();
+
+  if (alt.error) throw alt.error;
+  data = alt.data;
+}
+state.portalUserEmployee = data ? {
+  ...data,
+  team_code: data.team || '',
+  division_code: data.department || '',
+  team_name: data.team || '',
+  division_name: data.department || ''
+} : null;
       } catch (e) {
         console.error('loadPortalUserEmployee', e);
         state.portalUserEmployee = null;
