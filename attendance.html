@@ -2779,6 +2779,35 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
   await insertRowsInChunks('attendance_secom_raw', secomPayload);
   await insertRowsInChunks('attendance_erp_raw', erpPayload);
 
+const recordsPayload = [
+  ...(secomRows || []).map(row => ({
+    upload_batch_id: batchId,
+    work_date: row.date || null,
+    emp_no: String(row.employeeId || '').trim() || null,
+    name: row.name || null,
+    in_time: row.start || null,
+    out_time: row.end || null,
+    raw_data: row
+  })),
+  ...(erpRows || []).map(row => ({
+    upload_batch_id: batchId,
+    work_date: row.date || null,
+    emp_no: String(row.employeeId || '').trim() || null,
+    name: row.name || null,
+    in_time: row.start || null,
+    out_time: row.end || null,
+    raw_data: row
+  }))
+];
+
+if (recordsPayload.length > 0) {
+  const { error: insertError } = await supabaseClient
+    .from('attendance_records')
+    .insert(recordsPayload);
+
+  if (insertError) throw insertError;
+}
+  
   return {
     ok: true,
     skipped: false,
