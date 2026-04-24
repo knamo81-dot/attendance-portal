@@ -6483,13 +6483,36 @@ function getPrimaryExcusedReason(reason){
 function isMissingInputReason(reason){
   return reasonHas(reason, ['출근미입력','퇴근미입력','출퇴근미입력','출근누락','퇴근누락']);
 }
+
+// ✅ 00:00 보정
+// 업로드/가공 과정에서 출근값이 비어 있을 때 00:00으로 들어오는 경우를
+// 실제 자정 출근으로 보지 않고 "출근값 없음"으로 처리한다.
+function isZeroClockValue(value){
+  const s = String(value || '').trim();
+  return s === '00:00' || s === '0:00' || s === '00:00:00' || s === '0';
+}
+function normalizeZeroClockStartForAttendance(startValue, row){
+  const s = String(startValue || '').trim();
+  if(!isZeroClockValue(s)) return s;
+
+  const reasonText = normalizeAttendanceReasonText([row?.erpReason, row?.reason, row?.status].filter(Boolean).join(' '));
+  const endText = String(row?.end || '').trim();
+
+  // 회사 근태 데이터에서 출근 00:00은 대부분 "출근 미입력" 기본값이다.
+  // 화면과 집계에서는 빈 값으로 넘겨 기존 누락 판정 로직이 처리하게 한다.
+  if(endText || reasonText || row?.erpActualOvertime || row?.erpAppliedOvertime){
+    return '';
+  }
+  return '';
+}
 function decorateAttendanceRow(row, metaByName){
   const cleanedName = normalizeEmployeeName(row.name);
   const meta = metaByName.get(cleanedName);
   const rawStatus = String(row.status || '').trim();
   const rawErpReason = String(row.erpReason || '').trim();
   const rawReason = String(rawErpReason || row.reason || rawStatus || '').trim();
-  const startRaw = String(row.start || '').trim();
+  const originalStartRaw = String(row.start || '').trim();
+  const startRaw = normalizeZeroClockStartForAttendance(originalStartRaw, row);
   const endRaw = String(row.end || '').trim();
   const workRaw = String(row.workHours || '').trim();
   const overtimeCheckRaw = String(row.overtimeCheck || '').trim();
