@@ -1519,7 +1519,7 @@ html.embed-mode #main-dashboard .kpis{
           <span class="badge amber">주의 2~3건</span>
           <span class="badge red">문제 4건 이상</span>
         </div>
-        <div class="desc" style="margin-bottom:0">총누락은 출근누락+퇴근누락의 확정 건만 포함합니다. 잠재출근/잠재퇴근은 사유가 있으나 출근·퇴근 시간이 비어 있는 확인 필요 건이며, 상태 판정과 순위에는 포함하지 않습니다.</div>
+        <div class="desc" style="margin-bottom:0">총누락은 출근누락+퇴근누락의 확정 건만 포함합니다. 잠재출근은 사유 기준의 출근 확인 필요 건, 잠재퇴근은 근태관리 표에서 퇴근 시간이 비어 보이는 확인 필요 건이며, 상태 판정과 순위에는 포함하지 않습니다.</div>
       </div>
     </div>
 
@@ -1529,7 +1529,7 @@ html.embed-mode #main-dashboard .kpis{
 ※ 출산휴가·육아휴직·휴직 등 연속 휴직성 인원은 자동 제외되며, 누락 0건 담당자도 현황에 포함됩니다.
 </div>
 </div>
-      <div class="desc">총누락 기준 내림차순으로 정렬됩니다. 누락 0건 담당자도 함께 표시합니다. 잠재출근/잠재퇴근은 참고용 확인 필요 건으로 별도 표시하며, 총누락과 상태 판정에는 포함하지 않습니다.</div>
+      <div class="desc">총누락 기준 내림차순으로 정렬됩니다. 누락 0건 담당자도 함께 표시합니다. 잠재출근/잠재퇴근은 참고용 확인 필요 건으로 별도 표시하며, 잠재퇴근은 퇴근 칸이 비어 보이는 건을 화면 기준 그대로 집계합니다.</div>
       <div class="attTableWrap" style="max-height:none">
         <table class="attTable" style="min-width:1280px;font-size:14px">
           <thead>
@@ -8237,10 +8237,10 @@ function renderAttendanceMissingAnalysis(){
   };
 
   const isPotentialEndCheck = (row) => {
-    if(isDefiniteEndMissing(row)) return false;
+    // 잠재퇴근은 근태관리 표의 퇴근 칸이 비어 보이는 건을 그대로 확인 대상으로 집계합니다.
+    // 오후반차/외근 등 사유가 있더라도 화면상 퇴근 '-' 건이면 사용자 검토용 잠재퇴근에 포함합니다.
+    // 단, 위에서 출산휴가·육아휴직·휴직 등 연속 휴직성 행은 이미 rows에서 제외되어 있습니다.
     if(!isBlankClockDisplay(row?.displayEnd)) return false;
-    const reason = getMissingPotentialReason(row);
-    if(isExcludedPotentialReason(reason)) return false;
     return true;
   };
 
