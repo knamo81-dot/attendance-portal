@@ -903,6 +903,30 @@ html.embed-mode #main-dashboard .kpis{
 .mainTab:hover{
   background:#bbf7d0 !important;
 }  
+
+
+/* ===== Dashboard relayout: decision -> cause -> detail ===== */
+.dashboardRelayout{display:block !important;margin-top:16px;}
+.dashboardRelayout .kpiDragHandle{display:none !important}
+.dashboardSection{background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 2px 12px rgba(15,23,42,.04);padding:18px;margin-top:16px;}
+.dashboardSection:first-child{margin-top:0}
+.dashboardSectionHead{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:14px;}
+.dashboardSectionTitle{font-size:20px;font-weight:900;letter-spacing:-.03em;}
+.dashboardSectionDesc{margin-top:6px;font-size:13px;line-height:1.55;color:var(--muted);}
+.dashboardDecisionGrid,.dashboardCauseGrid,.dashboardInfoGrid{display:grid;gap:14px;}
+.dashboardDecisionGrid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.dashboardCauseGrid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.dashboardInfoGrid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.dashboardRelayout .card[data-kpi-card]{position:relative;cursor:default;user-select:auto;height:100%;margin:0;border-radius:18px;box-shadow:none;}
+.dashboardRelayout .dashboardDecisionGrid .card[data-kpi-card],.dashboardRelayout .dashboardCauseGrid .card[data-kpi-card]{min-height:150px;}
+.dashboardRelayout details.dashboardDetailBox{border:1px dashed #cbd5e1;border-radius:18px;background:#f8fafc;padding:14px;}
+.dashboardRelayout details.dashboardDetailBox summary{cursor:pointer;font-size:16px;font-weight:900;user-select:none;}
+.dashboardDetailGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px;}
+.dashboardDetailGrid .card[data-kpi-card]{min-height:116px;background:#fff}
+.dashboardCauseBadge{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#ecfdf5;color:#15803d;font-size:12px;font-weight:900;white-space:nowrap;}
+@media (max-width:1300px){.dashboardDecisionGrid,.dashboardCauseGrid,.dashboardInfoGrid,.dashboardDetailGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){.dashboardDecisionGrid,.dashboardCauseGrid,.dashboardInfoGrid,.dashboardDetailGrid{grid-template-columns:1fr}.dashboardSectionHead{flex-direction:column}}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1048,7 +1072,7 @@ html.embed-mode #main-dashboard .kpis{
   </div>
 
   <div id="main-dashboard" class="mainPanel">
-  <div class="kpis" id="dashboardKpis">
+  <div class="kpis dashboardRelayout" id="dashboardKpis" data-slot-ready="Y" data-drag-ready="Y">
     <div class="card" data-kpi-card="target_headcount"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button><div class="label">분석 대상 인원</div><div class="headcountCardFlex"><div class="headcountCardMain"><div id="kpiTotal" class="value"></div><div class="sub">재직 · 근태대상 Y · 휴직 제외 기준</div></div><div id="kpiHeadcountSide" class="headcountSideInfo"><div class="headcountSideRow">휴직 <span id="kpiLeaveOnlyCount">0명</span></div><div class="headcountSideRow">복직 <span id="kpiReturnCount">0명</span></div><div class="headcountSideRow">휴직전환 <span id="kpiLeaveSwitchCount">0명</span></div></div></div></div>
     <div class="card" data-kpi-card="avg_overtime"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button>
       <div class="label">1인당 평균 연장근로시간</div>
@@ -4679,6 +4703,84 @@ function renderKpis(scoped){
         activeKey==='warn' ? '#d97706' : '#ef4444';
     }
   }
+  applyDashboardRelayoutCards();
+}
+
+
+function parseDashboardMetricValue(id){
+  const el = document.getElementById(id);
+  if(!el) return 0;
+  const text = String(el.textContent || '').replace(/,/g,'');
+  const match = text.match(/-?\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : 0;
+}
+function ensureDashboardRelayoutStructure(){
+  const container = document.getElementById('dashboardKpis');
+  if(!container) return null;
+  if(container.dataset.relayoutReady !== 'Y'){
+    const cards = [...container.querySelectorAll('[data-kpi-card]')];
+    container.innerHTML = `
+      <section class="dashboardSection" data-dashboard-section="decision">
+        <div class="dashboardSectionHead"><div><div class="dashboardSectionTitle">1. 결론 요약</div><div class="dashboardSectionDesc">현재 조직 상태를 빠르게 판단할 수 있는 핵심 결과 카드입니다.</div></div></div>
+        <div class="dashboardDecisionGrid" id="dashboardDecisionGrid"></div>
+      </section>
+      <section class="dashboardSection" data-dashboard-section="cause">
+        <div class="dashboardSectionHead"><div><div class="dashboardSectionTitle">2. 핵심 원인</div><div class="dashboardSectionDesc">원인성 지표 후보 중 현재 값이 높은 상위 3개 카드를 자동 배치합니다.</div></div><span class="dashboardCauseBadge">자동 TOP 3</span></div>
+        <div class="dashboardCauseGrid" id="dashboardCauseGrid"></div>
+      </section>
+      <section class="dashboardSection" data-dashboard-section="info">
+        <div class="dashboardSectionHead"><div><div class="dashboardSectionTitle">3. 조직 상태 요약</div><div class="dashboardSectionDesc">인원, 미사용 연차, 총 연장근로처럼 판단에 필요한 기본 숫자입니다.</div></div></div>
+        <div class="dashboardInfoGrid" id="dashboardInfoGrid"></div>
+      </section>
+      <section class="dashboardSection" data-dashboard-section="detail">
+        <details class="dashboardDetailBox"><summary>4. 상세 지표 보기</summary><div class="dashboardDetailGrid" id="dashboardDetailGrid"></div></details>
+      </section>
+    `;
+    cards.forEach(card => container.appendChild(card));
+    container.dataset.relayoutReady = 'Y';
+  }
+  return container;
+}
+function moveDashboardCard(cardId, targetId){
+  const card = document.querySelector(`[data-kpi-card="${cardId}"]`);
+  const target = document.getElementById(targetId);
+  if(card && target) target.appendChild(card);
+}
+function applyDashboardRelayoutCards(){
+  const container = ensureDashboardRelayoutStructure();
+  if(!container) return;
+
+  const decisionIds = ['operational_risk_total','leave_risk','operational_risk','high_risk_count'];
+  const infoIds = ['target_headcount','unused_leave','total_overtime'];
+  const causeCandidates = [
+    { id:'work_concentration', metric:'kpiWorkConcentration', weight:1.00 },
+    { id:'overtime_concentration', metric:'kpiOvertimeSkew', weight:1.00 },
+    { id:'leave_deficiency', metric:'kpiLeaveDef', weight:1.00 },
+    { id:'mobility_concentration', metric:'kpiMobilitySkew', weight:1.00 },
+    { id:'avg_overtime', metric:'kpiOver', weight:5.00 },
+    { id:'mobility_activity', metric:'kpiMobility', weight:25.00 }
+  ];
+
+  decisionIds.forEach(id => moveDashboardCard(id, 'dashboardDecisionGrid'));
+
+  const existingCandidateIds = new Set(causeCandidates.map(item => item.id));
+  const scored = causeCandidates
+    .map(item => ({ ...item, score: parseDashboardMetricValue(item.metric) * item.weight }))
+    .filter(item => document.querySelector(`[data-kpi-card="${item.id}"]`))
+    .sort((a,b) => b.score - a.score);
+  const topCauseIds = new Set(scored.slice(0,3).map(item => item.id));
+  scored.forEach(item => moveDashboardCard(item.id, topCauseIds.has(item.id) ? 'dashboardCauseGrid' : 'dashboardDetailGrid'));
+
+  infoIds.forEach(id => moveDashboardCard(id, 'dashboardInfoGrid'));
+
+  const fixedIds = new Set([...decisionIds, ...infoIds, ...existingCandidateIds]);
+  [...container.querySelectorAll('[data-kpi-card]')].forEach(card => {
+    const id = card.getAttribute('data-kpi-card');
+    if(!fixedIds.has(id)){
+      const hiddenByDesign = card.style && String(card.style.display || '').includes('none');
+      if(!hiddenByDesign) document.getElementById('dashboardDetailGrid')?.appendChild(card);
+    }
+  });
 }
 
 function renderSummary(months){
