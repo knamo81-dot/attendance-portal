@@ -2640,7 +2640,8 @@ function updateUploadStatus(){
   const dates = [...new Set(REAL_ATTENDANCE_DATA.map(r => String(r.date || '').trim()).filter(Boolean))].sort();
   const start = dates[0] || '-';
   const end = dates[dates.length - 1] || '-';
-  label.textContent = `${start} ~ ${end} 기준 업로드 데이터 ${total}행 반영됨 · 조직관리 / 사원정보관리는 유지됨`;
+  const mergedCount = (typeof getMergedRawAttendanceData === 'function') ? getMergedRawAttendanceData().length : total;
+  label.textContent = `${start} ~ ${end} 기준 원본(raw) ${total}행 반영 / 분석(records) ${mergedCount}건 생성됨 · 조직관리 / 사원정보관리는 유지됨`;
   bar.style.width = '100%';
 }
 
@@ -2963,9 +2964,16 @@ function clearUploadedAttendanceData(){
 }
 function parseExcelDateValue(v){
   if(v === undefined || v === null || v === '') return '';
+  if(v instanceof Date && !Number.isNaN(v.getTime())){
+    const year = v.getFullYear();
+    const month = String(v.getMonth()+1).padStart(2,'0');
+    const day = String(v.getDate()).padStart(2,'0');
+    return `${year}-${month}-${day}`;
+  }
   if(typeof v === 'number'){
+    // Excel serial date
     const utcDays = Math.floor(v - 25569);
-    const utcValue = utcDays * 86400;                                        
+    const utcValue = utcDays * 86400;
     const dateInfo = new Date(utcValue * 1000);
     const year = dateInfo.getUTCFullYear();
     const month = String(dateInfo.getUTCMonth()+1).padStart(2,'0');
@@ -2973,78 +2981,221 @@ function parseExcelDateValue(v){
     return `${year}-${month}-${day}`;
   }
   const s = String(v).trim();
+  if(!s) return '';
   if(/^\d{8}$/.test(s)) return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
-  const m = s.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
+  let m = s.match(/^(\d{4})[-./년\s]+(\d{1,2})[-./월\s]+(\d{1,2})/);
   if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  m = s.match(/(\d{1,2})[-./월\s]+(\d{1,2})/);
+  if(m){
+    const yearGuess = (typeof getAttendanceUploadMonthKey === 'function') ? String(new Date().getFullYear()) : String(new Date().getFullYear());
+    return `${yearGuess}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
+  }
   return s;
 }
+
 function parseExcelTimeValue(v){
   if(v === undefined || v === null || v === '') return '';
+  if(v instanceof Date && !Number.isNaN(v.getTime())){
+    return `${String(v.getHours()).padStart(2,'0')}:${String(v.getMinutes()).padStart(2,'0')}`;
+  }
   if(typeof v === 'number'){
-    const totalMinutes = Math.round(v * 24 * 60);
+    // Excel time fraction. If a date serial is accidentally included, use only the fractional part.
+    const fraction = ((v % 1) + 1) % 1;
+    if(fraction === 0 && v >= 1) return '';
+    const totalMinutes = Math.round(fraction * 24 * 60);
     const hh = Math.floor(totalMinutes / 60) % 24;
     const mm = totalMinutes % 60;
     return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
   }
-  const s = String(v).trim();
-  const m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-  if(m) return `${String(m[1]).padStart(2,'0')}:${m[2]}`;
+  let s = String(v).trim();
+  if(!s || s === '-' || s === '미입력') return '';
+  const isPm = /오후|PM/i.test(s);
+  const isAm = /오전|AM/i.test(s);
+  s = s.replace(/오전|오후|AM|PM/gi,'').trim();
+  let m = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if(m){
+    let hh = Number(m[1]);
+    const mm = m[2];
+    if(isPm && hh < 12) hh += 12;
+    if(isAm && hh === 12) hh = 0;
+    if(hh >= 0 && hh <= 23) return `${String(hh).padStart(2,'0')}:${mm}`;
+    return '';
+  }
+  m = s.match(/^(\d{3,4})$/);
+  if(m){
+    const raw = m[1].padStart(4,'0');
+    const hh = Number(raw.slice(0,2));
+    const mm = Number(raw.slice(2,4));
+    if(hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59) return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+  }
   return '';
 }
+
 function parseDurationCell(v){
   if(v === undefined || v === null || v === '') return '';
-  if(typeof v === 'number'){
-    const totalMinutes = Math.round(v * 24 * 60);
+  if(v instanceof Date && !Number.isNaN(v.getTime())){
+    const totalMinutes = v.getHours() * 60 + v.getMinutes();
     const hh = Math.floor(totalMinutes / 60);
     const mm = totalMinutes % 60;
     return `${hh}:${String(mm).padStart(2,'0')}`;
   }
-  const s = String(v).trim();
-  if(/^\d{1,2}:\d{2}(?::\d{2})?$/.test(s)){
-    const parts = s.split(':');
-    return `${Number(parts[0])}:${String(parts[1]).padStart(2,'0')}`;
+  if(typeof v === 'number'){
+    if(!Number.isFinite(v) || v < 0) return '';
+    let hours;
+    if(v > 0 && v < 1){
+      // Excel duration fraction of a day
+      hours = v * 24;
+    }else if(v <= 48){
+      // Already hours
+      hours = v;
+    }else{
+      // Date serial or broken value: do not treat it as thousands of hours.
+      return '';
+    }
+    const totalMinutes = Math.round(hours * 60);
+    const hh = Math.floor(totalMinutes / 60);
+    const mm = totalMinutes % 60;
+    return `${hh}:${String(mm).padStart(2,'0')}`;
+  }
+  let s = String(v).trim();
+  if(!s || s === '-' || s === '미입력') return '';
+  s = s.replace(/시간/g, ':').replace(/분/g, '').replace(/\s+/g, '');
+  let m = s.match(/^(\d{1,3}):(\d{1,2})(?::\d{1,2})?$/);
+  if(m){
+    const hh = Number(m[1]);
+    const mm = Number(m[2]);
+    if(hh <= 48 && mm >= 0 && mm <= 59) return `${hh}:${String(mm).padStart(2,'0')}`;
+    return '';
   }
   if(/^\d+(?:\.\d+)?$/.test(s)){
     const n = Number(s);
-    const hh = Math.floor(n);
-    const mm = Math.round((n - hh) * 60);
+    if(!Number.isFinite(n) || n < 0 || n > 48) return '';
+    const totalMinutes = Math.round(n * 60);
+    const hh = Math.floor(totalMinutes / 60);
+    const mm = totalMinutes % 60;
     return `${hh}:${String(mm).padStart(2,'0')}`;
   }
   return '';
 }
-function parseHourNumber(mainValue, hValue, mValue){
-  const main = Number(mainValue);
-  if(Number.isFinite(main) && main > 0) return +main.toFixed(2);
-  const hh = Number(hValue || 0);
-  const mm = Number(mValue || 0);
-  if(!Number.isFinite(hh) && !Number.isFinite(mm)) return 0;
-  return +((Number.isFinite(hh)?hh:0) + (Number.isFinite(mm)?mm:0)/60).toFixed(2);
+
+function parseDurationHoursValue(v){
+  const durationText = parseDurationCell(v);
+  const hours = parseWorkDurationToHours(durationText);
+  return hours === null ? 0 : hours;
 }
+
+function parseHourNumber(mainValue, hValue, mValue){
+  const fromMain = parseDurationHoursValue(mainValue);
+  if(fromMain > 0) return +fromMain.toFixed(2);
+  const hhRaw = String(hValue ?? '').trim();
+  const mmRaw = String(mValue ?? '').trim();
+  const hh = Number(hhRaw || 0);
+  const mm = Number(mmRaw || 0);
+  if(!Number.isFinite(hh) && !Number.isFinite(mm)) return 0;
+  const val = (Number.isFinite(hh) ? hh : 0) + (Number.isFinite(mm) ? mm : 0) / 60;
+  if(val < 0 || val > 48) return 0;
+  return +val.toFixed(2);
+}
+
+function normalizeColumnKey(key){
+  return String(key || '')
+    .replace(/\s+/g,'')
+    .replace(/[()\[\]{}_.:\-\/\\]/g,'')
+    .toLowerCase();
+}
+
+function makeNormalizedRowMap(row){
+  const map = new Map();
+  Object.keys(row || {}).forEach(k => {
+    const nk = normalizeColumnKey(k);
+    if(nk && !map.has(nk)) map.set(nk, row[k]);
+  });
+  return map;
+}
+
+function pickCell(row, exactNames = [], containsRules = []){
+  const map = makeNormalizedRowMap(row);
+  for(const name of exactNames){
+    const key = normalizeColumnKey(name);
+    if(map.has(key)){
+      const v = map.get(key);
+      if(v !== undefined && v !== null && String(v).trim() !== '') return v;
+    }
+  }
+  const entries = Object.keys(row || {}).map(k => ({ raw:k, key:normalizeColumnKey(k), value:row[k] }));
+  for(const rule of containsRules){
+    const found = entries.find(e => {
+      if(e.value === undefined || e.value === null || String(e.value).trim() === '') return false;
+      if(typeof rule === 'function') return rule(e.key, e.raw);
+      return String(rule || '').split('|').every(part => e.key.includes(part));
+    });
+    if(found) return found.value;
+  }
+  return '';
+}
+
+function pickFirstNonEmpty(){
+  for(const v of arguments){
+    if(v !== undefined && v !== null && String(v).trim() !== '') return v;
+  }
+  return '';
+}
+
 async function readWorkbook(file){
   const buf = await file.arrayBuffer();
-  return XLSX.read(buf, {type:'array'});
+  return XLSX.read(buf, {type:'array', cellDates:true});
 }
 function firstSheetRows(workbook){
   const ws = workbook.Sheets[workbook.SheetNames[0]];
   return XLSX.utils.sheet_to_json(ws, {defval:'', raw:true});
 }
 function parseSecomWorkbookRows(rows){
-  return rows.map(r => {
-    const date = parseExcelDateValue(r['근무일자']);
-    const name = normalizeEmployeeName(r['이름']);
+  return (rows || []).map(r => {
+    const date = parseExcelDateValue(pickCell(r,
+      ['근무일자','근무일','일자','날짜','출입일자','출근일자'],
+      [(key)=>key.includes('근무') && key.includes('일'), (key)=>key.includes('일자')]
+    ));
+    const name = normalizeEmployeeName(pickCell(r,
+      ['이름','성명','사원명','사용자명','대상자'],
+      [(key)=>key.includes('이름'), (key)=>key.includes('성명'), (key)=>key.includes('사원') && key.includes('명')]
+    ));
     if(!date || !name) return null;
+
+    const org = String(pickCell(r, ['조직','부서','부서명','본부','소속','소속부서'], [(key)=>key.includes('조직'), (key)=>key.includes('부서'), (key)=>key.includes('소속')]) || '').trim();
+    const team = String(pickCell(r, ['팀','팀명','조직','부서','부서명'], [(key)=>key.includes('팀'), (key)=>key.includes('조직')]) || org).trim();
+    const startRaw = pickCell(r,
+      ['출근시간','출근시각','출근','입실시간','입실시각','최초출입','최초출입시간','출근일시'],
+      [(key)=>key.includes('출근') && !key.includes('퇴근'), (key)=>key.includes('입실'), (key)=>key.includes('최초')]
+    );
+    const endRaw = pickCell(r,
+      ['퇴근시간','퇴근시각','퇴근','퇴실시간','퇴실시각','최종출입','최종출입시간','퇴근일시'],
+      [(key)=>key.includes('퇴근'), (key)=>key.includes('퇴실'), (key)=>key.includes('최종')]
+    );
+    const workRaw = pickCell(r,
+      ['총근무시간','실제근무시간','근무시간','정상근무시간','실근무시간'],
+      [(key)=>key.includes('근무') && key.includes('시간'), (key)=>key.includes('실근무')]
+    );
+    const realWorkRaw = pickCell(r,
+      ['실제근무시간','실근무시간','정상근무시간','총근무시간','근무시간'],
+      [(key)=>key.includes('실제') && key.includes('근무'), (key)=>key.includes('실근무')]
+    );
+    const secomOtRaw = pickCell(r,
+      ['연장근무시간','휴일근무시간','초과근무시간','연장시간','초과시간'],
+      [(key)=>key.includes('연장') && key.includes('시간'), (key)=>key.includes('초과') && key.includes('시간'), (key)=>key.includes('휴일') && key.includes('시간')]
+    );
+
     return {
       date,
-      division: String(r['조직'] || '').trim(),
-      team: String(r['조직'] || '').trim(),
+      division: org,
+      team,
       name,
-      employeeId: String(r['사원번호'] || '').trim(),
-      grade: String(r['직급'] || '').trim(),
-      start: parseExcelTimeValue(r['출근시간']),
-      end: parseExcelTimeValue(r['퇴근시간']),
-      workHours: parseDurationCell(r['총근무시간'] || r['실제근무시간']),
-      realWorkHours: parseDurationCell(r['실제근무시간'] || r['정상근무시간']),
-      seccomOvertimeHours: parseWorkDurationToHours(parseDurationCell(r['연장근무시간'] || r['휴일근무시간'])) || 0,
+      employeeId: String(pickCell(r, ['사원번호','사번','직원번호','사용자ID','아이디','ID'], [(key)=>key.includes('사번'), (key)=>key.includes('사원') && key.includes('번호')]) || '').trim(),
+      grade: String(pickCell(r, ['직급','직위','직책'], [(key)=>key.includes('직급'), (key)=>key.includes('직위')]) || '').trim(),
+      start: parseExcelTimeValue(startRaw),
+      end: parseExcelTimeValue(endRaw),
+      workHours: parseDurationCell(workRaw),
+      realWorkHours: parseDurationCell(realWorkRaw || workRaw),
+      seccomOvertimeHours: parseDurationHoursValue(secomOtRaw),
       erpReason: '',
       reason: '',
       status: '',
@@ -3056,29 +3207,54 @@ function parseSecomWorkbookRows(rows){
   }).filter(Boolean);
 }
 function parseErpWorkbookRows(rows){
-  return rows.map(r => {
-    const date = parseExcelDateValue(r['일자']);
-    const name = normalizeEmployeeName(r['성명']);
+  return (rows || []).map(r => {
+    const date = parseExcelDateValue(pickCell(r,
+      ['일자','근무일자','근무일','날짜','신청일자'],
+      [(key)=>key.includes('일자'), (key)=>key.includes('근무') && key.includes('일')]
+    ));
+    const name = normalizeEmployeeName(pickCell(r,
+      ['성명','이름','사원명','대상자','신청자'],
+      [(key)=>key.includes('성명'), (key)=>key.includes('이름'), (key)=>key.includes('사원') && key.includes('명')]
+    ));
     if(!date || !name) return null;
+
+    const reason = String(pickCell(r,
+      ['근태구분','근태구분명','근태명','근태','사유','휴가구분'],
+      [(key)=>key.includes('근태') && key.includes('구분'), (key)=>key.includes('사유'), (key)=>key.includes('휴가') && key.includes('구분')]
+    ) || '').trim();
+
+    const appliedMain = pickCell(r,
+      ['연장신청_시간','연장신청시간','연장신청','신청연장','연장근무신청','신청OT','OT신청'],
+      [(key)=>key.includes('연장') && key.includes('신청') && key.includes('시간'), (key)=>key.includes('신청') && key.includes('ot')]
+    );
+    const appliedH = pickCell(r, ['연장신청_시','연장신청시','신청연장시'], [(key)=>key.includes('연장') && key.includes('신청') && key.endsWith('시')]);
+    const appliedM = pickCell(r, ['연장신청_분','연장신청분','신청연장분'], [(key)=>key.includes('연장') && key.includes('신청') && key.endsWith('분')]);
+    const actualMain = pickCell(r,
+      ['실제연장_시간','실제연장시간','실제연장','실제OT','OT실제','연장실적','연장근무시간','실연장'],
+      [(key)=>key.includes('실제') && key.includes('연장'), (key)=>key.includes('연장') && key.includes('실적'), (key)=>key.includes('실제') && key.includes('ot')]
+    );
+    const actualH = pickCell(r, ['실제연장_시','실제연장시','실연장시'], [(key)=>key.includes('실제') && key.includes('연장') && key.endsWith('시')]);
+    const actualM = pickCell(r, ['실제연장_분','실제연장분','실연장분'], [(key)=>key.includes('실제') && key.includes('연장') && key.endsWith('분')]);
+
     return {
       date,
       division: '',
       team: '',
       name,
-      employeeId: '',
+      employeeId: String(pickCell(r, ['사원번호','사번','직원번호'], [(key)=>key.includes('사번'), (key)=>key.includes('사원') && key.includes('번호')]) || '').trim(),
       grade: '',
       start: '',
       end: '',
       workHours: '',
       realWorkHours: '',
       seccomOvertimeHours: 0,
-      erpReason: String(r['근태구분'] || '').trim(),
-      reason: String(r['근태구분'] || '').trim(),
+      erpReason: reason,
+      reason,
       status: '',
       dayType: '',
-      erpAppliedOvertime: parseHourNumber(r['연장신청_시간'], r['연장신청_시'], r['연장신청_분']),
-      erpActualOvertime: parseHourNumber(r['실제연장_시간'], r['실제연장_시'], r['실제연장_분']),
-      jobName: String(r['업무명칭'] || '').trim()
+      erpAppliedOvertime: parseHourNumber(appliedMain, appliedH, appliedM),
+      erpActualOvertime: parseHourNumber(actualMain, actualH, actualM),
+      jobName: String(pickCell(r, ['업무명칭','업무명','업무','비고','내용'], [(key)=>key.includes('업무'), (key)=>key.includes('비고')]) || '').trim()
     };
   }).filter(Boolean);
 }
@@ -3336,12 +3512,6 @@ async function applyUploadedFiles(){
 
   const applyBtn = $('#applyUploadBtn');
   const originalBtnText = applyBtn ? applyBtn.textContent : '';
-  const restoreUploadButton = () => {
-    if(applyBtn){
-      applyBtn.disabled = false;
-      applyBtn.textContent = originalBtnText || '업로드 데이터 반영';
-    }
-  };
   if(applyBtn){
     applyBtn.disabled = true;
     applyBtn.textContent = '업로드 처리 중...';
@@ -3375,11 +3545,11 @@ async function applyUploadedFiles(){
   await refreshAdminUploadManagement(true);
 }
     render();
-    restoreUploadButton();
 
     alert(`업로드 데이터 반영이 완료되었습니다. 조직관리와 사원정보관리는 유지되었습니다.
-서버 저장 완료 · ${backupResult.uploadMonth || ''} · Batch: ${backupResult.batchId} · 분석용 records ${backupResult.recordsCount ?? '-'}건
-※ records는 ERP/세콤 원본을 사람·날짜 기준으로 통합한 분석용 건수입니다.`);
+서버 저장 완료 · ${backupResult.uploadMonth || ''} · Batch: ${backupResult.batchId}
+원본 raw ${nextRows.length}행 / 분석 records ${backupResult.recordsCount ?? '-'}건
+※ records는 ERP/세콤 원본을 사번·날짜 기준으로 통합한 분석용 건수입니다.`);
   }catch(error){
     console.error('[ATTENDANCE UPLOAD FAILED]', {
   message: error?.message,
@@ -3388,8 +3558,7 @@ async function applyUploadedFiles(){
   error
 });
 
-    restoreUploadButton();
-    alert('업로드 실패 상세: ' + (error?.message || JSON.stringify(error)));
+alert('업로드 실패 상세: ' + (error?.message || JSON.stringify(error)));
     resetAttendanceClientState();
     try{
       await loadAttendanceFromSupabase();
@@ -3399,8 +3568,12 @@ async function applyUploadedFiles(){
     }
     updateUploadStatus();
     render();
+    return;
   } finally {
-    restoreUploadButton();
+    if(applyBtn){
+      applyBtn.disabled = false;
+      applyBtn.textContent = originalBtnText || '업로드 데이터 반영';
+    }
   }
 }
 function bindUploadRuntimeEvents(){
@@ -5925,13 +6098,20 @@ function formatHoursToHM(h){
 
 function parseWorkDurationToHours(v){
   const s = String(v || '').trim();
-  if(!s || s === '-' || s === '미계산') return null;
-  const hm = s.match(/^(\d{1,2}):(\d{2})$/);
-  if(hm) return Number(hm[1]) + Number(hm[2]) / 60;
+  if(!s || s === '-' || s === '미계산' || s === '미입력') return null;
+  const hm = s.match(/^(\d{1,3}):(\d{2})$/);
+  if(hm){
+    const h = Number(hm[1]) + Number(hm[2]) / 60;
+    return h > 48 ? null : h;
+  }
   const hh = s.match(/^(\d+(?:\.\d+)?)h$/i);
-  if(hh) return Number(hh[1]);
+  if(hh){
+    const h = Number(hh[1]);
+    return h > 48 ? null : h;
+  }
   const n = Number(s);
-  return Number.isFinite(n) ? n : null;
+  if(!Number.isFinite(n) || n < 0 || n > 48) return null;
+  return n;
 }
 
 function timeStrToMinutes(v){
