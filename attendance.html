@@ -1497,7 +1497,7 @@ html.embed-mode #main-dashboard .kpis{
   <div id="main-attendance-missing" class="mainPanel">
     <div class="card" style="margin-top:16px">
       <div class="title">출퇴근 누락 분석</div>
-      <div class="desc">기존 근태관리·분석대시보드·심층분석과 별도로, 출근/퇴근 컬럼에 실제 표시된 누락값만 담당자 기준으로 누적 집계하는 전용 화면입니다.</div>
+      <div class="desc">기존 근태관리·분석대시보드·심층분석과 별도로, 확정 출근/퇴근 누락은 담당자별 총누락으로 집계하고 사유가 있는 빈 출퇴근 기록은 확인필요로 분리해 보여주는 전용 화면입니다.</div>
       <div class="attLegend">
         <span class="dot" style="background:#16a34a"></span>정상 0~1건
         <span class="dot" style="background:#d97706"></span>주의 2~3건
@@ -1519,15 +1519,15 @@ html.embed-mode #main-dashboard .kpis{
           <span class="badge amber">주의 2~3건</span>
           <span class="badge red">문제 4건 이상</span>
         </div>
-        <div class="desc" style="margin-bottom:0">이 화면은 근태관리의 주의/문제 판정과 별도로, 출근/퇴근 컬럼에 보이는 누락값만 따로 누적해 보여줍니다.</div>
+        <div class="desc" style="margin-bottom:0">총누락은 확정 출근누락+퇴근누락만 포함합니다. 잠재 출근/퇴근 확인필요는 외근·반차 등 사유가 있으나 원본 출퇴근 기록이 비어 있는 참고 지표이며, 순위와 상태 판정에는 포함하지 않습니다.</div>
       </div>
     </div>
 
     <div class="card" style="margin-top:16px">
       <div class="title">담당자별 누락 현황</div>
-      <div class="desc">총 누락 기준 내림차순으로 정렬되며, 출근누락과 퇴근누락을 각각 분리해서 확인할 수 있습니다.</div>
+      <div class="desc">총누락 기준 내림차순으로 정렬되며, 확정 누락과 잠재 확인필요를 분리해서 확인할 수 있습니다. 총누락과 상태 판정에는 잠재 확인필요를 포함하지 않습니다.</div>
       <div class="attTableWrap" style="max-height:none">
-        <table class="attTable" style="min-width:1100px;font-size:14px">
+        <table class="attTable" style="min-width:1320px;font-size:14px">
           <thead>
             <tr>
               <th style="width:72px">순위</th>
@@ -1536,7 +1536,9 @@ html.embed-mode #main-dashboard .kpis{
               <th>팀</th>
               <th>출근누락</th>
               <th>퇴근누락</th>
-              <th>총 누락</th>
+              <th>총누락</th>
+              <th>잠재출근</th>
+              <th>잠재퇴근</th>
               <th>상태</th>
             </tr>
           </thead>
@@ -8096,6 +8098,34 @@ function renderAttendanceMissingAnalysis(){
   const rows = getAttendanceManagementRows(buildAttendanceRows());
   const byPerson = new Map();
 
+  const cleanReasonText = (value) => {
+    try{
+      return normalizeAttendanceReasonText(String(value || '').replace(/<[^>]*>/g, ' '));
+    }catch(_e){
+      return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+  };
+
+  const hasRawClock = (value) => {
+    const s = String(value || '').trim();
+    return !!s && s !== '-' && s !== '출근누락' && s !== '퇴근누락';
+  };
+
+  // 잠재 누락은 총누락/상태/순위에는 넣지 않고 확인필요 참고값으로만 표시한다.
+  // 대상: 외근/출장/반차/교육 등 실제 출퇴근 기록이 남아야 할 가능성이 있는 사유.
+  const isPotentialCheckReason = (reason) => {
+    const s = cleanReasonText(reason);
+    if(!s) return false;
+    if(isContinuousLeaveReason(s)) return false;
+    if(s === '연차' || s === '연차휴가') return false;
+    if(['공휴일','휴일','휴무일','결근'].some(k => s === k || s.includes(k))) return false;
+    return [
+      '외근','출장','오전외근','오후외근',
+      '오전반차','오후반차','반차',
+      '공가','보건휴가','검진휴가','교육','회의','재택근무'
+    ].some(k => s === k || s.includes(k));
+  };
+
   (rows || []).forEach(row => {
     const name = String(row.name || '').trim();
     if(!name) return;
@@ -8104,10 +8134,27 @@ function renderAttendanceMissingAnalysis(){
       division: row.division || '',
       team: row.team || '',
       startMissing: 0,
-      endMissing: 0
+      endMissing: 0,
+      potentialStart: 0,
+      potentialEnd: 0
     };
-    if(row.displayStart === '출근누락') current.startMissing += 1;
-    if(row.displayEnd === '퇴근누락') current.endMissing += 1;
+
+    const displayStart = String(row.displayStart || '').trim();
+    const displayEnd = String(row.displayEnd || '').trim();
+    const reason = cleanReasonText(row.primaryReason || row.reason || row.erpReason || row.originalErpReason || row.originalStatus || row.status || '');
+    const rawStart = row.start ?? row.startTime ?? row.checkIn ?? row.inTime ?? '';
+    const rawEnd = row.end ?? row.endTime ?? row.checkOut ?? row.outTime ?? '';
+    const confirmedStartMissing = displayStart === '출근누락';
+    const confirmedEndMissing = displayEnd === '퇴근누락';
+
+    if(confirmedStartMissing) current.startMissing += 1;
+    if(confirmedEndMissing) current.endMissing += 1;
+
+    if(isPotentialCheckReason(reason)){
+      if(!confirmedStartMissing && !hasRawClock(rawStart)) current.potentialStart += 1;
+      if(!confirmedEndMissing && !hasRawClock(rawEnd)) current.potentialEnd += 1;
+    }
+
     if(!current.division && row.division) current.division = row.division;
     if(!current.team && row.team) current.team = row.team;
     byPerson.set(name, current);
@@ -8116,6 +8163,7 @@ function renderAttendanceMissingAnalysis(){
   const list = Array.from(byPerson.values())
     .map(item => {
       const total = item.startMissing + item.endMissing;
+      const potentialTotal = item.potentialStart + item.potentialEnd;
       let status = '정상';
       let tone = 'normal';
       if(total >= 4){
@@ -8125,26 +8173,31 @@ function renderAttendanceMissingAnalysis(){
         status = '주의';
         tone = 'warn';
       }
-      return { ...item, total, status, tone };
+      return { ...item, total, potentialTotal, status, tone };
     })
-    .filter(item => item.total > 0)
+    .filter(item => item.total > 0 || item.potentialTotal > 0)
     .sort((a,b) => {
       if(b.total !== a.total) return b.total - a.total;
       if(b.endMissing !== a.endMissing) return b.endMissing - a.endMissing;
       if(b.startMissing !== a.startMissing) return b.startMissing - a.startMissing;
+      if(b.potentialTotal !== a.potentialTotal) return b.potentialTotal - a.potentialTotal;
       return a.name.localeCompare(b.name, 'ko');
     });
 
   const totalStart = list.reduce((sum, item) => sum + item.startMissing, 0);
   const totalEnd = list.reduce((sum, item) => sum + item.endMissing, 0);
-  const totalPeople = list.length;
-  const topPerson = list[0];
+  const totalConfirmed = totalStart + totalEnd;
+  const totalPotentialStart = list.reduce((sum, item) => sum + item.potentialStart, 0);
+  const totalPotentialEnd = list.reduce((sum, item) => sum + item.potentialEnd, 0);
+  const totalPotential = totalPotentialStart + totalPotentialEnd;
+  const totalPeople = list.filter(item => item.total > 0).length;
+  const potentialPeople = list.filter(item => item.potentialTotal > 0).length;
 
   summaryEl.innerHTML = [
-    ['출근누락 총건수', `${totalStart}건`, '출근 컬럼에 표시된 누락 건수'],
-    ['퇴근누락 총건수', `${totalEnd}건`, '퇴근 컬럼에 표시된 누락 건수'],
-    ['누락 발생 인원', `${totalPeople}명`, '출근/퇴근 누락이 1건 이상 있는 담당자'],
-    ['최다 누락 담당자', topPerson ? `${topPerson.name} ${topPerson.total}건` : '-', topPerson ? `출근 ${topPerson.startMissing} · 퇴근 ${topPerson.endMissing}` : '']
+    ['확정 총누락', `${totalConfirmed}건`, `출근 ${totalStart} · 퇴근 ${totalEnd}`],
+    ['누락 발생 인원', `${totalPeople}명`, '확정 누락이 1건 이상 있는 담당자'],
+    ['확인필요 총건수', `${totalPotential}건`, `잠재출근 ${totalPotentialStart} · 잠재퇴근 ${totalPotentialEnd}`],
+    ['확인필요 인원', `${potentialPeople}명`, '사유가 있으나 원본 출퇴근 기록이 비어 있는 담당자']
   ].map(([label, value, sub]) => `
     <div class="card" style="padding:18px;border-radius:18px;box-shadow:none">
       <div class="label">${label}</div>
@@ -8153,7 +8206,7 @@ function renderAttendanceMissingAnalysis(){
     </div>
   `).join('');
 
-  const top5 = list.slice(0,5);
+  const top5 = list.filter(item => item.total > 0).slice(0,5);
   const maxTotal = Math.max(...top5.map(item => item.total), 1);
   top5El.innerHTML = top5.length ? top5.map(item => `
     <div class="missingBarRow">
@@ -8163,10 +8216,10 @@ function renderAttendanceMissingAnalysis(){
       </div>
       <span>${item.total}건</span>
     </div>
-  `).join('') : '<div class="employeeEmpty" style="padding:20px 0">누락 데이터가 없습니다.</div>';
+  `).join('') : '<div class="employeeEmpty" style="padding:20px 0">확정 누락 데이터가 없습니다.</div>';
 
   tbody.innerHTML = list.map((item, idx) => `
-    <tr class="${idx < 2 ? 'missingTopRow' : ''}">
+    <tr class="${idx < 2 && item.total > 0 ? 'missingTopRow' : ''}">
       <td><span class="missingRank">${idx + 1}</span></td>
       <td style="text-align:left"><strong>${item.name}</strong></td>
       <td>${item.division || '-'}</td>
@@ -8174,6 +8227,8 @@ function renderAttendanceMissingAnalysis(){
       <td><span class="missingCount ${item.startMissing >= 4 ? 'danger' : item.startMissing >= 1 ? 'warn' : 'zero'}">${item.startMissing}</span></td>
       <td><span class="missingCount ${item.endMissing >= 4 ? 'danger' : item.endMissing >= 1 ? 'warn' : 'zero'}">${item.endMissing}</span></td>
       <td><span class="missingTotalPill ${item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : ''}">${item.total}</span></td>
+      <td><span class="missingPotentialPill ${item.potentialStart ? '' : 'zero'}">${item.potentialStart}</span></td>
+      <td><span class="missingPotentialPill ${item.potentialEnd ? '' : 'zero'}">${item.potentialEnd}</span></td>
       <td><span class="missingStatePill ${item.tone}">${item.status}</span></td>
     </tr>
   `).join('');
