@@ -6489,7 +6489,6 @@ function decorateAttendanceRow(row, metaByName){
   const rawStatus = String(row.status || '').trim();
   const rawErpReason = String(row.erpReason || '').trim();
   const rawReason = String(rawErpReason || row.reason || rawStatus || '').trim();
-  const primaryExcusedReason = getPrimaryExcusedReason(rawReason);
   const startRaw = String(row.start || '').trim();
   const endRaw = String(row.end || '').trim();
   const workRaw = String(row.workHours || '').trim();
@@ -6545,7 +6544,7 @@ function decorateAttendanceRow(row, metaByName){
     overtimeCheck = '-';
     seccomOT = 0;
 
-  } else if (isContinuousLeaveReason(getPrimaryExcusedReason(rawReason)) || reasonHas(rawReason, ['육아휴직','출산휴가','산전후휴가','병가','가족돌봄휴직','장기휴직','휴직'])) {
+  } else if (isContinuousLeaveReason(rawReason)) {
     if (!actualWorkExists) {
       displayStart = '-';
       displayEnd = '-';
@@ -6557,10 +6556,10 @@ function decorateAttendanceRow(row, metaByName){
     }
     bucket = '근태사유';
     statusLabel = '';
-    reason = primaryExcusedReason || rawReason;
+    reason = rawReason;
     seccomOT = 0;
 
-  } else if (reasonHas(rawReason, ['오전외근'])) {
+  } else if (rawReason === '오전외근') {
     displayStart = '-';
     displayEnd = endRaw || '퇴근누락';
     if (startRaw && endRaw) {
@@ -6570,10 +6569,10 @@ function decorateAttendanceRow(row, metaByName){
     }
     bucket = '근태사유';
     statusLabel = '';
-    reason = primaryExcusedReason || rawReason;
+    reason = rawReason;
     seccomOT = 0;
 
-  } else if (reasonHas(rawReason, ['오후외근'])) {
+  } else if (rawReason === '오후외근') {
     displayStart = startRaw || '출근누락';
     displayEnd = '-';
     if (startRaw && endRaw) {
@@ -6583,10 +6582,10 @@ function decorateAttendanceRow(row, metaByName){
     }
     bucket = '근태사유';
     statusLabel = '';
-    reason = primaryExcusedReason || rawReason;
+    reason = rawReason;
     seccomOT = 0;
 
-  } else if (reasonHas(rawReason, ['오전반차','오후반차'])) {
+  } else if (rawReason === '오전반차' || rawReason === '오후반차') {
     displayStart = rawReason === '오전반차' ? '-' : (startRaw || '출근누락');
     displayEnd = rawReason === '오후반차' ? '-' : (endRaw || '퇴근누락');
     totalWork = '4:30';
@@ -6595,7 +6594,7 @@ function decorateAttendanceRow(row, metaByName){
     reason = rawReason;
     seccomOT = 0;
 
-  } else if (reasonHas(rawReason, ['반차'])) {
+  } else if (isHalfDayVacationReason(rawReason)) {
     displayStart = startRaw || '출근누락';
     displayEnd = endRaw || '퇴근누락';
     totalWork = '4:30';
@@ -6604,7 +6603,7 @@ function decorateAttendanceRow(row, metaByName){
     reason = rawReason;
     seccomOT = 0;
 
-  } else if (reasonHas(rawReason, ['연차','연차휴가','공가','보건휴가'])) {
+  } else if (isVacationReason(rawReason)) {
     displayStart = '-';
     displayEnd = '-';
     totalWork = '-';
@@ -6613,7 +6612,7 @@ function decorateAttendanceRow(row, metaByName){
     reason = rawReason;
     seccomOT = 0;
 
-  } else if (reasonHas(rawReason, ['외근','출장'])) {
+  } else if (rawReason === '외근' || rawReason === '출장') {
     displayStart = '-';
     displayEnd = '-';
     totalWork = '9:00';
@@ -6622,7 +6621,7 @@ function decorateAttendanceRow(row, metaByName){
     reason = rawReason;
     seccomOT = 0;
 
-  } else if (isOutsideReason(getPrimaryExcusedReason(rawReason))) {
+  } else if (isOutsideReason(rawReason)) {
     displayStart = startRaw || '-';
     displayEnd = endRaw || '-';
     totalWork = workRaw || '9:00';
@@ -6644,23 +6643,6 @@ function decorateAttendanceRow(row, metaByName){
     bucket = '근태사유';
     statusLabel = '';
     reason = '재택근무';
-    seccomOT = 0;
-
-  } else if (isExcusedReasonBeforeMissing(rawReason) && !isMissingInputReason(rawReason)) {
-    // ✅ 사유 예외 우선: ERP에 명확한 근태 사유가 있으면 시간 누락보다 사유를 먼저 인정
-    const excused = primaryExcusedReason || rawReason;
-    if(reasonHas(excused, ['단축근무'])){
-      displayStart = startRaw || '-';
-      displayEnd = endRaw || '-';
-      totalWork = workRaw || (startRaw && endRaw ? calcHoursText(startRaw, endRaw) : '6:00');
-    }else{
-      displayStart = startRaw || '-';
-      displayEnd = endRaw || '-';
-      totalWork = workRaw || (startRaw && endRaw ? calcHoursText(startRaw, endRaw) : '-');
-    }
-    bucket = '근태사유';
-    statusLabel = '';
-    reason = excused;
     seccomOT = 0;
 
   } else {
@@ -6711,15 +6693,15 @@ function decorateAttendanceRow(row, metaByName){
       bucket = '주의';
       statusLabel = '주의';
       reason = '휴일근무';
-    } else if (((rawReason === '정상근무' || rawReason === '' || rawReason === '-') && !startRaw && !endRaw) || reasonHas(rawReason, ['출퇴근미입력'])) {
+    } else if ((rawReason === '정상근무' || rawReason === '' || rawReason === '-') && !startRaw && !endRaw) {
       bucket = '주의';
       statusLabel = '주의';
       reason = '출퇴근미입력';
-    } else if (((rawReason === '정상근무' || rawReason === '' || rawReason === '-') && !startRaw && endRaw) || reasonHas(rawReason, ['출근미입력','출근누락'])) {
+    } else if ((rawReason === '정상근무' || rawReason === '' || rawReason === '-') && !startRaw && endRaw) {
       bucket = '주의';
       statusLabel = '주의';
       reason = '출근미입력';
-    } else if (((rawReason === '정상근무' || rawReason === '' || rawReason === '-') && startRaw && !endRaw) || reasonHas(rawReason, ['퇴근미입력','퇴근누락'])) {
+    } else if ((rawReason === '정상근무' || rawReason === '' || rawReason === '-') && startRaw && !endRaw) {
       bucket = '주의';
       statusLabel = '주의';
       reason = '퇴근미입력';
@@ -6869,7 +6851,6 @@ function decorateAttendanceRow(row, metaByName){
   }
 
   // 저장된/선택된 OT확인 값은 연장근로가 있을 때만 상태에 반영
-  const plainDisplayReasonForJudge = normalizeAttendanceReasonText(displayReason);
   if (dispatchRule || workFromHomeRule) {
     statusLabel = '';
   } else if (erpOT > 0 && overtimeCheck === '미인정') {
@@ -6878,10 +6859,10 @@ function decorateAttendanceRow(row, metaByName){
   } else if (erpOT > 0 && (overtimeCheck === '인정' || overtimeCheck === '부분인정')) {
     bucket = '주의';
     statusLabel = '주의';
-  } else if (judgedReasonsWarning.some(r => plainDisplayReasonForJudge.includes(r))) {
+  } else if (judgedReasonsWarning.includes(displayReason)) {
     bucket = '주의';
     statusLabel = '주의';
-  } else if (judgedReasonsIssue.some(r => plainDisplayReasonForJudge.includes(r))) {
+  } else if (judgedReasonsIssue.includes(displayReason)) {
     bucket = '문제';
     statusLabel = '문제';
   } else {
