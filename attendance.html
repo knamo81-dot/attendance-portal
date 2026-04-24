@@ -8284,6 +8284,9 @@ function bindMainTabs(){
       if(btn.dataset.main === 'dashboard' || btn.dataset.main === 'deep-analysis'){
         rerenderDashboardVisibleCharts();
       }
+      if(btn.dataset.main === 'attendance-missing'){
+        renderAttendanceMissingAnalysis();
+      }
     };
   });
 }
@@ -8608,6 +8611,7 @@ const renderLightweight = debounce(() => {
   const months = periodMonths();
   const scoped = scopedEmployees();
   renderAttendanceTab();
+  renderAttendanceMissingAnalysis();
   renderTopCharts(scoped, months);
   renderInsight(scoped, months);
   renderRisk(scoped);
@@ -9745,6 +9749,7 @@ async function refreshAdminUploadManagement(forceYearReload = false){
     renderSummary(months);
     renderAlerts(months);
     renderAttendanceTab();
+    renderAttendanceMissingAnalysis();
     renderTopCharts(scoped, months);
     renderInsight(scoped, months);
     renderRisk(scoped);
