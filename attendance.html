@@ -2659,12 +2659,12 @@ function createUploadBatchId(){
 
 
 async function insertRowsInChunks(tableName, rows, chunkSize = 500){
-  if(!supabase || !Array.isArray(rows) || !rows.length) return;
+  if(!supabaseClient || !Array.isArray(rows) || !rows.length) return;
 
   for(let i = 0; i < rows.length; i += chunkSize){
     const chunk = rows.slice(i, i + chunkSize);
 
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from(tableName)
       .insert(chunk);
 
@@ -3390,7 +3390,6 @@ alert('업로드 실패 상세: ' + (error?.message || JSON.stringify(error)));
     }
     updateUploadStatus();
     render();
-    throw error;
   } finally {
     if(applyBtn){
       applyBtn.disabled = false;
@@ -3411,7 +3410,7 @@ function bindUploadRuntimeEvents(){
       }
       updateUploadStatus();
       render();
-      alert('업로드 처리 중 오류가 발생했습니다. 파일 형식을 다시 확인해주세요.');
+      alert('업로드 실패 상세: ' + (err?.message || JSON.stringify(err)));
     });
   });
   $('#clearUploadBtn')?.addEventListener('click', clearUploadedAttendanceData);
