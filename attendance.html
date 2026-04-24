@@ -3336,6 +3336,12 @@ async function applyUploadedFiles(){
 
   const applyBtn = $('#applyUploadBtn');
   const originalBtnText = applyBtn ? applyBtn.textContent : '';
+  const restoreUploadButton = () => {
+    if(applyBtn){
+      applyBtn.disabled = false;
+      applyBtn.textContent = originalBtnText || '업로드 데이터 반영';
+    }
+  };
   if(applyBtn){
     applyBtn.disabled = true;
     applyBtn.textContent = '업로드 처리 중...';
@@ -3369,9 +3375,11 @@ async function applyUploadedFiles(){
   await refreshAdminUploadManagement(true);
 }
     render();
+    restoreUploadButton();
 
     alert(`업로드 데이터 반영이 완료되었습니다. 조직관리와 사원정보관리는 유지되었습니다.
-서버 저장 완료 · ${backupResult.uploadMonth || ''} · Batch: ${backupResult.batchId} · records ${backupResult.recordsCount ?? '-'}건`);
+서버 저장 완료 · ${backupResult.uploadMonth || ''} · Batch: ${backupResult.batchId} · 분석용 records ${backupResult.recordsCount ?? '-'}건
+※ records는 ERP/세콤 원본을 사람·날짜 기준으로 통합한 분석용 건수입니다.`);
   }catch(error){
     console.error('[ATTENDANCE UPLOAD FAILED]', {
   message: error?.message,
@@ -3380,7 +3388,8 @@ async function applyUploadedFiles(){
   error
 });
 
-alert('업로드 실패 상세: ' + (error?.message || JSON.stringify(error)));
+    restoreUploadButton();
+    alert('업로드 실패 상세: ' + (error?.message || JSON.stringify(error)));
     resetAttendanceClientState();
     try{
       await loadAttendanceFromSupabase();
@@ -3391,10 +3400,7 @@ alert('업로드 실패 상세: ' + (error?.message || JSON.stringify(error)));
     updateUploadStatus();
     render();
   } finally {
-    if(applyBtn){
-      applyBtn.disabled = false;
-      applyBtn.textContent = originalBtnText || '업로드 데이터 반영';
-    }
+    restoreUploadButton();
   }
 }
 function bindUploadRuntimeEvents(){
