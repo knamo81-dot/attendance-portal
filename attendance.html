@@ -8417,7 +8417,7 @@ function renderAdminMonthCards(){
   grid.innerHTML = stats.map(stat => {
     const state = deriveMonthState(stat);
     const latestText = stat.latestUploadedAt ? formatAdminDateTime(stat.latestUploadedAt) : '-';
-    const deleteDisabled = (!stat.erpCount && !stat.secomCount && !stat.recordCount) ? 'disabled' : '';
+    const deleteDisabled = (!stat.erpCount && !stat.secomCount && !stat.recordCount && !stat.batchCount) ? 'disabled' : '';
     return `
       <div class="adminMonthCard ${state.key}">
         <div class="adminMonthHead">
