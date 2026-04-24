@@ -8099,6 +8099,30 @@ function renderAttendanceMissingAnalysis(){
   const rows = getAttendanceManagementRows(buildAttendanceRows());
   const byPerson = new Map();
 
+  // 0건 담당자도 누락 현황에 표시되도록 현재 필터 기준 분석 대상자를 먼저 생성
+  const seedPeople = (() => {
+    try{
+      if(typeof scopedEmployees === 'function') return scopedEmployees();
+      if(typeof filteredEmployees === 'function') return filteredEmployees();
+    }catch(e){}
+    return [];
+  })();
+
+  seedPeople.forEach(emp => {
+    const rawName = String(emp?.name || '').trim();
+    const name = (typeof normalizeEmployeeName === 'function') ? normalizeEmployeeName(rawName) : rawName;
+    if(!name || byPerson.has(name)) return;
+    byPerson.set(name, {
+      name,
+      division: emp?.division || '',
+      team: emp?.team || '',
+      startMissing: 0,
+      endMissing: 0,
+      potentialStart: 0,
+      potentialEnd: 0
+    });
+  });
+
   const stripHtmlText = (value) => String(value || '')
     .replace(/<br\s*\/?>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
@@ -8159,7 +8183,8 @@ function renderAttendanceMissingAnalysis(){
   };
 
   (rows || []).forEach(row => {
-    const name = String(row.name || '').trim();
+    const rawName = String(row.name || '').trim();
+    const name = (typeof normalizeEmployeeName === 'function') ? normalizeEmployeeName(rawName) : rawName;
     if(!name) return;
     const current = byPerson.get(name) || {
       name,
@@ -8196,7 +8221,6 @@ function renderAttendanceMissingAnalysis(){
       }
       return { ...item, total, potentialTotal, status, tone };
     })
-    .filter(item => item.total > 0 || item.potentialTotal > 0)
     .sort((a,b) => {
       // 순위는 확정 총누락 기준만 우선 적용
       if(b.total !== a.total) return b.total - a.total;
@@ -8213,7 +8237,7 @@ function renderAttendanceMissingAnalysis(){
   const totalPotentialEnd = list.reduce((sum, item) => sum + item.potentialEnd, 0);
   const totalPeople = list.filter(item => item.total > 0).length;
   const potentialPeople = list.filter(item => item.potentialTotal > 0).length;
-  const topPerson = list.find(item => item.total > 0) || list[0];
+  const topPerson = list.find(item => item.total > 0);
 
   summaryEl.innerHTML = [
     ['출근누락 총건수', `${totalStart}건`, '출근 컬럼에 표시된 확정 누락 건수'],
