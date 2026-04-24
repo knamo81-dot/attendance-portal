@@ -985,18 +985,19 @@ html.embed-mode #main-dashboard .kpis{
 @media (max-width:760px){.dashboardDecisionGrid,.dashboardCauseGrid,.dashboardInfoGrid,.dashboardDetailGroupGrid{grid-template-columns:1fr}.dashboardSectionHead{flex-direction:column}}
 
 
-/* ===== Risk organization final refinements ===== */
-#panel-risk .statusList{max-height:420px;overflow-y:auto;padding-right:6px}
-#panel-risk .statusList::-webkit-scrollbar{width:8px}
-#panel-risk .statusList::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:999px}
-.orgRiskScoreLabel{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px}
-.orgRiskScoreLabel .score{font-size:13px;font-weight:900;color:#0f172a}
-.orgRiskScoreLabel .summary{font-size:12px;color:#64748b;font-weight:700;text-align:right}
-.orgRiskOverallCard{background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);border-color:#cbd5e1}
-.orgRiskInsightCard{border-left:4px solid #16a34a}
-.orgRiskInsightCard.red{border-left-color:#ef4444}
-.orgRiskInsightCard.amber{border-left-color:#d97706}
-.orgRiskInsightCard.green{border-left-color:#16a34a}
+
+/* Risk organization final polish: keep original score logic, improve labels/insights */
+.statusList{max-height:520px;overflow-y:auto;padding-right:4px}
+.statusList::-webkit-scrollbar{width:8px}
+.statusList::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:999px}
+.orgRiskScoreLabel{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--muted)}
+.orgRiskScoreLabel .score{font-weight:900;color:#0f172a}
+.orgRiskScoreLabel .summary{font-weight:700;color:#64748b;text-align:right}
+.orgRiskOverallCard{border-color:#0f172a;background:#f8fafc}
+.orgRiskInsightCard.green{background:#f7fff8}
+.orgRiskInsightCard.amber{background:#fffaf0}
+.orgRiskInsightCard.red{background:#fff7f7}
+@media (max-width:700px){.orgRiskScoreLabel{flex-direction:column;align-items:flex-start}.orgRiskScoreLabel .summary{text-align:left}}
 
 </style>
 
@@ -1473,7 +1474,7 @@ html.embed-mode #main-dashboard .kpis{
     </div>
     <div class="card" style="margin-top:16px">
       <div class="title">담당자 상태 분포</div>
-      <div class="desc">선택 기간 기준으로 위험지수 점수에 따라 위험 · 주의 · 정상 인원을 분류하고, 각 상태별 전체 인원을 위험순으로 보여줍니다.</div>
+      <div class="desc">선택 기간 기준으로 위험지수 점수에 따라 위험 · 주의 · 정상 인원을 분류하고, 각 상태별 상위 5명을 보여줍니다.</div>
       <div id="statusCards" class="statusGrid"></div>
     </div>
   </div>
@@ -5425,9 +5426,9 @@ function personMini(item){
 
 function renderStatusCards(scoped){
   const groups = {
-    '위험': scoped.filter(x=>x.scopedRisk>=75).sort((a,b)=>b.scopedRisk-a.scopedRisk || String(a.name).localeCompare(String(b.name),'ko')),
-    '주의': scoped.filter(x=>x.scopedRisk>=50 && x.scopedRisk<75).sort((a,b)=>b.scopedRisk-a.scopedRisk || String(a.name).localeCompare(String(b.name),'ko')),
-    '정상': scoped.filter(x=>x.scopedRisk<50).sort((a,b)=>b.scopedRisk-a.scopedRisk || String(a.name).localeCompare(String(b.name),'ko'))
+    '위험': scoped.filter(x=>x.scopedRisk>=75).sort((a,b)=>b.scopedRisk-a.scopedRisk),
+    '주의': scoped.filter(x=>x.scopedRisk>=50 && x.scopedRisk<75).sort((a,b)=>b.scopedRisk-a.scopedRisk),
+    '정상': scoped.filter(x=>x.scopedRisk<50).sort((a,b)=>b.scopedRisk-a.scopedRisk)
   };
   const defs = [
     ['위험','red'],
@@ -5682,71 +5683,68 @@ function renderLeaveCauseAnalysis(scoped, scoreItems){
 }
 
 
+
 function getOrgRiskItemSummary(item){
-  const list = item.list || [];
-  const score = toSafeNumber(item.score || 0);
+  const list = item?.list || [];
+  if(!list.length) return '선택된 범위 기준 조직 위험 점수';
   const overtimeAvg = avg(list, list.some(x => typeof x.scopedMonthlyOvertime !== 'undefined') ? 'scopedMonthlyOvertime' : 'overtime');
   const riskAvg = avg(list, list.some(x => typeof x.scopedRisk !== 'undefined') ? 'scopedRisk' : 'risk');
   const highFocus = list.filter(x => Number(x.focusRatio || 0) >= 1.5 || getEmployeeAnalysisDailyHours(x) >= 9).length;
   const leavePoor = list.filter(x => Number(x.leaveUsed || 0) === 0).length;
-  const causes = [];
-
-  if(overtimeAvg >= 10) causes.push('연장근로 영향 큼');
-  else if(overtimeAvg >= 5) causes.push('연장근로 영향 있음');
-
-  if(highFocus > 0) causes.push('업무집중 영향');
-  if(leavePoor > 0) causes.push('연차 미사용 영향');
-  if(riskAvg >= 50) causes.push('개인위험 평균 높음');
-
-  if(causes.length) return causes.slice(0,3).join(' · ');
-  if(score >= 75) return '고위험 관리 필요';
-  if(score >= 50) return '주의 관리 필요';
-  return '상대적으로 안정';
+  const reasons = [];
+  if(overtimeAvg >= 30) reasons.push('연장근로 영향 큼');
+  else if(overtimeAvg >= 15) reasons.push('연장근로 영향 있음');
+  if(highFocus >= 2) reasons.push('고부하 인원 다수');
+  else if(highFocus >= 1) reasons.push('고부하 인원 존재');
+  if(leavePoor >= 2) reasons.push('연차 미사용 영향');
+  else if(leavePoor >= 1) reasons.push('회복 지표 관찰');
+  if(riskAvg >= 60) reasons.push('개인위험 평균 높음');
+  if(!reasons.length) reasons.push(item.score >= 50 ? '주의 요인 관찰 필요' : '상대적으로 안정');
+  return reasons.slice(0,2).join(' · ');
 }
 
 function buildOrgRiskInsights(overallItem, scoreItems){
-  const topItem = scoreItems[0] || overallItem;
+  const items = scoreItems || [];
+  const topItem = items[0] || overallItem;
+  const lowItem = items[items.length-1] || topItem;
   const [overallStatus, overallCls] = riskBadge(overallItem.score);
   const [topStatus, topCls] = riskBadge(topItem.score);
-  const topList = topItem.list || [];
-  const overtimeAvg = avg(topList, topList.some(x => typeof x.scopedMonthlyOvertime !== 'undefined') ? 'scopedMonthlyOvertime' : 'overtime');
-  const riskAvg = avg(topList, topList.some(x => typeof x.scopedRisk !== 'undefined') ? 'scopedRisk' : 'risk');
-  const highFocus = topList.filter(x => Number(x.focusRatio || 0) >= 1.5 || getEmployeeAnalysisDailyHours(x) >= 9).length;
-  const leavePoor = topList.filter(x => Number(x.leaveUsed || 0) === 0).length;
+  const topSummary = getOrgRiskItemSummary(topItem);
   const insights = [];
 
   insights.push({
     cls: overallCls,
-    title: '전체 조직 평균',
+    title: '해석 1',
     text: `${periodLabel()} 기준 전체 조직 평균은 ${overallItem.score}점으로 '${overallStatus}' 구간입니다. 선택된 범위의 종합 위험 수준을 먼저 확인하는 기준값입니다.`
   });
 
-  insights.push({
-    cls: topCls,
-    title: '최고 위험 조직',
-    text: `${topItem.name}는 ${topItem.score}점으로 '${topStatus}' 구간이며, ${getOrgRiskItemSummary(topItem)} 상태입니다.`
-  });
+  if(topItem && topItem.name){
+    insights.push({
+      cls: topCls,
+      title: '해석 2',
+      text: `${topItem.name}는 ${topItem.score}점으로 '${topStatus}' 구간이며, 주요 원인은 ${topSummary}입니다.`
+    });
+  }
 
-  const causeBits = [];
-  if(overtimeAvg >= 10) causeBits.push(`평균 연장근로가 ${overtimeAvg.toFixed(1)}시간으로 높습니다`);
-  else if(overtimeAvg >= 5) causeBits.push(`평균 연장근로가 ${overtimeAvg.toFixed(1)}시간 수준입니다`);
-  if(highFocus > 0) causeBits.push(`고부하/업무집중 인원이 ${highFocus}명 있습니다`);
-  if(leavePoor > 0) causeBits.push(`연차 미사용 인원이 ${leavePoor}명 있습니다`);
-  if(riskAvg >= 50) causeBits.push(`개인위험 평균이 ${Math.round(riskAvg)}점입니다`);
-  insights.push({
-    cls: causeBits.length ? (topItem.score >= 50 ? 'amber' : 'green') : 'green',
-    title: '주요 원인',
-    text: causeBits.length ? causeBits.join(' · ') + '.' : '현재 선택 범위에서는 특정 원인이 과도하게 집중된 상태는 아닙니다.'
-  });
+  if(items.length >= 2){
+    const gap = Math.max(0, Number(topItem.score || 0) - Number(lowItem.score || 0));
+    insights.push({
+      cls: gap >= 20 ? 'amber' : 'green',
+      title: '해석 3',
+      text: `${topItem.name}와 ${lowItem.name}의 조직 위험 점수 차이는 ${gap}점입니다. 차이가 클수록 조직 간 업무부하와 회복 여력의 편차를 점검할 필요가 있습니다.`
+    });
+  }
 
+  const riskCount = items.filter(x => Number(x.score || 0) >= 75).length;
+  const warnCount = items.filter(x => Number(x.score || 0) >= 50 && Number(x.score || 0) < 75).length;
   insights.push({
-    cls: topItem.score >= 50 ? 'amber' : 'green',
-    title: '관리 방향',
-    text: topItem.score >= 75
-      ? '위험 구간 조직은 연장근로 배분, 휴식 사용, 고부하 인원 업무 재분배를 우선 점검하는 것이 좋습니다.'
-      : topItem.score >= 50
-        ? '주의 구간 조직은 다음 기간에 위험 구간으로 전환되지 않도록 연장근로와 회복 지표를 함께 관찰하는 것이 좋습니다.'
-        : '정상 구간 조직은 현재 수준을 유지하되 특정 인원에게 업무가 누적되는지 주기적으로 확인하면 됩니다.'
+    cls: riskCount ? 'red' : warnCount ? 'amber' : 'green',
+    title: '해석 4',
+    text: riskCount
+      ? `위험 구간 조직이 ${riskCount}개 있습니다. 연장근로 배분, 고부하 인원 업무 재조정, 연차 사용 독려를 우선 검토하는 것이 좋습니다.`
+      : warnCount
+        ? `주의 구간 조직이 ${warnCount}개 있습니다. 다음 기간에 위험 구간으로 전환되지 않도록 연장근로와 회복 지표를 함께 관찰하는 것이 좋습니다.`
+        : '현재 위험·주의 구간 조직은 없습니다. 다만 특정 인원에게 업무가 누적되는지 주기적으로 확인하면 됩니다.'
   });
 
   return insights;
@@ -5763,15 +5761,14 @@ function renderRisk(scoped){
   }
   renderStatusCards(scoped);
   const add=periodRiskAdder();
-  const scopedForScore = scoped;
-  const overallScore = Math.min(100, scoreTeam(scopedForScore) + add);
-  const overallItem = { name:'전체 조직 평균', score: overallScore, list: scopedForScore, type:'overall' };
 
+  // 중요: 본부/팀 조직 위험 점수는 기존 방식 그대로 filteredEmployees() 기준으로 계산합니다.
   let scoreItems = STATE.division==='전체' && STATE.team==='전체'
-    ? Object.entries(groupBy(scopedForScore,'division')).map(([name,list])=>({name,score:Math.min(100,scoreTeam(list)+add),list,type:'division'}))
+    ? Object.entries(groupBy(filteredEmployees(),'division')).map(([name,list])=>({name,score:Math.min(100,scoreTeam(list)+add),list,type:'division'}))
     : STATE.division!=='전체' && STATE.team==='전체'
-      ? Object.entries(groupBy(scopedForScore,'team')).map(([name,list])=>({name,score:Math.min(100,scoreTeam(list)+add),list,type:'team'}))
-      : scopedForScore.map(x=>({name:x.name,score:x.scopedRisk,list:[x],type:'person'}));
+      ? Object.entries(groupBy(filteredEmployees(),'team')).map(([name,list])=>({name,score:Math.min(100,scoreTeam(list)+add),list,type:'team'}))
+      : scoped.map(x=>({name:x.name,score:x.scopedRisk,list:[x],type:'person'}));
+
   scoreItems = scoreItems.sort((a,b)=>b.score-a.score || String(a.name).localeCompare(String(b.name), 'ko'));
   $('#scoreTitle').textContent = STATE.division==='전체' && STATE.team==='전체'
     ? `${periodLabel()} 본부별 조직 위험 점수`
@@ -5780,6 +5777,11 @@ function renderRisk(scoped){
       : `${periodLabel()} ${STATE.team} 팀원별 위험 점수`;
 
   renderLeaveCauseAnalysis(scoped, scoreItems);
+
+  const overallScore = scoreItems.length
+    ? Math.round(scoreItems.reduce((sum,item)=>sum + Number(item.score || 0),0) / scoreItems.length)
+    : Math.min(100, scoreTeam(filteredEmployees()) + add);
+  const overallItem = { name:'전체 조직 평균', score: overallScore, list: filteredEmployees(), type:'overall' };
 
   const renderScoreCard = (item, isOverall=false) => {
     const [txt,cls]=riskBadge(item.score);
