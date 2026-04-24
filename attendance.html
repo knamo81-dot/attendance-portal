@@ -2659,12 +2659,15 @@ function createUploadBatchId(){
 
 
 async function insertRowsInChunks(tableName, rows, chunkSize = 500){
-  if(!supabaseClient || !Array.isArray(rows) || !rows.length) return;
+  if(!supabase || !Array.isArray(rows) || !rows.length) return;
+
   for(let i = 0; i < rows.length; i += chunkSize){
     const chunk = rows.slice(i, i + chunkSize);
-    const { error } = await supabaseClient
+
+    const { error } = await supabase
       .from(tableName)
       .insert(chunk);
+
     if(error) throw error;
   }
 }
