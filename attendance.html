@@ -992,23 +992,12 @@ html.embed-mode #main-dashboard .kpis{
     <div class="grid21">
       <div class="card">
         <div id="attendanceChartTitle" class="title">본부/팀별 근태 현황</div>
-        <div class="desc">선택한 본부·팀 기준으로 전체와 정상 처리/주의/문제/사유 건수를 비교합니다. 전체는 정상 처리 + 주의 + 문제이며, 사유는 정상 처리 건 중 별도 상세 기준으로 집계합니다.</div>
+        <div class="desc">선택한 본부·팀 기준으로 전체와 정상 처리/주의/문제/사유 건수를 비교합니다. 전체는 정상 처리 + 주의 + 문제이며, 사유는 ERP 사유 중 주의/문제를 제외한 인정 근태 기준으로 집계합니다.</div>
         <div id="attendanceChart" class="chart" style="height:360px"></div>
       </div>
       <div class="card">
         <div class="title">근태 요약</div>
         <div id="attendanceInsightList"></div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <div class="title">주말 ERP 사유 보정 규칙</div>
-      <div class="desc">ERPDB에 주말에도 육아휴직, 출산휴가 같은 사유가 연속으로 찍히는 경우를 대비한 판정 기준입니다. 실제 세콤DB / ERPDB 연결 시 이 규칙을 그대로 적용할 수 있게 준비해두었습니다.</div>
-      <div class="guideGrid">
-        <div class="mini"><strong>연속 상태형</strong><div class="label" style="margin-top:8px">육아휴직, 출산휴가, 산전후휴가, 병가, 휴직류는 주말에도 정상 상태로 인정</div></div>
-        <div class="mini"><strong>일일 행위형</strong><div class="label" style="margin-top:8px">연차, 반차, 외근, 출장, 조퇴, 결근은 주말일 경우 별도 검토 대상으로 분리</div></div>
-        <div class="mini"><strong>누락 판정 제외</strong><div class="label" style="margin-top:8px">주말 + 연속 상태형 사유는 출근누락/퇴근누락 문제건에서 제외</div></div>
-        <div class="mini"><strong>대시보드 제외</strong><div class="label" style="margin-top:8px">주말 휴직/휴가형 사유는 문제건수, 피로도, 위험도 집계에서 제외</div></div>
       </div>
     </div>
 
@@ -7162,15 +7151,50 @@ function normalizeAttendanceReasonKey(value, mode='default'){
 }
 function countAttendanceReasonMap(list, excluded=[], mode='default'){
   return list.reduce((acc, row) => {
-    const key = normalizeAttendanceReasonKey(row.reason, mode);
+    const key = normalizeAttendanceReasonKey(getAttendanceBaseReason(row) || row.reason, mode);
     if(!key || key === '-' || excluded.includes(key)) return acc;
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
 }
+function getAttendanceWarningFlags(row){
+  const holidayWorkTypes = ['공휴일','휴일','휴무일'];
+  const weekdayWorkTypes = ['정상근무','외근','오전외근','오후외근'];
+  const erpReason = String(row?.originalErpReason || row?.erpReason || getAttendanceBaseReason(row) || row?.reason || '')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .trim();
+  const erpOT = Number(row?.erpActualOvertime || 0);
+  const hasActualOvertime = erpOT > 0;
+  const isHolidayType = holidayWorkTypes.includes(erpReason);
+  const isWeekdayWorkType = weekdayWorkTypes.includes(erpReason);
+  const reasonKey = normalizeAttendanceReasonKey(row?.reason, 'warning');
+  const fallbackOvertime = reasonKey === '연장근무';
+  const fallbackHoliday = reasonKey === '공휴일근무';
+  const fallbackWeekendHoliday = reasonKey === '휴일근무';
+  const isOvertime = hasActualOvertime
+    ? (isWeekdayWorkType || !isHolidayType)
+    : fallbackOvertime;
+  const isHoliday = hasActualOvertime
+    ? isHolidayType
+    : (fallbackHoliday || fallbackWeekendHoliday);
+  const isMissingStart = String(row?.displayStart || '').trim() === '출근누락';
+  const isMissingEnd = String(row?.displayEnd || '').trim() === '퇴근누락';
+  return { isOvertime, isHoliday, isMissingStart, isMissingEnd, isWarning:isOvertime || isHoliday || isMissingStart || isMissingEnd };
+}
+function isAttendanceReasonDisplayRow(row){
+  const key = normalizeAttendanceReasonKey(getAttendanceBaseReason(row) || row?.reason);
+  if(!key || key === '-' || ATTENDANCE_REASON_EXCLUDE.includes(key)) return false;
+  if(row?.bucket === '문제') return false;
+  if(getAttendanceWarningFlags(row).isWarning) return false;
+  return true;
+}
+function getAttendanceReasonRows(list){
+  return (Array.isArray(list) ? list : []).filter(isAttendanceReasonDisplayRow);
+}
 function getAttendanceReasonCount(list){
   return Object.values(countAttendanceReasonMap(
-    list.filter(row => row.bucket === '근태사유'),
+    getAttendanceReasonRows(list),
     ATTENDANCE_REASON_EXCLUDE
   )).reduce((sum, value) => sum + value, 0);
 }
@@ -7194,29 +7218,11 @@ function getAttendanceWarningEventSummary(list){
     // - 연장근무: 실제연장_시간 > 0 AND 근태구분이 평일 근무계열
     // - 공휴일근무: 실제연장_시간 > 0 AND 근태구분이 공휴일/휴일/휴무일
     // 업로드/저장 로직은 건드리지 않고, 요약 집계 기준만 안정화한다.
-    const erpReason = String(row.originalErpReason || row.erpReason || row.reason || '')
-      .replace(/<br\s*\/?>/gi, ' ')
-      .replace(/<[^>]+>/g, ' ')
-      .trim();
-    const erpOT = Number(row.erpActualOvertime || 0);
-    const hasActualOvertime = erpOT > 0;
-    const isHolidayType = holidayWorkTypes.includes(erpReason);
-    const isWeekdayWorkType = weekdayWorkTypes.includes(erpReason);
-
-    const reasonKey = normalizeAttendanceReasonKey(row.reason, 'warning');
-    const fallbackOvertime = reasonKey === '연장근무';
-    const fallbackHoliday = reasonKey === '공휴일근무';
-    const fallbackWeekendHoliday = reasonKey === '휴일근무';
-
-    const isOvertime = hasActualOvertime
-      ? (isWeekdayWorkType || !isHolidayType)
-      : fallbackOvertime;
-    const isHoliday = hasActualOvertime
-      ? isHolidayType
-      : (fallbackHoliday || fallbackWeekendHoliday);
-
-    const isMissingStart = String(row.displayStart || '').trim() === '출근누락';
-    const isMissingEnd = String(row.displayEnd || '').trim() === '퇴근누락';
+    const flags = getAttendanceWarningFlags(row);
+    const isOvertime = flags.isOvertime;
+    const isHoliday = flags.isHoliday;
+    const isMissingStart = flags.isMissingStart;
+    const isMissingEnd = flags.isMissingEnd;
     const hasPriorityWork = isOvertime || isHoliday;
 
     if (isOvertime) summary.overtime += 1;
@@ -7257,7 +7263,7 @@ function renderAttendanceKpis(rows){
     ['정상', `${normal}건`, '전체 표시건에서 주의/문제를 제외한 정상 처리 건'],
     ['주의', `${warn}건`, warningDetail || '연장근무, 휴일/공휴일근무, 출퇴근 미입력 등 확인이 필요한 건'],
     ['문제', `${issue}건`, '결근·근무시간 부족·단축근무 미달'],
-    ['사유', `${reason}건`, '정상 처리 건 중 사유 상세로 별도 표시한 인정 근태']
+    ['사유', `${reason}건`, 'ERP 사유 중 주의/문제를 제외한 인정 근태']
   ].map(([label, value, sub]) => `<div class="card"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`).join('');
 }
 function renderAttendanceChart(rows){
@@ -7282,7 +7288,7 @@ function renderAttendanceInsights(rows){
   const msgs = [];
   const issues = rows.filter(r => r.bucket === '문제');
   const warns = rows.filter(r => r.bucket === '주의');
-  const reasons = rows.filter(r => r.bucket === '근태사유');
+  const reasons = getAttendanceReasonRows(rows);
 
   const issueCounts = countAttendanceReasonMap(issues);
   const warnSummary = getAttendanceWarningEventSummary(rows);
@@ -7315,7 +7321,7 @@ function renderAttendanceInsights(rows){
   if(Object.keys(reasonCounts).length){
     msgs.push({
       title: `사유 ${reasonTotal}건`,
-      desc: '일반근무가 아닌 인정 근태 내역입니다.',
+      desc: 'ERP 사유 반영 건 중 주의/문제를 제외한 인정 근태 내역입니다.',
       detail: formatDetail(reasonCounts, ['연차','오전반차','오후반차','반차','외근','오전외근','오후외근','출장','재택근무','단축근무','파견','휴직','육아휴직','출산휴가','산전후휴가','병가','가족돌봄휴직','장기휴직','공가','보건휴가'])
     });
   }
