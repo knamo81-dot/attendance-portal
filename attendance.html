@@ -920,28 +920,21 @@ html.embed-mode #main-dashboard .kpis{
 .dashboardRelayout .card[data-kpi-card]{position:relative;cursor:default;user-select:auto;height:100%;margin:0;border-radius:18px;box-shadow:none;}
 .dashboardRelayout .dashboardDecisionGrid .card[data-kpi-card],.dashboardRelayout .dashboardCauseGrid .card[data-kpi-card]{min-height:150px;}
 .dashboardRelayout details.dashboardDetailBox{border:1px dashed #cbd5e1;border-radius:18px;background:#f8fafc;padding:14px;}
-.dashboardRelayout details.dashboardDetailBox summary{cursor:pointer;font-size:16px;font-weight:900;user-select:none;}
-.dashboardDetailGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px;}
-.dashboardDetailGrid .card[data-kpi-card]{min-height:116px;background:#fff}
-.dashboardCauseBadge{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#ecfdf5;color:#15803d;font-size:12px;font-weight:900;white-space:nowrap;}
-@media (max-width:1300px){.dashboardDecisionGrid,.dashboardCauseGrid,.dashboardInfoGrid,.dashboardDetailGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:760px){.dashboardDecisionGrid,.dashboardCauseGrid,.dashboardInfoGrid,.dashboardDetailGrid{grid-template-columns:1fr}.dashboardSectionHead{flex-direction:column}}
-
-/* ===== Dashboard detail grouped layout ===== */
-.dashboardDetailIntro{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin:12px 0 14px;}
-.dashboardDetailIntroText{font-size:13px;line-height:1.55;color:var(--muted);}
-.dashboardDetailNote{display:inline-flex;padding:7px 10px;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--muted);font-size:12px;font-weight:800;white-space:nowrap;}
+.dashboardRelayout details.dashboardDetailBox summary{cursor:pointer;font-size:16px;font-weight:900;user-select:none;list-style:none;}
+.dashboardRelayout details.dashboardDetailBox summary::-webkit-details-marker{display:none;}
+.dashboardRelayout details.dashboardDetailBox summary::before{content:'▼ ';font-weight:900;}
+.dashboardRelayout details.dashboardDetailBox[open] summary::before{content:'▲ ';}
 .dashboardDetailGroupGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:14px;}
 .dashboardDetailGroup{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px;min-height:320px;}
 .dashboardDetailGroupHead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #edf2f7;}
 .dashboardDetailGroupHead strong{font-size:16px;font-weight:900;}
-.dashboardDetailGroupHead span{font-size:12px;color:var(--muted);font-weight:800;}
+.dashboardDetailGroupHead span{font-size:12px;color:var(--muted);font-weight:800;white-space:nowrap;}
 .dashboardDetailGroupBody{display:grid;gap:10px;}
-.dashboardDetailGroupBody:empty::before{content:'해당 상세 지표 없음';display:block;border:1px dashed #dbe4ef;border-radius:14px;background:#f8fafc;color:#94a3b8;font-size:12px;font-weight:800;text-align:center;padding:18px 10px;}
 .dashboardDetailGroupBody .card[data-kpi-card]{min-height:116px;background:#fff;border-radius:15px;box-shadow:none;}
-.dashboardDetailGroupSummary{margin-top:12px;border-radius:14px;padding:11px;font-size:12px;line-height:1.5;color:#475569;background:#f8fafc;border:1px solid #edf2f7;}
-@media (max-width:1300px){.dashboardDetailGroupGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:760px){.dashboardDetailGroupGrid{grid-template-columns:1fr}.dashboardDetailIntro{flex-direction:column}.dashboardDetailNote{white-space:normal}}
+.dashboardDetailGroupNote{margin-top:12px;border-radius:14px;padding:11px;font-size:12px;line-height:1.5;color:#475569;background:#f8fafc;border:1px solid #edf2f7;}
+.dashboardCauseBadge{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#ecfdf5;color:#15803d;font-size:12px;font-weight:900;white-space:nowrap;}
+@media (max-width:1300px){.dashboardDecisionGrid,.dashboardCauseGrid,.dashboardInfoGrid,.dashboardDetailGroupGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){.dashboardDecisionGrid,.dashboardCauseGrid,.dashboardInfoGrid,.dashboardDetailGroupGrid{grid-template-columns:1fr}.dashboardSectionHead{flex-direction:column}}
 
 </style>
 
@@ -4749,39 +4742,22 @@ function ensureDashboardRelayoutStructure(){
         <div class="dashboardInfoGrid" id="dashboardInfoGrid"></div>
       </section>
       <section class="dashboardSection" data-dashboard-section="detail">
-        <details class="dashboardDetailBox" open>
+        <details class="dashboardDetailBox" id="dashboardDetailBox">
           <summary>4. 상세 지표 보기</summary>
-          <div class="dashboardDetailIntro">
-            <div class="dashboardDetailIntroText">상세 지표는 항상 같은 그룹과 순서로 표시합니다. 위쪽 핵심 원인 카드와 겹치는 값이 있어도, 여기서는 전체 현황 확인용으로 작게 정리합니다.</div>
-            <div class="dashboardDetailNote">고정 영역 · 계산 로직 변경 없음</div>
-          </div>
-          <div class="dashboardDetailGroupGrid" id="dashboardDetailGrid">
-            <div class="dashboardDetailGroup" data-detail-group="overtime">
-              <div class="dashboardDetailGroupHead"><strong>연장근로</strong><span>부하/집중</span></div>
-              <div class="dashboardDetailGroupBody" id="dashboardDetailOvertime"></div>
-              <div class="dashboardDetailGroupSummary">연장근로는 총량보다 특정 인원 집중 여부를 함께 보는 구조입니다.</div>
-            </div>
-            <div class="dashboardDetailGroup" data-detail-group="leave">
-              <div class="dashboardDetailGroupHead"><strong>연차/회복</strong><span>휴식/회복</span></div>
-              <div class="dashboardDetailGroupBody" id="dashboardDetailLeave"></div>
-              <div class="dashboardDetailGroupSummary">연차 관련 지표는 회복 부족 여부를 판단하는 보조 지표입니다.</div>
-            </div>
-            <div class="dashboardDetailGroup" data-detail-group="mobility">
-              <div class="dashboardDetailGroupHead"><strong>외근/출장</strong><span>활동/편중</span></div>
-              <div class="dashboardDetailGroupBody" id="dashboardDetailMobility"></div>
-              <div class="dashboardDetailGroupSummary">외근/출장은 발생량보다 특정 인원 편중 여부를 함께 확인합니다.</div>
-            </div>
-            <div class="dashboardDetailGroup" data-detail-group="operation">
-              <div class="dashboardDetailGroupHead"><strong>조직/운영</strong><span>종합 판단</span></div>
-              <div class="dashboardDetailGroupBody" id="dashboardDetailOperation"></div>
-              <div class="dashboardDetailGroupSummary">조직/운영 그룹은 결론 카드의 근거를 세부적으로 확인하는 용도입니다.</div>
-            </div>
+          <div class="dashboardSectionDesc" style="margin:8px 0 12px">상세 지표는 기본 닫힘 상태로 두고, 열면 전체 내역을 한 번에 확인할 수 있게 그룹별로 모아 표시합니다.</div>
+          <div class="dashboardDetailGroupGrid" id="dashboardDetailGroupGrid">
+            <div class="dashboardDetailGroup" data-detail-group="overtime"><div class="dashboardDetailGroupHead"><strong>연장근로</strong><span>부하/집중</span></div><div class="dashboardDetailGroupBody" id="detailGroupOvertime"></div><div class="dashboardDetailGroupNote">연장근로는 총량과 특정 인원 집중 여부를 함께 확인합니다.</div></div>
+            <div class="dashboardDetailGroup" data-detail-group="leave"><div class="dashboardDetailGroupHead"><strong>연차/회복</strong><span>휴식/회복</span></div><div class="dashboardDetailGroupBody" id="detailGroupLeave"></div><div class="dashboardDetailGroupNote">연차 관련 지표는 회복 부족 여부를 판단하는 보조 지표입니다.</div></div>
+            <div class="dashboardDetailGroup" data-detail-group="mobility"><div class="dashboardDetailGroupHead"><strong>외근/출장</strong><span>활동/편중</span></div><div class="dashboardDetailGroupBody" id="detailGroupMobility"></div><div class="dashboardDetailGroupNote">외근/출장은 발생량보다 특정 인원 편중 여부를 함께 확인합니다.</div></div>
+            <div class="dashboardDetailGroup" data-detail-group="operation"><div class="dashboardDetailGroupHead"><strong>조직/운영</strong><span>종합 판단</span></div><div class="dashboardDetailGroupBody" id="detailGroupOperation"></div><div class="dashboardDetailGroupNote">조직/운영 그룹은 결론 카드의 근거를 세부적으로 확인하는 용도입니다.</div></div>
           </div>
         </details>
-
       </section>
+      <div id="dashboardHiddenCardPool" style="display:none"></div>
     `;
     cards.forEach(card => container.appendChild(card));
+    const detailBox = document.getElementById('dashboardDetailBox');
+    if(detailBox) detailBox.open = false;
     container.dataset.relayoutReady = 'Y';
   }
   return container;
@@ -4791,30 +4767,28 @@ function moveDashboardCard(cardId, targetId){
   const target = document.getElementById(targetId);
   if(card && target) target.appendChild(card);
 }
-function dashboardDetailTargetForCard(cardId){
-  const map = {
-    total_overtime:'dashboardDetailOvertime',
-    avg_overtime:'dashboardDetailOvertime',
-    overtime_concentration:'dashboardDetailOvertime',
-    leave_deficiency:'dashboardDetailLeave',
-    unused_leave:'dashboardDetailLeave',
-    leave_risk:'dashboardDetailLeave',
-    total_activity:'dashboardDetailMobility',
-    mobility_activity:'dashboardDetailMobility',
-    mobility_concentration:'dashboardDetailMobility',
-    mobility_risk:'dashboardDetailMobility',
-    work_concentration:'dashboardDetailOperation',
-    work_concentration_status:'dashboardDetailOperation',
-    high_risk_count:'dashboardDetailOperation',
-    operational_risk:'dashboardDetailOperation',
-    operational_risk_total:'dashboardDetailOperation',
-    avg_risk_score:'dashboardDetailOperation',
-    retirement_risk:'dashboardDetailOperation',
-    target_headcount:'dashboardDetailOperation'
-  };
-  return map[cardId] || 'dashboardDetailOperation';
+function stripIdsForDashboardClone(root){
+  if(!root) return root;
+  if(root.removeAttribute) root.removeAttribute('id');
+  root.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+  root.querySelectorAll('.kpiDragHandle').forEach(el => el.remove());
+  root.setAttribute('data-detail-clone','Y');
+  return root;
 }
-
+function cloneDashboardCardForDetail(cardId, targetId){
+  const source = document.querySelector(`[data-kpi-card="${cardId}"]:not([data-detail-clone="Y"])`);
+  const target = document.getElementById(targetId);
+  if(!source || !target) return;
+  const clone = stripIdsForDashboardClone(source.cloneNode(true));
+  clone.setAttribute('data-kpi-card', `${cardId}_detail`);
+  target.appendChild(clone);
+}
+function resetDashboardDetailGroups(){
+  ['detailGroupOvertime','detailGroupLeave','detailGroupMobility','detailGroupOperation'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = '';
+  });
+}
 function applyDashboardRelayoutCards(){
   const container = ensureDashboardRelayoutStructure();
   if(!container) return;
@@ -4835,21 +4809,39 @@ function applyDashboardRelayoutCards(){
   const existingCandidateIds = new Set(causeCandidates.map(item => item.id));
   const scored = causeCandidates
     .map(item => ({ ...item, score: parseDashboardMetricValue(item.metric) * item.weight }))
-    .filter(item => document.querySelector(`[data-kpi-card="${item.id}"]`))
+    .filter(item => document.querySelector(`[data-kpi-card="${item.id}"]:not([data-detail-clone="Y"])`))
     .sort((a,b) => b.score - a.score);
   const topCauseIds = new Set(scored.slice(0,3).map(item => item.id));
-  scored.forEach(item => moveDashboardCard(item.id, topCauseIds.has(item.id) ? 'dashboardCauseGrid' : dashboardDetailTargetForCard(item.id)));
+  scored.forEach(item => moveDashboardCard(item.id, topCauseIds.has(item.id) ? 'dashboardCauseGrid' : 'dashboardHiddenCardPool'));
 
   infoIds.forEach(id => moveDashboardCard(id, 'dashboardInfoGrid'));
 
   const fixedIds = new Set([...decisionIds, ...infoIds, ...existingCandidateIds]);
-  [...container.querySelectorAll('[data-kpi-card]')].forEach(card => {
+  [...container.querySelectorAll('[data-kpi-card]:not([data-detail-clone="Y"])')].forEach(card => {
     const id = card.getAttribute('data-kpi-card');
     if(!fixedIds.has(id)){
       const hiddenByDesign = card.style && String(card.style.display || '').includes('none');
-      if(!hiddenByDesign) document.getElementById(dashboardDetailTargetForCard(id))?.appendChild(card);
+      if(!hiddenByDesign) document.getElementById('dashboardHiddenCardPool')?.appendChild(card);
     }
   });
+
+  // 상세지표는 상단 TOP3/결론 카드와 분산되지 않도록, 원본을 이동하지 않고 복제본으로 전체 내역을 그룹별 표시합니다.
+  resetDashboardDetailGroups();
+  [
+    ['total_overtime','detailGroupOvertime'],
+    ['avg_overtime','detailGroupOvertime'],
+    ['overtime_concentration','detailGroupOvertime'],
+    ['leave_deficiency','detailGroupLeave'],
+    ['unused_leave','detailGroupLeave'],
+    ['leave_risk','detailGroupLeave'],
+    ['total_activity','detailGroupMobility'],
+    ['mobility_activity','detailGroupMobility'],
+    ['mobility_concentration','detailGroupMobility'],
+    ['mobility_risk','detailGroupMobility'],
+    ['work_concentration_status','detailGroupOperation'],
+    ['high_risk_count','detailGroupOperation'],
+    ['retirement_risk','detailGroupOperation']
+  ].forEach(([cardId, targetId]) => cloneDashboardCardForDetail(cardId, targetId));
 }
 
 function renderSummary(months){
