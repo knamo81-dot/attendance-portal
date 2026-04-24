@@ -2715,45 +2715,50 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
   
 async function insertRowsInChunks(tableName, rows, chunkSize = 500){
   if(!supabaseClient || !Array.isArray(rows) || !rows.length) return;
+
   for(let i = 0; i < rows.length; i += chunkSize){
     const chunk = rows.slice(i, i + chunkSize);
-    const { error } = await supabaseClient.from(tableName).insert(chunk);
+    const { error } = await supabaseClient
+      .from(tableName)
+      .insert(chunk);
+
     if(error) throw error;
   }
 }
-async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], erpRows = [], secomFilename = '', erpFilename = '' }){
-  if(!supabaseClient) return { ok:false, skipped:true, reason:'supabase-disabled' };
 
-  const uploadedBy = (() => {
-    try{
-      const currentUser = window.__portalCurrentUser || window.currentUser || null;
-      if(currentUser && typeof currentUser === 'object'){
-        return String(currentUser.email || currentUser.user_email || currentUser.name || '').trim() || null;
-      }
-    }catch(e){}
-    return null;
-  })();
+async function backupUploadedAttendanceRawToSupabase({
+  batchId,
+  secomRows = [],
+  erpRows = [],
+  secomFilename = '',
+  erpFilename = ''
+}){
+  if(!supabaseClient) {
+    return { ok:false, skipped:true, reason:'supabase-disabled' };
+  }
 
- async function createServerUploadBatchMeta(batchId, meta){
-  if(!supabaseClient) return null;
+  async function createServerUploadBatchMeta(batchId, meta){
+    const payload = {
+      batch_id: batchId,
+      upload_type: 'manual_upload',
+      secom_file_name: meta?.secomFilename || null,
+      erp_file_name: meta?.erpFilename || null
+    };
 
-  const payload = {
-    batch_id: batchId,
-    upload_type: 'manual_upload',
-    secom_file_name: meta?.secomFilename || null,
-    erp_file_name: meta?.erpFilename || null
-  };
+    const { data, error } = await supabaseClient
+      .from('attendance_upload_batches')
+      .insert([payload])
+      .select()
+      .single();
 
-  const { data, error } = await supabaseClient
-    .from('attendance_upload_batches')
-    .insert([payload])
-    .select()
-    .single();
+    if(error) throw error;
+    return data?.id ?? null;
+  }
 
-  if(error) throw error;
-
-  return data?.id ?? null;
-}
+  await createServerUploadBatchMeta(batchId, {
+    secomFilename,
+    erpFilename
+  });
 
   const secomPayload = (secomRows || []).map(row => ({
     upload_batch_id: batchId,
@@ -2776,46 +2781,49 @@ async function backupUploadedAttendanceRawToSupabase({ batchId, secomRows = [], 
     raw_data: row
   }));
 
-  await insertRowsInChunks('attendance_secom_raw', secomPayload);
-  await insertRowsInChunks('attendance_erp_raw', erpPayload);
+  if(secomPayload.length){
+    await insertRowsInChunks('attendance_secom_raw', secomPayload);
+  }
 
-const recordsPayload = [
-  ...(secomRows || []).map(row => ({
-    upload_batch_id: batchId,
-    work_date: row.date || null,
-    emp_no: String(row.employeeId || '').trim() || null,
-    name: row.name || null,
-    in_time: row.start || null,
-    out_time: row.end || null,
-    raw_data: row
-  })),
-  ...(erpRows || []).map(row => ({
-    upload_batch_id: batchId,
-    work_date: row.date || null,
-    emp_no: String(row.employeeId || '').trim() || null,
-    name: row.name || null,
-    in_time: row.start || null,
-    out_time: row.end || null,
-    raw_data: row
-  }))
-];
+  if(erpPayload.length){
+    await insertRowsInChunks('attendance_erp_raw', erpPayload);
+  }
 
-if (recordsPayload.length > 0) {
-  const { error: insertError } = await supabaseClient
-    .from('attendance_records')
-    .insert(recordsPayload);
+  const recordsPayload = [
+    ...(secomRows || []).map(row => ({
+      upload_batch_id: batchId,
+      work_date: row.date || null,
+      emp_no: String(row.employeeId || '').trim() || null,
+      name: row.name || null,
+      in_time: row.start || null,
+      out_time: row.end || null,
+      raw_data: row
+    })),
+    ...(erpRows || []).map(row => ({
+      upload_batch_id: batchId,
+      work_date: row.date || null,
+      emp_no: String(row.employeeId || '').trim() || null,
+      name: row.name || null,
+      in_time: row.start || null,
+      out_time: row.end || null,
+      raw_data: row
+    }))
+  ];
 
-  if (insertError) throw insertError;
-}
-  
+  if(recordsPayload.length){
+    await insertRowsInChunks('attendance_records', recordsPayload);
+  }
+
   return {
     ok: true,
     skipped: false,
     batchId,
     secomCount: secomPayload.length,
-    erpCount: erpPayload.length
+    erpCount: erpPayload.length,
+    recordsCount: recordsPayload.length
   };
 }
+  
 function loadUploadedAttendanceData(){
   try{
     const raw = localStorage.getItem(ATTENDANCE_UPLOAD_STORAGE_KEY);
