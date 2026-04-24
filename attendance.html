@@ -6946,7 +6946,12 @@ function matchesAttendanceFilters(row){
     && selectedOrAll(row.statusLabel || '-', 'status')
     && selectedOrAll((row.absenceDecision || '-'), 'absencecheck')
     && selectedOrAll(row.overtimeCheck === '-' ? '-' : row.overtimeCheck, 'otcheck')
-    && selectedOrAll(row.reason || '-', 'reason');
+    && (() => {
+      const selected = ATT_FILTERS.reason || [];
+      if(!selected.length) return true;
+      const tokens = getAttendanceReasonTokens(row);
+      return selected.some(v => tokens.includes(String(v)));
+    })();
 }
 
 function isAttendanceTargetIncludedRow(row, metaByName){
@@ -7183,14 +7188,127 @@ function renderAttendanceInsights(rows){
   `).join('');
 }
 
-function formatAttendanceReasonHtml(reason){
-  const raw = String(reason || '').trim();
-  if(!raw || raw === '-') return '-';
-  const match = raw.match(/^(.+?)\s*\((.+)\)$/);
-  if(!match) return raw;
-  const main = match[1].trim();
-  const sub = '(' + match[2].trim() + ')';
-  return `<span class="reason-main">${main}</span><span class="reason-sub">${sub}</span>`;
+function escapeHtmlSafe(value){
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+const ATTENDANCE_REASON_ORDER = [
+  '결근','출근미입력','퇴근미입력','출퇴근미입력',
+  '연장근무','연장근무 미인정','연장근무 부분인정','공휴일근무','휴일근무',
+  '근무시간 부족','단축근무','단축근무 부족',
+  '연차','연차휴가','반차','오전반차','오후반차',
+  '외근','오전외근','오후외근','출장','파견','재택근무',
+  '육아휴직','출산휴가','산전후휴가','병가','휴직','가족돌봄휴직','장기휴직',
+  '공가','보건휴가','지각','조퇴','근태사유','확인필요'
+];
+
+function normalizeReasonToken(value){
+  let s = String(value || '')
+    .replace(/<br\s*\/?\s*>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/^주말\s+/, '')
+    .replace(/\(검토\)$/,'')
+    .replace(/[()\[\]{}]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if(!s || s === '-' || s === '정상' || s === '정상근무' || s === '정상출퇴근') return '';
+
+  if(/출퇴근미입력|출퇴근 미입력/.test(s)) return '출퇴근미입력';
+  if(/출근미입력|출근 미입력|출근누락/.test(s)) return '출근미입력';
+  if(/퇴근미입력|퇴근 미입력|퇴근누락/.test(s)) return '퇴근미입력';
+  if(/공휴일근무|공휴일 근무/.test(s)) return '공휴일근무';
+  if(/휴일근무|휴일 근무/.test(s)) return '휴일근무';
+  if(/연장근무.*미인정|미인정.*연장근무/.test(s)) return '연장근무 미인정';
+  if(/연장근무.*부분인정|부분인정.*연장근무/.test(s)) return '연장근무 부분인정';
+  if(/연장근무|연장 근무/.test(s)) return '연장근무';
+  if(/단축근무 부족/.test(s)) return '단축근무 부족';
+  if(/근무시간 부족/.test(s)) return '근무시간 부족';
+  if(/오전반차/.test(s)) return '오전반차';
+  if(/오후반차/.test(s)) return '오후반차';
+  if(/연차휴가/.test(s)) return '연차휴가';
+  if(/육아휴직/.test(s)) return '육아휴직';
+  if(/출산휴가/.test(s)) return '출산휴가';
+  if(/산전후휴가/.test(s)) return '산전후휴가';
+  if(/가족돌봄휴직/.test(s)) return '가족돌봄휴직';
+  if(/장기휴직/.test(s)) return '장기휴직';
+  if(/오전외근/.test(s)) return '오전외근';
+  if(/오후외근/.test(s)) return '오후외근';
+
+  return s;
+}
+
+function splitReasonTokens(value){
+  const raw = String(value || '')
+    .replace(/<br\s*\/?\s*>/gi, '|')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[()]/g, '|')
+    .replace(/[\/,，·;]/g, '|');
+
+  return raw.split('|')
+    .map(normalizeReasonToken)
+    .filter(Boolean);
+}
+
+function uniqueOrderedReasonTokens(tokens){
+  const unique = [...new Set((tokens || []).map(normalizeReasonToken).filter(Boolean))];
+  return unique.sort((a,b) => {
+    const ai = ATTENDANCE_REASON_ORDER.indexOf(a);
+    const bi = ATTENDANCE_REASON_ORDER.indexOf(b);
+    if(ai !== -1 || bi !== -1){
+      if(ai === -1) return 1;
+      if(bi === -1) return -1;
+      return ai - bi;
+    }
+    return String(a).localeCompare(String(b), 'ko');
+  });
+}
+
+function getAttendanceReasonTokens(row){
+  const tokens = [];
+
+  tokens.push(...splitReasonTokens(row?.reason));
+  tokens.push(...splitReasonTokens(row?.primaryReason));
+  tokens.push(...splitReasonTokens(row?.secondaryReason));
+  tokens.push(...splitReasonTokens(row?.originalErpReason));
+  tokens.push(...splitReasonTokens(row?.originalStatus));
+
+  const displayStart = String(row?.displayStart || '').trim();
+  const displayEnd = String(row?.displayEnd || '').trim();
+  if(displayStart === '출근누락') tokens.push('출근미입력');
+  if(displayEnd === '퇴근누락') tokens.push('퇴근미입력');
+  if(displayStart === '출근누락' && displayEnd === '퇴근누락') tokens.push('출퇴근미입력');
+
+  const absenceDecision = String(row?.absenceDecision || '').trim();
+  if(absenceDecision && absenceDecision !== '-') tokens.push(absenceDecision);
+
+  const erpOT = String(row?.erpOTDisplay || '').trim();
+  const overtimeCheck = String(row?.overtimeCheck || '').trim();
+  if(erpOT && erpOT !== '-' && erpOT !== '0:00'){
+    if(overtimeCheck === '미인정') tokens.push('연장근무 미인정');
+    else if(overtimeCheck === '부분인정') tokens.push('연장근무 부분인정');
+    else tokens.push('연장근무');
+  }
+
+  const bucket = String(row?.bucket || '').trim();
+  if(bucket === '근태사유' && !tokens.length) tokens.push('근태사유');
+  if(bucket === '문제' && !tokens.length) tokens.push('확인필요');
+
+  return uniqueOrderedReasonTokens(tokens);
+}
+
+function formatAttendanceReasonHtml(reason, row){
+  const tokens = row ? getAttendanceReasonTokens(row) : uniqueOrderedReasonTokens(splitReasonTokens(reason));
+  if(!tokens.length) return '-';
+  if(tokens.length === 1) return `<span class="reason-main">${escapeHtmlSafe(tokens[0])}</span>`;
+  return `<span class="reason-main">${escapeHtmlSafe(tokens[0])}</span>` +
+    tokens.slice(1).map(t => `<span class="reason-sub">${escapeHtmlSafe(t)}</span>`).join('');
 }
 
 function toMinutesFromHM(v){
@@ -7325,7 +7443,7 @@ function renderAttendanceTable(rows){
       <td data-label="상태">${r.statusLabel ? attendanceStatusBadge(r.statusLabel) : ''}</td>
       <td data-label="결근확인">${renderAbsenceCheckSelect(r)}</td>
       <td data-label="OT확인">${r.overtimeCheck === '-' ? '-' : renderOvertimeCheckSelect(r)}</td>
-      <td data-label="사유">${formatAttendanceReasonHtml(r.reason || '-')}</td>
+      <td data-label="사유">${formatAttendanceReasonHtml(r.reason || '-', r)}</td>
       ${(() => { const a = getAttendanceAnalysisFields(r); return `
       <td data-label="실근무" class="analysisCell">${a.analysisWorkDisplay}</td>
       <td data-label="8시보정" class="analysisCell dim">${a.adjustedWorkDisplay}</td>
@@ -7352,7 +7470,7 @@ function bindAttendanceFilters(){
     status: r => r.statusLabel || '-',
     absencecheck: r => (r.absenceDecision || '-'),
     otcheck: r => (r.overtimeCheck === '-' ? '-' : r.overtimeCheck),
-    reason: r => r.reason || '-'
+    reason: r => getAttendanceReasonTokens(r)
   };
 
   const baseRows = (buildAttendanceRows.unfiltered ? buildAttendanceRows.unfiltered() : []).filter(r => !isDisplayExcludedAttendance(r));
@@ -7361,7 +7479,13 @@ function bindAttendanceFilters(){
     const dd = document.getElementById('dropdown-' + key);
     if(!dd) return;
 
-    const values = [...new Set(baseRows.map(getter).filter(v => String(v).trim() !== ''))].sort((a,b)=>String(a).localeCompare(String(b),'ko'));
+    const rawValues = baseRows.flatMap(row => {
+      const v = getter(row);
+      return Array.isArray(v) ? v : [v];
+    }).filter(v => String(v).trim() !== '');
+    const values = key === 'reason'
+      ? uniqueOrderedReasonTokens(rawValues)
+      : [...new Set(rawValues.map(v => String(v)))].sort((a,b)=>String(a).localeCompare(String(b),'ko'));
     const committed = ATT_FILTERS[key] || [];
     dd.innerHTML = values.map(v => `<label><input type="checkbox" value="${String(v).replace(/"/g,'&quot;')}" ${committed.includes(String(v))?'checked':''}> <span>${v}</span></label>`).join('') + `
       <div class="filterActions">
