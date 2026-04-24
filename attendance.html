@@ -5299,7 +5299,40 @@ function renderInsight(scoped, months){
       : '팀 선택 시 해당 팀 구성원별 실근무일수 기준 일평균 기본근무시간, ERP 기준 일평균 연장근로시간, 일평균 숨은초과시간과 총부하를 비교합니다. 주말·공휴일 근무는 기본근무 0시간, 연장근로로 반영합니다.';
   barSVG($('#scopeChart'), scopeData, ['avgBaseWorkHours','avgDailyOvertime','avgHiddenOvertime','avgTotalLoad'], ['#2563eb','#ef4444','#d97706','#0f172a'], scopeData.length>4, {timeFormat:true});
 
-  const workConMetrics = getWorkConcentrationMetrics(selectedMembers.length ? selectedMembers : scoped);
+  // 자동 인사이트는 레이더/핵심지표에서 이미 계산한 값과 같은 기준을 사용한다.
+  // 별도 평균 재계산으로 레이더와 숫자가 달라지지 않도록, 아래 계산식은 renderTopCharts의 레이더 계산식과 동일하게 유지한다.
+  const workConMetrics = getWorkConcentrationMetrics(scoped);
+  const concentration = Math.min(100, Math.round(workConMetrics.workConcentrationRate));
+  const gradeMetrics = getGradeImbalanceMetrics(scoped);
+  const gradeImbalance = Math.min(100, Math.round(gradeMetrics.gradeImbalanceScore));
+
+  const scopedRiskValues = scoped
+    .map(x => Number(x.scopedRisk || 0))
+    .filter(v => Number.isFinite(v))
+    .sort((a,b)=>b-a);
+  const attritionAvg = scopedRiskValues.length
+    ? scopedRiskValues.reduce((sum, value) => sum + value, 0) / scopedRiskValues.length
+    : 0;
+  const topRiskCount = Math.max(1, Math.ceil(scopedRiskValues.length * 0.2));
+  const topRiskAvg = scopedRiskValues.length
+    ? scopedRiskValues.slice(0, topRiskCount).reduce((sum, value) => sum + value, 0) / Math.max(1, Math.min(topRiskCount, scopedRiskValues.length))
+    : 0;
+  const riskRatio = scopedRiskValues.length
+    ? (scopedRiskValues.filter(v => v >= 75).length / scopedRiskValues.length) * 100
+    : 0;
+  const attrition = Math.min(100, Math.round(
+    (attritionAvg * 0.70) +
+    (topRiskAvg * 0.20) +
+    (riskRatio * 0.10)
+  ));
+
+  const expectedLeaveMap = buildExpectedLeaveMapForPeriod(months, scoped);
+  const expectedLeaveTotal = scoped.reduce((sum, e) => sum + Number(expectedLeaveMap.get(normalizeEmployeeName(e.name))?.expectedLeave || 0), 0);
+  const actualLeaveTotal = scoped.reduce((sum, e) => sum + Number(e.leaveUsed || 0), 0);
+  const leaveDef = expectedLeaveTotal > 0
+    ? Math.min(100, Math.max(0, Math.round((1 - (actualLeaveTotal / expectedLeaveTotal)) * 100)))
+    : 0;
+
   const topOvertimeNames = workConMetrics.sortedOvertime
     .slice(0, workConMetrics.topCount)
     .filter(person => workConMetrics.overtimeValue(person) > 0)
@@ -5312,29 +5345,26 @@ function renderInsight(scoped, months){
     .map(person => String(person.name || '').trim())
     .filter(Boolean)
     .slice(0, 3);
-
-  const insights = insightForTeam(selectedTeamName||'선택 팀', selectedMembers, avg(months,'avgDailyOvertime'));
-  const gradeMetrics = getGradeImbalanceMetrics(scoped);
-  insights.unshift(`직급불균형은 ${gradeMetrics.gradeImbalanceScore}%이며,
-상위 2개 직급 비율 ${Math.round(gradeMetrics.rawTopTwoShare)}% 기준으로 산출되었습니다. 
-${
-  gradeMetrics.gradeImbalanceScore >= 60
-    ? '특정 직급 구간 쏠림이 커 중간 직급 공백 또는 구조 불균형 가능성이 있습니다.'
-    : gradeMetrics.gradeImbalanceScore >= 40
-    ? '일부 직급 구간에 편중이 나타나 구조 점검이 필요한 상태입니다.'
-    : '직급 분포가 비교적 균형 잡힌 상태입니다.'
-}`);
-  const attritionAvg = Math.round(avg(scoped, 'scopedRisk'));
   const attritionTop = [...scoped]
     .sort((a,b) => Number(b.scopedRisk || 0) - Number(a.scopedRisk || 0))
     .slice(0,3)
     .map(person => String(person.name || '').trim())
     .filter(Boolean);
-  insights.unshift(`위험도는 ${attritionAvg}점이며, 2단계에서는 총부하 · 숨은초과 · 반복 이슈일수 · 연장근로 · 회복부족 · 팀 업무집중 · 직급불균형을 함께 반영한 종합 모델입니다.${attritionTop.length ? ` 현재 상위 후보는 ${attritionTop.join(', ')} 입니다.` : ''}`);
-  insights.unshift(`업무집중도는 ${workConMetrics.workConcentrationRate}%이며, 연장근로 상위 20% 비중 ${Math.round(workConMetrics.overtimeConcentrationRate)}% · 외근/출장 상위 20% 비중 ${Math.round(workConMetrics.activityConcentrationRate)}% 기준으로 산출됩니다.`);
+
+  const insights = [];
+  insights.push(`업무집중도는 ${concentration}%이며, 연장근로 상위 20% 비중 ${Math.round(workConMetrics.overtimeConcentrationRate)}% · 외근/출장 상위 20% 비중 ${Math.round(workConMetrics.activityConcentrationRate)}% 기준으로 산출됩니다.`);
+  insights.push(`레이더 기준 위험지수는 ${attrition}점이며, 개인 위험 평균 · 상위 위험군 평균 · 위험군 비율을 함께 반영한 값입니다.${attritionTop.length ? ` 현재 상위 후보는 ${attritionTop.join(', ')} 입니다.` : ''}`);
+  insights.push(`직급불균형은 ${gradeImbalance}%이며, 상위 2개 직급 비율 ${Math.round(gradeMetrics.rawTopTwoShare)}% 기준으로 산출되었습니다. ${gradeImbalance >= 60 ? '특정 직급 구간 쏠림이 커 중간 직급 공백 또는 구조 불균형 가능성이 있습니다.' : gradeImbalance >= 40 ? '일부 직급 구간에 편중이 나타나 구조 점검이 필요한 상태입니다.' : '직급 분포가 비교적 균형 잡힌 상태입니다.'}`);
+  insights.push(`연차부족은 ${leaveDef}%이며, 선택 기간 기준 기대 연차/반차 사용량 대비 실제 사용량을 기준으로 산출됩니다.${leaveDef >= 70 ? ' 회복 부족 리스크가 높은 상태입니다.' : leaveDef >= 50 ? ' 회복 여력 점검이 필요한 상태입니다.' : ' 회복 여력은 비교적 유지되고 있습니다.'}`);
   if(topOvertimeNames.length || topActivityNames.length){
     insights.push(`집중 인원은 연장근로 ${topOvertimeNames.length ? topOvertimeNames.join(', ') : '해당 없음'} / 외근·출장 ${topActivityNames.length ? topActivityNames.join(', ') : '해당 없음'} 중심으로 나타났습니다.`);
   }
+
+  const selectedTeamInsights = insightForTeam(selectedTeamName||'선택 팀', selectedMembers, avg(months,'avgDailyOvertime'));
+  selectedTeamInsights.forEach(line => {
+    if(line && !insights.includes(line)) insights.push(line);
+  });
+
   $('#insightList').innerHTML = insights.map((t,i)=>`<div class="alertCard"><div style="font-weight:800;margin-bottom:8px">분석 결과 ${i+1}</div><div class="desc">${t}</div></div>`).join('');
 }
 
