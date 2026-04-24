@@ -11,6 +11,7 @@
 <link rel="manifest" href="/manifest.json">
   
 <!-- attendance detail final rules applied: holiday hidden, missing clock compensations -->
+<!-- actual overtime source fixed: ERP I column 실제연장_시간 only; 연장신청_시간 excluded from overtime counts -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -2835,7 +2836,7 @@ function buildAttendanceRecordPayloads(batchId, secomRows = [], erpRows = []){
     const name = normalizeEmployeeName(row.name);
     const meta = metaByName.get(name) || {};
     const workHours = parseWorkDurationToHours(row.workHours || row.realWorkHours || '');
-    const overtime = Number(row.erpActualOvertime || row.erpAppliedOvertime || row.seccomOvertimeHours || 0) || 0;
+    const overtime = Number(row.erpActualOvertime || row.seccomOvertimeHours || 0) || 0;
     const reason = String(row.erpReason || row.reason || row.status || '').trim();
     return {
       work_date: row.date || null,
@@ -2910,7 +2911,7 @@ async function backupUploadedAttendanceRawToSupabase({
     name: row.name || null,
     erp_start: row.start || null,
     erp_end: row.end || null,
-    overtime: Number(row.erpActualOvertime || row.erpAppliedOvertime || 0),
+    overtime: Number(row.erpActualOvertime || 0),
     raw_data: row
   }));
 
@@ -3300,9 +3301,9 @@ function rebuildDerivedMetricsFromAttendance(){
     const totalWork = parseWorkDurationToHours(row.totalWork || row.workHours || row.realWorkHours);
     const overtimeCheckRaw = String(row.overtimeCheck || '').trim();
   const overtimeCheckHours = parseWorkDurationToHours(overtimeCheckRaw);
-  const erpOT = Number(row.erpActualOvertime || row.erpAppliedOvertime || 0) > 0
-    ? Number(row.erpActualOvertime || row.erpAppliedOvertime || 0)
-    : (overtimeCheckHours !== null ? overtimeCheckHours : 0);
+  const erpOT = Number(row.erpActualOvertime || 0) > 0
+    ? Number(row.erpActualOvertime || 0)
+    : 0;
     const hasActualWork = hasAttendanceActualWork(row);
     const reason = getAttendanceBaseReason(row);
     const monthKey = String(row.date || '').slice(5, 7) || '03';
@@ -6500,7 +6501,7 @@ function normalizeZeroClockStartForAttendance(startValue, row){
 
   // 회사 근태 데이터에서 출근 00:00은 대부분 "출근 미입력" 기본값이다.
   // 화면과 집계에서는 빈 값으로 넘겨 기존 누락 판정 로직이 처리하게 한다.
-  if(endText || reasonText || row?.erpActualOvertime || row?.erpAppliedOvertime){
+  if(endText || reasonText || row?.erpActualOvertime){
     return '';
   }
   return '';
@@ -6517,8 +6518,10 @@ function decorateAttendanceRow(row, metaByName){
   const workRaw = String(row.workHours || '').trim();
   const overtimeCheckRaw = String(row.overtimeCheck || '').trim();
   const overtimeCheckHours = parseWorkDurationToHours(overtimeCheckRaw);
-  const baseErpOT = Number(row.erpActualOvertime || row.erpAppliedOvertime || 0);
-  const erpOT = baseErpOT > 0 ? baseErpOT : ((overtimeCheckHours !== null && overtimeCheckHours > 0) ? overtimeCheckHours : 0);
+  const baseErpOT = Number(row.erpActualOvertime || 0);
+  // 연장근무 발생 여부는 ERP I열 '실제연장_시간'만 기준으로 한다.
+  // F열 '연장신청_시간'은 신청값이므로 집계/OT발생/ERP OT 판정에서 제외한다.
+  const erpOT = baseErpOT > 0 ? baseErpOT : 0;
   const isHolidayDate = HOLIDAY_DATE_SET.has(String(row.date || '').trim());
 
   const workHoursNum = parseWorkDurationToHours(workRaw);
@@ -6933,7 +6936,6 @@ function hasAttendanceActualWork(row){
     || !!end
     || ((workHoursNum !== null) && workHoursNum > 0)
     || Number(row?.erpActualOvertime || 0) > 0
-    || Number(row?.erpAppliedOvertime || 0) > 0
     || ((overtimeCheckNum !== null) && overtimeCheckNum > 0)
     || Number(row?.seccomOvertimeHours || 0) > 0;
 }
@@ -6948,7 +6950,7 @@ function shouldHideAttendanceRow(row){
   const erpReasonText = String(row?.erpReason || '').trim();
   const hasActualWork = hasAttendanceActualWork(row);
   const overtimeCheckNum = parseWorkDurationToHours(String(row?.overtimeCheck || '').trim());
-  const overtimeBase = Number(row?.erpActualOvertime || row?.erpAppliedOvertime || 0);
+  const overtimeBase = Number(row?.erpActualOvertime || 0);
   const overtime = overtimeBase > 0 ? overtimeBase : ((overtimeCheckNum !== null && overtimeCheckNum > 0) ? overtimeCheckNum : 0);
   const rawRows = Array.isArray(REAL_ATTENDANCE_DATA) ? REAL_ATTENDANCE_DATA : [];
 
@@ -6971,7 +6973,7 @@ function isDisplayExcludedAttendance(row){
   const erpReasonText = String(row?.erpReason || '').trim();
   const hasActualWork = hasAttendanceActualWork(row);
   const overtimeCheckNum = parseWorkDurationToHours(String(row?.overtimeCheck || '').trim());
-  const overtimeBase = Number(row?.erpActualOvertime || row?.erpAppliedOvertime || 0);
+  const overtimeBase = Number(row?.erpActualOvertime || 0);
   const overtime = overtimeBase > 0 ? overtimeBase : ((overtimeCheckNum !== null && overtimeCheckNum > 0) ? overtimeCheckNum : 0);
   const rawRows = Array.isArray(REAL_ATTENDANCE_DATA) ? REAL_ATTENDANCE_DATA : [];
 
@@ -7808,7 +7810,7 @@ function deriveAttendanceRow(row, metaByName){
   const startRaw = String(row.start || '').trim();
   const endRaw = String(row.end || '').trim();
   const workRaw = String(row.workHours || row.realWorkHours || '').trim();
-  const erpOT = Number(row.erpActualOvertime || row.erpAppliedOvertime || 0);
+  const erpOT = Number(row.erpActualOvertime || 0);
   const isHolidayDate = HOLIDAY_DATE_SET.has(String(row.date || ''));
   const holidayLike = isHolidayLike(rawReason) || isHolidayDate;
   const fullDayReasons = ['외근','오전외근','오후외근','출장'];
@@ -8160,7 +8162,7 @@ window.addEventListener('resize', renderLightweight);
         workHours: row.work_hours == null ? '' : String(row.work_hours),
         realWorkHours: row.work_hours == null ? '' : String(row.work_hours),
         erpActualOvertime: Number(row.overtime_hours || 0),
-        erpAppliedOvertime: Number(row.overtime_hours || 0),
+        erpAppliedOvertime: 0,
         erpReason: String(row.reason || '').trim(),
         reason: String(row.reason || '').trim(),
         overtimeCheck: String(row.overtime_check_result || row.overtime_check || '').trim(),
