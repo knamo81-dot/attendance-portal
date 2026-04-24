@@ -2737,13 +2737,13 @@ async function backupUploadedAttendanceRawToSupabase({
     return { ok:false, skipped:true, reason:'supabase-disabled' };
   }
 
-  async function createServerUploadBatchMeta(batchId, meta){
-    const payload = {
-      batch_id: batchId,
-      upload_type: 'manual_upload',
-      secom_file_name: meta?.secomFilename || null,
-      erp_file_name: meta?.erpFilename || null
-    };
+  const payload = {
+  batch_id: batchId,
+  upload_month: meta?.uploadMonth || null, // 🔥 이거 추가
+  upload_type: 'manual_upload',
+  secom_file_name: meta?.secomFilename || null,
+  erp_file_name: meta?.erpFilename || null
+};
 
     const { data, error } = await supabaseClient
       .from('attendance_upload_batches')
@@ -2755,10 +2755,13 @@ async function backupUploadedAttendanceRawToSupabase({
     return data?.id ?? null;
   }
 
-  await createServerUploadBatchMeta(batchId, {
-    secomFilename,
-    erpFilename
-  });
+await createServerUploadBatchMeta(batchId, {
+  uploadMonth: targetMonthKey, // 🔥 이거 반드시 필요 (예: '2026-03')
+  secomFilename,
+  erpFilename,
+  uploadedBy,
+  note: '관리자 화면 업로드 완료'
+});
 
   const secomPayload = (secomRows || []).map(row => ({
     upload_batch_id: batchId,
