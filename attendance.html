@@ -601,22 +601,25 @@ th.filterable{position:sticky;top:0;z-index:8;position:sticky}
 
 /* Leave usage visual insight panel */
 .leaveVisualPanel{display:grid;gap:12px}
-.leaveVisualCard{border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);padding:14px;box-shadow:0 2px 10px rgba(15,23,42,.035)}
-.leaveVisualHead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.leaveVisualCard{border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);padding:12px;box-shadow:0 2px 10px rgba(15,23,42,.035)}
+.leaveVisualCardDonut{padding-bottom:10px}
+.leaveVisualHead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
 .leaveVisualTitle{font-size:15px;font-weight:900;color:var(--text)}
 .leaveVisualSub{font-size:12px;color:var(--muted);font-weight:700}
 .leaveDonutWrap{display:block}
-.leaveDonutStage{position:relative;min-height:190px;display:flex;align-items:center;justify-content:center;padding:18px 8px 12px}
-.leaveDonut{width:126px;height:126px;border-radius:50%;background:conic-gradient(#16a34a 0deg var(--normalDeg),#d97706 var(--normalDeg) var(--partialDeg),#ef4444 var(--partialDeg) 360deg);position:relative;box-shadow:inset 0 0 0 1px rgba(15,23,42,.06),0 10px 22px rgba(15,23,42,.07)}
-.leaveDonut::after{content:'';position:absolute;inset:28px;background:#fff;border-radius:50%;box-shadow:0 0 0 1px rgba(226,232,240,.95)}
-.leaveDonutCenter{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1;font-weight:900;color:#0f172a;line-height:1.15;font-size:20px}
+.leaveDonutStage{position:relative;height:170px;min-height:170px;display:flex;align-items:center;justify-content:center;padding:8px 6px 4px;overflow:visible}
+.leaveDonut{width:150px;height:150px;border-radius:50%;background:conic-gradient(#16a34a 0deg var(--normalDeg),#d97706 var(--normalDeg) var(--partialDeg),#ef4444 var(--partialDeg) 360deg);position:relative;box-shadow:inset 0 0 0 1px rgba(15,23,42,.06),0 10px 22px rgba(15,23,42,.08)}
+.leaveDonut::after{content:'';position:absolute;inset:34px;background:#fff;border-radius:50%;box-shadow:0 0 0 1px rgba(226,232,240,.95)}
+.leaveDonutCenter{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1;font-weight:900;color:#0f172a;line-height:1.15;font-size:21px}
 .leaveDonutCenter span{font-size:11px;color:var(--muted);font-weight:800;margin-top:2px}
-.leaveDonutLabel{position:absolute;display:flex;align-items:center;gap:6px;padding:7px 9px;border-radius:999px;background:#fff;border:1px solid #e2e8f0;box-shadow:0 5px 14px rgba(15,23,42,.06);font-size:12px;font-weight:900;white-space:nowrap}
-.leaveDonutLabel .leaveLegendDot{width:9px;height:9px;border-radius:4px;display:inline-block;flex:0 0 auto}
-.leaveDonutLabel b{font-size:13px;color:#0f172a;margin-left:2px}
-.leaveDonutLabel.normal{top:4px;left:50%;transform:translateX(-50%);color:#15803d}
-.leaveDonutLabel.partial{right:0;top:50%;transform:translateY(-50%);color:#b45309}
-.leaveDonutLabel.unused{left:0;top:50%;transform:translateY(-50%);color:#b91c1c}
+.leaveDonutLeaderSvg{position:absolute;left:50%;top:50%;width:280px;height:200px;transform:translate(-50%,-50%);overflow:visible;pointer-events:none;z-index:0}
+.leaveDonutLeaderSvg line{stroke:#cbd5e1;stroke-width:1.2;stroke-linecap:round;opacity:.9}
+.leaveDonutLabel{position:absolute;left:calc(50% + (var(--label-x) * 1px));top:calc(50% + (var(--label-y) * 1px));transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;background:rgba(255,255,255,.96);border:1px solid #e2e8f0;box-shadow:0 5px 14px rgba(15,23,42,.07);font-size:11.5px;font-weight:900;white-space:nowrap;z-index:2}
+.leaveDonutLabel .leaveLegendDot{width:8px;height:8px;border-radius:4px;display:inline-block;flex:0 0 auto}
+.leaveDonutLabel b{font-size:12.5px;color:#0f172a;margin-left:2px}
+.leaveDonutLabel.normal{color:#15803d}
+.leaveDonutLabel.partial{color:#b45309}
+.leaveDonutLabel.unused{color:#b91c1c}
 .leaveLegendList{display:grid;gap:8px}
 .leaveLegendRow{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px}
 .leaveLegendName{display:flex;align-items:center;gap:8px;color:#475569;font-weight:800}
@@ -640,7 +643,8 @@ th.filterable{position:sticky;top:0;z-index:8;position:sticky}
 .leaveVisualChip.green{background:#dcfce7;color:#15803d;border-color:#bbf7d0}
 .leaveVisualChip.amber{background:#fef3c7;color:#b45309;border-color:#fde68a}
 .leaveVisualChip.red{background:#fee2e2;color:#b91c1c;border-color:#fecaca}
-@media (max-width:700px){.leaveDonutStage{min-height:210px;padding-top:34px}.leaveDonutLabel.normal{top:0}.leaveDonutLabel.partial{right:6px}.leaveDonutLabel.unused{left:6px}.leaveVizBarRow,.leaveVizBarRow.division{grid-template-columns:78px 1fr 74px}}
+@media (max-width:700px){.leaveDonutStage{height:180px;min-height:180px}.leaveDonut{width:140px;height:140px}.leaveDonut::after{inset:32px}.leaveDonutLabel{font-size:11px;padding:5px 7px}.leaveVizBarRow,.leaveVizBarRow.division{grid-template-columns:78px 1fr 74px}}
+
 
 
 
@@ -5515,6 +5519,36 @@ function renderLeaveCauseAnalysis(scoped, scoreItems){
   });
   const statusNormalDeg = Math.round((leaveStatusCounts['정상'] / total) * 360);
   const statusPartialDeg = Math.round(((leaveStatusCounts['정상'] + leaveStatusCounts['부족']) / total) * 360);
+  const statusNormalEnd = (leaveStatusCounts['정상'] / total) * 360;
+  const statusPartialEnd = ((leaveStatusCounts['정상'] + leaveStatusCounts['부족']) / total) * 360;
+
+  function buildLeaveDonutLabel(key, label, count, startDeg, endDeg, color){
+    if(!count) return { labelHtml:'', lineHtml:'' };
+    const mid = (startDeg + endDeg) / 2;
+    const rad = mid * Math.PI / 180;
+    const labelRadius = 116;
+    const lineStart = 78;
+    const lineEnd = 98;
+    const x = Math.round(Math.sin(rad) * labelRadius);
+    const y = Math.round(-Math.cos(rad) * labelRadius);
+    const x1 = Math.round(Math.sin(rad) * lineStart);
+    const y1 = Math.round(-Math.cos(rad) * lineStart);
+    const x2 = Math.round(Math.sin(rad) * lineEnd);
+    const y2 = Math.round(-Math.cos(rad) * lineEnd);
+    return {
+      labelHtml:`<div class="leaveDonutLabel ${key}" style="--label-x:${x};--label-y:${y}"><span class="leaveLegendDot" style="background:${color}"></span>${label} <b>${count}명</b></div>`,
+      lineHtml:`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"></line>`
+    };
+  }
+
+  const leaveDonutParts = [
+    buildLeaveDonutLabel('normal','정상', leaveStatusCounts['정상'], 0, statusNormalEnd, '#16a34a'),
+    buildLeaveDonutLabel('partial','부족', leaveStatusCounts['부족'], statusNormalEnd, statusPartialEnd, '#d97706'),
+    buildLeaveDonutLabel('unused','미사용', leaveStatusCounts['미사용'], statusPartialEnd, 360, '#ef4444')
+  ];
+  const leaveDonutLabelsHtml = leaveDonutParts.map(x=>x.labelHtml).join('');
+  const leaveDonutLeadersHtml = leaveDonutParts.map(x=>x.lineHtml).join('');
+
   const maxUsageRange = Math.max(1, ...Object.values(leaveUsageRanges));
   const unusedDivisionRows = Object.keys(leaveDivisionTotals).length
     ? Object.keys(leaveDivisionTotals).sort((a,b)=>{
@@ -5600,16 +5634,15 @@ function renderLeaveCauseAnalysis(scoped, scoreItems){
         </div>
       </div>
       <div class="leaveVisualPanel">
-        <div class="leaveVisualCard">
+        <div class="leaveVisualCard leaveVisualCardDonut">
           <div class="leaveVisualHead"><div class="leaveVisualTitle">연차 판정 분포</div><span class="leaveVisualChip ${statusClass}">${statusText}</span></div>
           <div class="leaveDonutWrap">
             <div class="leaveDonutStage">
-              <div class="leaveDonutLabel normal"><span class="leaveLegendDot" style="background:#16a34a"></span>정상 <b>${leaveStatusCounts['정상']}명</b></div>
-              <div class="leaveDonutLabel partial"><span class="leaveLegendDot" style="background:#d97706"></span>부족 <b>${leaveStatusCounts['부족']}명</b></div>
-              <div class="leaveDonutLabel unused"><span class="leaveLegendDot" style="background:#ef4444"></span>미사용 <b>${leaveStatusCounts['미사용']}명</b></div>
+              <svg class="leaveDonutLeaderSvg" viewBox="-140 -100 280 200" aria-hidden="true">${leaveDonutLeadersHtml}</svg>
               <div class="leaveDonut" style="--normalDeg:${statusNormalDeg}deg;--partialDeg:${statusPartialDeg}deg">
                 <div class="leaveDonutCenter">${total}명<span>대상</span></div>
               </div>
+              ${leaveDonutLabelsHtml}
             </div>
           </div>
         </div>
