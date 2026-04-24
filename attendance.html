@@ -1003,6 +1003,34 @@ html.embed-mode #main-dashboard .kpis{
 .orgRiskInsightCard.red{background:#fff7f7}
 @media (max-width:700px){.orgRiskScoreLabel{flex-direction:column;align-items:flex-start}.orgRiskScoreLabel .summary{text-align:left}}
 
+
+/* ===== Trend Analysis Tab ===== */
+#main-trend-analysis{width:100%;max-width:none;margin:0}
+.trendSummaryGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:16px}
+.trendCard{margin-top:16px}
+.trendCardHead{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.trendLegend{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:12px;color:#64748b;font-weight:700}
+.trendLegend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.trendLegend i{display:inline-block;width:11px;height:11px;border-radius:4px}
+.trendLegend.compact{max-width:520px;justify-content:flex-end}
+.trendChartLarge{width:100%;height:360px;border-radius:16px;background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);border:1px solid #e2e8f0;overflow:hidden}
+.trendRadarChart{width:100%;height:420px;border-radius:16px;background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);border:1px solid #e2e8f0;overflow:hidden;margin-top:12px}
+.trendGrid2{display:grid;grid-template-columns:minmax(480px,1.35fr) minmax(300px,.65fr);gap:16px;margin-top:16px;align-items:stretch}
+.trendCheckGrid{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.trendCheckGrid label{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:999px;background:#fff;font-size:12px;font-weight:800;color:#475569;cursor:pointer;user-select:none}
+.trendCheckGrid label.active{border-color:#16a34a;background:#f0fdf4;color:#166534}
+.trendCheckGrid input{margin:0}
+.trendMetricCards{display:grid;gap:10px;margin-top:12px}
+.trendMetricCard{border:1px solid #e2e8f0;border-radius:14px;padding:12px;background:#fff;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+.trendMetricCard .k{font-size:13px;font-weight:900;color:#0f172a}
+.trendMetricCard .d{font-size:12px;color:#64748b;line-height:1.45;margin-top:4px}
+.trendMetricCard .v{font-size:22px;font-weight:900;color:#0f172a}
+.trendSummaryCard{border:1px solid #e2e8f0;border-radius:18px;background:#fff;padding:16px;box-shadow:0 2px 12px rgba(15,23,42,.04)}
+.trendSummaryCard .k{font-size:12px;color:#64748b;font-weight:800;margin-bottom:8px}
+.trendSummaryCard .v{font-size:28px;font-weight:900;color:#0f172a}
+.trendSummaryCard .s{font-size:12px;color:#64748b;margin-top:6px;line-height:1.45}
+@media (max-width:1100px){.trendSummaryGrid,.trendGrid2{grid-template-columns:1fr}.trendChartLarge,.trendRadarChart{height:320px}.trendCardHead{flex-direction:column}.trendLegend.compact{justify-content:flex-start}}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1069,6 +1097,7 @@ html.embed-mode #main-dashboard .kpis{
     <button class="mainTab active" data-main="attendance">근태관리</button>
     <button class="mainTab" data-main="dashboard">분석대시보드</button>
     <button class="mainTab" data-main="deep-analysis">심층분석</button>
+    <button class="mainTab" data-main="trend-analysis">트렌드분석</button>
     <button class="mainTab" data-main="attendance-missing">출퇴근 누락 분석</button>
     <div class="spacer"></div>
     <button class="mainTab" data-main="admin">관리자 기능</button>
@@ -1318,15 +1347,6 @@ html.embed-mode #main-dashboard .kpis{
       <div class="desc">핵심 추이, 분포, 레이더, 업무 부하 분석, 위험 조직, 위험지수 상위 담당자까지 심층 해석용 화면입니다. 업무 부하 비교는 실근무일수 기준으로 기본근무·연장근로·숨은초과·총부하를 함께 표시합니다.</div>
     </div>
 
-  <div class="card" style="margin-top:16px">
-    <div id="trendTitle" class="title"></div>
-    <div class="legend">
-      <span class="dot" style="background:var(--blue)"></span>1인당 평균 연장근로시간
-      <span class="dot" style="background:var(--red)"></span>위험 인원
-      <span class="dot" style="background:var(--purple)"></span>연차 미사용 인원
-    </div>
-    <div id="trendChart" class="chart"></div>
-  </div>
 
   <div class="deepTopGrid">
     <div class="deepLeftStack">
@@ -1492,6 +1512,68 @@ html.embed-mode #main-dashboard .kpis{
   </div>
 
 
+  </div>
+
+
+  <div id="main-trend-analysis" class="mainPanel">
+    <div class="card" style="margin-top:16px">
+      <div class="title">트렌드분석</div>
+      <div class="desc">최근 12개월 흐름을 월별 그래프로 확인하는 전용 화면입니다. 현재 업로드된 데이터가 3월뿐이면 3월 값만 실제 데이터로 표시하고, 추후 월별 업로드가 누적되면 자동으로 12개월 추이가 확장됩니다.</div>
+      <div id="trendDataNotice" class="mini" style="margin-top:10px"></div>
+    </div>
+
+    <div class="trendSummaryGrid" id="trendSummaryCards"></div>
+
+    <div class="card trendCard">
+      <div class="trendCardHead">
+        <div>
+          <div class="title">1. 핵심 KPI 추이</div>
+          <div class="desc">1인당 평균 연장근로시간, 위험 인원, 연차 미사용 인원의 월별 흐름입니다.</div>
+        </div>
+        <div class="trendLegend">
+          <span><i style="background:#2563eb"></i>1인당 연장근로</span>
+          <span><i style="background:#ef4444"></i>위험 인원</span>
+          <span><i style="background:#7c3aed"></i>연차 미사용</span>
+        </div>
+      </div>
+      <div id="trendKpiChart" class="trendChartLarge"></div>
+    </div>
+
+    <div class="trendGrid2">
+      <div class="card trendCard">
+        <div class="trendCardHead">
+          <div>
+            <div class="title">2. 리스크 레이더 비교</div>
+            <div class="desc">체크한 기준만 레이더에 표시합니다. 기본은 현재월과 12개월 평균 비교입니다.</div>
+          </div>
+        </div>
+        <div id="trendRadarChecks" class="trendCheckGrid"></div>
+        <div id="trendRadarChart" class="trendRadarChart"></div>
+      </div>
+
+      <div class="card trendCard">
+        <div class="title">레이더 지표 해석</div>
+        <div class="desc">값이 높을수록 관리 필요도가 높습니다.</div>
+        <div id="trendRadarCards" class="trendMetricCards"></div>
+      </div>
+    </div>
+
+    <div class="card trendCard">
+      <div class="trendCardHead">
+        <div>
+          <div class="title">3. 리스크 지표 추이</div>
+          <div class="desc">연장근로 리스크, 외근 리스크, 업무집중 상태, 운영 리스크, 휴식/연차 리스크의 월별 흐름입니다.</div>
+        </div>
+        <div class="trendLegend compact">
+          <span><i style="background:#2563eb"></i>연장</span>
+          <span><i style="background:#0f766e"></i>외근</span>
+          <span><i style="background:#f59e0b"></i>집중</span>
+          <span><i style="background:#ef4444"></i>운영</span>
+          <span><i style="background:#7c3aed"></i>휴식</span>
+        </div>
+      </div>
+      <div id="trendRiskChart" class="trendChartLarge"></div>
+    </div>
   </div>
 
 
@@ -5133,9 +5215,348 @@ function buildExpectedLeaveMapForPeriod(months, targetEmployees){
 }
 
 
+
+/* ===== Trend Analysis: real graph rendering from uploaded attendance data ===== */
+function trendClamp(v, min=0, max=100){
+  const n = Number(v || 0);
+  if(!Number.isFinite(n)) return min;
+  return Math.max(min, Math.min(max, n));
+}
+function trendRound(v, d=1){ return +Number(v || 0).toFixed(d); }
+function trendGetAvailableMonths(){
+  const set = new Set((Array.isArray(REAL_ATTENDANCE_DATA) ? REAL_ATTENDANCE_DATA : [])
+    .map(row => String(row?.date || '').trim().slice(0,7))
+    .filter(v => /^\d{4}-\d{2}$/.test(v)));
+  return [...set].sort((a,b)=>a.localeCompare(b));
+}
+function trendMonthLabel(ym){ return /^\d{4}-\d{2}$/.test(String(ym||'')) ? `${String(ym).slice(2,4)}.${String(ym).slice(5,7)}` : String(ym||''); }
+function trendLast12Months(){
+  const months = trendGetAvailableMonths();
+  if(!months.length) return [];
+  const end = months[months.length-1];
+  const endY = Number(end.slice(0,4));
+  const endM = Number(end.slice(5,7));
+  const list=[];
+  for(let i=11;i>=0;i--){
+    const d = new Date(endY, endM-1-i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if(months.includes(ym)) list.push(ym);
+  }
+  return list.length ? list : months.slice(-12);
+}
+function trendRowsForMonth(ym){
+  const metaByName = new Map((empMaster || []).map(e => [normalizeEmployeeName(e.name), e]));
+  const rows = getMergedRawAttendanceData()
+    .map(row => decorateAttendanceRow(row, metaByName))
+    .filter(Boolean)
+    .filter(row => String(row.date || '').startsWith(`${ym}-`))
+    .filter(row => !isDisplayExcludedAttendance(row))
+    .filter(row => isAttendanceTargetIncludedRow(row, metaByName))
+    .filter(row => !(STATE.dashboardExcludeLeave !== false && isAttendanceContinuousLeaveRow(row)))
+    .filter(row => {
+      const name = normalizeEmployeeName(row.name);
+      const meta = metaByName.get(name) || {};
+      const div = meta.division || row.division || '';
+      const team = meta.team || row.team || '';
+      return (STATE.division === '전체' || div === STATE.division) && (STATE.team === '전체' || team === STATE.team);
+    });
+  return { rows, metaByName };
+}
+function trendEmployeesForMonth(ym){
+  const { rows, metaByName } = trendRowsForMonth(ym);
+  const byName = new Map();
+  rows.forEach(row => {
+    const cleanName = normalizeEmployeeName(row.name);
+    const meta = metaByName.get(cleanName) || {};
+    const person = byName.get(cleanName) || {
+      id: meta.id || row.id || row.employeeId || cleanName,
+      name: cleanName,
+      division: meta.division || row.division || '',
+      team: meta.team || row.team || '',
+      grade: meta.grade || row.grade || '',
+      monthlyHours:0, avgDailyHours:0,
+      monthlyBaseWorkHours:0, avgBaseWorkHours:0,
+      monthlyHiddenOvertime:0, avgHiddenOvertime:0,
+      overtime:0, avgDailyOvertime:0,
+      businessTripDays:0, outdoorDays:0,
+      leaveUsed:0, workDays:0, issueDays:0,
+      risk:0, focusRatio:1
+    };
+    const totalWork = parseWorkDurationToHours(row.totalWork || row.workHours || row.realWorkHours);
+    const erpOT = Number(row.erpActualOvertime || 0) > 0 ? Number(row.erpActualOvertime || 0) : 0;
+    const hasActualWork = hasAttendanceActualWork(row);
+    const reason = getAttendanceBaseReason(row);
+    const analysisFields = getAttendanceAnalysisFields(row);
+    const adjustedWork = parseWorkDurationToHours(analysisFields.adjustedWorkDisplay);
+    const baseWork = parseWorkDurationToHours(analysisFields.baseWorkDisplay);
+    const hiddenOvertime = parseWorkDurationToHours(analysisFields.hiddenOvertimeDisplay);
+    if(totalWork !== null) person.monthlyHours += totalWork;
+    if(baseWork !== null) person.monthlyBaseWorkHours += baseWork;
+    if(hiddenOvertime !== null) person.monthlyHiddenOvertime += hiddenOvertime;
+    person.overtime += erpOT;
+    const countsAsWork = hasActualWork || adjustedWork !== null || baseWork !== null || erpOT > 0;
+    if(countsAsWork) person.workDays += 1;
+    if(isVacationReason(reason)) person.leaveUsed += isHalfDayVacationReason(reason) ? 0.5 : 1;
+    const rawReasonText = [row.erpReason,row.reason,row.attendanceType,row.statusReason,reason].filter(Boolean).join(' ');
+    const normalizedReason = String(rawReasonText || '').replace(/<br\s*\/?>/gi,' ').replace(/\([^)]*\)/g,' ').replace(/\s+/g,'').toLowerCase();
+    if(normalizedReason.includes('출장')) person.businessTripDays += 1;
+    if(normalizedReason.includes('오전외근')) person.outdoorDays += 0.5;
+    if(normalizedReason.includes('오후외근')) person.outdoorDays += 0.5;
+    if(normalizedReason.includes('외근') && !normalizedReason.includes('오전외근') && !normalizedReason.includes('오후외근')) person.outdoorDays += 1;
+    if(row.bucket === '문제'){ person.risk += 20; person.issueDays += 1; }
+    else if(row.bucket === '주의'){ person.risk += 8; person.issueDays += 1; }
+    if(reason.includes('결근')) person.risk += 20;
+    if(reason.includes('조퇴')) person.risk += 8;
+    if(reason.includes('지각')) person.risk += 6;
+    if(erpOT >= 2) person.risk += 6;
+    if(erpOT >= 4) person.risk += 8;
+    if(totalWork !== null && hasActualWork){
+      const analysisWork = getAnalysisWorkHours(totalWork);
+      if(analysisWork > 0 && analysisWork < 8) person.risk += 6;
+    }
+    byName.set(cleanName, person);
+  });
+  const base = [...byName.values()].map(e => {
+    const days = Math.max(1, Number(e.workDays || 0));
+    const avgDailyHours = Number(e.monthlyHours || 0) / days;
+    const avgBaseWorkHours = Number(e.monthlyBaseWorkHours || 0) / days;
+    const avgHiddenOvertime = Number(e.monthlyHiddenOvertime || 0) / days;
+    const avgDailyOvertime = Number(e.overtime || 0) / days;
+    const avgTotalLoad = (Number(e.monthlyBaseWorkHours || 0) + Number(e.overtime || 0) + Number(e.monthlyHiddenOvertime || 0)) / days;
+    const focusRatio = Number(((avgBaseWorkHours + avgDailyOvertime + avgHiddenOvertime) / ANALYSIS_FULL_DAY_HOURS).toFixed(1));
+    const adjustedRisk = Math.min(100, Math.round(Number(e.risk || 0) + Math.max(0,(focusRatio - 1.1) * 10) + (avgHiddenOvertime >= 0.5 ? 4 : 0) + (Number(e.leaveUsed || 0) === 0 && days >= 10 ? 8 : 0)));
+    return {
+      ...e,
+      monthlyHours:trendRound(e.monthlyHours,1), avgDailyHours:trendRound(avgDailyHours,1),
+      monthlyBaseWorkHours:trendRound(e.monthlyBaseWorkHours,1), avgBaseWorkHours:trendRound(avgBaseWorkHours,1),
+      monthlyHiddenOvertime:trendRound(e.monthlyHiddenOvertime,1), avgHiddenOvertime:trendRound(avgHiddenOvertime,1),
+      overtime:trendRound(e.overtime,1), avgDailyOvertime:trendRound(avgDailyOvertime,1), avgTotalLoad:trendRound(avgTotalLoad,1),
+      focusRatio, risk:adjustedRisk,
+      scopedMonthlyOvertime:trendRound(e.overtime,1), scopedDailyOvertime:trendRound(avgDailyOvertime,1),
+      scopedDailyHours:trendRound(avgDailyHours,1), scopedDailyBaseWorkHours:trendRound(avgBaseWorkHours,1),
+      scopedDailyHiddenOvertime:trendRound(avgHiddenOvertime,1), scopedDailyTotalLoad:trendRound(avgTotalLoad,1),
+      scopedIssueDays:Number(e.issueDays || 0), scopedRisk:adjustedRisk
+    };
+  });
+  return applyAttritionRiskModel(base);
+}
+function trendMetricsForMonth(ym){
+  const people = trendEmployeesForMonth(ym);
+  const count = people.length;
+  if(!count){
+    return { ym, label:trendMonthLabel(ym), employeeCount:0, avgOvertimePerPerson:0, highRisk:0, leaveZero:0, overtimeRisk:0, mobilityRisk:0, workConcentrationRisk:0, operationalRisk:0, leaveRisk:0 };
+  }
+  const totalOT = people.reduce((s,p)=>s+Number(p.scopedMonthlyOvertime || p.overtime || 0),0);
+  const avgOvertimePerPerson = totalOT / Math.max(1,count);
+  const highRisk = people.filter(p => Number(p.scopedRisk || p.risk || 0) >= 75).length;
+  const leaveZero = people.filter(p => Number(p.leaveUsed || 0) === 0).length;
+  const workCon = getWorkConcentrationMetrics(people);
+  const workConcentrationRisk = trendClamp(Math.round(Number(workCon.workConcentrationRate || 0)));
+  const overtimeValues = people.map(p=>Number(p.scopedMonthlyOvertime || p.overtime || 0)).sort((a,b)=>b-a);
+  const topCount = Math.max(1, Math.ceil(count * 0.2));
+  const topOT = overtimeValues.slice(0, topCount).reduce((s,v)=>s+v,0);
+  const otConcentration = totalOT > 0 ? (topOT / totalOT) * 100 : 0;
+  const overtimeRisk = trendClamp(Math.round((Math.min(100, (avgOvertimePerPerson / 20) * 100) * 0.65) + (otConcentration * 0.35)));
+  const mobilityScores = people.map(p => (Number(p.businessTripDays || 0) * 1.5) + (Number(p.outdoorDays || 0) * 0.5)).sort((a,b)=>b-a);
+  const totalMobility = mobilityScores.reduce((s,v)=>s+v,0);
+  const topMobility = mobilityScores.slice(0, topCount).reduce((s,v)=>s+v,0);
+  const avgMobility = totalMobility / Math.max(1,count);
+  const mobilityCon = totalMobility > 0 ? (topMobility / totalMobility) * 100 : 0;
+  const mobilityRisk = trendClamp(Math.round((Math.min(100, (avgMobility / 3) * 100) * 0.45) + (mobilityCon * 0.55)));
+  const expectedLeave = count; // 월 기준 1인 1회 사용 기대값으로 단순화
+  const actualLeave = people.reduce((s,p)=>s+Number(p.leaveUsed || 0),0);
+  const leaveRisk = expectedLeave > 0 ? trendClamp(Math.round((1 - Math.min(1, actualLeave / expectedLeave)) * 100)) : 0;
+  const highRiskRatio = (highRisk / Math.max(1,count)) * 100;
+  const operationalRisk = trendClamp(Math.round((overtimeRisk * 0.30) + (workConcentrationRisk * 0.25) + (leaveRisk * 0.25) + (highRiskRatio * 0.20)));
+  return {
+    ym, label:trendMonthLabel(ym), employeeCount:count,
+    avgOvertimePerPerson:trendRound(avgOvertimePerPerson,1), highRisk, leaveZero,
+    overtimeRisk, mobilityRisk, workConcentrationRisk, operationalRisk, leaveRisk
+  };
+}
+function trendBuildData(){ return trendLast12Months().map(trendMetricsForMonth); }
+function trendColor(idx){ return ['#2563eb','#64748b','#f59e0b','#0f766e','#7c3aed','#ef4444'][idx % 6]; }
+function trendValueExtent(data, keys){
+  const nums = data.flatMap(d => keys.map(k => Number(d[k] || 0))).filter(Number.isFinite);
+  const max = Math.max(1, ...nums);
+  return Math.ceil(max * 1.15);
+}
+function trendLineSVG(el, data, series, options={}){
+  if(!el) return;
+  if(!data || !data.length){ renderEmptyChart(el, '업로드된 월별 데이터가 없습니다.'); return; }
+  const width = el.clientWidth || 900, height = el.clientHeight || 360;
+  const margin = {top:28,right:28,bottom:44,left:54};
+  const pw = width - margin.left - margin.right, ph = height - margin.top - margin.bottom;
+  const keys = series.map(s=>s.key);
+  const maxV = options.maxValue || trendValueExtent(data, keys);
+  const denom = Math.max(1, data.length - 1);
+  const x = i => margin.left + (data.length === 1 ? pw/2 : (pw * i / denom));
+  const y = v => margin.top + ph - (Number(v || 0) / maxV) * ph;
+  let svg = `<svg viewBox="0 0 ${width} ${height}" width="100%" height="100%">`;
+  svg += `<rect x="0" y="0" width="${width}" height="${height}" fill="transparent"/>`;
+  for(let t=0;t<=4;t++){
+    const yy = margin.top + ph * t / 4;
+    const val = Math.round(maxV * (1 - t/4));
+    svg += `<line x1="${margin.left}" y1="${yy}" x2="${width-margin.right}" y2="${yy}" stroke="#e2e8f0"/>`;
+    svg += `<text x="${margin.left-10}" y="${yy+4}" text-anchor="end" style="font-size:11px;fill:#64748b">${val}</text>`;
+  }
+  data.forEach((d,i)=>{
+    svg += `<text x="${x(i)}" y="${height-16}" text-anchor="middle" style="font-size:12px;fill:#64748b;font-weight:700">${d.label}</text>`;
+  });
+  series.forEach((s, si)=>{
+    const pts = data.map((d,i)=>`${x(i)},${y(d[s.key])}`).join(' ');
+    svg += `<polyline points="${pts}" fill="none" stroke="${s.color || trendColor(si)}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+    data.forEach((d,i)=>{
+      const val = Number(d[s.key] || 0);
+      svg += `<circle cx="${x(i)}" cy="${y(val)}" r="4" fill="${s.color || trendColor(si)}"/>`;
+      if(data.length <= 6){ svg += `<text x="${x(i)}" y="${y(val)-9}" text-anchor="middle" style="font-size:11px;fill:${s.color || trendColor(si)};font-weight:800">${val}${s.suffix || ''}</text>`; }
+    });
+  });
+  svg += `</svg>`;
+  el.innerHTML = svg;
+}
+function trendRadarMultiSVG(el, labels, datasets){
+  if(!el) return;
+  if(!datasets || !datasets.length){ renderEmptyChart(el, '체크박스로 표시할 기준을 선택하세요.'); return; }
+  const width = el.clientWidth || 620, height = el.clientHeight || 420;
+  const cx = width/2, cy = height/2 + 8, r = Math.min(width, height) * 0.31;
+  const n = labels.length;
+  let svg = `<svg viewBox="0 0 ${width} ${height}" width="100%" height="100%">`;
+  for(let lv=1; lv<=5; lv++){
+    const rr = r * lv / 5;
+    const pts=[];
+    for(let i=0;i<n;i++){ const a=-Math.PI/2+Math.PI*2*i/n; pts.push(`${cx+rr*Math.cos(a)},${cy+rr*Math.sin(a)}`); }
+    svg += `<polygon points="${pts.join(' ')}" fill="none" stroke="#e2e8f0"/>`;
+  }
+  labels.forEach((label,i)=>{
+    const a=-Math.PI/2+Math.PI*2*i/n;
+    svg += `<line x1="${cx}" y1="${cy}" x2="${cx+r*Math.cos(a)}" y2="${cy+r*Math.sin(a)}" stroke="#e2e8f0"/>`;
+    svg += `<text x="${cx+(r+34)*Math.cos(a)}" y="${cy+(r+34)*Math.sin(a)+4}" text-anchor="middle" style="font-size:12px;fill:#475569;font-weight:800">${label}</text>`;
+  });
+  datasets.forEach((ds, idx)=>{
+    const color = ds.color || trendColor(idx);
+    const pts = ds.values.map((v,i)=>{
+      const a=-Math.PI/2+Math.PI*2*i/n; const rr = r * trendClamp(v)/100;
+      return `${cx+rr*Math.cos(a)},${cy+rr*Math.sin(a)}`;
+    }).join(' ');
+    svg += `<polygon points="${pts}" fill="${color}22" stroke="${color}" stroke-width="${idx===0?3:2}" stroke-dasharray="${ds.dash || ''}"/>`;
+    ds.values.forEach((v,i)=>{ const a=-Math.PI/2+Math.PI*2*i/n; const rr=r*trendClamp(v)/100; svg += `<circle cx="${cx+rr*Math.cos(a)}" cy="${cy+rr*Math.sin(a)}" r="3" fill="${color}"/>`; });
+  });
+  let lx = 18, ly = 20;
+  datasets.forEach((ds,idx)=>{
+    const color = ds.color || trendColor(idx);
+    svg += `<rect x="${lx}" y="${ly-10}" width="10" height="10" rx="3" fill="${color}"/><text x="${lx+16}" y="${ly}" style="font-size:12px;fill:#475569;font-weight:800">${ds.name}</text>`;
+    ly += 20;
+  });
+  svg += `</svg>`;
+  el.innerHTML = svg;
+}
+function trendAverageMetrics(data, count){
+  const slice = data.slice(-count);
+  const avgKey = key => slice.length ? slice.reduce((s,d)=>s+Number(d[key]||0),0)/slice.length : 0;
+  return {
+    label:`${count}개월 평균`,
+    overtimeRisk:Math.round(avgKey('overtimeRisk')),
+    mobilityRisk:Math.round(avgKey('mobilityRisk')),
+    workConcentrationRisk:Math.round(avgKey('workConcentrationRisk')),
+    operationalRisk:Math.round(avgKey('operationalRisk')),
+    leaveRisk:Math.round(avgKey('leaveRisk'))
+  };
+}
+function trendRadarOptionData(data){
+  if(!data.length) return [];
+  const current = data[data.length-1];
+  const prev = data.length >= 2 ? data[data.length-2] : null;
+  const opts = [{id:'current', name:`현재월 ${current.label}`, source:current, color:'#2563eb'}];
+  if(prev) opts.push({id:'prev', name:`전월 ${prev.label}`, source:prev, color:'#64748b'});
+  opts.push({id:'avg3', name:'3개월 평균', source:trendAverageMetrics(data,3), color:'#f59e0b', dash:'4 4'});
+  opts.push({id:'avg6', name:'6개월 평균', source:trendAverageMetrics(data,6), color:'#0f766e', dash:'4 4'});
+  opts.push({id:'avg12', name:'12개월 평균', source:trendAverageMetrics(data,12), color:'#7c3aed', dash:'4 4'});
+  return opts;
+}
+function trendSelectedRadarIds(){
+  if(!Array.isArray(STATE.trendRadarSelected) || !STATE.trendRadarSelected.length){
+    STATE.trendRadarSelected = ['current','avg12'];
+  }
+  return STATE.trendRadarSelected;
+}
+function renderTrendRadar(data){
+  const options = trendRadarOptionData(data);
+  const host = $('#trendRadarChecks');
+  const selected = new Set(trendSelectedRadarIds());
+  if(host){
+    host.innerHTML = options.map(opt => `<label class="${selected.has(opt.id)?'active':''}"><input type="checkbox" data-trend-radar="${opt.id}" ${selected.has(opt.id)?'checked':''}>${opt.name}</label>`).join('');
+    host.querySelectorAll('[data-trend-radar]').forEach(input => {
+      input.onchange = () => {
+        const checked = [...host.querySelectorAll('[data-trend-radar]:checked')].map(x=>x.getAttribute('data-trend-radar'));
+        if(checked.length > 4){ input.checked = false; alert('레이더 비교는 최대 4개까지 선택 가능합니다.'); return; }
+        if(!checked.length){ input.checked = true; return; }
+        STATE.trendRadarSelected = checked;
+        renderTrendAnalysis();
+      };
+    });
+  }
+  const labels = ['연장근로','외근','업무집중','운영','휴식/연차'];
+  const keys = ['overtimeRisk','mobilityRisk','workConcentrationRisk','operationalRisk','leaveRisk'];
+  const datasets = options.filter(opt => selected.has(opt.id)).map(opt => ({
+    name:opt.name, color:opt.color, dash:opt.dash,
+    values:keys.map(k=>Number(opt.source[k] || 0))
+  }));
+  trendRadarMultiSVG($('#trendRadarChart'), labels, datasets);
+}
+function renderTrendAnalysis(){
+  const data = trendBuildData();
+  const notice = $('#trendDataNotice');
+  if(notice){
+    notice.textContent = data.length ? `현재 그래프 반영 월: ${data.map(d=>d.label).join(', ')} · 업로드 월이 늘어나면 최근 12개월까지 자동 표시됩니다.` : '아직 업로드된 근태 월 데이터가 없습니다.';
+  }
+  if(!data.length){
+    renderEmptyChart($('#trendKpiChart'), '업로드된 월별 데이터가 없습니다.');
+    renderEmptyChart($('#trendRiskChart'), '업로드된 월별 데이터가 없습니다.');
+    renderEmptyChart($('#trendRadarChart'), '업로드된 월별 데이터가 없습니다.');
+    if($('#trendSummaryCards')) $('#trendSummaryCards').innerHTML='';
+    if($('#trendRadarCards')) $('#trendRadarCards').innerHTML='';
+    return;
+  }
+  const latest = data[data.length-1];
+  const prev = data.length >= 2 ? data[data.length-2] : null;
+  const diffText = (key, suffix='') => prev ? `${Number(latest[key]||0) - Number(prev[key]||0) >= 0 ? '+' : ''}${trendRound(Number(latest[key]||0) - Number(prev[key]||0),1)}${suffix}` : '비교월 없음';
+  if($('#trendSummaryCards')){
+    $('#trendSummaryCards').innerHTML = [
+      ['최근월', latest.label, `${latest.employeeCount}명 기준`],
+      ['1인당 연장근로', `${latest.avgOvertimePerPerson}h`, `전월 대비 ${diffText('avgOvertimePerPerson','h')}`],
+      ['위험 인원', `${latest.highRisk}명`, `전월 대비 ${diffText('highRisk','명')}`],
+      ['운영 리스크', `${latest.operationalRisk}점`, `전월 대비 ${diffText('operationalRisk','점')}`]
+    ].map(([k,v,s])=>`<div class="trendSummaryCard"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+  }
+  trendLineSVG($('#trendKpiChart'), data, [
+    {key:'avgOvertimePerPerson', color:'#2563eb', suffix:'h'},
+    {key:'highRisk', color:'#ef4444', suffix:'명'},
+    {key:'leaveZero', color:'#7c3aed', suffix:'명'}
+  ]);
+  renderTrendRadar(data);
+  trendLineSVG($('#trendRiskChart'), data, [
+    {key:'overtimeRisk', color:'#2563eb', suffix:'점'},
+    {key:'mobilityRisk', color:'#0f766e', suffix:'점'},
+    {key:'workConcentrationRisk', color:'#f59e0b', suffix:'점'},
+    {key:'operationalRisk', color:'#ef4444', suffix:'점'},
+    {key:'leaveRisk', color:'#7c3aed', suffix:'점'}
+  ], {maxValue:100});
+  const radarCards = [
+    ['연장근로 리스크', latest.overtimeRisk, '1인당 연장근로와 상위 인원 편중을 함께 반영'],
+    ['외근 리스크', latest.mobilityRisk, '출장/외근 활동량과 특정 인원 편중을 함께 반영'],
+    ['업무집중 상태', latest.workConcentrationRisk, '연장근로와 외근/출장이 상위 인원에게 쏠린 정도'],
+    ['운영 리스크', latest.operationalRisk, '연장근로·업무집중·연차부족·위험인원 종합'],
+    ['휴식/연차 리스크', latest.leaveRisk, '월 기준 기대 연차 사용량 대비 부족 정도']
+  ];
+  if($('#trendRadarCards')){
+    $('#trendRadarCards').innerHTML = radarCards.map(([k,v,d]) => `<div class="trendMetricCard"><div><div class="k">${k}</div><div class="d">${d}</div></div><div class="v">${v}점</div></div>`).join('');
+  }
+}
+
 function renderTopCharts(scoped, months){
-  $('#trendTitle').textContent = `${periodLabel()} 핵심 추이`;
-  lineSVG($('#trendChart'), months, [{key:'avgOvertimePerPerson',color:'#2563eb'},{key:'highRisk',color:'#ef4444'},{key:'leaveZero',color:'#7c3aed'}]);
+  if($('#trendTitle')) $('#trendTitle').textContent = `${periodLabel()} 핵심 추이`;
+  if($('#trendChart')) lineSVG($('#trendChart'), months, [{key:'avgOvertimePerPerson',color:'#2563eb'},{key:'highRisk',color:'#ef4444'},{key:'leaveZero',color:'#7c3aed'}]);
 
   const scopedEmployees = filteredEmployees();
   const pieTitleEl = $('#pieTitle');
@@ -8371,6 +8792,9 @@ function bindMainTabs(){
       if(btn.dataset.main === 'dashboard' || btn.dataset.main === 'deep-analysis'){
         rerenderDashboardVisibleCharts();
       }
+      if(btn.dataset.main === 'trend-analysis'){
+        requestAnimationFrame(() => { renderTrendAnalysis(); setTimeout(renderTrendAnalysis, 80); });
+      }
       if(btn.dataset.main === 'attendance-missing'){
         renderAttendanceMissingAnalysis();
       }
@@ -8443,6 +8867,7 @@ function render(){
   renderInsight(scoped, months);
   renderRisk(scoped);
   renderPeople(scoped);
+  renderTrendAnalysis();
   bindMainTabs();
   renderTabs();
 }
@@ -8703,6 +9128,7 @@ const renderLightweight = debounce(() => {
   renderInsight(scoped, months);
   renderRisk(scoped);
   renderPeople(scoped);
+  renderTrendAnalysis();
 }, 120);
 
 document.addEventListener('click', function(e){
