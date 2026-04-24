@@ -7130,18 +7130,42 @@ function getAttendanceWarningEventSummary(list){
     allMissingEnd: 0
   };
 
+  const holidayWorkTypes = ['공휴일','휴일','휴무일'];
+  const weekdayWorkTypes = ['정상근무','외근','오전외근','오후외근'];
+
   (list || []).forEach(row => {
+    // 주의 요약의 연장/휴일근무 집계는 화면 사유·OT확인값이 아니라
+    // ERP 원본 기준으로 고정한다.
+    // - 연장근무: 실제연장_시간 > 0 AND 근태구분이 평일 근무계열
+    // - 공휴일근무: 실제연장_시간 > 0 AND 근태구분이 공휴일/휴일/휴무일
+    // 업로드/저장 로직은 건드리지 않고, 요약 집계 기준만 안정화한다.
+    const erpReason = String(row.originalErpReason || row.erpReason || row.reason || '')
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .trim();
+    const erpOT = Number(row.erpActualOvertime || 0);
+    const hasActualOvertime = erpOT > 0;
+    const isHolidayType = holidayWorkTypes.includes(erpReason);
+    const isWeekdayWorkType = weekdayWorkTypes.includes(erpReason);
+
     const reasonKey = normalizeAttendanceReasonKey(row.reason, 'warning');
-    const isOvertime = reasonKey === '연장근무';
-    const isHoliday = reasonKey === '공휴일근무';
-    const isWeekendHoliday = reasonKey === '휴일근무';
+    const fallbackOvertime = reasonKey === '연장근무';
+    const fallbackHoliday = reasonKey === '공휴일근무';
+    const fallbackWeekendHoliday = reasonKey === '휴일근무';
+
+    const isOvertime = hasActualOvertime
+      ? (isWeekdayWorkType || !isHolidayType)
+      : fallbackOvertime;
+    const isHoliday = hasActualOvertime
+      ? isHolidayType
+      : (fallbackHoliday || fallbackWeekendHoliday);
+
     const isMissingStart = String(row.displayStart || '').trim() === '출근누락';
     const isMissingEnd = String(row.displayEnd || '').trim() === '퇴근누락';
-    const hasPriorityWork = isOvertime || isHoliday || isWeekendHoliday;
+    const hasPriorityWork = isOvertime || isHoliday;
 
     if (isOvertime) summary.overtime += 1;
     if (isHoliday) summary.holiday += 1;
-    if (isWeekendHoliday) summary.holidayWeekend += 1;
 
     if (isMissingStart) {
       summary.allMissingStart += 1;
@@ -7153,18 +7177,18 @@ function getAttendanceWarningEventSummary(list){
     }
   });
 
-  summary.total = summary.overtime + summary.holiday + summary.holidayWeekend + summary.pureMissingStart + summary.pureMissingEnd;
+  summary.total = summary.overtime + summary.holiday + summary.pureMissingStart + summary.pureMissingEnd;
   return summary;
 }
 function formatAttendanceWarningDetail(summary){
   const parts = [];
-  if (summary.pureMissingStart || summary.allMissingStart) parts.push(`출근미입력 ${summary.pureMissingStart}(${summary.allMissingStart})`);
-  if (summary.pureMissingEnd || summary.allMissingEnd) parts.push(`퇴근미입력 ${summary.pureMissingEnd}(${summary.allMissingEnd})`);
   if (summary.overtime) parts.push(`연장근무 ${summary.overtime}`);
-  if (summary.holidayWeekend) parts.push(`휴일근무 ${summary.holidayWeekend}`);
   if (summary.holiday) parts.push(`공휴일근무 ${summary.holiday}`);
+  if (summary.pureMissingEnd || summary.allMissingEnd) parts.push(`퇴근미입력 ${summary.pureMissingEnd}(${summary.allMissingEnd})`);
+  if (summary.pureMissingStart || summary.allMissingStart) parts.push(`출근미입력 ${summary.pureMissingStart}(${summary.allMissingStart})`);
   return parts.join(' | ');
 }
+
 function renderAttendanceKpis(rows){
   const warnSummary = getAttendanceWarningEventSummary(rows);
   const warn = warnSummary.total;
