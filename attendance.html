@@ -7028,16 +7028,80 @@ function isAttendanceTargetIncludedRow(row, metaByName){
 
 function buildAttendanceRows(){
   const metaByName = new Map(empMaster.map(e => [normalizeEmployeeName(e.name), e]));
-  const rows = getMergedRawAttendanceData()
-    .map(row => decorateAttendanceRow(row, metaByName))
-    .filter(Boolean)
-    .filter(row => isAttendanceTargetIncludedRow(row, metaByName))
-    .filter(row => row.bucket !== '제외')
-    .filter(row => rowMatchesSelectedPeriod(row.date))
-    .filter(row => !isDisplayExcludedAttendance(row))
-    .filter(row => (STATE.division === '전체' || row.division === STATE.division) && (STATE.team === '전체' || row.team === STATE.team))
-    .filter(matchesAttendanceFilters)
+
+  // ✅ 디버깅용 단계 분리
+  // 업로드/저장 로직은 건드리지 않고, 화면 표시 행이 어느 단계에서 제외되는지 확인하기 위한 전역 스냅샷만 남긴다.
+  const rawRows = getMergedRawAttendanceData();
+  const decoratedRows = rawRows.map(row => decorateAttendanceRow(row, metaByName));
+  const validRows = decoratedRows.filter(Boolean);
+  const targetRows = validRows.filter(row => isAttendanceTargetIncludedRow(row, metaByName));
+  const bucketRows = targetRows.filter(row => row.bucket !== '제외');
+  const periodRows = bucketRows.filter(row => rowMatchesSelectedPeriod(row.date));
+  const displayRows = periodRows.filter(row => !isDisplayExcludedAttendance(row));
+  const orgRows = displayRows.filter(row => (STATE.division === '전체' || row.division === STATE.division) && (STATE.team === '전체' || row.team === STATE.team));
+  const filteredRows = orgRows.filter(matchesAttendanceFilters);
+  const rows = filteredRows
+    .slice()
     .sort((a,b) => (String(a.date)+String(a.name)).localeCompare(String(b.date)+String(b.name),'ko'));
+
+  window.__attendanceDebug = {
+    rawRows,
+    decoratedRows,
+    validRows,
+    targetRows,
+    bucketRows,
+    periodRows,
+    displayRows,
+    orgRows,
+    filteredRows,
+    rows,
+    counts: {
+      raw: rawRows.length,
+      decorated: decoratedRows.length,
+      valid: validRows.length,
+      target: targetRows.length,
+      bucket: bucketRows.length,
+      period: periodRows.length,
+      display: displayRows.length,
+      org: orgRows.length,
+      filtered: filteredRows.length,
+      final: rows.length
+    }
+  };
+  window.__rawRows = rawRows;
+  window.__decoratedRows = decoratedRows;
+  window.__attendanceRows = rows;
+  window.findAttendanceExcludedRows = function(){
+    const makeKey = row => `${String(row?.date || row?.일자 || '').trim()}|${String(row?.id || row?.사번 || row?.employeeId || '').trim()}|${String(row?.name || row?.이름 || '').trim()}`;
+    const finalKeys = new Set(rows.map(makeKey));
+    return validRows
+      .filter(row => !finalKeys.has(makeKey(row)))
+      .map(row => {
+        let excludedAt = 'unknown';
+        if(!isAttendanceTargetIncludedRow(row, metaByName)) excludedAt = '근태대상 제외';
+        else if(row.bucket === '제외') excludedAt = 'bucket 제외';
+        else if(!rowMatchesSelectedPeriod(row.date)) excludedAt = '기간 필터 제외';
+        else if(isDisplayExcludedAttendance(row)) excludedAt = '화면표시 제외';
+        else if(!((STATE.division === '전체' || row.division === STATE.division) && (STATE.team === '전체' || row.team === STATE.team))) excludedAt = '본부/팀 필터 제외';
+        else if(!matchesAttendanceFilters(row)) excludedAt = '상세 필터 제외';
+        return {
+          excludedAt,
+          date: row.date,
+          id: row.id,
+          name: row.name,
+          division: row.division,
+          team: row.team,
+          bucket: row.bucket,
+          reason: row.reason,
+          displayStart: row.displayStart,
+          displayEnd: row.displayEnd,
+          erpReason: row.erpReason,
+          originalErpReason: row.originalErpReason,
+          erpActualOvertime: row.erpActualOvertime
+        };
+      });
+  };
+
   return rows;
 }
 buildAttendanceRows.unfiltered = function(){
@@ -7184,8 +7248,10 @@ function formatAttendanceWarningDetail(summary){
   const parts = [];
   if (summary.overtime) parts.push(`연장근무 ${summary.overtime}`);
   if (summary.holiday) parts.push(`공휴일근무 ${summary.holiday}`);
-  if (summary.pureMissingEnd || summary.allMissingEnd) parts.push(`퇴근미입력 ${summary.pureMissingEnd}(${summary.allMissingEnd})`);
-  if (summary.pureMissingStart || summary.allMissingStart) parts.push(`출근미입력 ${summary.pureMissingStart}(${summary.allMissingStart})`);
+  // ✅ 출근/퇴근 미입력은 겹침 제거된 순수 건수만 표기한다.
+  // 전체 발생건수(allMissingStart/allMissingEnd)는 내부 검증용으로만 유지하고 화면에는 표시하지 않는다.
+  if (summary.pureMissingEnd) parts.push(`퇴근미입력 ${summary.pureMissingEnd}`);
+  if (summary.pureMissingStart) parts.push(`출근미입력 ${summary.pureMissingStart}`);
   return parts.join(' | ');
 }
 
@@ -7253,7 +7319,7 @@ function renderAttendanceInsights(rows){
   if(warnSummary.total){
     msgs.push({
       title: `주의 ${warnSummary.total}건`,
-      desc: '연장근무·휴일/공휴일근무는 우선 집계하고, 출퇴근 미입력은 순수 건수(괄호 안은 전체 발생건수)로 표시합니다.',
+      desc: '연장근무·휴일/공휴일근무는 원본 기준으로 집계하고, 출퇴근 미입력은 겹침 제거된 순수 건수만 표시합니다.',
       detail: formatAttendanceWarningDetail(warnSummary) ? `<div class="sub" style="margin-top:8px;line-height:1.6">${formatAttendanceWarningDetail(warnSummary)}</div>` : ''
     });
   }
