@@ -1497,7 +1497,7 @@ html.embed-mode #main-dashboard .kpis{
   <div id="main-attendance-missing" class="mainPanel">
     <div class="card" style="margin-top:16px">
       <div class="title">출퇴근 누락 분석</div>
-      <div class="desc">기존 근태관리·분석대시보드·심층분석과 별도로, 확정 출근/퇴근 누락과 사유가 있는 잠재 확인 필요 건을 담당자 기준으로 분리 집계하는 전용 화면입니다.</div>
+      <div class="desc">기존 근태관리·분석대시보드·심층분석과 별도로, 확정 출근/퇴근 누락과 사유가 있는 잠재 확인 필요 건을 담당자 기준으로 분리 집계하는 전용 화면입니다. 0건 담당자도 표시하며, 출산휴가·육아휴직·휴직 등 연속 휴직성 인원은 자동 제외합니다.</div>
       <div class="attLegend">
         <span class="dot" style="background:#16a34a"></span>정상 0~1건
         <span class="dot" style="background:#d97706"></span>주의 2~3건
@@ -1526,10 +1526,10 @@ html.embed-mode #main-dashboard .kpis{
     <div class="card" style="margin-top:16px">
       <div class="title">담당자별 누락 현황
 <div style="margin:10px 0; padding:10px; background:#f5f7fa; border-radius:8px; font-size:13px; color:#555;">
-※ 휴직 및 비근무 인원은 분석에서 제외됩니다.
+※ 출산휴가·육아휴직·휴직 등 연속 휴직성 인원은 자동 제외되며, 누락 0건 담당자도 현황에 포함됩니다.
 </div>
 </div>
-      <div class="desc">총누락 기준 내림차순으로 정렬됩니다. 잠재출근/잠재퇴근은 참고용 확인 필요 건으로 별도 표시하며, 총누락과 상태 판정에는 포함하지 않습니다.</div>
+      <div class="desc">총누락 기준 내림차순으로 정렬됩니다. 누락 0건 담당자도 함께 표시합니다. 잠재출근/잠재퇴근은 참고용 확인 필요 건으로 별도 표시하며, 총누락과 상태 판정에는 포함하지 않습니다.</div>
       <div class="attTableWrap" style="max-height:none">
         <table class="attTable" style="min-width:1280px;font-size:14px">
           <thead>
@@ -8099,40 +8099,104 @@ function renderAttendanceMissingAnalysis(){
   const emptyEl = document.getElementById('attendanceMissingEmpty');
   if(!summaryEl || !top5El || !tbody || !emptyEl) return;
 
-  // 기준 데이터: 근태관리 화면과 동일하게 휴직 포함/제외 토글이 반영된 유효 행 기준
-  const rows = getAttendanceManagementRows(buildAttendanceRows());
-  const byPerson = new Map();
-
-  // 0건 담당자도 누락 현황에 표시되도록 현재 필터 기준 분석 대상자를 먼저 생성
-  const seedPeople = (() => {
-    try{
-      if(typeof scopedEmployees === 'function') return scopedEmployees();
-      if(typeof filteredEmployees === 'function') return filteredEmployees();
-    }catch(e){}
-    return [];
-  })();
-
-  seedPeople.forEach(emp => {
-    const rawName = String(emp?.name || '').trim();
-    const name = (typeof normalizeEmployeeName === 'function') ? normalizeEmployeeName(rawName) : rawName;
-    if(!name || byPerson.has(name)) return;
-    byPerson.set(name, {
-      name,
-      division: emp?.division || '',
-      team: emp?.team || '',
-      startMissing: 0,
-      endMissing: 0,
-      potentialStart: 0,
-      potentialEnd: 0
-    });
-  });
-
   const stripHtmlText = (value) => String(value || '')
     .replace(/<br\s*\/?>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+  const normalizeNameSafe = (value) => {
+    const raw = String(value || '').trim();
+    return (typeof normalizeEmployeeName === 'function') ? normalizeEmployeeName(raw) : raw;
+  };
+
+  const selectedRowsIgnoringColumnFilters = () => {
+    const backup = {};
+    try{
+      if(typeof ATT_FILTERS === 'object' && ATT_FILTERS){
+        Object.keys(ATT_FILTERS).forEach(key => {
+          backup[key] = Array.isArray(ATT_FILTERS[key]) ? ATT_FILTERS[key].slice() : [];
+          ATT_FILTERS[key] = [];
+        });
+      }
+      return (typeof buildAttendanceRows === 'function') ? buildAttendanceRows() : [];
+    }catch(e){
+      console.warn('[missing-analysis] build rows failed', e);
+      return [];
+    }finally{
+      try{ Object.keys(backup).forEach(key => { ATT_FILTERS[key] = backup[key]; }); }catch(e){}
+    }
+  };
+
+  const isContinuousLeaveRowSafe = (row) => {
+    try{
+      if(typeof isAttendanceContinuousLeaveRow === 'function' && isAttendanceContinuousLeaveRow(row)) return true;
+      if(typeof isContinuousLeaveReason === 'function' && typeof getAttendanceBaseReason === 'function' && isContinuousLeaveReason(getAttendanceBaseReason(row))) return true;
+    }catch(e){}
+    return false;
+  };
+
+  // 기준 데이터: 근태관리 컬럼 필터와 무관하게 선택 월/본부/팀 기준 전체 행을 사용합니다.
+  // 단, 출산휴가·육아휴직·휴직 등 연속 휴직성 행은 누락 집계에서 자동 제외합니다.
+  const allRows = selectedRowsIgnoringColumnFilters();
+  const continuousLeaveRows = (allRows || []).filter(isContinuousLeaveRowSafe);
+  const rows = (allRows || []).filter(row => !isContinuousLeaveRowSafe(row));
+
+  // 선택 기간에 휴직성 행만 존재하는 담당자는 담당자 목록에서도 자동 제외합니다.
+  // 복직/휴직전환처럼 동일 기간에 실제 근무성 행이 있으면 제외하지 않습니다.
+  const leaveOnlyNames = new Set();
+  const rowsByNameForLeaveCheck = new Map();
+  (allRows || []).forEach(row => {
+    const name = normalizeNameSafe(row?.name);
+    if(!name) return;
+    const list = rowsByNameForLeaveCheck.get(name) || [];
+    list.push(row);
+    rowsByNameForLeaveCheck.set(name, list);
+  });
+  rowsByNameForLeaveCheck.forEach((personRows, name) => {
+    const hasRows = personRows.length > 0;
+    const hasNonLeaveRow = personRows.some(row => !isContinuousLeaveRowSafe(row));
+    if(hasRows && !hasNonLeaveRow) leaveOnlyNames.add(name);
+  });
+
+  const byPerson = new Map();
+
+  // 0건 담당자도 표시하기 위해 사원 마스터를 우선 사용합니다.
+  // EMPLOYEES/분석집계에 아직 생성되지 않은 담당자(예: 김지현)도 여기서 빠지지 않습니다.
+  const masterSource = (() => {
+    if(Array.isArray(empMaster) && empMaster.length) return empMaster;
+    if(typeof DEFAULT_MASTER !== 'undefined' && Array.isArray(DEFAULT_MASTER) && DEFAULT_MASTER.length) return DEFAULT_MASTER;
+    if(Array.isArray(EMPLOYEES) && EMPLOYEES.length) return EMPLOYEES;
+    return [];
+  })();
+
+  const isInCurrentOrgScope = (emp) => {
+    const division = String(emp?.division || '').trim();
+    const team = String(emp?.team || '').trim();
+    if(STATE.division !== '전체' && division !== STATE.division) return false;
+    if(STATE.team !== '전체' && team !== STATE.team) return false;
+    return true;
+  };
+
+  masterSource
+    .filter(emp => String(emp?.status || '재직').trim() === '재직')
+    .filter(emp => String(emp?.attendanceTarget || 'Y').trim().toUpperCase() !== 'N')
+    .filter(isInCurrentOrgScope)
+    .forEach(emp => {
+      const name = normalizeNameSafe(emp?.name);
+      if(!name || leaveOnlyNames.has(name) || byPerson.has(name)) return;
+      byPerson.set(name, {
+        name,
+        division: emp?.division || '',
+        team: emp?.team || '',
+        sortOrder: Number.isFinite(Number(emp?.sortOrder)) ? Number(emp.sortOrder) : 999999,
+        startMissing: 0,
+        endMissing: 0,
+        potentialStart: 0,
+        potentialEnd: 0
+      });
+    });
 
   const isBlankClockDisplay = (value) => {
     const v = stripHtmlText(value);
@@ -8159,19 +8223,13 @@ function renderAttendanceMissingAnalysis(){
     if(!r || r === '-' || r === '정상근무') return true;
     if(typeof isContinuousLeaveReason === 'function' && isContinuousLeaveReason(r)) return true;
     if(typeof isVacationReason === 'function' && isVacationReason(r)) return true;
-
-    // 휴가/휴직/결근류는 출퇴근 기록이 없는 것이 자연스러운 경우가 많아 잠재 누락에서 제외
     if(/연차|반차|휴가|휴무|휴직|출산|육아|병가|공가|경조|결근|재택근무/.test(r)) return true;
-
-    // 이미 확정 누락으로 표기되는 사유는 잠재에서 중복 제외
     if(/출근미입력|퇴근미입력|출퇴근미입력|출근누락|퇴근누락/.test(r)) return true;
     return false;
   };
 
-  // 잠재 누락: 확정 누락은 아니지만 출근/퇴근 시간이 비어 있고, 확인이 필요한 ERP 사유가 있는 건
-  // 총누락·상태·순위에는 포함하지 않고 참고용으로만 표시
   const isPotentialStartCheck = (row) => {
-    if(isDefiniteStartMissing(row)) return false; // 확정과 잠재 중복 방지
+    if(isDefiniteStartMissing(row)) return false;
     if(!isBlankClockDisplay(row?.displayStart)) return false;
     const reason = getMissingPotentialReason(row);
     if(isExcludedPotentialReason(reason)) return false;
@@ -8179,7 +8237,7 @@ function renderAttendanceMissingAnalysis(){
   };
 
   const isPotentialEndCheck = (row) => {
-    if(isDefiniteEndMissing(row)) return false; // 확정과 잠재 중복 방지
+    if(isDefiniteEndMissing(row)) return false;
     if(!isBlankClockDisplay(row?.displayEnd)) return false;
     const reason = getMissingPotentialReason(row);
     if(isExcludedPotentialReason(reason)) return false;
@@ -8187,13 +8245,13 @@ function renderAttendanceMissingAnalysis(){
   };
 
   (rows || []).forEach(row => {
-    const rawName = String(row.name || '').trim();
-    const name = (typeof normalizeEmployeeName === 'function') ? normalizeEmployeeName(rawName) : rawName;
-    if(!name) return;
+    const name = normalizeNameSafe(row.name);
+    if(!name || leaveOnlyNames.has(name)) return;
     const current = byPerson.get(name) || {
       name,
       division: row.division || '',
       team: row.team || '',
+      sortOrder: Number.isFinite(Number(row?.sortOrder)) ? Number(row.sortOrder) : 999999,
       startMissing: 0,
       endMissing: 0,
       potentialStart: 0,
@@ -8207,31 +8265,30 @@ function renderAttendanceMissingAnalysis(){
 
     if(!current.division && row.division) current.division = row.division;
     if(!current.team && row.team) current.team = row.team;
+    if((!Number.isFinite(Number(current.sortOrder)) || Number(current.sortOrder) === 999999) && Number.isFinite(Number(row?.sortOrder))) current.sortOrder = Number(row.sortOrder);
     byPerson.set(name, current);
   });
 
   const list = Array.from(byPerson.values())
     .map(item => {
-      const total = item.startMissing + item.endMissing; // 총누락은 확정 누락만 포함
+      const total = item.startMissing + item.endMissing;
       const potentialTotal = item.potentialStart + item.potentialEnd;
       let status = '정상';
       let tone = 'normal';
-      if(total >= 4){
-        status = '문제';
-        tone = 'danger';
-      } else if(total >= 2){
-        status = '주의';
-        tone = 'warn';
-      }
+      if(total >= 4){ status = '문제'; tone = 'danger'; }
+      else if(total >= 2){ status = '주의'; tone = 'warn'; }
       return { ...item, total, potentialTotal, status, tone };
     })
     .sort((a,b) => {
-      // 순위는 확정 총누락 기준만 우선 적용
       if(b.total !== a.total) return b.total - a.total;
       if(b.endMissing !== a.endMissing) return b.endMissing - a.endMissing;
       if(b.startMissing !== a.startMissing) return b.startMissing - a.startMissing;
-      // 동률일 때만 참고용 잠재 확인 필요 건으로 보조 정렬
       if(b.potentialTotal !== a.potentialTotal) return b.potentialTotal - a.potentialTotal;
+      const divCompare = String(a.division || '').localeCompare(String(b.division || ''), 'ko');
+      if(divCompare) return divCompare;
+      const teamCompare = String(a.team || '').localeCompare(String(b.team || ''), 'ko');
+      if(teamCompare) return teamCompare;
+      if(Number(a.sortOrder || 999999) !== Number(b.sortOrder || 999999)) return Number(a.sortOrder || 999999) - Number(b.sortOrder || 999999);
       return a.name.localeCompare(b.name, 'ko');
     });
 
@@ -8242,11 +8299,14 @@ function renderAttendanceMissingAnalysis(){
   const totalPeople = list.filter(item => item.total > 0).length;
   const potentialPeople = list.filter(item => item.potentialTotal > 0).length;
   const topPerson = list.find(item => item.total > 0);
+  const excludedLeavePeopleCount = leaveOnlyNames.size;
+  const excludedLeaveRowCount = continuousLeaveRows.length;
 
   summaryEl.innerHTML = [
     ['출근누락 총건수', `${totalStart}건`, '출근 컬럼에 표시된 확정 누락 건수'],
     ['퇴근누락 총건수', `${totalEnd}건`, '퇴근 컬럼에 표시된 확정 누락 건수'],
-    ['누락 발생 인원', `${totalPeople}명`, '확정 출근/퇴근 누락이 1건 이상 있는 담당자'],
+    ['누락 발생 인원', `${totalPeople}명`, `0건 담당자 포함 전체 ${list.length}명 기준`],
+    ['휴직 자동 제외', `${excludedLeavePeopleCount}명`, `출산휴가·육아휴직·휴직 등 연속 휴직성 행 ${excludedLeaveRowCount}건 제외`],
     ['잠재 확인 필요', `${totalPotentialStart + totalPotentialEnd}건`, `잠재출근 ${totalPotentialStart} · 잠재퇴근 ${totalPotentialEnd} / 대상 ${potentialPeople}명`],
     ['최다 누락 담당자', topPerson ? `${topPerson.name} ${topPerson.total}건` : '-', topPerson ? `출근 ${topPerson.startMissing} · 퇴근 ${topPerson.endMissing} · 잠재 ${topPerson.potentialTotal}` : '']
   ].map(([label, value, sub]) => `
@@ -8262,15 +8322,13 @@ function renderAttendanceMissingAnalysis(){
   top5El.innerHTML = top5.length ? top5.map(item => `
     <div class="missingBarRow">
       <strong>${item.name}</strong>
-      <div class="missingBarBg">
-        <div class="missingBarFill" style="width:${(item.total / maxTotal) * 100}%"></div>
-      </div>
+      <div class="missingBarBg"><div class="missingBarFill" style="width:${(item.total / maxTotal) * 100}%"></div></div>
       <span>${item.total}건</span>
     </div>
   `).join('') : '<div class="employeeEmpty" style="padding:20px 0">확정 누락 데이터가 없습니다.</div>';
 
   tbody.innerHTML = list.map((item, idx) => `
-    <tr class="${idx < 2 ? 'missingTopRow' : ''}">
+    <tr class="${idx < 2 && item.total > 0 ? 'missingTopRow' : ''}">
       <td><span class="missingRank">${idx + 1}</span></td>
       <td style="text-align:left"><strong>${item.name}</strong></td>
       <td>${item.division || '-'}</td>
