@@ -3310,6 +3310,7 @@ function rebuildDerivedMetricsFromAttendance(){
 
     const countsAsEvaluatedWorkDay = hasActualWork || baseWorkForMetrics !== null || adjustedWorkForMetrics !== null || erpOT > 0;
     if(countsAsEvaluatedWorkDay) person.workDays += 1;
+    // 연차/반차는 ERP 사유 문자열이 다른 상태값과 함께 합쳐져도 인식되도록 포함 검색으로 집계합니다.
     if(isVacationReason(reason)) person.leaveUsed += isHalfDayVacationReason(reason) ? 0.5 : 1;
 
     const rawReasonText = [
@@ -6421,10 +6422,12 @@ function isLeaveLike(reason){
 }
 
 function isHalfDayVacationReason(reason){
-  return ['반차','오전반차','오후반차'].includes(String(reason || '').trim());
+  const s = normalizeAttendanceReasonText(reason);
+  return ["오전반차","오후반차","반차"].some(k => s === k || s.includes(k));
 }
 function isVacationReason(reason){
-  return ['연차','연차휴가','반차','오전반차','오후반차'].includes(String(reason || '').trim());
+  const s = normalizeAttendanceReasonText(reason);
+  return ["연차휴가","연차","오전반차","오후반차","반차"].some(k => s === k || s.includes(k));
 }
 function isOutsideReason(reason){
   return ['외근','출장','오전외근','오후외근'].includes(String(reason || '').trim());
