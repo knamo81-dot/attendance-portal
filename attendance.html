@@ -6440,8 +6440,11 @@ function isVacationReason(reason){
 function isOutsideReason(reason){
   return ['외근','출장','오전외근','오후외근'].includes(String(reason || '').trim());
 }
+const ATTENDANCE_CONTINUOUS_LEAVE_KEYWORDS = ['육아휴직','출산휴가','산전후휴가','병가','가족돌봄휴직','장기휴직','휴직'];
 function isContinuousLeaveReason(reason){
-  return ['육아휴직','출산휴가','산전후휴가','병가','가족돌봄휴직','장기휴직','휴직'].includes(String(reason || '').trim());
+  const s = normalizeAttendanceReasonText(reason);
+  if(!s) return false;
+  return ATTENDANCE_CONTINUOUS_LEAVE_KEYWORDS.some(key => s === key || s.includes(key));
 }
 
 // ✅ 누락 판정 전 사유 예외처리 보강
@@ -7101,7 +7104,19 @@ buildAttendanceRows.unfiltered = function(){
 };
 
 function getAttendanceBaseReason(row){
-  let raw = String(row?.reason || row?.erpReason || row?.status || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, ' ').trim();
+  const parts = [
+    row?.reason,
+    row?.erpReason,
+    row?.originalErpReason,
+    row?.status,
+    row?.originalStatus,
+    row?.primaryReason,
+    row?.secondaryReason
+  ];
+  let raw = parts
+    .map(v => String(v || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, ' ').trim())
+    .filter(Boolean)
+    .join(' ');
   raw = raw.replace(/^주말\s+/, '').replace(/\(검토\)$/,'').trim();
   return raw;
 }
@@ -7109,9 +7124,10 @@ function isAttendanceContinuousLeaveRow(row){
   return isContinuousLeaveReason(getAttendanceBaseReason(row));
 }
 function getAttendanceManagementRows(rows){
+  const list = Array.isArray(rows) ? rows : [];
   return (STATE.attendanceIncludeLeave === false)
-    ? rows.filter(row => !isAttendanceContinuousLeaveRow(row))
-    : rows.slice();
+    ? list.filter(row => !isAttendanceContinuousLeaveRow(row))
+    : list.slice();
 }
 function renderAttendanceLeaveToggle(){
   const el = $('#attendanceLeaveToggle');
@@ -7386,7 +7402,15 @@ function splitReasonTokens(value){
 }
 
 function uniqueOrderedReasonTokens(tokens){
-  const unique = [...new Set((tokens || []).map(normalizeReasonToken).filter(Boolean))];
+  // ✅ 표시 전용 정리: 공휴일근무는 유지하되, 단독 휴일/공휴일 표기는 숨김
+  // - 이유 칸에 연장근무 / 공휴일근무 / 휴일처럼 노출되던 휴일 상태값 제거
+  // - KPI/집계/업로드/저장 로직에는 영향 없음
+  const hiddenDisplayTokens = new Set(["휴일", "휴무일", "공휴일"]);
+  const unique = [...new Set((tokens || [])
+    .map(normalizeReasonToken)
+    .filter(Boolean)
+    .filter(token => !hiddenDisplayTokens.has(token))
+  )];
   return unique.sort((a,b) => {
     const ai = ATTENDANCE_REASON_ORDER.indexOf(a);
     const bi = ATTENDANCE_REASON_ORDER.indexOf(b);
@@ -7602,7 +7626,7 @@ function bindAttendanceFilters(){
     reason: r => getAttendanceReasonTokens(r)
   };
 
-  const baseRows = (buildAttendanceRows.unfiltered ? buildAttendanceRows.unfiltered() : []).filter(r => !isDisplayExcludedAttendance(r));
+  const baseRows = getAttendanceManagementRows(buildAttendanceRows.unfiltered ? buildAttendanceRows.unfiltered() : []).filter(r => !isDisplayExcludedAttendance(r));
 
   Object.entries(columns).forEach(([key, getter]) => {
     const dd = document.getElementById('dropdown-' + key);
