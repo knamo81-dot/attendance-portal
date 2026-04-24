@@ -1497,7 +1497,7 @@ html.embed-mode #main-dashboard .kpis{
   <div id="main-attendance-missing" class="mainPanel">
     <div class="card" style="margin-top:16px">
       <div class="title">출퇴근 누락 분석</div>
-      <div class="desc">기존 근태관리·분석대시보드·심층분석과 별도로, 확정 출근/퇴근 누락과 사유가 있는 잠재 확인 필요 건을 담당자 기준으로 분리 집계하는 전용 화면입니다. 0건 담당자도 표시하며, 출산휴가·육아휴직·휴직 등 연속 휴직성 인원은 자동 제외합니다.</div>
+      <div class="desc">기존 근태관리·분석대시보드·심층분석과 별도로, 확정 출근/퇴근 누락과 사유가 있는 잠재 확인 필요 건을 담당자 기준으로 분리 집계하는 전용 화면입니다. 0건 담당자도 표시하며, 출산휴가·육아휴직·휴직·파견 등 연속 제외성 인원은 자동 제외합니다.</div>
       <div class="attLegend">
         <span class="dot" style="background:#16a34a"></span>정상 0~1건
         <span class="dot" style="background:#d97706"></span>주의 2~3건
@@ -1526,7 +1526,7 @@ html.embed-mode #main-dashboard .kpis{
     <div class="card" style="margin-top:16px">
       <div class="title">담당자별 누락 현황
 <div style="margin:10px 0; padding:10px; background:#f5f7fa; border-radius:8px; font-size:13px; color:#555;">
-※ 출산휴가·육아휴직·휴직 등 연속 휴직성 인원은 자동 제외되며, 누락 0건 담당자도 현황에 포함됩니다.
+※ 출산휴가·육아휴직·휴직·파견 등 연속 제외성 인원은 자동 제외되며, 누락 0건 담당자도 현황에 포함됩니다.
 </div>
 </div>
       <div class="desc">총누락 기준 내림차순으로 정렬됩니다. 누락 0건 담당자도 함께 표시합니다. 잠재출근/잠재퇴근은 참고용 확인 필요 건으로 별도 표시하며, 잠재퇴근은 퇴근 칸이 비어 보이는 건을 화면 기준 그대로 집계합니다.</div>
@@ -6820,7 +6820,7 @@ function isVacationReason(reason){
 function isOutsideReason(reason){
   return ['외근','출장','오전외근','오후외근'].includes(String(reason || '').trim());
 }
-const ATTENDANCE_CONTINUOUS_LEAVE_KEYWORDS = ['육아휴직','출산휴가','산전후휴가','병가','가족돌봄휴직','장기휴직','휴직'];
+const ATTENDANCE_CONTINUOUS_LEAVE_KEYWORDS = ['육아휴직','출산휴가','산전후휴가','병가','가족돌봄휴직','장기휴직','휴직','파견'];
 function isContinuousLeaveReason(reason){
   const s = normalizeAttendanceReasonText(reason);
   if(!s) return false;
@@ -7515,7 +7515,7 @@ function renderAttendanceLeaveToggle(){
   el.innerHTML = `
     <button type="button" class="attToggleBtn ${STATE.attendanceIncludeLeave !== false ? 'active' : ''}" data-attendance-leave-mode="include">휴직 포함</button>
     <button type="button" class="attToggleBtn ${STATE.attendanceIncludeLeave === false ? 'active' : ''}" data-attendance-leave-mode="exclude">휴직 제외</button>
-    <span class="attToggleHint">휴직 제외는 육아휴직·출산휴가·휴직·병가 등 연속 상태형 휴직만 제외합니다.</span>
+    <span class="attToggleHint">휴직 제외는 육아휴직·출산휴가·휴직·병가·파견 등 출퇴근 기록 제외 대상을 제외합니다.</span>
   `;
   el.querySelectorAll('[data-attendance-leave-mode]').forEach(btn => {
     btn.onclick = () => {
@@ -8138,7 +8138,7 @@ function renderAttendanceMissingAnalysis(){
   };
 
   // 기준 데이터: 근태관리 컬럼 필터와 무관하게 선택 월/본부/팀 기준 전체 행을 사용합니다.
-  // 단, 출산휴가·육아휴직·휴직 등 연속 휴직성 행은 누락 집계에서 자동 제외합니다.
+  // 단, 출산휴가·육아휴직·휴직·파견 등 연속 제외성 행은 누락 집계에서 자동 제외합니다.
   const allRows = selectedRowsIgnoringColumnFilters();
   const continuousLeaveRows = (allRows || []).filter(isContinuousLeaveRowSafe);
   const rows = (allRows || []).filter(row => !isContinuousLeaveRowSafe(row));
@@ -8223,7 +8223,7 @@ function renderAttendanceMissingAnalysis(){
     if(!r || r === '-' || r === '정상근무') return true;
     if(typeof isContinuousLeaveReason === 'function' && isContinuousLeaveReason(r)) return true;
     if(typeof isVacationReason === 'function' && isVacationReason(r)) return true;
-    if(/연차|반차|휴가|휴무|휴직|출산|육아|병가|공가|경조|결근|재택근무/.test(r)) return true;
+    if(/연차|반차|휴가|휴무|휴직|출산|육아|병가|공가|경조|결근|재택근무|파견/.test(r)) return true;
     if(/출근미입력|퇴근미입력|출퇴근미입력|출근누락|퇴근누락/.test(r)) return true;
     return false;
   };
@@ -8239,7 +8239,7 @@ function renderAttendanceMissingAnalysis(){
   const isPotentialEndCheck = (row) => {
     // 잠재퇴근은 근태관리 표의 퇴근 칸이 비어 보이는 건을 그대로 확인 대상으로 집계합니다.
     // 오후반차/외근 등 사유가 있더라도 화면상 퇴근 '-' 건이면 사용자 검토용 잠재퇴근에 포함합니다.
-    // 단, 위에서 출산휴가·육아휴직·휴직 등 연속 휴직성 행은 이미 rows에서 제외되어 있습니다.
+    // 단, 위에서 출산휴가·육아휴직·휴직·파견 등 연속 제외성 행은 이미 rows에서 제외되어 있습니다.
     if(!isBlankClockDisplay(row?.displayEnd)) return false;
     return true;
   };
@@ -8306,7 +8306,7 @@ function renderAttendanceMissingAnalysis(){
     ['출근누락 총건수', `${totalStart}건`, '출근 컬럼에 표시된 확정 누락 건수'],
     ['퇴근누락 총건수', `${totalEnd}건`, '퇴근 컬럼에 표시된 확정 누락 건수'],
     ['누락 발생 인원', `${totalPeople}명`, `0건 담당자 포함 전체 ${list.length}명 기준`],
-    ['휴직 자동 제외', `${excludedLeavePeopleCount}명`, `출산휴가·육아휴직·휴직 등 연속 휴직성 행 ${excludedLeaveRowCount}건 제외`],
+    ['휴직 자동 제외', `${excludedLeavePeopleCount}명`, `출산휴가·육아휴직·휴직·파견 등 연속 제외성 행 ${excludedLeaveRowCount}건 제외`],
     ['잠재 확인 필요', `${totalPotentialStart + totalPotentialEnd}건`, `잠재출근 ${totalPotentialStart} · 잠재퇴근 ${totalPotentialEnd} / 대상 ${potentialPeople}명`],
     ['최다 누락 담당자', topPerson ? `${topPerson.name} ${topPerson.total}건` : '-', topPerson ? `출근 ${topPerson.startMissing} · 퇴근 ${topPerson.endMissing} · 잠재 ${topPerson.potentialTotal}` : '']
   ].map(([label, value, sub]) => `
