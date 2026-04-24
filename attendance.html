@@ -2657,6 +2657,75 @@ function createUploadBatchId(){
   return `batch_${Date.now()}_${Math.random().toString(36).slice(2,10)}`;
 }
 
+function detectUploadMonthKeyFromUpload(secomRows = [], erpRows = [], secomFilename = '', erpFilename = ''){
+  const dateValues = [
+    ...(secomRows || []).map(row => row?.date || row?.work_date || ''),
+    ...(erpRows || []).map(row => row?.date || row?.work_date || '')
+  ].map(v => String(v || '').trim()).filter(Boolean);
+
+  for(const value of dateValues){
+    const m = value.match(/^(20\d{2})[-./](\d{1,2})/);
+    if(m) return `${m[1]}-${String(m[2]).padStart(2, '0')}`;
+
+    const d = new Date(value);
+    if(!Number.isNaN(d.getTime())){
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+  }
+
+  const filenameText = `${secomFilename || ''} ${erpFilename || ''}`;
+  const fileMatch4 = filenameText.match(/(20\d{2})[^\d]?(0?[1-9]|1[0-2])/);
+  if(fileMatch4) return `${fileMatch4[1]}-${String(fileMatch4[2]).padStart(2, '0')}`;
+
+  const fileMatch2 = filenameText.match(/(?:^|[^\d])(\d{2})[^\d]?(0?[1-9]|1[0-2])(?:[^\d]|$)/);
+  if(fileMatch2) return `20${fileMatch2[1]}-${String(fileMatch2[2]).padStart(2, '0')}`;
+
+  return null;
+}
+
+async function createServerUploadBatchMeta(batchId, meta = {}){
+  if(!supabaseClient) return null;
+
+  const fullPayload = {
+    batch_id: batchId,
+    upload_month: meta?.uploadMonth || null,
+    upload_type: 'manual_upload',
+    secom_filename: meta?.secomFilename || null,
+    erp_filename: meta?.erpFilename || null,
+    uploaded_by: meta?.uploadedBy || null,
+    note: meta?.note || null
+  };
+
+  const payloadCandidates = [
+    fullPayload,
+    (() => {
+      const p = { ...fullPayload };
+      delete p.uploaded_by;
+      delete p.note;
+      return p;
+    })()
+  ];
+
+  let lastError = null;
+
+  for(const payload of payloadCandidates){
+    const { data, error } = await supabaseClient
+      .from('attendance_upload_batches')
+      .insert([payload])
+      .select()
+      .single();
+
+    if(!error) return data?.id ?? data?.batch_id ?? batchId;
+
+    lastError = error;
+    const msg = String(error?.message || '').toLowerCase();
+    const isColumnError = msg.includes('column') || msg.includes('schema cache');
+    if(!isColumnError) break;
+  }
+
+  throw lastError || new Error('배치 메타 저장 실패');
+}
+
 async function backupUploadedAttendanceRawToSupabase({
   batchId,
   secomRows = [],
@@ -2678,24 +2747,7 @@ async function backupUploadedAttendanceRawToSupabase({
     return null;
   })();
 
-  function getUploadMonthKey(){
-    const firstDate =
-      (secomRows.find(r => r.date)?.date) ||
-      (erpRows.find(r => r.date)?.date) ||
-      '';
-
-    const m = String(firstDate).match(/(\d{4})[-./](\d{1,2})/);
-    if(m) return `${m[1]}-${String(m[2]).padStart(2, '0')}`;
-
-    const d = new Date(firstDate);
-    if(!Number.isNaN(d.getTime())){
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    }
-
-    return null;
-  }
-
-  const uploadMonth = getUploadMonthKey();
+  const uploadMonth = detectUploadMonthKeyFromUpload(secomRows, erpRows, secomFilename, erpFilename);
 
   const secomPayload = (secomRows || []).map(row => ({
     upload_batch_id: batchId,
@@ -2718,6 +2770,10 @@ async function backupUploadedAttendanceRawToSupabase({
     raw_data: row
   }));
 
+  if(!secomPayload.length && !erpPayload.length){
+    return { ok:false, skipped:true, reason:'no-parsed-rows', batchId, uploadMonth };
+  }
+
   if(secomPayload.length){
     await insertRowsInChunks('attendance_secom_raw', secomPayload);
   }
@@ -2725,6 +2781,14 @@ async function backupUploadedAttendanceRawToSupabase({
   if(erpPayload.length){
     await insertRowsInChunks('attendance_erp_raw', erpPayload);
   }
+
+  const batchRowId = await createServerUploadBatchMeta(batchId, {
+    uploadMonth,
+    secomFilename,
+    erpFilename,
+    uploadedBy,
+    note: uploadMonth ? `${uploadMonth} 근태 업로드` : '근태 업로드'
+  });
 
   return {
     ok: true,
@@ -8078,7 +8142,7 @@ async function fetchAdminUploadYears(){
     const { data, error } = await supabaseClient.from('attendance_upload_batches').select('*').limit(500);
     if(error) throw error;
     (data || []).forEach(row => {
-      const combined = [row.created_at, row.uploaded_at, row.secom_filename, row.erp_filename, row.note, row.id].filter(Boolean).join(' ');
+      const combined = [row.upload_month, row.created_at, row.uploaded_at, row.secom_filename, row.erp_filename, row.note, row.batch_id, row.id].filter(Boolean).join(' ');
       const matches = String(combined).match(/20\d{2}/g) || [];
       matches.forEach(y => years.add(Number(y)));
     });
@@ -8114,9 +8178,17 @@ async function fetchMonthCountMap(tableName, year){
   return { countMap: map, batchDateMap };
 }
 function extractBatchYearMonth(row){
+  const uploadMonth = String(row?.upload_month || '').trim();
+  const uploadMonthMatch = uploadMonth.match(/^(20\d{2})-(\d{2})$/);
+  if(uploadMonthMatch) return { year:Number(uploadMonthMatch[1]), month:Number(uploadMonthMatch[2]) };
+
   const filenameJoined = [row.erp_filename, row.secom_filename, row.note].filter(Boolean).join(' ');
-  const fileMatch = filenameJoined.match(/(20\d{2})[^\d]?(0[1-9]|1[0-2])/);
+  const fileMatch = filenameJoined.match(/(20\d{2})[^\d]?(0?[1-9]|1[0-2])/);
   if(fileMatch) return { year:Number(fileMatch[1]), month:Number(fileMatch[2]) };
+
+  const fileMatch2 = filenameJoined.match(/(?:^|[^\d])(\d{2})[^\d]?(0?[1-9]|1[0-2])(?:[^\d]|$)/);
+  if(fileMatch2) return { year:Number(`20${fileMatch2[1]}`), month:Number(fileMatch2[2]) };
+
   const created = String(row.created_at || row.uploaded_at || '');
   const createdMatch = created.match(/^(20\d{2})-(\d{2})/);
   if(createdMatch) return { year:Number(createdMatch[1]), month:Number(createdMatch[2]) };
@@ -8126,21 +8198,30 @@ async function fetchAdminBatchRows(year, secomBatchDateMap, erpBatchDateMap){
   if(!supabaseClient) return [];
   const rows = [];
   try{
-    const { data, error } = await supabaseClient.from('attendance_upload_batches').select('*').order('created_at', { ascending:false }).limit(1000);
+    const { data, error } = await supabaseClient
+      .from('attendance_upload_batches')
+      .select('*')
+      .order('created_at', { ascending:false })
+      .limit(1000);
     if(error) throw error;
+
     (data || []).forEach(row => {
+      const batchKey = String(row.batch_id || row.id || '').trim();
       const inferred = extractBatchYearMonth(row);
-      const secomDates = secomBatchDateMap.get(row.id) || [];
-      const erpDates = erpBatchDateMap.get(row.id) || [];
+      const secomDates = secomBatchDateMap.get(batchKey) || secomBatchDateMap.get(row.id) || [];
+      const erpDates = erpBatchDateMap.get(batchKey) || erpBatchDateMap.get(row.id) || [];
       const allDates = [...secomDates, ...erpDates].sort();
       const monthSource = allDates[0] || '';
       const dateMatch = monthSource.match(/^(\d{4})-(\d{2})/);
-      const rowYear = dateMatch ? Number(dateMatch[1]) : inferred.year;
-      const rowMonth = dateMatch ? Number(dateMatch[2]) : inferred.month;
+      const rowYear = inferred.year || (dateMatch ? Number(dateMatch[1]) : null);
+      const rowMonth = inferred.month || (dateMatch ? Number(dateMatch[2]) : null);
       if(rowYear !== year) return;
+
       rows.push({
         id: row.id,
+        batchKey,
         created_at: row.created_at || row.uploaded_at || null,
+        upload_month: row.upload_month || '',
         secom_filename: row.secom_filename || '',
         erp_filename: row.erp_filename || '',
         note: row.note || '',
@@ -8231,8 +8312,8 @@ function renderAdminBatchHistory(){
       <td title="${row.secom_filename || ''}">${row.secom_filename || '-'}</td>
       <td>${row.erpCount || 0}</td>
       <td>${row.secomCount || 0}</td>
-      <td style="font-family:monospace;font-size:12px">${row.id}</td>
-      <td><button type="button" class="adminActionBtn danger" data-admin-delete-batch="${row.id}">삭제</button></td>
+      <td style="font-family:monospace;font-size:12px">${row.batchKey || row.id}</td>
+      <td><button type="button" class="adminActionBtn danger" data-admin-delete-batch="${row.batchKey || row.id}">삭제</button></td>
     </tr>`).join('');
 }
 function initAdminManagementEventDelegation(){
@@ -8423,8 +8504,7 @@ ERP raw + 세콤 raw + attendance_records가 함께 삭제됩니다.`)) return;
     const batchDelete = await supabaseClient
       .from('attendance_upload_batches')
       .delete()
-      .eq('target_year', year)
-      .eq('target_month', m);
+      .eq('upload_month', `${year}-${mm}`);
 
     if(batchDelete.error){
       console.warn('[ADMIN DELETE MONTH BATCH META]', batchDelete.error);
@@ -8497,7 +8577,7 @@ async function deleteAdminBatchData(batchId){
     if(result.error) throw result.error;
     result = await supabaseClient.from('attendance_erp_raw').delete().eq('upload_batch_id', batchId);
     if(result.error) throw result.error;
-    result = await supabaseClient.from('attendance_upload_batches').delete().eq('id', batchId);
+    result = await supabaseClient.from('attendance_upload_batches').delete().eq('batch_id', batchId);
     if(result.error) console.warn('[ADMIN DELETE BATCH META]', result.error);
     if(minDate && maxDate){
       result = await supabaseClient.from('attendance_records').delete().gte('work_date', minDate).lte('work_date', maxDate);
