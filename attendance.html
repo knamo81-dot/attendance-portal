@@ -669,8 +669,8 @@ th.filterable{position:sticky;top:0;z-index:8;position:sticky}
 .trendTopPeopleTable th{background:#f8fafc;color:#64748b;font-size:12px;font-weight:900;position:sticky;top:0;z-index:1}
 .trendTopPeopleTable th:first-child,.trendTopPeopleTable td:first-child{text-align:left;position:sticky;left:0;z-index:2;box-shadow:1px 0 0 var(--line)}
 .trendTopPeopleTable th:first-child{background:#f8fafc;z-index:3}.trendTopPeopleTable td:first-child{background:#fff}
-.trendTopPerson{display:flex;align-items:center;gap:10px;min-width:150px}.trendTopRank{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;background:#0f172a;color:#fff;font-size:12px;font-weight:900;flex:0 0 auto}.trendTopPerson strong{display:block;font-size:14px;color:#0f172a;margin-bottom:3px}.trendTopPerson span{display:block;font-size:12px;color:#64748b}
-.trendStateCell{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:58px;padding:7px 8px;border-radius:13px;border:1px solid #e2e8f0;font-weight:900}.trendStateCell .state{font-size:12px;line-height:1}.trendStateCell .score{font-size:14px;line-height:1;font-variant-numeric:tabular-nums}.trendStateCell.risk{background:#fef2f2;border-color:#fecaca;color:#b91c1c}.trendStateCell.warn{background:#fffbeb;border-color:#fde68a;color:#b45309}.trendStateCell.normal{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}.trendStateCell.empty{background:#f8fafc;border-color:#e2e8f0;color:#94a3b8}.trendSelectedMonth{outline:2px solid #0f172a;outline-offset:2px}
+.trendTopPerson{display:flex;align-items:center;gap:10px;min-width:190px}.trendTopRank{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:10px;background:#f8fafc;border:1px solid #cbd5e1;color:#475569;font-size:12px;font-weight:900;flex:0 0 auto}.trendTopPerson strong{display:block;font-size:14px;color:#0f172a;margin-bottom:3px}.trendTopPerson span{display:block;font-size:12px;color:#64748b}.trendTopFlow{display:inline-flex;align-items:center;margin-top:5px;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:900;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b}.trendTopFlow.risk{background:#fef2f2;border-color:#fecaca;color:#b91c1c}.trendTopFlow.warn{background:#fffbeb;border-color:#fde68a;color:#b45309}.trendTopFlow.normal{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}.trendTopFlow.up{background:#fff7ed;border-color:#fed7aa;color:#c2410c}.trendTopFlow.down{background:#ecfdf5;border-color:#bbf7d0;color:#15803d}
+.trendStateCell{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:58px;padding:7px 8px;border-radius:13px;border:1px solid #e2e8f0;font-weight:900}.trendStateCell .state{font-size:12px;line-height:1}.trendStateCell .score{font-size:14px;line-height:1;font-variant-numeric:tabular-nums}.trendStateCell.risk{background:#fef2f2;border-color:#fecaca;color:#b91c1c}.trendStateCell.warn{background:#fffbeb;border-color:#fde68a;color:#b45309}.trendStateCell.normal{background:#f0fdf4;border-color:#bbf7d0;color:#15803d;opacity:.78}.trendStateCell.empty{background:#f8fafc;border-color:#e2e8f0;color:#94a3b8}.trendSelectedMonth{background:#f0fdf4 !important;box-shadow:inset 0 0 0 1px #bbf7d0}.trendTopPeopleTable td.trendSelectedMonth{background:#f7fff8 !important}.trendTopPeopleTable th.trendSelectedMonth{background:#dcfce7 !important;color:#166534 !important}
 .trendTopLegend{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:#64748b;align-items:center}.trendTopLegend span{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;background:#fff;border:1px solid #e2e8f0;font-weight:700}
 .trendTopNote{margin-top:12px;border:1px dashed #cbd5e1;background:#f8fafc;border-radius:15px;padding:12px;font-size:12px;line-height:1.55;color:#475569}
 @media (max-width:1100px){.trendPeriodControl{border-left:none;margin-left:0;padding-left:0}.trendPeriodBtn{padding:7px 9px}}
@@ -5685,6 +5685,36 @@ function trendPersonRiskMapForMonth(ym){
   });
   return map;
 }
+function trendPersonFlowInfo(name, monthMaps, displayMonths, selected){
+  const scored = displayMonths
+    .map(ym => {
+      const item = monthMaps.get(ym)?.get(name);
+      if(!item) return null;
+      const score = Number(item.score || 0);
+      return { ym, score, state: trendRiskState(score) };
+    })
+    .filter(Boolean);
+  if(!scored.length) return { label:'흐름 데이터 없음', cls:'normal' };
+  const selectedItem = scored.find(x => x.ym === selected) || scored[scored.length - 1];
+  const last3 = scored.filter(x => x.ym <= selected).slice(-3);
+  const last2 = scored.filter(x => x.ym <= selected).slice(-2);
+  if(last3.length >= 3 && last3.every(x => x.score >= 75)) return { label:'위험 지속', cls:'risk' };
+  if(last3.length >= 3 && last3.every(x => x.score >= 50 && x.score < 75)) return { label:'주의 지속', cls:'warn' };
+  if(last3.length >= 3 && last3.every(x => x.score < 50)) return { label:'정상 유지', cls:'normal' };
+  if(last2.length >= 2){
+    const prev = last2[0];
+    const curr = last2[1];
+    const prevState = trendRiskState(prev.score);
+    const currState = trendRiskState(curr.score);
+    if(curr.score - prev.score >= 10) return { label:`${prevState.label} → ${currState.label} 악화`, cls:'up' };
+    if(prev.score - curr.score >= 10) return { label:`${prevState.label} → ${currState.label} 개선`, cls:'down' };
+    if(prevState.label !== currState.label){
+      if(curr.score > prev.score) return { label:`${prevState.label} → ${currState.label}`, cls:'up' };
+      return { label:`${prevState.label} → ${currState.label}`, cls:'down' };
+    }
+  }
+  return { label:`${selectedItem.state.label} ${selectedItem.score}점`, cls:selectedItem.state.cls };
+}
 function renderTrendTopPeople(){
   const host = document.getElementById('trendTopPeopleTable');
   if(!host) return;
@@ -5696,22 +5726,23 @@ function renderTrendTopPeople(){
     return;
   }
   const selectedMap = trendPersonRiskMapForMonth(selected);
-  const top = [...selectedMap.values()].sort((a,b)=>b.score-a.score || a.name.localeCompare(b.name,'ko')).slice(0,5);
-  if(!top.length){
+  const people = [...selectedMap.values()].sort((a,b)=>b.score-a.score || a.name.localeCompare(b.name,'ko'));
+  if(!people.length){
     host.innerHTML = '<div class="trendTopNote">선택 기준월에 표시할 담당자 데이터가 없습니다.</div>';
     return;
   }
   const monthMaps = new Map(displayMonths.map(ym => [ym, trendPersonRiskMapForMonth(ym)]));
   const modeLabel = trendPeriodMode() === 'rolling' ? '최근 12개월' : '해당년도';
   const headerMonths = displayMonths.map(ym => `<th class="${ym===selected?'trendSelectedMonth':''}">${trendMonthLabel(ym)}</th>`).join('');
-  const rows = top.map((person, idx) => {
+  const rows = people.map((person, idx) => {
+    const flow = trendPersonFlowInfo(person.name, monthMaps, displayMonths, selected);
     const cells = displayMonths.map(ym => {
       const item = monthMaps.get(ym)?.get(person.name);
-      if(!item) return `<td><span class="trendStateCell empty"><span class="state">-</span><span class="score">-</span></span></td>`;
+      if(!item) return `<td class="${ym===selected?'trendSelectedMonth':''}"><span class="trendStateCell empty"><span class="state">-</span><span class="score">-</span></span></td>`;
       const st = trendRiskState(item.score);
-      return `<td><span class="trendStateCell ${st.cls} ${ym===selected?'trendSelectedMonth':''}"><span class="state">${st.label}</span><span class="score">${item.score}</span></span></td>`;
+      return `<td class="${ym===selected?'trendSelectedMonth':''}"><span class="trendStateCell ${st.cls}"><span class="state">${st.label}</span><span class="score">${item.score}</span></span></td>`;
     }).join('');
-    return `<tr><td><div class="trendTopPerson"><span class="trendTopRank">${idx+1}</span><div><strong>${person.name}</strong><span>선택월 ${person.score}점</span></div></div></td>${cells}</tr>`;
+    return `<tr><td><div class="trendTopPerson"><span class="trendTopRank">${idx+1}</span><div><strong>${person.name}</strong><span>선택월 ${person.score}점</span><span class="trendTopFlow ${flow.cls}">${flow.label}</span></div></div></td>${cells}</tr>`;
   }).join('');
   host.innerHTML = `
     <div class="trendTopPeopleTableWrap">
@@ -5724,9 +5755,9 @@ function renderTrendTopPeople(){
       <span><i class="dot" style="background:#ef4444"></i>위험 75점 이상</span>
       <span><i class="dot" style="background:#f59e0b"></i>주의 50~74점</span>
       <span><i class="dot" style="background:#16a34a"></i>정상 50점 미만</span>
-      <span><i class="dot" style="background:#0f172a"></i>굵은 테두리: 선택 기준월</span>
+      <span><i class="dot" style="background:#dcfce7;border:1px solid #86efac"></i>음영: 선택 기준월</span>
     </div>
-    <div class="trendTopNote">※ TOP 순위는 현재 필터에서 선택한 기준월(${trendMonthLabel(selected)})의 위험지수 기준입니다. 월별 셀은 ${modeLabel} 기준으로 같은 담당자의 상태와 점수를 표시합니다.</div>`;
+    <div class="trendTopNote">※ 순위는 현재 필터에서 선택한 기준월(${trendMonthLabel(selected)})의 위험지수 기준입니다. 정상 담당자까지 모두 표시하며, 월별 셀은 ${modeLabel} 기준으로 같은 담당자의 상태와 점수를 표시합니다.</div>`;
 }
 function renderTrendAnalysis(){
   trendBindPeriodModeButtons();
