@@ -1518,33 +1518,19 @@ html.embed-mode #main-dashboard .kpis{
   <div id="main-trend-analysis" class="mainPanel">
     <div class="card" style="margin-top:16px">
       <div class="title">트렌드분석</div>
-      <div class="desc">최근 12개월 흐름을 월별 그래프로 확인하는 전용 화면입니다. 현재 업로드된 데이터가 3월뿐이면 3월 값만 실제 데이터로 표시하고, 추후 월별 업로드가 누적되면 자동으로 12개월 추이가 확장됩니다.</div>
+      <div class="desc">현재 리스크를 먼저 진단하고, 이어서 월별 변화 흐름과 세부 KPI 근거를 확인하는 보고서형 화면입니다. 업로드 월이 누적되면 선택 기준월 기준 최근 12개월까지 자동 확장됩니다.</div>
       <div id="trendDataNotice" class="mini" style="margin-top:10px"></div>
     </div>
 
     <div class="trendSummaryGrid" id="trendSummaryCards"></div>
 
-    <div class="card trendCard">
-      <div class="trendCardHead">
-        <div>
-          <div class="title">1. 핵심 KPI 추이</div>
-          <div class="desc">1인당 평균 연장근로시간, 위험 인원, 연차 미사용 인원의 월별 흐름입니다.</div>
-        </div>
-        <div class="trendLegend">
-          <span><i style="background:#2563eb"></i>1인당 연장근로</span>
-          <span><i style="background:#ef4444"></i>위험 인원</span>
-          <span><i style="background:#7c3aed"></i>연차 미사용</span>
-        </div>
-      </div>
-      <div id="trendKpiChart" class="trendChartLarge"></div>
-    </div>
-
     <div class="trendGrid2">
       <div class="card trendCard">
         <div class="trendCardHead">
           <div>
-            <div class="title">2. 리스크 레이더 비교</div>
-            <div class="desc">체크한 기준만 레이더에 표시합니다. 기본은 현재월과 12개월 평균 비교입니다.</div>
+            <div class="label" style="font-weight:800;color:#16a34a;margin-bottom:6px">STEP 1 · 현재 상태 판단</div>
+            <div class="title">1. 현재 리스크 진단</div>
+            <div class="desc">현재 조직의 리스크 분포를 한눈에 파악하고, 어떤 영역이 상대적으로 높은지 확인합니다. 기본은 현재월과 12개월 평균 비교입니다.</div>
           </div>
         </div>
         <div id="trendRadarChecks" class="trendCheckGrid"></div>
@@ -1552,8 +1538,9 @@ html.embed-mode #main-dashboard .kpis{
       </div>
 
       <div class="card trendCard">
-        <div class="title">레이더 지표 해석</div>
-        <div class="desc">값이 높을수록 관리 필요도가 높습니다.</div>
+        <div class="label" style="font-weight:800;color:#16a34a;margin-bottom:6px">해석 가이드</div>
+        <div class="title">리스크 지표 해석</div>
+        <div class="desc">값이 높을수록 관리 필요도가 높습니다. 현재 리스크 진단에서 튀는 항목을 우선 확인하세요.</div>
         <div id="trendRadarCards" class="trendMetricCards"></div>
       </div>
     </div>
@@ -1561,8 +1548,9 @@ html.embed-mode #main-dashboard .kpis{
     <div class="card trendCard">
       <div class="trendCardHead">
         <div>
-          <div class="title">3. 리스크 지표 추이</div>
-          <div class="desc">연장근로 리스크, 외근 리스크, 업무집중 상태, 운영 리스크, 휴식/연차 리스크의 월별 흐름입니다.</div>
+          <div class="label" style="font-weight:800;color:#16a34a;margin-bottom:6px">STEP 2 · 변화 흐름 확인</div>
+          <div class="title">2. 리스크 변화 흐름</div>
+          <div class="desc">연장근로, 외근, 업무집중, 운영, 휴식/연차 리스크가 월별로 어떻게 변하는지 확인합니다. 데이터가 3개월 이상 쌓이면 상승·완화 흐름을 판단하는 핵심 영역입니다.</div>
         </div>
         <div class="trendLegend compact">
           <span><i style="background:#2563eb"></i>연장</span>
@@ -1573,6 +1561,22 @@ html.embed-mode #main-dashboard .kpis{
         </div>
       </div>
       <div id="trendRiskChart" class="trendChartLarge"></div>
+    </div>
+
+    <div class="card trendCard">
+      <div class="trendCardHead">
+        <div>
+          <div class="label" style="font-weight:800;color:#16a34a;margin-bottom:6px">STEP 3 · 세부 근거 확인</div>
+          <div class="title">3. 세부 KPI 분석</div>
+          <div class="desc">1인당 평균 연장근로시간, 위험 인원, 연차 미사용 인원 등 리스크를 구성하는 세부 지표를 수치 흐름으로 확인합니다.</div>
+        </div>
+        <div class="trendLegend">
+          <span><i style="background:#2563eb"></i>1인당 연장근로</span>
+          <span><i style="background:#ef4444"></i>위험 인원</span>
+          <span><i style="background:#7c3aed"></i>연차 미사용</span>
+        </div>
+      </div>
+      <div id="trendKpiChart" class="trendChartLarge"></div>
     </div>
   </div>
 
