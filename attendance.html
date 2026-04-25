@@ -5490,10 +5490,20 @@ function trendPeriodMode(){
   if(STATE.trendPeriodMode !== 'rolling' && STATE.trendPeriodMode !== 'year') STATE.trendPeriodMode = 'year';
   return STATE.trendPeriodMode;
 }
+let __trendPeriodRenderTimer = null;
 function trendSetPeriodMode(mode){
-  STATE.trendPeriodMode = mode === 'rolling' ? 'rolling' : 'year';
+  const nextMode = mode === 'rolling' ? 'rolling' : 'year';
+  if(STATE.trendPeriodMode === nextMode){
+    trendSyncPeriodModeButtons();
+    return;
+  }
+  STATE.trendPeriodMode = nextMode;
   trendSyncPeriodModeButtons();
-  renderTrendAnalysis();
+  if(__trendPeriodRenderTimer) cancelAnimationFrame(__trendPeriodRenderTimer);
+  __trendPeriodRenderTimer = requestAnimationFrame(() => {
+    __trendPeriodRenderTimer = null;
+    renderTrendAnalysis();
+  });
 }
 function trendSyncPeriodModeButtons(){
   const mode = trendPeriodMode();
@@ -5793,18 +5803,42 @@ function renderTrendTopPeople(){
     host.innerHTML = '<div class="trendTopNote">표시할 월별 담당자 데이터가 없습니다.</div>';
     return;
   }
+
+  // 월별 담당자 위험점수는 한 번만 계산해 재사용한다. (최근 12개월 전환 시 지연 방지)
   const selectedMap = trendPersonRiskMapForMonth(selected);
+  const monthMaps = new Map();
+  displayMonths.forEach(ym => {
+    monthMaps.set(ym, ym === selected ? selectedMap : trendPersonRiskMapForMonth(ym));
+  });
+
   const people = [...selectedMap.values()].sort((a,b)=>b.score-a.score || a.name.localeCompare(b.name,'ko'));
   if(!people.length){
     host.innerHTML = '<div class="trendTopNote">선택 기준월에 표시할 담당자 데이터가 없습니다.</div>';
     return;
   }
-  const monthMaps = new Map(displayMonths.map(ym => [ym, trendPersonRiskMapForMonth(ym)]));
+
+  const prevYm = [...displayMonths].filter(ym => ym < selected && available.includes(ym)).pop();
+  const prevMap = prevYm ? (monthMaps.get(prevYm) || new Map()) : new Map();
+  const prevRanks = new Map([...prevMap.values()]
+    .sort((a,b)=>b.score-a.score || a.name.localeCompare(b.name,'ko'))
+    .map((p,idx)=>[p.name, idx+1]));
+
+  const rankDeltaFor = (person, idx) => {
+    const currentRank = idx + 1;
+    if(!prevYm) return { label:'순위 비교 없음', cls:'none' };
+    const prevRank = prevRanks.get(person.name);
+    if(!prevRank) return { label:'신규 진입', cls:'up' };
+    const delta = prevRank - currentRank;
+    if(delta > 0) return { label:`전월 대비 +${delta}위 ↑`, cls:'up' };
+    if(delta < 0) return { label:`전월 대비 ${delta}위 ↓`, cls:'down' };
+    return { label:'순위 변동 없음', cls:'same' };
+  };
+
   const modeLabel = trendPeriodMode() === 'rolling' ? '최근 12개월' : '해당년도';
   const headerMonths = displayMonths.map(ym => `<th class="${ym===selected?'trendSelectedMonth':''}">${trendMonthLabel(ym)}</th>`).join('');
   const rows = people.map((person, idx) => {
     const flow = trendPersonFlowInfo(person.name, monthMaps, displayMonths, selected);
-    const rankDelta = trendRankDeltaInfo(person.name, selected, displayMonths);
+    const rankDelta = rankDeltaFor(person, idx);
     const cells = displayMonths.map(ym => {
       const item = monthMaps.get(ym)?.get(person.name);
       if(!item) return `<td class="${ym===selected?'trendSelectedMonth':''}"><span class="trendStateCell empty"><span class="state">-</span><span class="score">-</span></span></td>`;
@@ -5828,6 +5862,7 @@ function renderTrendTopPeople(){
     </div>
     <div class="trendTopNote">※ 순위는 현재 필터에서 선택한 기준월(${trendMonthLabel(selected)})의 위험지수 기준입니다. 담당자명 오른쪽은 전월 대비 순위 변화, 이름 아래는 최근 흐름 상태를 표시합니다. 월별 셀은 ${modeLabel} 기준으로 같은 담당자의 상태와 점수를 표시합니다.</div>`;
 }
+
 function renderTrendAnalysis(){
   trendBindPeriodModeButtons();
   trendUpdatePeriodControlVisibility();
@@ -5835,34 +5870,14 @@ function renderTrendAnalysis(){
   const trendDataWithValues = data.filter(d => d && d.__hasData !== false);
   const notice = $('#trendDataNotice');
   if(notice){
-    notice.textContent = data.length ? `분석 범위: ${trendScopeLabel()} · 기준월: ${periodLabel()} · 기간 기준: ${trendPeriodMode() === 'rolling' ? '최근 12개월' : '해당년도'} · 표시 축: ${data.map(d=>d.label).join(', ')} · 데이터 월: ${trendDataWithValues.map(d=>d.label).join(', ')}` : `${trendScopeLabel()} 기준으로 표시할 근태 월 데이터가 없습니다.`;
-  }
-  if(!trendDataWithValues.length){
-    renderEmptyChart($('#trendKpiChart'), '업로드된 월별 데이터가 없습니다.');
-    renderEmptyChart($('#trendRiskChart'), '업로드된 월별 데이터가 없습니다.');
-    renderEmptyChart($('#trendRadarChart'), '업로드된 월별 데이터가 없습니다.');
-    if($('#trendSummaryCards')) $('#trendSummaryCards').innerHTML='';
-    if($('#trendRadarCards')) $('#trendRadarCards').innerHTML='';
-    if($('#trendTopPeopleTable')) $('#trendTopPeopleTable').innerHTML='';
-    return;
-  }
-  const latest = trendDataWithValues[trendDataWithValues.length-1];
-  const prev = trendDataWithValues.length >= 2 ? trendDataWithValues[trendDataWithValues.length-2] : null;
-  const diffText = (key, suffix='') => prev ? `${Number(latest[key]||0) - Number(prev[key]||0) >= 0 ? '+' : ''}${trendRound(Number(latest[key]||0) - Number(prev[key]||0),1)}${suffix}` : '비교월 없음';
-  if($('#trendSummaryCards')){
-    $('#trendSummaryCards').innerHTML = [
-      ['최근월', latest.label, `${latest.employeeCount}명 기준`],
-      ['1인당 연장근로', `${latest.avgOvertimePerPerson}h`, `전월 대비 ${diffText('avgOvertimePerPerson','h')}`],
-      ['위험 인원', `${latest.highRisk}명`, `전월 대비 ${diffText('highRisk','명')}`],
-      ['운영 리스크', `${latest.operationalRisk}점`, `전월 대비 ${diffText('operationalRisk','점')}`]
-    ].map(([k,v,s])=>`<div class="trendSummaryCard"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+    notice.textContent = data.length ? `현재 기준: 26.03 | 해당년도 (1~12월)</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
   }
   trendLineSVG($('#trendKpiChart'), data, [
     {key:'avgOvertimePerPerson', color:'#2563eb', suffix:'h'},
     {key:'highRisk', color:'#ef4444', suffix:'명'},
     {key:'leaveZero', color:'#7c3aed', suffix:'명'}
   ]);
-  renderTrendRadar(trendLast12Months().map(trendMetricsForMonth));
+  renderTrendRadar(trendDataWithValues);
   trendLineSVG($('#trendRiskChart'), data, [
     {key:'overtimeRisk', color:'#2563eb', suffix:'점'},
     {key:'mobilityRisk', color:'#0f766e', suffix:'점'},
