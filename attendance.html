@@ -5296,6 +5296,13 @@ function trendRowsForMonth(ym){
   return { rows, metaByName };
 }
 function trendEmployeesForMonth(ym){
+  // 현재 선택 월의 KPI추이는 분석대시보드/심층분석과 동일하게 scopedEmployees() 기준을 사용한다.
+  // 과거 월은 기존 월별 raw 재계산 로직을 유지한다.
+  const selectedYm = String(STATE.period || '').trim();
+  if(/^\d{4}-\d{2}$/.test(selectedYm) && String(ym || '').trim() === selectedYm){
+    return scopedEmployees();
+  }
+
   const { rows, metaByName } = trendRowsForMonth(ym);
   const byName = new Map();
   rows.forEach(row => {
