@@ -1051,6 +1051,24 @@ html.embed-mode #main-dashboard .kpis{
 .trendSummaryCard .s{font-size:12px;color:#64748b;margin-top:6px;line-height:1.45}
 @media (max-width:1100px){.trendSummaryGrid,.trendGrid2{grid-template-columns:1fr}.trendChartLarge,.trendRadarChart{height:320px}.trendCardHead{flex-direction:column}.trendLegend.compact{justify-content:flex-start}}
 
+
+/* trend top people final refinement: rank delta + flow + selected month shading */
+.trendTopPerson{min-width:230px !important; align-items:flex-start !important}
+.trendTopPersonMain{min-width:0; flex:1 1 auto}
+.trendTopPersonHead{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:190px}
+.trendTopPersonHead strong{margin-bottom:0 !important}
+.trendRankDelta{display:inline-flex;align-items:center;justify-content:center;padding:4px 8px;border-radius:999px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:11px;font-weight:900;white-space:nowrap}
+.trendRankDelta.up{background:#fff7ed;border-color:#fed7aa;color:#c2410c}
+.trendRankDelta.down{background:#ecfdf5;border-color:#bbf7d0;color:#15803d}
+.trendRankDelta.same{background:#f8fafc;border-color:#e2e8f0;color:#64748b}
+.trendRankDelta.none{background:#f8fafc;border-color:#e2e8f0;color:#94a3b8}
+.trendTopPerson .trendTopFlow{margin-top:6px}
+.trendTopRank{background:#f8fafc !important;border:1px solid #cbd5e1 !important;color:#475569 !important;border-radius:10px !important}
+.trendTopPeopleTable th.trendSelectedMonth{background:#dcfce7 !important;color:#166534 !important;box-shadow:inset 0 -2px 0 #86efac}
+.trendTopPeopleTable td.trendSelectedMonth{background:#f7fff8 !important;box-shadow:none !important}
+.trendTopPeopleTable td.trendSelectedMonth:first-child{background:#f7fff8 !important}
+.trendStateCell.normal{opacity:.72}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -5537,7 +5555,22 @@ function trendDisplayMonths(){
   const year = Number(base.slice(0,4));
   return Array.from({length:12}, (_,i)=>`${year}-${String(i+1).padStart(2,'0')}`);
 }
-function trendBuildData(){ return trendPeriodMonths().map(trendMetricsForMonth); }
+function trendBuildData(){
+  const availableSet = new Set(trendGetAvailableMonths());
+  return trendDisplayMonths().map(ym => {
+    const hasData = availableSet.has(ym);
+    if(hasData){
+      const metric = trendMetricsForMonth(ym);
+      metric.__hasData = true;
+      return metric;
+    }
+    return {
+      ym, label:trendMonthLabel(ym), employeeCount:0, __hasData:false,
+      avgOvertimePerPerson:null, highRisk:null, leaveZero:null,
+      overtimeRisk:null, mobilityRisk:null, workConcentrationRisk:null, operationalRisk:null, leaveRisk:null
+    };
+  });
+}
 function trendColor(idx){ return ['#2563eb','#64748b','#f59e0b','#0f766e','#7c3aed','#ef4444'][idx % 6]; }
 function trendValueExtent(data, keys){
   const nums = data.flatMap(d => keys.map(k => Number(d[k] || 0))).filter(Number.isFinite);
@@ -5547,11 +5580,14 @@ function trendValueExtent(data, keys){
 function trendLineSVG(el, data, series, options={}){
   if(!el) return;
   if(!data || !data.length){ renderEmptyChart(el, '업로드된 월별 데이터가 없습니다.'); return; }
+  const validRows = data.filter(d => d && d.__hasData !== false);
+  if(!validRows.length){ renderEmptyChart(el, '표시할 월별 데이터가 없습니다.'); return; }
   const width = el.clientWidth || 900, height = el.clientHeight || 360;
   const margin = {top:28,right:28,bottom:44,left:54};
   const pw = width - margin.left - margin.right, ph = height - margin.top - margin.bottom;
   const keys = series.map(s=>s.key);
-  const maxV = options.maxValue || trendValueExtent(data, keys);
+  const nums = validRows.flatMap(d => keys.map(k => Number(d[k]))).filter(Number.isFinite);
+  const maxV = options.maxValue || Math.ceil(Math.max(1, ...nums) * 1.15);
   const denom = Math.max(1, data.length - 1);
   const x = i => margin.left + (data.length === 1 ? pw/2 : (pw * i / denom));
   const y = v => margin.top + ph - (Number(v || 0) / maxV) * ph;
@@ -5567,18 +5603,35 @@ function trendLineSVG(el, data, series, options={}){
     svg += `<text x="${x(i)}" y="${height-16}" text-anchor="middle" style="font-size:12px;fill:#64748b;font-weight:700">${d.label}</text>`;
   });
   series.forEach((s, si)=>{
-    const pts = data.map((d,i)=>`${x(i)},${y(d[s.key])}`).join(' ');
-    svg += `<polyline points="${pts}" fill="none" stroke="${s.color || trendColor(si)}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const color = s.color || trendColor(si);
+    let segment = [];
+    const flushSegment = () => {
+      if(segment.length >= 2){
+        svg += `<polyline points="${segment.join(' ')}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+      }
+      segment = [];
+    };
     data.forEach((d,i)=>{
-      const val = Number(d[s.key] || 0);
-      svg += `<circle cx="${x(i)}" cy="${y(val)}" r="4" fill="${s.color || trendColor(si)}"/>`;
-      if(data.length <= 6){ svg += `<text x="${x(i)}" y="${y(val)-9}" text-anchor="middle" style="font-size:11px;fill:${s.color || trendColor(si)};font-weight:800">${val}${s.suffix || ''}</text>`; }
+      const val = Number(d[s.key]);
+      if(d.__hasData === false || !Number.isFinite(val)){
+        flushSegment();
+        return;
+      }
+      segment.push(`${x(i)},${y(val)}`);
+    });
+    flushSegment();
+    data.forEach((d,i)=>{
+      const val = Number(d[s.key]);
+      if(d.__hasData === false || !Number.isFinite(val)) return;
+      svg += `<circle cx="${x(i)}" cy="${y(val)}" r="4" fill="${color}"/>`;
+      const visiblePointCount = validRows.length;
+      if(visiblePointCount <= 6){ svg += `<text x="${x(i)}" y="${y(val)-9}" text-anchor="middle" style="font-size:11px;fill:${color};font-weight:800">${val}${s.suffix || ''}</text>`; }
     });
   });
   svg += `</svg>`;
   el.innerHTML = svg;
 }
-function trendRadarMultiSVG(el, labels, datasets){
+function trendRadarMultiSVGfunction trendRadarMultiSVG(el, labels, datasets){
   if(!el) return;
   if(!datasets || !datasets.length){ renderEmptyChart(el, '체크박스로 표시할 기준을 선택하세요.'); return; }
   const width = el.clientWidth || 620, height = el.clientHeight || 420;
@@ -5715,6 +5768,21 @@ function trendPersonFlowInfo(name, monthMaps, displayMonths, selected){
   }
   return { label:`${selectedItem.state.label} ${selectedItem.score}점`, cls:selectedItem.state.cls };
 }
+function trendRankDeltaInfo(name, selected, displayMonths){
+  const currentMap = trendPersonRiskMapForMonth(selected);
+  const currentList = [...currentMap.values()].sort((a,b)=>b.score-a.score || a.name.localeCompare(b.name,'ko'));
+  const currentRank = currentList.findIndex(x => x.name === name) + 1;
+  const prevYm = [...displayMonths].filter(ym => ym < selected && trendGetAvailableMonths().includes(ym)).pop();
+  if(!prevYm || !currentRank) return { label:'순위 비교 없음', cls:'none' };
+  const prevMap = trendPersonRiskMapForMonth(prevYm);
+  const prevList = [...prevMap.values()].sort((a,b)=>b.score-a.score || a.name.localeCompare(b.name,'ko'));
+  const prevRank = prevList.findIndex(x => x.name === name) + 1;
+  if(!prevRank) return { label:'신규 진입', cls:'up' };
+  const delta = prevRank - currentRank;
+  if(delta > 0) return { label:`전월 대비 +${delta}위 ↑`, cls:'up' };
+  if(delta < 0) return { label:`전월 대비 ${delta}위 ↓`, cls:'down' };
+  return { label:'순위 변동 없음', cls:'same' };
+}
 function renderTrendTopPeople(){
   const host = document.getElementById('trendTopPeopleTable');
   if(!host) return;
@@ -5736,13 +5804,14 @@ function renderTrendTopPeople(){
   const headerMonths = displayMonths.map(ym => `<th class="${ym===selected?'trendSelectedMonth':''}">${trendMonthLabel(ym)}</th>`).join('');
   const rows = people.map((person, idx) => {
     const flow = trendPersonFlowInfo(person.name, monthMaps, displayMonths, selected);
+    const rankDelta = trendRankDeltaInfo(person.name, selected, displayMonths);
     const cells = displayMonths.map(ym => {
       const item = monthMaps.get(ym)?.get(person.name);
       if(!item) return `<td class="${ym===selected?'trendSelectedMonth':''}"><span class="trendStateCell empty"><span class="state">-</span><span class="score">-</span></span></td>`;
       const st = trendRiskState(item.score);
       return `<td class="${ym===selected?'trendSelectedMonth':''}"><span class="trendStateCell ${st.cls}"><span class="state">${st.label}</span><span class="score">${item.score}</span></span></td>`;
     }).join('');
-    return `<tr><td><div class="trendTopPerson"><span class="trendTopRank">${idx+1}</span><div><strong>${person.name}</strong><span>선택월 ${person.score}점</span><span class="trendTopFlow ${flow.cls}">${flow.label}</span></div></div></td>${cells}</tr>`;
+    return `<tr><td><div class="trendTopPerson"><span class="trendTopRank">${idx+1}</span><div class="trendTopPersonMain"><div class="trendTopPersonHead"><strong>${person.name}</strong><span class="trendRankDelta ${rankDelta.cls}">${rankDelta.label}</span></div><span class="trendTopFlow ${flow.cls}">${flow.label}</span></div></div></td>${cells}</tr>`;
   }).join('');
   host.innerHTML = `
     <div class="trendTopPeopleTableWrap">
@@ -5757,17 +5826,18 @@ function renderTrendTopPeople(){
       <span><i class="dot" style="background:#16a34a"></i>정상 50점 미만</span>
       <span><i class="dot" style="background:#dcfce7;border:1px solid #86efac"></i>음영: 선택 기준월</span>
     </div>
-    <div class="trendTopNote">※ 순위는 현재 필터에서 선택한 기준월(${trendMonthLabel(selected)})의 위험지수 기준입니다. 정상 담당자까지 모두 표시하며, 월별 셀은 ${modeLabel} 기준으로 같은 담당자의 상태와 점수를 표시합니다.</div>`;
+    <div class="trendTopNote">※ 순위는 현재 필터에서 선택한 기준월(${trendMonthLabel(selected)})의 위험지수 기준입니다. 담당자명 오른쪽은 전월 대비 순위 변화, 이름 아래는 최근 흐름 상태를 표시합니다. 월별 셀은 ${modeLabel} 기준으로 같은 담당자의 상태와 점수를 표시합니다.</div>`;
 }
-function renderTrendAnalysis(){
+function renderTrendAnalysisfunction renderTrendAnalysis(){
   trendBindPeriodModeButtons();
   trendUpdatePeriodControlVisibility();
   const data = trendBuildData();
+  const trendDataWithValues = data.filter(d => d && d.__hasData !== false);
   const notice = $('#trendDataNotice');
   if(notice){
-    notice.textContent = data.length ? `분석 범위: ${trendScopeLabel()} · 기준월: ${periodLabel()} · 기간 기준: ${trendPeriodMode() === 'rolling' ? '최근 12개월' : '해당년도'} · 그래프 반영 월: ${data.map(d=>d.label).join(', ')}` : `${trendScopeLabel()} 기준으로 표시할 근태 월 데이터가 없습니다.`;
+    notice.textContent = data.length ? `분석 범위: ${trendScopeLabel()} · 기준월: ${periodLabel()} · 기간 기준: ${trendPeriodMode() === 'rolling' ? '최근 12개월' : '해당년도'} · 표시 축: ${data.map(d=>d.label).join(', ')} · 데이터 월: ${trendDataWithValues.map(d=>d.label).join(', ')}` : `${trendScopeLabel()} 기준으로 표시할 근태 월 데이터가 없습니다.`;
   }
-  if(!data.length){
+  if(!trendDataWithValues.length){
     renderEmptyChart($('#trendKpiChart'), '업로드된 월별 데이터가 없습니다.');
     renderEmptyChart($('#trendRiskChart'), '업로드된 월별 데이터가 없습니다.');
     renderEmptyChart($('#trendRadarChart'), '업로드된 월별 데이터가 없습니다.');
@@ -5776,8 +5846,8 @@ function renderTrendAnalysis(){
     if($('#trendTopPeopleTable')) $('#trendTopPeopleTable').innerHTML='';
     return;
   }
-  const latest = data[data.length-1];
-  const prev = data.length >= 2 ? data[data.length-2] : null;
+  const latest = trendDataWithValues[trendDataWithValues.length-1];
+  const prev = trendDataWithValues.length >= 2 ? trendDataWithValues[trendDataWithValues.length-2] : null;
   const diffText = (key, suffix='') => prev ? `${Number(latest[key]||0) - Number(prev[key]||0) >= 0 ? '+' : ''}${trendRound(Number(latest[key]||0) - Number(prev[key]||0),1)}${suffix}` : '비교월 없음';
   if($('#trendSummaryCards')){
     $('#trendSummaryCards').innerHTML = [
