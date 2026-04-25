@@ -5631,7 +5631,7 @@ function trendLineSVG(el, data, series, options={}){
   svg += `</svg>`;
   el.innerHTML = svg;
 }
-function trendRadarMultiSVGfunction trendRadarMultiSVG(el, labels, datasets){
+function trendRadarMultiSVG(el, labels, datasets){
   if(!el) return;
   if(!datasets || !datasets.length){ renderEmptyChart(el, '체크박스로 표시할 기준을 선택하세요.'); return; }
   const width = el.clientWidth || 620, height = el.clientHeight || 420;
@@ -5828,7 +5828,7 @@ function renderTrendTopPeople(){
     </div>
     <div class="trendTopNote">※ 순위는 현재 필터에서 선택한 기준월(${trendMonthLabel(selected)})의 위험지수 기준입니다. 담당자명 오른쪽은 전월 대비 순위 변화, 이름 아래는 최근 흐름 상태를 표시합니다. 월별 셀은 ${modeLabel} 기준으로 같은 담당자의 상태와 점수를 표시합니다.</div>`;
 }
-function renderTrendAnalysisfunction renderTrendAnalysis(){
+function renderTrendAnalysis(){
   trendBindPeriodModeButtons();
   trendUpdatePeriodControlVisibility();
   const data = trendBuildData();
