@@ -1621,8 +1621,8 @@ html.embed-mode #main-dashboard .kpis{
       <div class="desc">현재 리스크를 먼저 진단하고, 이어서 월별 변화 흐름과 세부 KPI 근거를 확인하는 보고서형 화면입니다. 상단 기간 기준 버튼으로 해당년도 흐름과 최근 12개월 흐름을 전환할 수 있습니다.</div>
       <div id="trendDataNotice" class="mini" style="margin-top:10px"></div>
       <div class="reportActionBar">
-        <div class="reportActionText">현재 필터와 기간 기준을 반영해 월별 진단과 트렌드 분석 보고서를 생성/조회합니다. 같은 데이터는 서버 저장본을 다시 불러옵니다.</div>
-        <button id="attendanceReportOpenBtn" class="reportActionBtn" type="button">보고서 생성/조회</button>
+        <div class="reportActionText">현재 필터와 기간 기준을 반영해 보고서 창을 엽니다. 창 안에서 기존 저장본 불러오기와 새 보고서 재생성을 선택할 수 있습니다.</div>
+        <button id="attendanceReportOpenBtn" class="reportActionBtn" type="button">보고서 열기</button>
       </div>
     </div>
 
@@ -10747,10 +10747,10 @@ async function refreshAdminUploadManagement(forceYearReload = false){
 <div id="attendanceReportModal" class="reportModalBg" aria-hidden="true">
   <div class="reportModal">
     <div class="reportModalTop">
-      <div><div id="attendanceReportModalTitle" class="reportModalTitle">근태 분석 보고서</div><div id="attendanceReportModalDesc" class="reportModalDesc">월별 진단과 트렌드 분석 데이터를 기반으로 보고서를 생성/조회합니다. 같은 데이터는 서버 저장본을 다시 불러옵니다.</div></div>
-      <div class="reportModalActions"><button id="attendanceReportRegenerateBtn" class="reportSmallBtn" type="button">보고서 생성/조회</button><button id="attendanceReportPrintBtn" class="reportSmallBtn primary" type="button">PDF/인쇄</button><button id="attendanceReportCloseBtn" class="reportSmallBtn danger" type="button">닫기</button></div>
+      <div><div id="attendanceReportModalTitle" class="reportModalTitle">근태 분석 보고서</div><div id="attendanceReportModalDesc" class="reportModalDesc">월별 진단과 트렌드 분석 데이터를 기반으로 보고서를 불러오거나 다시 생성합니다.</div></div>
+      <div class="reportModalActions"><button id="attendanceReportLoadBtn" class="reportSmallBtn" type="button">기존 보고서 불러오기</button><button id="attendanceReportRegenerateBtn" class="reportSmallBtn primary" type="button">보고서 다시 생성</button><button id="attendanceReportPrintBtn" class="reportSmallBtn" type="button">PDF/인쇄</button><button id="attendanceReportCloseBtn" class="reportSmallBtn danger" type="button">닫기</button></div>
     </div>
-    <div class="reportSettings"><span id="attendanceReportModeLabel" class="reportModePill" style="cursor:default">보고서</span><span class="reportModePill" style="cursor:default">서버 저장: 데이터 해시 기준</span><span class="reportModePill" style="cursor:default">재업로드 시: 데이터 변경 → 새 보고서 생성</span></div>
+    <div class="reportSettings"><span id="attendanceReportModeLabel" class="reportModePill" style="cursor:default">보고서</span><span class="reportModePill" style="cursor:default">기존 보고서 불러오기: 서버 저장본 조회</span><span class="reportModePill" style="cursor:default">보고서 다시 생성: 최신 양식으로 강제 생성</span></div>
     <div id="attendanceReportStatus" class="reportAiStatus">보고서 요청 대기 중입니다.</div>
     <div class="reportPreviewWrap"><div id="attendanceReportPreview" class="attReportDoc"></div></div>
   </div>
@@ -10903,10 +10903,10 @@ async function requestAiReport(reportType,forceRegenerate){
   currentReportPayload=await buildServerPayload(reportType);
   const title=document.getElementById('attendanceReportModalTitle'),desc=document.getElementById('attendanceReportModalDesc'),mode=document.getElementById('attendanceReportModeLabel');
   if(title)title.textContent=reportType==='hiring'?'충원 검토 보고서':'근태 분석 보고서';
-  if(desc)desc.textContent=reportType==='hiring'?'충원 입력값과 현재 근태 데이터를 함께 분석해 보고서를 생성/조회합니다.':'월별 진단과 트렌드 데이터를 기반으로 보고서를 생성/조회합니다.';
+  if(desc)desc.textContent=reportType==='hiring'?'충원 입력값과 현재 근태 데이터를 함께 분석해 보고서를 불러오거나 다시 생성합니다.':'월별 진단과 트렌드 데이터를 기반으로 보고서를 불러오거나 다시 생성합니다.';
   if(mode)mode.textContent=reportType==='hiring'?'충원 보고서':'월별+트렌드 보고서';
-  host.innerHTML='<div class="attReportIntro"><p>보고서를 생성/조회하는 중입니다.</p></div>';
-  setStatus('보고서 요청 중입니다. 같은 데이터의 저장본이 있으면 서버에서 바로 불러옵니다.','warn');
+  host.innerHTML=`<div class="attReportIntro"><p>${forceRegenerate?'새 보고서를 다시 생성하는 중입니다.':'기존 저장 보고서를 불러오는 중입니다.'}</p></div>`;
+  setStatus(forceRegenerate?'최신 양식 기준으로 새 보고서를 생성하는 중입니다.':'서버에 저장된 기존 보고서를 조회하는 중입니다. 저장본이 없으면 새 보고서를 생성합니다.','warn');
   try{
     const res=await fetch('/api/generate-attendance-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...currentReportPayload,forceRegenerate:!!forceRegenerate})});
     const json=await res.json().catch(()=>({}));
@@ -10925,10 +10925,10 @@ function openModal(reportType){
   currentReportKind=reportType||'monthly_trend';
   const title=document.getElementById('attendanceReportModalTitle'),desc=document.getElementById('attendanceReportModalDesc'),mode=document.getElementById('attendanceReportModeLabel'),host=document.getElementById('attendanceReportPreview');
   if(title)title.textContent=currentReportKind==='hiring'?'충원 검토 보고서':'근태 분석 보고서';
-  if(desc)desc.textContent=currentReportKind==='hiring'?'충원 입력값과 현재 근태 데이터를 함께 분석해 보고서를 생성/조회합니다.':'월별 진단과 트렌드 데이터를 기반으로 보고서를 생성/조회합니다.';
+  if(desc)desc.textContent=currentReportKind==='hiring'?'충원 입력값과 현재 근태 데이터를 함께 분석해 보고서를 불러오거나 다시 생성합니다.':'월별 진단과 트렌드 데이터를 기반으로 보고서를 불러오거나 다시 생성합니다.';
   if(mode)mode.textContent=currentReportKind==='hiring'?'충원 보고서':'월별+트렌드 보고서';
-  if(host)host.innerHTML='<div class="attReportIntro"><p>보고서 생성/조회 버튼을 누르면 서버 저장본을 확인하고, 저장본이 없으면 새 보고서를 생성합니다.</p></div>';
-  setStatus('보고서 생성/조회 대기 중입니다.','');
+  if(host)host.innerHTML='<div class="attReportIntro"><p>상단 버튼을 선택하세요. 기존 보고서 불러오기는 서버 저장본을 조회하고, 보고서 다시 생성은 최신 양식으로 새 보고서를 생성합니다.</p></div>';
+  setStatus('보고서 요청 대기 중입니다.','');
   modal.classList.add('show');
   modal.setAttribute('aria-hidden','false');
 }
@@ -10937,7 +10937,54 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
 function empForOption(e){return{employeeNo:e.employee_no||e.employeeNo||e.id||'',id:e.id||e.employee_no||'',name:e.name||'',division:e.department||e.division||'',team:e.team||'',position:e.position||e.grade||'',status:e.status||'',resignationDate:e.resignation_date||e.leaveDate||e.retireDate||'',memo:e.memo||''};}
 function refreshHiringEmployeeOptions(){const input=document.getElementById('hiringEmployeeSearch'),sel=document.getElementById('hiringEmployeeSelect'),info=document.getElementById('hiringSelectedInfo');if(!input||!sel)return;const kw=String(input.value||'').trim().toLowerCase();const list=Array.isArray(window.empMaster)?window.empMaster:(typeof empMaster!=='undefined'&&Array.isArray(empMaster)?empMaster:[]);const matched=list.map(empForOption).filter(e=>!kw||String(e.name).toLowerCase().includes(kw)||String(e.employeeNo).toLowerCase().includes(kw)).slice(0,80);sel.innerHTML='<option value="">선택 안 함</option>'+matched.map(e=>`<option value="${encodeURIComponent(JSON.stringify(e))}">${esc(e.name)} (${esc(e.employeeNo||'-')}) · ${esc(e.division||'-')} / ${esc(e.team||'-')}</option>`).join('');if(info)info.textContent=matched.length?`${matched.length}명 검색됨. 대상자를 선택하면 상세 정보가 표시됩니다.`:'검색 결과가 없습니다.';}
 function updateHiringSelectedInfo(){const info=document.getElementById('hiringSelectedInfo');if(!info)return;const e=getSelectedHiringEmployee();if(!e){info.textContent='퇴사/이탈 대상자를 선택하면 사번, 본부, 팀, 직급, 퇴사예정일 정보가 표시됩니다.';return;}info.innerHTML=`<b>선택 대상자</b> ${esc(e.name)} · 사번 ${esc(e.employeeNo||'-')} · ${esc(e.division||'-')} / ${esc(e.team||'-')} · 직급 ${esc(e.position||'-')} · 상태 ${esc(e.status||'-')} · 퇴사/예정일 ${esc(e.resignationDate||'-')}`;}
-function bindReport(){const btn=document.getElementById('attendanceReportOpenBtn');if(btn&&btn.dataset.bound!=='Y'){btn.dataset.bound='Y';btn.addEventListener('click',()=>openModal('monthly_trend'));}const hbtn=document.getElementById('hiringReportOpenBtn');if(hbtn&&hbtn.dataset.bound!=='Y'){hbtn.dataset.bound='Y';hbtn.addEventListener('click',()=>openModal('hiring'));}const close=document.getElementById('attendanceReportCloseBtn');if(close&&close.dataset.bound!=='Y'){close.dataset.bound='Y';close.addEventListener('click',closeModal);}const print=document.getElementById('attendanceReportPrintBtn');if(print&&print.dataset.bound!=='Y'){print.dataset.bound='Y';print.addEventListener('click',printReport);}const regen=document.getElementById('attendanceReportRegenerateBtn');if(regen&&regen.dataset.bound!=='Y'){regen.dataset.bound='Y';regen.addEventListener('click',()=>requestAiReport(currentReportKind,false));}const modal=document.getElementById('attendanceReportModal');if(modal&&modal.dataset.bound!=='Y'){modal.dataset.bound='Y';modal.addEventListener('click',e=>{if(e.target===modal)closeModal();});}const search=document.getElementById('hiringEmployeeSearch');if(search&&search.dataset.bound!=='Y'){search.dataset.bound='Y';search.addEventListener('input',refreshHiringEmployeeOptions);refreshHiringEmployeeOptions();}const sel=document.getElementById('hiringEmployeeSelect');if(sel&&sel.dataset.bound!=='Y'){sel.dataset.bound='Y';sel.addEventListener('change',updateHiringSelectedInfo);}}
+function bindReport(){
+  const btn=document.getElementById('attendanceReportOpenBtn');
+  if(btn&&btn.dataset.bound!=='Y'){
+    btn.dataset.bound='Y';
+    btn.addEventListener('click',()=>openModal('monthly_trend'));
+  }
+  const hbtn=document.getElementById('hiringReportOpenBtn');
+  if(hbtn&&hbtn.dataset.bound!=='Y'){
+    hbtn.dataset.bound='Y';
+    hbtn.addEventListener('click',()=>openModal('hiring'));
+  }
+  const close=document.getElementById('attendanceReportCloseBtn');
+  if(close&&close.dataset.bound!=='Y'){
+    close.dataset.bound='Y';
+    close.addEventListener('click',closeModal);
+  }
+  const print=document.getElementById('attendanceReportPrintBtn');
+  if(print&&print.dataset.bound!=='Y'){
+    print.dataset.bound='Y';
+    print.addEventListener('click',printReport);
+  }
+  const load=document.getElementById('attendanceReportLoadBtn');
+  if(load&&load.dataset.bound!=='Y'){
+    load.dataset.bound='Y';
+    load.addEventListener('click',()=>requestAiReport(currentReportKind,false));
+  }
+  const regen=document.getElementById('attendanceReportRegenerateBtn');
+  if(regen&&regen.dataset.bound!=='Y'){
+    regen.dataset.bound='Y';
+    regen.addEventListener('click',()=>requestAiReport(currentReportKind,true));
+  }
+  const modal=document.getElementById('attendanceReportModal');
+  if(modal&&modal.dataset.bound!=='Y'){
+    modal.dataset.bound='Y';
+    modal.addEventListener('click',e=>{if(e.target===modal)closeModal();});
+  }
+  const search=document.getElementById('hiringEmployeeSearch');
+  if(search&&search.dataset.bound!=='Y'){
+    search.dataset.bound='Y';
+    search.addEventListener('input',refreshHiringEmployeeOptions);
+    refreshHiringEmployeeOptions();
+  }
+  const sel=document.getElementById('hiringEmployeeSelect');
+  if(sel&&sel.dataset.bound!=='Y'){
+    sel.dataset.bound='Y';
+    sel.addEventListener('change',updateHiringSelectedInfo);
+  }
+}
 document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,500);window.openAttendanceAiReportModal=openModal;window.renderAttendanceReportPreview=function(){requestAiReport(currentReportKind,false);};
 })();
 </script>
