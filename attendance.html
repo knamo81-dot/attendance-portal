@@ -5223,17 +5223,56 @@ function trendClamp(v, min=0, max=100){
   return Math.max(min, Math.min(max, n));
 }
 function trendRound(v, d=1){ return +Number(v || 0).toFixed(d); }
+function trendMonthLabel(ym){ return /^\d{4}-\d{2}$/.test(String(ym||'')) ? `${String(ym).slice(2,4)}.${String(ym).slice(5,7)}` : String(ym||''); }
+function trendScopeLabel(){
+  const div = String(STATE.division || '전체').trim() || '전체';
+  const team = String(STATE.team || '전체').trim() || '전체';
+  if(div === '전체' && team === '전체') return '전체 조직';
+  if(div !== '전체' && team === '전체') return `${div} 전체`;
+  if(div === '전체' && team !== '전체') return `${team}`;
+  return `${div} > ${team}`;
+}
+function trendOrgMatchesRow(row, metaByName){
+  const cleanName = normalizeEmployeeName(row?.name || row?.employeeName || '');
+  const meta = metaByName.get(cleanName) || {};
+  const div = String(meta.division || row?.division || '').trim();
+  const team = String(meta.team || row?.team || '').trim();
+  return (STATE.division === '전체' || div === STATE.division) && (STATE.team === '전체' || team === STATE.team);
+}
+function trendDecoratedRows(){
+  const metaByName = new Map((empMaster || []).map(e => [normalizeEmployeeName(e.name), e]));
+  const rows = getMergedRawAttendanceData()
+    .map(row => decorateAttendanceRow(row, metaByName))
+    .filter(Boolean)
+    .filter(row => !isDisplayExcludedAttendance(row))
+    .filter(row => isAttendanceTargetIncludedRow(row, metaByName))
+    .filter(row => !(STATE.dashboardExcludeLeave !== false && isAttendanceContinuousLeaveRow(row)))
+    .filter(row => trendOrgMatchesRow(row, metaByName));
+  return { rows, metaByName };
+}
 function trendGetAvailableMonths(){
-  const set = new Set((Array.isArray(REAL_ATTENDANCE_DATA) ? REAL_ATTENDANCE_DATA : [])
+  const { rows } = trendDecoratedRows();
+  const set = new Set(rows
     .map(row => String(row?.date || '').trim().slice(0,7))
     .filter(v => /^\d{4}-\d{2}$/.test(v)));
   return [...set].sort((a,b)=>a.localeCompare(b));
 }
-function trendMonthLabel(ym){ return /^\d{4}-\d{2}$/.test(String(ym||'')) ? `${String(ym).slice(2,4)}.${String(ym).slice(5,7)}` : String(ym||''); }
+function trendSelectedEndMonth(months){
+  const available = Array.isArray(months) ? months : trendGetAvailableMonths();
+  if(!available.length) return '';
+  const selected = String(STATE.period || '').trim();
+  if(/^\d{4}-\d{2}$/.test(selected) && available.includes(selected)) return selected;
+  if(/^\d{4}-\d{2}$/.test(selected)){
+    const beforeOrEqual = available.filter(m => m <= selected);
+    return beforeOrEqual.length ? beforeOrEqual[beforeOrEqual.length - 1] : available[available.length - 1];
+  }
+  return available[available.length - 1];
+}
 function trendLast12Months(){
   const months = trendGetAvailableMonths();
   if(!months.length) return [];
-  const end = months[months.length-1];
+  const end = trendSelectedEndMonth(months);
+  if(!end) return [];
   const endY = Number(end.slice(0,4));
   const endM = Number(end.slice(5,7));
   const list=[];
@@ -5242,7 +5281,7 @@ function trendLast12Months(){
     const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     if(months.includes(ym)) list.push(ym);
   }
-  return list.length ? list : months.slice(-12);
+  return list.length ? list : months.filter(m => m <= end).slice(-12);
 }
 function trendRowsForMonth(ym){
   const metaByName = new Map((empMaster || []).map(e => [normalizeEmployeeName(e.name), e]));
@@ -5253,13 +5292,7 @@ function trendRowsForMonth(ym){
     .filter(row => !isDisplayExcludedAttendance(row))
     .filter(row => isAttendanceTargetIncludedRow(row, metaByName))
     .filter(row => !(STATE.dashboardExcludeLeave !== false && isAttendanceContinuousLeaveRow(row)))
-    .filter(row => {
-      const name = normalizeEmployeeName(row.name);
-      const meta = metaByName.get(name) || {};
-      const div = meta.division || row.division || '';
-      const team = meta.team || row.team || '';
-      return (STATE.division === '전체' || div === STATE.division) && (STATE.team === '전체' || team === STATE.team);
-    });
+    .filter(row => trendOrgMatchesRow(row, metaByName));
   return { rows, metaByName };
 }
 function trendEmployeesForMonth(ym){
@@ -5508,7 +5541,7 @@ function renderTrendAnalysis(){
   const data = trendBuildData();
   const notice = $('#trendDataNotice');
   if(notice){
-    notice.textContent = data.length ? `현재 그래프 반영 월: ${data.map(d=>d.label).join(', ')} · 업로드 월이 늘어나면 최근 12개월까지 자동 표시됩니다.` : '아직 업로드된 근태 월 데이터가 없습니다.';
+    notice.textContent = data.length ? `분석 범위: ${trendScopeLabel()} · 기준월: ${periodLabel()} · 그래프 반영 월: ${data.map(d=>d.label).join(', ')} · 업로드 월이 늘어나면 선택 기준월 기준 최근 12개월까지 자동 표시됩니다.` : `${trendScopeLabel()} 기준으로 표시할 근태 월 데이터가 없습니다.`;
   }
   if(!data.length){
     renderEmptyChart($('#trendKpiChart'), '업로드된 월별 데이터가 없습니다.');
@@ -10267,6 +10300,7 @@ async function refreshAdminUploadManagement(forceYearReload = false){
     renderInsight(scoped, months);
     renderRisk(scoped);
     renderPeople(scoped);
+    renderTrendAnalysis();
     bindMainTabs();
     renderTabs();
     await refreshAdminUploadManagement();
