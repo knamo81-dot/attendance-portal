@@ -10786,3 +10786,78 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
 </div>
 </body>
 </html>
+
+<!-- ================= AI REPORT SECTION ================= -->
+
+<script>
+function buildGptPayload() {
+  return {
+    reportKey: `attendance-${selectedMonth}`,
+    dataHash: Date.now().toString(),
+    reportType: "monthly",
+    reportTitle: `${selectedMonth} 근태 분석 보고서`,
+    data: {
+      scope: "연구소 전체",
+      period: selectedMonth,
+      monthlySummary: {
+        totalEmployees,
+        riskCount,
+        warningCount,
+        normalCount,
+        averageOvertimeHours: avgOvertime
+      },
+      monthlyKpi: {
+        overtimeCount,
+        holidayWorkCount: holidayCount,
+        averageOvertimeHours: avgOvertime,
+        riskEmployeeCount: riskCount
+      },
+      riskUsers: buildRiskUsers(),
+      trend: buildTrendData()
+    }
+  };
+}
+
+function buildRiskUsers() {
+  const sorted = employees.sort((a, b) => b.riskScore - a.riskScore);
+  const risk = sorted.filter(e => e.status === "위험");
+  const warning = sorted.filter(e => e.status === "주의");
+  let selectedWarning = warning.length <= 5 ? warning : warning.slice(0, 3);
+
+  return [...risk, ...selectedWarning].map(e => ({
+    name: e.name,
+    status: e.status,
+    riskScore: e.riskScore,
+    issues: e.issues || [],
+    trend: e.trend || "유지"
+  }));
+}
+
+async function generateAIReport() {
+  const payload = buildGptPayload();
+
+  const res = await fetch('/api/generate-attendance-report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+
+  if (!data.ok) {
+    alert("보고서 생성 실패: " + data.error);
+    return;
+  }
+
+  document.getElementById('aiReportPreview').innerHTML = data.reportHtml;
+}
+</script>
+
+<div class="card" style="margin-top:20px;">
+  <div class="title">AI 보고서</div>
+  <button onclick="generateAIReport()" style="background:#16a34a;color:#fff;padding:10px 14px;border-radius:10px;">
+    AI 보고서 생성
+  </button>
+  <div id="aiReportPreview" style="margin-top:12px;"></div>
+</div>
+
