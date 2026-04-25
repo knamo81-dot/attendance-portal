@@ -18,30 +18,187 @@ function stripUnsafeHtml(html = '') {
 }
 
 function buildPrompt(payload) {
-  const isHiring = payload.reportType === 'hiring';
+  const reportType = String(payload.reportType || '').trim();
+  const isHiring = reportType === 'hiring';
 
-  const base = {
-    reportType: payload.reportType,
-    reportTitle: payload.reportTitle,
-    data: payload.data,
+  const dataForPrompt = {
+    reportType: payload.reportType || null,
+    reportTitle: payload.reportTitle || null,
+    reportInfo: payload.reportInfo || null,
+    monthlySummary: payload.monthlySummary || null,
+    monthlyKpi: payload.monthlyKpi || null,
+    riskUsers: payload.riskUsers || [],
+    trend: payload.trend || null,
+    visualDecisionHints: payload.visualDecisionHints || null,
+    constraints: payload.constraints || null,
+    data: payload.data || null,
     hiringInput: payload.hiringInput || null,
   };
 
-  return `당신은 연구소 근태/인력운영 데이터를 해석해 경영진 검토용 보고서를 작성하는 분석가입니다.
+  if (isHiring) {
+    return `당신은 연구소 근태/인력운영 데이터를 해석해 충원 검토 보고서를 작성하는 분석가입니다.
 
-작성 규칙:
-- 출력은 HTML 본문 조각만 작성합니다. <!doctype>, html, body, script는 금지합니다.
-- 기존 화면 CSS를 활용할 수 있도록 h2, p, ul, table.attReportTable, div.attReportHeaderTitle, div.attReportMeta, div.attReportIntro, div.attReportCards, div.attReportCard, div.attReportNote 구조를 사용합니다.
-- 실제 데이터에 없는 수치나 이름은 만들지 않습니다.
-- 단정하지 말고 "가능성", "검토 필요", "반복 확인 필요" 수준으로 표현합니다.
-- 개인정보는 입력된 이름/사번/조직 정보 범위 안에서만 사용합니다.
-- 보고서 제목, 작성일자, 보고대상, 분석기준을 상단에 표시합니다.
-- ${isHiring
-    ? '충원 보고서는 1) 충원 요청 개요 2) 퇴사/공백 정보 3) 근태 리스크 근거 4) 업무 재배분 가능성 5) 충원 검토 의견 6) 결론 순서로 작성합니다.'
-    : '월별+트렌드 보고서는 1) 핵심 요약 2) 월별 진단 3) 트렌드 변화 4) 담당자 리스크 5) 원인 가능성 6) 관리 방향 7) 결론 순서로 작성합니다.'}
+입력 데이터는 이미 시스템에서 계산되었거나 사용자가 입력한 결과입니다.
+새로운 수치, 이름, 조직, 해석을 임의로 생성하지 말고 제공된 데이터만 사용하세요.
 
-분석 데이터 JSON:
-${JSON.stringify(base, null, 2)}`;
+========================
+[입력 데이터]
+${JSON.stringify(dataForPrompt, null, 2)}
+========================
+
+보고서는 A4 세로 출력용 HTML “본문 조각”으로 작성하세요.
+
+--------------------------------
+[충원 보고서 구조]
+--------------------------------
+
+각 부는 반드시 독립된 section 또는 div로 구분하여 작성하세요.
+
+1부. 충원 요청 개요
+- hiringInput과 reportInfo를 기반으로 작성
+- 충원 사유, 요청 인원, 필요 시점, 영향도를 카드 형태로 정리
+- 단정하지 말고 “검토 필요”, “확인 필요” 수준으로 표현
+
+2부. 공백 및 운영 리스크
+- 퇴사/퇴사 예정 정보가 있으면 해당 정보를 기반으로 작성
+- 근태 리스크 또는 업무 집중 관련 데이터가 있으면 근거로 사용
+- 데이터가 없으면 “추가 확인 필요” 수준으로 간단히 표현
+
+3부. 업무 재배분 가능성
+- 현재 데이터로 확인 가능한 범위에서만 작성
+- 대체 가능성, 업무 분산 가능성, 조직 영향 가능성을 구분
+- 새로운 담당자명이나 조직명은 만들지 마세요.
+
+4부. 충원 검토 의견 및 결론
+- 충원 필요성을 단정하지 말고 검토 의견으로 작성
+- 마지막 문장은 반드시 다음 흐름으로 마무리하세요.
+→ “현재 기준으로는 추가적인 데이터 확인 및 운영 검토가 필요합니다.”
+
+--------------------------------
+[시각화 선택 규칙]
+
+- 핵심 수치 → 카드
+- 사유/영향도 비교 → 카드 또는 표
+- 담당자/조직 비교 → 표 또는 가로 막대
+- 데이터가 부족하면 그래프를 만들지 말고 카드 + 설명으로 대체
+
+--------------------------------
+[출력 규칙]
+
+- <!doctype>, html, head, body 태그 금지
+- script 태그 절대 금지
+- 기존 CSS class 구조 유지 (임의 class 생성 최소화)
+- 데이터에 없는 값 생성 금지
+- HTML은 반드시 닫힌 태그 구조로 작성하고 렌더링 오류가 없도록 할 것
+
+--------------------------------
+[데이터 누락 처리 규칙]
+
+- 입력 데이터에 특정 항목이 없을 경우 해당 내용은 생략하거나 “데이터 확인 필요” 수준으로 간단히 표현하세요.
+
+--------------------------------
+[고정 정보]
+
+작성부서: 연구지원팀
+작성자: 김남호 차장`;
+  }
+
+  return `당신은 연구소 근태 데이터를 해석해 월간 근태 보고서를 작성하는 분석가입니다.
+
+입력 데이터는 이미 시스템에서 계산된 결과입니다.
+새로운 수치, 이름, 조직, 해석을 임의로 생성하지 말고 제공된 데이터만 사용하세요.
+
+========================
+[입력 데이터]
+${JSON.stringify(dataForPrompt, null, 2)}
+========================
+
+보고서는 A4 세로 출력용 HTML “본문 조각”으로 작성하세요.
+
+--------------------------------
+[보고서 구조]
+--------------------------------
+
+각 부(1~4부)는 반드시 독립된 section(div)으로 구분하여 작성하세요.
+
+1부. 해당월 현황
+
+- monthlySummary와 monthlyKpi 데이터를 기반으로 작성
+- 전체 인원, 위험/주의/정상 인원 분포를 카드 형태로 표현
+- 핵심 KPI는 카드 또는 막대형 근거로 표현
+- 출근미입력/퇴근미입력 등 출퇴근 누락 분석용 데이터는 보고서 본문에서 제외
+- 문장은 단정하지 말고 “확인 필요”, “검토 필요” 수준으로 작성
+
+--------------------------------
+
+2부. 트렌드 분석
+
+- trend 데이터를 기반으로 월별 변화 설명
+- 데이터가 1개월이면 → 장기 추세를 단정하지 말고 기준점 설명만 수행
+- 2~3개월이면 → 초기 변화 흐름 설명
+- 3개월 이상이면 → 증가 / 감소 / 유지 흐름 설명
+- 월별 변화가 명확하지 않으면 그래프를 억지로 만들지 말고 기준점 카드와 설명으로 대체
+
+--------------------------------
+
+3부. 담당자 리스크
+
+- riskUsers 데이터를 기반으로 작성
+- 위험 인원은 반드시 포함
+- 주의 인원은 입력 데이터에 포함된 핵심 인원 중심으로 설명
+- 표 또는 가로 막대 형태로 표현
+- 각 인원의 issues와 trend를 근거로 설명
+- 정상 인원 전체 목록은 작성하지 않음
+
+--------------------------------
+
+4부. 원인 가능성 및 종합 의견
+
+- 데이터 기반으로만 가능성 제시
+- 다음 관점에서 분석:
+  · 업무 집중 여부
+  · 근무 시간 편중
+  · 특정 인원 리스크 집중
+  · 운영 기준 편차 가능성
+
+- 절대 단정하지 말고 가능성 중심으로 작성
+
+- 마지막 문장은 반드시 다음 형식으로 마무리:
+→ “현재 기준으로는 추가적인 데이터 확인 및 운영 검토가 필요합니다.”
+
+--------------------------------
+[시각화 선택 규칙]
+
+- 핵심 수치 → 카드
+- 월별 변화 → 막대 또는 선 그래프
+- 구성비 → 도넛 또는 비율 카드
+- 담당자 비교 → 표 또는 가로 막대
+
+- 데이터가 부족하면:
+→ 그래프를 만들지 말고 카드 + 설명으로 대체
+
+--------------------------------
+[출력 규칙]
+
+- <!doctype>, html, head, body 태그 금지
+- script 태그 절대 금지
+- 기존 CSS class 구조 유지 (임의 class 생성 최소화)
+- 데이터에 없는 값 생성 금지
+- HTML은 반드시 닫힌 태그 구조로 작성하고 렌더링 오류가 없도록 할 것
+- 출근미입력/퇴근미입력 중심의 출퇴근 누락 분석은 포함하지 말 것
+
+--------------------------------
+[데이터 누락 처리 규칙]
+
+- 입력 데이터에 특정 항목이 없을 경우:
+  → 해당 내용은 생략하거나
+  → “데이터 확인 필요” 수준으로 간단히 표현
+
+--------------------------------
+[고정 정보]
+
+작성부서: 연구지원팀
+작성자: 김남호 차장`;
 }
 
 async function callOpenAI(payload) {
@@ -152,8 +309,8 @@ module.exports = async function handler(req, res) {
       report_key: reportKey,
       report_type: reportType,
       report_title: payload.reportTitle || null,
-      scope_label: payload?.data?.scope || null,
-      period_label: payload?.data?.period || null,
+      scope_label: payload?.reportInfo?.scope || payload?.data?.scope || null,
+      period_label: payload?.reportInfo?.month || payload?.data?.period || null,
       period_mode: payload?.data?.periodMode || null,
       data_hash: dataHash,
       payload,
