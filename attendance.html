@@ -5870,7 +5870,33 @@ function renderTrendAnalysis(){
   const trendDataWithValues = data.filter(d => d && d.__hasData !== false);
   const notice = $('#trendDataNotice');
   if(notice){
-    notice.textContent = data.length ? `현재 기준: 26.03 | 해당년도 (1~12월)</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+    const periodName = trendPeriodMode() === 'rolling' ? '최근 12개월' : '해당년도';
+    const axisText = trendPeriodMode() === 'rolling'
+      ? `${data[0]?.label || '-'} ~ ${data[data.length - 1]?.label || '-'}`
+      : '1~12월';
+    notice.textContent = data.length
+      ? `현재 기준: ${periodLabel()} | ${periodName} (${axisText})`
+      : `${trendScopeLabel()} 기준으로 표시할 근태 월 데이터가 없습니다.`;
+  }
+  if(!trendDataWithValues.length){
+    renderEmptyChart($('#trendKpiChart'), '업로드된 월별 데이터가 없습니다.');
+    renderEmptyChart($('#trendRiskChart'), '업로드된 월별 데이터가 없습니다.');
+    renderEmptyChart($('#trendRadarChart'), '업로드된 월별 데이터가 없습니다.');
+    if($('#trendSummaryCards')) $('#trendSummaryCards').innerHTML='';
+    if($('#trendRadarCards')) $('#trendRadarCards').innerHTML='';
+    if($('#trendTopPeopleTable')) $('#trendTopPeopleTable').innerHTML='';
+    return;
+  }
+  const latest = trendDataWithValues[trendDataWithValues.length-1];
+  const prev = trendDataWithValues.length >= 2 ? trendDataWithValues[trendDataWithValues.length-2] : null;
+  const diffText = (key, suffix='') => prev ? `${Number(latest[key]||0) - Number(prev[key]||0) >= 0 ? '+' : ''}${trendRound(Number(latest[key]||0) - Number(prev[key]||0),1)}${suffix}` : '비교월 없음';
+  if($('#trendSummaryCards')){
+    $('#trendSummaryCards').innerHTML = [
+      ['최근월', latest.label, `${latest.employeeCount}명 기준`],
+      ['1인당 연장근로', `${latest.avgOvertimePerPerson}h`, `전월 대비 ${diffText('avgOvertimePerPerson','h')}`],
+      ['위험 인원', `${latest.highRisk}명`, `전월 대비 ${diffText('highRisk','명')}`],
+      ['운영 리스크', `${latest.operationalRisk}점`, `전월 대비 ${diffText('operationalRisk','점')}`]
+    ].map(([k,v,s])=>`<div class="trendSummaryCard"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
   }
   trendLineSVG($('#trendKpiChart'), data, [
     {key:'avgOvertimePerPerson', color:'#2563eb', suffix:'h'},
