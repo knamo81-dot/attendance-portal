@@ -19,6 +19,7 @@ function stripUnsafeHtml(html = '') {
 
 function buildPrompt(payload) {
   const isHiring = payload.reportType === 'hiring';
+
   const base = {
     reportType: payload.reportType,
     reportTitle: payload.reportTitle,
@@ -35,18 +36,23 @@ function buildPrompt(payload) {
 - 단정하지 말고 "가능성", "검토 필요", "반복 확인 필요" 수준으로 표현합니다.
 - 개인정보는 입력된 이름/사번/조직 정보 범위 안에서만 사용합니다.
 - 보고서 제목, 작성일자, 보고대상, 분석기준을 상단에 표시합니다.
-- ${isHiring ? '충원 보고서는 1) 충원 요청 개요 2) 퇴사/공백 정보 3) 근태 리스크 근거 4) 업무 재배분 가능성 5) 충원 검토 의견 6) 결론 순서로 작성합니다.' : '월별+트렌드 보고서는 1) 핵심 요약 2) 월별 진단 3) 트렌드 변화 4) 담당자 리스크 5) 원인 가능성 6) 관리 방향 7) 결론 순서로 작성합니다.'}
+- ${isHiring
+    ? '충원 보고서는 1) 충원 요청 개요 2) 퇴사/공백 정보 3) 근태 리스크 근거 4) 업무 재배분 가능성 5) 충원 검토 의견 6) 결론 순서로 작성합니다.'
+    : '월별+트렌드 보고서는 1) 핵심 요약 2) 월별 진단 3) 트렌드 변화 4) 담당자 리스크 5) 원인 가능성 6) 관리 방향 7) 결론 순서로 작성합니다.'}
 
 분석 데이터 JSON:
 ${JSON.stringify(base, null, 2)}`;
 }
 
 async function callOpenAI(payload) {
-  if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY 환경변수가 없습니다.');
+  if (!OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY 환경변수가 없습니다.');
+  }
+
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -58,6 +64,7 @@ async function callOpenAI(payload) {
   });
 
   const data = await response.json().catch(() => ({}));
+
   if (!response.ok) {
     throw new Error(data?.error?.message || `OpenAI API 오류: ${response.status}`);
   }
@@ -65,33 +72,54 @@ async function callOpenAI(payload) {
   const text =
     data.output_text ||
     (Array.isArray(data.output)
-      ? data.output.flatMap(item => item.content || []).map(c => c.text || '').join('\n')
+      ? data.output
+          .flatMap(item => item.content || [])
+          .map(c => c.text || '')
+          .join('\n')
       : '');
 
-  if (!text.trim()) throw new Error('OpenAI 응답이 비어 있습니다.');
+  if (!text.trim()) {
+    throw new Error('OpenAI 응답이 비어 있습니다.');
+  }
+
   return stripUnsafeHtml(text.trim());
 }
 
 module.exports = async function handler(req, res) {
-  if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'POST만 지원합니다.' });
+  if (req.method !== 'POST') {
+    return json(res, 405, {
+      ok: false,
+      error: 'POST만 지원합니다.',
+    });
+  }
 
   try {
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error('SUPABASE_URL 또는 SUPABASE_SERVICE_ROLE_KEY 환경변수가 없습니다.');
+    if (!SUPABASE_URL) {
+      throw new Error('SUPABASE_URL 환경변수가 없습니다.');
+    }
+
+    if (!SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY 환경변수가 없습니다.');
     }
 
     const payload = req.body || {};
+
     const reportKey = String(payload.reportKey || '').trim();
     const dataHash = String(payload.dataHash || '').trim();
     const reportType = String(payload.reportType || '').trim();
     const forceRegenerate = !!payload.forceRegenerate;
 
     if (!reportKey || !dataHash || !reportType) {
-      return json(res, 400, { ok: false, error: 'reportKey, dataHash, reportType이 필요합니다.' });
+      return json(res, 400, {
+        ok: false,
+        error: 'reportKey, dataHash, reportType이 필요합니다.',
+      });
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      auth: { persistSession: false },
+      auth: {
+        persistSession: false,
+      },
     });
 
     if (!forceRegenerate) {
@@ -102,7 +130,10 @@ module.exports = async function handler(req, res) {
         .eq('data_hash', dataHash)
         .maybeSingle();
 
-      if (readError) throw readError;
+      if (readError) {
+        throw readError;
+      }
+
       if (existing?.report_html) {
         return json(res, 200, {
           ok: true,
@@ -110,6 +141,7 @@ module.exports = async function handler(req, res) {
           reportHtml: existing.report_html,
           reportId: existing.id,
           createdAt: existing.created_at,
+          generatedAt: existing.generated_at,
         });
       }
     }
@@ -132,11 +164,15 @@ module.exports = async function handler(req, res) {
 
     const { data: saved, error: saveError } = await supabase
       .from('attendance_ai_reports')
-      .upsert(row, { onConflict: 'report_key' })
+      .upsert(row, {
+        onConflict: 'report_key',
+      })
       .select('id, created_at, generated_at')
       .single();
 
-    if (saveError) throw saveError;
+    if (saveError) {
+      throw saveError;
+    }
 
     return json(res, 200, {
       ok: true,
@@ -148,6 +184,10 @@ module.exports = async function handler(req, res) {
     });
   } catch (error) {
     console.error('[generate-attendance-report]', error);
-    return json(res, 500, { ok: false, error: error?.message || String(error) });
+
+    return json(res, 500, {
+      ok: false,
+      error: error?.message || String(error),
+    });
   }
-}
+};
