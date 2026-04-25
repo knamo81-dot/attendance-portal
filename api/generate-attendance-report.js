@@ -367,7 +367,7 @@ async function callOpenAI(payload) {
       model: OPENAI_MODEL,
       input: buildPrompt(payload),
       temperature: 0.25,
-      max_output_tokens: 4500,
+      max_output_tokens: 7000,
     }),
   });
 
@@ -415,7 +415,9 @@ module.exports = async function handler(req, res) {
     const reportKey = String(payload.reportKey || '').trim();
     const dataHash = String(payload.dataHash || '').trim();
     const reportType = String(payload.reportType || '').trim();
-    const forceRegenerate = !!payload.forceRegenerate;
+    // 보고서 다시 생성 방식: 기본값은 항상 새로 생성입니다.
+    // payload.forceRegenerate === false 를 명시적으로 보낸 경우에만 기존 저장 보고서를 조회합니다.
+    const forceRegenerate = payload.forceRegenerate === false ? false : true;
 
     if (!reportKey || !dataHash || !reportType) {
       return json(res, 400, {
@@ -430,6 +432,8 @@ module.exports = async function handler(req, res) {
       },
     });
 
+    // forceRegenerate가 false일 때만 저장된 보고서를 조회합니다.
+    // 기본은 항상 새 보고서를 생성하여 최신 프롬프트/양식을 반영합니다.
     if (!forceRegenerate) {
       const { data: existing, error: readError } = await supabase
         .from('attendance_ai_reports')
