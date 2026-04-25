@@ -655,6 +655,26 @@ th.filterable{position:sticky;top:0;z-index:8;position:sticky}
 .floatingFiltersInner{width:100%;max-width:none;margin:0;padding:0 12px;display:flex;justify-content:flex-end}
 .floatingFiltersPanel{display:flex;gap:10px;flex-wrap:wrap;pointer-events:auto;background:rgba(248,250,252,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:8px 10px;border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 24px rgba(15,23,42,.10)}
 .floatingFiltersPanel select{min-width:120px}
+
+/* trend period mode toggle: shown only on Trend Analysis tab */
+.trendPeriodControl{display:none;align-items:center;gap:8px;padding:4px 4px 4px 10px;border-left:1px solid #e2e8f0;margin-left:2px}
+.trendPeriodControl.show{display:flex}
+.trendPeriodLabel{font-size:12px;font-weight:900;color:#475569;white-space:nowrap}
+.trendPeriodToggle{display:inline-flex;gap:4px;padding:4px;border:1px solid #dbeafe;border-radius:999px;background:#f8fafc}
+.trendPeriodBtn{border:none;background:transparent;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:900;color:#64748b;cursor:pointer;white-space:nowrap}
+.trendPeriodBtn.active{background:#16a34a;color:#fff;box-shadow:0 3px 10px rgba(22,163,74,.18)}
+.trendTopPeopleTableWrap{overflow:auto;border:1px solid var(--line);border-radius:18px;background:#fff;margin-top:12px}
+.trendTopPeopleTable{width:100%;border-collapse:separate;border-spacing:0;min-width:1180px;font-size:13px}
+.trendTopPeopleTable th,.trendTopPeopleTable td{padding:11px 9px;border-bottom:1px solid var(--line);text-align:center;vertical-align:middle;white-space:nowrap}
+.trendTopPeopleTable th{background:#f8fafc;color:#64748b;font-size:12px;font-weight:900;position:sticky;top:0;z-index:1}
+.trendTopPeopleTable th:first-child,.trendTopPeopleTable td:first-child{text-align:left;position:sticky;left:0;z-index:2;box-shadow:1px 0 0 var(--line)}
+.trendTopPeopleTable th:first-child{background:#f8fafc;z-index:3}.trendTopPeopleTable td:first-child{background:#fff}
+.trendTopPerson{display:flex;align-items:center;gap:10px;min-width:150px}.trendTopRank{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;background:#0f172a;color:#fff;font-size:12px;font-weight:900;flex:0 0 auto}.trendTopPerson strong{display:block;font-size:14px;color:#0f172a;margin-bottom:3px}.trendTopPerson span{display:block;font-size:12px;color:#64748b}
+.trendStateCell{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:58px;padding:7px 8px;border-radius:13px;border:1px solid #e2e8f0;font-weight:900}.trendStateCell .state{font-size:12px;line-height:1}.trendStateCell .score{font-size:14px;line-height:1;font-variant-numeric:tabular-nums}.trendStateCell.risk{background:#fef2f2;border-color:#fecaca;color:#b91c1c}.trendStateCell.warn{background:#fffbeb;border-color:#fde68a;color:#b45309}.trendStateCell.normal{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}.trendStateCell.empty{background:#f8fafc;border-color:#e2e8f0;color:#94a3b8}.trendSelectedMonth{outline:2px solid #0f172a;outline-offset:2px}
+.trendTopLegend{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:#64748b;align-items:center}.trendTopLegend span{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;background:#fff;border:1px solid #e2e8f0;font-weight:700}
+.trendTopNote{margin-top:12px;border:1px dashed #cbd5e1;background:#f8fafc;border-radius:15px;padding:12px;font-size:12px;line-height:1.55;color:#475569}
+@media (max-width:1100px){.trendPeriodControl{border-left:none;margin-left:0;padding-left:0}.trendPeriodBtn{padding:7px 9px}}
+
 body.has-floating-filters{padding-top:0}
 @media (max-width:1100px){
   .floatingFilters{top:8px}
@@ -1080,6 +1100,13 @@ html.embed-mode #main-dashboard .kpis{
       <select id="period"></select>
       <select id="division"></select>
       <select id="team"></select>
+      <div id="trendPeriodControl" class="trendPeriodControl" aria-hidden="true">
+        <span class="trendPeriodLabel">기간 기준</span>
+        <span class="trendPeriodToggle">
+          <button type="button" class="trendPeriodBtn active" data-trend-period-mode="year">해당년도</button>
+          <button type="button" class="trendPeriodBtn" data-trend-period-mode="rolling">최근 12개월</button>
+        </span>
+      </div>
     </div>
   </div>
 
@@ -1089,6 +1116,13 @@ html.embed-mode #main-dashboard .kpis{
         <select id="stickyPeriod"></select>
         <select id="stickyDivision"></select>
         <select id="stickyTeam"></select>
+        <div id="stickyTrendPeriodControl" class="trendPeriodControl" aria-hidden="true">
+          <span class="trendPeriodLabel">기간 기준</span>
+          <span class="trendPeriodToggle">
+            <button type="button" class="trendPeriodBtn active" data-trend-period-mode="year">해당년도</button>
+            <button type="button" class="trendPeriodBtn" data-trend-period-mode="rolling">최근 12개월</button>
+          </span>
+        </div>
       </div>
     </div>
   </div>
@@ -1518,7 +1552,7 @@ html.embed-mode #main-dashboard .kpis{
   <div id="main-trend-analysis" class="mainPanel">
     <div class="card" style="margin-top:16px">
       <div class="title">트렌드분석</div>
-      <div class="desc">현재 리스크를 먼저 진단하고, 이어서 월별 변화 흐름과 세부 KPI 근거를 확인하는 보고서형 화면입니다. 업로드 월이 누적되면 선택 기준월 기준 최근 12개월까지 자동 확장됩니다.</div>
+      <div class="desc">현재 리스크를 먼저 진단하고, 이어서 월별 변화 흐름과 세부 KPI 근거를 확인하는 보고서형 화면입니다. 상단 기간 기준 버튼으로 해당년도 흐름과 최근 12개월 흐름을 전환할 수 있습니다.</div>
       <div id="trendDataNotice" class="mini" style="margin-top:10px"></div>
     </div>
 
@@ -1577,6 +1611,22 @@ html.embed-mode #main-dashboard .kpis{
         </div>
       </div>
       <div id="trendKpiChart" class="trendChartLarge"></div>
+    </div>
+
+    <div class="card trendCard">
+      <div class="trendCardHead">
+        <div>
+          <div class="label" style="font-weight:800;color:#16a34a;margin-bottom:6px">STEP 4 · 사람별 위험 흐름 확인</div>
+          <div class="title">4. 위험지수 상위 담당자</div>
+          <div class="desc">선택한 월 기준으로 위험지수가 높은 담당자를 정렬하고, 기간 기준에 따라 각 담당자의 월별 상태와 점수 흐름을 확인합니다.</div>
+        </div>
+        <div class="trendLegend compact">
+          <span><i style="background:#ef4444"></i>위험</span>
+          <span><i style="background:#f59e0b"></i>주의</span>
+          <span><i style="background:#16a34a"></i>정상</span>
+        </div>
+      </div>
+      <div id="trendTopPeopleTable"></div>
     </div>
   </div>
 
@@ -5418,7 +5468,76 @@ function trendMetricsForMonth(ym){
     overtimeRisk, mobilityRisk, workConcentrationRisk, operationalRisk, leaveRisk
   };
 }
-function trendBuildData(){ return trendLast12Months().map(trendMetricsForMonth); }
+function trendPeriodMode(){
+  if(STATE.trendPeriodMode !== 'rolling' && STATE.trendPeriodMode !== 'year') STATE.trendPeriodMode = 'year';
+  return STATE.trendPeriodMode;
+}
+function trendSetPeriodMode(mode){
+  STATE.trendPeriodMode = mode === 'rolling' ? 'rolling' : 'year';
+  trendSyncPeriodModeButtons();
+  renderTrendAnalysis();
+}
+function trendSyncPeriodModeButtons(){
+  const mode = trendPeriodMode();
+  document.querySelectorAll('[data-trend-period-mode]').forEach(btn => {
+    const active = btn.getAttribute('data-trend-period-mode') === mode;
+    btn.classList.toggle('active', active);
+  });
+}
+function trendBindPeriodModeButtons(){
+  document.querySelectorAll('[data-trend-period-mode]').forEach(btn => {
+    if(btn.dataset.bound === 'Y') return;
+    btn.addEventListener('click', () => trendSetPeriodMode(btn.getAttribute('data-trend-period-mode')));
+    btn.dataset.bound = 'Y';
+  });
+  trendSyncPeriodModeButtons();
+}
+function trendUpdatePeriodControlVisibility(){
+  const isTrend = !!document.querySelector('.mainTab[data-main="trend-analysis"]')?.classList.contains('active');
+  ['trendPeriodControl','stickyTrendPeriodControl'].forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.classList.toggle('show', isTrend);
+    el.setAttribute('aria-hidden', isTrend ? 'false' : 'true');
+  });
+}
+function trendYearMonths(){
+  const months = trendGetAvailableMonths();
+  const selected = String(STATE.period || '').trim();
+  const base = /^\d{4}-\d{2}$/.test(selected) ? selected : trendSelectedEndMonth(months);
+  if(!base) return [];
+  const year = Number(base.slice(0,4));
+  const availableSet = new Set(months);
+  const list = [];
+  for(let m=1;m<=12;m++){
+    const ym = `${year}-${String(m).padStart(2,'0')}`;
+    if(availableSet.has(ym)) list.push(ym);
+  }
+  return list;
+}
+function trendPeriodMonths(){
+  return trendPeriodMode() === 'rolling' ? trendLast12Months() : trendYearMonths();
+}
+function trendDisplayMonths(){
+  const mode = trendPeriodMode();
+  const months = trendGetAvailableMonths();
+  const selected = String(STATE.period || '').trim();
+  const base = /^\d{4}-\d{2}$/.test(selected) ? selected : trendSelectedEndMonth(months);
+  if(!base) return [];
+  if(mode === 'rolling'){
+    const endY = Number(base.slice(0,4));
+    const endM = Number(base.slice(5,7));
+    const list=[];
+    for(let i=11;i>=0;i--){
+      const d = new Date(endY, endM-1-i, 1);
+      list.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    }
+    return list;
+  }
+  const year = Number(base.slice(0,4));
+  return Array.from({length:12}, (_,i)=>`${year}-${String(i+1).padStart(2,'0')}`);
+}
+function trendBuildData(){ return trendPeriodMonths().map(trendMetricsForMonth); }
 function trendColor(idx){ return ['#2563eb','#64748b','#f59e0b','#0f766e','#7c3aed','#ef4444'][idx % 6]; }
 function trendValueExtent(data, keys){
   const nums = data.flatMap(d => keys.map(k => Number(d[k] || 0))).filter(Number.isFinite);
@@ -5548,11 +5667,74 @@ function renderTrendRadar(data){
   }));
   trendRadarMultiSVG($('#trendRadarChart'), labels, datasets);
 }
+function trendRiskState(score){
+  const n = Number(score || 0);
+  if(n >= 75) return { label:'위험', cls:'risk' };
+  if(n >= 50) return { label:'주의', cls:'warn' };
+  return { label:'정상', cls:'normal' };
+}
+function trendPersonRiskMapForMonth(ym){
+  const map = new Map();
+  if(!/^\d{4}-\d{2}$/.test(String(ym||''))) return map;
+  const people = trendEmployeesForMonth(ym) || [];
+  people.forEach(p => {
+    const name = normalizeEmployeeName(p.name || p.employeeName || '');
+    if(!name) return;
+    const score = Number(p.scopedRisk ?? p.risk ?? p.riskScore ?? 0);
+    map.set(name, { name, score: Number.isFinite(score) ? Math.round(score) : 0 });
+  });
+  return map;
+}
+function renderTrendTopPeople(){
+  const host = document.getElementById('trendTopPeopleTable');
+  if(!host) return;
+  const available = trendGetAvailableMonths();
+  const selected = trendSelectedEndMonth(available);
+  const displayMonths = trendDisplayMonths();
+  if(!selected || !displayMonths.length){
+    host.innerHTML = '<div class="trendTopNote">표시할 월별 담당자 데이터가 없습니다.</div>';
+    return;
+  }
+  const selectedMap = trendPersonRiskMapForMonth(selected);
+  const top = [...selectedMap.values()].sort((a,b)=>b.score-a.score || a.name.localeCompare(b.name,'ko')).slice(0,5);
+  if(!top.length){
+    host.innerHTML = '<div class="trendTopNote">선택 기준월에 표시할 담당자 데이터가 없습니다.</div>';
+    return;
+  }
+  const monthMaps = new Map(displayMonths.map(ym => [ym, trendPersonRiskMapForMonth(ym)]));
+  const modeLabel = trendPeriodMode() === 'rolling' ? '최근 12개월' : '해당년도';
+  const headerMonths = displayMonths.map(ym => `<th class="${ym===selected?'trendSelectedMonth':''}">${trendMonthLabel(ym)}</th>`).join('');
+  const rows = top.map((person, idx) => {
+    const cells = displayMonths.map(ym => {
+      const item = monthMaps.get(ym)?.get(person.name);
+      if(!item) return `<td><span class="trendStateCell empty"><span class="state">-</span><span class="score">-</span></span></td>`;
+      const st = trendRiskState(item.score);
+      return `<td><span class="trendStateCell ${st.cls} ${ym===selected?'trendSelectedMonth':''}"><span class="state">${st.label}</span><span class="score">${item.score}</span></span></td>`;
+    }).join('');
+    return `<tr><td><div class="trendTopPerson"><span class="trendTopRank">${idx+1}</span><div><strong>${person.name}</strong><span>선택월 ${person.score}점</span></div></div></td>${cells}</tr>`;
+  }).join('');
+  host.innerHTML = `
+    <div class="trendTopPeopleTableWrap">
+      <table class="trendTopPeopleTable">
+        <thead><tr><th>담당자</th>${headerMonths}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="trendTopLegend">
+      <span><i class="dot" style="background:#ef4444"></i>위험 75점 이상</span>
+      <span><i class="dot" style="background:#f59e0b"></i>주의 50~74점</span>
+      <span><i class="dot" style="background:#16a34a"></i>정상 50점 미만</span>
+      <span><i class="dot" style="background:#0f172a"></i>굵은 테두리: 선택 기준월</span>
+    </div>
+    <div class="trendTopNote">※ TOP 순위는 현재 필터에서 선택한 기준월(${trendMonthLabel(selected)})의 위험지수 기준입니다. 월별 셀은 ${modeLabel} 기준으로 같은 담당자의 상태와 점수를 표시합니다.</div>`;
+}
 function renderTrendAnalysis(){
+  trendBindPeriodModeButtons();
+  trendUpdatePeriodControlVisibility();
   const data = trendBuildData();
   const notice = $('#trendDataNotice');
   if(notice){
-    notice.textContent = data.length ? `분석 범위: ${trendScopeLabel()} · 기준월: ${periodLabel()} · 그래프 반영 월: ${data.map(d=>d.label).join(', ')} · 업로드 월이 늘어나면 선택 기준월 기준 최근 12개월까지 자동 표시됩니다.` : `${trendScopeLabel()} 기준으로 표시할 근태 월 데이터가 없습니다.`;
+    notice.textContent = data.length ? `분석 범위: ${trendScopeLabel()} · 기준월: ${periodLabel()} · 기간 기준: ${trendPeriodMode() === 'rolling' ? '최근 12개월' : '해당년도'} · 그래프 반영 월: ${data.map(d=>d.label).join(', ')}` : `${trendScopeLabel()} 기준으로 표시할 근태 월 데이터가 없습니다.`;
   }
   if(!data.length){
     renderEmptyChart($('#trendKpiChart'), '업로드된 월별 데이터가 없습니다.');
@@ -5560,6 +5742,7 @@ function renderTrendAnalysis(){
     renderEmptyChart($('#trendRadarChart'), '업로드된 월별 데이터가 없습니다.');
     if($('#trendSummaryCards')) $('#trendSummaryCards').innerHTML='';
     if($('#trendRadarCards')) $('#trendRadarCards').innerHTML='';
+    if($('#trendTopPeopleTable')) $('#trendTopPeopleTable').innerHTML='';
     return;
   }
   const latest = data[data.length-1];
@@ -5578,7 +5761,7 @@ function renderTrendAnalysis(){
     {key:'highRisk', color:'#ef4444', suffix:'명'},
     {key:'leaveZero', color:'#7c3aed', suffix:'명'}
   ]);
-  renderTrendRadar(data);
+  renderTrendRadar(trendLast12Months().map(trendMetricsForMonth));
   trendLineSVG($('#trendRiskChart'), data, [
     {key:'overtimeRisk', color:'#2563eb', suffix:'점'},
     {key:'mobilityRisk', color:'#0f766e', suffix:'점'},
@@ -5596,7 +5779,9 @@ function renderTrendAnalysis(){
   if($('#trendRadarCards')){
     $('#trendRadarCards').innerHTML = radarCards.map(([k,v,d]) => `<div class="trendMetricCard"><div><div class="k">${k}</div><div class="d">${d}</div></div><div class="v">${v}점</div></div>`).join('');
   }
+  renderTrendTopPeople();
 }
+
 
 function renderTopCharts(scoped, months){
   if($('#trendTitle')) $('#trendTitle').textContent = `${periodLabel()} 핵심 추이`;
@@ -8836,6 +9021,7 @@ function bindMainTabs(){
       if(btn.dataset.main === 'dashboard' || btn.dataset.main === 'deep-analysis'){
         rerenderDashboardVisibleCharts();
       }
+      trendUpdatePeriodControlVisibility();
       if(btn.dataset.main === 'trend-analysis'){
         requestAnimationFrame(() => { renderTrendAnalysis(); setTimeout(renderTrendAnalysis, 80); });
       }
@@ -9712,6 +9898,8 @@ window.addEventListener('resize', renderLightweight);
     syncFloatingFilterOptions();
     bindFloatingFilterEvents();
     updateFloatingFilterVisibility();
+    trendBindPeriodModeButtons();
+    trendUpdatePeriodControlVisibility();
   }
 
   window.addEventListener('scroll', updateFloatingFilterVisibility, { passive:true });
