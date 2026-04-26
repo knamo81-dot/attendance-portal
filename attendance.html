@@ -1356,6 +1356,18 @@ html.embed-mode #main-dashboard .kpis{
 .fixedStoryBox b{font-weight:900;color:#0f172a;}
 @media print{.fixedStoryFlow{gap:6px!important;margin:7px 0 8px!important}.fixedStoryBox{padding:8px 10px 8px 13px!important;border-radius:10px!important}.fixedStoryBox::before{top:8px!important;bottom:8px!important;width:4px!important}.fixedStoryBox .fixedStoryLabel{font-size:9.2px!important;margin-bottom:3px!important}.fixedStoryBox .fixedStoryText{font-size:9.2px!important;line-height:1.38!important}}
 
+
+.fixedAdditionalData{
+  margin-top:12px;
+  padding:12px 14px;
+  border:1px dashed #cbd5e1;
+  border-radius:14px;
+  background:#f8fafc;
+  color:#334155;
+  font-size:12px;
+  line-height:1.65;
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -5773,8 +5785,22 @@ function trendMetricsForMonth(ym){
   const people = trendEmployeesForMonth(ym);
   const count = people.length;
   if(!count){
-    return { ym, label:trendMonthLabel(ym), employeeCount:0, avgOvertimePerPerson:0, highRisk:0, leaveZero:0, overtimeRisk:0, mobilityRisk:0, workConcentrationRisk:0, operationalRisk:0, leaveRisk:0 };
+    return { ym, label:trendMonthLabel(ym), employeeCount:0, avgOvertimePerPerson:0, highRisk:0, leaveZero:0, overtimeRisk:0, mobilityRisk:0, workConcentrationRisk:0, operationalRisk:0, leaveRisk:0, holidayWorkCount:0 };
   }
+  const holidayWorkCount = (() => {
+    try {
+      const monthRows = trendRowsForMonth(ym)?.rows || [];
+      return monthRows.filter(row => {
+        const baseReason = getAttendanceBaseReason(row);
+        const rawText = [row.erpReason,row.reason,row.attendanceType,row.statusReason,baseReason].filter(Boolean).join(' ');
+        const erpOT = Number(row.erpActualOvertime || 0);
+        return /공휴일근무|휴일근무/.test(rawText) || ((/공휴일|휴일|휴무일/.test(rawText)) && erpOT > 0);
+      }).length;
+    } catch(e) {
+      console.warn('holidayWorkCount 계산 실패', e);
+      return 0;
+    }
+  })();
   const totalOT = people.reduce((s,p)=>s+Number(p.scopedMonthlyOvertime || p.overtime || 0),0);
   const avgOvertimePerPerson = totalOT / Math.max(1,count);
   const highRisk = people.filter(p => Number(p.scopedRisk || p.risk || 0) >= 75).length;
@@ -5800,7 +5826,8 @@ function trendMetricsForMonth(ym){
   return {
     ym, label:trendMonthLabel(ym), employeeCount:count,
     avgOvertimePerPerson:trendRound(avgOvertimePerPerson,1), highRisk, leaveZero,
-    overtimeRisk, mobilityRisk, workConcentrationRisk, operationalRisk, leaveRisk
+    overtimeRisk, mobilityRisk, workConcentrationRisk, operationalRisk, leaveRisk,
+    holidayWorkCount
   };
 }
 function trendPeriodMode(){
@@ -11005,7 +11032,7 @@ function stableStringify(obj){const seen=new WeakSet();const sort=v=>{if(v&&type
 function setStatus(text,tone){const el=document.getElementById('attendanceReportStatus');if(!el)return;el.className='reportAiStatus'+(tone?' '+tone:'');el.textContent=text;}
 function reportParseYearMonth(label){const s=String(label||'').trim();let m=s.match(/(\d{4})[-.\/]?(\d{1,2})/);if(m)return{year:Number(m[1]),month:Number(m[2])};m=s.match(/(\d{2})[.\-/](\d{1,2})/);if(m)return{year:2000+Number(m[1]),month:Number(m[2])};return null;}
 function reportUploadDateFromPeriod(label){const ym=reportParseYearMonth(label);if(!ym)return new Date().toISOString().slice(0,10);let y=ym.year,mo=ym.month+1;if(mo>12){y+=1;mo=1;}return `${y}-${String(mo).padStart(2,'0')}-01`;}
-function compactTrendRows(rows){return(rows||[]).filter(Boolean).map(d=>({label:d.label||d.month||'',hasData:d.__hasData!==false,highRisk:Number(d.highRisk||0),warning:Number(d.warning||0),normal:Number(d.normal||0),avgRisk:Number(d.avgRisk||0),avgOvertimePerPerson:Number(d.avgOvertimePerPerson||0),totalOvertime:Number(d.totalOvertime||0),missingStart:Number(d.missingStart||0),missingEnd:Number(d.missingEnd||0),leaveUsageRate:Number(d.leaveUsageRate||0),workloadRisk:Number(d.workloadRisk||0),restRisk:Number(d.restRisk||0)}));}
+function compactTrendRows(rows){return(rows||[]).filter(Boolean).map(d=>({label:d.label||d.month||'',hasData:d.__hasData!==false,highRisk:Number(d.highRisk||0),warning:Number(d.warning||0),normal:Number(d.normal||0),avgRisk:Number(d.avgRisk||0),avgOvertimePerPerson:Number(d.avgOvertimePerPerson||0),totalOvertime:Number(d.totalOvertime||0),missingStart:Number(d.missingStart||0),missingEnd:Number(d.missingEnd||0),leaveUsageRate:Number(d.leaveUsageRate||0),workloadRisk:Number(d.workloadRisk||0),restRisk:Number(d.restRisk||0),holidayWorkCount:Number(d.holidayWorkCount||d.holidayWork||d.holiday||d.holiday_work_count||0)}));}
 function buildReportCoreData(){const trendData=safeCall(window.trendBuildData,[]);const dataWithValues=(trendData||[]).filter(d=>d&&d.__hasData!==false);const latest=dataWithValues[dataWithValues.length-1]||{};const scope=safeCall(window.trendScopeLabel,'전체 조직');const period=safeCall(window.periodLabel,'전체');const periodMode=safeCall(window.trendPeriodMode,'year');const available=safeCall(window.trendGetAvailableMonths,[]);const selectedYm=safeCall(()=>window.trendSelectedEndMonth(available),'');const selectedMap=selectedYm&&typeof window.trendPersonRiskMapForMonth==='function'?window.trendPersonRiskMapForMonth(selectedYm):new Map();const people=[...selectedMap.values()].sort((a,b)=>Number(b.score||0)-Number(a.score||0)||String(a.name).localeCompare(String(b.name),'ko'));const riskCount=people.filter(p=>Number(p.score||0)>=75).length;const warnCount=people.filter(p=>Number(p.score||0)>=50&&Number(p.score||0)<75).length;const normalCount=Math.max(0,people.length-riskCount-warnCount);const topPeople=people.filter(p=>Number(p.score||0)>=50).map(p=>({name:p.name,score:Number(p.score||0),division:p.division||'',team:p.team||'',overtime:Number(p.overtime||p.monthlyOvertime||0),leaveDays:Number(p.leaveDays||0),trend:p.trend||'확인 필요'}));const scoped=safeCall(window.scopedEmployees,[]);const scopedSummary={employeeCount:Array.isArray(scoped)?scoped.length:0,totalOvertime:Array.isArray(scoped)?scoped.reduce((a,b)=>a+Number(b.scopedMonthlyOvertime||b.overtime||0),0):0,totalBusinessTrip:Array.isArray(scoped)?scoped.reduce((a,b)=>a+Number(b.businessTripDays||0),0):0,totalOutdoor:Array.isArray(scoped)?scoped.reduce((a,b)=>a+Number(b.outdoorDays||0),0):0};return{scope,period,periodMode,selectedYm,writtenDate:reportUploadDateFromPeriod(period),trendData:compactTrendRows(trendData),latest,riskCount,warnCount,normalCount,topPeople,scopedSummary};}
 function getSelectedHiringEmployee(){const sel=document.getElementById('hiringEmployeeSelect');if(!sel||!sel.value)return null;try{return JSON.parse(decodeURIComponent(sel.value));}catch(e){return null;}}
 function buildHiringInput(){return{reason:document.getElementById('hiringReason')?.value||'퇴사/퇴사 예정',requestCount:Number(document.getElementById('hiringCount')?.value||1),neededDate:document.getElementById('hiringNeededDate')?.value||'',impact:document.getElementById('hiringImpact')?.value||'High',detail:document.getElementById('hiringDetail')?.value||'',employee:getSelectedHiringEmployee()};}
@@ -11034,7 +11061,7 @@ async function buildServerPayload(reportType){
   };
   const monthlyKpi={
     overtimeCount: totalOvertime,
-    holidayWorkCount: Number(core?.latest?.holidayWorkCount || core?.latest?.holidayWork || 0),
+    holidayWorkCount: Number(core?.latest?.holidayWorkCount ?? core?.latest?.holidayWork ?? core?.latest?.holiday ?? core?.latest?.holiday_work_count ?? 0),
     averageOvertimeHours: avgOvertime,
     riskEmployeeCount: monthlySummary.riskCount
   };
@@ -11068,7 +11095,7 @@ async function buildServerPayload(reportType){
     warningCount: recentRows.map(r=>Number(r.warning||0)),
     averageOvertimeHours: recentRows.map(r=>Number(r.avgOvertimePerPerson||0)),
     overtimeCount: recentRows.map(r=>Number(r.totalOvertime||r.overtime||0)),
-    holidayWorkCount: recentRows.map(r=>Number(r.holidayWorkCount||0))
+    holidayWorkCount: recentRows.map(r=>Number(r.holidayWorkCount ?? r.holidayWork ?? r.holiday ?? r.holiday_work_count ?? 0))
   };
   const visualDecisionHints={
     monthlySummary:'cards',
@@ -11141,42 +11168,55 @@ function cleanAiText(html){const tmp=document.createElement('div');tmp.innerHTML
 function splitSentences(text){const s=String(text||'').replace(/\s+/g,' ').trim();if(!s)return[];return(s.match(/[^.!?。]+(?:[.!?。]|다\.|요\.|니다\.|습니다\.)?/g)||[s]).map(v=>v.trim()).filter(v=>v.length>12).slice(0,12);}
 function getAiSentence(html,idx,fallback){return splitSentences(cleanAiText(html))[idx]||fallback;}
 function fixedNum(v,d=0){const n=Number(v||0);return Number.isFinite(n)?n.toLocaleString('ko-KR',{maximumFractionDigits:d,minimumFractionDigits:d?d:0}):'0';}
-function fixedPct(v,m){return Math.max(5,Math.min(100,Math.round((Math.max(0,Number(v||0))/Math.max(1,Number(m||0)))*100)));}
+function fixedPct(v,m){
+  const n=Math.max(0,Number(v||0));
+  if(!n) return 0;
+  return Math.max(5,Math.min(100,Math.round((n/Math.max(1,Number(m||0)))*100)));
+}
 function fixedStatusClass(s){return s==='위험'?'red':(s==='주의'?'amber':(s==='정상'?'green':'gray'));}
 function renderFixedHeader(label,title,info){return `<div class="fixedReportHeader"><div class="fixedReportTitleBlock"><div class="fixedReportLabel">${esc(label)}</div><div class="fixedReportTitle">${esc(title)}</div></div><div class="fixedReportMeta">작성일자: ${esc(info.writtenDate||'-')}<br>보고대상: ${esc(info.scope||'-')}<br>작성부서: 연구지원팀<br>작성자: 김남호 차장</div></div>`;}
 function renderFixedBars(items){const max=Math.max(1,...items.map(i=>Number(i.value||0)));return items.map(i=>`<div class="fixedBarRow"><div class="fixedBarLabel">${esc(i.label)}</div><div class="fixedBarBg"><div class="fixedBar ${i.tone||''}" style="width:${fixedPct(i.value,max)}%"></div></div><div class="fixedBarVal">${esc(i.display??fixedNum(i.value))}</div></div>`).join('');}
 function renderFixedRiskTable(users){const rows=(users||[]).slice(0,8).map((p,i)=>`<tr><td>${i+1}</td><td><b>${esc(p.name||'-')}</b><br><span style="color:#64748b;font-size:11px">${esc(p.division||'')} ${esc(p.team||'')}</span></td><td><span class="fixedPill ${fixedStatusClass(p.status)}">${esc(p.status||'확인')}</span></td><td>${fixedNum(p.riskScore||p.score||0)}</td><td>${esc((p.issues||[]).join(' · ')||p.trend||'확인 필요')}</td></tr>`).join('');return `<table class="fixedTable"><thead><tr><th>순위</th><th>담당자</th><th>상태</th><th>점수</th><th>확인 필요사항</th></tr></thead><tbody>${rows||'<tr><td colspan="5">표시할 위험/주의 담당자 데이터가 없습니다.</td></tr>'}</tbody></table>`;}
 function renderFixedTrendChart(trend,info){const months=trend?.months||[],risks=trend?.riskCount||[],warns=trend?.warningCount||[];const values=months.map((m,i)=>Number(risks[i]||0)+Number(warns[i]||0));const max=Math.max(1,...values);return `<div class="fixedChartBox"><div class="fixedChartTitle">월별 위험·주의 인원 흐름</div><div class="fixedChartMock">${months.length?months.map((m,i)=>`<div class="fixedMonthGroup"><div class="fixedMonthBar ${m===info.selectedYm||i===months.length-1?'active':''}" style="height:${fixedPct(values[i],max)}%">${fixedNum(values[i])}</div><div class="fixedMonthLabel">${esc(m)}</div></div>`).join(''):'<div class="fixedBlockText">추세 데이터가 충분하지 않아 기준점으로만 표시합니다.</div>'}</div></div>`;}
-function formatReportMonthLabel(raw){
+function parseReportMonthParts(raw){
   const s=String(raw||'').trim();
-  let m=s.match(/(\d{4})[.\-\/ë\s]*(\d{1,2})/);
-  if(m)return `${Number(m[2])}ì`;
-  m=s.match(/(\d{1,2})\s*ì/);
-  if(m)return `${Number(m[1])}ì`;
-  m=s.match(/\b(\d{1,2})\b/);
-  if(m)return `${Number(m[1])}ì`;
-  return s||'í´ë¹ì';
+  let m=s.match(/(\d{4})[-.\/년\s]*(\d{1,2})/);
+  if(m) return {year:Number(m[1]), month:Number(m[2])};
+  m=s.match(/(\d{2})[.\-/](\d{1,2})/);
+  if(m) return {year:2000+Number(m[1]), month:Number(m[2])};
+  m=s.match(/(\d{1,2})\s*월/);
+  if(m) return {year:null, month:Number(m[1])};
+  return null;
+}
+function formatReportMonthLabel(raw){
+  const parsed=parseReportMonthParts(raw);
+  return parsed?.month ? `${parsed.month}월` : (String(raw||'').trim() || '해당월');
+}
+function formatReportShortMonthLabel(raw){
+  const parsed=parseReportMonthParts(raw);
+  if(parsed?.year && parsed?.month) return `${String(parsed.year).slice(2)}.${String(parsed.month).padStart(2,'0')}`;
+  if(parsed?.month) return `${parsed.month}월`;
+  return String(raw||'').trim() || '해당월';
 }
 function formatReportFullMonthTitle(raw){
-  const s=String(raw||'').trim();
-  let m=s.match(/(\d{4})[.\-\/ë\s]*(\d{1,2})/);
-  if(m)return `${Number(m[1])}ë ${Number(m[2])}ì`;
-  const month=formatReportMonthLabel(s);
-  return month==='í´ë¹ì'?'í´ë¹ì':month;
+  const parsed=parseReportMonthParts(raw);
+  if(parsed?.year && parsed?.month) return `${parsed.year}년 ${parsed.month}월`;
+  if(parsed?.month) return `${parsed.month}월`;
+  return String(raw||'').trim() || '해당월';
 }
 function buildFixedCoreInsight(risk,warn,normal,total){
   const r=Number(risk||0), w=Number(warn||0), n=Number(normal||0), t=Number(total||0);
-  const month=formatReportMonthLabel((currentReportPayload&&currentReportPayload.reportInfo&&currentReportPayload.reportInfo.month)||'í´ë¹ì');
-  if(!t)return 'í´ë¹ì ê·¼í íí©ì ë°ì´í° ë°ì ìíë¥¼ ê¸°ì¤ì¼ë¡ íì¸ì´ íìí©ëë¤. ìíÂ·ì£¼ì ì¸ìì ë°ì ì¬ë¶ì ë°ë³µ ê°ë¥ì±ì ì¤ì¬ì¼ë¡ ê²í íë ê²ì´ ì ì í©ëë¤.';
-  if(r>0 || w>0)return `${month} íí©ì ì ì²´ ì¡°ì§ì ê¸ê²©í ìíë¼ê¸°ë³´ë¤, í¹ì  ë´ë¹ììê² ëì ëë ìí ì í¸ë¥¼ ì¡°ê¸°ì íì¸í´ì¼ íë ííë¡ ë³¼ ì ììµëë¤. ë°ë¼ì ì´ë² ë¬ ë³´ê³ ìë ì ì²´ íê· ë³´ë¤ ìì ë¦¬ì¤í¬ ì¸ìì ë°ë³µì±ê³¼ ìì¸ì íì¸íë ë°©í¥ì´ ì ì í©ëë¤.`;
-  return 'í´ë¹ì íí©ì ì ë°ì ì¼ë¡ ìì ì ì¸ ìíë¡ ë³¼ ì ììµëë¤. ë¤ë§ ì¶í ëì¼ ì§íê° ë°ë³µëëì§ íì¸íê¸° ìí´ ê¸°ì¤ì ë°ì´í°ë¥¼ ëì  ê´ë¦¬íë ê²ì´ ì ì í©ëë¤.';
+  const month=formatReportMonthLabel((currentReportPayload&&currentReportPayload.reportInfo&&currentReportPayload.reportInfo.month)||'해당월');
+  if(!t) return '해당월 근태 현황은 데이터 반영 상태를 기준으로 확인이 필요합니다. 위험·주의 인원의 발생 여부와 반복 가능성을 중심으로 검토하는 것이 적절합니다.';
+  if(r>0 || w>0) return `${month} 현황은 전체 조직의 급격한 악화라기보다, 특정 담당자에게 누적되는 위험 신호를 조기에 확인해야 하는 형태로 볼 수 있습니다. 따라서 이번 달 보고서는 전체 평균보다 상위 리스크 인원의 반복성과 원인을 확인하는 방향이 적절합니다.`;
+  return '해당월 현황은 전반적으로 안정적인 상태로 볼 수 있습니다. 다만 추후 동일 지표가 반복되는지 확인하기 위해 기준월 데이터를 누적 관리하는 것이 적절합니다.';
 }
 
 function renderFixedAttendanceReport(payload,aiHtml){
   if(!payload||payload.reportType==='hiring')return aiHtml||fallbackReportHtml(payload||{});
   const info=payload.reportInfo||{},d=payload.data||{},sum=payload.monthlySummary||{},kpi=payload.monthlyKpi||{},trend=payload.trend||{},users=payload.riskUsers||[];
   const monthText=info.month||d.period||'해당월';
-  const monthKo=(()=>{const ym=String(info.selectedYm||info.monthKey||d.selectedYm||d.periodKey||'');let m=ym.match(/(\d{4})[-./](\d{1,2})/);if(m)return `${m[1]}년 ${Number(m[2])}월`;m=String(monthText).match(/(\d{2,4})[.\-/년\s]*(\d{1,2})/);if(m){const y=m[1].length===2?`20${m[1]}`:m[1];return `${y}년 ${Number(m[2])}월`;}m=String(monthText).match(/(\d{1,2})월/);if(m)return `${Number(m[1])}월`;return String(monthText);})();
+  const monthKo=formatReportFullMonthTitle(info.selectedYm||info.monthKey||d.selectedYm||d.periodKey||monthText);
   const total=sum.totalEmployees||d?.scopedSummary?.employeeCount||0;
   const risk=sum.riskCount??d.riskCount??0,warn=sum.warningCount??d.warnCount??0,normal=sum.normalCount??d.normalCount??0;
   const story=(()=>{try{if(aiHtml&&typeof aiHtml==='object')return aiHtml;const raw=String(aiHtml||'').trim();if(!raw)return{};const cleaned=cleanAiText(raw);const target=(cleaned.match(/\{[\s\S]*\}/)||[cleaned])[0];const parsed=JSON.parse(target);return parsed&&typeof parsed==='object'?parsed:{};}catch(e){return{};}})();
@@ -11207,12 +11247,20 @@ function renderFixedAttendanceReport(payload,aiHtml){
   const nextMonthText=pickStoryText(story.nextMonthText,storySections.nextMonthText,'동일 지표가 다음 월에도 반복되는지, 위험 상태가 해소되는지, 신규 위험 인원이 발생하는지를 비교합니다.');
   const summaryOpinion=pickStoryText(story.summaryOpinion,storySections.summaryOpinion,story.overallOpinion,`현재 조직은 전반적으로 안정 상태로 판단되나, 일부 인원에서 리스크 징후가 관찰되고 있어 추가적인 확인이 필요한 상황입니다. 특히 향후 월별 데이터가 누적될 경우, 현재의 리스크가 일시적 변동인지 반복적인 흐름인지 구분할 수 있을 것으로 판단됩니다.`);
   const bottomNote=pickStoryText(story.bottomNote,storySections.bottomNote,'본 보고서는 근태 데이터를 기반으로 작성되었으며, 실제 인력 운영 판단에는 담당자별 업무 상황, 프로젝트 일정, 예외 근무 정보 등을 함께 확인한 후 활용하는 것이 적절합니다.');
-  const barItems=[
+  const holidayWorkCount=Number(kpi.holidayWorkCount ?? kpi.holidayWork ?? kpi.holiday ?? kpi.holiday_work_count ?? (Array.isArray(trend.holidayWorkCount)?trend.holidayWorkCount.at(-1):0) ?? 0);
+  const defaultBarItems=[
     {label:'연장근무',value:kpi.overtimeCount||0,display:`${fixedNum(kpi.overtimeCount||0,1)}h`,tone:'red'},
-    {label:'공휴일근무',value:kpi.holidayWorkCount||0,display:`${fixedNum(kpi.holidayWorkCount||0)}건`,tone:'amber'},
+    {label:'공휴일근무',value:holidayWorkCount,display:`${fixedNum(holidayWorkCount)}건`,tone:'amber'},
     {label:'평균연장',value:kpi.averageOvertimeHours||0,display:`${fixedNum(kpi.averageOvertimeHours||0,1)}h`,tone:'blue'},
     {label:'위험인원',value:kpi.riskEmployeeCount||risk||0,display:`${fixedNum(kpi.riskEmployeeCount||risk||0)}명`,tone:'red'}
   ];
+  const aiRiskIndicators=Array.isArray(story.riskIndicators)?story.riskIndicators:[];
+  const barItems=(aiRiskIndicators.length?aiRiskIndicators.map(item=>({
+    label:item.label||item.name||'리스크 지표',
+    value:Number(item.value||0),
+    display:`${fixedNum(item.value||0,item.unit==='h'||item.unit==='시간'?1:0)}${item.unit||''}`,
+    tone:item.level==='high'||item.tone==='red'?'red':(item.level==='medium'||item.tone==='amber'?'amber':(item.tone||'blue'))
+  })):defaultBarItems).slice(0,4);
   return `<div class="fixedRawText">${esc(cleanAiText(aiHtml))}</div>
   <section class="fixedReportPage">
     ${renderFixedHeader('ATTENDANCE\nREPORT',`${monthText} 근태 현황 및 트렌드 분석 보고서`,info)}
@@ -11264,6 +11312,7 @@ ${reasonText}`)}</div></div>
     <div class="fixedCurrentTitle" style="font-size:20px;margin-top:18px">종합 의견</div>
     <p class="fixedCurrentLead">${esc(summaryOpinion)}</p>
     <div class="fixedConclusion"><b>결론</b><br>${esc(conclusion)}</div>
+    ${Array.isArray(story.additionalDataNeeded)&&story.additionalDataNeeded.length?`<div class="fixedAdditionalData"><b>추가 확인 필요 데이터</b><br>${story.additionalDataNeeded.map(v=>`• ${esc(v)}`).join('<br>')}</div>`:''}
     <div class="fixedCaution">${esc(bottomNote)}</div>
   </section>`;
 }
