@@ -11181,7 +11181,7 @@ function buildReportCoreData(){const trendData=safeCall(window.trendBuildData,[]
 function getSelectedHiringEmployee(){const sel=document.getElementById('hiringEmployeeSelect');if(!sel||!sel.value)return null;try{return JSON.parse(decodeURIComponent(sel.value));}catch(e){return null;}}
 function buildHiringInput(){return{reason:document.getElementById('hiringReason')?.value||'퇴사/퇴사 예정',requestCount:Number(document.getElementById('hiringCount')?.value||1),neededDate:document.getElementById('hiringNeededDate')?.value||'',impact:document.getElementById('hiringImpact')?.value||'High',detail:document.getElementById('hiringDetail')?.value||'',employee:getSelectedHiringEmployee()};}
 function fallbackReportHtml(payload){const d=payload.data||{},h=payload.hiringInput;if(payload.reportType==='hiring'){const emp=h?.employee;return `<div class="attReportHeaderTitle">${esc(d.period)} 충원 검토 보고서</div><div class="attReportMeta">작성일자: ${esc(d.writtenDate)}<br>보고대상: ${esc(d.scope)}<br>충원사유: ${esc(h?.reason||'-')}</div><div class="attReportIntro"><p>API 또는 서버 저장소 연결이 실패하여 임시 보고서를 표시합니다. Vercel API와 환경변수를 설정하면 이 영역은 생성된 보고서로 대체됩니다.</p></div><h2>1. 충원 요청 개요</h2><p>요청 인원은 ${esc(h?.requestCount||1)}명이며 필요 시점은 ${esc(h?.neededDate||'-')}입니다. 업무 공백 영향도는 ${esc(h?.impact||'-')}입니다.</p><h2>2. 대상자 정보</h2><p>${emp?`${esc(emp.name)} / ${esc(emp.employeeNo||emp.id||'-')} / ${esc(emp.division||'-')} / ${esc(emp.team||'-')} / ${esc(emp.position||'-')}`:'선택된 대상자 없음'}</p><h2>3. 현재 근태 참고 지표</h2><p>위험 ${d.riskCount||0}명, 주의 ${d.warnCount||0}명, 정상 ${d.normalCount||0}명입니다.</p><h2>4. 상세 사유</h2><p>${esc(h?.detail||'-')}</p>`;}return `<div class="attReportHeaderTitle">${esc(d.period)} 근태 분석 보고서</div><div class="attReportMeta">작성일자: ${esc(d.writtenDate)}<br>보고대상: ${esc(d.scope)}</div><div class="attReportIntro"><p>API 또는 서버 저장소 연결이 실패하여 임시 보고서를 표시합니다. Vercel API와 환경변수를 설정하면 이 영역은 생성된 보고서로 대체됩니다.</p></div><h2>1. 핵심 요약</h2><p>위험 ${d.riskCount||0}명, 주의 ${d.warnCount||0}명, 정상 ${d.normalCount||0}명입니다.</p><h2>2. 상위 담당자</h2><table class="attReportTable"><thead><tr><th>순위</th><th>담당자</th><th>점수</th></tr></thead><tbody>${(d.topPeople||[]).map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.name)}</td><td>${Math.round(Number(p.score||0))}</td></tr>`).join('')||'<tr><td colspan="3">데이터 없음</td></tr>'}</tbody></table>`;}
-async function buildServerPayload(reportType,options){
+async async function buildServerPayload(reportType,options){
   options=options||{};
   const includeAdditionalData=!!options.includeAdditionalData;
   const core=buildReportCoreData();
@@ -11290,6 +11290,17 @@ async function buildServerPayload(reportType,options){
       restRisk:Number(r.restRisk||0)
     }))
   };
+  const analysisProbe={reportInfo,data:sanitizedData,riskUsers:riskCandidates};
+  const analysisLevel=inferAttendanceAnalysisLevel(analysisProbe);
+  const teamSummary=buildTeamSummaryForReport(analysisProbe);
+  const analysisGuide={
+    analysisLevel,
+    comparisonTarget:analysisLevel==='team'?'담당자':'팀',
+    instruction:analysisLevel==='team'
+      ? '현재 선택 범위가 팀 단위이므로 담당자별 위험/주의 흐름을 중심으로 분석한다.'
+      : '현재 선택 범위가 전체 또는 본부/연구소 단위이므로 팀별 위험/주의 집중도와 소속 본부 표기를 중심으로 분석한다.'
+  };
+
   const payload={
     app:'attendance',
     version:'ai-report-v2',
@@ -11299,6 +11310,9 @@ async function buildServerPayload(reportType,options){
     monthlySummary,
     monthlyKpi,
     riskUsers,
+    teamSummary,
+    analysisLevel,
+    analysisGuide,
     trend,
     visualDecisionHints,
     constraints,
@@ -11311,7 +11325,7 @@ async function buildServerPayload(reportType,options){
     payload.additionalDataRequested=Array.isArray(currentAdditionalDataNeeded)?currentAdditionalDataNeeded:[];
     payload.regenerationReason='additional_data_confirmed_by_user';
   }
-  payload.dataHash=await sha256(stableStringify({reportType,reportInfo,monthlySummary,monthlyKpi,riskUsers,trend,hiringInput:payload.hiringInput,additionalUserData:payload.additionalUserData||null,additionalDataRequested:payload.additionalDataRequested||[]}));
+  payload.dataHash=await sha256(stableStringify({reportType,reportInfo,monthlySummary,monthlyKpi,riskUsers,teamSummary:payload.teamSummary||[],analysisLevel:payload.analysisLevel||null,analysisGuide:payload.analysisGuide||null,trend,hiringInput:payload.hiringInput,additionalUserData:payload.additionalUserData||null,additionalDataRequested:payload.additionalDataRequested||[]}));
   payload.reportKey=`attendance:${reportType}:${reportInfo.scope}:${reportInfo.month}:${reportInfo.periodMode}:${payload.dataHash}`;
   return payload;
 }
@@ -11346,7 +11360,15 @@ function renderFixedHeader(label,title,info){return `<div class="fixedReportHead
 function renderFixedFooter(){return `<div class="fixedPrintFooter"><span>Attendance Report</span><span class="fixedPageNumber"></span></div>`;}
 function renderFixedBars(items){const max=Math.max(1,...items.map(i=>Number(i.value||0)));return items.map(i=>`<div class="fixedBarRow"><div class="fixedBarLabel">${esc(i.label)}</div><div class="fixedBarBg"><div class="fixedBar ${i.tone||''}" style="width:${fixedPct(i.value,max)}%"></div></div><div class="fixedBarVal">${esc(i.display??fixedNum(i.value))}</div></div>`).join('');}
 function renderFixedRiskTable(users){const rows=(users||[]).slice(0,8).map((p,i)=>`<tr><td>${i+1}</td><td><b>${esc(p.name||'-')}</b><br><span style="color:#64748b;font-size:11px">${esc(p.division||'')} ${esc(p.team||'')}</span></td><td><span class="fixedPill ${fixedStatusClass(p.status)}">${esc(p.status||'확인')}</span></td><td>${fixedNum(p.riskScore||p.score||0)}</td><td>${esc((p.issues||[]).join(' · ')||p.trend||'확인 필요')}</td></tr>`).join('');return `<table class="fixedTable"><thead><tr><th>순위</th><th>담당자</th><th>상태</th><th>점수</th><th>확인 필요사항</th></tr></thead><tbody>${rows||'<tr><td colspan="5">표시할 위험/주의 담당자 데이터가 없습니다.</td></tr>'}</tbody></table>`;}
-function renderFixedTrendChart(trend,info){const months=trend?.months||[],risks=trend?.riskCount||[],warns=trend?.warningCount||[];const values=months.map((m,i)=>Number(risks[i]||0)+Number(warns[i]||0));const max=Math.max(1,...values);return `<div class="fixedChartBox"><div class="fixedChartTitle">월별 위험·주의 인원 흐름</div><div class="fixedChartMock">${months.length?months.map((m,i)=>`<div class="fixedMonthGroup"><div class="fixedMonthBar ${m===info.selectedYm||i===months.length-1?'active':''}" style="height:${fixedPct(values[i],max)}%">${fixedNum(values[i])}</div><div class="fixedMonthLabel">${esc(m)}</div></div>`).join(''):'<div class="fixedBlockText">추세 데이터가 충분하지 않아 기준점으로만 표시합니다.</div>'}</div></div>`;}
+function renderFixedTeamTable(teams){
+  const rows=(teams||[]).slice(0,8).map((t,i)=>{
+    const status=t.risk>0?'위험':(t.warning>0?'주의':'정상');
+    const need=t.risk>0?'위험 팀 우선 점검':(t.warning>0?'주의 팀 모니터링':'안정 상태');
+    return `<tr><td>${i+1}</td><td><b>${esc(t.team||'-')}</b><br><span style="color:#64748b;font-size:11px">${esc(t.division||'')}</span></td><td>${fixedNum(t.risk||0)}명</td><td>${fixedNum(t.warning||0)}명</td><td>${fixedNum(t.avgScore||0,1)}</td><td>${esc(need)}</td></tr>`;
+  }).join('');
+  return `<table class="fixedTable"><thead><tr><th>순위</th><th>팀 / 본부</th><th>위험</th><th>주의</th><th>평균점수</th><th>확인 필요사항</th></tr></thead><tbody>${rows||'<tr><td colspan="6">표시할 팀별 리스크 데이터가 없습니다.</td></tr>'}</tbody></table>`;
+}
+function renderFixedTrendChartfunction renderFixedTrendChart(trend,info){const months=trend?.months||[],risks=trend?.riskCount||[],warns=trend?.warningCount||[];const values=months.map((m,i)=>Number(risks[i]||0)+Number(warns[i]||0));const max=Math.max(1,...values);return `<div class="fixedChartBox"><div class="fixedChartTitle">월별 위험·주의 인원 흐름</div><div class="fixedChartMock">${months.length?months.map((m,i)=>`<div class="fixedMonthGroup"><div class="fixedMonthBar ${m===info.selectedYm||i===months.length-1?'active':''}" style="height:${fixedPct(values[i],max)}%">${fixedNum(values[i])}</div><div class="fixedMonthLabel">${esc(m)}</div></div>`).join(''):'<div class="fixedBlockText">추세 데이터가 충분하지 않아 기준점으로만 표시합니다.</div>'}</div></div>`;}
 function parseReportMonthParts(raw){
   const s=String(raw||'').trim();
   let m=s.match(/(\d{4})[-.\/년\s]*(\d{1,2})/);
@@ -11464,8 +11486,10 @@ function buildTeamSummaryForReport(payload){
 }
 function enrichAttendanceReportPayloadForAnalysis(payload){
   const next = { ...(payload || {}) };
-  const analysisLevel = inferAttendanceAnalysisLevel(next);
-  const teamSummary = buildTeamSummaryForReport(next);
+  const analysisLevel = next.analysisLevel || inferAttendanceAnalysisLevel(next);
+  const teamSummary = Array.isArray(next.teamSummary) && next.teamSummary.length
+    ? next.teamSummary
+    : buildTeamSummaryForReport(next);
 
   next.analysisLevel = analysisLevel;
   next.teamSummary = teamSummary;
@@ -11488,6 +11512,14 @@ function getFixedReportComparisonLabel(payload){
 function renderFixedAttendanceReport(payload,aiHtml){
   if(!payload||payload.reportType==='hiring')return aiHtml||fallbackReportHtml(payload||{});
   const info=payload.reportInfo||{},d=payload.data||{},sum=payload.monthlySummary||{},kpi=payload.monthlyKpi||{},trend=payload.trend||{},users=payload.riskUsers||[];
+  const analysisLevel=payload.analysisLevel||inferAttendanceAnalysisLevel(payload);
+  const isTeamComparisonReport=analysisLevel==='organization'||analysisLevel==='division';
+  const teamRows=Array.isArray(payload.teamSummary)?payload.teamSummary:[];
+  const comparison=getFixedReportComparisonLabel({...payload,analysisLevel});
+  const riskTableHtml=isTeamComparisonReport?renderFixedTeamTable(teamRows):renderFixedRiskTable(users);
+  const focusTarget=isTeamComparisonReport?'팀':'담당자';
+  const focusTargetText=isTeamComparisonReport?'팀별 위험·주의 집중도':'담당자별 위험·주의 흐름';
+  const concentrationNote=isTeamComparisonReport?'특정 팀 집중형':'특정 인원 집중형';
   const monthText=info.month||d.period||'해당월';
   const monthKo=formatReportFullMonthTitle(info.selectedYm||info.monthKey||d.selectedYm||d.periodKey||monthText);
   const total=sum.totalEmployees||d?.scopedSummary?.employeeCount||0;
@@ -11495,21 +11527,21 @@ function renderFixedAttendanceReport(payload,aiHtml){
   const story=(()=>{try{if(aiHtml&&typeof aiHtml==='object')return aiHtml;const raw=String(aiHtml||'').trim();if(!raw)return{};const cleaned=cleanAiText(raw);const target=(cleaned.match(/\{[\s\S]*\}/)||[cleaned])[0];const parsed=JSON.parse(target);return parsed&&typeof parsed==='object'?parsed:{};}catch(e){return{};}})();
   const storySections=(story&&story.sections&&typeof story.sections==='object')?story.sections:{};
   const pickStoryText=(...vals)=>vals.map(v=>v==null?'':String(v).trim()).find(Boolean)||'';
-  const frameText=pickStoryText(story.intro,storySections.intro,story.frame,story.analysisFrame,`${monthText} 데이터는 단순 평균 비교보다 위험·주의 인원이 특정 담당자에게 집중되는지 확인하는 관점으로 해석합니다.`);
+  const frameText=pickStoryText(story.intro,storySections.intro,story.frame,story.analysisFrame,`${monthText} 데이터는 단순 평균 비교보다 위험·주의 인원이 특정 ${focusTarget}에 집중되는지 확인하는 관점으로 해석합니다.`);
   const statusText=pickStoryText(story.status,storySections.status,getAiSentence(aiHtml,0,`${monthText} 기준 위험 인원 ${risk}명, 주의 인원 ${warn}명으로 확인됩니다. 현재 수치는 업무 집중과 근무시간 편중 가능성을 검토하기 위한 기준점으로 보는 것이 적절합니다.`));
   const ai1=pickStoryText(story.judge,storySections.judge,story.currentJudge,getAiSentence(aiHtml,1,`${monthText} 기준 위험 인원 ${risk}명, 주의 인원 ${warn}명으로 확인됩니다. 현재 수치는 업무 집중과 근무시간 편중 가능성을 검토하기 위한 기준점으로 보는 것이 적절합니다.`));
   const reasonText=pickStoryText(story.reason,storySections.reason,story.evidence,getAiSentence(aiHtml,2,`연장근무, 공휴일근무, 평균 연장시간, 위험 인원 지표를 함께 비교하여 업무 집중 또는 관리 확인이 필요한 구간을 파악합니다.`));
   const ai2=pickStoryText(story.trendStory,storySections.trendStory,story.trend,story.trendJudge,getAiSentence(aiHtml,3,`월별 흐름은 누적 데이터가 충분할수록 의미가 커지며, 현재는 기준월의 위험·주의 인원과 연장근무 흐름을 함께 확인하는 단계입니다.`));
   const ai3=pickStoryText(story.causeStory,storySections.causeStory,story.cause,story.summary,story.opinion,getAiSentence(aiHtml,4,`원인 가능성은 특정 개인의 문제로 단정하기보다 업무 집중, 근무 시간 편중, 휴식 부족 가능성을 함께 검토하는 방식이 적절합니다.`));
-  const monitoringText=pickStoryText(story.monitoring,storySections.monitoring,`상위 위험·주의 담당자의 최근 업무 배정과 동일 지표 반복 여부를 다음 월 데이터에서 함께 확인합니다.`);
+  const monitoringText=pickStoryText(story.monitoring,storySections.monitoring,isTeamComparisonReport?`상위 위험·주의 팀의 업무량, 구성원 배치, 동일 지표 반복 여부를 다음 월 데이터에서 함께 확인합니다.`:`상위 위험·주의 담당자의 최근 업무 배정과 동일 지표 반복 여부를 다음 월 데이터에서 함께 확인합니다.`);
   const cautionList=Array.isArray(story.cautions)?story.cautions:(Array.isArray(storySections.cautions)?storySections.cautions:[]);
   const cautionText=cautionList.map(v=>String(v||'').trim()).filter(Boolean).join(' · ');
   let conclusion=pickStoryText(story.conclusion,storySections.conclusion,getAiSentence(aiHtml,5,`현재 기준으로는 추가적인 데이터 확인 및 운영 검토가 필요합니다.`));
   if(!String(conclusion).includes('현재 기준으로는 추가적인 데이터 확인 및 운영 검토가 필요합니다.'))conclusion=`${String(conclusion).replace(/\s+$/,'')}
 현재 기준으로는 추가적인 데이터 확인 및 운영 검토가 필요합니다.`;
-  const issueTitle=pickStoryText(story.issueTitle,storySections.issueTitle,story.mainIssueTitle,'담당자 리스크 흐름');
-  const issueDescription=pickStoryText(story.issueDescription,storySections.issueDescription,story.riskFlowStory,storySections.riskFlowStory,story.issueStory,`담당자별 리스크 흐름은 특정 인원이 반복적으로 위험 상태에 머무르는지, 또는 주의 단계에서 위험 단계로 전환되는지를 확인하기 위한 영역입니다. 현재 기준에서는 일부 인원에서 리스크 징후가 관찰되고 있어, 다음 월 데이터에서 동일한 흐름이 반복되는지 확인이 필요합니다.`);
-  const causeIntro=pickStoryText(story.causeIntro,storySections.causeIntro,story.causeLead,`현재 확인되는 흐름은 특정 개인에게 업무 부담이 집중되었거나, 일부 업무가 특정 기간에 몰리면서 리스크 점수가 높아졌을 가능성이 있습니다. 다만 단일 월 기준에서는 원인을 확정하기 어렵기 때문에 연장근무, 휴식 사용, 출퇴근 누락 등 세부 지표를 함께 확인하는 방식이 필요합니다.`);
+  const issueTitle=pickStoryText(story.issueTitle,storySections.issueTitle,story.mainIssueTitle,isTeamComparisonReport?'팀별 리스크 집중도':'담당자 리스크 흐름');
+  const issueDescription=pickStoryText(story.issueDescription,storySections.issueDescription,story.riskFlowStory,storySections.riskFlowStory,story.issueStory,isTeamComparisonReport?`팀별 리스크 집중도는 위험·주의 인원이 특정 팀에 몰려 있는지, 또는 여러 팀에 분산되어 있는지를 확인하기 위한 영역입니다. 현재 기준에서는 팀별 위험·주의 편차를 통해 업무량 배분, 구성원 운영, 관리 우선순위를 검토하는 것이 필요합니다.`:`담당자별 리스크 흐름은 특정 인원이 반복적으로 위험 상태에 머무르는지, 또는 주의 단계에서 위험 단계로 전환되는지를 확인하기 위한 영역입니다. 현재 기준에서는 일부 인원에서 리스크 징후가 관찰되고 있어, 다음 월 데이터에서 동일한 흐름이 반복되는지 확인이 필요합니다.`);
+  const causeIntro=pickStoryText(story.causeIntro,storySections.causeIntro,story.causeLead,isTeamComparisonReport?`현재 확인되는 흐름은 특정 팀에 업무 부담이 집중되었거나, 팀별 업무 특성 차이로 인해 위험·주의 지표가 다르게 나타났을 가능성이 있습니다. 다만 단일 월 기준에서는 원인을 확정하기 어렵기 때문에 팀별 업무량, 프로젝트 일정, 연장근무, 휴식 사용 등 세부 지표를 함께 확인하는 방식이 필요합니다.`:`현재 확인되는 흐름은 특정 개인에게 업무 부담이 집중되었거나, 일부 업무가 특정 기간에 몰리면서 리스크 점수가 높아졌을 가능성이 있습니다. 다만 단일 월 기준에서는 원인을 확정하기 어렵기 때문에 연장근무, 휴식 사용, 출퇴근 누락 등 세부 지표를 함께 확인하는 방식이 필요합니다.`);
   const cause1Title=pickStoryText(story.cause1Title,storySections.cause1Title,'가능 원인 1 · 업무 집중');
   const cause1Text=pickStoryText(story.cause1Text,storySections.cause1Text,ai3);
   const cause2Title=pickStoryText(story.cause2Title,storySections.cause2Title,'가능 원인 2 · 휴식 부족');
@@ -11541,7 +11573,7 @@ function renderFixedAttendanceReport(payload,aiHtml){
     <div class="fixedFrameCards">
       <div class="fixedFrameCard"><div class="k">분석 기준</div><div class="v">${esc(monthKo)} 단일월</div></div>
       <div class="fixedFrameCard"><div class="k">보고 구성</div><div class="v">해당월 현황 + 트렌드</div></div>
-      <div class="fixedFrameCard"><div class="k">주요 관점</div><div class="v">리스크 집중 여부</div></div>
+      <div class="fixedFrameCard"><div class="k">주요 관점</div><div class="v">${esc(focusTargetText)}</div></div>
       <div class="fixedFrameCard"><div class="k">판단 방식</div><div class="v">추후 확인형</div></div>
     </div>
     <div class="fixedSectionBadge green">1부 · 해당월 현황</div>
@@ -11551,7 +11583,7 @@ function renderFixedAttendanceReport(payload,aiHtml){
       <div class="fixedMetaCard red"><div class="k">위험 인원</div><div class="v">${fixedNum(risk)}명</div><div class="s">집중 관리 후보</div></div>
       <div class="fixedMetaCard amber"><div class="k">주의 인원</div><div class="v">${fixedNum(warn)}명</div><div class="s">반복 여부 확인</div></div>
       <div class="fixedMetaCard green"><div class="k">정상 인원</div><div class="v">${fixedNum(normal)}명</div><div class="s">전체 ${fixedNum(total)}명 기준</div></div>
-      <div class="fixedMetaCard blue"><div class="k">월간 판단</div><div class="v">${risk>0?'부분 집중':'안정'}</div><div class="s">전사적 위험보다 특정 인원 집중형</div></div>
+      <div class="fixedMetaCard blue"><div class="k">월간 판단</div><div class="v">${risk>0?'부분 집중':'안정'}</div><div class="s">${esc(concentrationNote)}</div></div>
     </div>
     <div class="fixedStoryFlow">
       <div class="fixedStoryBox judge"><div class="fixedStoryLabel">핵심 판단 및 판단 근거</div><div class="fixedStoryText">${esc(`${ai1}
@@ -11559,7 +11591,7 @@ function renderFixedAttendanceReport(payload,aiHtml){
 ${reasonText}`)}</div></div>
     </div>
     <div class="fixedEvidenceSectionTitle">해당월 리스크 근거</div>
-    <div class="fixedGrid2"><div class="fixedEvidence"><div class="fixedEvidenceTitle">리스크 근거 시각화</div>${renderFixedBars(barItems)}</div><div class="fixedEvidence"><div class="fixedEvidenceTitle">담당자 리스크 요약</div>${renderFixedRiskTable(users)}</div></div>
+    <div class="fixedGrid2"><div class="fixedEvidence"><div class="fixedEvidenceTitle">리스크 근거 시각화</div>${renderFixedBars(barItems)}</div><div class="fixedEvidence"><div class="fixedEvidenceTitle">${esc(comparison.tableTitle)}</div>${riskTableHtml}</div></div>
     <div class="fixedTailNote">해당월 기준으로는 위험 인원이 전체를 대표한다고 보기 어렵지만, 연장근무와 입력 부수성 지표가 함께 나타나는 경우 실제 업무 집중, 근무시간 편중, 예외 근무 반영 여부를 함께 검토할 필요가 있습니다.</div>
     ${renderFixedFooter()}
   </section>
@@ -11570,10 +11602,10 @@ ${reasonText}`)}</div></div>
     <p class="fixedCurrentLead">${esc(ai2)}</p>
     <div class="fixedMetaCards"><div class="fixedMetaCard red"><div class="k">기준월 위험</div><div class="v">${fixedNum(risk)}</div><div class="s">위험 상태</div></div><div class="fixedMetaCard amber"><div class="k">기준월 주의</div><div class="v">${fixedNum(warn)}</div><div class="s">주의 상태</div></div><div class="fixedMetaCard blue"><div class="k">기간 기준</div><div class="v">${fixedNum((trend.months||[]).length)}</div><div class="s">표시 월 수</div></div><div class="fixedMetaCard green"><div class="k">평균 연장</div><div class="v">${fixedNum(sum.averageOvertimeHours||kpi.averageOvertimeHours||0,1)}</div><div class="s">시간/인</div></div></div>
     ${renderFixedTrendChart(trend,info)}
-    <div class="fixedGrid3"><div class="fixedMiniNote"><b>현재 판단</b><br>${esc(ai2)}</div><div class="fixedMiniNote"><b>다음 확인</b><br>동일 인원이 반복적으로 상위권에 남는지 확인합니다.</div><div class="fixedMiniNote"><b>관리 포인트</b><br>${esc(monitoringText)}</div></div>
+    <div class="fixedGrid3"><div class="fixedMiniNote"><b>현재 판단</b><br>${esc(ai2)}</div><div class="fixedMiniNote"><b>다음 확인</b><br>${esc(isTeamComparisonReport?'동일 팀이 반복적으로 상위권에 남는지 확인합니다.':'동일 인원이 반복적으로 상위권에 남는지 확인합니다.')}</div><div class="fixedMiniNote"><b>관리 포인트</b><br>${esc(monitoringText)}</div></div>
     <div class="fixedCurrentTitle" style="font-size:20px;margin-top:20px">${esc(issueTitle)}</div>
     <p class="fixedCurrentLead">${esc(issueDescription)}</p>
-    ${renderFixedRiskTable(users)}
+    ${riskTableHtml}
     ${renderFixedFooter()}
   </section>
   <section class="fixedReportPage">
@@ -11598,6 +11630,7 @@ async function requestAiReport(reportType,forceRegenerate,options){
   if(!host)return;
   currentReportKind=reportType;
   currentReportPayload=await buildServerPayload(reportType,{includeAdditionalData:!!options.includeAdditionalData});
+  currentReportPayload=enrichAttendanceReportPayloadForAnalysis(currentReportPayload);
   const title=document.getElementById('attendanceReportModalTitle'),desc=document.getElementById('attendanceReportModalDesc'),mode=document.getElementById('attendanceReportModeLabel');
   if(title)title.textContent=reportType==='hiring'?'충원 검토 보고서':'근태 분석 보고서';
   if(desc)desc.textContent=reportType==='hiring'?'충원 입력값과 현재 근태 데이터를 함께 분석해 보고서를 불러오거나 다시 생성합니다.':'월별 진단과 트렌드 데이터를 기반으로 보고서를 불러오거나 다시 생성합니다.';
