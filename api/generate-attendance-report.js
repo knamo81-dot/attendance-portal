@@ -94,8 +94,9 @@ function makeDataHash(payload = {}) {
     monthlyKpi: payload.monthlyKpi || null,
     riskUsers: payload.riskUsers || [],
     teamSummary: payload.teamSummary || [],
-    analysisLevel: payload.analysisLevel || null,
+    analysisLevel,
     analysisGuide: payload.analysisGuide || null,
+    analysisModeGuide,
     trend: payload.trend || null,
     visualDecisionHints: payload.visualDecisionHints || null,
     constraints: payload.constraints || null,
@@ -209,9 +210,51 @@ function parseSavedStory(value) {
   }
 }
 
+
+function normalizeAnalysisLevel(payload = {}) {
+  const level = String(payload.analysisLevel || payload?.analysisGuide?.analysisLevel || '').trim();
+  if (level === 'organization' || level === 'division' || level === 'team') return level;
+  const scope = String(payload?.reportInfo?.scope || payload?.data?.scope || '').trim();
+  if (scope.includes('팀')) return 'team';
+  if (scope.includes('본부') || scope.includes('연구소')) return 'division';
+  return 'organization';
+}
+
+function buildAnalysisModeGuide(payload = {}) {
+  const analysisLevel = normalizeAnalysisLevel(payload);
+  const teamSummary = Array.isArray(payload.teamSummary) ? payload.teamSummary : [];
+  const riskUsers = Array.isArray(payload.riskUsers) ? payload.riskUsers : [];
+
+  if (analysisLevel === 'team') {
+    return `
+[이번 보고서의 실제 분석 모드: 담당자 분석]
+- 현재 선택 범위는 팀 단위입니다.
+- 보고서의 중심 대상은 "담당자"입니다.
+- riskUsers를 우선 사용해 담당자별 위험/주의 흐름, 반복 가능성, 관리 우선순위를 작성하세요.
+- 팀 간 비교, 팀별 순위, 팀별 리스크 집중도 표현은 작성하지 마세요.
+- 개인 이름은 riskUsers에 제공된 담당자만 언급할 수 있습니다.
+- 제공된 담당자 수: ${riskUsers.length}명
+`;
+  }
+
+  return `
+[이번 보고서의 실제 분석 모드: 팀 분석]
+- 현재 선택 범위는 ${analysisLevel === 'division' ? '본부/연구소' : '전체 조직'} 단위입니다.
+- 보고서의 중심 대상은 "담당자 개인"이 아니라 "팀"입니다.
+- 반드시 teamSummary를 우선 사용해 팀별 위험/주의 인원, 평균점수, 팀 간 편차, 특정 팀 집중 여부를 작성하세요.
+- riskUsers는 팀별 집계를 설명하기 위한 보조 근거로만 사용하고, 특정 개인 이름은 꼭 필요한 경우가 아니면 언급하지 마세요.
+- 표제, issueTitle, status, judge, reason, trendStory, summaryOpinion 모두 팀 비교 관점으로 작성하세요.
+- "담당자 리스크 흐름", "개인별 위험", "특정 담당자" 중심 표현은 피하고, "팀별 리스크 집중도", "팀 간 편차", "조직 단위 관리 우선순위" 중심으로 표현하세요.
+- teamSummary가 비어 있으면 팀 분석을 억지로 단정하지 말고 additionalDataNeeded에 "팀/본부 매칭 가능한 직원 마스터 데이터"를 포함하세요.
+- 제공된 팀 요약 수: ${teamSummary.length}개
+`;
+}
+
 function buildStoryPrompt(payload) {
   const reportType = String(payload.reportType || '').trim();
   const isHiring = reportType === 'hiring';
+  const analysisLevel = normalizeAnalysisLevel(payload);
+  const analysisModeGuide = buildAnalysisModeGuide(payload);
 
   const dataForPrompt = {
     reportType: payload.reportType || null,
@@ -254,10 +297,13 @@ function buildStoryPrompt(payload) {
 - 위험/주의 인원, 특정 팀 또는 담당자 집중 여부, 전월/누적 비교 가능 여부를 우선 검토하세요.
 - 데이터가 1개월뿐이면 장기 추세를 단정하지 말고 "기준점", "향후 누적 관찰 필요"로 표현하세요.
 
-[선택 범위별 분석 기준]
-- analysisLevel이 "organization"이면 전체 조직 기준 보고서입니다. 담당자 개인보다 teamSummary를 우선 사용해 팀 간 비교, 팀별 위험/주의 집중도, 본부별 소속 표기를 중심으로 작성하세요.
-- analysisLevel이 "division"이면 본부 또는 연구소 기준 보고서입니다. 해당 본부/연구소 소속 팀만 비교하는 관점으로 작성하고, 팀별 차이를 중심으로 해석하세요.
-- analysisLevel이 "team"이면 팀 기준 보고서입니다. 팀 간 비교는 수행하지 말고 riskUsers를 사용해 담당자별 위험/주의 흐름, 업무 집중 가능성, 단기 관리 방향을 중심으로 작성하세요.
+[선택 범위별 분석 기준 - 반드시 준수]
+- analysisLevel은 보고서의 분석 단위를 결정하는 최우선 기준입니다.
+- analysisLevel이 "organization"이면 전체 조직 기준 보고서입니다. 이 경우 담당자 개인 분석이 아니라 teamSummary 기반의 "팀 간 비교 분석"을 작성하세요.
+- analysisLevel이 "division"이면 본부 또는 연구소 기준 보고서입니다. 이 경우 해당 본부/연구소 소속 팀만 대상으로 "팀 간 비교 분석"을 작성하세요.
+- analysisLevel이 "team"이면 팀 기준 보고서입니다. 이 경우 팀 간 비교는 금지하고 riskUsers 기반의 "담당자 분석"을 작성하세요.
+- organization/division 보고서에서는 status, judge, reason, trendStory, issueTitle, issueDescription, summaryOpinion에 반드시 팀별 비교 관점을 포함하세요.
+- organization/division 보고서에서는 "담당자 리스크 요약", "개인별 위험 흐름" 같은 개인 중심 표현을 피하고, "팀별 리스크 집중도", "팀 간 편차", "팀 단위 관리 우선순위"로 표현하세요.
 - teamSummary가 제공된 경우 팀명은 가능한 한 "팀명(본부명)" 형식으로 언급하세요. 단, 동일 본부 내 비교에서는 첫 문단에서 본부 기준임을 밝히고 이후에는 팀명만 사용해도 됩니다.
 - 전체/본부 보고서에서 특정 담당자 이름은 꼭 필요한 경우에만 제한적으로 언급하고, 기본적으로 팀 단위 판단을 우선하세요.
 
@@ -280,6 +326,8 @@ function buildStoryPrompt(payload) {
     return `당신은 연구소 근태/인력운영 데이터를 해석해 충원 검토 보고서의 스토리 문장을 작성하는 분석가입니다.
 
 ${commonRules}
+
+${analysisModeGuide}
 
 [입력 데이터]
 ${JSON.stringify(dataForPrompt, null, 2)}
@@ -309,6 +357,8 @@ ${JSON.stringify(dataForPrompt, null, 2)}
 
 ${commonRules}
 
+${analysisModeGuide}
+
 [입력 데이터]
 ${JSON.stringify(dataForPrompt, null, 2)}
 
@@ -317,10 +367,10 @@ ${JSON.stringify(dataForPrompt, null, 2)}
 - 당신은 보고서 박스에 들어갈 "팀장급 이상 보고용 스토리 문장"만 작성합니다.
 - 데이터 나열이 아니라 "현재 상태 → 핵심 판단 → 근거 → 조직 영향 → 관리자 조치 방향"의 흐름으로 작성합니다.
 - riskUsers에 있는 담당자만 언급할 수 있습니다.
-- monthlySummary, monthlyKpi, riskUsers, teamSummary, analysisLevel, analysisGuide, trend를 우선 사용합니다.
-- analysisLevel이 organization 또는 division이면 teamSummary 기반의 팀 비교 분석을 우선 작성하세요.
-- analysisLevel이 team이면 riskUsers 기반의 담당자 분석을 우선 작성하세요.
-- 위험/주의 인원이 특정 팀, 담당자, 업무 흐름에 집중되는지 우선 판단하세요.
+- monthlySummary, monthlyKpi, riskUsers, teamSummary, analysisLevel, analysisGuide, analysisModeGuide, trend를 우선 사용합니다.
+- analysisLevel이 organization 또는 division이면 teamSummary 기반의 팀 비교 분석을 최우선으로 작성하세요. 이 경우 riskUsers는 보조 근거입니다.
+- analysisLevel이 team이면 riskUsers 기반의 담당자 분석을 최우선으로 작성하세요. 이 경우 teamSummary는 보조 정보입니다.
+- 위험/주의 인원이 특정 팀 또는 담당자에 집중되는지 우선 판단하되, analysisLevel에 맞는 단위만 중심으로 작성하세요.
 - 각 섹션은 단순 설명이 아니라 관리자가 조치 여부를 판단할 수 있는 문장으로 작성하세요.
 - 데이터가 1개월뿐이면 장기 추세를 단정하지 말고 기준점 또는 추후 누적 확인으로 표현합니다.
 
@@ -332,9 +382,9 @@ ${JSON.stringify(dataForPrompt, null, 2)}
     "tone": "management_report"
   },
   "intro": "분석 기준, 보고 구성, 주요 관점, 판단 방식을 연결하는 도입 문장",
-  "status": "해당월 현재 상태 요약. 수치의 의미와 관리자가 봐야 할 포인트를 포함해 3~5문장으로 작성",
-  "judge": "이번 보고서의 핵심 판단 한 단락. 문제 수준, 긴급도, 관리 우선순위를 포함해 3~5문장으로 작성",
-  "reason": "핵심 판단의 데이터 근거 설명. 단순 수치 반복이 아니라 왜 해당 판단이 가능한지 3~5문장으로 작성",
+  "status": "해당월 현재 상태 요약. organization/division이면 팀별 분포와 팀 간 편차를 중심으로, team이면 담당자별 흐름을 중심으로 3~5문장 작성",
+  "judge": "이번 보고서의 핵심 판단 한 단락. analysisLevel에 맞춰 팀 단위 또는 담당자 단위의 문제 수준, 긴급도, 관리 우선순위를 포함해 3~5문장으로 작성",
+  "reason": "핵심 판단의 데이터 근거 설명. organization/division이면 teamSummary의 팀별 위험/주의/평균점수를 근거로, team이면 riskUsers를 근거로 3~5문장 작성",
   "trendStory": "2부 도입 설명. 해당 월을 기준점으로 트렌드를 어떻게 읽어야 하는지 3~5문장으로 작성",
   "issueTitle": "이번 데이터에서 AI가 주요 이슈로 판단한 동적 제목. 전체/본부 기준이면 팀별 리스크 집중도, 팀 간 편차, 조직 전반 리스크 확산 등을 우선하고, 팀 기준이면 담당자 리스크 흐름, 연장근무 증가 패턴 등을 우선",
   "issueDescription": "issueTitle에 대한 설명. analysisLevel에 맞춰 팀 비교 또는 담당자 분석 관점으로 왜 이 이슈를 봐야 하는지 3~5문장으로 작성",
@@ -373,7 +423,7 @@ async function callOpenAI(payload) {
       model: OPENAI_MODEL,
       input: buildStoryPrompt(payload),
       temperature: 0.2,
-      max_output_tokens: 2600,
+      max_output_tokens: 3200,
     }),
   });
 
