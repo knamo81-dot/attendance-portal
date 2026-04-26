@@ -1114,6 +1114,27 @@ html.embed-mode #main-dashboard .kpis{
 .attReportBox{background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:15px;margin-top:12px}
 @media(max-width:900px){.attReportCards,.attReportGrid2{grid-template-columns:1fr 1fr}.attReportDoc{padding:24px}.reportPreviewWrap{padding:12px}}
 @media(max-width:640px){.attReportCards,.attReportGrid2{grid-template-columns:1fr}.reportModalBg{padding:10px}.reportModalTop{flex-direction:column}.reportModalActions{justify-content:flex-start}.attReportHeaderTitle{font-size:23px}}
+
+/* ===== AI additional data confirmation panel ===== */
+.reportAdditionalPanel{margin:14px 20px 0;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:18px;padding:16px;display:none}
+.reportAdditionalPanel.show{display:block}
+.reportAdditionalHead{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:12px}
+.reportAdditionalTitle{font-size:15px;font-weight:900;color:#166534;margin-bottom:4px}
+.reportAdditionalDesc{font-size:12px;line-height:1.55;color:#15803d;font-weight:700}
+.reportAdditionalGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.reportAdditionalItem{border:1px solid #bbf7d0;background:#fff;border-radius:14px;padding:12px}
+.reportAdditionalItem label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:900;color:#0f172a;margin-bottom:8px}
+.reportAdditionalItem input[type="checkbox"]{width:16px;height:16px;accent-color:#16a34a}
+.reportAdditionalItem textarea,.reportAdditionalMemo{width:100%;border:1px solid #cbd5e1;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.5;resize:vertical;background:#fff;color:#0f172a}
+.reportAdditionalMemoWrap{margin-top:12px}
+.reportAdditionalMemoLabel{font-size:12px;font-weight:900;color:#166534;margin-bottom:6px}
+.reportAdditionalActions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px}
+.reportAdditionalBtn{border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:13px;font-weight:900;padding:10px 14px;cursor:pointer;box-shadow:0 6px 16px rgba(22,163,74,.18)}
+.reportAdditionalBtn:hover{background:#15803d}
+.reportAdditionalBtn.secondary{background:#fff;color:#166534;border:1px solid #bbf7d0;box-shadow:none}
+.fixedAdditionalData{margin-top:12px;padding:12px 14px;border:1px dashed #86efac;background:#f0fdf4;border-radius:14px;color:#166534;font-size:11px;line-height:1.55}
+@media(max-width:900px){.reportAdditionalGrid{grid-template-columns:1fr}.reportAdditionalHead{flex-direction:column}.reportAdditionalActions{justify-content:flex-start}}
+
 @media print{.reportModalTop,.reportSettings{display:none!important}.reportPreviewWrap{padding:0;background:#fff;max-height:none;overflow:visible}.attReportDoc{box-shadow:none;border:none;border-radius:0;max-width:none}.attReportDoc h2,.attReportChart,.attReportCards,.attReportTable{break-inside:avoid}}
 
 
@@ -1372,6 +1393,7 @@ html.embed-mode #main-dashboard .kpis{
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
+<!-- final build: additional data regeneration flow verified -->
 </head>
 <body>
 <script>
@@ -11019,17 +11041,75 @@ async function refreshAdminUploadManagement(forceYearReload = false){
     </div>
     <div class="reportSettings"><span id="attendanceReportModeLabel" class="reportModePill" style="cursor:default">보고서</span><span class="reportModePill" style="cursor:default">기존 보고서 불러오기: 서버 저장본 조회</span><span class="reportModePill" style="cursor:default">보고서 다시 생성: 최신 양식으로 강제 생성</span></div>
     <div id="attendanceReportStatus" class="reportAiStatus">보고서 요청 대기 중입니다.</div>
+    <div id="attendanceAdditionalDataPanel" class="reportAdditionalPanel" aria-hidden="true"></div>
     <div class="reportPreviewWrap"><div id="attendanceReportPreview" class="attReportDoc fixedReportDoc"></div></div>
   </div>
 </div>
 <script>
 (function(){
-let currentReportKind='monthly_trend', currentReportPayload=null;
+let currentReportKind='monthly_trend', currentReportPayload=null, currentReportStory=null, currentAdditionalDataNeeded=[];
 function esc(v){return String(v??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));}
 function safeCall(fn,fallback){try{return typeof fn==='function'?fn():fallback;}catch(e){console.warn('ai report safeCall',e);return fallback;}}
 async function sha256(text){try{const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}catch(e){return String(text.length)+'_'+Date.now();}}
 function stableStringify(obj){const seen=new WeakSet();const sort=v=>{if(v&&typeof v==='object'){if(seen.has(v))return null;seen.add(v);if(Array.isArray(v))return v.map(sort);return Object.keys(v).sort().reduce((a,k)=>(a[k]=sort(v[k]),a),{});}return v;};return JSON.stringify(sort(obj));}
 function setStatus(text,tone){const el=document.getElementById('attendanceReportStatus');if(!el)return;el.className='reportAiStatus'+(tone?' '+tone:'');el.textContent=text;}
+
+function normalizeAdditionalDataNeeded(story){
+  const raw=story&&typeof story==='object'?(story.additionalDataNeeded||story.additionalDataRequests||story.additionalRequests||story.requiredAdditionalData):null;
+  if(!Array.isArray(raw))return[];
+  return raw.map((v,i)=>{
+    if(v&&typeof v==='object')return String(v.title||v.name||v.label||v.item||v.question||`추가 확인 자료 ${i+1}`).trim();
+    return String(v||'').trim();
+  }).filter(Boolean).slice(0,8);
+}
+function hideAdditionalDataPanel(){
+  const panel=document.getElementById('attendanceAdditionalDataPanel');
+  if(!panel)return;
+  panel.classList.remove('show');
+  panel.setAttribute('aria-hidden','true');
+  panel.innerHTML='';
+}
+function renderAdditionalDataPanel(story){
+  const panel=document.getElementById('attendanceAdditionalDataPanel');
+  if(!panel)return;
+  const list=normalizeAdditionalDataNeeded(story);
+  currentAdditionalDataNeeded=list;
+  if(!list.length){hideAdditionalDataPanel();return;}
+  panel.classList.add('show');
+  panel.setAttribute('aria-hidden','false');
+  panel.innerHTML=`
+    <div class="reportAdditionalHead">
+      <div>
+        <div class="reportAdditionalTitle">AI 추가 확인 필요 데이터</div>
+        <div class="reportAdditionalDesc">AI가 보고서 정확도를 높이기 위해 아래 자료 확인을 요청했습니다. 확인 여부와 메모를 입력한 뒤 재생성하면 해당 내용이 보고서 프롬프트에 함께 전달됩니다.</div>
+      </div>
+      <button id="attendanceAdditionalClearBtn" class="reportAdditionalBtn secondary" type="button">입력 초기화</button>
+    </div>
+    <div class="reportAdditionalGrid">
+      ${list.map((item,i)=>`<div class="reportAdditionalItem"><label><input type="checkbox" class="additionalCheck" data-additional-index="${i}"> ${esc(item)}</label><textarea class="additionalMemo" data-additional-index="${i}" rows="3" placeholder="확인 결과, 보유 자료, 해석에 반영할 내용 등을 입력하세요."></textarea></div>`).join('')}
+    </div>
+    <div class="reportAdditionalMemoWrap"><div class="reportAdditionalMemoLabel">공통 메모</div><textarea id="attendanceAdditionalGeneralMemo" class="reportAdditionalMemo" rows="3" placeholder="추가자료 전반에 대한 공통 의견이나 보고서에 반영할 관리 판단을 입력하세요."></textarea></div>
+    <div class="reportAdditionalActions"><button id="attendanceAdditionalRegenerateBtn" class="reportAdditionalBtn" type="button">추가자료 반영 후 보고서 재생성</button></div>`;
+  const regen=document.getElementById('attendanceAdditionalRegenerateBtn');
+  if(regen)regen.addEventListener('click',()=>requestAiReport(currentReportKind,true,{includeAdditionalData:true}));
+  const clear=document.getElementById('attendanceAdditionalClearBtn');
+  if(clear)clear.addEventListener('click',()=>{panel.querySelectorAll('input[type="checkbox"]').forEach(el=>el.checked=false);panel.querySelectorAll('textarea').forEach(el=>el.value='');});
+}
+function collectAdditionalUserData(){
+  const panel=document.getElementById('attendanceAdditionalDataPanel');
+  if(!panel||!panel.classList.contains('show'))return null;
+  const list=Array.isArray(currentAdditionalDataNeeded)?currentAdditionalDataNeeded:[];
+  const items=list.map((title,i)=>{
+    const checked=!!panel.querySelector(`.additionalCheck[data-additional-index="${i}"]`)?.checked;
+    const memo=String(panel.querySelector(`.additionalMemo[data-additional-index="${i}"]`)?.value||'').trim();
+    return {title,confirmed:checked,memo};
+  });
+  const generalMemo=String(document.getElementById('attendanceAdditionalGeneralMemo')?.value||'').trim();
+  const hasAny=items.some(v=>v.confirmed||v.memo)||!!generalMemo;
+  if(!hasAny)return null;
+  return {confirmedAt:new Date().toISOString(),source:'attendance-report-ui',items,generalMemo};
+}
+
 function reportParseYearMonth(label){const s=String(label||'').trim();let m=s.match(/(\d{4})[-.\/]?(\d{1,2})/);if(m)return{year:Number(m[1]),month:Number(m[2])};m=s.match(/(\d{2})[.\-/](\d{1,2})/);if(m)return{year:2000+Number(m[1]),month:Number(m[2])};return null;}
 function reportUploadDateFromPeriod(label){const ym=reportParseYearMonth(label);if(!ym)return new Date().toISOString().slice(0,10);let y=ym.year,mo=ym.month+1;if(mo>12){y+=1;mo=1;}return `${y}-${String(mo).padStart(2,'0')}-01`;}
 function compactTrendRows(rows){return(rows||[]).filter(Boolean).map(d=>({label:d.label||d.month||'',hasData:d.__hasData!==false,highRisk:Number(d.highRisk||0),warning:Number(d.warning||0),normal:Number(d.normal||0),avgRisk:Number(d.avgRisk||0),avgOvertimePerPerson:Number(d.avgOvertimePerPerson||0),totalOvertime:Number(d.totalOvertime||0),missingStart:Number(d.missingStart||0),missingEnd:Number(d.missingEnd||0),leaveUsageRate:Number(d.leaveUsageRate||0),workloadRisk:Number(d.workloadRisk||0),restRisk:Number(d.restRisk||0),holidayWorkCount:Number(d.holidayWorkCount||d.holidayWork||d.holiday||d.holiday_work_count||0)}));}
@@ -11037,7 +11117,9 @@ function buildReportCoreData(){const trendData=safeCall(window.trendBuildData,[]
 function getSelectedHiringEmployee(){const sel=document.getElementById('hiringEmployeeSelect');if(!sel||!sel.value)return null;try{return JSON.parse(decodeURIComponent(sel.value));}catch(e){return null;}}
 function buildHiringInput(){return{reason:document.getElementById('hiringReason')?.value||'퇴사/퇴사 예정',requestCount:Number(document.getElementById('hiringCount')?.value||1),neededDate:document.getElementById('hiringNeededDate')?.value||'',impact:document.getElementById('hiringImpact')?.value||'High',detail:document.getElementById('hiringDetail')?.value||'',employee:getSelectedHiringEmployee()};}
 function fallbackReportHtml(payload){const d=payload.data||{},h=payload.hiringInput;if(payload.reportType==='hiring'){const emp=h?.employee;return `<div class="attReportHeaderTitle">${esc(d.period)} 충원 검토 보고서</div><div class="attReportMeta">작성일자: ${esc(d.writtenDate)}<br>보고대상: ${esc(d.scope)}<br>충원사유: ${esc(h?.reason||'-')}</div><div class="attReportIntro"><p>API 또는 서버 저장소 연결이 실패하여 임시 보고서를 표시합니다. Vercel API와 환경변수를 설정하면 이 영역은 생성된 보고서로 대체됩니다.</p></div><h2>1. 충원 요청 개요</h2><p>요청 인원은 ${esc(h?.requestCount||1)}명이며 필요 시점은 ${esc(h?.neededDate||'-')}입니다. 업무 공백 영향도는 ${esc(h?.impact||'-')}입니다.</p><h2>2. 대상자 정보</h2><p>${emp?`${esc(emp.name)} / ${esc(emp.employeeNo||emp.id||'-')} / ${esc(emp.division||'-')} / ${esc(emp.team||'-')} / ${esc(emp.position||'-')}`:'선택된 대상자 없음'}</p><h2>3. 현재 근태 참고 지표</h2><p>위험 ${d.riskCount||0}명, 주의 ${d.warnCount||0}명, 정상 ${d.normalCount||0}명입니다.</p><h2>4. 상세 사유</h2><p>${esc(h?.detail||'-')}</p>`;}return `<div class="attReportHeaderTitle">${esc(d.period)} 근태 분석 보고서</div><div class="attReportMeta">작성일자: ${esc(d.writtenDate)}<br>보고대상: ${esc(d.scope)}</div><div class="attReportIntro"><p>API 또는 서버 저장소 연결이 실패하여 임시 보고서를 표시합니다. Vercel API와 환경변수를 설정하면 이 영역은 생성된 보고서로 대체됩니다.</p></div><h2>1. 핵심 요약</h2><p>위험 ${d.riskCount||0}명, 주의 ${d.warnCount||0}명, 정상 ${d.normalCount||0}명입니다.</p><h2>2. 상위 담당자</h2><table class="attReportTable"><thead><tr><th>순위</th><th>담당자</th><th>점수</th></tr></thead><tbody>${(d.topPeople||[]).map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.name)}</td><td>${Math.round(Number(p.score||0))}</td></tr>`).join('')||'<tr><td colspan="3">데이터 없음</td></tr>'}</tbody></table>`;}
-async function buildServerPayload(reportType){
+async function buildServerPayload(reportType,options){
+  options=options||{};
+  const includeAdditionalData=!!options.includeAdditionalData;
   const core=buildReportCoreData();
   const reportInfo={
     month: core.period,
@@ -11159,7 +11241,13 @@ async function buildServerPayload(reportType){
     data:sanitizedData,
     hiringInput:reportType==='hiring'?buildHiringInput():null
   };
-  payload.dataHash=await sha256(stableStringify({reportType,reportInfo,monthlySummary,monthlyKpi,riskUsers,trend,hiringInput:payload.hiringInput}));
+  const additionalUserData=includeAdditionalData?collectAdditionalUserData():null;
+  if(additionalUserData){
+    payload.additionalUserData=additionalUserData;
+    payload.additionalDataRequested=Array.isArray(currentAdditionalDataNeeded)?currentAdditionalDataNeeded:[];
+    payload.regenerationReason='additional_data_confirmed_by_user';
+  }
+  payload.dataHash=await sha256(stableStringify({reportType,reportInfo,monthlySummary,monthlyKpi,riskUsers,trend,hiringInput:payload.hiringInput,additionalUserData:payload.additionalUserData||null,additionalDataRequested:payload.additionalDataRequested||[]}));
   payload.reportKey=`attendance:${reportType}:${reportInfo.scope}:${reportInfo.month}:${reportInfo.periodMode}:${payload.dataHash}`;
   return payload;
 }
@@ -11316,26 +11404,32 @@ ${reasonText}`)}</div></div>
     <div class="fixedCaution">${esc(bottomNote)}</div>
   </section>`;
 }
-async function requestAiReport(reportType,forceRegenerate){
+async function requestAiReport(reportType,forceRegenerate,options){
+  options=options||{};
   const host=document.getElementById('attendanceReportPreview');
   if(!host)return;
   currentReportKind=reportType;
-  currentReportPayload=await buildServerPayload(reportType);
+  currentReportPayload=await buildServerPayload(reportType,{includeAdditionalData:!!options.includeAdditionalData});
   const title=document.getElementById('attendanceReportModalTitle'),desc=document.getElementById('attendanceReportModalDesc'),mode=document.getElementById('attendanceReportModeLabel');
   if(title)title.textContent=reportType==='hiring'?'충원 검토 보고서':'근태 분석 보고서';
   if(desc)desc.textContent=reportType==='hiring'?'충원 입력값과 현재 근태 데이터를 함께 분석해 보고서를 불러오거나 다시 생성합니다.':'월별 진단과 트렌드 데이터를 기반으로 보고서를 불러오거나 다시 생성합니다.';
   if(mode)mode.textContent=reportType==='hiring'?'충원 보고서':'월별+트렌드 보고서';
-  host.innerHTML=`<div class="attReportIntro"><p>${forceRegenerate?'새 보고서를 다시 생성하는 중입니다.':'기존 저장 보고서를 불러오는 중입니다.'}</p></div>`;
-  setStatus(forceRegenerate?'최신 양식 기준으로 새 보고서를 생성하는 중입니다.':'서버에 저장된 기존 보고서를 조회하는 중입니다. 저장본이 없으면 새 보고서를 생성합니다.','warn');
+  host.innerHTML=`<div class="attReportIntro"><p>${options.includeAdditionalData?'추가 확인 자료를 반영해 새 보고서를 다시 생성하는 중입니다.':(forceRegenerate?'새 보고서를 다시 생성하는 중입니다.':'기존 저장 보고서를 불러오는 중입니다.')}</p></div>`;
+  setStatus(options.includeAdditionalData?'추가 확인 자료를 포함해 새 보고서를 생성하는 중입니다.':(forceRegenerate?'최신 양식 기준으로 새 보고서를 생성하는 중입니다.':'서버에 저장된 기존 보고서를 조회하는 중입니다. 저장본이 없으면 새 보고서를 생성합니다.'),'warn');
   try{
     const res=await fetch('/api/generate-attendance-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...currentReportPayload,forceRegenerate:!!forceRegenerate})});
     const json=await res.json().catch(()=>({}));
     if(!res.ok||!json.ok)throw new Error(json.error||`HTTP ${res.status}`);
-    host.innerHTML=renderFixedAttendanceReport(currentReportPayload,json.reportStory||json.story||json.storyJson||json.reportJson||json.reportHtml||fallbackReportHtml(currentReportPayload));
-    setStatus(json.fromCache?'서버에 저장된 보고서를 불러왔습니다.':'새 보고서를 생성하고 서버에 저장했습니다.','good');
+    currentReportStory=json.reportStory||json.story||json.storyJson||json.reportJson||null;
+    const reportContent=currentReportStory||json.reportHtml||fallbackReportHtml(currentReportPayload);
+    host.innerHTML=renderFixedAttendanceReport(currentReportPayload,reportContent);
+    renderAdditionalDataPanel(currentReportStory);
+    setStatus(json.fromCache?'서버에 저장된 보고서를 불러왔습니다.':(options.includeAdditionalData?'추가 확인 자료를 반영한 새 보고서를 생성하고 서버에 저장했습니다.':'새 보고서를 생성하고 서버에 저장했습니다.'),'good');
   }catch(error){
     console.error('[REPORT FAILED]',error);
+    currentReportStory=null;
     host.innerHTML=renderFixedAttendanceReport(currentReportPayload,fallbackReportHtml(currentReportPayload));
+    hideAdditionalDataPanel();
     setStatus(`보고서 생성 실패: ${error?.message||error}. 임시 보고서를 표시합니다.`,'bad');
   }
 }
@@ -11348,12 +11442,13 @@ function openModal(reportType){
   if(desc)desc.textContent=currentReportKind==='hiring'?'충원 입력값과 현재 근태 데이터를 함께 분석해 보고서를 불러오거나 다시 생성합니다.':'월별 진단과 트렌드 데이터를 기반으로 보고서를 불러오거나 다시 생성합니다.';
   if(mode)mode.textContent=currentReportKind==='hiring'?'충원 보고서':'월별+트렌드 보고서';
   if(host)host.innerHTML='<div class="attReportIntro"><p>상단 버튼을 선택하세요. 기존 보고서 불러오기는 서버 저장본을 조회하고, 보고서 다시 생성은 최신 양식으로 새 보고서를 생성합니다.</p></div>';
+  currentReportStory=null;currentAdditionalDataNeeded=[];hideAdditionalDataPanel();
   setStatus('보고서 요청 대기 중입니다.','');
   modal.classList.add('show');
   modal.setAttribute('aria-hidden','false');
 }
 function closeModal(){const modal=document.getElementById('attendanceReportModal');if(!modal)return;modal.classList.remove('show');modal.setAttribute('aria-hidden','true');}
-function printReport(){const doc=document.getElementById('attendanceReportPreview');if(!doc)return;const win=window.open('','_blank');if(!win){window.print();return;}win.document.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>근태 보고서</title><style>${document.querySelector('style')?.innerHTML||''}body{background:#fff;padding:0}.attReportDoc{box-shadow:none;border:none;border-radius:0;max-width:none}.reportModalTop,.reportSettings,.reportAiStatus{display:none}</style></head><body><div class="attReportDoc">${doc.innerHTML}</div></body></html>`);win.document.close();setTimeout(()=>{win.focus();win.print();},300);}
+function printReport(){const doc=document.getElementById('attendanceReportPreview');if(!doc)return;const win=window.open('','_blank');if(!win){window.print();return;}win.document.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>근태 보고서</title><style>${document.querySelector('style')?.innerHTML||''}body{background:#fff;padding:0}.attReportDoc{box-shadow:none;border:none;border-radius:0;max-width:none}.reportModalTop,.reportSettings,.reportAiStatus,.reportAdditionalPanel{display:none}</style></head><body><div class="attReportDoc">${doc.innerHTML}</div></body></html>`);win.document.close();setTimeout(()=>{win.focus();win.print();},300);}
 function empForOption(e){return{employeeNo:e.employee_no||e.employeeNo||e.id||'',id:e.id||e.employee_no||'',name:e.name||'',division:e.department||e.division||'',team:e.team||'',position:e.position||e.grade||'',status:e.status||'',resignationDate:e.resignation_date||e.leaveDate||e.retireDate||'',memo:e.memo||''};}
 function refreshHiringEmployeeOptions(){const input=document.getElementById('hiringEmployeeSearch'),sel=document.getElementById('hiringEmployeeSelect'),info=document.getElementById('hiringSelectedInfo');if(!input||!sel)return;const kw=String(input.value||'').trim().toLowerCase();const list=Array.isArray(window.empMaster)?window.empMaster:(typeof empMaster!=='undefined'&&Array.isArray(empMaster)?empMaster:[]);const matched=list.map(empForOption).filter(e=>!kw||String(e.name).toLowerCase().includes(kw)||String(e.employeeNo).toLowerCase().includes(kw)).slice(0,80);sel.innerHTML='<option value="">선택 안 함</option>'+matched.map(e=>`<option value="${encodeURIComponent(JSON.stringify(e))}">${esc(e.name)} (${esc(e.employeeNo||'-')}) · ${esc(e.division||'-')} / ${esc(e.team||'-')}</option>`).join('');if(info)info.textContent=matched.length?`${matched.length}명 검색됨. 대상자를 선택하면 상세 정보가 표시됩니다.`:'검색 결과가 없습니다.';}
 function updateHiringSelectedInfo(){const info=document.getElementById('hiringSelectedInfo');if(!info)return;const e=getSelectedHiringEmployee();if(!e){info.textContent='퇴사/이탈 대상자를 선택하면 사번, 본부, 팀, 직급, 퇴사예정일 정보가 표시됩니다.';return;}info.innerHTML=`<b>선택 대상자</b> ${esc(e.name)} · 사번 ${esc(e.employeeNo||'-')} · ${esc(e.division||'-')} / ${esc(e.team||'-')} · 직급 ${esc(e.position||'-')} · 상태 ${esc(e.status||'-')} · 퇴사/예정일 ${esc(e.resignationDate||'-')}`;}
