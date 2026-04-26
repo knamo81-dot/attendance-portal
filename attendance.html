@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>실데이터 연동본 | 조직 컨디션 대시보드</title>
+<title>근태 리스크 및 운영 분석 대시보드</title>
 
 <!-- ✅ 여기 추가 -->
 <link rel="icon" href="/favicon.ico">
@@ -1459,6 +1459,7 @@ html.embed-mode #main-dashboard .kpis{
 <!-- final build: print/PDF header meta + page footer patch applied -->
 <!-- final build: compact meta + analysisLevel/teamSummary payload applied -->
 <!-- final build: employee-master team/division report matching fixed -->
+<!-- final title patch: attendance risk and operations report -->
 </head>
 <body>
 <script>
@@ -1559,7 +1560,7 @@ html.embed-mode #main-dashboard .kpis{
 
     <div class="grid21">
       <div class="card">
-        <div id="attendanceChartTitle" class="title">본부/팀별 근태 현황</div>
+        <div id="attendanceChartTitle" class="title">본부/팀별 근태 운영 상태</div>
         <div class="desc">선택한 본부·팀 기준으로 전체와 정상 처리/주의/문제/사유 건수를 비교합니다. 전체는 정상 처리 + 주의 + 문제이며, 사유는 ERP 사유 중 주의/문제를 제외한 인정 근태 기준으로 집계합니다.</div>
         <div id="attendanceChart" class="chart" style="height:360px"></div>
       </div>
@@ -8893,10 +8894,10 @@ function renderAttendanceChart(rows){
     return { name, total, normal, warn, issue, reason };
   });
   $('#attendanceChartTitle').textContent = STATE.division === '전체' && STATE.team === '전체'
-    ? '본부/팀별 근태 현황'
+    ? '본부/팀별 근태 운영 상태'
     : STATE.team === '전체'
-      ? `${STATE.division} 내 팀별 근태 현황`
-      : `${STATE.team} 구성원 근태 현황`;
+      ? `${STATE.division} 내 팀별 근태 운영 상태`
+      : `${STATE.team} 구성원 근태 운영 상태`;
   barSVG($('#attendanceChart'), data, ['total','normal','warn','issue','reason'], ['#94a3b8','#16a34a','#d97706','#ef4444','#2563eb'], data.length > 4);
 }
 function renderAttendanceInsights(rows){
@@ -11311,7 +11312,7 @@ async function buildServerPayload(reportType,options){
     app:'attendance',
     version:'ai-report-v2',
     reportType,
-    reportTitle:reportType==='hiring'?`${core.period} 충원 검토 보고서`:`${core.period} 월별+트렌드 근태 분석 보고서`,
+    reportTitle:reportType==='hiring'?`${core.period} 충원 검토 보고서`:`${core.period} 근태 리스크 및 운영 분석 보고서`,
     reportInfo,
     monthlySummary,
     monthlyKpi,
@@ -11404,7 +11405,7 @@ function formatReportFullMonthTitle(raw){
 function buildFixedCoreInsight(risk,warn,normal,total){
   const r=Number(risk||0), w=Number(warn||0), n=Number(normal||0), t=Number(total||0);
   const month=formatReportMonthLabel((currentReportPayload&&currentReportPayload.reportInfo&&currentReportPayload.reportInfo.month)||'해당월');
-  if(!t) return '해당월 근태 현황은 데이터 반영 상태를 기준으로 확인이 필요합니다. 위험·주의 인원의 발생 여부와 반복 가능성을 중심으로 검토하는 것이 적절합니다.';
+  if(!t) return '해당월 근태 운영 상태은 데이터 반영 상태를 기준으로 확인이 필요합니다. 위험·주의 인원의 발생 여부와 반복 가능성을 중심으로 검토하는 것이 적절합니다.';
   if(r>0 || w>0) return `${month} 현황은 전체 조직의 급격한 악화라기보다, 특정 담당자에게 누적되는 위험 신호를 조기에 확인해야 하는 형태로 볼 수 있습니다. 따라서 이번 달 보고서는 전체 평균보다 상위 리스크 인원의 반복성과 원인을 확인하는 방향이 적절합니다.`;
   return '해당월 현황은 전반적으로 안정적인 상태로 볼 수 있습니다. 다만 추후 동일 지표가 반복되는지 확인하기 위해 기준월 데이터를 누적 관리하는 것이 적절합니다.';
 }
@@ -11639,8 +11640,8 @@ function renderFixedAttendanceReport(payload,aiHtml){
   })):defaultBarItems).slice(0,4);
   return `<div class="fixedRawText">${esc(cleanAiText(aiHtml))}</div>
   <section class="fixedReportPage">
-    ${renderFixedHeader('ATTENDANCE\nREPORT',`${monthText} 근태 현황 및 트렌드 분석 보고서`,info)}
-    <div class="fixedCoverBand"><div class="fixedCoverPart">1부 · 해당월 현황</div><div class="fixedCoverTitle">${esc(monthKo)} 근태 현황 요약</div><div class="fixedCoverText">해당월 데이터를 기준으로 현재 상태를 설명하고, 관리자가 확인해야 할 핵심 리스크를 정리합니다.</div></div>
+    ${renderFixedHeader('ATTENDANCE\nREPORT',`${monthText} 근태 리스크 및 운영 분석 보고서`,info)}
+    <div class="fixedCoverBand"><div class="fixedCoverPart">1부 · 해당월 현황</div><div class="fixedCoverTitle">${esc(monthKo)} 근태 운영 상태 요약</div><div class="fixedCoverText">해당월 데이터를 기준으로 현재 상태를 설명하고, 관리자가 확인해야 할 핵심 리스크를 정리합니다.</div></div>
     <div class="fixedFrameCards">
       <div class="fixedFrameCard"><div class="k">분석 기준</div><div class="v">${esc(monthKo)} 단일월</div></div>
       <div class="fixedFrameCard"><div class="k">보고 구성</div><div class="v">해당월 현황 + 트렌드</div></div>
