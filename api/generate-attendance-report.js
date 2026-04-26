@@ -27,6 +27,61 @@ function normalizeReportMode(payload = {}) {
   return 'regenerate';
 }
 
+
+function normalizeAdditionalUserData(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item, index) => {
+        if (item && typeof item === 'object') {
+          return {
+            id: item.id || item.key || `item_${index + 1}`,
+            title: safeText(item.title || item.label || item.name || `추가 확인 자료 ${index + 1}`),
+            value: item.value ?? item.content ?? item.text ?? item.memo ?? '',
+            status: safeText(item.status || item.confirmStatus || item.checkedStatus || ''),
+            confirmed: item.confirmed === true || item.checked === true || item.status === 'confirmed',
+            note: safeText(item.note || item.memo || item.comment || ''),
+          };
+        }
+        return {
+          id: `item_${index + 1}`,
+          title: `추가 확인 자료 ${index + 1}`,
+          value: item,
+          status: '',
+          confirmed: true,
+          note: '',
+        };
+      })
+      .filter(item => item.title || item.value || item.note || item.status);
+
+    return items.length ? items : null;
+  }
+
+  if (value && typeof value === 'object') {
+    const normalized = {};
+    Object.entries(value).forEach(([key, item]) => {
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        normalized[key] = {
+          title: safeText(item.title || item.label || item.name || key),
+          value: item.value ?? item.content ?? item.text ?? item.memo ?? '',
+          status: safeText(item.status || item.confirmStatus || item.checkedStatus || ''),
+          confirmed: item.confirmed === true || item.checked === true || item.status === 'confirmed',
+          note: safeText(item.note || item.memo || item.comment || ''),
+        };
+      } else {
+        normalized[key] = item;
+      }
+    });
+
+    return Object.keys(normalized).length ? normalized : null;
+  }
+
+  return String(value).trim() ? String(value).trim() : null;
+}
+
 function makeDataHash(payload = {}) {
   const existing = String(payload.dataHash || '').trim();
   if (existing) return existing;
@@ -43,6 +98,8 @@ function makeDataHash(payload = {}) {
     constraints: payload.constraints || null,
     data: payload.data || null,
     hiringInput: payload.hiringInput || null,
+    additionalDataNeeded: payload.additionalDataNeeded || null,
+    additionalUserData: normalizeAdditionalUserData(payload.additionalUserData),
   });
 
   let hash = 0;
@@ -109,6 +166,10 @@ function normalizeStory(raw = {}) {
     monitoring: safeText(story.monitoring || sections.monitoring),
     conclusion: safeText(story.conclusion || sections.conclusion),
     cautions: Array.isArray(story.cautions) ? story.cautions.map(v => safeText(v)).filter(Boolean) : [],
+    additionalDataNeeded: Array.isArray(story.additionalDataNeeded)
+      ? story.additionalDataNeeded.map(v => safeText(v)).filter(Boolean)
+      : [],
+    additionalDataUsageSummary: safeText(story.additionalDataUsageSummary || sections.additionalDataUsageSummary),
   };
 
   if (!normalized.conclusion) {
@@ -161,6 +222,8 @@ function buildStoryPrompt(payload) {
     constraints: payload.constraints || null,
     data: payload.data || null,
     hiringInput: payload.hiringInput || null,
+    additionalDataNeeded: payload.additionalDataNeeded || null,
+    additionalUserData: normalizeAdditionalUserData(payload.additionalUserData),
   };
 
   const commonRules = `
@@ -172,6 +235,9 @@ function buildStoryPrompt(payload) {
 각 항목은 3~5문장으로 작성하고, 단순 수치 반복이 아니라 수치의 의미, 조직 관점 해석, 관리자가 확인해야 할 포인트를 포함하세요.
 마지막 conclusion은 반드시 다음 문장으로 끝내세요: "현재 기준으로는 추가적인 데이터 확인 및 운영 검토가 필요합니다."
 출근미입력/퇴근미입력 중심의 출퇴근 누락 분석은 포함하지 마세요.
+additionalUserData가 제공된 경우 이는 사용자가 확인 또는 보완한 추가자료입니다. 기존 근태 데이터와 충돌하지 않는 범위에서 우선 참고하세요.
+additionalUserData가 비어 있거나 불충분하면 추정하지 말고 additionalDataNeeded 배열에 추가 확인 필요 자료명을 담으세요.
+additionalDataUsageSummary에는 추가자료를 보고서 판단에 어떻게 반영했는지 1~2문장으로 작성하세요.
 `;
 
   if (isHiring) {
@@ -197,6 +263,8 @@ ${JSON.stringify(dataForPrompt, null, 2)}
   "causeStory": "공백 또는 운영 리스크의 가능 원인",
   "monitoring": "단기 확인 및 관리 방향",
   "conclusion": "최종 검토 의견. 마지막 문장은 고정 문장으로 끝낼 것",
+  "additionalDataNeeded": ["보고서 신뢰도를 높이기 위해 추가 확인이 필요한 자료명. 없으면 빈 배열"],
+  "additionalDataUsageSummary": "additionalUserData가 제공된 경우 반영 방식 요약. 없으면 빈 문자열",
   "cautions": ["데이터 해석 시 주의사항 1", "데이터 해석 시 주의사항 2"]
 }`;
   }
@@ -244,6 +312,8 @@ ${JSON.stringify(dataForPrompt, null, 2)}
   "monitoring": "다음 월 또는 단기 관리 방향 요약",
   "conclusion": "결론. 마지막 문장은 고정 문장으로 끝낼 것",
   "bottomNote": "보고서 맨 아래 안내 문구. 근태 데이터 기반이며 실제 운영 판단에는 업무 상황 등 보조 확인이 필요하다는 문장",
+  "additionalDataNeeded": ["보고서 신뢰도를 높이기 위해 추가 확인이 필요한 자료명. 없으면 빈 배열"],
+  "additionalDataUsageSummary": "additionalUserData가 제공된 경우 반영 방식 요약. 없으면 빈 문자열",
   "cautions": ["데이터 해석 시 주의사항 1", "데이터 해석 시 주의사항 2"]
 }`;
 }
