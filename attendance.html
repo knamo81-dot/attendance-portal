@@ -1347,6 +1347,12 @@ html.embed-mode #main-dashboard .kpis{
 .fixedStoryBox.reason::before{background:#2563eb;}
 .fixedStoryBox.summary{background:#ecfdf5;border-color:#bbf7d0;}
 .fixedStoryBox.summary::before{background:#16a34a;}
+.fixedStoryBox.status{background:#f8fafc;border-color:#cbd5e1;}
+.fixedStoryBox.status::before{background:#64748b;}
+.fixedStoryBox.monitoring{background:#f0f9ff;border-color:#bae6fd;}
+.fixedStoryBox.monitoring::before{background:#0284c7;}
+.fixedStoryBox.caution{background:#fff7ed;border-color:#fed7aa;}
+.fixedStoryBox.caution::before{background:#f97316;}
 .fixedStoryBox b{font-weight:900;color:#0f172a;}
 @media print{.fixedStoryFlow{gap:6px!important;margin:7px 0 8px!important}.fixedStoryBox{padding:8px 10px 8px 13px!important;border-radius:10px!important}.fixedStoryBox::before{top:8px!important;bottom:8px!important;width:4px!important}.fixedStoryBox .fixedStoryLabel{font-size:9.2px!important;margin-bottom:3px!important}.fixedStoryBox .fixedStoryText{font-size:9.2px!important;line-height:1.38!important}}
 
@@ -11174,13 +11180,20 @@ function renderFixedAttendanceReport(payload,aiHtml){
   const total=sum.totalEmployees||d?.scopedSummary?.employeeCount||0;
   const risk=sum.riskCount??d.riskCount??0,warn=sum.warningCount??d.warnCount??0,normal=sum.normalCount??d.normalCount??0;
   const story=(()=>{try{if(aiHtml&&typeof aiHtml==='object')return aiHtml;const raw=String(aiHtml||'').trim();if(!raw)return{};const cleaned=cleanAiText(raw);const target=(cleaned.match(/\{[\s\S]*\}/)||[cleaned])[0];const parsed=JSON.parse(target);return parsed&&typeof parsed==='object'?parsed:{};}catch(e){return{};}})();
-  const frameText=story.intro||story.frame||story.analysisFrame||`${monthText} 데이터는 단순 평균 비교보다 위험·주의 인원이 특정 담당자에게 집중되는지 확인하는 관점으로 해석합니다.`;
-  const ai1=story.judge||story.currentJudge||story.status||getAiSentence(aiHtml,0,`${monthText} 기준 위험 인원 ${risk}명, 주의 인원 ${warn}명으로 확인됩니다. 현재 수치는 업무 집중과 근무시간 편중 가능성을 검토하기 위한 기준점으로 보는 것이 적절합니다.`);
-  const reasonText=story.reason||story.evidence||getAiSentence(aiHtml,1,`연장근무, 공휴일근무, 평균 연장시간, 위험 인원 지표를 함께 비교하여 업무 집중 또는 관리 확인이 필요한 구간을 파악합니다.`);
-  const ai2=story.trend||story.trendJudge||getAiSentence(aiHtml,2,`월별 흐름은 누적 데이터가 충분할수록 의미가 커지며, 현재는 기준월의 위험·주의 인원과 연장근무 흐름을 함께 확인하는 단계입니다.`);
-  const ai3=story.cause||story.summary||story.opinion||getAiSentence(aiHtml,3,`원인 가능성은 특정 개인의 문제로 단정하기보다 업무 집중, 근무 시간 편중, 휴식 부족 가능성을 함께 검토하는 방식이 적절합니다.`);
-  let conclusion=story.conclusion||getAiSentence(aiHtml,4,`현재 기준으로는 추가적인 데이터 확인 및 운영 검토가 필요합니다.`);
-  if(!String(conclusion).includes('현재 기준으로는 추가적인 데이터 확인 및 운영 검토가 필요합니다.'))conclusion='현재 기준으로는 추가적인 데이터 확인 및 운영 검토가 필요합니다.';
+  const storySections=(story&&story.sections&&typeof story.sections==='object')?story.sections:{};
+  const pickStoryText=(...vals)=>vals.map(v=>v==null?'':String(v).trim()).find(Boolean)||'';
+  const frameText=pickStoryText(story.intro,storySections.intro,story.frame,story.analysisFrame,`${monthText} 데이터는 단순 평균 비교보다 위험·주의 인원이 특정 담당자에게 집중되는지 확인하는 관점으로 해석합니다.`);
+  const statusText=pickStoryText(story.status,storySections.status,getAiSentence(aiHtml,0,`${monthText} 기준 위험 인원 ${risk}명, 주의 인원 ${warn}명으로 확인됩니다. 현재 수치는 업무 집중과 근무시간 편중 가능성을 검토하기 위한 기준점으로 보는 것이 적절합니다.`));
+  const ai1=pickStoryText(story.judge,storySections.judge,story.currentJudge,getAiSentence(aiHtml,1,`${monthText} 기준 위험 인원 ${risk}명, 주의 인원 ${warn}명으로 확인됩니다. 현재 수치는 업무 집중과 근무시간 편중 가능성을 검토하기 위한 기준점으로 보는 것이 적절합니다.`));
+  const reasonText=pickStoryText(story.reason,storySections.reason,story.evidence,getAiSentence(aiHtml,2,`연장근무, 공휴일근무, 평균 연장시간, 위험 인원 지표를 함께 비교하여 업무 집중 또는 관리 확인이 필요한 구간을 파악합니다.`));
+  const ai2=pickStoryText(story.trendStory,storySections.trendStory,story.trend,story.trendJudge,getAiSentence(aiHtml,3,`월별 흐름은 누적 데이터가 충분할수록 의미가 커지며, 현재는 기준월의 위험·주의 인원과 연장근무 흐름을 함께 확인하는 단계입니다.`));
+  const ai3=pickStoryText(story.causeStory,storySections.causeStory,story.cause,story.summary,story.opinion,getAiSentence(aiHtml,4,`원인 가능성은 특정 개인의 문제로 단정하기보다 업무 집중, 근무 시간 편중, 휴식 부족 가능성을 함께 검토하는 방식이 적절합니다.`));
+  const monitoringText=pickStoryText(story.monitoring,storySections.monitoring,`상위 위험·주의 담당자의 최근 업무 배정과 동일 지표 반복 여부를 다음 월 데이터에서 함께 확인합니다.`);
+  const cautionList=Array.isArray(story.cautions)?story.cautions:(Array.isArray(storySections.cautions)?storySections.cautions:[]);
+  const cautionText=cautionList.map(v=>String(v||'').trim()).filter(Boolean).join(' · ');
+  let conclusion=pickStoryText(story.conclusion,storySections.conclusion,getAiSentence(aiHtml,5,`현재 기준으로는 추가적인 데이터 확인 및 운영 검토가 필요합니다.`));
+  if(!String(conclusion).includes('현재 기준으로는 추가적인 데이터 확인 및 운영 검토가 필요합니다.'))conclusion=`${String(conclusion).replace(/\s+$/,'')}
+현재 기준으로는 추가적인 데이터 확인 및 운영 검토가 필요합니다.`;
   const barItems=[
     {label:'연장근무',value:kpi.overtimeCount||0,display:`${fixedNum(kpi.overtimeCount||0,1)}h`,tone:'red'},
     {label:'공휴일근무',value:kpi.holidayWorkCount||0,display:`${fixedNum(kpi.holidayWorkCount||0)}건`,tone:'amber'},
@@ -11207,6 +11220,7 @@ function renderFixedAttendanceReport(payload,aiHtml){
       <div class="fixedMetaCard blue"><div class="k">월간 판단</div><div class="v">${risk>0?'부분 집중':'안정'}</div><div class="s">전사적 위험보다 특정 인원 집중형</div></div>
     </div>
     <div class="fixedStoryFlow">
+      <div class="fixedStoryBox status"><div class="fixedStoryLabel">현재 상태</div><div class="fixedStoryText">${esc(statusText)}</div></div>
       <div class="fixedStoryBox judge"><div class="fixedStoryLabel">핵심 판단</div><div class="fixedStoryText">${esc(ai1)}</div></div>
       <div class="fixedStoryBox reason"><div class="fixedStoryLabel">판단 근거</div><div class="fixedStoryText">${esc(reasonText)}</div></div>
     </div>
@@ -11220,15 +11234,15 @@ function renderFixedAttendanceReport(payload,aiHtml){
     <div class="fixedStoryFlow"><div class="fixedStoryBox frame"><div class="fixedStoryLabel">트렌드 해석 기준</div><div class="fixedStoryText">월별 흐름은 단일월 수치보다 반복 여부와 방향성을 확인하기 위한 보조 기준으로 활용합니다.</div></div><div class="fixedStoryBox judge"><div class="fixedStoryLabel">흐름 판단</div><div class="fixedStoryText">${esc(ai2)}</div></div></div>
     <div class="fixedMetaCards"><div class="fixedMetaCard red"><div class="k">기준월 위험</div><div class="v">${fixedNum(risk)}</div><div class="s">위험 상태</div></div><div class="fixedMetaCard amber"><div class="k">기준월 주의</div><div class="v">${fixedNum(warn)}</div><div class="s">주의 상태</div></div><div class="fixedMetaCard blue"><div class="k">기간 기준</div><div class="v">${fixedNum((trend.months||[]).length)}</div><div class="s">표시 월 수</div></div><div class="fixedMetaCard green"><div class="k">평균 연장</div><div class="v">${fixedNum(sum.averageOvertimeHours||kpi.averageOvertimeHours||0,1)}</div><div class="s">시간/인</div></div></div>
     ${renderFixedTrendChart(trend,info)}
-    <div class="fixedGrid3"><div class="fixedMiniNote"><b>현재 판단</b><br>기준월 데이터를 중심으로 위험·주의 인원 집중 여부를 확인합니다.</div><div class="fixedMiniNote"><b>다음 확인</b><br>동일 인원이 반복적으로 상위권에 남는지 확인합니다.</div><div class="fixedMiniNote"><b>관리 포인트</b><br>업무량, 연장근무, 휴식 부족 가능성을 함께 봅니다.</div></div>${renderFixedRiskTable(users)}
+    <div class="fixedGrid3"><div class="fixedMiniNote"><b>현재 판단</b><br>${esc(ai2)}</div><div class="fixedMiniNote"><b>다음 확인</b><br>동일 인원이 반복적으로 상위권에 남는지 확인합니다.</div><div class="fixedMiniNote"><b>관리 포인트</b><br>${esc(monitoringText)}</div></div>${renderFixedRiskTable(users)}
   </section>
   <section class="fixedReportPage">
     ${renderFixedHeader('SUMMARY\nOPINION',`${monthText} 원인 가능성 및 종합 의견`,info)}
     <div class="fixedSectionBadge amber">3부 · 원인 가능성 및 종합 의견</div>
-    <div class="fixedStoryFlow"><div class="fixedStoryBox frame"><div class="fixedStoryLabel">종합 의견 기준</div><div class="fixedStoryText">원인 가능성은 특정 개인의 문제로 단정하지 않고 업무량, 근무시간 편중, 휴식 부족 가능성을 함께 검토합니다.</div></div><div class="fixedStoryBox summary"><div class="fixedStoryLabel">종합 해석</div><div class="fixedStoryText">${esc(ai3)}</div></div></div>
-    <div class="fixedGrid2"><div class="fixedEvidence"><div class="fixedEvidenceTitle">가능 원인 1 · 업무 집중</div><div class="fixedBlockText">위험·주의 인원이 특정 담당자에게 집중된다면 업무 배분, 일정 집중, 프로젝트 마감 영향 가능성을 우선 검토할 필요가 있습니다.</div></div><div class="fixedEvidence"><div class="fixedEvidenceTitle">가능 원인 2 · 근무 시간 편중/휴식 부족</div><div class="fixedBlockText">연장근무와 휴식 지표가 함께 나빠지는 경우 단기 업무량 증가뿐 아니라 회복 시간 부족 가능성도 함께 확인해야 합니다.</div></div></div>
-    <div class="fixedGrid2"><div class="fixedHighlightBox blue"><div class="fixedBlockTitle">단기 관리 방향</div><div class="fixedBlockText">상위 위험·주의 담당자의 최근 업무 배정과 반복 발생 여부를 확인하고, 필요 시 업무 분산 또는 일정 조정을 검토합니다.</div></div><div class="fixedHighlightBox amber"><div class="fixedBlockTitle">다음 월 확인 방향</div><div class="fixedBlockText">동일 지표가 다음 월에도 반복되는지, 위험 상태가 해소되는지, 신규 위험 인원이 발생하는지를 비교합니다.</div></div></div>
-    <div class="fixedConclusion">${esc(conclusion)}</div><div class="fixedCaution">본 보고서는 현재 시스템에 반영된 근태 데이터를 기준으로 작성된 운영 검토용 자료입니다. 데이터 누락, 예외근무, 조직 변경 사항은 별도 확인이 필요합니다.</div>
+    <div class="fixedStoryFlow"><div class="fixedStoryBox frame"><div class="fixedStoryLabel">종합 의견 기준</div><div class="fixedStoryText">원인 가능성은 특정 개인의 문제로 단정하지 않고 업무량, 근무시간 편중, 휴식 부족 가능성을 함께 검토합니다.</div></div><div class="fixedStoryBox summary"><div class="fixedStoryLabel">원인 가능성 해석</div><div class="fixedStoryText">${esc(ai3)}</div></div><div class="fixedStoryBox monitoring"><div class="fixedStoryLabel">모니터링 방향</div><div class="fixedStoryText">${esc(monitoringText)}</div></div></div>
+    <div class="fixedGrid2"><div class="fixedEvidence"><div class="fixedEvidenceTitle">가능 원인 1 · 업무 집중</div><div class="fixedBlockText">${esc(ai3)}</div></div><div class="fixedEvidence"><div class="fixedEvidenceTitle">가능 원인 2 · 근무 시간 편중/휴식 부족</div><div class="fixedBlockText">연장근무와 휴식 지표가 함께 나빠지는 경우 단기 업무량 증가뿐 아니라 회복 시간 부족 가능성도 함께 확인해야 합니다.</div></div></div>
+    <div class="fixedGrid2"><div class="fixedHighlightBox blue"><div class="fixedBlockTitle">단기 관리 방향</div><div class="fixedBlockText">${esc(monitoringText)}</div></div><div class="fixedHighlightBox amber"><div class="fixedBlockTitle">다음 월 확인 방향</div><div class="fixedBlockText">동일 지표가 다음 월에도 반복되는지, 위험 상태가 해소되는지, 신규 위험 인원이 발생하는지를 비교합니다.</div></div></div>
+    <div class="fixedConclusion">${esc(conclusion)}</div><div class="fixedCaution">${esc(cautionText||'본 보고서는 현재 시스템에 반영된 근태 데이터를 기준으로 작성된 운영 검토용 자료입니다. 데이터 누락, 예외근무, 조직 변경 사항은 별도 확인이 필요합니다.')}</div>
   </section>`;
 }
 async function requestAiReport(reportType,forceRegenerate){
