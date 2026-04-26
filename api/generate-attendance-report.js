@@ -93,6 +93,19 @@ function normalizeStory(raw = {}) {
     reason: safeText(story.reason || sections.reason),
     trendStory: safeText(story.trendStory || sections.trendStory || story.trend),
     causeStory: safeText(story.causeStory || sections.causeStory || story.cause),
+    issueTitle: safeText(story.issueTitle || sections.issueTitle),
+    issueDescription: safeText(story.issueDescription || sections.issueDescription || story.riskFlowStory || sections.riskFlowStory),
+    causeIntro: safeText(story.causeIntro || sections.causeIntro || story.causeLead || sections.causeLead),
+    cause1Title: safeText(story.cause1Title || sections.cause1Title),
+    cause1Text: safeText(story.cause1Text || sections.cause1Text),
+    cause2Title: safeText(story.cause2Title || sections.cause2Title),
+    cause2Text: safeText(story.cause2Text || sections.cause2Text),
+    shortTermTitle: safeText(story.shortTermTitle || sections.shortTermTitle),
+    shortTermText: safeText(story.shortTermText || sections.shortTermText),
+    nextMonthTitle: safeText(story.nextMonthTitle || sections.nextMonthTitle),
+    nextMonthText: safeText(story.nextMonthText || sections.nextMonthText),
+    summaryOpinion: safeText(story.summaryOpinion || sections.summaryOpinion || story.overallOpinion || sections.overallOpinion),
+    bottomNote: safeText(story.bottomNote || sections.bottomNote),
     monitoring: safeText(story.monitoring || sections.monitoring),
     conclusion: safeText(story.conclusion || sections.conclusion),
     cautions: Array.isArray(story.cautions) ? story.cautions.map(v => safeText(v)).filter(Boolean) : [],
@@ -156,7 +169,7 @@ function buildStoryPrompt(payload) {
 데이터가 부족한 항목은 "추가 확인 필요" 또는 "추후 확인 필요"로 표현하세요.
 단정 표현을 피하고 "가능성", "검토 필요", "확인 필요" 중심으로 작성하세요.
 문장은 관리자가 읽는 월간 보고서 톤으로 작성하세요.
-각 항목은 1~3문장으로 작성하고, 너무 길게 쓰지 마세요.
+각 항목은 3~5문장으로 작성하고, 단순 수치 반복이 아니라 수치의 의미, 조직 관점 해석, 관리자가 확인해야 할 포인트를 포함하세요.
 마지막 conclusion은 반드시 다음 문장으로 끝내세요: "현재 기준으로는 추가적인 데이터 확인 및 운영 검토가 필요합니다."
 출근미입력/퇴근미입력 중심의 출퇴근 누락 분석은 포함하지 마세요.
 `;
@@ -214,10 +227,23 @@ ${JSON.stringify(dataForPrompt, null, 2)}
   "status": "해당월 현재 상태 요약",
   "judge": "이번 보고서의 핵심 판단 한 단락",
   "reason": "핵심 판단의 데이터 근거 설명",
-  "trendStory": "트렌드 또는 누적 관찰 관점의 해석",
+  "trendStory": "2부 도입 설명. 해당 월을 기준점으로 트렌드를 어떻게 읽어야 하는지 3~5문장으로 작성",
+  "issueTitle": "이번 데이터에서 AI가 주요 이슈로 판단한 동적 제목. 예: 담당자 리스크 흐름, 연장근무 증가 패턴, 조직 전반 리스크 확산 등",
+  "issueDescription": "issueTitle에 대한 설명. 왜 이 이슈를 봐야 하는지 3~5문장으로 작성",
   "causeStory": "가능 원인과 해석. 단정 금지",
-  "monitoring": "다음 월 또는 단기 관리 방향",
-  "conclusion": "종합 의견. 마지막 문장은 고정 문장으로 끝낼 것",
+  "causeIntro": "3부 원인 가능성 검토의 첫 설명 문단. 원인을 확정하지 않고 검토 관점을 설명",
+  "cause1Title": "가능 원인 1 카드 제목",
+  "cause1Text": "가능 원인 1 설명. 3~5문장",
+  "cause2Title": "가능 원인 2 카드 제목",
+  "cause2Text": "가능 원인 2 설명. 3~5문장",
+  "shortTermTitle": "모니터링 및 검토 방향 카드 1 제목",
+  "shortTermText": "단기 관리 방향 설명. 3~5문장",
+  "nextMonthTitle": "모니터링 및 검토 방향 카드 2 제목",
+  "nextMonthText": "다음 월 확인 방향 설명. 3~5문장",
+  "summaryOpinion": "종합 의견 문단. 현재 조직 상태와 추후 판단 방향을 3~5문장으로 작성",
+  "monitoring": "다음 월 또는 단기 관리 방향 요약",
+  "conclusion": "결론. 마지막 문장은 고정 문장으로 끝낼 것",
+  "bottomNote": "보고서 맨 아래 안내 문구. 근태 데이터 기반이며 실제 운영 판단에는 업무 상황 등 보조 확인이 필요하다는 문장",
   "cautions": ["데이터 해석 시 주의사항 1", "데이터 해석 시 주의사항 2"]
 }`;
 }
