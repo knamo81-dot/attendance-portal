@@ -86,6 +86,9 @@ function makeDataHash(payload = {}) {
   const existing = String(payload.dataHash || '').trim();
   if (existing) return existing;
 
+  const analysisLevel = normalizeAnalysisLevel(payload);
+  const analysisModeGuide = buildAnalysisModeGuide(payload);
+
   const base = JSON.stringify({
     reportType: payload.reportType || null,
     reportTitle: payload.reportTitle || null,
