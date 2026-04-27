@@ -4213,8 +4213,8 @@ async function applyUploadedFiles(){
     // 서버 저장 완료 후 attendance_records 전체를 다시 불러오고, 기존 선택 월은 유지합니다.
     const previousSelectedPeriod = String(STATE?.period || '').trim();
 
-    if (supabaseClient && typeof loadAttendanceFromSupabase === 'function') {
-      await loadAttendanceFromSupabase();
+    if (supabaseClient && typeof window.loadAttendanceFromSupabase === 'function') {
+      await window.loadAttendanceFromSupabase();
     } else {
       REAL_ATTENDANCE_DATA = nextRows;
       HOLIDAY_DATE_SET = buildHolidayDateSet();
@@ -4250,7 +4250,7 @@ async function applyUploadedFiles(){
 alert('업로드 실패 상세: ' + (error?.message || JSON.stringify(error)));
     resetAttendanceClientState();
     try{
-      await loadAttendanceFromSupabase();
+      await window.loadAttendanceFromSupabase();
     }catch(loadError){
       console.error('[ATTENDANCE RELOAD FAILED AFTER UPLOAD ERROR]', loadError);
       resetAttendanceClientState();
@@ -4271,7 +4271,7 @@ function bindUploadRuntimeEvents(){
       console.error(err);
       resetAttendanceClientState();
       try{
-        await loadAttendanceFromSupabase();
+        await window.loadAttendanceFromSupabase();
       }catch(loadError){
         console.error('[ATTENDANCE RELOAD FAILED IN CLICK HANDLER]', loadError);
         resetAttendanceClientState();
@@ -4288,6 +4288,53 @@ function bindUploadRuntimeEvents(){
 const GRADE_ORDER = ['사원','주임','대리','과장','차장','부장','이사부장'];
 const COLORS = ['#2563eb','#0f766e','#f59e0b','#ef4444','#7c3aed','#14b8a6','#334155'];
 const STATE = { period:'3M', division:'전체', team:'전체', attendanceIncludeLeave:true, dashboardExcludeLeave:true, leaveCauseFocus:'', fatigueMode:'recommended' };
+
+const ATTENDANCE_UI_STATE_KEYS = {
+  mainTab: 'attendanceActiveMainTab',
+  period: 'attendanceSelectedPeriod'
+};
+function saveAttendanceUiState(key, value){
+  try{
+    if(!key) return;
+    localStorage.setItem(key, String(value || '').trim());
+  }catch(e){}
+}
+function readAttendanceUiState(key){
+  try{ return String(localStorage.getItem(key) || '').trim(); }catch(e){ return ''; }
+}
+function restoreSavedAttendancePeriod(){
+  const savedPeriod = readAttendanceUiState(ATTENDANCE_UI_STATE_KEYS.period);
+  if(savedPeriod) STATE.period = savedPeriod;
+}
+function activateMainTabWithoutRender(tabName){
+  const targetName = String(tabName || '').trim();
+  if(!targetName) return false;
+  const btn = document.querySelector(`.mainTab[data-main="${targetName}"]`);
+  const panel = document.querySelector(`#main-${targetName}`);
+  if(!btn || !panel) return false;
+  $$('.mainTab').forEach(x => x.classList.remove('active'));
+  $$('.mainPanel').forEach(x => x.classList.remove('active'));
+  btn.classList.add('active');
+  panel.classList.add('active');
+  return true;
+}
+function restoreSavedMainTab(){
+  const savedTab = readAttendanceUiState(ATTENDANCE_UI_STATE_KEYS.mainTab);
+  if(activateMainTabWithoutRender(savedTab)){
+    if(typeof trendUpdatePeriodControlVisibility === 'function') trendUpdatePeriodControlVisibility();
+    if(savedTab === 'dashboard' || savedTab === 'deep-analysis'){
+      requestAnimationFrame(() => { if(typeof rerenderDashboardVisibleCharts === 'function') rerenderDashboardVisibleCharts(); });
+    }
+    if(savedTab === 'trend-analysis'){
+      requestAnimationFrame(() => { if(typeof renderTrendAnalysis === 'function') renderTrendAnalysis(); setTimeout(() => { if(typeof renderTrendAnalysis === 'function') renderTrendAnalysis(); }, 80); });
+    }
+    if(savedTab === 'attendance-missing'){
+      requestAnimationFrame(() => { if(typeof renderAttendanceMissingAnalysis === 'function') renderAttendanceMissingAnalysis(); });
+    }
+  }
+}
+restoreSavedAttendancePeriod();
+
 
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -4733,6 +4780,7 @@ function renderFilters(){
   $('#period').value = STATE.period;
   $('#period').onchange = e => {
     STATE.period = (e.target.value || fallbackPeriod || 'ALL').trim() || 'ALL';
+    saveAttendanceUiState(ATTENDANCE_UI_STATE_KEYS.period, STATE.period);
     render();
   };
 
@@ -8056,7 +8104,7 @@ async function saveOvertimeCheckChanges(){
   PENDING_APPROVED_OVERTIME_CHANGES = {};
 
   try{
-    await loadAttendanceFromSupabase();
+    await window.loadAttendanceFromSupabase();
   }catch(reloadError){
     console.error('[SAVE BUTTON] reload failed', reloadError);
   }
@@ -9722,6 +9770,7 @@ function bindMainTabs(){
       $$('.mainPanel').forEach(x => x.classList.remove('active'));
       btn.classList.add('active');
       $('#main-' + btn.dataset.main).classList.add('active');
+      saveAttendanceUiState(ATTENDANCE_UI_STATE_KEYS.mainTab, btn.dataset.main);
       if(btn.dataset.main === 'dashboard' || btn.dataset.main === 'deep-analysis'){
         rerenderDashboardVisibleCharts();
       }
@@ -9803,6 +9852,7 @@ function render(){
   renderPeople(scoped);
   renderTrendAnalysis();
   bindMainTabs();
+  restoreSavedMainTab();
   renderTabs();
 }
 
@@ -10210,6 +10260,9 @@ window.addEventListener('resize', renderLightweight);
     resetAttendanceClientState();
     HOLIDAY_DATE_SET = buildHolidayDateSet();
   }
+
+  window.fetchAllAttendanceRecordsFromSupabase = fetchAllAttendanceRecordsFromSupabase;
+  window.loadAttendanceFromSupabase = loadAttendanceFromSupabase;
 
   async function saveOrgMasterToSupabase(sourceOrgMaster){
     const orgRows = normalizeOrgMaster(sourceOrgMaster || orgMaster);
@@ -11046,8 +11099,8 @@ async function deleteAdminMonthData(month){
       saveUploadedAttendanceData();
     }
 
-    if(typeof loadAttendanceFromSupabase === 'function'){
-      try{ await loadAttendanceFromSupabase(); }catch(e){ console.warn('[ADMIN DELETE MONTH] loadAttendanceFromSupabase warn', e); }
+    if(typeof window.loadAttendanceFromSupabase === 'function'){
+      try{ await window.loadAttendanceFromSupabase(); }catch(e){ console.warn('[ADMIN DELETE MONTH] loadAttendanceFromSupabase warn', e); }
     }
 
     if(typeof refreshAdminUploadManagement === 'function') await refreshAdminUploadManagement(true);
@@ -11112,8 +11165,8 @@ async function deleteAdminBatchData(batchId){
       saveUploadedAttendanceData();
     }
 
-    if(typeof loadAttendanceFromSupabase === 'function'){
-      try{ await loadAttendanceFromSupabase(); }catch(e){ console.warn(e); }
+    if(typeof window.loadAttendanceFromSupabase === 'function'){
+      try{ await window.loadAttendanceFromSupabase(); }catch(e){ console.warn(e); }
     }
     updateUploadStatus();
     await refreshAdminUploadManagement(true);
@@ -11195,7 +11248,7 @@ async function refreshAdminUploadManagement(forceYearReload = false){
       }
               bindUploadRuntimeEvents();
       try{
-        await loadAttendanceFromSupabase();
+        await window.loadAttendanceFromSupabase();
       }catch(error){
         console.error('attendance_records 로딩 오류', error);
         resetAttendanceClientState();
@@ -11230,6 +11283,7 @@ async function refreshAdminUploadManagement(forceYearReload = false){
     renderPeople(scoped);
     renderTrendAnalysis();
     bindMainTabs();
+    restoreSavedMainTab();
     renderTabs();
     await refreshAdminUploadManagement();
     };
