@@ -4204,17 +4204,15 @@ async function applyUploadedFiles(){
       throw new Error(backupResult?.reason || '서버 저장에 실패했습니다.');
     }
 
-    // ✅ 월별 누적 데이터 안정화
-    // 업로드 직후 화면 데이터가 방금 올린 월(nextRows)만 남으면,
-    // 2월 업로드 후 3월 화면이 일부 데이터로 재계산되는 문제가 발생합니다.
-    // 따라서 서버 저장이 끝난 뒤 attendance_records 전체를 다시 불러오고,
-    // 기존 선택 월(예: 2026-03)은 유지한 상태로 render()에서 월 필터를 다시 적용합니다.
+    // ✅ 업로드 직후 화면 데이터 안정화
+    // 방금 업로드한 원본 nextRows만 화면 데이터로 사용하면,
+    // 여러 달 데이터가 누적된 상태에서 선택 월이 일부 데이터로 계산될 수 있습니다.
+    // 서버 저장 완료 후 attendance_records 전체를 다시 불러오고, 기존 선택 월은 유지합니다.
     const previousSelectedPeriod = String(STATE?.period || '').trim();
 
     if (supabaseClient && typeof loadAttendanceFromSupabase === 'function') {
       await loadAttendanceFromSupabase();
     } else {
-      // Supabase 비활성화/localStorage 모드일 때만 업로드한 원본 rows를 사용합니다.
       REAL_ATTENDANCE_DATA = nextRows;
       HOLIDAY_DATE_SET = buildHolidayDateSet();
       rebuildDerivedMetricsFromAttendance();
@@ -10031,6 +10029,36 @@ window.addEventListener('resize', renderLightweight);
     return map;
   }
 
+  async function fetchAllAttendanceRecordsFromSupabase(){
+    if(!supabaseClient) return [];
+
+    // Supabase select()는 기본 응답 행 수 제한이 있어 여러 달 누적 시 일부 월이 잘릴 수 있습니다.
+    // 1,000건 단위로 끝까지 가져와 선택 월 계산이 항상 전체 records 기준으로 되게 합니다.
+    const pageSize = 1000;
+    let from = 0;
+    const allRows = [];
+
+    while(true){
+      const to = from + pageSize - 1;
+      const { data, error } = await supabaseClient
+        .from('attendance_records')
+        .select('*')
+        .order('work_date', { ascending: true })
+        .order('employee_no', { ascending: true })
+        .range(from, to);
+
+      if(error) throw error;
+
+      const pageRows = Array.isArray(data) ? data : [];
+      allRows.push(...pageRows);
+
+      if(pageRows.length < pageSize) break;
+      from += pageSize;
+    }
+
+    return allRows;
+  }
+
   async function loadAttendanceFromSupabase(){
     if(!supabaseClient){
       resetAttendanceClientState();
@@ -10038,12 +10066,7 @@ window.addEventListener('resize', renderLightweight);
       return;
     }
 
-    const { data, error } = await supabaseClient
-      .from('attendance_records')
-      .select('*')
-      .order('work_date', { ascending: true });
-
-    if(error) throw error;
+    const data = await fetchAllAttendanceRecordsFromSupabase();
 
     if(Array.isArray(data) && data.length){
       REAL_ATTENDANCE_DATA = data.map(row => ({
