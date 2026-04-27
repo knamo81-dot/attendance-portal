@@ -3486,11 +3486,32 @@ async function deleteServerAttendanceMonth(uploadMonth){
   await deleteUploadBatchesForMonth(uploadMonth);
 }
 
+function hasMeaningfulErpAttendanceRecord(row){
+  if(!row) return false;
+  const reason = String(row.erpReason || row.reason || row.status || '').trim();
+  const jobName = String(row.jobName || '').trim();
+  const actualOT = Number(row.erpActualOvertime || 0) || 0;
+  const appliedOT = Number(row.erpAppliedOvertime || 0) || 0;
+  const hasClockOrWork = !!(row.start || row.end || row.workHours || row.realWorkHours);
+  return !!(reason || jobName || actualOT > 0 || appliedOT > 0 || hasClockOrWork);
+}
+
 function buildMergedAttendanceRowsForServer(secomRows = [], erpRows = []){
   const previousRows = Array.isArray(REAL_ATTENDANCE_DATA) ? REAL_ATTENDANCE_DATA : [];
   try{
-    REAL_ATTENDANCE_DATA = [...(secomRows || []), ...(erpRows || [])];
-    return getMergedRawAttendanceData();
+    // 서버 records는 월 단위로 고정 생성합니다.
+    // 세콤은 날짜+담당자 기준으로 출퇴근 중복을 정리하고,
+    // ERP는 휴가/외근/연장 등 의미 있는 사유 행을 별도 records로 보존합니다.
+    // 전체 raw를 한 번에 date+name으로 합치면 2월 업로드 여부에 따라 3월 records 수가 흔들릴 수 있어
+    // records 생성 단계에서는 세콤 기준 근무행 + ERP 사유행을 분리해 저장합니다.
+    REAL_ATTENDANCE_DATA = (secomRows || []);
+    const mergedSecomRows = getMergedRawAttendanceData().map(row => ({ ...row, __sourceType:'secom' }));
+
+    const erpMeaningfulRows = (erpRows || [])
+      .filter(hasMeaningfulErpAttendanceRecord)
+      .map((row, idx) => ({ ...row, __sourceType:'erp', __erpRecordSeq:idx + 1 }));
+
+    return [...mergedSecomRows, ...erpMeaningfulRows];
   }finally{
     REAL_ATTENDANCE_DATA = previousRows;
   }
