@@ -1,3 +1,6 @@
+<!doctype html>
+<html lang="ko">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>근태 리스크 및 운영 분석 대시보드</title>
@@ -3337,49 +3340,23 @@ async function insertRowsInChunks(tableName, rows, chunkSize = 500){
   }
 }
 
-function getAttendanceRowYM(row){
-  const rawDate = String(row?.work_date || row?.date || '').trim();
-  if(!rawDate) return '';
+function getAttendanceUploadMonthKey({ secomRows = [], erpRows = [], secomFilename = '', erpFilename = '' } = {}){
+  const firstDate =
+    (secomRows.find(r => r && r.date)?.date) ||
+    (erpRows.find(r => r && r.date)?.date) ||
+    '';
 
-  let m = rawDate.match(/^(20\d{2})-(\d{2})-/);
-  if(m) return `${m[1]}-${m[2]}`;
+  const dateText = String(firstDate || '').trim();
+  let m = dateText.match(/^(20\d{2})[-./](\d{1,2})/);
+  if(m) return `${m[1]}-${String(m[2]).padStart(2, '0')}`;
 
-  m = rawDate.match(/^(20\d{2})(\d{2})(\d{2})$/);
-  if(m) return `${m[1]}-${m[2]}`;
-
-  const d = new Date(rawDate);
-  if(!Number.isNaN(d.getTime())){
+  const d = new Date(dateText);
+  if(dateText && !Number.isNaN(d.getTime())){
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }
 
-  return '';
-}
-
-function getUniqueAttendanceYMs(rows = []){
-  return [...new Set((rows || []).map(getAttendanceRowYM).filter(Boolean))].sort();
-}
-
-function assertSingleUploadMonth(rows = [], label = '파일'){
-  const yms = getUniqueAttendanceYMs(rows);
-  if(!yms.length) return null;
-  if(yms.length > 1){
-    throw new Error(`${label} 안에 여러 년월 데이터가 섞여 있습니다: ${yms.join(', ')}. 한 번에는 같은 년월 데이터만 업로드해주세요.`);
-  }
-  return yms[0];
-}
-
-function getAttendanceUploadMonthKey({ secomRows = [], erpRows = [], secomFilename = '', erpFilename = '' } = {}){
-  const secomYM = assertSingleUploadMonth(secomRows, '세콤 파일');
-  const erpYM = assertSingleUploadMonth(erpRows, 'ERP 파일');
-
-  if(secomYM && erpYM && secomYM !== erpYM){
-    throw new Error(`세콤과 ERP의 기준 년월이 다릅니다. 세콤: ${secomYM}, ERP: ${erpYM}. 같은 년월 파일을 선택해주세요.`);
-  }
-
-  if(secomYM || erpYM) return secomYM || erpYM;
-
   const fileText = `${secomFilename || ''} ${erpFilename || ''}`;
-  let m = fileText.match(/(20\d{2})[^0-9]?(0?[1-9]|1[0-2])/);
+  m = fileText.match(/(20\d{2})[^0-9]?(0?[1-9]|1[0-2])/);
   if(m) return `${m[1]}-${String(m[2]).padStart(2, '0')}`;
 
   m = fileText.match(/(?:^|[^0-9])(\d{2})[^0-9]?(0?[1-9]|1[0-2])(?:[^0-9]|$)/);
@@ -3581,16 +3558,9 @@ async function backupUploadedAttendanceRawToSupabase({
     return null;
   })();
 
-  const targetSecomRows = (secomRows || []).filter(row => getAttendanceRowYM(row) === uploadMonth);
-  const targetErpRows = (erpRows || []).filter(row => getAttendanceRowYM(row) === uploadMonth);
-
-  if((secomRows || []).length !== targetSecomRows.length || (erpRows || []).length !== targetErpRows.length){
-    throw new Error(`업로드 대상월(${uploadMonth})과 다른 날짜가 포함되어 있습니다. 파일 내용을 확인해주세요.`);
-  }
-
   await deleteServerAttendanceMonth(uploadMonth);
 
-  const secomPayload = (targetSecomRows || []).map(row => ({
+  const secomPayload = (secomRows || []).map(row => ({
     upload_batch_id: batchId,
     work_date: row.date || null,
     emp_no: String(row.employeeId || '').trim() || null,
@@ -3600,7 +3570,7 @@ async function backupUploadedAttendanceRawToSupabase({
     raw_data: row
   }));
 
-  const erpPayload = (targetErpRows || []).map(row => ({
+  const erpPayload = (erpRows || []).map(row => ({
     upload_batch_id: batchId,
     work_date: row.date || null,
     emp_no: String(row.employeeId || '').trim() || null,
@@ -3619,7 +3589,7 @@ async function backupUploadedAttendanceRawToSupabase({
     await insertRowsInChunks('attendance_erp_raw', erpPayload);
   }
 
-  const recordPayload = buildAttendanceRecordPayloads(batchId, targetSecomRows, targetErpRows);
+  const recordPayload = buildAttendanceRecordPayloads(batchId, secomRows, erpRows);
   if(recordPayload.length){
     await insertAttendanceRecordsInChunks(recordPayload);
   }
@@ -4243,8 +4213,8 @@ async function applyUploadedFiles(){
     // 서버 저장 완료 후 attendance_records 전체를 다시 불러오고, 기존 선택 월은 유지합니다.
     const previousSelectedPeriod = String(STATE?.period || '').trim();
 
-    if (supabaseClient && typeof window.loadAttendanceFromSupabase === 'function') {
-      await window.loadAttendanceFromSupabase();
+    if (supabaseClient && typeof loadAttendanceFromSupabase === 'function') {
+      await loadAttendanceFromSupabase();
     } else {
       REAL_ATTENDANCE_DATA = nextRows;
       HOLIDAY_DATE_SET = buildHolidayDateSet();
@@ -4260,10 +4230,10 @@ async function applyUploadedFiles(){
     }
 
     updateUploadStatus();
-    await updateAttendanceViewsAfterDataChange({ refreshFilters: true });
     if (typeof refreshAdminUploadManagement === 'function') {
-      await refreshAdminUploadManagement(true);
-    }
+  await refreshAdminUploadManagement(true);
+}
+    render();
 
     alert(`업로드 데이터 반영이 완료되었습니다. 조직관리와 사원정보관리는 유지되었습니다.
 서버 저장 완료 · ${backupResult.uploadMonth || ''} · Batch: ${backupResult.batchId}
@@ -4280,7 +4250,7 @@ async function applyUploadedFiles(){
 alert('업로드 실패 상세: ' + (error?.message || JSON.stringify(error)));
     resetAttendanceClientState();
     try{
-      await window.loadAttendanceFromSupabase();
+      await loadAttendanceFromSupabase();
     }catch(loadError){
       console.error('[ATTENDANCE RELOAD FAILED AFTER UPLOAD ERROR]', loadError);
       resetAttendanceClientState();
@@ -4301,7 +4271,7 @@ function bindUploadRuntimeEvents(){
       console.error(err);
       resetAttendanceClientState();
       try{
-        await window.loadAttendanceFromSupabase();
+        await loadAttendanceFromSupabase();
       }catch(loadError){
         console.error('[ATTENDANCE RELOAD FAILED IN CLICK HANDLER]', loadError);
         resetAttendanceClientState();
@@ -4318,43 +4288,6 @@ function bindUploadRuntimeEvents(){
 const GRADE_ORDER = ['사원','주임','대리','과장','차장','부장','이사부장'];
 const COLORS = ['#2563eb','#0f766e','#f59e0b','#ef4444','#7c3aed','#14b8a6','#334155'];
 const STATE = { period:'3M', division:'전체', team:'전체', attendanceIncludeLeave:true, dashboardExcludeLeave:true, leaveCauseFocus:'', fatigueMode:'recommended' };
-
-const ATTENDANCE_UI_STATE_KEYS = {
-  mainTab: '',
-  period: 'attendanceSelectedPeriod'
-};
-function saveAttendanceUiState(key, value){
-  try{
-    if(!key) return;
-    localStorage.setItem(key, String(value || '').trim());
-  }catch(e){}
-}
-function readAttendanceUiState(key){
-  try{ return String(localStorage.getItem(key) || '').trim(); }catch(e){ return ''; }
-}
-function restoreSavedAttendancePeriod(){
-  const savedPeriod = readAttendanceUiState(ATTENDANCE_UI_STATE_KEYS.period);
-  if(savedPeriod) STATE.period = savedPeriod;
-}
-function activateMainTabWithoutRender(tabName){
-  const targetName = String(tabName || '').trim();
-  if(!targetName) return false;
-  const btn = document.querySelector(`.mainTab[data-main="${targetName}"]`);
-  const panel = document.querySelector(`#main-${targetName}`);
-  if(!btn || !panel) return false;
-  $$('.mainTab').forEach(x => x.classList.remove('active'));
-  $$('.mainPanel').forEach(x => x.classList.remove('active'));
-  btn.classList.add('active');
-  panel.classList.add('active');
-  return true;
-}
-function restoreSavedMainTab(){
-  try{ localStorage.removeItem('attendanceActiveMainTab'); }catch(e){}
-  activateMainTabWithoutRender('attendance');
-  if(typeof trendUpdatePeriodControlVisibility === 'function') trendUpdatePeriodControlVisibility();
-}
-restoreSavedAttendancePeriod();
-
 
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -4800,8 +4733,7 @@ function renderFilters(){
   $('#period').value = STATE.period;
   $('#period').onchange = e => {
     STATE.period = (e.target.value || fallbackPeriod || 'ALL').trim() || 'ALL';
-    saveAttendanceUiState(ATTENDANCE_UI_STATE_KEYS.period, STATE.period);
-    updateAttendanceViewsAfterDataChange({ refreshFilters: false });
+    render();
   };
 
   const divisionMetaByName = new Map(orgMaster.map(div => [div.divisionName, div]));
@@ -4835,7 +4767,7 @@ function renderFilters(){
       STATE.division = nextDivision;
       STATE.team = '전체';
     }
-    updateAttendanceViewsAfterDataChange({ refreshFilters: true });
+    render();
   };
 
   const teamBase = STATE.division==='전체' ? EMPLOYEES : EMPLOYEES.filter(e=>e.division===STATE.division);
@@ -4858,59 +4790,10 @@ function renderFilters(){
     STATE.team = '전체';
     $('#team').value = '';
   }
-  $('#team').onchange = e => {
-    STATE.team = (e.target.value || '').trim() || '전체';
-    updateAttendanceViewsAfterDataChange({ refreshFilters: false });
-  };
+  $('#team').onchange = e => { STATE.team = (e.target.value || '').trim() || '전체'; render(); };
 }
 
 
-
-
-async function updateAttendanceViewsAfterDataChange(options = {}){
-  try{
-    dedupeEmpMasterByName();
-    if(Array.isArray(REAL_ATTENDANCE_DATA) && REAL_ATTENDANCE_DATA.length){
-      rebuildDerivedMetricsFromAttendance();
-    }else{
-      syncDashboardDataFromEmpMaster();
-    }
-    updateUploadStatus();
-    if(options.refreshFilters !== false){
-      renderFilters();
-    }
-    if(typeof refreshFloatingFilters === 'function') refreshFloatingFilters();
-    const months = periodMonths();
-    const scoped = scopedEmployees();
-    renderKpis(scoped);
-    if(typeof initKpiCardLayout === 'function') initKpiCardLayout();
-    renderSummary(months);
-    renderAlerts(months);
-    renderAttendanceTab();
-    renderAttendanceMissingAnalysis();
-    renderTopCharts(scoped, months);
-    renderInsight(scoped, months);
-    renderRisk(scoped);
-    renderPeople(scoped);
-    renderTrendAnalysis();
-    renderTabs();
-  }catch(error){
-    console.error('[UPDATE ATTENDANCE VIEWS FAILED]', error);
-  }
-}
-
-async function refreshAttendanceAfterAdminMutation(options = {}){
-  // DB 삭제/업로드 직후에는 먼저 최신 attendance 데이터를 다시 가져오고,
-  // 화면을 갱신한 뒤, 마지막에 관리자 업로드 현황을 다시 조회합니다.
-  // 순서가 반대이면 renderTabs()/부분 갱신 이후 월카드가 오래된 값으로 보일 수 있습니다.
-  if(typeof window.loadAttendanceFromSupabase === 'function'){
-    try{ await window.loadAttendanceFromSupabase(); }catch(e){ console.warn('[ADMIN MUTATION RELOAD WARN]', e); }
-  }
-  await updateAttendanceViewsAfterDataChange({ refreshFilters: options.refreshFilters !== false });
-  if(typeof refreshAdminUploadManagement === 'function'){
-    await refreshAdminUploadManagement(options.forceYearReload === true);
-  }
-}
 function getHeadcountStatusSummary(){
   const employeeMetaMap = new Map((Array.isArray(empMaster) ? empMaster : EMPLOYEES).map(e => [normalizeEmployeeName(e.name), e]));
   const rows = getMergedRawAttendanceData()
@@ -8173,7 +8056,7 @@ async function saveOvertimeCheckChanges(){
   PENDING_APPROVED_OVERTIME_CHANGES = {};
 
   try{
-    await window.loadAttendanceFromSupabase();
+    await loadAttendanceFromSupabase();
   }catch(reloadError){
     console.error('[SAVE BUTTON] reload failed', reloadError);
   }
@@ -9920,7 +9803,6 @@ function render(){
   renderPeople(scoped);
   renderTrendAnalysis();
   bindMainTabs();
-  restoreSavedMainTab();
   renderTabs();
 }
 
@@ -10328,9 +10210,6 @@ window.addEventListener('resize', renderLightweight);
     resetAttendanceClientState();
     HOLIDAY_DATE_SET = buildHolidayDateSet();
   }
-
-  window.fetchAllAttendanceRecordsFromSupabase = fetchAllAttendanceRecordsFromSupabase;
-  window.loadAttendanceFromSupabase = loadAttendanceFromSupabase;
 
   async function saveOrgMasterToSupabase(sourceOrgMaster){
     const orgRows = normalizeOrgMaster(sourceOrgMaster || orgMaster);
@@ -11167,7 +11046,13 @@ async function deleteAdminMonthData(month){
       saveUploadedAttendanceData();
     }
 
-    await refreshAttendanceAfterAdminMutation({ forceYearReload: true, refreshFilters: true });
+    if(typeof loadAttendanceFromSupabase === 'function'){
+      try{ await loadAttendanceFromSupabase(); }catch(e){ console.warn('[ADMIN DELETE MONTH] loadAttendanceFromSupabase warn', e); }
+    }
+
+    if(typeof refreshAdminUploadManagement === 'function') await refreshAdminUploadManagement(true);
+    if(typeof updateUploadStatus === 'function') updateUploadStatus();
+    if(typeof render === 'function') await render();
 
     alert(`${year}년 ${m}월 데이터 삭제가 완료되었습니다.`);
   }catch(error){
@@ -11227,7 +11112,12 @@ async function deleteAdminBatchData(batchId){
       saveUploadedAttendanceData();
     }
 
-    await refreshAttendanceAfterAdminMutation({ forceYearReload: true, refreshFilters: true });
+    if(typeof loadAttendanceFromSupabase === 'function'){
+      try{ await loadAttendanceFromSupabase(); }catch(e){ console.warn(e); }
+    }
+    updateUploadStatus();
+    await refreshAdminUploadManagement(true);
+    await render();
     alert('배치 삭제가 완료되었습니다.');
   }catch(error){
     console.error('[ADMIN DELETE BATCH FAILED]', error);
@@ -11305,7 +11195,7 @@ async function refreshAdminUploadManagement(forceYearReload = false){
       }
               bindUploadRuntimeEvents();
       try{
-        await window.loadAttendanceFromSupabase();
+        await loadAttendanceFromSupabase();
       }catch(error){
         console.error('attendance_records 로딩 오류', error);
         resetAttendanceClientState();
@@ -11340,11 +11230,8 @@ async function refreshAdminUploadManagement(forceYearReload = false){
     renderPeople(scoped);
     renderTrendAnalysis();
     bindMainTabs();
-    restoreSavedMainTab();
     renderTabs();
-    if(document.getElementById('adminUploadMonthGrid')){
-      await refreshAdminUploadManagement();
-    }
+    await refreshAdminUploadManagement();
     };
 
   bindAdminManagementEvents();
