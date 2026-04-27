@@ -3340,23 +3340,49 @@ async function insertRowsInChunks(tableName, rows, chunkSize = 500){
   }
 }
 
-function getAttendanceUploadMonthKey({ secomRows = [], erpRows = [], secomFilename = '', erpFilename = '' } = {}){
-  const firstDate =
-    (secomRows.find(r => r && r.date)?.date) ||
-    (erpRows.find(r => r && r.date)?.date) ||
-    '';
+function getAttendanceRowYM(row){
+  const rawDate = String(row?.work_date || row?.date || '').trim();
+  if(!rawDate) return '';
 
-  const dateText = String(firstDate || '').trim();
-  let m = dateText.match(/^(20\d{2})[-./](\d{1,2})/);
-  if(m) return `${m[1]}-${String(m[2]).padStart(2, '0')}`;
+  let m = rawDate.match(/^(20\d{2})-(\d{2})-/);
+  if(m) return `${m[1]}-${m[2]}`;
 
-  const d = new Date(dateText);
-  if(dateText && !Number.isNaN(d.getTime())){
+  m = rawDate.match(/^(20\d{2})(\d{2})(\d{2})$/);
+  if(m) return `${m[1]}-${m[2]}`;
+
+  const d = new Date(rawDate);
+  if(!Number.isNaN(d.getTime())){
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }
 
+  return '';
+}
+
+function getUniqueAttendanceYMs(rows = []){
+  return [...new Set((rows || []).map(getAttendanceRowYM).filter(Boolean))].sort();
+}
+
+function assertSingleUploadMonth(rows = [], label = '파일'){
+  const yms = getUniqueAttendanceYMs(rows);
+  if(!yms.length) return null;
+  if(yms.length > 1){
+    throw new Error(`${label} 안에 여러 년월 데이터가 섞여 있습니다: ${yms.join(', ')}. 한 번에는 같은 년월 데이터만 업로드해주세요.`);
+  }
+  return yms[0];
+}
+
+function getAttendanceUploadMonthKey({ secomRows = [], erpRows = [], secomFilename = '', erpFilename = '' } = {}){
+  const secomYM = assertSingleUploadMonth(secomRows, '세콤 파일');
+  const erpYM = assertSingleUploadMonth(erpRows, 'ERP 파일');
+
+  if(secomYM && erpYM && secomYM !== erpYM){
+    throw new Error(`세콤과 ERP의 기준 년월이 다릅니다. 세콤: ${secomYM}, ERP: ${erpYM}. 같은 년월 파일을 선택해주세요.`);
+  }
+
+  if(secomYM || erpYM) return secomYM || erpYM;
+
   const fileText = `${secomFilename || ''} ${erpFilename || ''}`;
-  m = fileText.match(/(20\d{2})[^0-9]?(0?[1-9]|1[0-2])/);
+  let m = fileText.match(/(20\d{2})[^0-9]?(0?[1-9]|1[0-2])/);
   if(m) return `${m[1]}-${String(m[2]).padStart(2, '0')}`;
 
   m = fileText.match(/(?:^|[^0-9])(\d{2})[^0-9]?(0?[1-9]|1[0-2])(?:[^0-9]|$)/);
@@ -3558,9 +3584,16 @@ async function backupUploadedAttendanceRawToSupabase({
     return null;
   })();
 
+  const targetSecomRows = (secomRows || []).filter(row => getAttendanceRowYM(row) === uploadMonth);
+  const targetErpRows = (erpRows || []).filter(row => getAttendanceRowYM(row) === uploadMonth);
+
+  if((secomRows || []).length !== targetSecomRows.length || (erpRows || []).length !== targetErpRows.length){
+    throw new Error(`업로드 대상월(${uploadMonth})과 다른 날짜가 포함되어 있습니다. 파일 내용을 확인해주세요.`);
+  }
+
   await deleteServerAttendanceMonth(uploadMonth);
 
-  const secomPayload = (secomRows || []).map(row => ({
+  const secomPayload = (targetSecomRows || []).map(row => ({
     upload_batch_id: batchId,
     work_date: row.date || null,
     emp_no: String(row.employeeId || '').trim() || null,
@@ -3570,7 +3603,7 @@ async function backupUploadedAttendanceRawToSupabase({
     raw_data: row
   }));
 
-  const erpPayload = (erpRows || []).map(row => ({
+  const erpPayload = (targetErpRows || []).map(row => ({
     upload_batch_id: batchId,
     work_date: row.date || null,
     emp_no: String(row.employeeId || '').trim() || null,
@@ -3589,7 +3622,7 @@ async function backupUploadedAttendanceRawToSupabase({
     await insertRowsInChunks('attendance_erp_raw', erpPayload);
   }
 
-  const recordPayload = buildAttendanceRecordPayloads(batchId, secomRows, erpRows);
+  const recordPayload = buildAttendanceRecordPayloads(batchId, targetSecomRows, targetErpRows);
   if(recordPayload.length){
     await insertAttendanceRecordsInChunks(recordPayload);
   }
