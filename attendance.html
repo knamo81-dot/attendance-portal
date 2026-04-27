@@ -3341,8 +3341,7 @@ async function insertRowsInChunks(tableName, rows, chunkSize = 500){
 }
 
 function getAttendanceRowYM(row){
-  const rawValue = row?.work_date || row?.date || '';
-  const rawDate = String(rawValue).trim();
+  const rawDate = String(row?.work_date || row?.date || '').trim();
   if(!rawDate) return '';
 
   let m = rawDate.match(/^(20\d{2})-(\d{2})-/);
@@ -3350,12 +3349,6 @@ function getAttendanceRowYM(row){
 
   m = rawDate.match(/^(20\d{2})(\d{2})(\d{2})$/);
   if(m) return `${m[1]}-${m[2]}`;
-
-  if(typeof rawValue === 'number'){
-    const fixedDate = parseExcelDateValue(rawValue);
-    m = String(fixedDate || '').match(/^(20\d{2})-(\d{2})-/);
-    if(m) return `${m[1]}-${m[2]}`;
-  }
 
   const d = new Date(rawDate);
   if(!Number.isNaN(d.getTime())){
@@ -3678,9 +3671,8 @@ function parseExcelDateValue(v){
     return `${year}-${month}-${day}`;
   }
   if(typeof v === 'number'){
-    // Excel serial date. 일부 세콤 파일은 46022.999999처럼 소수 오차가 들어와
-    // floor 처리 시 2026-01-01이 2025-12-31로 밀릴 수 있으므로 round로 보정합니다.
-    const utcDays = Math.round(v - 25569);
+    // Excel serial date
+    const utcDays = Math.floor(v - 25569);
     const utcValue = utcDays * 86400;
     const dateInfo = new Date(utcValue * 1000);
     const year = dateInfo.getUTCFullYear();
