@@ -4266,7 +4266,7 @@ async function applyUploadedFiles(){
     if (typeof refreshAdminUploadManagement === 'function') {
       await refreshAdminUploadManagement(true);
     }
-    renderAttendanceViews({ refreshFilters:true });
+    await updateAttendanceViewsAfterDataChange({ refreshFilters: true });
 
     alert(`업로드 데이터 반영이 완료되었습니다. 조직관리와 사원정보관리는 유지되었습니다.
 서버 저장 완료 · ${backupResult.uploadMonth || ''} · Batch: ${backupResult.batchId}
@@ -4289,7 +4289,7 @@ alert('업로드 실패 상세: ' + (error?.message || JSON.stringify(error)));
       resetAttendanceClientState();
     }
     updateUploadStatus();
-    renderAttendanceViews({ refreshFilters:true });
+    render();
     return;
   } finally {
     if(applyBtn){
@@ -4310,7 +4310,7 @@ function bindUploadRuntimeEvents(){
         resetAttendanceClientState();
       }
       updateUploadStatus();
-      renderAttendanceViews({ refreshFilters:true });
+      render();
       alert('업로드 실패 상세: ' + (err?.message || JSON.stringify(err)));
     });
   });
@@ -4802,13 +4802,9 @@ function renderFilters(){
     : '<option value="ALL">전체</option>';
   $('#period').value = STATE.period;
   $('#period').onchange = e => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-    const nextPeriod = (e.target.value || fallbackPeriod || 'ALL').trim() || 'ALL';
-    if(STATE.period === nextPeriod) return;
-    STATE.period = nextPeriod;
+    STATE.period = (e.target.value || fallbackPeriod || 'ALL').trim() || 'ALL';
     saveAttendanceUiState(ATTENDANCE_UI_STATE_KEYS.period, STATE.period);
-    scheduleAttendanceViewsRender({ refreshFilters:false });
+    updateAttendanceViewsAfterDataChange({ refreshFilters: false });
   };
 
   const divisionMetaByName = new Map(orgMaster.map(div => [div.divisionName, div]));
@@ -4842,7 +4838,7 @@ function renderFilters(){
       STATE.division = nextDivision;
       STATE.team = '전체';
     }
-    scheduleAttendanceViewsRender({ refreshFilters:true });
+    render();
   };
 
   const teamBase = STATE.division==='전체' ? EMPLOYEES : EMPLOYEES.filter(e=>e.division===STATE.division);
@@ -4865,15 +4861,53 @@ function renderFilters(){
     STATE.team = '전체';
     $('#team').value = '';
   }
-  $('#team').onchange = e => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-    STATE.team = (e.target.value || '').trim() || '전체';
-    scheduleAttendanceViewsRender({ refreshFilters:false });
-  };
+  $('#team').onchange = e => { STATE.team = (e.target.value || '').trim() || '전체'; render(); };
 }
 
 
+
+
+async function updateAttendanceViewsAfterDataChange(options = {}){
+  try{
+    dedupeEmpMasterByName();
+    if(Array.isArray(REAL_ATTENDANCE_DATA) && REAL_ATTENDANCE_DATA.length){
+      rebuildDerivedMetricsFromAttendance();
+    }else{
+      syncDashboardDataFromEmpMaster();
+    }
+    updateUploadStatus();
+    if(options.refreshFilters !== false){
+      renderFilters();
+    }
+    if(typeof refreshFloatingFilters === 'function') refreshFloatingFilters();
+    const months = periodMonths();
+    const scoped = scopedEmployees();
+    renderKpis(scoped);
+    if(typeof initKpiCardLayout === 'function') initKpiCardLayout();
+    renderSummary(months);
+    renderAlerts(months);
+    renderAttendanceTab();
+    renderAttendanceMissingAnalysis();
+    renderTopCharts(scoped, months);
+    renderInsight(scoped, months);
+    renderRisk(scoped);
+    renderPeople(scoped);
+    renderTrendAnalysis();
+    renderTabs();
+  }catch(error){
+    console.error('[UPDATE ATTENDANCE VIEWS FAILED]', error);
+  }
+}
+
+async function refreshAttendanceAfterAdminMutation(options = {}){
+  if(typeof window.loadAttendanceFromSupabase === 'function'){
+    try{ await window.loadAttendanceFromSupabase(); }catch(e){ console.warn('[ADMIN MUTATION RELOAD WARN]', e); }
+  }
+  if(typeof refreshAdminUploadManagement === 'function'){
+    await refreshAdminUploadManagement(options.forceYearReload === true);
+  }
+  await updateAttendanceViewsAfterDataChange({ refreshFilters: options.refreshFilters !== false });
+}
 function getHeadcountStatusSummary(){
   const employeeMetaMap = new Map((Array.isArray(empMaster) ? empMaster : EMPLOYEES).map(e => [normalizeEmployeeName(e.name), e]));
   const rows = getMergedRawAttendanceData()
@@ -9812,9 +9846,6 @@ function bindMainTabs(){
       if(btn.dataset.main === 'attendance-missing'){
         renderAttendanceMissingAnalysis();
       }
-      if(btn.dataset.main === 'admin' && typeof refreshAdminUploadManagement === 'function'){
-        refreshAdminUploadManagement().catch(err => console.error('[ADMIN REFRESH ON TAB]', err));
-      }
     };
   });
 }
@@ -9888,44 +9919,6 @@ function render(){
   bindMainTabs();
   restoreSavedMainTab();
   renderTabs();
-
-
-function renderAttendanceViews(options = {}){
-  const refreshFilters = options.refreshFilters === true;
-  dedupeEmpMasterByName();
-  if(Array.isArray(REAL_ATTENDANCE_DATA) && REAL_ATTENDANCE_DATA.length){
-    rebuildDerivedMetricsFromAttendance();
-  }else{
-    syncDashboardDataFromEmpMaster();
-  }
-  updateUploadStatus();
-  if(refreshFilters) renderFilters();
-  if(typeof refreshFloatingFilters === 'function') refreshFloatingFilters();
-  const months = periodMonths();
-  const scoped = scopedEmployees();
-  renderKpis(scoped);
-  initKpiCardLayout();
-  renderSummary(months);
-  renderAlerts(months);
-  renderAttendanceTab();
-  renderAttendanceMissingAnalysis();
-  renderTopCharts(scoped, months);
-  renderInsight(scoped, months);
-  renderRisk(scoped);
-  renderPeople(scoped);
-  renderTrendAnalysis();
-  renderTabs();
-}
-
-function scheduleAttendanceViewsRender(options = {}){
-  requestAnimationFrame(() => {
-    try{
-      renderAttendanceViews(options);
-    }catch(error){
-      console.error('[ATTENDANCE VIEW RENDER FAILED]', error);
-    }
-  });
-}
 }
 
 
@@ -11171,13 +11164,7 @@ async function deleteAdminMonthData(month){
       saveUploadedAttendanceData();
     }
 
-    if(typeof window.loadAttendanceFromSupabase === 'function'){
-      try{ await window.loadAttendanceFromSupabase(); }catch(e){ console.warn('[ADMIN DELETE MONTH] loadAttendanceFromSupabase warn', e); }
-    }
-
-    if(typeof refreshAdminUploadManagement === 'function') await refreshAdminUploadManagement(true);
-    if(typeof updateUploadStatus === 'function') updateUploadStatus();
-    if(typeof renderAttendanceViews === 'function') renderAttendanceViews({ refreshFilters:true });
+    await refreshAttendanceAfterAdminMutation({ forceYearReload: true, refreshFilters: true });
 
     alert(`${year}년 ${m}월 데이터 삭제가 완료되었습니다.`);
   }catch(error){
@@ -11237,12 +11224,7 @@ async function deleteAdminBatchData(batchId){
       saveUploadedAttendanceData();
     }
 
-    if(typeof window.loadAttendanceFromSupabase === 'function'){
-      try{ await window.loadAttendanceFromSupabase(); }catch(e){ console.warn(e); }
-    }
-    updateUploadStatus();
-    await refreshAdminUploadManagement(true);
-    if(typeof renderAttendanceViews === 'function') renderAttendanceViews({ refreshFilters:true });
+    await refreshAttendanceAfterAdminMutation({ forceYearReload: true, refreshFilters: true });
     alert('배치 삭제가 완료되었습니다.');
   }catch(error){
     console.error('[ADMIN DELETE BATCH FAILED]', error);
@@ -11332,13 +11314,32 @@ async function refreshAdminUploadManagement(forceYearReload = false){
       }
       window.__empMasterInitialized = true;
     }
-    renderAttendanceViews({ refreshFilters:true });
+    dedupeEmpMasterByName();
+    if(Array.isArray(REAL_ATTENDANCE_DATA) && REAL_ATTENDANCE_DATA.length){
+      rebuildDerivedMetricsFromAttendance();
+    }else{
+      syncDashboardDataFromEmpMaster();
+    }
+    updateUploadStatus();
+    renderFilters();
+    refreshFloatingFilters();
+            const months = periodMonths();
+    const scoped = scopedEmployees();
+    renderKpis(scoped);
+    initKpiCardLayout();
+    renderSummary(months);
+    renderAlerts(months);
+    renderAttendanceTab();
+    renderAttendanceMissingAnalysis();
+    renderTopCharts(scoped, months);
+    renderInsight(scoped, months);
+    renderRisk(scoped);
+    renderPeople(scoped);
+    renderTrendAnalysis();
     bindMainTabs();
     restoreSavedMainTab();
-    const isAdminActive = !!document.getElementById('main-admin')?.classList.contains('active');
-    if(isAdminActive && typeof refreshAdminUploadManagement === 'function'){
-      await refreshAdminUploadManagement();
-    }
+    renderTabs();
+    await refreshAdminUploadManagement();
     };
 
   bindAdminManagementEvents();
