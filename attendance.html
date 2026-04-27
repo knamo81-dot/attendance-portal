@@ -4290,7 +4290,7 @@ const COLORS = ['#2563eb','#0f766e','#f59e0b','#ef4444','#7c3aed','#14b8a6','#33
 const STATE = { period:'3M', division:'전체', team:'전체', attendanceIncludeLeave:true, dashboardExcludeLeave:true, leaveCauseFocus:'', fatigueMode:'recommended' };
 
 const ATTENDANCE_UI_STATE_KEYS = {
-  mainTab: 'attendanceActiveMainTab',
+  mainTab: '',
   period: 'attendanceSelectedPeriod'
 };
 function saveAttendanceUiState(key, value){
@@ -4319,19 +4319,9 @@ function activateMainTabWithoutRender(tabName){
   return true;
 }
 function restoreSavedMainTab(){
-  const savedTab = readAttendanceUiState(ATTENDANCE_UI_STATE_KEYS.mainTab);
-  if(activateMainTabWithoutRender(savedTab)){
-    if(typeof trendUpdatePeriodControlVisibility === 'function') trendUpdatePeriodControlVisibility();
-    if(savedTab === 'dashboard' || savedTab === 'deep-analysis'){
-      requestAnimationFrame(() => { if(typeof rerenderDashboardVisibleCharts === 'function') rerenderDashboardVisibleCharts(); });
-    }
-    if(savedTab === 'trend-analysis'){
-      requestAnimationFrame(() => { if(typeof renderTrendAnalysis === 'function') renderTrendAnalysis(); setTimeout(() => { if(typeof renderTrendAnalysis === 'function') renderTrendAnalysis(); }, 80); });
-    }
-    if(savedTab === 'attendance-missing'){
-      requestAnimationFrame(() => { if(typeof renderAttendanceMissingAnalysis === 'function') renderAttendanceMissingAnalysis(); });
-    }
-  }
+  try{ localStorage.removeItem('attendanceActiveMainTab'); }catch(e){}
+  activateMainTabWithoutRender('attendance');
+  if(typeof trendUpdatePeriodControlVisibility === 'function') trendUpdatePeriodControlVisibility();
 }
 restoreSavedAttendancePeriod();
 
@@ -9770,7 +9760,6 @@ function bindMainTabs(){
       $$('.mainPanel').forEach(x => x.classList.remove('active'));
       btn.classList.add('active');
       $('#main-' + btn.dataset.main).classList.add('active');
-      saveAttendanceUiState(ATTENDANCE_UI_STATE_KEYS.mainTab, btn.dataset.main);
       if(btn.dataset.main === 'dashboard' || btn.dataset.main === 'deep-analysis'){
         rerenderDashboardVisibleCharts();
       }
