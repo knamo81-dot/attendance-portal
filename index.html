@@ -133,6 +133,9 @@
   const SUPABASE_URL = 'https://mbqpsovlwvedwrtbbauj.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
 
+  const HOME_SRC = 'portal-home.html';
+  const LAST_PAGE_KEY = 'portalLastPage';
+
   const frame = document.getElementById('portalFrame');
   const navButtons = Array.prototype.slice.call(document.querySelectorAll('.nav-btn[data-portal-src]'));
   const logoutBtn = document.getElementById('logoutNavBtn');
@@ -140,83 +143,152 @@
 
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
- async function ensureAuthenticated() {
-  const { data } = await supabaseClient.auth.getSession();
-
-  if (!data.session) {
-    if (frame) {
-      frame.src = 'portal-home.html';
-    }
-    if (homeBtn) {
-      setActiveNav(homeBtn);
-    }
-    return false;
-  }
-
-  return true;
-}
-  
   function setActiveNav(activeBtn) {
     navButtons.forEach(function (b) {
       b.classList.toggle('active', b === activeBtn);
     });
   }
 
-async function navigate(btn) {
-  const ok = await ensureAuthenticated();
-  if (!ok) return;
-
-  var src = btn.getAttribute('data-portal-src');
-  if (!src || !frame) return;
-
-  // 현재 로그인 사용자 가져오기
-  const { data } = await supabaseClient.auth.getUser();
-  const user = data?.user;
-
-  frame.src = src;
-
-  frame.onload = () => {
-    if (!user) return;
-
-frame.contentWindow.postMessage(
-  {
-    type: 'portal-auth',
-    user: {
-      email: user.email
-    }
-  },
-  '*'
-);
-  };
-
-  setActiveNav(btn);
-}
-
-navButtons.forEach(function (btn) {
-  btn.addEventListener('click', async function () {
-    await navigate(btn);
-  });
-});
-
-logoutBtn.addEventListener('click', async function () {
-  try {
-    await supabaseClient.auth.signOut();
-
-    if (frame) {
-      frame.src = 'portal-home.html';
-    }
-
-    if (homeBtn) {
-      setActiveNav(homeBtn);
-    }
-
-    window.location.reload();
-
-  } catch (e) {
-    console.error('logout failed:', e);
-    alert('로그아웃 중 오류가 발생했습니다.');
+  function findNavBySrc(src) {
+    return navButtons.find(function (btn) {
+      return btn.getAttribute('data-portal-src') === src;
+    });
   }
-});
+
+  function postAuthToFrame(user) {
+    if (!frame || !frame.contentWindow || !user) return;
+
+    frame.contentWindow.postMessage(
+      {
+        type: 'portal-auth',
+        user: {
+          email: user.email
+        }
+      },
+      '*'
+    );
+  }
+
+  async function getCurrentUser() {
+    const { data } = await supabaseClient.auth.getUser();
+    return data?.user || null;
+  }
+
+  async function ensureAuthenticated() {
+    const { data } = await supabaseClient.auth.getSession();
+
+    if (!data.session) {
+      localStorage.removeItem(LAST_PAGE_KEY);
+
+      if (frame) {
+        frame.src = HOME_SRC;
+      }
+      if (homeBtn) {
+        setActiveNav(homeBtn);
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  async function navigate(btn, options) {
+    options = options || {};
+
+    var src = btn.getAttribute('data-portal-src');
+    if (!src || !frame) return;
+
+    // 홈은 로그인 전에도 열 수 있게 둡니다.
+    if (src === HOME_SRC) {
+      frame.src = HOME_SRC;
+      localStorage.removeItem(LAST_PAGE_KEY);
+      setActiveNav(btn);
+      return;
+    }
+
+    const ok = await ensureAuthenticated();
+    if (!ok) return;
+
+    const user = await getCurrentUser();
+
+    // 사용자가 선택한 앱만 마지막 페이지로 저장합니다.
+    if (!options.skipSave) {
+      localStorage.setItem(LAST_PAGE_KEY, src);
+    }
+
+    frame.onload = function () {
+      postAuthToFrame(user);
+    };
+
+    frame.src = src;
+    setActiveNav(btn);
+  }
+
+  async function restoreLastPage() {
+    if (!frame) return;
+
+    const { data } = await supabaseClient.auth.getSession();
+    const hasSession = !!data.session;
+    const savedSrc = localStorage.getItem(LAST_PAGE_KEY);
+
+    if (!hasSession) {
+      localStorage.removeItem(LAST_PAGE_KEY);
+      frame.src = HOME_SRC;
+      if (homeBtn) setActiveNav(homeBtn);
+      return;
+    }
+
+    if (!savedSrc || savedSrc === HOME_SRC) {
+      frame.src = HOME_SRC;
+      if (homeBtn) setActiveNav(homeBtn);
+      return;
+    }
+
+    const targetBtn = findNavBySrc(savedSrc);
+    if (!targetBtn) {
+      localStorage.removeItem(LAST_PAGE_KEY);
+      frame.src = HOME_SRC;
+      if (homeBtn) setActiveNav(homeBtn);
+      return;
+    }
+
+    const user = await getCurrentUser();
+    frame.onload = function () {
+      postAuthToFrame(user);
+    };
+
+    frame.src = savedSrc;
+    setActiveNav(targetBtn);
+  }
+
+  navButtons.forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      await navigate(btn);
+    });
+  });
+
+  logoutBtn.addEventListener('click', async function () {
+    try {
+      await supabaseClient.auth.signOut();
+      localStorage.removeItem(LAST_PAGE_KEY);
+
+      if (frame) {
+        frame.src = HOME_SRC;
+      }
+
+      if (homeBtn) {
+        setActiveNav(homeBtn);
+      }
+
+      window.location.reload();
+
+    } catch (e) {
+      console.error('logout failed:', e);
+      alert('로그아웃 중 오류가 발생했습니다.');
+    }
+  });
+
+  restoreLastPage();
 })();
 </script>
 </body>
