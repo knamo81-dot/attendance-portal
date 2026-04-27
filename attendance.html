@@ -4204,10 +4204,30 @@ async function applyUploadedFiles(){
       throw new Error(backupResult?.reason || '서버 저장에 실패했습니다.');
     }
 
-    REAL_ATTENDANCE_DATA = nextRows;
-    HOLIDAY_DATE_SET = buildHolidayDateSet();
-    rebuildDerivedMetricsFromAttendance();
-    saveUploadedAttendanceData();
+    // ✅ 월별 누적 데이터 안정화
+    // 업로드 직후 화면 데이터가 방금 올린 월(nextRows)만 남으면,
+    // 2월 업로드 후 3월 화면이 일부 데이터로 재계산되는 문제가 발생합니다.
+    // 따라서 서버 저장이 끝난 뒤 attendance_records 전체를 다시 불러오고,
+    // 기존 선택 월(예: 2026-03)은 유지한 상태로 render()에서 월 필터를 다시 적용합니다.
+    const previousSelectedPeriod = String(STATE?.period || '').trim();
+
+    if (supabaseClient && typeof loadAttendanceFromSupabase === 'function') {
+      await loadAttendanceFromSupabase();
+    } else {
+      // Supabase 비활성화/localStorage 모드일 때만 업로드한 원본 rows를 사용합니다.
+      REAL_ATTENDANCE_DATA = nextRows;
+      HOLIDAY_DATE_SET = buildHolidayDateSet();
+      rebuildDerivedMetricsFromAttendance();
+      saveUploadedAttendanceData();
+    }
+
+    const availablePeriodsAfterUpload = getAvailableAttendancePeriodOptions();
+    if (previousSelectedPeriod && availablePeriodsAfterUpload.some(item => item.value === previousSelectedPeriod)) {
+      STATE.period = previousSelectedPeriod;
+    } else if (backupResult?.uploadMonth && availablePeriodsAfterUpload.some(item => item.value === backupResult.uploadMonth)) {
+      STATE.period = backupResult.uploadMonth;
+    }
+
     updateUploadStatus();
     if (typeof refreshAdminUploadManagement === 'function') {
   await refreshAdminUploadManagement(true);
