@@ -3930,6 +3930,9 @@ function rebuildDerivedMetricsFromAttendance(){
   const rows = getMergedRawAttendanceData()
     .map(row => decorateAttendanceRow(row, metaByName))
     .filter(Boolean)
+    // 월별 분석 안정화: 분석/심층/담당자 지표는 반드시 선택 월로 먼저 제한한 뒤 계산합니다.
+    // 2월+3월이 함께 저장되어도 26.03 선택 시 3월 단독 업로드와 동일한 기준으로 계산됩니다.
+    .filter(row => rowMatchesSelectedPeriod(row.date))
     .filter(row => !isDisplayExcludedAttendance(row))
     .filter(row => isAttendanceTargetIncludedRow(row, metaByName));
 
