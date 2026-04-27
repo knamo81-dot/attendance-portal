@@ -4264,9 +4264,9 @@ async function applyUploadedFiles(){
 
     updateUploadStatus();
     if (typeof refreshAdminUploadManagement === 'function') {
-  await refreshAdminUploadManagement(true);
-}
-    render();
+      await refreshAdminUploadManagement(true);
+    }
+    renderAttendanceViews({ refreshFilters:true });
 
     alert(`업로드 데이터 반영이 완료되었습니다. 조직관리와 사원정보관리는 유지되었습니다.
 서버 저장 완료 · ${backupResult.uploadMonth || ''} · Batch: ${backupResult.batchId}
@@ -4289,7 +4289,7 @@ alert('업로드 실패 상세: ' + (error?.message || JSON.stringify(error)));
       resetAttendanceClientState();
     }
     updateUploadStatus();
-    render();
+    renderAttendanceViews({ refreshFilters:true });
     return;
   } finally {
     if(applyBtn){
@@ -4310,7 +4310,7 @@ function bindUploadRuntimeEvents(){
         resetAttendanceClientState();
       }
       updateUploadStatus();
-      render();
+      renderAttendanceViews({ refreshFilters:true });
       alert('업로드 실패 상세: ' + (err?.message || JSON.stringify(err)));
     });
   });
@@ -4802,9 +4802,13 @@ function renderFilters(){
     : '<option value="ALL">전체</option>';
   $('#period').value = STATE.period;
   $('#period').onchange = e => {
-    STATE.period = (e.target.value || fallbackPeriod || 'ALL').trim() || 'ALL';
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    const nextPeriod = (e.target.value || fallbackPeriod || 'ALL').trim() || 'ALL';
+    if(STATE.period === nextPeriod) return;
+    STATE.period = nextPeriod;
     saveAttendanceUiState(ATTENDANCE_UI_STATE_KEYS.period, STATE.period);
-    render();
+    scheduleAttendanceViewsRender({ refreshFilters:false });
   };
 
   const divisionMetaByName = new Map(orgMaster.map(div => [div.divisionName, div]));
@@ -4838,7 +4842,7 @@ function renderFilters(){
       STATE.division = nextDivision;
       STATE.team = '전체';
     }
-    render();
+    scheduleAttendanceViewsRender({ refreshFilters:true });
   };
 
   const teamBase = STATE.division==='전체' ? EMPLOYEES : EMPLOYEES.filter(e=>e.division===STATE.division);
@@ -4861,7 +4865,12 @@ function renderFilters(){
     STATE.team = '전체';
     $('#team').value = '';
   }
-  $('#team').onchange = e => { STATE.team = (e.target.value || '').trim() || '전체'; render(); };
+  $('#team').onchange = e => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    STATE.team = (e.target.value || '').trim() || '전체';
+    scheduleAttendanceViewsRender({ refreshFilters:false });
+  };
 }
 
 
@@ -9803,6 +9812,9 @@ function bindMainTabs(){
       if(btn.dataset.main === 'attendance-missing'){
         renderAttendanceMissingAnalysis();
       }
+      if(btn.dataset.main === 'admin' && typeof refreshAdminUploadManagement === 'function'){
+        refreshAdminUploadManagement().catch(err => console.error('[ADMIN REFRESH ON TAB]', err));
+      }
     };
   });
 }
@@ -9876,6 +9888,44 @@ function render(){
   bindMainTabs();
   restoreSavedMainTab();
   renderTabs();
+
+
+function renderAttendanceViews(options = {}){
+  const refreshFilters = options.refreshFilters === true;
+  dedupeEmpMasterByName();
+  if(Array.isArray(REAL_ATTENDANCE_DATA) && REAL_ATTENDANCE_DATA.length){
+    rebuildDerivedMetricsFromAttendance();
+  }else{
+    syncDashboardDataFromEmpMaster();
+  }
+  updateUploadStatus();
+  if(refreshFilters) renderFilters();
+  if(typeof refreshFloatingFilters === 'function') refreshFloatingFilters();
+  const months = periodMonths();
+  const scoped = scopedEmployees();
+  renderKpis(scoped);
+  initKpiCardLayout();
+  renderSummary(months);
+  renderAlerts(months);
+  renderAttendanceTab();
+  renderAttendanceMissingAnalysis();
+  renderTopCharts(scoped, months);
+  renderInsight(scoped, months);
+  renderRisk(scoped);
+  renderPeople(scoped);
+  renderTrendAnalysis();
+  renderTabs();
+}
+
+function scheduleAttendanceViewsRender(options = {}){
+  requestAnimationFrame(() => {
+    try{
+      renderAttendanceViews(options);
+    }catch(error){
+      console.error('[ATTENDANCE VIEW RENDER FAILED]', error);
+    }
+  });
+}
 }
 
 
@@ -11127,7 +11177,7 @@ async function deleteAdminMonthData(month){
 
     if(typeof refreshAdminUploadManagement === 'function') await refreshAdminUploadManagement(true);
     if(typeof updateUploadStatus === 'function') updateUploadStatus();
-    if(typeof render === 'function') await render();
+    if(typeof renderAttendanceViews === 'function') renderAttendanceViews({ refreshFilters:true });
 
     alert(`${year}년 ${m}월 데이터 삭제가 완료되었습니다.`);
   }catch(error){
@@ -11192,7 +11242,7 @@ async function deleteAdminBatchData(batchId){
     }
     updateUploadStatus();
     await refreshAdminUploadManagement(true);
-    await render();
+    if(typeof renderAttendanceViews === 'function') renderAttendanceViews({ refreshFilters:true });
     alert('배치 삭제가 완료되었습니다.');
   }catch(error){
     console.error('[ADMIN DELETE BATCH FAILED]', error);
@@ -11282,32 +11332,13 @@ async function refreshAdminUploadManagement(forceYearReload = false){
       }
       window.__empMasterInitialized = true;
     }
-    dedupeEmpMasterByName();
-    if(Array.isArray(REAL_ATTENDANCE_DATA) && REAL_ATTENDANCE_DATA.length){
-      rebuildDerivedMetricsFromAttendance();
-    }else{
-      syncDashboardDataFromEmpMaster();
-    }
-    updateUploadStatus();
-    renderFilters();
-    refreshFloatingFilters();
-            const months = periodMonths();
-    const scoped = scopedEmployees();
-    renderKpis(scoped);
-    initKpiCardLayout();
-    renderSummary(months);
-    renderAlerts(months);
-    renderAttendanceTab();
-    renderAttendanceMissingAnalysis();
-    renderTopCharts(scoped, months);
-    renderInsight(scoped, months);
-    renderRisk(scoped);
-    renderPeople(scoped);
-    renderTrendAnalysis();
+    renderAttendanceViews({ refreshFilters:true });
     bindMainTabs();
     restoreSavedMainTab();
-    renderTabs();
-    await refreshAdminUploadManagement();
+    const isAdminActive = !!document.getElementById('main-admin')?.classList.contains('active');
+    if(isAdminActive && typeof refreshAdminUploadManagement === 'function'){
+      await refreshAdminUploadManagement();
+    }
     };
 
   bindAdminManagementEvents();
