@@ -4266,7 +4266,7 @@ async function applyUploadedFiles(){
     if (typeof refreshAdminUploadManagement === 'function') {
       await refreshAdminUploadManagement(true);
     }
-    await updateAttendanceViewsAfterDataChange({ refreshFilters: true });
+    await updateAttendanceViewsAfterDataChange({ refreshFilters: true, keepMainTab: getActiveAttendanceMainTab('admin') });
 
     alert(`업로드 데이터 반영이 완료되었습니다. 조직관리와 사원정보관리는 유지되었습니다.
 서버 저장 완료 · ${backupResult.uploadMonth || ''} · Batch: ${backupResult.batchId}
@@ -4323,9 +4323,21 @@ const COLORS = ['#2563eb','#0f766e','#f59e0b','#ef4444','#7c3aed','#14b8a6','#33
 const STATE = { period:'3M', division:'전체', team:'전체', attendanceIncludeLeave:true, dashboardExcludeLeave:true, leaveCauseFocus:'', fatigueMode:'recommended' };
 
 const ATTENDANCE_UI_STATE_KEYS = {
-  mainTab: '',
+  // mainTab은 sessionStorage에만 저장합니다.
+  // - 같은 브라우저 탭에서 새로고침: 현재 탭 유지
+  // - 새 브라우저 탭/새 접속: 근태관리 홈에서 시작
+  mainTab: 'attendanceActiveMainTab',
   period: 'attendanceSelectedPeriod'
 };
+let ATTENDANCE_CURRENT_MAIN_TAB = 'attendance';
+function getActiveAttendanceMainTab(fallback = 'attendance'){
+  try{
+    const active = document.querySelector('.mainTab.active')?.dataset?.main;
+    return String(active || ATTENDANCE_CURRENT_MAIN_TAB || fallback || 'attendance').trim() || 'attendance';
+  }catch(e){
+    return String(ATTENDANCE_CURRENT_MAIN_TAB || fallback || 'attendance').trim() || 'attendance';
+  }
+}
 function saveAttendanceUiState(key, value){
   try{
     if(!key) return;
@@ -4334,6 +4346,19 @@ function saveAttendanceUiState(key, value){
 }
 function readAttendanceUiState(key){
   try{ return String(localStorage.getItem(key) || '').trim(); }catch(e){ return ''; }
+}
+function saveAttendanceMainTab(tabName){
+  try{
+    const value = String(tabName || '').trim();
+    if(!value) return;
+    ATTENDANCE_CURRENT_MAIN_TAB = value;
+    sessionStorage.setItem(ATTENDANCE_UI_STATE_KEYS.mainTab, value);
+  }catch(e){}
+}
+function readAttendanceMainTab(){
+  try{
+    return String(sessionStorage.getItem(ATTENDANCE_UI_STATE_KEYS.mainTab) || ATTENDANCE_CURRENT_MAIN_TAB || '').trim();
+  }catch(e){ return String(ATTENDANCE_CURRENT_MAIN_TAB || '').trim(); }
 }
 function restoreSavedAttendancePeriod(){
   const savedPeriod = readAttendanceUiState(ATTENDANCE_UI_STATE_KEYS.period);
@@ -4349,11 +4374,17 @@ function activateMainTabWithoutRender(tabName){
   $$('.mainPanel').forEach(x => x.classList.remove('active'));
   btn.classList.add('active');
   panel.classList.add('active');
+  ATTENDANCE_CURRENT_MAIN_TAB = targetName;
+  try{ sessionStorage.setItem(ATTENDANCE_UI_STATE_KEYS.mainTab, targetName); }catch(e){}
   return true;
 }
-function restoreSavedMainTab(){
-  try{ localStorage.removeItem('attendanceActiveMainTab'); }catch(e){}
-  activateMainTabWithoutRender('attendance');
+function restoreSavedMainTab(preferredTab){
+  const targetTab = String(preferredTab || readAttendanceMainTab() || 'attendance').trim() || 'attendance';
+  const restored = activateMainTabWithoutRender(targetTab);
+  if(!restored){
+    activateMainTabWithoutRender('attendance');
+    saveAttendanceMainTab('attendance');
+  }
   if(typeof trendUpdatePeriodControlVisibility === 'function') trendUpdatePeriodControlVisibility();
 }
 restoreSavedAttendancePeriod();
@@ -4802,9 +4833,12 @@ function renderFilters(){
     : '<option value="ALL">전체</option>';
   $('#period').value = STATE.period;
   $('#period').onchange = e => {
+    if(e?.preventDefault) e.preventDefault();
+    const keepTab = getActiveAttendanceMainTab('attendance');
+    saveAttendanceMainTab(keepTab);
     STATE.period = (e.target.value || fallbackPeriod || 'ALL').trim() || 'ALL';
     saveAttendanceUiState(ATTENDANCE_UI_STATE_KEYS.period, STATE.period);
-    updateAttendanceViewsAfterDataChange({ refreshFilters: false });
+    Promise.resolve(updateAttendanceViewsAfterDataChange({ refreshFilters: false, keepMainTab: keepTab })).finally(() => restoreSavedMainTab(keepTab));
   };
 
   const divisionMetaByName = new Map(orgMaster.map(div => [div.divisionName, div]));
@@ -4828,6 +4862,9 @@ function renderFilters(){
     $('#division').value = '';
   }
   $('#division').onchange = e => {
+    if(e?.preventDefault) e.preventDefault();
+    const keepTab = getActiveAttendanceMainTab('attendance');
+    saveAttendanceMainTab(keepTab);
     const nextDivision = (e.target.value || '').trim();
     if(!nextDivision){
       STATE.division = '전체';
@@ -4838,7 +4875,7 @@ function renderFilters(){
       STATE.division = nextDivision;
       STATE.team = '전체';
     }
-    render();
+    Promise.resolve(updateAttendanceViewsAfterDataChange({ refreshFilters: true, keepMainTab: keepTab })).finally(() => restoreSavedMainTab(keepTab));
   };
 
   const teamBase = STATE.division==='전체' ? EMPLOYEES : EMPLOYEES.filter(e=>e.division===STATE.division);
@@ -4861,13 +4898,21 @@ function renderFilters(){
     STATE.team = '전체';
     $('#team').value = '';
   }
-  $('#team').onchange = e => { STATE.team = (e.target.value || '').trim() || '전체'; render(); };
+  $('#team').onchange = e => {
+    if(e?.preventDefault) e.preventDefault();
+    const keepTab = getActiveAttendanceMainTab('attendance');
+    saveAttendanceMainTab(keepTab);
+    STATE.team = (e.target.value || '').trim() || '전체';
+    Promise.resolve(updateAttendanceViewsAfterDataChange({ refreshFilters: true, keepMainTab: keepTab })).finally(() => restoreSavedMainTab(keepTab));
+  };
 }
 
 
 
 
 async function updateAttendanceViewsAfterDataChange(options = {}){
+  const keepTab = String(options.keepMainTab || getActiveAttendanceMainTab('attendance')).trim() || 'attendance';
+  saveAttendanceMainTab(keepTab);
   try{
     dedupeEmpMasterByName();
     if(Array.isArray(REAL_ATTENDANCE_DATA) && REAL_ATTENDANCE_DATA.length){
@@ -4894,19 +4939,26 @@ async function updateAttendanceViewsAfterDataChange(options = {}){
     renderPeople(scoped);
     renderTrendAnalysis();
     renderTabs();
+    restoreSavedMainTab(keepTab);
   }catch(error){
     console.error('[UPDATE ATTENDANCE VIEWS FAILED]', error);
   }
 }
 
 async function refreshAttendanceAfterAdminMutation(options = {}){
+  const keepTab = getActiveAttendanceMainTab('admin');
+  saveAttendanceMainTab(keepTab);
   if(typeof window.loadAttendanceFromSupabase === 'function'){
     try{ await window.loadAttendanceFromSupabase(); }catch(e){ console.warn('[ADMIN MUTATION RELOAD WARN]', e); }
   }
+  updateUploadStatus();
   if(typeof refreshAdminUploadManagement === 'function'){
     await refreshAdminUploadManagement(options.forceYearReload === true);
   }
-  await updateAttendanceViewsAfterDataChange({ refreshFilters: options.refreshFilters !== false });
+  await updateAttendanceViewsAfterDataChange({ refreshFilters: options.refreshFilters !== false, keepMainTab: keepTab });
+  if(typeof refreshAdminUploadManagement === 'function'){
+    await refreshAdminUploadManagement(false);
+  }
 }
 function getHeadcountStatusSummary(){
   const employeeMetaMap = new Map((Array.isArray(empMaster) ? empMaster : EMPLOYEES).map(e => [normalizeEmployeeName(e.name), e]));
@@ -9832,18 +9884,21 @@ function rerenderDashboardVisibleCharts(){
 function bindMainTabs(){
   $$('.mainTab').forEach(btn => {
     btn.onclick = () => {
+      const mainName = String(btn.dataset.main || '').trim();
+      if(mainName) saveAttendanceMainTab(mainName);
       $$('.mainTab').forEach(x => x.classList.remove('active'));
       $$('.mainPanel').forEach(x => x.classList.remove('active'));
       btn.classList.add('active');
-      $('#main-' + btn.dataset.main).classList.add('active');
-      if(btn.dataset.main === 'dashboard' || btn.dataset.main === 'deep-analysis'){
+      const panel = $('#main-' + mainName);
+      if(panel) panel.classList.add('active');
+      if(mainName === 'dashboard' || mainName === 'deep-analysis'){
         rerenderDashboardVisibleCharts();
       }
       trendUpdatePeriodControlVisibility();
-      if(btn.dataset.main === 'trend-analysis'){
+      if(mainName === 'trend-analysis'){
         requestAnimationFrame(() => { renderTrendAnalysis(); setTimeout(renderTrendAnalysis, 80); });
       }
-      if(btn.dataset.main === 'attendance-missing'){
+      if(mainName === 'attendance-missing'){
         renderAttendanceMissingAnalysis();
       }
     };
@@ -9890,6 +9945,8 @@ window.addEventListener('message', async (event) => {
 });
 
 function render(){
+  const keepTab = getActiveAttendanceMainTab('attendance');
+  saveAttendanceMainTab(keepTab);
   if(!window.__empMasterInitialized){
     loadOrgMaster();
     loadEmpMaster();
@@ -9917,7 +9974,7 @@ function render(){
   renderPeople(scoped);
   renderTrendAnalysis();
   bindMainTabs();
-  restoreSavedMainTab();
+  restoreSavedMainTab(keepTab);
   renderTabs();
 }
 
@@ -11293,6 +11350,8 @@ async function refreshAdminUploadManagement(forceYearReload = false){
 
 
   window.render = async function(){
+    const keepTab = getActiveAttendanceMainTab('attendance');
+    saveAttendanceMainTab(keepTab);
     if(!window.__empMasterInitialized){
       try{
         await window.loadOrgMaster();
@@ -11337,7 +11396,7 @@ async function refreshAdminUploadManagement(forceYearReload = false){
     renderPeople(scoped);
     renderTrendAnalysis();
     bindMainTabs();
-    restoreSavedMainTab();
+    restoreSavedMainTab(keepTab);
     renderTabs();
     await refreshAdminUploadManagement();
     };
