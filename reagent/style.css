@@ -627,3 +627,14 @@ html.embed-mode .shell{
   border-color:#cbd5e1 !important;
   color:#334155 !important;
 }
+
+/* ===== 제품취합 총수량 확정/미확정 색상 ===== */
+.qty-confirmed{
+  color:#2563eb;
+  font-weight:800;
+}
+
+.qty-pending{
+  color:#ea580c;
+  font-weight:800;
+}
