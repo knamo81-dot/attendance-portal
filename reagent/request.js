@@ -242,7 +242,16 @@ window.ReagentApp.request = {
     toast("신청이 저장되었습니다.", "success");
   },
 
-  clearAllRows() {
+  clearAllRows(options = {}) {
+    const skipConfirm = options.skipConfirm === true;
+
+    if (!skipConfirm) {
+      const ok = confirm(
+        "신청 목록과 취합 상태를 모두 삭제합니다.\n\n정말 전체 데이터를 비우시겠습니까?"
+      );
+      if (!ok) return;
+    }
+
     this.requestRows = [];
     this.selectedKeys = [];
     this.collectedMeta = {};
@@ -252,6 +261,73 @@ window.ReagentApp.request = {
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
     window.ReagentApp.toast("전체 데이터가 비워졌습니다.", "success");
+  },
+
+  clearUncollectedRows(options = {}) {
+    const skipConfirm = options.skipConfirm === true;
+
+    if (!skipConfirm) {
+      const ok = confirm(
+        "취합완료되지 않은 신청건만 삭제합니다.\n\n추가신청건/미취합건을 삭제하시겠습니까?"
+      );
+      if (!ok) return;
+    }
+
+    const groups = this.groupItems(this.requestRows);
+    const completedKeys = new Set(
+      groups
+        .filter((group) => group.collectedQty > 0 && group.newQty === 0)
+        .map((group) => group.key)
+    );
+
+    this.requestRows = this.requestRows.filter((row) => {
+      const key = [
+        row.category || "",
+        row.name || "",
+        row.maker || "",
+        row.code || "",
+        row.capacity || "",
+        row.cas || "",
+        row.grade || ""
+      ].join("||");
+
+      return completedKeys.has(key);
+    });
+
+    this.selectedKeys = this.selectedKeys.filter((key) => completedKeys.has(key));
+
+    Object.keys(this.collectedMeta || {}).forEach((key) => {
+      if (!completedKeys.has(key)) delete this.collectedMeta[key];
+    });
+
+    this.saveRequestRows();
+    this.saveSelectedKeys();
+    this.saveCollectedMeta();
+    this.renderRequest();
+    window.ReagentApp.collect?.renderCollect?.();
+    window.ReagentApp.toast("취합완료 건만 남기고 정리했습니다.", "success");
+  },
+
+  openClearDataDialog() {
+    const choice = prompt(
+      "삭제 옵션을 선택하세요.\n\n1. 전체 삭제\n2. 취합제외 삭제(미취합/추가신청건만 삭제)\n\n숫자 1 또는 2를 입력하세요."
+    );
+
+    if (choice === null || String(choice).trim() === "") return;
+
+    const normalized = String(choice).trim();
+
+    if (normalized === "1") {
+      this.clearAllRows();
+      return;
+    }
+
+    if (normalized === "2") {
+      this.clearUncollectedRows();
+      return;
+    }
+
+    window.ReagentApp.toast?.("삭제 옵션은 1 또는 2만 입력할 수 있습니다.", "warn");
   },
 
   insertSample() {
