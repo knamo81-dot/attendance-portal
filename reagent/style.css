@@ -573,3 +573,29 @@ html.embed-mode .shell{
 .vendor-cell.auto-vendor-selected input[readonly]{
   background:rgba(255,255,255,0.42) !important;
 }
+
+
+/* ===== 제품취합 확정 행 전체 음영 ===== */
+.collect-row-confirmed > td{
+  background:#f1f5f9 !important;
+  color:#64748b;
+}
+
+.collect-row-confirmed .ghost-btn{
+  background:#e2e8f0 !important;
+  border-color:#cbd5e1 !important;
+  color:#334155 !important;
+}
+
+.collect-row-confirmed input{
+  color:#475569 !important;
+}
+
+.collect-row-confirmed .auto-vendor-selected{
+  background:#dbeafe !important;
+  color:#1e3a8a !important;
+}
+
+.collect-row-confirmed .auto-vendor-selected input{
+  color:#1e3a8a !important;
+}
