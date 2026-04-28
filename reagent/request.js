@@ -5,6 +5,21 @@ window.ReagentApp.request = {
   selectedKeys: [],
   collectedMeta: {},
 
+  saveRequestRows() {
+    try {
+      localStorage.setItem("reagent_request_rows", JSON.stringify(this.requestRows || []));
+    } catch (_) {}
+  },
+
+  loadRequestRows() {
+    try {
+      const rows = JSON.parse(localStorage.getItem("reagent_request_rows") || "[]");
+      this.requestRows = Array.isArray(rows) ? rows : [];
+    } catch (_) {
+      this.requestRows = [];
+    }
+  },
+
   mockProducts: [
     { category: "시약", name: "Ethanol", maker: "Sigma", code: "E7023", capacity: "500ml", cas: "64-17-5", grade: "ACS" },
     { category: "시약", name: "Methanol", maker: "Daejung", code: "M100", capacity: "1L", cas: "67-56-1", grade: "EP" },
@@ -202,6 +217,7 @@ window.ReagentApp.request = {
     };
 
     this.requestRows.push(row);
+    this.saveRequestRows();
     this.clearForm();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
@@ -212,6 +228,7 @@ window.ReagentApp.request = {
     this.requestRows = [];
     this.selectedKeys = [];
     this.collectedMeta = {};
+    this.saveRequestRows();
     this.saveSelectedKeys();
     this.saveCollectedMeta();
     this.renderRequest();
@@ -269,12 +286,14 @@ window.ReagentApp.request = {
       }
     );
 
+    this.saveRequestRows();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
     window.ReagentApp.toast("샘플 3건이 추가되었습니다.", "success");
   },
 
   async fetchData() {
+    this.loadRequestRows();
     this.loadSelectedKeys();
     this.loadCollectedMeta();
     this.renderRequest();
@@ -370,6 +389,7 @@ window.ReagentApp.request = {
 
     row.qty = Number(newQty || row.qty);
     row.usage = newUsage;
+    this.saveRequestRows();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
     window.ReagentApp.toast("수정되었습니다.", "success");
@@ -379,6 +399,7 @@ window.ReagentApp.request = {
     if (!confirm("삭제하시겠습니까?")) return;
 
     this.requestRows = this.requestRows.filter((r) => Number(r.id) !== Number(id));
+    this.saveRequestRows();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
     window.ReagentApp.toast("삭제되었습니다.", "success");
@@ -389,15 +410,9 @@ window.ReagentApp.request = {
     if (!els.draftTableBody) return;
 
     const groups = this.groupItems(this.requestRows).sort((a, b) => {
-      // 미취합건 / 추가신청건(체크박스가 열려있는 항목)을 위로,
-      // 취합완료건(체크박스 잠김)을 아래로 정렬합니다.
       const getPriority = (group) => {
         const isCompletedOnly = group.collectedQty > 0 && group.newQty === 0;
-        const isAdditional = group.collectedQty > 0 && group.newQty > 0;
-
-        if (!isCompletedOnly) return 0; // 미취합 또는 추가신청건
-        if (isAdditional) return 0;
-        return 1; // 취합완료
+        return isCompletedOnly ? 1 : 0;
       };
 
       const priorityDiff = getPriority(a) - getPriority(b);
