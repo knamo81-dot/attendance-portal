@@ -210,10 +210,14 @@ window.ReagentApp.loadCurrentUser = async function () {
     email: email || "",
     employee_no: employeeNo || "",
     name: userName || "",
-    department: storedHint.department || "",
-    team: storedHint.team || "",
+    division_code: storedHint.division_code || "",
+    team_code: storedHint.team_code || "",
+    department: storedHint.department || storedHint.division_name || "",
+    division_name: storedHint.division_name || storedHint.department || "",
+    team: storedHint.team || storedHint.team_name || "",
+    team_name: storedHint.team_name || storedHint.team || "",
     position: storedHint.position || "",
-    role: storedHint.role || ""
+    role: storedHint.role || storedHint.authority || ""
   };
 
   if (!sb) {
@@ -224,7 +228,7 @@ window.ReagentApp.loadCurrentUser = async function () {
   try {
     let query = sb
       .from("employees")
-      .select("employee_no,name,department,team,position,role,email,status")
+      .select("employee_no,name,division_code,team_code,position,authority,email,status")
       .limit(1);
 
     if (employeeNo) {
@@ -247,14 +251,47 @@ window.ReagentApp.loadCurrentUser = async function () {
     }
 
     if (data) {
+      let divisionName = "";
+      let teamName = "";
+
+      const divisionCode = data.division_code || "";
+      const teamCode = data.team_code || "";
+
+      if (divisionCode || teamCode) {
+        const codes = [divisionCode, teamCode].filter(Boolean);
+
+        const { data: orgRows, error: orgError } = await sb
+          .from("teams")
+          .select("team_code,division_code,team_name")
+          .in("team_code", codes);
+
+        if (orgError) {
+          console.warn("조직명 조회 실패:", orgError);
+        } else if (Array.isArray(orgRows)) {
+          const divisionRow = orgRows.find((row) => row.team_code === divisionCode);
+          const teamRow = orgRows.find((row) => row.team_code === teamCode);
+
+          divisionName = divisionRow?.team_name || "";
+          teamName = teamRow?.team_name || "";
+        }
+      }
+
+      // team_code가 본부 코드와 동일한 경우에는 본부명만 있고 팀명은 비어 있을 수 있습니다.
+      // 이때 화면 표시용 team은 divisionName으로 대체합니다.
+      const displayTeam = teamName || divisionName || "";
+
       window.ReagentApp.currentUser = {
         email: data.email || email || "",
         employee_no: data.employee_no || "",
         name: data.name || "",
-        department: data.department || "",
-        team: data.team || "",
+        division_code: divisionCode,
+        team_code: teamCode,
+        department: divisionName,
+        division_name: divisionName,
+        team: displayTeam,
+        team_name: teamName,
         position: data.position || "",
-        role: data.role || ""
+        role: data.authority || ""
       };
 
       try {
