@@ -603,9 +603,9 @@ window.ReagentApp.request = {
           <td>${this.html(group.name)}</td>
           <td>${this.html(group.maker)}</td>
           <td>${this.html(group.code)}</td>
-          <td>${this.html(group.capacity)}</td>
           <td>${this.html(group.cas)}</td>
           <td>${this.html(group.grade)}</td>
+          <td>${this.html(group.capacity)}</td>
           <td>
             ${
               group.collectedQty === 0
