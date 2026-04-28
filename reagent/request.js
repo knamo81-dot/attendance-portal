@@ -214,6 +214,33 @@ window.ReagentApp.request = {
       return;
     }
 
+    const itemKey = [
+      els.category?.value || "",
+      productName,
+      els.maker?.value || "",
+      els.code?.value || "",
+      els.capacity?.value || "",
+      els.cas?.value || "",
+      els.grade?.value || ""
+    ].join("||");
+
+    let collectMeta = window.ReagentApp.collect?.collectMeta || {};
+
+    try {
+      const storedCollectMeta = JSON.parse(localStorage.getItem("reagent_collect_meta") || "{}");
+      collectMeta = { ...storedCollectMeta, ...collectMeta };
+    } catch (_) {}
+
+    const isConfirmed = collectMeta[itemKey]?.confirmed === true;
+
+    if (isConfirmed) {
+      toast(
+        "이미 거래처 확정이 완료된 품목입니다.\n추가 신청이 필요한 경우 제품취합 담당자에게 확정 취소를 요청해 주세요.",
+        "warn"
+      );
+      return;
+    }
+
     const row = {
       id: Date.now(),
       category: els.category?.value || "",
@@ -546,7 +573,7 @@ window.ReagentApp.request = {
         const isLocked = item.rowStatus === "취합완료";
 
         return `
-          <tr>
+          <tr class="${isLocked ? "request-detail-collected" : ""}">
             <td>${this.formatDateTime(item.created_at || item.id)}</td>
             <td>${this.html(item.team)} / ${this.html(item.requester)}</td>
             <td>${this.html(item.name)}</td>
@@ -568,7 +595,7 @@ window.ReagentApp.request = {
       }).join("");
 
       return `
-        <tr>
+        <tr class="${isCompletedOnly ? "request-row-collected" : ""}">
           <td>
             <input type="checkbox" class="request-check" data-key="${this.attr(group.key)}" ${checked} ${disabled}>
           </td>
