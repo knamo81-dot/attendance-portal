@@ -90,48 +90,31 @@ window.ReagentApp.bindTabs = function () {
 
 
 window.ReagentApp.isRequestAdmin = function () {
-  const user = window.ReagentApp.currentUser || {};
-  const role = String(user.role || user.authority || "").trim().toLowerCase();
-
-  return [
-    "admin",
-    "administrator",
-    "operator",
-    "manager",
-    "supervisor",
-    "관리자",
-    "운영자",
-    "책임자"
-  ].includes(role);
+  // 로컬 작업 단계에서는 권한 체크를 비활성화합니다.
+  // 추후 서버/권한 구조가 확정되면 관리자/운영자 기준으로 다시 제한하면 됩니다.
+  return true;
 };
 
 window.ReagentApp.applyRequestAdminUI = function () {
-  const isAdmin = window.ReagentApp.isRequestAdmin?.() === true;
   const adminArea = document.querySelector(".admin-request-actions");
 
   if (adminArea) {
-    adminArea.style.display = isAdmin ? "flex" : "none";
+    adminArea.style.display = "flex";
   }
 
   if (window.ReagentApp.els?.addToCollect) {
-    window.ReagentApp.els.addToCollect.disabled = !isAdmin;
-    window.ReagentApp.els.addToCollect.style.display = isAdmin ? "" : "none";
+    window.ReagentApp.els.addToCollect.disabled = false;
+    window.ReagentApp.els.addToCollect.style.display = "";
   }
 
   if (window.ReagentApp.els?.clearDraft) {
-    window.ReagentApp.els.clearDraft.disabled = !isAdmin;
-    window.ReagentApp.els.clearDraft.style.display = isAdmin ? "" : "none";
+    window.ReagentApp.els.clearDraft.disabled = false;
+    window.ReagentApp.els.clearDraft.style.display = "";
   }
 };
 
 window.ReagentApp.requireRequestAdmin = function () {
-  const ok = window.ReagentApp.isRequestAdmin?.() === true;
-
-  if (!ok) {
-    window.ReagentApp.toast?.("관리자/운영자만 사용할 수 있는 기능입니다.", "warn");
-  }
-
-  return ok;
+  return true;
 };
 
 
@@ -154,11 +137,9 @@ window.ReagentApp.bindEvents = function () {
   els.clearForm?.addEventListener("click", () => request.clearForm());
   els.loadSample?.addEventListener("click", () => request.insertSample());
   els.clearDraft?.addEventListener("click", () => {
-    if (!window.ReagentApp.requireRequestAdmin?.()) return;
     request.openClearDataDialog?.();
   });
   els.addToCollect?.addEventListener("click", () => {
-    if (!window.ReagentApp.requireRequestAdmin?.()) return;
     collect.addSelectedToCollect();
   });
 
