@@ -3552,6 +3552,7 @@ function resolveEmployeeMetaForServer(row, metaById, metaByName){
 }
 
 function buildStableAttendanceRowsForServer(secomRows = [], erpRows = []){
+  // records final fix: include every valid employee-date raw row; do not drop regular ERP rows with no clock/overtime values.
   const metaByName = new Map((empMaster || []).map(e => [normalizeEmployeeName(e.name), e]));
   const metaById = new Map((empMaster || []).map(e => [String(e.id || e.employee_no || '').trim(), e]).filter(([id]) => id));
   const idByName = new Map();
@@ -3628,7 +3629,7 @@ function buildStableAttendanceRowsForServer(secomRows = [], erpRows = []){
   });
 
   return [...map.values()]
-    .filter(row => row.date && (row.employeeId || row.name) && hasClockOrWork(row))
+    .filter(row => row.date && (row.employeeId || row.name))
     .sort((a,b) => (String(a.date)+String(a.employeeId || a.name)).localeCompare(String(b.date)+String(b.employeeId || b.name),'ko'));
 }
 
