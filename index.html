@@ -192,6 +192,21 @@
     return true;
   }
 
+
+  function buildSrcWithUser(src, user) {
+    if (!src || !user) return src;
+
+    // 시약초자 앱에는 로그인 사용자의 이메일을 URL로 전달합니다.
+    // 시약초자 쪽 app.js에서 email 기준으로 employees 테이블을 조회하면
+    // 신청자 정보가 실제 이름/팀으로 들어갑니다.
+    const separator = src.includes('?') ? '&' : '?';
+    const email = user.email || '';
+
+    if (!email) return src;
+
+    return src + separator + 'email=' + encodeURIComponent(email);
+  }
+
   async function navigate(btn, options) {
     options = options || {};
 
@@ -220,7 +235,8 @@
       postAuthToFrame(user);
     };
 
-    frame.src = src;
+    const finalSrc = buildSrcWithUser(src, user);
+    frame.src = finalSrc;
     setActiveNav(btn);
   }
 
@@ -257,7 +273,8 @@
       postAuthToFrame(user);
     };
 
-    frame.src = savedSrc;
+    const finalSrc = buildSrcWithUser(savedSrc, user);
+    frame.src = finalSrc;
     setActiveNav(targetBtn);
   }
 
