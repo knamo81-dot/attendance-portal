@@ -34,7 +34,14 @@
 <div class="actions"><button class="btn primary" id="addItem">신청 추가</button><button class="btn" id="clearForm">입력 초기화</button><button class="btn" id="requestNew">제품 등록 요청</button><button class="btn" id="loadSample">샘플 3건 자동입력</button></div></div></section>
 <section class="card"><div class="card-head"><div><h3>신청 목록</h3><p>체크한 품목만 취합 탭으로 반영됩니다.</p></div><span class="badge orange" id="draftCountBadge">통합 항목 0건</span></div>
 <div class="card-body"><div class="summary"><div class="tile"><div class="k">통합 품목 수</div><div class="v" id="sumDraftCount">0</div></div><div class="tile"><div class="k">시약</div><div class="v" id="sumReagent">0</div></div><div class="tile"><div class="k">초자/소모품</div><div class="v" id="sumGlass">0</div></div><div class="tile"><div class="k">안전용품</div><div class="v" id="sumSafety">0</div></div></div>
-<div class="actions" style="margin-top:16px;"><button class="btn" id="clearDraft">전체 데이터 비우기</button><button class="btn primary" id="addToCollect">취합추가</button></div>
+<div class="actions admin-request-actions" style="margin-top:16px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+  <div class="admin-action-left">
+    <button class="btn primary" id="addToCollect">취합추가</button>
+  </div>
+  <div class="admin-action-right">
+    <button class="btn" id="clearDraft">전체 데이터 비우기</button>
+  </div>
+</div>
 <div class="small" style="margin-top:10px;">체크박스 선택 후 취합추가를 눌러야 제품취합에 반영됩니다.</div>
 <div class="table-wrap" style="margin-top:16px;"><table><thead><tr><th>선택</th><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>용량</th><th>CAS</th><th>등급</th><th>총수량</th><th>신청자수</th><th>용도</th><th>작업</th></tr></thead><tbody id="draftTableBody"><tr><td class="empty" colspan="12">아직 추가된 신청 항목이 없습니다.</td></tr></tbody></table></div></div></section></section>
 <section class="page" id="page-collect"><section class="card"><div class="card-head"><div><h2>제품 취합</h2><p>신청 목록에서 체크 후 취합추가한 항목만 표시됩니다.</p></div><span class="badge blue">신청 데이터 연동</span></div>
