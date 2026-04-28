@@ -32,25 +32,6 @@ window.ReagentApp.collect = {
     }
   },
 
-
-  ensureCancelConfirmButton() {
-    const { els } = window.ReagentApp;
-    if (!els?.excludeSelectedCollect) return;
-
-    if (document.getElementById("cancelSelectedCollect")) return;
-
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "btn";
-    btn.id = "cancelSelectedCollect";
-    btn.textContent = "선택 확정 취소";
-
-    els.excludeSelectedCollect.insertAdjacentElement("afterend", btn);
-    els.cancelSelectedCollect = btn;
-
-    btn.addEventListener("click", () => this.cancelSelectedConfirm());
-  },
-
   getMeta(key) {
     if (!this.collectMeta[key]) {
       this.collectMeta[key] = {
@@ -100,7 +81,23 @@ window.ReagentApp.collect = {
     return Number(value || 0).toLocaleString("ko-KR");
   },
 
-  bindCollectEvents(groups) {
+  simpleKey(key) {
+    let hash = 0;
+    const str = String(key || "");
+    for (let i = 0; i < str.length; i += 1) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return `k${Math.abs(hash)}`;
+  },
+
+  getCheckedKeysFromDOM() {
+    return Array.from(document.querySelectorAll(".collect-check:checked"))
+      .map((el) => el.dataset.key)
+      .filter(Boolean);
+  },
+
+  bindCollectEvents() {
     document.querySelectorAll(".collect-check").forEach((chk) => {
       chk.addEventListener("change", (e) => {
         const key = e.target.dataset.key;
@@ -119,11 +116,21 @@ window.ReagentApp.collect = {
       btn.addEventListener("click", () => this.toggleCollectDetail(btn.dataset.key));
     });
 
+    document.querySelectorAll(".collect-cancel-btn").forEach((btn) => {
+      btn.addEventListener("click", () => this.cancelConfirmByKey(btn.dataset.key));
+    });
+
+    document.querySelectorAll(".collect-exclude-btn").forEach((btn) => {
+      btn.addEventListener("click", () => this.excludeCollectByKey(btn.dataset.key));
+    });
+
     document.querySelectorAll(".collect-input").forEach((input) => {
       input.addEventListener("input", (e) => {
         const key = e.target.dataset.key;
         const field = e.target.dataset.field;
         const meta = this.getMeta(key);
+
+        if (meta.confirmed) return;
 
         if (field === "unit1" || field === "unit2") {
           meta[field] = this.normalizeNumber(e.target.value);
@@ -148,6 +155,8 @@ window.ReagentApp.collect = {
         const key = e.target.dataset.key;
         const meta = this.getMeta(key);
 
+        if (meta.confirmed) return;
+
         meta.selectedVendor = e.target.value;
         this.saveCollectMeta();
       });
@@ -164,35 +173,85 @@ window.ReagentApp.collect = {
 
     const price1 = qty * this.normalizeNumber(meta.unit1);
     const price2 = qty * this.normalizeNumber(meta.unit2);
+    const rowId = this.simpleKey(key);
 
-    const price1El = document.querySelector(`[data-price-key="${CSS.escape(key)}"][data-price-field="price1"]`);
-    const price2El = document.querySelector(`[data-price-key="${CSS.escape(key)}"][data-price-field="price2"]`);
+    const price1El = document.querySelector(`[data-row-id="${rowId}"][data-price-field="price1"]`);
+    const price2El = document.querySelector(`[data-row-id="${rowId}"][data-price-field="price2"]`);
 
     if (price1El) price1El.textContent = this.formatNumber(price1);
     if (price2El) price2El.textContent = this.formatNumber(price2);
   },
 
   toggleCollectDetail(key) {
-    const row = document.querySelector(`.collect-detail-row[data-detail-key="${CSS.escape(key)}"]`);
+    const rowId = this.simpleKey(key);
+    const row = document.querySelector(`.collect-detail-row[data-detail-id="${rowId}"]`);
     if (!row) return;
     row.style.display = row.style.display === "none" ? "" : "none";
   },
 
+  cancelConfirmByKey(key) {
+    const request = window.ReagentApp.request;
+    const meta = this.getMeta(key);
+
+    if (!meta.confirmed) {
+      return window.ReagentApp.toast("이미 미확정 상태입니다.", "warn");
+    }
+
+    const ok = confirm("이 품목의 확정을 취소하시겠습니까?\\n취소 후 거래처/단가 수정 및 제외가 가능해집니다.");
+    if (!ok) return;
+
+    meta.confirmed = false;
+    meta.confirmedAt = "";
+
+    this.saveCollectMeta();
+    request.renderRequest?.();
+    this.renderCollect();
+
+    window.ReagentApp.toast("확정이 취소되었습니다.", "success");
+  },
+
+  excludeCollectByKey(key) {
+    const request = window.ReagentApp.request;
+    const meta = this.getMeta(key);
+
+    if (meta.confirmed) {
+      return window.ReagentApp.toast("확정된 취합건은 제외할 수 없습니다. 먼저 '취소'를 눌러 확정을 해제하세요.", "warn");
+    }
+
+    const ok = confirm("이 품목을 제품취합에서 제외하시겠습니까?\\n신청 목록에서는 미취합 상태로 다시 표시됩니다.");
+    if (!ok) return;
+
+    delete request.collectedMeta[key];
+    delete this.collectMeta[key];
+
+    this.selectedKeys = this.selectedKeys.filter((selectedKey) => selectedKey !== key);
+
+    request.saveCollectedMeta();
+    this.saveCollectMeta();
+    this.saveSelectedKeys();
+
+    request.renderRequest?.();
+    this.renderCollect();
+
+    window.ReagentApp.toast("선택 항목이 취합에서 제외되었습니다.", "success");
+  },
+
   confirmSelectedCollect() {
     const request = window.ReagentApp.request;
+    const checkedKeys = this.getCheckedKeysFromDOM();
+    const targetKeys = checkedKeys.length ? checkedKeys : this.selectedKeys;
 
-    if (!this.selectedKeys.length) {
+    if (!targetKeys.length) {
       return window.ReagentApp.toast("확정할 취합 항목을 선택하세요.", "warn");
     }
 
     let confirmedCount = 0;
 
-    this.selectedKeys.forEach((key) => {
+    targetKeys.forEach((key) => {
       const meta = this.getMeta(key);
 
-      if (!meta.selectedVendor) {
-        return;
-      }
+      if (meta.confirmed) return;
+      if (!meta.selectedVendor) return;
 
       meta.confirmed = true;
       meta.confirmedAt = new Date().toISOString();
@@ -200,9 +259,11 @@ window.ReagentApp.collect = {
     });
 
     if (!confirmedCount) {
-      return window.ReagentApp.toast("거래처1 또는 거래처2를 먼저 선택하세요.", "warn");
+      return window.ReagentApp.toast("미확정 항목에서 거래처1 또는 거래처2를 먼저 선택하세요.", "warn");
     }
 
+    this.selectedKeys = [];
+    this.saveSelectedKeys();
     this.saveCollectMeta();
     request.renderRequest();
     this.renderCollect();
@@ -211,29 +272,37 @@ window.ReagentApp.collect = {
   },
 
   excludeSelectedCollect() {
-    const request = window.ReagentApp.request;
+    const checkedKeys = this.getCheckedKeysFromDOM();
+    const targetKeys = checkedKeys.length ? checkedKeys : this.selectedKeys;
 
-    if (!this.selectedKeys.length) {
+    if (!targetKeys.length) {
       return window.ReagentApp.toast("제외할 취합 항목을 선택하세요.", "warn");
     }
 
-    const confirmedKeys = this.selectedKeys.filter((key) => this.getMeta(key).confirmed);
-    if (confirmedKeys.length) {
-      return window.ReagentApp.toast("확정된 취합건은 제외할 수 없습니다. 먼저 '선택 확정 취소'를 해주세요.", "warn");
+    if (targetKeys.length === 1) {
+      this.excludeCollectByKey(targetKeys[0]);
+      return;
     }
 
-    const ok = confirm("선택한 항목을 제품취합에서 제외하시겠습니까?\n신청 목록에서는 미취합 상태로 다시 표시됩니다.");
+    const confirmedKeys = targetKeys.filter((key) => this.getMeta(key).confirmed);
+    if (confirmedKeys.length) {
+      return window.ReagentApp.toast("확정된 취합건은 제외할 수 없습니다. 먼저 해당 행의 '취소'를 눌러주세요.", "warn");
+    }
+
+    const ok = confirm("선택한 항목을 제품취합에서 제외하시겠습니까?\\n신청 목록에서는 미취합 상태로 다시 표시됩니다.");
     if (!ok) return;
 
-    this.selectedKeys.forEach((key) => {
+    const request = window.ReagentApp.request;
+
+    targetKeys.forEach((key) => {
       delete request.collectedMeta[key];
       delete this.collectMeta[key];
     });
 
+    this.selectedKeys = this.selectedKeys.filter((key) => !targetKeys.includes(key));
+
     request.saveCollectedMeta();
     this.saveCollectMeta();
-
-    this.selectedKeys = [];
     this.saveSelectedKeys();
 
     request.renderRequest();
@@ -243,7 +312,6 @@ window.ReagentApp.collect = {
   },
 
   renderCollect() {
-    this.ensureCancelConfirmButton();
     this.loadCollectMeta();
     this.loadSelectedKeys();
 
@@ -267,7 +335,7 @@ window.ReagentApp.collect = {
     }
 
     if (!groups.length) {
-      els.collectList.innerHTML = `<tr><td colspan="15" class="empty">취합할 항목이 없습니다.</td></tr>`;
+      els.collectList.innerHTML = `<tr><td colspan="16" class="empty">취합할 항목이 없습니다.</td></tr>`;
       if (els.collectCount) els.collectCount.textContent = "0";
       if (els.collectQty) els.collectQty.textContent = "0";
       if (els.collectMix) els.collectMix.textContent = "0 / 0 / 0";
@@ -285,6 +353,13 @@ window.ReagentApp.collect = {
       const confirmedBadge = meta.confirmed ? `<span style="color:#16a34a; font-weight:700;">확정</span>` : "";
       const lockedAttr = meta.confirmed ? "disabled" : "";
       const readonlyAttr = meta.confirmed ? "readonly" : "";
+      const rowId = this.simpleKey(group.key);
+      const cancelButton = meta.confirmed
+        ? `<button type="button" class="ghost-btn collect-cancel-btn" data-key="${escapeHtml(group.key)}" style="margin-right:6px;">취소</button>`
+        : "";
+      const actionCell = meta.confirmed
+        ? `<span style="color:#94a3b8;">잠김</span>`
+        : `<button type="button" class="ghost-btn collect-exclude-btn" data-key="${escapeHtml(group.key)}">제외</button>`;
 
       const detailRows = group.entries.map((item) => `
         <tr>
@@ -298,8 +373,8 @@ window.ReagentApp.collect = {
 
       return `
         <tr>
-          <td><input type="checkbox" class="collect-check" data-key="${escapeHtml(group.key)}" ${checked}></td>
-          <td>${escapeHtml(group.name)} ${confirmedBadge}</td>
+          <td><input type="checkbox" class="collect-check" data-key="${escapeHtml(group.key)}" ${checked} ${lockedAttr}></td>
+          <td>${cancelButton}${escapeHtml(group.name)} ${confirmedBadge}</td>
           <td>${escapeHtml(group.maker)}</td>
           <td>${escapeHtml(group.code)}</td>
           <td>${escapeHtml(group.capacity)}</td>
@@ -314,27 +389,28 @@ window.ReagentApp.collect = {
           </td>
           <td>
             <label style="display:flex; gap:4px; align-items:center; justify-content:center;">
-              <input type="radio" class="vendor-select" name="vendor-${escapeHtml(group.key)}" data-key="${escapeHtml(group.key)}" value="vendor1" ${meta.selectedVendor === "vendor1" ? "checked" : ""} ${lockedAttr}>
+              <input type="radio" class="vendor-select" name="vendor-${rowId}" data-key="${escapeHtml(group.key)}" value="vendor1" ${meta.selectedVendor === "vendor1" ? "checked" : ""} ${lockedAttr}>
               <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit1" value="${this.formatNumber(unit1)}" style="width:90px; text-align:right;" ${readonlyAttr}>
             </label>
           </td>
-          <td data-price-key="${escapeHtml(group.key)}" data-price-field="price1">${this.formatNumber(price1)}</td>
+          <td data-row-id="${rowId}" data-price-field="price1">${this.formatNumber(price1)}</td>
           <td>
             <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor1" value="${escapeHtml(meta.vendor1 || "")}" style="width:110px;" ${readonlyAttr}>
           </td>
           <td>
             <label style="display:flex; gap:4px; align-items:center; justify-content:center;">
-              <input type="radio" class="vendor-select" name="vendor-${escapeHtml(group.key)}" data-key="${escapeHtml(group.key)}" value="vendor2" ${meta.selectedVendor === "vendor2" ? "checked" : ""} ${lockedAttr}>
+              <input type="radio" class="vendor-select" name="vendor-${rowId}" data-key="${escapeHtml(group.key)}" value="vendor2" ${meta.selectedVendor === "vendor2" ? "checked" : ""} ${lockedAttr}>
               <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit2" value="${this.formatNumber(unit2)}" style="width:90px; text-align:right;" ${readonlyAttr}>
             </label>
           </td>
-          <td data-price-key="${escapeHtml(group.key)}" data-price-field="price2">${this.formatNumber(price2)}</td>
+          <td data-row-id="${rowId}" data-price-field="price2">${this.formatNumber(price2)}</td>
           <td>
             <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor2" value="${escapeHtml(meta.vendor2 || "")}" style="width:110px;" ${readonlyAttr}>
           </td>
+          <td>${actionCell}</td>
         </tr>
-        <tr class="collect-detail-row" data-detail-key="${escapeHtml(group.key)}" style="display:none;">
-          <td colspan="15">
+        <tr class="collect-detail-row" data-detail-id="${rowId}" style="display:none;">
+          <td colspan="16">
             <div style="padding:12px; background:#f8fafc; border-radius:12px;">
               <table style="width:100%; min-width:0; table-layout:fixed;">
                 <colgroup>
@@ -361,7 +437,7 @@ window.ReagentApp.collect = {
       `;
     }).join("");
 
-    this.bindCollectEvents(groups);
+    this.bindCollectEvents();
 
     if (els.collectCount) els.collectCount.textContent = String(groups.length);
     if (els.collectQty) els.collectQty.textContent = String(groups.reduce((sum, g) => sum + Number(g.collectedQty || g.totalQty || 0), 0));
