@@ -11243,20 +11243,42 @@ async function fetchMonthCountMap(tableName, year){
   const batchDateMap = new Map();
   if(!supabaseClient) return { countMap: map, batchDateMap };
   const columns = tableName === 'attendance_records' ? 'work_date' : 'work_date, upload_batch_id';
+
+  // ✅ Supabase REST는 한 번에 1,000행까지만 내려오는 환경이 있어 .limit(50000)만으로는 부족합니다.
+  // 2월 588건 + 3월 651건처럼 연간 합계가 1,000건을 넘으면 3월이 412건으로 잘려 보이는 문제가 생깁니다.
+  // 따라서 range()로 전 구간을 페이지 단위로 모두 읽어서 월카드 카운트를 계산합니다.
+  const pageSize = 1000;
+  let from = 0;
+
   try{
-    const { data, error } = await supabaseClient.from(tableName).select(columns).gte('work_date', start).lte('work_date', end).limit(50000);
-    if(error) throw error;
-    (data || []).forEach(row => {
-      const workDate = String(row.work_date || '');
-      const m = workDate.match(/^\d{4}-(\d{2})-/);
-      if(!m) return;
-      const month = Number(m[1]);
-      map.set(month, (map.get(month) || 0) + 1);
-      if('upload_batch_id' in row && row.upload_batch_id){
-        if(!batchDateMap.has(row.upload_batch_id)) batchDateMap.set(row.upload_batch_id, []);
-        batchDateMap.get(row.upload_batch_id).push(workDate);
-      }
-    });
+    while(true){
+      const to = from + pageSize - 1;
+      const { data, error } = await supabaseClient
+        .from(tableName)
+        .select(columns)
+        .gte('work_date', start)
+        .lte('work_date', end)
+        .order('work_date', { ascending:true })
+        .range(from, to);
+
+      if(error) throw error;
+
+      const rows = data || [];
+      rows.forEach(row => {
+        const workDate = String(row.work_date || '');
+        const m = workDate.match(/^\d{4}-(\d{2})-/);
+        if(!m) return;
+        const month = Number(m[1]);
+        map.set(month, (map.get(month) || 0) + 1);
+        if('upload_batch_id' in row && row.upload_batch_id){
+          if(!batchDateMap.has(row.upload_batch_id)) batchDateMap.set(row.upload_batch_id, []);
+          batchDateMap.get(row.upload_batch_id).push(workDate);
+        }
+      });
+
+      if(rows.length < pageSize) break;
+      from += pageSize;
+    }
   }catch(err){
     console.warn(`[ADMIN MONTH MAP ${tableName}]`, err);
   }
