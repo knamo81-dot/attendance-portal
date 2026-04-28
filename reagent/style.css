@@ -599,3 +599,31 @@ html.embed-mode .shell{
 .collect-row-confirmed .auto-vendor-selected input{
   color:#1e3a8a !important;
 }
+
+/* ===== 제품신청 취합완료 행 음영 ===== */
+.request-row-collected > td{
+  background:#f1f5f9 !important;
+  color:#64748b;
+}
+
+.request-row-collected .ghost-btn{
+  background:#e2e8f0 !important;
+  border-color:#cbd5e1 !important;
+  color:#334155 !important;
+}
+
+.request-row-collected input[type="checkbox"]{
+  opacity:.55;
+}
+
+/* 상세정보 안에서는 취합완료 행만 음영, 추가신청건은 일반 배경 유지 */
+.request-detail-collected > td{
+  background:#f1f5f9 !important;
+  color:#64748b;
+}
+
+.request-detail-collected .ghost-btn{
+  background:#e2e8f0 !important;
+  border-color:#cbd5e1 !important;
+  color:#334155 !important;
+}
