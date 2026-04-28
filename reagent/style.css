@@ -542,3 +542,34 @@ html.embed-mode .shell{
   width:100% !important;
   max-width:none !important;
 }
+
+/* ===== 제품취합 자동 선택 거래처 음영 박스 ===== */
+.vendor-cell.auto-vendor-selected{
+  background:#eaf2ff !important;
+}
+
+.vendor-cell-start.auto-vendor-selected{
+  border-top-left-radius:14px;
+  border-bottom-left-radius:14px;
+}
+
+.vendor-cell-end.auto-vendor-selected{
+  border-top-right-radius:14px;
+  border-bottom-right-radius:14px;
+}
+
+.vendor-cell.auto-vendor-selected input{
+  background:rgba(255,255,255,0.72) !important;
+  border-color:transparent !important;
+  box-shadow:none !important;
+  font-weight:700;
+}
+
+.vendor-cell.auto-vendor-selected[data-price-field]{
+  color:#1d4ed8;
+  font-weight:800;
+}
+
+.vendor-cell.auto-vendor-selected input[readonly]{
+  background:rgba(255,255,255,0.42) !important;
+}
