@@ -288,7 +288,22 @@
     }
   });
 
-  restoreLastPage();
+  // 새 접속은 항상 홈에서 시작하고, 브라우저 새로고침일 때만 마지막 프로그램을 복원합니다.
+  // - 일반 접속/새 탭/주소 직접 입력: portal-home.html
+  // - F5 또는 브라우저 새로고침: localStorage의 마지막 프로그램 유지
+  const navEntry = performance.getEntriesByType('navigation')[0];
+  const navType = navEntry && navEntry.type ? navEntry.type : '';
+
+  if (navType === 'reload') {
+    restoreLastPage();
+  } else {
+    if (frame) {
+      frame.src = HOME_SRC;
+    }
+    if (homeBtn) {
+      setActiveNav(homeBtn);
+    }
+  }
 })();
 </script>
 </body>
