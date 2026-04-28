@@ -4447,6 +4447,56 @@ async function detectUploadMonthFromSelectedFiles(){
   }
 }
 
+
+function sleepMs(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+function getNextMonthKey(monthKey){
+  const [y,m] = String(monthKey || '').split('-').map(Number);
+  if(!y || !m) return '';
+  const d = new Date(y, m, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0') }`;
+}
+async function waitForAttendanceRecordCount(monthKey, expectedCount, options = {}){
+  if(!supabaseClient || !monthKey || !Number.isFinite(Number(expectedCount))) return null;
+  const start = `${monthKey}-01`;
+  const nextMonth = getNextMonthKey(monthKey);
+  if(!nextMonth) return null;
+  const endExclusive = `${nextMonth}-01`;
+  const maxTry = Number(options.maxTry || 8);
+  const delay = Number(options.delay || 450);
+  let lastCount = null;
+  for(let i=0; i<maxTry; i++){
+    const { count, error } = await supabaseClient
+      .from('attendance_records')
+      .select('id', { count:'exact', head:true })
+      .gte('work_date', start)
+      .lt('work_date', endExclusive);
+    if(error){
+      console.warn('[WAIT RECORD COUNT]', error);
+      break;
+    }
+    lastCount = Number(count || 0);
+    if(lastCount === Number(expectedCount)) return lastCount;
+    await sleepMs(delay);
+  }
+  return lastCount;
+}
+async function refreshAdminUploadManagementStrong(monthKey, expectedRecordCount){
+  const targetYear = Number(String(monthKey || '').slice(0,4)) || new Date().getFullYear();
+  if(window.ADMIN_UPLOAD_MANAGEMENT) window.ADMIN_UPLOAD_MANAGEMENT.selectedYear = targetYear;
+  await waitForAttendanceRecordCount(monthKey, Number(expectedRecordCount), { maxTry:8, delay:450 });
+  if(typeof window.loadAttendanceFromSupabase === 'function'){
+    try{ await window.loadAttendanceFromSupabase(); }catch(e){ console.warn('[STRONG REFRESH LOAD]', e); }
+  }
+  if(typeof window.refreshAdminUploadManagement === 'function'){
+    await window.refreshAdminUploadManagement(true);
+    await sleepMs(350);
+    if(window.ADMIN_UPLOAD_MANAGEMENT) window.ADMIN_UPLOAD_MANAGEMENT.selectedYear = targetYear;
+    const yearSelect = document.getElementById('adminUploadYear');
+    if(yearSelect) yearSelect.value = String(targetYear);
+    await window.refreshAdminUploadManagement(false);
+  }
+}
+
 async function applyUploadedFiles(targetMonth = ''){
   const uploadMonth = String(targetMonth || getSelectedUploadTargetMonth()).trim();
   if(!uploadMonth){
@@ -4527,7 +4577,9 @@ async function applyUploadedFiles(targetMonth = ''){
     if (window.ADMIN_UPLOAD_MANAGEMENT) window.ADMIN_UPLOAD_MANAGEMENT.selectedYear = uploadedYear;
 
     await updateAttendanceViewsAfterDataChange({ refreshFilters: true, keepMainTab: getActiveAttendanceMainTab('admin') });
-    if (typeof window.refreshAdminMonthCardsImmediately === 'function') {
+    if (typeof refreshAdminUploadManagementStrong === 'function') {
+      await refreshAdminUploadManagementStrong(backupResult.uploadMonth, backupResult.recordsCount);
+    } else if (typeof window.refreshAdminMonthCardsImmediately === 'function') {
       await window.refreshAdminMonthCardsImmediately({ targetYear: uploadedYear, forceYearReload: true });
     } else if (typeof window.refreshAdminUploadManagement === 'function') {
       await window.refreshAdminUploadManagement(true);
@@ -11711,6 +11763,7 @@ async function refreshAdminUploadManagement(forceYearReload = false){
 window.refreshAdminUploadManagement = refreshAdminUploadManagement;
 window.refreshAdminMonthCardsImmediately = refreshAdminMonthCardsImmediately;
 window.applyUploadedFiles = applyUploadedFiles;
+window.refreshAdminUploadManagementStrong = refreshAdminUploadManagementStrong;
 
   window.render = async function(){
     const keepTab = getActiveAttendanceMainTab('attendance');
