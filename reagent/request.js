@@ -524,7 +524,16 @@ window.ReagentApp.request = {
         <tr class="detail-row" data-detail-key="${this.attr(group.key)}" style="display:none;">
           <td colspan="12">
             <div style="padding:12px; background:#f8fafc; border-radius:12px;">
-              <table style="width:100%; min-width:0;">
+              <table style="width:100%; min-width:0; table-layout:fixed;">
+                <colgroup>
+                  <col style="width:150px;">
+                  <col style="width:170px;">
+                  <col style="width:28%;">
+                  <col style="width:80px;">
+                  <col style="width:30%;">
+                  <col style="width:110px;">
+                  <col style="width:120px;">
+                </colgroup>
                 <thead>
                   <tr>
                     <th>신청일자</th>
