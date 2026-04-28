@@ -81,6 +81,30 @@ window.ReagentApp.collect = {
     return Number(value || 0).toLocaleString("ko-KR");
   },
 
+  autoSelectVendor(meta) {
+    const unit1 = this.normalizeNumber(meta.unit1);
+    const unit2 = this.normalizeNumber(meta.unit2);
+    const vendor1 = String(meta.vendor1 || "").trim();
+    const vendor2 = String(meta.vendor2 || "").trim();
+
+    const hasVendor1 = vendor1 !== "" && unit1 > 0;
+    const hasVendor2 = vendor2 !== "" && unit2 > 0;
+
+    if (hasVendor1 && !hasVendor2) return "vendor1";
+    if (!hasVendor1 && hasVendor2) return "vendor2";
+
+    if (hasVendor1 && hasVendor2) {
+      return unit1 <= unit2 ? "vendor1" : "vendor2";
+    }
+
+    return "";
+  },
+
+  getAutoBadge(selectedVendor, vendorKey) {
+    if (selectedVendor !== vendorKey) return "";
+    return `<div style="margin-top:4px; color:#2563eb; font-size:11px; font-weight:700;">자동선택</div>`;
+  },
+
   simpleKey(key) {
     let hash = 0;
     const str = String(key || "");
@@ -140,6 +164,7 @@ window.ReagentApp.collect = {
 
         this.saveCollectMeta();
         this.updatePriceCells(key);
+        this.updateAutoBadges(key);
       });
 
       input.addEventListener("blur", (e) => {
@@ -150,17 +175,6 @@ window.ReagentApp.collect = {
       });
     });
 
-    document.querySelectorAll(".vendor-select").forEach((radio) => {
-      radio.addEventListener("change", (e) => {
-        const key = e.target.dataset.key;
-        const meta = this.getMeta(key);
-
-        if (meta.confirmed) return;
-
-        meta.selectedVendor = e.target.value;
-        this.saveCollectMeta();
-      });
-    });
   },
 
   updatePriceCells(key) {
@@ -180,6 +194,18 @@ window.ReagentApp.collect = {
 
     if (price1El) price1El.textContent = this.formatNumber(price1);
     if (price2El) price2El.textContent = this.formatNumber(price2);
+  },
+
+  updateAutoBadges(key) {
+    const meta = this.getMeta(key);
+    const selectedVendor = this.autoSelectVendor(meta);
+    const rowId = this.simpleKey(key);
+
+    const badge1 = document.querySelector(`[data-row-id="${rowId}"][data-auto-field="vendor1"]`);
+    const badge2 = document.querySelector(`[data-row-id="${rowId}"][data-auto-field="vendor2"]`);
+
+    if (badge1) badge1.innerHTML = this.getAutoBadge(selectedVendor, "vendor1");
+    if (badge2) badge2.innerHTML = this.getAutoBadge(selectedVendor, "vendor2");
   },
 
   toggleCollectDetail(key) {
@@ -246,20 +272,27 @@ window.ReagentApp.collect = {
     }
 
     let confirmedCount = 0;
+    let skippedCount = 0;
 
     targetKeys.forEach((key) => {
       const meta = this.getMeta(key);
 
       if (meta.confirmed) return;
-      if (!meta.selectedVendor) return;
 
+      const autoSelectedVendor = this.autoSelectVendor(meta);
+      if (!autoSelectedVendor) {
+        skippedCount += 1;
+        return;
+      }
+
+      meta.selectedVendor = autoSelectedVendor;
       meta.confirmed = true;
       meta.confirmedAt = new Date().toISOString();
       confirmedCount += 1;
     });
 
     if (!confirmedCount) {
-      return window.ReagentApp.toast("미확정 항목에서 거래처1 또는 거래처2를 먼저 선택하세요.", "warn");
+      return window.ReagentApp.toast("확정할 수 있는 거래처 정보가 없습니다. 거래처명과 단가를 입력하세요.", "warn");
     }
 
     this.selectedKeys = [];
@@ -268,7 +301,11 @@ window.ReagentApp.collect = {
     request.renderRequest();
     this.renderCollect();
 
-    window.ReagentApp.toast(`${confirmedCount}건의 거래처가 확정되었습니다.`, "success");
+    if (skippedCount > 0) {
+      window.ReagentApp.toast(`${confirmedCount}건 확정, ${skippedCount}건은 거래처명/단가 부족으로 제외되었습니다.`, "warn");
+    } else {
+      window.ReagentApp.toast(`${confirmedCount}건의 거래처가 자동 선택되어 확정되었습니다.`, "success");
+    }
   },
 
   excludeSelectedCollect() {
@@ -349,6 +386,10 @@ window.ReagentApp.collect = {
       const unit2 = this.normalizeNumber(meta.unit2);
       const price1 = qty * unit1;
       const price2 = qty * unit2;
+      const autoSelectedVendor = this.autoSelectVendor(meta);
+      if (!meta.confirmed) {
+        meta.selectedVendor = autoSelectedVendor;
+      }
       const checked = this.selectedKeys.includes(group.key) ? "checked" : "";
       const confirmedBadge = meta.confirmed ? `<span style="color:#16a34a; font-weight:700;">확정</span>` : "";
       const lockedAttr = meta.confirmed ? "disabled" : "";
@@ -388,24 +429,20 @@ window.ReagentApp.collect = {
             <button type="button" class="ghost-btn collect-detail-btn" data-key="${escapeHtml(group.key)}">상세보기</button>
           </td>
           <td>
-            <label style="display:flex; gap:4px; align-items:center; justify-content:center;">
-              <input type="radio" class="vendor-select" name="vendor-${rowId}" data-key="${escapeHtml(group.key)}" value="vendor1" ${meta.selectedVendor === "vendor1" ? "checked" : ""} ${lockedAttr}>
-              <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit1" value="${this.formatNumber(unit1)}" style="width:90px; text-align:right;" ${readonlyAttr}>
-            </label>
+            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit1" value="${this.formatNumber(unit1)}" style="width:90px; text-align:right;" ${readonlyAttr}>
           </td>
           <td data-row-id="${rowId}" data-price-field="price1">${this.formatNumber(price1)}</td>
           <td>
             <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor1" value="${escapeHtml(meta.vendor1 || "")}" style="width:110px;" ${readonlyAttr}>
+            <span data-row-id="${rowId}" data-auto-field="vendor1">${this.getAutoBadge(autoSelectedVendor, "vendor1")}</span>
           </td>
           <td>
-            <label style="display:flex; gap:4px; align-items:center; justify-content:center;">
-              <input type="radio" class="vendor-select" name="vendor-${rowId}" data-key="${escapeHtml(group.key)}" value="vendor2" ${meta.selectedVendor === "vendor2" ? "checked" : ""} ${lockedAttr}>
-              <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit2" value="${this.formatNumber(unit2)}" style="width:90px; text-align:right;" ${readonlyAttr}>
-            </label>
+            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit2" value="${this.formatNumber(unit2)}" style="width:90px; text-align:right;" ${readonlyAttr}>
           </td>
           <td data-row-id="${rowId}" data-price-field="price2">${this.formatNumber(price2)}</td>
           <td>
             <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor2" value="${escapeHtml(meta.vendor2 || "")}" style="width:110px;" ${readonlyAttr}>
+            <span data-row-id="${rowId}" data-auto-field="vendor2">${this.getAutoBadge(autoSelectedVendor, "vendor2")}</span>
           </td>
           <td>${actionCell}</td>
         </tr>
