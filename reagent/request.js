@@ -55,6 +55,90 @@ window.ReagentApp.request = {
     }
   },
 
+  getMonthKey(date = new Date(), offset = 0) {
+    const d = new Date(date.getFullYear(), date.getMonth() + offset, 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `${yyyy}-${mm}`;
+  },
+
+  formatOrderMonthLabel(monthKey) {
+    const [yyyy, mm] = String(monthKey || "").split("-");
+    if (!yyyy || !mm) return monthKey || "";
+    return `${yyyy}년 ${Number(mm)}월`;
+  },
+
+  getOrderMonthDescription(monthKey) {
+    const [, mm] = String(monthKey || "").split("-");
+    const month = Number(mm || 0);
+    if (!month) return "선택한 주문월에 발주할 품목을 신청합니다.";
+    return `${month}월 주문건은 전월 신청분과 ${month}월 추가신청분을 함께 취합할 수 있습니다.`;
+  },
+
+  getCurrentOrderMonth() {
+    const saved = localStorage.getItem("reagent_order_month");
+    return saved || this.getMonthKey(new Date(), 1);
+  },
+
+  setCurrentOrderMonth(monthKey) {
+    if (!monthKey) return;
+
+    try {
+      localStorage.setItem("reagent_order_month", monthKey);
+    } catch (_) {}
+
+    const requestSelect = document.getElementById("orderMonthSelect");
+    const collectSelect = document.getElementById("collectOrderMonthSelect");
+    const requestDesc = document.getElementById("orderMonthDesc");
+    const collectDesc = document.getElementById("collectOrderMonthDesc");
+
+    [requestSelect, collectSelect].forEach((select) => {
+      if (select && select.value !== monthKey) select.value = monthKey;
+    });
+
+    const desc = this.getOrderMonthDescription(monthKey);
+    if (requestDesc) requestDesc.textContent = desc;
+    if (collectDesc) collectDesc.textContent = `선택한 주문월 기준으로 취합합니다. ${desc}`;
+
+    this.renderRequest?.();
+    window.ReagentApp.collect?.renderCollect?.();
+  },
+
+  initOrderMonthControls() {
+    const requestSelect = document.getElementById("orderMonthSelect");
+    const collectSelect = document.getElementById("collectOrderMonthSelect");
+    const selects = [requestSelect, collectSelect].filter(Boolean);
+
+    if (!selects.length) return;
+
+    const currentMonth = this.getMonthKey(new Date(), 0);
+    const nextMonth = this.getMonthKey(new Date(), 1);
+    const selectedMonth = this.getCurrentOrderMonth();
+
+    const months = Array.from(new Set([currentMonth, nextMonth, selectedMonth]));
+
+    selects.forEach((select) => {
+      select.innerHTML = months
+        .map((month) => `<option value="${this.attr(month)}">${this.html(this.formatOrderMonthLabel(month))}</option>`)
+        .join("");
+
+      select.value = selectedMonth;
+      select.onchange = (e) => this.setCurrentOrderMonth(e.target.value);
+    });
+
+    const requestDesc = document.getElementById("orderMonthDesc");
+    const collectDesc = document.getElementById("collectOrderMonthDesc");
+    const desc = this.getOrderMonthDescription(selectedMonth);
+
+    if (requestDesc) requestDesc.textContent = desc;
+    if (collectDesc) collectDesc.textContent = `선택한 주문월 기준으로 취합합니다. ${desc}`;
+  },
+
+  getRowsForCurrentOrderMonth() {
+    const month = this.getCurrentOrderMonth();
+    return this.requestRows.filter((row) => (row.order_month || month) === month);
+  },
+
   populateMakerOptions() {
     const { els } = window.ReagentApp;
     if (!els.searchMaker) return;
@@ -214,7 +298,10 @@ window.ReagentApp.request = {
       return;
     }
 
+    const orderMonth = this.getCurrentOrderMonth();
+
     const itemKey = [
+      orderMonth,
       els.category?.value || "",
       productName,
       els.maker?.value || "",
@@ -243,6 +330,7 @@ window.ReagentApp.request = {
 
     const row = {
       id: Date.now(),
+      order_month: orderMonth,
       category: els.category?.value || "",
       name: productName,
       maker: els.maker?.value || "",
@@ -309,6 +397,7 @@ window.ReagentApp.request = {
 
     this.requestRows = this.requestRows.filter((row) => {
       const key = [
+        row.order_month || this.getCurrentOrderMonth(),
         row.category || "",
         row.name || "",
         row.maker || "",
@@ -359,9 +448,11 @@ window.ReagentApp.request = {
 
   insertSample() {
     const now = Date.now();
+    const orderMonth = this.getCurrentOrderMonth();
     this.requestRows.push(
       {
         id: now + 1,
+        order_month: orderMonth,
         category: "시약",
         name: "Ethanol",
         maker: "Sigma",
@@ -377,6 +468,7 @@ window.ReagentApp.request = {
       },
       {
         id: now + 2,
+        order_month: orderMonth,
         category: "시약",
         name: "Ethanol",
         maker: "Sigma",
@@ -392,6 +484,7 @@ window.ReagentApp.request = {
       },
       {
         id: now + 3,
+        order_month: orderMonth,
         category: "초자",
         name: "비커",
         maker: "Pyrex",
@@ -414,6 +507,7 @@ window.ReagentApp.request = {
   },
 
   async fetchData() {
+    this.initOrderMonthControls();
     this.loadRequestRows();
     this.loadSelectedKeys();
     this.loadCollectedMeta();
@@ -425,7 +519,9 @@ window.ReagentApp.request = {
     const grouped = {};
 
     rows.forEach((row) => {
+      const orderMonth = row.order_month || this.getCurrentOrderMonth();
       const key = [
+        orderMonth,
         row.category || "",
         row.name || "",
         row.maker || "",
@@ -438,6 +534,7 @@ window.ReagentApp.request = {
       if (!grouped[key]) {
         grouped[key] = {
           key,
+          order_month: orderMonth,
           category: row.category || "",
           name: row.name || "",
           maker: row.maker || "",
@@ -530,7 +627,7 @@ window.ReagentApp.request = {
     const { els } = window.ReagentApp;
     if (!els.draftTableBody) return;
 
-    const groups = this.groupItems(this.requestRows).sort((a, b) => {
+    const groups = this.groupItems(this.getRowsForCurrentOrderMonth()).sort((a, b) => {
       const getPriority = (group) => {
         const isCompletedOnly = group.collectedQty > 0 && group.newQty === 0;
         return isCompletedOnly ? 1 : 0;
