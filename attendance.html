@@ -2132,10 +2132,10 @@ html.embed-mode #main-dashboard .kpis{
     <div>
       <div class="card">
         <div class="title">관리자 전용 데이터 업로드</div>
-        <div class="desc">월별 누적 운영 기준입니다. 세콤DB와 ERP 근태 파일을 먼저 선택한 뒤, 아래 연도별 업로드 현황의 해당 월카드에서 업로드를 실행하세요. 월카드가 기준월을 결정하고 파일 날짜는 검증만 합니다.</div>
+        <div class="desc">월별 누적 운영 기준입니다. 세콤DB와 ERP 근태 파일을 각각 선택하면 파일 날짜를 읽어 업로드 년월을 자동 감지합니다. 담당자가 년월을 확인한 뒤 상단의 [업로드 실행] 버튼으로 반영합니다.</div>
         <div class="uploadBox">
           <div style="font-size:36px">📁</div>
-          <div style="margin:8px 0 14px">조직·사원·팀변경·특이사항 기준정보는 포털 설정에서만 관리합니다. 파일을 선택한 뒤 아래 월카드의 [업로드] 버튼을 눌러 해당 월에 반영하세요.</div>
+          <div style="margin:8px 0 14px">조직·사원·팀변경·특이사항 기준정보는 포털 설정에서만 관리합니다. 세콤DB와 ERP 파일을 각각 선택한 뒤 감지된 년월을 확인하고 업로드를 실행하세요.</div>
           <div style="display:grid;gap:12px;max-width:860px;margin:0 auto">
             <div class="mini" style="text-align:left">
               <strong>세콤DB 업로드</strong>
@@ -2147,10 +2147,25 @@ html.embed-mode #main-dashboard .kpis{
               <div class="label" style="margin:6px 0 8px">근태구분 + 연장신청/실제연장 시간이 들어있는 파일</div>
               <input id="erpUploadInput" type="file" accept=".xlsx,.xls" style="width:100%">
             </div>
+            <div class="mini" style="text-align:left;background:#f8fafc">
+              <strong>업로드 기준월 확인</strong>
+              <div class="label" style="margin:6px 0 8px">파일을 선택하면 감지된 년월이 자동 입력됩니다. 필요 시 담당자가 수정한 뒤 업로드하세요.</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <span class="adminMute">감지된 년월</span>
+                <strong id="detectedUploadMonth" style="min-width:120px">-</strong>
+                <select id="uploadTargetYear" class="adminYearSelect" style="min-width:110px"></select>
+                <select id="uploadTargetMonth" class="adminYearSelect" style="min-width:90px">
+                  <option value="01">01월</option><option value="02">02월</option><option value="03">03월</option><option value="04">04월</option>
+                  <option value="05">05월</option><option value="06">06월</option><option value="07">07월</option><option value="08">08월</option>
+                  <option value="09">09월</option><option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+                </select>
+                <span id="uploadMonthCheckMessage" class="adminMute">파일을 선택해주세요.</span>
+              </div>
+            </div>
             <div class="filters" style="justify-content:center">
-              <button id="applyUploadBtn" type="button">선택파일 월카드 업로드 안내</button>
+              <button id="applyUploadBtn" type="button" class="adminActionBtn primary">업로드 실행</button>
               <button id="clearUploadBtn" type="button">업로드 데이터 비우기</button>
-                          </div>
+            </div>
           </div>
         </div>
         <div style="display:grid;gap:10px;margin-top:14px">
@@ -2162,7 +2177,7 @@ html.embed-mode #main-dashboard .kpis{
         <div class="adminYearBar">
           <div>
             <div class="title">연도별 업로드 현황</div>
-            <div class="desc">선택한 연도의 1~12월 업로드 상태를 한눈에 확인합니다. 파일은 상단에서 선택하고, 해당 월카드의 업로드 버튼으로 반영합니다.</div>
+            <div class="desc">선택한 연도의 1~12월 업로드 상태를 한눈에 확인합니다. 업로드는 상단에서 실행하고, 월카드는 결과 확인과 삭제에 사용합니다.</div>
           </div>
           <div class="adminYearControls">
             <select id="adminUploadYear" class="adminYearSelect"></select>
@@ -3538,15 +3553,17 @@ function buildMergedAttendanceRowsForServer(secomRows = [], erpRows = []){
 
 function buildAttendanceRecordPayloads(batchId, secomRows = [], erpRows = []){
   const metaByName = new Map((empMaster || []).map(e => [normalizeEmployeeName(e.name), e]));
+  const metaById = new Map((empMaster || []).map(e => [String(e.id || e.employee_no || '').trim(), e]).filter(([id]) => id));
   return buildMergedAttendanceRowsForServer(secomRows, erpRows).map(row => {
     const name = normalizeEmployeeName(row.name);
-    const meta = metaByName.get(name) || {};
+    const rowEmpNo = String(row.employeeId || row.employee_no || row.emp_no || '').trim();
+    const meta = metaById.get(rowEmpNo) || metaByName.get(name) || {};
     const workHours = parseWorkDurationToHours(row.workHours || row.realWorkHours || '');
     const overtime = Number(row.erpActualOvertime || row.seccomOvertimeHours || 0) || 0;
     const reason = String(row.erpReason || row.reason || row.status || '').trim();
     return {
       work_date: row.date || null,
-      employee_no: String(row.employeeId || meta.id || '').trim() || null,
+      employee_no: String(rowEmpNo || meta.id || meta.employee_no || '').trim() || null,
       employee_name: name || null,
       division_name: String(meta.division || row.division || '').trim() || null,
       team_name: String(meta.team || row.team || '').trim() || null,
@@ -4243,12 +4260,117 @@ function showMonthCardUploadGuide(){
   alert('파일을 먼저 선택한 뒤, 아래 연도별 업로드 현황에서 해당 월카드의 [업로드] 버튼을 눌러주세요.\n\n예: 2026년 3월 자료는 2026년 선택 → 3월 카드 [업로드]');
 }
 
-async function applyUploadedFiles(targetMonth = ''){
-  const uploadMonth = String(targetMonth || '').trim();
-  if(!uploadMonth){
-    showMonthCardUploadGuide();
+function getSelectedUploadTargetMonth(){
+  const year = String(document.getElementById('uploadTargetYear')?.value || '').trim();
+  const month = String(document.getElementById('uploadTargetMonth')?.value || '').trim().padStart(2, '0');
+  if(!/^20\d{2}$/.test(year) || !/^(0[1-9]|1[0-2])$/.test(month)) return '';
+  return `${year}-${month}`;
+}
+
+function ensureUploadTargetYearOptions(preferredYear){
+  const select = document.getElementById('uploadTargetYear');
+  if(!select) return;
+  const currentYear = new Date().getFullYear();
+  const values = new Set([currentYear - 2, currentYear - 1, currentYear, currentYear + 1, currentYear + 2]);
+  try{ (loadAdminExtraYears?.() || []).forEach(y => values.add(Number(y))); }catch(e){}
+  const p = Number(preferredYear);
+  if(Number.isFinite(p) && p >= 2000 && p <= 2099) values.add(p);
+  const selected = String(select.value || preferredYear || currentYear);
+  select.innerHTML = [...values].filter(y => Number.isFinite(y) && y >= 2000 && y <= 2099).sort((a,b)=>b-a).map(y => `<option value="${y}">${y}년</option>`).join('');
+  if([...select.options].some(opt => opt.value === selected)) select.value = selected;
+  else select.value = String((Number.isFinite(p) && p) || currentYear);
+}
+
+function updateUploadMonthCheckMessage(info = null){
+  const msg = document.getElementById('uploadMonthCheckMessage');
+  if(!msg) return;
+  const target = getSelectedUploadTargetMonth();
+  if(!info){
+    msg.textContent = target ? `업로드 기준월: ${target}` : '파일을 선택해주세요.';
+    msg.style.color = '';
     return;
   }
+  const { secomMonths = [], erpMonths = [], allMonths = [] } = info;
+  if(!target){
+    msg.textContent = '업로드 기준월을 선택해주세요.';
+    msg.style.color = '#b45309';
+  }else if(allMonths.length === 1 && allMonths[0] === target){
+    msg.textContent = `파일 월 확인 완료 · 세콤 ${secomMonths[0] || '-'} / ERP ${erpMonths[0] || '-'}`;
+    msg.style.color = '#15803d';
+  }else if(allMonths.length){
+    msg.textContent = `파일 월과 선택 월을 확인하세요 · 세콤 ${secomMonths.join(', ') || '-'} / ERP ${erpMonths.join(', ') || '-'}`;
+    msg.style.color = '#b45309';
+  }else{
+    msg.textContent = '파일 날짜를 아직 감지하지 못했습니다.';
+    msg.style.color = '';
+  }
+}
+
+function setUploadTargetMonth(monthKey, sourceLabel = ''){
+  const match = String(monthKey || '').match(/^(20\d{2})-(0[1-9]|1[0-2])$/);
+  if(!match) return false;
+  ensureUploadTargetYearOptions(Number(match[1]));
+  const yearEl = document.getElementById('uploadTargetYear');
+  const monthEl = document.getElementById('uploadTargetMonth');
+  const detectedEl = document.getElementById('detectedUploadMonth');
+  if(yearEl) yearEl.value = match[1];
+  if(monthEl) monthEl.value = match[2];
+  if(detectedEl) detectedEl.textContent = sourceLabel ? `${monthKey} (${sourceLabel})` : monthKey;
+  updateUploadMonthCheckMessage();
+  return true;
+}
+
+function detectSingleUploadMonthFromRows(secomRows = [], erpRows = []){
+  const secomMonths = getUniqueAttendanceYMs(secomRows || []);
+  const erpMonths = getUniqueAttendanceYMs(erpRows || []);
+  const allMonths = [...new Set([...secomMonths, ...erpMonths])];
+  return { secomMonths, erpMonths, allMonths, detectedMonth: allMonths.length === 1 ? allMonths[0] : '' };
+}
+
+async function detectUploadMonthFromSelectedFiles(){
+  const { secomFile, erpFile } = getAdminSelectedUploadFiles();
+  const detectedEl = document.getElementById('detectedUploadMonth');
+  if(!secomFile && !erpFile){
+    if(detectedEl) detectedEl.textContent = '-';
+    updateUploadMonthCheckMessage();
+    return null;
+  }
+  if(typeof XLSX === 'undefined'){
+    updateUploadMonthCheckMessage();
+    return null;
+  }
+  try{
+    const [secomRows, erpRows] = await Promise.all([
+      secomFile ? readWorkbook(secomFile).then(wb => parseSecomWorkbookRows(firstSheetRows(wb))) : Promise.resolve([]),
+      erpFile ? readWorkbook(erpFile).then(wb => parseErpWorkbookRows(firstSheetRows(wb))) : Promise.resolve([])
+    ]);
+    const info = detectSingleUploadMonthFromRows(secomRows, erpRows);
+    if(info.detectedMonth){
+      setUploadTargetMonth(info.detectedMonth, '자동감지');
+    }else if(detectedEl){
+      detectedEl.textContent = info.allMonths.length ? `복수 월 감지: ${info.allMonths.join(', ')}` : '-';
+    }
+    updateUploadMonthCheckMessage(info);
+    return info;
+  }catch(err){
+    console.error('[UPLOAD MONTH DETECT FAILED]', err);
+    if(detectedEl) detectedEl.textContent = '감지 실패';
+    const msg = document.getElementById('uploadMonthCheckMessage');
+    if(msg){
+      msg.textContent = '파일 년월 감지 중 오류가 발생했습니다.';
+      msg.style.color = '#b91c1c';
+    }
+    return null;
+  }
+}
+
+async function applyUploadedFiles(targetMonth = ''){
+  const uploadMonth = String(targetMonth || getSelectedUploadTargetMonth()).trim();
+  if(!uploadMonth){
+    alert('업로드 기준 년월을 선택해주세요.');
+    return;
+  }
+
   const { secomFile, erpFile } = getAdminSelectedUploadFiles();
   if(!secomFile || !erpFile){
     alert('세콤DB와 ERP 근태 파일을 모두 선택해주세요.');
@@ -4276,8 +4398,9 @@ async function applyUploadedFiles(targetMonth = ''){
       throw new Error('세콤 또는 ERP 파일에서 날짜/이름 기준 데이터를 찾지 못했습니다. 파일 양식을 확인해주세요.');
     }
     if(secomMonths.length !== 1 || secomMonths[0] !== uploadMonth || erpMonths.length !== 1 || erpMonths[0] !== uploadMonth){
-      throw new Error(`선택한 월카드(${uploadMonth})와 파일 날짜가 맞지 않습니다. 세콤: ${secomMonths.join(', ') || '-'} / ERP: ${erpMonths.join(', ') || '-'}`);
+      throw new Error(`선택한 업로드 기준월(${uploadMonth})과 파일 날짜가 맞지 않습니다. 세콤: ${secomMonths.join(', ') || '-'} / ERP: ${erpMonths.join(', ') || '-'}`);
     }
+    if(!confirm(`${uploadMonth} 데이터를 업로드할까요?\n기존 ${uploadMonth} raw/records는 삭제 후 재생성됩니다.`)) return;
     const nextRows = [...secomRows, ...erpRows];
 
     const batchId = createUploadBatchId();
@@ -4353,15 +4476,25 @@ alert('업로드 실패 상세: ' + (error?.message || JSON.stringify(error)));
   } finally {
     if(applyBtn){
       applyBtn.disabled = false;
-      applyBtn.textContent = originalBtnText || '업로드 데이터 반영';
+      applyBtn.textContent = originalBtnText || '업로드 실행';
     }
   }
 }
 function bindUploadRuntimeEvents(){
+  ensureUploadTargetYearOptions(new Date().getFullYear());
+  const yearEl = document.getElementById('uploadTargetYear');
+  const monthEl = document.getElementById('uploadTargetMonth');
+  if(yearEl && !yearEl.value) yearEl.value = String(new Date().getFullYear());
+  if(monthEl && !monthEl.value) monthEl.value = String(new Date().getMonth() + 1).padStart(2, '0');
+  updateUploadMonthCheckMessage();
   $('#applyUploadBtn')?.addEventListener('click', () => {
-    showMonthCardUploadGuide();
+    applyUploadedFiles();
   });
   $('#clearUploadBtn')?.addEventListener('click', clearUploadedAttendanceData);
+  $('#secomUploadInput')?.addEventListener('change', () => { detectUploadMonthFromSelectedFiles(); });
+  $('#erpUploadInput')?.addEventListener('change', () => { detectUploadMonthFromSelectedFiles(); });
+  $('#uploadTargetYear')?.addEventListener('change', () => { updateUploadMonthCheckMessage(); });
+  $('#uploadTargetMonth')?.addEventListener('change', () => { updateUploadMonthCheckMessage(); });
 }
 
 
@@ -11113,11 +11246,9 @@ function renderAdminMonthCards(){
           <div>파일: ERP ${stat.erpFileNames.length ? stat.erpFileNames[0] : '-'} / 세콤 ${stat.secomFileNames.length ? stat.secomFileNames[0] : '-'}</div>
         </div>
         <div class="adminMonthActions">
-          <button type="button" class="adminActionBtn primary" data-admin-upload-month="${stat.month}">업로드</button>
           <button type="button" class="adminActionBtn" data-admin-detail-month="${stat.month}">상세</button>
           <button type="button" class="adminActionBtn danger" data-admin-delete-month="${stat.month}" ${deleteDisabled}>월 삭제</button>
         </div>
-        <div class="adminUploadTargetHint">대상월: ${ADMIN_UPLOAD_MANAGEMENT.selectedYear}-${String(stat.month).padStart(2,'0')}</div>
       </div>`;
   }).join('');
 }
@@ -11171,26 +11302,6 @@ function initAdminManagementEventDelegation(){
           await refreshAdminUploadManagement(true);
         }catch(err){
           console.error('[ADMIN REFRESH BTN]', err);
-        }
-      })();
-      return;
-    }
-    const uploadMonthBtn = e.target.closest('[data-admin-upload-month]');
-    if(uploadMonthBtn){
-      if(uploadMonthBtn.disabled) return;
-      const month = Number(uploadMonthBtn.getAttribute('data-admin-upload-month'));
-      const uploadMonth = makeAdminTargetMonth(month);
-      if(!uploadMonth){
-        alert('업로드 대상월을 확인하지 못했습니다.');
-        return;
-      }
-      (async () => {
-        try{
-          if(!confirm(`${uploadMonth} 데이터를 업로드할까요?\n기존 ${uploadMonth} raw/records는 삭제 후 재생성됩니다.`)) return;
-          await applyUploadedFiles(uploadMonth);
-        }catch(err){
-          console.error('[ADMIN MONTH UPLOAD CLICK]', err);
-          alert('월카드 업로드 중 오류가 발생했습니다.\n' + (err?.message || err));
         }
       })();
       return;
