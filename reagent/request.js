@@ -388,7 +388,26 @@ window.ReagentApp.request = {
     const { els } = window.ReagentApp;
     if (!els.draftTableBody) return;
 
-    const groups = this.groupItems(this.requestRows);
+    const groups = this.groupItems(this.requestRows).sort((a, b) => {
+      // 미취합건 / 추가신청건(체크박스가 열려있는 항목)을 위로,
+      // 취합완료건(체크박스 잠김)을 아래로 정렬합니다.
+      const getPriority = (group) => {
+        const isCompletedOnly = group.collectedQty > 0 && group.newQty === 0;
+        const isAdditional = group.collectedQty > 0 && group.newQty > 0;
+
+        if (!isCompletedOnly) return 0; // 미취합 또는 추가신청건
+        if (isAdditional) return 0;
+        return 1; // 취합완료
+      };
+
+      const priorityDiff = getPriority(a) - getPriority(b);
+      if (priorityDiff !== 0) return priorityDiff;
+
+      return [a.category, a.name, a.maker, a.code].join(" ").localeCompare(
+        [b.category, b.name, b.maker, b.code].join(" "),
+        "ko"
+      );
+    });
 
     if (!groups.length) {
       els.draftTableBody.innerHTML = `<tr><td colspan="12" class="empty">데이터 없음</td></tr>`;
@@ -428,7 +447,7 @@ window.ReagentApp.request = {
             <td>
               ${
                 isLocked
-                  ? `<span style="color:#94a3b8; font-weight:700;">잠김</span>`
+                  ? `<span style="color:#94a3b8;">잠김</span>`
                   : `
                     <button type="button" class="ghost-btn detail-edit-btn" data-id="${item.id}">수정</button>
                     <button type="button" class="ghost-btn detail-delete-btn" data-id="${item.id}">삭제</button>
