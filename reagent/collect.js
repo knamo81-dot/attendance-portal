@@ -182,7 +182,7 @@ window.ReagentApp.collect = {
     if (!group) return;
 
     const meta = this.getMeta(key);
-    const qty = Number(group.collectedQty || group.totalQty || 0);
+    const qty = Number(group.collectedQty || 0);
 
     const price1 = qty * this.normalizeNumber(meta.unit1);
     const price2 = qty * this.normalizeNumber(meta.unit2);
@@ -228,6 +228,8 @@ window.ReagentApp.collect = {
     if (!ok) return;
 
     meta.confirmed = false;
+    meta.confirmedQty = 0;
+    meta.pendingQty = 0;
     meta.confirmedAt = "";
 
     this.saveCollectMeta();
@@ -272,13 +274,39 @@ window.ReagentApp.collect = {
       return window.ReagentApp.toast("확정할 취합 항목을 선택하세요.", "warn");
     }
 
+    const groups = request.groupItems(request.requestRows);
+    const targetGroups = targetKeys
+      .map((key) => groups.find((group) => group.key === key))
+      .filter(Boolean);
+
+    const hasAdditionalQty = targetGroups.some((group) => Number(group.newQty || 0) > 0);
+
+    if (hasAdditionalQty) {
+      const ok = confirm(
+        "추가신청건이 포함되어 있습니다.\n\n" +
+        "취합 완료된 수량만 거래처 확정하고,\n" +
+        "추가신청건은 확정 대상에서 제외됩니다.\n\n" +
+        "계속 진행하시겠습니까?"
+      );
+
+      if (!ok) return;
+    }
+
     let confirmedCount = 0;
     let skippedCount = 0;
 
-    targetKeys.forEach((key) => {
+    targetGroups.forEach((group) => {
+      const key = group.key;
       const meta = this.getMeta(key);
 
       if (meta.confirmed) return;
+
+      const confirmedQty = Number(group.collectedQty || 0);
+
+      if (!confirmedQty) {
+        skippedCount += 1;
+        return;
+      }
 
       const autoSelectedVendor = this.autoSelectVendor(meta);
       if (!autoSelectedVendor) {
@@ -288,6 +316,8 @@ window.ReagentApp.collect = {
 
       meta.selectedVendor = autoSelectedVendor;
       meta.confirmed = true;
+      meta.confirmedQty = confirmedQty;
+      meta.pendingQty = Number(group.newQty || 0);
       meta.confirmedAt = new Date().toISOString();
       confirmedCount += 1;
     });
@@ -304,6 +334,8 @@ window.ReagentApp.collect = {
 
     if (skippedCount > 0) {
       window.ReagentApp.toast(`${confirmedCount}건 확정, ${skippedCount}건은 거래처명/단가 부족으로 제외되었습니다.`, "warn");
+    } else if (hasAdditionalQty) {
+      window.ReagentApp.toast("취합 완료된 수량만 거래처 확정되었습니다. 추가신청건은 미확정 상태로 유지됩니다.", "warn");
     } else {
       window.ReagentApp.toast(`${confirmedCount}건의 거래처가 자동 선택되어 확정되었습니다.`, "success");
     }
@@ -382,7 +414,7 @@ window.ReagentApp.collect = {
 
     els.collectList.innerHTML = groups.map((group) => {
       const meta = this.getMeta(group.key);
-      const qty = Number(group.collectedQty || group.totalQty || 0);
+      const qty = Number(group.collectedQty || 0);
       const unit1 = this.normalizeNumber(meta.unit1);
       const unit2 = this.normalizeNumber(meta.unit2);
       const price1 = qty * unit1;
@@ -424,8 +456,17 @@ window.ReagentApp.collect = {
           <td>${escapeHtml(group.cas)}</td>
           <td>${escapeHtml(group.grade)}</td>
           <td>
-            ${group.collectedQty > 0 ? `완료 ${group.collectedQty}<br>` : ""}
-            ${group.newQty > 0 ? `추가 ${group.newQty}` : ""}
+            ${
+              meta.confirmed
+                ? `
+                  ${group.collectedQty > 0 ? `<span class="qty-confirmed">완료 ${group.collectedQty}</span><br>` : ""}
+                  ${group.newQty > 0 ? `<span class="qty-pending">추가 ${group.newQty}</span>` : ""}
+                `
+                : `
+                  ${group.collectedQty > 0 ? `완료 ${group.collectedQty}<br>` : ""}
+                  ${group.newQty > 0 ? `추가 ${group.newQty}` : ""}
+                `
+            }
           </td>
           <td>
             <button type="button" class="ghost-btn collect-detail-btn" data-key="${escapeHtml(group.key)}">상세보기</button>
