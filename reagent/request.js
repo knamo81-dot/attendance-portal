@@ -414,20 +414,30 @@ window.ReagentApp.request = {
         checked = this.selectedKeys.includes(group.key) ? "checked" : "";
       }
 
-      const detailRows = this.splitEntryStatus(group).map((item) => `
-        <tr>
-          <td>${item.id}</td>
-          <td>${this.html(item.team)} / ${this.html(item.requester)}</td>
-          <td>${this.html(item.name)}</td>
-          <td>${item.qty}</td>
-          <td>${this.html(item.usage)}</td>
-          <td>${this.html(item.rowStatus)}</td>
-          <td>
-            <button type="button" class="ghost-btn detail-edit-btn" data-id="${item.id}">수정</button>
-            <button type="button" class="ghost-btn detail-delete-btn" data-id="${item.id}">삭제</button>
-          </td>
-        </tr>
-      `).join("");
+      const detailRows = this.splitEntryStatus(group).map((item) => {
+        const isLocked = item.rowStatus === "취합완료";
+
+        return `
+          <tr>
+            <td>${item.id}</td>
+            <td>${this.html(item.team)} / ${this.html(item.requester)}</td>
+            <td>${this.html(item.name)}</td>
+            <td>${item.qty}</td>
+            <td>${this.html(item.usage)}</td>
+            <td>${this.html(item.rowStatus)}</td>
+            <td>
+              ${
+                isLocked
+                  ? `<span style="color:#94a3b8; font-weight:700;">잠김</span>`
+                  : `
+                    <button type="button" class="ghost-btn detail-edit-btn" data-id="${item.id}">수정</button>
+                    <button type="button" class="ghost-btn detail-delete-btn" data-id="${item.id}">삭제</button>
+                  `
+              }
+            </td>
+          </tr>
+        `;
+      }).join("");
 
       return `
         <tr>
