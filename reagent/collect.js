@@ -49,7 +49,7 @@ window.ReagentApp.collect = {
 
   addSelectedToCollect() {
     const request = window.ReagentApp.request;
-    const groups = request.groupItems(request.requestRows);
+    const groups = request.groupItems(request.getRowsForCurrentOrderMonth ? request.getRowsForCurrentOrderMonth() : request.requestRows);
     const selected = groups.filter((g) => request.selectedKeys.includes(g.key));
 
     if (!selected.length) {
@@ -178,7 +178,7 @@ window.ReagentApp.collect = {
 
   updatePriceCells(key) {
     const request = window.ReagentApp.request;
-    const group = request.groupItems(request.requestRows).find((g) => g.key === key);
+    const group = request.groupItems(request.getRowsForCurrentOrderMonth ? request.getRowsForCurrentOrderMonth() : request.requestRows).find((g) => g.key === key);
     if (!group) return;
 
     const meta = this.getMeta(key);
@@ -274,7 +274,7 @@ window.ReagentApp.collect = {
       return window.ReagentApp.toast("확정할 취합 항목을 선택하세요.", "warn");
     }
 
-    const groups = request.groupItems(request.requestRows);
+    const groups = request.groupItems(request.getRowsForCurrentOrderMonth ? request.getRowsForCurrentOrderMonth() : request.requestRows);
     const targetGroups = targetKeys
       .map((key) => groups.find((group) => group.key === key))
       .filter(Boolean);
@@ -388,7 +388,7 @@ window.ReagentApp.collect = {
     const { els, escapeHtml } = window.ReagentApp;
     const request = window.ReagentApp.request;
 
-    let groups = request.groupItems(request.requestRows)
+    let groups = request.groupItems(request.getRowsForCurrentOrderMonth ? request.getRowsForCurrentOrderMonth() : request.requestRows)
       .filter((g) => Number(request.collectedMeta[g.key] || 0) > 0);
 
     const keyword = (els.collectKeyword?.value || "").trim().toLowerCase();
