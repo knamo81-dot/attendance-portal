@@ -504,9 +504,14 @@ window.ReagentApp.request = {
           <td>${this.html(group.cas)}</td>
           <td>${this.html(group.grade)}</td>
           <td>
-            ${group.collectedQty > 0 ? `완료 ${group.collectedQty}<br>` : ""}
-            ${group.newQty > 0 ? `추가 ${group.newQty}` : ""}
-            ${group.collectedQty === 0 ? `${group.totalQty}` : ""}
+            ${
+              group.collectedQty === 0
+                ? `${group.totalQty}`
+                : `
+                  ${group.collectedQty > 0 ? `완료 ${group.collectedQty}<br>` : ""}
+                  ${group.newQty > 0 ? `추가 ${group.newQty}` : ""}
+                `
+            }
           </td>
           <td>
             <button type="button" class="ghost-btn detail-toggle-btn" data-key="${this.attr(group.key)}">
