@@ -471,7 +471,7 @@ window.ReagentApp.request = {
 
         return `
           <tr>
-            <td>${item.id}</td>
+            <td>${this.formatDateTime(item.created_at || item.id)}</td>
             <td>${this.html(item.team)} / ${this.html(item.requester)}</td>
             <td>${this.html(item.name)}</td>
             <td>${item.qty}</td>
@@ -522,7 +522,7 @@ window.ReagentApp.request = {
               <table style="width:100%; min-width:0;">
                 <thead>
                   <tr>
-                    <th>ID</th>
+                    <th>신청일자</th>
                     <th>신청자</th>
                     <th>품명</th>
                     <th>수량</th>
@@ -578,6 +578,21 @@ window.ReagentApp.request = {
     if (els.sumGlass) els.sumGlass.textContent = String(groups.filter((g) => g.category === "초자").length);
     if (els.sumSafety) els.sumSafety.textContent = String(groups.filter((g) => g.category === "안전용품").length);
     if (els.draftCountBadge) els.draftCountBadge.textContent = `통합 항목 ${groups.length}건`;
+  },
+
+  formatDateTime(value) {
+    const raw = value?.created_at || value?.id || value;
+    const date = new Date(raw);
+
+    if (Number.isNaN(date.getTime())) return "-";
+
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    const hh = String(date.getHours()).padStart(2, "0");
+    const mi = String(date.getMinutes()).padStart(2, "0");
+
+    return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
   },
 
   html(value) {
