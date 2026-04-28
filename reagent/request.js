@@ -178,6 +178,20 @@ window.ReagentApp.request = {
     setValue(els.usage, "");
   },
 
+
+  getCurrentUser() {
+    const user = window.ReagentApp.currentUser || {};
+
+    return {
+      employee_no: user.employee_no || user.employeeNo || "",
+      name: user.name || user.user_name || user.userName || "미지정",
+      team: user.team || "미지정팀",
+      department: user.department || "",
+      position: user.position || "",
+      role: user.role || ""
+    };
+  },
+
   async addCurrentItem() {
     const { els, toast } = window.ReagentApp;
 
@@ -211,8 +225,12 @@ window.ReagentApp.request = {
       grade: els.grade?.value || "",
       qty,
       usage,
-      team: "미지정팀",
-      requester: "미지정",
+      employee_no: this.getCurrentUser().employee_no,
+      department: this.getCurrentUser().department,
+      team: this.getCurrentUser().team,
+      requester: this.getCurrentUser().name,
+      position: this.getCurrentUser().position,
+      role: this.getCurrentUser().role,
       created_at: new Date().toISOString()
     };
 
