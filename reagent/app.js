@@ -125,13 +125,13 @@ window.ReagentApp.bindEvents = function () {
 
 window.ReagentApp.getStoredUserHint = function () {
   const candidates = [
+    "reagent_current_user",
     "currentUser",
     "portal_current_user",
     "lab_current_user",
     "loginUser",
     "user",
-    "employee",
-    "reagent_current_user"
+    "employee"
   ];
 
   for (const key of candidates) {
@@ -156,12 +156,19 @@ window.ReagentApp.getUrlUserHint = function () {
   const params = new URLSearchParams(window.location.search);
 
   return {
+    email:
+      params.get("email") ||
+      params.get("user_email") ||
+      params.get("userEmail") ||
+      "",
+
     employee_no:
       params.get("employee_no") ||
       params.get("employeeNo") ||
       params.get("emp_no") ||
       params.get("empNo") ||
       "",
+
     name:
       params.get("name") ||
       params.get("user_name") ||
@@ -176,6 +183,13 @@ window.ReagentApp.loadCurrentUser = async function () {
 
   const storedHint = window.ReagentApp.getStoredUserHint?.() || {};
   const urlHint = window.ReagentApp.getUrlUserHint?.() || {};
+
+  const email =
+    urlHint.email ||
+    storedHint.email ||
+    storedHint.user_email ||
+    storedHint.userEmail ||
+    "";
 
   const employeeNo =
     urlHint.employee_no ||
@@ -193,6 +207,7 @@ window.ReagentApp.loadCurrentUser = async function () {
     "";
 
   window.ReagentApp.currentUser = {
+    email: email || "",
     employee_no: employeeNo || "",
     name: userName || "",
     department: storedHint.department || "",
@@ -209,15 +224,17 @@ window.ReagentApp.loadCurrentUser = async function () {
   try {
     let query = sb
       .from("employees")
-      .select("employee_no,name,department,team,position,role,status")
+      .select("employee_no,name,department,team,position,role,email,status")
       .limit(1);
 
     if (employeeNo) {
       query = query.eq("employee_no", employeeNo);
+    } else if (email) {
+      query = query.eq("email", email);
     } else if (userName) {
       query = query.eq("name", userName);
     } else {
-      console.warn("사용자 조회 기준(employee_no/name)이 없어 미지정 사용자로 진행합니다.");
+      console.warn("사용자 조회 기준(employee_no/email/name)이 없어 미지정 사용자로 진행합니다.");
       return window.ReagentApp.currentUser;
     }
 
@@ -231,6 +248,7 @@ window.ReagentApp.loadCurrentUser = async function () {
 
     if (data) {
       window.ReagentApp.currentUser = {
+        email: data.email || email || "",
         employee_no: data.employee_no || "",
         name: data.name || "",
         department: data.department || "",
@@ -242,6 +260,9 @@ window.ReagentApp.loadCurrentUser = async function () {
       try {
         localStorage.setItem("reagent_current_user", JSON.stringify(window.ReagentApp.currentUser));
       } catch (_) {}
+    } else {
+      console.warn("employees 테이블에서 사용자 정보를 찾지 못했습니다.", { employeeNo, email, userName });
+      toast("사원정보를 찾지 못해 미지정으로 저장됩니다.", "warn");
     }
 
     return window.ReagentApp.currentUser;
