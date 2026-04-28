@@ -101,8 +101,7 @@ window.ReagentApp.collect = {
   },
 
   getAutoBadge(selectedVendor, vendorKey) {
-    if (selectedVendor !== vendorKey) return "";
-    return `<div style="margin-top:4px; color:#2563eb; font-size:11px; font-weight:700;">자동선택</div>`;
+    return "";
   },
 
   simpleKey(key) {
@@ -201,11 +200,13 @@ window.ReagentApp.collect = {
     const selectedVendor = this.autoSelectVendor(meta);
     const rowId = this.simpleKey(key);
 
-    const badge1 = document.querySelector(`[data-row-id="${rowId}"][data-auto-field="vendor1"]`);
-    const badge2 = document.querySelector(`[data-row-id="${rowId}"][data-auto-field="vendor2"]`);
-
-    if (badge1) badge1.innerHTML = this.getAutoBadge(selectedVendor, "vendor1");
-    if (badge2) badge2.innerHTML = this.getAutoBadge(selectedVendor, "vendor2");
+    ["vendor1", "vendor2"].forEach((vendorKey) => {
+      document
+        .querySelectorAll(`[data-row-id="${rowId}"][data-vendor-group="${vendorKey}"]`)
+        .forEach((cell) => {
+          cell.classList.toggle("auto-vendor-selected", selectedVendor === vendorKey);
+        });
+    });
   },
 
   toggleCollectDetail(key) {
@@ -428,21 +429,19 @@ window.ReagentApp.collect = {
           <td>
             <button type="button" class="ghost-btn collect-detail-btn" data-key="${escapeHtml(group.key)}">상세보기</button>
           </td>
-          <td>
+          <td class="vendor-cell vendor-cell-start ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1">
             <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit1" value="${this.formatNumber(unit1)}" style="width:90px; text-align:right;" ${readonlyAttr}>
           </td>
-          <td data-row-id="${rowId}" data-price-field="price1">${this.formatNumber(price1)}</td>
-          <td>
+          <td class="vendor-cell vendor-cell-middle ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1" data-price-field="price1">${this.formatNumber(price1)}</td>
+          <td class="vendor-cell vendor-cell-end ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1">
             <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor1" value="${escapeHtml(meta.vendor1 || "")}" style="width:110px;" ${readonlyAttr}>
-            <span data-row-id="${rowId}" data-auto-field="vendor1">${this.getAutoBadge(autoSelectedVendor, "vendor1")}</span>
           </td>
-          <td>
+          <td class="vendor-cell vendor-cell-start ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
             <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit2" value="${this.formatNumber(unit2)}" style="width:90px; text-align:right;" ${readonlyAttr}>
           </td>
-          <td data-row-id="${rowId}" data-price-field="price2">${this.formatNumber(price2)}</td>
-          <td>
+          <td class="vendor-cell vendor-cell-middle ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2" data-price-field="price2">${this.formatNumber(price2)}</td>
+          <td class="vendor-cell vendor-cell-end ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
             <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor2" value="${escapeHtml(meta.vendor2 || "")}" style="width:110px;" ${readonlyAttr}>
-            <span data-row-id="${rowId}" data-auto-field="vendor2">${this.getAutoBadge(autoSelectedVendor, "vendor2")}</span>
           </td>
           <td>${actionCell}</td>
         </tr>
