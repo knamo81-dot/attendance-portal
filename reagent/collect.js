@@ -32,6 +32,25 @@ window.ReagentApp.collect = {
     }
   },
 
+
+  ensureCancelConfirmButton() {
+    const { els } = window.ReagentApp;
+    if (!els?.excludeSelectedCollect) return;
+
+    if (document.getElementById("cancelSelectedCollect")) return;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn";
+    btn.id = "cancelSelectedCollect";
+    btn.textContent = "선택 확정 취소";
+
+    els.excludeSelectedCollect.insertAdjacentElement("afterend", btn);
+    els.cancelSelectedCollect = btn;
+
+    btn.addEventListener("click", () => this.cancelSelectedConfirm());
+  },
+
   getMeta(key) {
     if (!this.collectMeta[key]) {
       this.collectMeta[key] = {
@@ -198,6 +217,11 @@ window.ReagentApp.collect = {
       return window.ReagentApp.toast("제외할 취합 항목을 선택하세요.", "warn");
     }
 
+    const confirmedKeys = this.selectedKeys.filter((key) => this.getMeta(key).confirmed);
+    if (confirmedKeys.length) {
+      return window.ReagentApp.toast("확정된 취합건은 제외할 수 없습니다. 먼저 '선택 확정 취소'를 해주세요.", "warn");
+    }
+
     const ok = confirm("선택한 항목을 제품취합에서 제외하시겠습니까?\n신청 목록에서는 미취합 상태로 다시 표시됩니다.");
     if (!ok) return;
 
@@ -219,6 +243,7 @@ window.ReagentApp.collect = {
   },
 
   renderCollect() {
+    this.ensureCancelConfirmButton();
     this.loadCollectMeta();
     this.loadSelectedKeys();
 
@@ -258,6 +283,8 @@ window.ReagentApp.collect = {
       const price2 = qty * unit2;
       const checked = this.selectedKeys.includes(group.key) ? "checked" : "";
       const confirmedBadge = meta.confirmed ? `<span style="color:#16a34a; font-weight:700;">확정</span>` : "";
+      const lockedAttr = meta.confirmed ? "disabled" : "";
+      const readonlyAttr = meta.confirmed ? "readonly" : "";
 
       const detailRows = group.entries.map((item) => `
         <tr>
@@ -287,23 +314,23 @@ window.ReagentApp.collect = {
           </td>
           <td>
             <label style="display:flex; gap:4px; align-items:center; justify-content:center;">
-              <input type="radio" class="vendor-select" name="vendor-${escapeHtml(group.key)}" data-key="${escapeHtml(group.key)}" value="vendor1" ${meta.selectedVendor === "vendor1" ? "checked" : ""}>
-              <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit1" value="${this.formatNumber(unit1)}" style="width:90px; text-align:right;">
+              <input type="radio" class="vendor-select" name="vendor-${escapeHtml(group.key)}" data-key="${escapeHtml(group.key)}" value="vendor1" ${meta.selectedVendor === "vendor1" ? "checked" : ""} ${lockedAttr}>
+              <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit1" value="${this.formatNumber(unit1)}" style="width:90px; text-align:right;" ${readonlyAttr}>
             </label>
           </td>
           <td data-price-key="${escapeHtml(group.key)}" data-price-field="price1">${this.formatNumber(price1)}</td>
           <td>
-            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor1" value="${escapeHtml(meta.vendor1 || "")}" style="width:110px;">
+            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor1" value="${escapeHtml(meta.vendor1 || "")}" style="width:110px;" ${readonlyAttr}>
           </td>
           <td>
             <label style="display:flex; gap:4px; align-items:center; justify-content:center;">
-              <input type="radio" class="vendor-select" name="vendor-${escapeHtml(group.key)}" data-key="${escapeHtml(group.key)}" value="vendor2" ${meta.selectedVendor === "vendor2" ? "checked" : ""}>
-              <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit2" value="${this.formatNumber(unit2)}" style="width:90px; text-align:right;">
+              <input type="radio" class="vendor-select" name="vendor-${escapeHtml(group.key)}" data-key="${escapeHtml(group.key)}" value="vendor2" ${meta.selectedVendor === "vendor2" ? "checked" : ""} ${lockedAttr}>
+              <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit2" value="${this.formatNumber(unit2)}" style="width:90px; text-align:right;" ${readonlyAttr}>
             </label>
           </td>
           <td data-price-key="${escapeHtml(group.key)}" data-price-field="price2">${this.formatNumber(price2)}</td>
           <td>
-            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor2" value="${escapeHtml(meta.vendor2 || "")}" style="width:110px;">
+            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor2" value="${escapeHtml(meta.vendor2 || "")}" style="width:110px;" ${readonlyAttr}>
           </td>
         </tr>
         <tr class="collect-detail-row" data-detail-key="${escapeHtml(group.key)}" style="display:none;">
