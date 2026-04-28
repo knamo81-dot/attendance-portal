@@ -197,7 +197,7 @@ window.ReagentApp.collect = {
 
   updateAutoBadges(key) {
     const meta = this.getMeta(key);
-    const selectedVendor = this.autoSelectVendor(meta);
+    const selectedVendor = meta.confirmed ? meta.selectedVendor : "";
     const rowId = this.simpleKey(key);
 
     ["vendor1", "vendor2"].forEach((vendorKey) => {
@@ -387,10 +387,11 @@ window.ReagentApp.collect = {
       const unit2 = this.normalizeNumber(meta.unit2);
       const price1 = qty * unit1;
       const price2 = qty * unit2;
-      const autoSelectedVendor = this.autoSelectVendor(meta);
+      const calculatedVendor = this.autoSelectVendor(meta);
       if (!meta.confirmed) {
-        meta.selectedVendor = autoSelectedVendor;
+        meta.selectedVendor = calculatedVendor;
       }
+      const autoSelectedVendor = meta.confirmed ? meta.selectedVendor : "";
       const checked = this.selectedKeys.includes(group.key) ? "checked" : "";
       const confirmedBadge = meta.confirmed ? `<span style="color:#16a34a; font-weight:700;">확정</span>` : "";
       const lockedAttr = meta.confirmed ? "disabled" : "";
@@ -414,7 +415,7 @@ window.ReagentApp.collect = {
       `).join("");
 
       return `
-        <tr>
+        <tr class="${meta.confirmed ? "collect-row-confirmed" : ""}">
           <td><input type="checkbox" class="collect-check" data-key="${escapeHtml(group.key)}" ${checked} ${lockedAttr}></td>
           <td>${cancelButton}${escapeHtml(group.name)} ${confirmedBadge}</td>
           <td>${escapeHtml(group.maker)}</td>
