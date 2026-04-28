@@ -88,6 +88,53 @@ window.ReagentApp.bindTabs = function () {
   });
 };
 
+
+window.ReagentApp.isRequestAdmin = function () {
+  const user = window.ReagentApp.currentUser || {};
+  const role = String(user.role || user.authority || "").trim().toLowerCase();
+
+  return [
+    "admin",
+    "administrator",
+    "operator",
+    "manager",
+    "supervisor",
+    "관리자",
+    "운영자",
+    "책임자"
+  ].includes(role);
+};
+
+window.ReagentApp.applyRequestAdminUI = function () {
+  const isAdmin = window.ReagentApp.isRequestAdmin?.() === true;
+  const adminArea = document.querySelector(".admin-request-actions");
+
+  if (adminArea) {
+    adminArea.style.display = isAdmin ? "flex" : "none";
+  }
+
+  if (window.ReagentApp.els?.addToCollect) {
+    window.ReagentApp.els.addToCollect.disabled = !isAdmin;
+    window.ReagentApp.els.addToCollect.style.display = isAdmin ? "" : "none";
+  }
+
+  if (window.ReagentApp.els?.clearDraft) {
+    window.ReagentApp.els.clearDraft.disabled = !isAdmin;
+    window.ReagentApp.els.clearDraft.style.display = isAdmin ? "" : "none";
+  }
+};
+
+window.ReagentApp.requireRequestAdmin = function () {
+  const ok = window.ReagentApp.isRequestAdmin?.() === true;
+
+  if (!ok) {
+    window.ReagentApp.toast?.("관리자/운영자만 사용할 수 있는 기능입니다.", "warn");
+  }
+
+  return ok;
+};
+
+
 window.ReagentApp.bindEvents = function () {
   const { els, request, collect, toast } = window.ReagentApp;
 
@@ -106,8 +153,14 @@ window.ReagentApp.bindEvents = function () {
   els.addItem?.addEventListener("click", () => request.addCurrentItem());
   els.clearForm?.addEventListener("click", () => request.clearForm());
   els.loadSample?.addEventListener("click", () => request.insertSample());
-  els.clearDraft?.addEventListener("click", () => request.clearAllRows());
-  els.addToCollect?.addEventListener("click", () => collect.addSelectedToCollect());
+  els.clearDraft?.addEventListener("click", () => {
+    if (!window.ReagentApp.requireRequestAdmin?.()) return;
+    request.openClearDataDialog?.();
+  });
+  els.addToCollect?.addEventListener("click", () => {
+    if (!window.ReagentApp.requireRequestAdmin?.()) return;
+    collect.addSelectedToCollect();
+  });
 
   els.collectKeyword?.addEventListener("input", () => collect.renderCollect());
   els.collectCategory?.addEventListener("change", () => collect.renderCollect());
@@ -318,6 +371,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   await window.ReagentApp.loadCurrentUser?.();
+  window.ReagentApp.applyRequestAdminUI?.();
 
   window.ReagentApp.bindTabs();
   window.ReagentApp.request.populateMakerOptions();
