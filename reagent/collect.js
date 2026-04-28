@@ -452,9 +452,9 @@ window.ReagentApp.collect = {
           <td>${cancelButton}${escapeHtml(group.name)} ${confirmedBadge}</td>
           <td>${escapeHtml(group.maker)}</td>
           <td>${escapeHtml(group.code)}</td>
-          <td>${escapeHtml(group.capacity)}</td>
           <td>${escapeHtml(group.cas)}</td>
           <td>${escapeHtml(group.grade)}</td>
+          <td>${escapeHtml(group.capacity)}</td>
           <td>
             ${
               meta.confirmed
