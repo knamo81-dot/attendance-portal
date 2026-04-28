@@ -23,7 +23,7 @@
     }
     
     body{
-    padding:12px;
+    padding:0;
     width:100%;
     max-width:none
     }
@@ -512,4 +512,33 @@ html.embed-mode .reagent-header-card{
 /* iframe에서도 동일 */
 html.embed-mode .reagent-header-card{
   background:linear-gradient(135deg,#173a7a 0%,#2251a3 100%) !important;
+}
+
+/* ===== Reagent app top-left alignment final patch ===== */
+html, body{
+  margin:0 !important;
+  padding:0 !important;
+  width:100% !important;
+  max-width:none !important;
+}
+
+body{
+  background:var(--bg) !important;
+}
+
+.shell{
+  width:100% !important;
+  max-width:none !important;
+  margin:0 !important;
+  padding:0 !important;
+}
+
+/* 포탈 iframe 삽입 시에도 근태/폐수처럼 좌측 상단 기준으로 시작 */
+html.embed-mode,
+html.embed-mode body,
+html.embed-mode .shell{
+  margin:0 !important;
+  padding:0 !important;
+  width:100% !important;
+  max-width:none !important;
 }
