@@ -122,11 +122,144 @@ window.ReagentApp.bindEvents = function () {
   });
 };
 
-document.addEventListener("DOMContentLoaded", () => {
+
+window.ReagentApp.getStoredUserHint = function () {
+  const candidates = [
+    "currentUser",
+    "portal_current_user",
+    "lab_current_user",
+    "loginUser",
+    "user",
+    "employee",
+    "reagent_current_user"
+  ];
+
+  for (const key of candidates) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        return parsed;
+      }
+    } catch (_) {
+      const raw = localStorage.getItem(key);
+      if (raw) return { employee_no: raw };
+    }
+  }
+
+  return {};
+};
+
+window.ReagentApp.getUrlUserHint = function () {
+  const params = new URLSearchParams(window.location.search);
+
+  return {
+    employee_no:
+      params.get("employee_no") ||
+      params.get("employeeNo") ||
+      params.get("emp_no") ||
+      params.get("empNo") ||
+      "",
+    name:
+      params.get("name") ||
+      params.get("user_name") ||
+      params.get("userName") ||
+      ""
+  };
+};
+
+window.ReagentApp.loadCurrentUser = async function () {
+  const sb = window.ReagentApp.sb;
+  const toast = window.ReagentApp.toast || (() => {});
+
+  const storedHint = window.ReagentApp.getStoredUserHint?.() || {};
+  const urlHint = window.ReagentApp.getUrlUserHint?.() || {};
+
+  const employeeNo =
+    urlHint.employee_no ||
+    storedHint.employee_no ||
+    storedHint.employeeNo ||
+    storedHint.emp_no ||
+    storedHint.empNo ||
+    "";
+
+  const userName =
+    urlHint.name ||
+    storedHint.name ||
+    storedHint.user_name ||
+    storedHint.userName ||
+    "";
+
+  window.ReagentApp.currentUser = {
+    employee_no: employeeNo || "",
+    name: userName || "",
+    department: storedHint.department || "",
+    team: storedHint.team || "",
+    position: storedHint.position || "",
+    role: storedHint.role || ""
+  };
+
+  if (!sb) {
+    console.warn("Supabase client가 없어 사용자 정보를 불러오지 못했습니다.");
+    return window.ReagentApp.currentUser;
+  }
+
+  try {
+    let query = sb
+      .from("employees")
+      .select("employee_no,name,department,team,position,role,status")
+      .limit(1);
+
+    if (employeeNo) {
+      query = query.eq("employee_no", employeeNo);
+    } else if (userName) {
+      query = query.eq("name", userName);
+    } else {
+      console.warn("사용자 조회 기준(employee_no/name)이 없어 미지정 사용자로 진행합니다.");
+      return window.ReagentApp.currentUser;
+    }
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error) {
+      console.warn("사용자 정보 조회 실패:", error);
+      toast("사용자 정보를 불러오지 못해 미지정으로 저장됩니다.", "warn");
+      return window.ReagentApp.currentUser;
+    }
+
+    if (data) {
+      window.ReagentApp.currentUser = {
+        employee_no: data.employee_no || "",
+        name: data.name || "",
+        department: data.department || "",
+        team: data.team || "",
+        position: data.position || "",
+        role: data.role || ""
+      };
+
+      try {
+        localStorage.setItem("reagent_current_user", JSON.stringify(window.ReagentApp.currentUser));
+      } catch (_) {}
+    }
+
+    return window.ReagentApp.currentUser;
+  } catch (err) {
+    console.warn("사용자 정보 조회 중 오류:", err);
+    toast("사용자 정보를 불러오지 못해 미지정으로 저장됩니다.", "warn");
+    return window.ReagentApp.currentUser;
+  }
+};
+
+
+document.addEventListener("DOMContentLoaded", async () => {
   if (!window.ReagentApp.request) {
     console.error("request.js 로드 실패");
     return;
   }
+
+  await window.ReagentApp.loadCurrentUser?.();
 
   window.ReagentApp.bindTabs();
   window.ReagentApp.request.populateMakerOptions();
