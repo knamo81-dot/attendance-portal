@@ -4264,13 +4264,13 @@ async function applyUploadedFiles(){
 
     updateUploadStatus();
     const uploadedYear = Number(String(backupResult?.uploadMonth || '').slice(0, 4)) || new Date().getFullYear();
-    ADMIN_UPLOAD_MANAGEMENT.selectedYear = uploadedYear;
+    if (window.ADMIN_UPLOAD_MANAGEMENT) window.ADMIN_UPLOAD_MANAGEMENT.selectedYear = uploadedYear;
 
     await updateAttendanceViewsAfterDataChange({ refreshFilters: true, keepMainTab: getActiveAttendanceMainTab('admin') });
-    if (typeof refreshAdminMonthCardsImmediately === 'function') {
-      await refreshAdminMonthCardsImmediately({ targetYear: uploadedYear, forceYearReload: true });
-    } else if (typeof refreshAdminUploadManagement === 'function') {
-      await refreshAdminUploadManagement(true);
+    if (typeof window.refreshAdminMonthCardsImmediately === 'function') {
+      await window.refreshAdminMonthCardsImmediately({ targetYear: uploadedYear, forceYearReload: true });
+    } else if (typeof window.refreshAdminUploadManagement === 'function') {
+      await window.refreshAdminUploadManagement(true);
     }
 
     alert(`업로드 데이터 반영이 완료되었습니다. 조직관리와 사원정보관리는 유지되었습니다.
@@ -4952,20 +4952,20 @@ async function updateAttendanceViewsAfterDataChange(options = {}){
 
 async function refreshAttendanceAfterAdminMutation(options = {}){
   const keepTab = getActiveAttendanceMainTab('admin');
-  const targetYear = Number(options.targetYear || ADMIN_UPLOAD_MANAGEMENT.selectedYear || document.getElementById('adminUploadYear')?.value || new Date().getFullYear());
+  const targetYear = Number(options.targetYear || window.ADMIN_UPLOAD_MANAGEMENT?.selectedYear || document.getElementById('adminUploadYear')?.value || new Date().getFullYear());
   saveAttendanceMainTab(keepTab);
-  if(Number.isFinite(targetYear)){
-    ADMIN_UPLOAD_MANAGEMENT.selectedYear = targetYear;
+  if(Number.isFinite(targetYear) && window.ADMIN_UPLOAD_MANAGEMENT){
+    window.ADMIN_UPLOAD_MANAGEMENT.selectedYear = targetYear;
   }
   if(typeof window.loadAttendanceFromSupabase === 'function'){
     try{ await window.loadAttendanceFromSupabase(); }catch(e){ console.warn('[ADMIN MUTATION RELOAD WARN]', e); }
   }
   updateUploadStatus();
   await updateAttendanceViewsAfterDataChange({ refreshFilters: options.refreshFilters !== false, keepMainTab: keepTab });
-  if(typeof refreshAdminMonthCardsImmediately === 'function'){
-    await refreshAdminMonthCardsImmediately({ targetYear, forceYearReload: options.forceYearReload === true });
-  } else if(typeof refreshAdminUploadManagement === 'function'){
-    await refreshAdminUploadManagement(options.forceYearReload === true);
+  if(typeof window.refreshAdminMonthCardsImmediately === 'function'){
+    await window.refreshAdminMonthCardsImmediately({ targetYear, forceYearReload: options.forceYearReload === true });
+  } else if(typeof window.refreshAdminUploadManagement === 'function'){
+    await window.refreshAdminUploadManagement(options.forceYearReload === true);
   }
 }
 function getHeadcountStatusSummary(){
@@ -10819,12 +10819,13 @@ window.addEventListener('resize', renderLightweight);
 
   
 
-const ADMIN_UPLOAD_MANAGEMENT = {
+const ADMIN_UPLOAD_MANAGEMENT = window.ADMIN_UPLOAD_MANAGEMENT || {
   years: [],
   selectedYear: null,
   monthStats: [],
   batchRows: []
 };
+window.ADMIN_UPLOAD_MANAGEMENT = ADMIN_UPLOAD_MANAGEMENT;
 
 function formatAdminDateTime(value){
   if(!value) return '-';
@@ -11443,6 +11444,11 @@ async function refreshAdminUploadManagement(forceYearReload = false){
     renderTabs();
     await refreshAdminUploadManagement();
     };
+
+  window.refreshAdminUploadManagement = refreshAdminUploadManagement;
+  window.refreshAdminMonthCardsImmediately = refreshAdminMonthCardsImmediately;
+  window.refreshAttendanceAfterAdminMutation = refreshAttendanceAfterAdminMutation;
+  window.ADMIN_UPLOAD_MANAGEMENT = ADMIN_UPLOAD_MANAGEMENT;
 
   bindAdminManagementEvents();
 
