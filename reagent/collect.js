@@ -438,6 +438,7 @@ window.ReagentApp.collect = {
       desc: document.getElementById("prepareOrderMonthDesc"),
       refresh: document.getElementById("refreshPrepare"),
       finalize: document.getElementById("finalizePrepareMonth"),
+      cancelFinalize: document.getElementById("cancelFinalizePrepareMonth"),
       showMain: document.getElementById("showQuoteMain"),
       showSafety: document.getElementById("showQuoteSafety"),
       showSummary: document.getElementById("showPrepareSummary"),
@@ -619,9 +620,27 @@ window.ReagentApp.collect = {
 
     this.setPrepareMonthStatus(monthKey, "확정");
     this.renderPrepare();
-    window.ReagentApp.toast?.("해당월 취합정리 자료가 확정되었습니다.", "success");
+
   },
 
+
+
+
+  cancelFinalizePrepareMonth() {
+    const request = window.ReagentApp.request;
+    const monthKey = request?.getCurrentOrderMonth ? request.getCurrentOrderMonth() : "";
+    if (!monthKey) return;
+
+    this.setPrepareMonthStatus(monthKey, "진행중");
+
+    try {
+      localStorage.removeItem(`reagent_prepare_snapshot_${monthKey}`);
+    } catch (_) {}
+
+    request.renderRequest?.();
+    this.renderCollect?.();
+    this.renderPrepare();
+  },
 
 
   getExcelRows() {
@@ -1005,7 +1024,25 @@ window.ReagentApp.collect = {
     if (els.desc) {
       els.desc.textContent = `${docLabel} 기준으로 확정된 취합자료를 정리합니다. 현재 상태: ${status}`;
     }
-    if (els.count) els.count.textContent = String(rows.length);
+
+    if (els.finalize) {
+      const isFinalized = status === "확정";
+      els.finalize.classList.toggle("primary", isFinalized);
+      els.finalize.classList.toggle("active", isFinalized);
+      els.finalize.textContent = "확정";
+      els.finalize.disabled = isFinalized;
+    }
+
+    if (els.cancelFinalize) {
+      const isFinalized = status === "확정";
+      els.cancelFinalize.classList.toggle("primary", !isFinalized);
+      els.cancelFinalize.classList.toggle("active", !isFinalized);
+      els.cancelFinalize.textContent = "미확정";
+      els.cancelFinalize.disabled = !isFinalized;
+    }
+
+
+if (els.count) els.count.textContent = String(rows.length);
     if (els.qty) els.qty.textContent = this.formatNumber(totalQty);
     if (els.amount) els.amount.textContent = this.formatNumber(totalAmount);
     if (els.docType) els.docType.textContent = docLabel;
@@ -1079,6 +1116,20 @@ window.ReagentApp.collect = {
     document.querySelectorAll(".prepare-table-view-btn").forEach((btn) => {
       btn.addEventListener("click", () => this.setPrepareTableView(btn.dataset.prepareTableView));
     });
+
+    const finalizePrepareBtn = document.getElementById("finalizePrepareMonth");
+    if (finalizePrepareBtn) {
+      finalizePrepareBtn.onclick = () => {
+        this.finalizePrepareMonth();
+      };
+    }
+
+    const cancelFinalizePrepareBtn = document.getElementById("cancelFinalizePrepareMonth");
+    if (cancelFinalizePrepareBtn) {
+      cancelFinalizePrepareBtn.onclick = () => {
+        this.cancelFinalizePrepareMonth();
+      };
+    }
 
     const downloadExcelBtn = document.getElementById("downloadExcel");
     if (downloadExcelBtn) {
