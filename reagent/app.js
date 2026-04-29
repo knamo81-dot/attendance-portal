@@ -43,6 +43,11 @@ window.ReagentApp.els = {
   collectMix: document.getElementById("collectMix"),
   confirmSelectedCollect: document.getElementById("confirmSelectedCollect"),
   excludeSelectedCollect: document.getElementById("excludeSelectedCollect"),
+  sendToPrepare: document.getElementById("sendToPrepare"),
+  refreshPrepare: document.getElementById("refreshPrepare"),
+  finalizePrepareMonth: document.getElementById("finalizePrepareMonth"),
+  showQuoteMain: document.getElementById("showQuoteMain"),
+  showQuoteSafety: document.getElementById("showQuoteSafety"),
 
   inlineRequest: document.getElementById("inlineRequest"),
   toastWrap: document.getElementById("toastWrap")
@@ -84,6 +89,11 @@ window.ReagentApp.bindTabs = function () {
       btn.classList.add("active");
       const page = document.getElementById(`page-${btn.dataset.tab}`);
       if (page) page.classList.add("active");
+
+      if (btn.dataset.tab === "prepare") {
+        window.ReagentApp.collect?.initPrepareMonthControl?.();
+        window.ReagentApp.collect?.renderPrepare?.();
+      }
     });
   });
 };
@@ -148,8 +158,21 @@ window.ReagentApp.bindEvents = function () {
 
   els.requestNew?.addEventListener("click", () => toast("제품 등록 요청 기능은 다음 단계에서 연결하면 됩니다.", "warn"));
   els.inlineRequest?.addEventListener("click", () => toast("제품 등록 요청 기능은 다음 단계에서 연결하면 됩니다.", "warn"));
-  els.confirmSelectedCollect?.addEventListener("click", () => toast("선택 거래처 확정 기능은 다음 단계에서 연결하면 됩니다.", "warn"));
-  els.excludeSelectedCollect?.addEventListener("click", () => toast("선택 취합 제외 기능은 다음 단계에서 연결하면 됩니다.", "warn"));
+
+  els.confirmSelectedCollect?.addEventListener("click", () => collect.confirmSelectedCollect?.());
+  els.excludeSelectedCollect?.addEventListener("click", () => collect.excludeSelectedCollect?.());
+
+  els.sendToPrepare?.addEventListener("click", () => collect.moveToPrepare?.());
+
+  // 취합정리는 제품취합의 [취합정리 반영] 버튼 또는 탭 진입 시 자동 갱신됩니다.
+  // 기존 HTML에 남아 있는 수동 새로고침 버튼은 혼동 방지를 위해 숨깁니다.
+  if (els.refreshPrepare) {
+    els.refreshPrepare.style.display = "none";
+  }
+
+  els.finalizePrepareMonth?.addEventListener("click", () => collect.finalizePrepareMonth?.());
+  els.showQuoteMain?.addEventListener("click", () => collect.setPrepareActiveView?.("main"));
+  els.showQuoteSafety?.addEventListener("click", () => collect.setPrepareActiveView?.("safety"));
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") request.closeSearchModal();
