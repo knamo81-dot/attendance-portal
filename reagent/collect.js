@@ -623,18 +623,9 @@ window.ReagentApp.collect = {
   },
 
 
-  downloadExcel() {
-    if (!window.XLSX) {
-      return window.ReagentApp.toast?.("엑셀 다운로드 라이브러리를 불러오지 못했습니다.", "warn");
-    }
 
-    const request = window.ReagentApp.request;
-    const monthKey = request?.getCurrentOrderMonth ? request.getCurrentOrderMonth() : "";
+  getExcelRows() {
     const rowsAll = this.getConfirmedPrepareRows();
-
-    if (!rowsAll.length) {
-      return window.ReagentApp.toast?.("다운로드할 취합정리 자료가 없습니다.", "warn");
-    }
 
     const mainRows = this.sortPrepareRows(
       rowsAll.filter((row) => row.category !== "안전용품"),
@@ -648,67 +639,248 @@ window.ReagentApp.collect = {
       "summary"
     );
 
-    const rows = [...mainRows, ...safetyRows];
+    return [...mainRows, ...safetyRows];
+  },
 
-    const sheet1 = rows.map((row, index) => ({
-      "No.": index + 1,
-      "구분": row.category,
-      "품명": row.name,
-      "수량": row.qty,
-      "용도": row.usage,
-      "단가": row.purchaseUnit,
-      "금액": row.purchaseAmount,
-      "거래처": row.purchaseVendor
-    }));
+  createSameValueMerges(rows, key, colIndex, startRowIndex) {
+    const merges = [];
+    let start = 0;
 
-    const sheet2 = rows.map((row, index) => ({
-      "No.": index + 1,
-      "구분": row.category,
-      "품명": row.name,
-      "제조원": row.maker,
-      "등급": row.grade,
-      "제품번호": row.code,
-      "단위": row.capacity,
-      "CAS": row.cas,
-      "수량": row.qty,
-      "목적": row.usage,
-      "구매업체 단가": row.purchaseUnit,
-      "구매업체 금액": row.purchaseAmount,
-      "구매 거래처": row.purchaseVendor,
-      "비교업체 단가": row.compareUnit || "",
-      "비교업체 금액": row.compareAmount || "",
-      "비교 거래처": row.compareVendor || "",
-      "비고": row.remark
-    }));
+    for (let i = 1; i <= rows.length; i += 1) {
+      const currentValue = String(rows[start]?.[key] ?? "");
+      const nextValue = String(rows[i]?.[key] ?? "");
+
+      if (i === rows.length || nextValue !== currentValue) {
+        if (currentValue && i - start > 1) {
+          merges.push({
+            s: { r: startRowIndex + start, c: colIndex },
+            e: { r: startRowIndex + i - 1, c: colIndex }
+          });
+        }
+        start = i;
+      }
+    }
+
+    return merges;
+  },
+
+  applyRangeStyle(ws, rangeText, style) {
+    if (!window.XLSX || !ws || !rangeText) return;
+
+    const range = XLSX.utils.decode_range(rangeText);
+    for (let r = range.s.r; r <= range.e.r; r += 1) {
+      for (let c = range.s.c; c <= range.e.c; c += 1) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (!ws[addr]) ws[addr] = { t: "s", v: "" };
+        ws[addr].s = Object.assign({}, ws[addr].s || {}, style);
+      }
+    }
+  },
+
+  downloadExcel() {
+    if (!window.XLSX) {
+      return window.ReagentApp.toast?.("엑셀 다운로드 라이브러리를 불러오지 못했습니다.", "warn");
+    }
+
+    const request = window.ReagentApp.request;
+    const monthKey = request?.getCurrentOrderMonth ? request.getCurrentOrderMonth() : "";
+    const rows = this.getExcelRows();
+
+    if (!rows.length) {
+      return window.ReagentApp.toast?.("다운로드할 취합정리 자료가 없습니다.", "warn");
+    }
 
     const wb = XLSX.utils.book_new();
-    const ws1 = XLSX.utils.json_to_sheet(sheet1);
-    const ws2 = XLSX.utils.json_to_sheet(sheet2);
 
+    const borderThin = {
+      top: { style: "thin", color: { rgb: "555555" } },
+      bottom: { style: "thin", color: { rgb: "555555" } },
+      left: { style: "thin", color: { rgb: "555555" } },
+      right: { style: "thin", color: { rgb: "555555" } }
+    };
+
+    const titleStyle = {
+      font: { bold: true, sz: 16 },
+      alignment: { horizontal: "center", vertical: "center" }
+    };
+
+    const headerStyle = {
+      font: { bold: true },
+      fill: { fgColor: { rgb: "FCE4D6" } },
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      border: borderThin
+    };
+
+    const groupHeaderStyle = {
+      font: { bold: true },
+      fill: { fgColor: { rgb: "D9EAF7" } },
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      border: borderThin
+    };
+
+    const bodyStyle = {
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      border: borderThin
+    };
+
+    const leftStyle = {
+      alignment: { horizontal: "left", vertical: "center", wrapText: true },
+      border: borderThin
+    };
+
+    const numStyle = {
+      alignment: { horizontal: "right", vertical: "center" },
+      border: borderThin,
+      numFmt: "#,##0"
+    };
+
+    const totalStyle = {
+      font: { bold: true },
+      fill: { fgColor: { rgb: "FFF2CC" } },
+      alignment: { horizontal: "right", vertical: "center" },
+      border: borderThin,
+      numFmt: "#,##0"
+    };
+
+    const totalAmount = rows.reduce((sum, row) => sum + Number(row.purchaseAmount || 0), 0);
+
+    // =========================
+    // Sheet1: 기안용 간략 양식
+    // =========================
+    const sheet1Data = [
+      ["제제연구용 시약 및 소모품 구매 기안"],
+      [],
+      ["No", "구분", "품명", "수량", "목적", "단가", "금액", "거래처"]
+    ];
+
+    rows.forEach((row, index) => {
+      sheet1Data.push([
+        index + 1,
+        row.category,
+        row.name,
+        row.qty,
+        row.usage,
+        row.purchaseUnit,
+        row.purchaseAmount,
+        row.purchaseVendor
+      ]);
+    });
+
+    sheet1Data.push(["", "", "", "", "", "합계", totalAmount, ""]);
+
+    const ws1 = XLSX.utils.aoa_to_sheet(sheet1Data);
     ws1["!cols"] = [
       { wch: 6 }, { wch: 10 }, { wch: 34 }, { wch: 8 },
       { wch: 42 }, { wch: 12 }, { wch: 14 }, { wch: 18 }
     ];
+    ws1["!rows"] = [{ hpt: 28 }, { hpt: 6 }, { hpt: 30 }];
 
+    const dataStart1 = 3;
+    const totalRow1 = dataStart1 + rows.length;
+
+    ws1["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
+      ...this.createSameValueMerges(rows, "usage", 4, dataStart1),
+      ...this.createSameValueMerges(rows, "purchaseVendor", 7, dataStart1)
+    ];
+
+    this.applyRangeStyle(ws1, "A1:H1", titleStyle);
+    this.applyRangeStyle(ws1, "A3:H3", headerStyle);
+
+    for (let r = dataStart1; r < totalRow1; r += 1) {
+      this.applyRangeStyle(ws1, `A${r + 1}:H${r + 1}`, bodyStyle);
+      if (ws1[`C${r + 1}`]) ws1[`C${r + 1}`].s = leftStyle;
+      if (ws1[`E${r + 1}`]) ws1[`E${r + 1}`].s = leftStyle;
+      ["D", "F", "G"].forEach((col) => {
+        if (ws1[`${col}${r + 1}`]) ws1[`${col}${r + 1}`].s = numStyle;
+      });
+    }
+
+    this.applyRangeStyle(ws1, `A${totalRow1 + 1}:H${totalRow1 + 1}`, totalStyle);
+
+    // =========================
+    // Sheet2: 비교견적표 상세 양식
+    // =========================
+    const sheet2Data = [
+      ["제제연구용 시약 및 소모품 비교 견적표"],
+      [],
+      ["No", "구분", "품명", "제조원", "등급", "제품번호", "단위", "CAS", "수량", "목적", "구매 업체", "", "", "비교 업체", "", "", "비고"],
+      ["", "", "", "", "", "", "", "", "", "", "단가", "금액", "거래처", "단가", "금액", "거래처", ""]
+    ];
+
+    rows.forEach((row, index) => {
+      sheet2Data.push([
+        index + 1,
+        row.category,
+        row.name,
+        row.maker,
+        row.grade,
+        row.code,
+        row.capacity,
+        row.cas,
+        row.qty,
+        row.usage,
+        row.purchaseUnit,
+        row.purchaseAmount,
+        row.purchaseVendor,
+        row.compareUnit || "",
+        row.compareAmount || "",
+        row.compareVendor || "",
+        row.remark
+      ]);
+    });
+
+    sheet2Data.push(["", "", "", "", "", "", "", "", "", "", "합계", totalAmount, "", "", "", "", ""]);
+
+    const ws2 = XLSX.utils.aoa_to_sheet(sheet2Data);
     ws2["!cols"] = [
-      { wch: 6 }, { wch: 10 }, { wch: 30 }, { wch: 18 },
-      { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
+      { wch: 6 }, { wch: 10 }, { wch: 32 }, { wch: 18 },
+      { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 16 },
       { wch: 8 }, { wch: 38 }, { wch: 14 }, { wch: 16 },
       { wch: 18 }, { wch: 14 }, { wch: 16 }, { wch: 18 },
       { wch: 16 }
     ];
+    ws2["!rows"] = [{ hpt: 28 }, { hpt: 6 }, { hpt: 28 }, { hpt: 28 }];
 
-    const range1 = XLSX.utils.decode_range(ws1["!ref"] || "A1:A1");
-    for (let C = range1.s.c; C <= range1.e.c; C += 1) {
-      const cell = ws1[XLSX.utils.encode_cell({ r: 0, c: C })];
-      if (cell) cell.s = { font: { bold: true } };
+    const dataStart2 = 4;
+    const totalRow2 = dataStart2 + rows.length;
+
+    ws2["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 16 } },
+      { s: { r: 2, c: 0 }, e: { r: 3, c: 0 } },
+      { s: { r: 2, c: 1 }, e: { r: 3, c: 1 } },
+      { s: { r: 2, c: 2 }, e: { r: 3, c: 2 } },
+      { s: { r: 2, c: 3 }, e: { r: 3, c: 3 } },
+      { s: { r: 2, c: 4 }, e: { r: 3, c: 4 } },
+      { s: { r: 2, c: 5 }, e: { r: 3, c: 5 } },
+      { s: { r: 2, c: 6 }, e: { r: 3, c: 6 } },
+      { s: { r: 2, c: 7 }, e: { r: 3, c: 7 } },
+      { s: { r: 2, c: 8 }, e: { r: 3, c: 8 } },
+      { s: { r: 2, c: 9 }, e: { r: 3, c: 9 } },
+      { s: { r: 2, c: 10 }, e: { r: 2, c: 12 } },
+      { s: { r: 2, c: 13 }, e: { r: 2, c: 15 } },
+      { s: { r: 2, c: 16 }, e: { r: 3, c: 16 } },
+      ...this.createSameValueMerges(rows, "usage", 9, dataStart2),
+      ...this.createSameValueMerges(rows, "purchaseVendor", 12, dataStart2),
+      ...this.createSameValueMerges(rows, "compareVendor", 15, dataStart2),
+      ...this.createSameValueMerges(rows, "remark", 16, dataStart2)
+    ];
+
+    this.applyRangeStyle(ws2, "A1:Q1", titleStyle);
+    this.applyRangeStyle(ws2, "A3:Q4", headerStyle);
+    this.applyRangeStyle(ws2, "K3:M3", groupHeaderStyle);
+    this.applyRangeStyle(ws2, "N3:P3", groupHeaderStyle);
+
+    for (let r = dataStart2; r < totalRow2; r += 1) {
+      this.applyRangeStyle(ws2, `A${r + 1}:Q${r + 1}`, bodyStyle);
+      if (ws2[`C${r + 1}`]) ws2[`C${r + 1}`].s = leftStyle;
+      if (ws2[`J${r + 1}`]) ws2[`J${r + 1}`].s = leftStyle;
+      ["I", "K", "L", "N", "O"].forEach((col) => {
+        if (ws2[`${col}${r + 1}`]) ws2[`${col}${r + 1}`].s = numStyle;
+      });
     }
 
-    const range2 = XLSX.utils.decode_range(ws2["!ref"] || "A1:A1");
-    for (let C = range2.s.c; C <= range2.e.c; C += 1) {
-      const cell = ws2[XLSX.utils.encode_cell({ r: 0, c: C })];
-      if (cell) cell.s = { font: { bold: true } };
-    }
+    this.applyRangeStyle(ws2, `A${totalRow2 + 1}:Q${totalRow2 + 1}`, totalStyle);
 
     XLSX.utils.book_append_sheet(wb, ws1, "기안서");
     XLSX.utils.book_append_sheet(wb, ws2, "비교견적표");
@@ -716,6 +888,7 @@ window.ReagentApp.collect = {
     const safeMonth = monthKey || new Date().toISOString().slice(0, 7);
     XLSX.writeFile(wb, `취합정리_${safeMonth}.xlsx`);
   },
+
 
   renderPrepare() {
     const request = window.ReagentApp.request;
