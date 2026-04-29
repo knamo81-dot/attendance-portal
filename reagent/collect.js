@@ -622,6 +622,101 @@ window.ReagentApp.collect = {
     window.ReagentApp.toast?.("해당월 취합정리 자료가 확정되었습니다.", "success");
   },
 
+
+  downloadExcel() {
+    if (!window.XLSX) {
+      return window.ReagentApp.toast?.("엑셀 다운로드 라이브러리를 불러오지 못했습니다.", "warn");
+    }
+
+    const request = window.ReagentApp.request;
+    const monthKey = request?.getCurrentOrderMonth ? request.getCurrentOrderMonth() : "";
+    const rowsAll = this.getConfirmedPrepareRows();
+
+    if (!rowsAll.length) {
+      return window.ReagentApp.toast?.("다운로드할 취합정리 자료가 없습니다.", "warn");
+    }
+
+    const mainRows = this.sortPrepareRows(
+      rowsAll.filter((row) => row.category !== "안전용품"),
+      "main",
+      "summary"
+    );
+
+    const safetyRows = this.sortPrepareRows(
+      rowsAll.filter((row) => row.category === "안전용품"),
+      "safety",
+      "summary"
+    );
+
+    const rows = [...mainRows, ...safetyRows];
+
+    const sheet1 = rows.map((row, index) => ({
+      "No.": index + 1,
+      "구분": row.category,
+      "품명": row.name,
+      "수량": row.qty,
+      "용도": row.usage,
+      "단가": row.purchaseUnit,
+      "금액": row.purchaseAmount,
+      "거래처": row.purchaseVendor
+    }));
+
+    const sheet2 = rows.map((row, index) => ({
+      "No.": index + 1,
+      "구분": row.category,
+      "품명": row.name,
+      "제조원": row.maker,
+      "등급": row.grade,
+      "제품번호": row.code,
+      "단위": row.capacity,
+      "CAS": row.cas,
+      "수량": row.qty,
+      "목적": row.usage,
+      "구매업체 단가": row.purchaseUnit,
+      "구매업체 금액": row.purchaseAmount,
+      "구매 거래처": row.purchaseVendor,
+      "비교업체 단가": row.compareUnit || "",
+      "비교업체 금액": row.compareAmount || "",
+      "비교 거래처": row.compareVendor || "",
+      "비고": row.remark
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws1 = XLSX.utils.json_to_sheet(sheet1);
+    const ws2 = XLSX.utils.json_to_sheet(sheet2);
+
+    ws1["!cols"] = [
+      { wch: 6 }, { wch: 10 }, { wch: 34 }, { wch: 8 },
+      { wch: 42 }, { wch: 12 }, { wch: 14 }, { wch: 18 }
+    ];
+
+    ws2["!cols"] = [
+      { wch: 6 }, { wch: 10 }, { wch: 30 }, { wch: 18 },
+      { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
+      { wch: 8 }, { wch: 38 }, { wch: 14 }, { wch: 16 },
+      { wch: 18 }, { wch: 14 }, { wch: 16 }, { wch: 18 },
+      { wch: 16 }
+    ];
+
+    const range1 = XLSX.utils.decode_range(ws1["!ref"] || "A1:A1");
+    for (let C = range1.s.c; C <= range1.e.c; C += 1) {
+      const cell = ws1[XLSX.utils.encode_cell({ r: 0, c: C })];
+      if (cell) cell.s = { font: { bold: true } };
+    }
+
+    const range2 = XLSX.utils.decode_range(ws2["!ref"] || "A1:A1");
+    for (let C = range2.s.c; C <= range2.e.c; C += 1) {
+      const cell = ws2[XLSX.utils.encode_cell({ r: 0, c: C })];
+      if (cell) cell.s = { font: { bold: true } };
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws1, "기안서");
+    XLSX.utils.book_append_sheet(wb, ws2, "비교견적표");
+
+    const safeMonth = monthKey || new Date().toISOString().slice(0, 7);
+    XLSX.writeFile(wb, `취합정리_${safeMonth}.xlsx`);
+  },
+
   renderPrepare() {
     const request = window.ReagentApp.request;
     const els = this.getPrepareEls();
@@ -729,6 +824,10 @@ window.ReagentApp.collect = {
 
     document.querySelectorAll(".prepare-table-view-btn").forEach((btn) => {
       btn.addEventListener("click", () => this.setPrepareTableView(btn.dataset.prepareTableView));
+    });
+
+    document.getElementById("downloadExcel")?.addEventListener("click", () => {
+      this.downloadExcel();
     });
   },
 
