@@ -790,7 +790,7 @@ html.embed-mode .shell{
 }
 
 .prepare-finalize-group .prepare-finalize-btn:disabled{
-  opacity:.45;
+  opacity:.55;
   cursor:not-allowed;
 }
 
