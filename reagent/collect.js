@@ -232,6 +232,7 @@ window.ReagentApp.collect = {
     meta.confirmedQty = 0;
     meta.pendingQty = 0;
     meta.confirmedAt = "";
+    meta.prepareRemark = "최저가 구매";
 
     this.saveCollectMeta();
     request.renderRequest?.();
