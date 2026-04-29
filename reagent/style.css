@@ -758,4 +758,11 @@ html.embed-mode .shell{
 /* ===== 취합정리 엑셀 다운로드 버튼 ===== */
 #downloadExcel{
   font-weight:800;
+  background:var(--primary);
+  color:#fff;
+  border-color:var(--primary);
+}
+
+#downloadExcel:hover{
+  filter:brightness(1.05);
 }
