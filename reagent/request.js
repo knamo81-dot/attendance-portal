@@ -89,25 +89,30 @@ window.ReagentApp.request = {
 
     const requestSelect = document.getElementById("orderMonthSelect");
     const collectSelect = document.getElementById("collectOrderMonthSelect");
+    const prepareSelect = document.getElementById("prepareOrderMonthSelect");
     const requestDesc = document.getElementById("orderMonthDesc");
     const collectDesc = document.getElementById("collectOrderMonthDesc");
+    const prepareDesc = document.getElementById("prepareOrderMonthDesc");
 
-    [requestSelect, collectSelect].forEach((select) => {
+    [requestSelect, collectSelect, prepareSelect].forEach((select) => {
       if (select && select.value !== monthKey) select.value = monthKey;
     });
 
     const desc = this.getOrderMonthDescription(monthKey);
     if (requestDesc) requestDesc.textContent = desc;
     if (collectDesc) collectDesc.textContent = `선택한 주문월 기준으로 취합합니다. ${desc}`;
+    if (prepareDesc) prepareDesc.textContent = `선택한 주문월의 거래처 확정 자료를 기안서/비교견적서 형태로 정리합니다. ${desc}`;
 
     this.renderRequest?.();
     window.ReagentApp.collect?.renderCollect?.();
+    window.ReagentApp.collect?.renderPrepare?.();
   },
 
   initOrderMonthControls() {
     const requestSelect = document.getElementById("orderMonthSelect");
     const collectSelect = document.getElementById("collectOrderMonthSelect");
-    const selects = [requestSelect, collectSelect].filter(Boolean);
+    const prepareSelect = document.getElementById("prepareOrderMonthSelect");
+    const selects = [requestSelect, collectSelect, prepareSelect].filter(Boolean);
 
     if (!selects.length) return;
 
@@ -128,10 +133,12 @@ window.ReagentApp.request = {
 
     const requestDesc = document.getElementById("orderMonthDesc");
     const collectDesc = document.getElementById("collectOrderMonthDesc");
+    const prepareDesc = document.getElementById("prepareOrderMonthDesc");
     const desc = this.getOrderMonthDescription(selectedMonth);
 
     if (requestDesc) requestDesc.textContent = desc;
     if (collectDesc) collectDesc.textContent = `선택한 주문월 기준으로 취합합니다. ${desc}`;
+    if (prepareDesc) prepareDesc.textContent = `선택한 주문월의 거래처 확정 자료를 기안서/비교견적서 형태로 정리합니다. ${desc}`;
   },
 
   getRowsForCurrentOrderMonth() {
@@ -354,6 +361,7 @@ window.ReagentApp.request = {
     this.clearForm();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
+    window.ReagentApp.collect?.renderPrepare?.();
     toast("신청이 저장되었습니다.", "success");
   },
 
@@ -375,6 +383,7 @@ window.ReagentApp.request = {
     this.saveCollectedMeta();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
+    window.ReagentApp.collect?.renderPrepare?.();
     window.ReagentApp.toast("전체 데이터가 비워졌습니다.", "success");
   },
 
@@ -421,6 +430,7 @@ window.ReagentApp.request = {
     this.saveCollectedMeta();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
+    window.ReagentApp.collect?.renderPrepare?.();
     window.ReagentApp.toast("취합완료 건만 남기고 정리했습니다.", "success");
   },
 
@@ -503,6 +513,7 @@ window.ReagentApp.request = {
     this.saveRequestRows();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
+    window.ReagentApp.collect?.renderPrepare?.();
     window.ReagentApp.toast("샘플 3건이 추가되었습니다.", "success");
   },
 
@@ -513,6 +524,7 @@ window.ReagentApp.request = {
     this.loadCollectedMeta();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
+    window.ReagentApp.collect?.renderPrepare?.();
   },
 
   groupItems(rows) {
@@ -610,6 +622,7 @@ window.ReagentApp.request = {
     this.saveRequestRows();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
+    window.ReagentApp.collect?.renderPrepare?.();
     window.ReagentApp.toast("수정되었습니다.", "success");
   },
 
@@ -620,6 +633,7 @@ window.ReagentApp.request = {
     this.saveRequestRows();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
+    window.ReagentApp.collect?.renderPrepare?.();
     window.ReagentApp.toast("삭제되었습니다.", "success");
   },
 
