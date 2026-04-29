@@ -69,6 +69,7 @@
       <div class="actions" style="margin-top:0; justify-content:space-between; align-items:center;">
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <button class="btn" id="finalizePrepareMonth">해당월 확정</button>
+          <button class="btn primary" id="downloadExcel">엑셀 다운로드</button>
         </div>
         <div class="prepare-control-wrap">
           <div class="prepare-control-group">
@@ -163,7 +164,7 @@
           <tfoot id="prepareQuoteFoot"></tfoot>
         </table>
       </div>
-      <div class="small" style="margin-top:10px;">정렬 기준: 기안서용 요약표는 구분 → 거래처 → 용도 → 품명, 비교견적표는 구분 → 거래처 → 비고 → 용도 → 품명 순입니다.</div>
+      <div class="small" style="margin-top:10px;">정렬 기준: 기안서용 요약표와 비교견적표 모두 구분 → 거래처 → 용도 → 품명 → 비고 순입니다.</div>
     </div>
   </section>
 </section>
@@ -172,6 +173,7 @@
 <div class="modal-search"><div class="field"><label>키워드</label><input id="searchInput" placeholder="예: ethanol, 459844, Sigma, 64-17-5"/><div class="search-hint">부분 검색 가능</div></div><div class="field"><label>분류</label><select id="searchCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div><div class="field"><label>제조사</label><select id="searchMaker"><option value="">전체</option></select></div><div class="field"><label>정렬</label><select id="sortMode"><option value="relevance">관련도순</option><option value="name">품명순</option><option value="maker">제조사순</option></select></div></div>
 <div class="modal-body" id="searchResults"></div><div class="modal-foot"><div class="small" id="resultInfo">검색 결과 0건</div><div class="small">원하는 제품이 없으면 <span class="product-link" id="inlineRequest">제품 등록 요청</span>으로 넘길 수 있습니다.</div></div></div></div>
 <div class="toast-wrap" id="toastWrap"></div>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   if (!window.supabase) {
