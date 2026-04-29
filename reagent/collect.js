@@ -748,18 +748,9 @@ window.ReagentApp.collect = {
 
 
 
-  downloadExcel() {
-    if (!window.XLSX) {
-      return window.ReagentApp.toast?.("엑셀 다운로드 라이브러리를 불러오지 못했습니다.", "warn");
-    }
-
-    const request = window.ReagentApp.request;
-    const monthKey = request?.getCurrentOrderMonth ? request.getCurrentOrderMonth() : "";
-    const rows = this.getExcelRows();
-
-    if (!rows.length) {
-      return window.ReagentApp.toast?.("다운로드할 취합정리 자료가 없습니다.", "warn");
-    }
+  createExcelWorkbook(rows, config = {}) {
+    const quoteTitle = config.quoteTitle || "제제연구용 시약 및 소모품 비교 견적표";
+    const requestTitle = config.requestTitle || "제제연구용 시약 및 소모품 구매 기안";
 
     const wb = XLSX.utils.book_new();
 
@@ -825,7 +816,7 @@ window.ReagentApp.collect = {
     // Sheet1: 기안용 간략 양식
     // =========================
     const sheet1Data = [
-      ["제제연구용 시약 및 소모품 구매 기안"],
+      [requestTitle],
       [],
       ["No", "구분", "품명", "수량", "목적", "단가", "금액", "거래처"]
     ];
@@ -881,7 +872,7 @@ window.ReagentApp.collect = {
     // 비고 컬럼은 만들지 않고, 비교업체가 없을 때만 비교업체 3칸에 비고를 표시
     // =========================
     const sheet2Data = [
-      ["제제연구용 시약 및 소모품 비교 견적표"],
+      [quoteTitle],
       [],
       ["No", "구분", "품명", "제조원", "등급", "제품번호", "단위", "CAS", "수량", "목적", "구매 업체", "", "", "비교 업체", "", ""],
       ["", "", "", "", "", "", "", "", "", "", "단가", "금액", "거래처", "단가", "금액", "거래처"]
@@ -985,8 +976,53 @@ window.ReagentApp.collect = {
     XLSX.utils.book_append_sheet(wb, ws1, "기안서");
     XLSX.utils.book_append_sheet(wb, ws2, "비교견적표");
 
+    return wb;
+  },
+
+  downloadExcel() {
+    if (!window.XLSX) {
+      return window.ReagentApp.toast?.("엑셀 다운로드 라이브러리를 불러오지 못했습니다.", "warn");
+    }
+
+    const request = window.ReagentApp.request;
+    const monthKey = request?.getCurrentOrderMonth ? request.getCurrentOrderMonth() : "";
+    const rowsAll = this.getConfirmedPrepareRows();
+
+    const mainRows = this.sortPrepareRows(
+      rowsAll.filter((row) => row.category !== "안전용품"),
+      "main",
+      "summary"
+    );
+
+    const safetyRows = this.sortPrepareRows(
+      rowsAll.filter((row) => row.category === "안전용품"),
+      "safety",
+      "summary"
+    );
+
+    if (!mainRows.length && !safetyRows.length) {
+      return window.ReagentApp.toast?.("다운로드할 취합정리 자료가 없습니다.", "warn");
+    }
+
     const safeMonth = monthKey || new Date().toISOString().slice(0, 7);
-    XLSX.writeFile(wb, `취합정리_${safeMonth}.xlsx`);
+
+    if (mainRows.length) {
+      const wbMain = this.createExcelWorkbook(mainRows, {
+        requestTitle: "제제연구용 시약 및 소모품 구매 기안",
+        quoteTitle: "제제연구용 시약 및 소모품 비교 견적표"
+      });
+
+      XLSX.writeFile(wbMain, `취합정리_${safeMonth}_시약초자.xlsx`);
+    }
+
+    if (safetyRows.length) {
+      const wbSafety = this.createExcelWorkbook(safetyRows, {
+        requestTitle: "연구소 안전 관련 물품 구매 기안",
+        quoteTitle: "연구소 안전 관련 물품 비교 견적표"
+      });
+
+      XLSX.writeFile(wbSafety, `취합정리_${safeMonth}_안전용품.xlsx`);
+    }
   },
 
 
