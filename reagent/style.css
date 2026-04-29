@@ -705,52 +705,97 @@ html.embed-mode .shell{
   font-size:12px;
 }
 
-/* ===== 취합정리 문서/표 선택 UI ===== */
-.prepare-control-wrap{
-  display:flex;
-  gap:14px;
-  flex-wrap:wrap;
-  justify-content:flex-end;
-  align-items:center;
+/* ===== 취합정리 테이블 컬럼 고정/정렬 ===== */
+.fixed-table{
+  table-layout:fixed;
+  width:100%;
+  border-collapse:collapse;
 }
 
-.prepare-control-group{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  align-items:center;
-  padding:6px;
-  border:1px solid var(--line);
-  border-radius:14px;
-  background:#f8fafc;
+.prepare-summary-table{
+  min-width:1180px;
 }
 
-.prepare-control-label{
-  font-size:12px;
-  font-weight:800;
-  color:#64748b;
-  padding:0 4px;
+.prepare-quote-table{
+  min-width:1740px;
 }
 
-.prepare-table-panel{
-  display:none;
+.fixed-table th,
+.fixed-table td{
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  vertical-align:middle;
 }
 
-.prepare-table-panel.active{
+.fixed-table th.txt,
+.fixed-table td.txt{
+  text-align:left;
+}
+
+.fixed-table th.num,
+.fixed-table td.num{
+  text-align:right;
+  font-variant-numeric:tabular-nums;
+}
+
+.fixed-table td.dash{
+  text-align:center;
+}
+
+.fixed-table .usage-cell{
+  white-space:normal;
+  line-height:1.45;
+  word-break:keep-all;
+}
+
+.fixed-table .remark-cell{
+  text-align:left;
+  overflow:visible;
+}
+
+.prepare-summary-table .col-category{width:90px;}
+.prepare-summary-table .col-name{width:260px;}
+.prepare-summary-table .col-qty{width:90px;}
+.prepare-summary-table .col-usage{width:420px;}
+.prepare-summary-table .col-unit{width:130px;}
+.prepare-summary-table .col-amount{width:150px;}
+.prepare-summary-table .col-vendor{width:180px;}
+
+.prepare-quote-table .col-category{width:70px;}
+.prepare-quote-table .col-name{width:150px;}
+.prepare-quote-table .col-maker{width:130px;}
+.prepare-quote-table .col-grade{width:75px;}
+.prepare-quote-table .col-code{width:110px;}
+.prepare-quote-table .col-capacity{width:90px;}
+.prepare-quote-table .col-cas{width:110px;}
+.prepare-quote-table .col-qty{width:70px;}
+.prepare-quote-table .col-usage{width:240px;}
+.prepare-quote-table .col-unit{width:120px;}
+.prepare-quote-table .col-amount{width:130px;}
+.prepare-quote-table .col-vendor{width:130px;}
+.prepare-quote-table .col-remark{width:180px;}
+
+.prepare-remark-select{
   display:block;
+  width:100%;
+  min-width:0;
+  height:34px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:0 8px;
+  background:#fff;
+  color:var(--text);
+  font:inherit;
+  font-size:12px;
 }
 
 @media (max-width:760px){
-  .prepare-control-wrap{
-    justify-content:flex-start;
-    width:100%;
+  .prepare-quote-table{
+    min-width:1740px;
   }
 
-  .prepare-control-group{
-    width:100%;
-  }
-
-  .prepare-control-group .btn{
-    flex:1;
+  .prepare-summary-table{
+    min-width:1180px;
   }
 }
