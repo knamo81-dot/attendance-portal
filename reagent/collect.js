@@ -1202,15 +1202,29 @@ if (els.count) els.count.textContent = String(rows.length);
         ? `<span style="color:#94a3b8;">잠김</span>`
         : `<button type="button" class="ghost-btn collect-exclude-btn" data-key="${escapeHtml(group.key)}">제외</button>`;
 
-      const detailRows = group.entries.map((item) => `
-        <tr>
-          <td>${request.formatDateTime ? request.formatDateTime(item.created_at || item.id) : escapeHtml(item.created_at || "")}</td>
-          <td>${escapeHtml(item.team)} / ${escapeHtml(item.requester)}</td>
-          <td>${escapeHtml(item.name)}</td>
-          <td>${item.qty}</td>
-          <td>${escapeHtml(item.usage)}</td>
-        </tr>
-      `).join("");
+      let remainingCollectedQty = Number(group.collectedQty || 0);
+
+      const detailRows = group.entries.map((item) => {
+        const itemQty = Number(item.qty || 0);
+        let statusClass = "";
+
+        if (remainingCollectedQty > 0) {
+          statusClass = "qty-confirmed";
+          remainingCollectedQty = Math.max(0, remainingCollectedQty - itemQty);
+        } else if (Number(group.collectedQty || 0) > 0) {
+          statusClass = "qty-pending";
+        }
+
+        return `
+          <tr>
+            <td>${request.formatDateTime ? request.formatDateTime(item.created_at || item.id) : escapeHtml(item.created_at || "")}</td>
+            <td>${escapeHtml(item.team)} / ${escapeHtml(item.requester)}</td>
+            <td>${escapeHtml(item.name)}</td>
+            <td><span class="${statusClass}">${item.qty}</span></td>
+            <td>${escapeHtml(item.usage)}</td>
+          </tr>
+        `;
+      }).join("");
 
       return `
         <tr class="${meta.confirmed ? "collect-row-confirmed" : ""}">
