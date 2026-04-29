@@ -232,7 +232,6 @@ window.ReagentApp.collect = {
     meta.confirmedQty = 0;
     meta.pendingQty = 0;
     meta.confirmedAt = "";
-    meta.prepareRemark = "최저가 구매";
 
     this.saveCollectMeta();
     request.renderRequest?.();
@@ -399,6 +398,22 @@ window.ReagentApp.collect = {
     this.renderPrepare();
   },
 
+  getPrepareTableView() {
+    try {
+      return localStorage.getItem("reagent_prepare_table_view") || "summary";
+    } catch (_) {
+      return "summary";
+    }
+  },
+
+  setPrepareTableView(view) {
+    const nextView = view === "quote" ? "quote" : "summary";
+    try {
+      localStorage.setItem("reagent_prepare_table_view", nextView);
+    } catch (_) {}
+    this.renderPrepare();
+  },
+
   getPrepareMonthStatus(monthKey) {
     try {
       const rows = JSON.parse(localStorage.getItem("reagent_prepare_month_status") || "{}");
@@ -424,6 +439,10 @@ window.ReagentApp.collect = {
       finalize: document.getElementById("finalizePrepareMonth"),
       showMain: document.getElementById("showQuoteMain"),
       showSafety: document.getElementById("showQuoteSafety"),
+      showSummary: document.getElementById("showPrepareSummary"),
+      showQuote: document.getElementById("showPrepareQuote"),
+      summaryPanel: document.getElementById("prepareSummaryPanel"),
+      quotePanel: document.getElementById("prepareQuotePanel"),
       count: document.getElementById("prepareCount"),
       qty: document.getElementById("prepareQty"),
       amount: document.getElementById("prepareAmount"),
@@ -523,27 +542,38 @@ window.ReagentApp.collect = {
       .filter(Boolean);
   },
 
-  sortPrepareRows(rows, view) {
+  sortPrepareRows(rows, view, tableView = "summary") {
     const categoryOrder = { "시약": 1, "초자": 2, "초자/소모품": 2, "안전용품": 3 };
+
     return [...rows].sort((a, b) => {
       if (view === "main") {
         const ca = categoryOrder[a.category] || 99;
         const cb = categoryOrder[b.category] || 99;
         if (ca !== cb) return ca - cb;
       }
-      return String(a.purchaseVendor || "").localeCompare(String(b.purchaseVendor || ""), "ko") ||
-        String(a.usage || "").localeCompare(String(b.usage || ""), "ko") ||
-        String(a.name || "").localeCompare(String(b.name || ""), "ko");
+
+      const vendorCompare = String(a.purchaseVendor || "").localeCompare(String(b.purchaseVendor || ""), "ko");
+      if (vendorCompare !== 0) return vendorCompare;
+
+      if (tableView === "quote") {
+        const remarkCompare = String(a.remark || "").localeCompare(String(b.remark || ""), "ko");
+        if (remarkCompare !== 0) return remarkCompare;
+      }
+
+      const usageCompare = String(a.usage || "").localeCompare(String(b.usage || ""), "ko");
+      if (usageCompare !== 0) return usageCompare;
+
+      return String(a.name || "").localeCompare(String(b.name || ""), "ko");
     });
   },
 
-  getPrepareRowsByView(view) {
+  getPrepareRowsByView(view, tableView = "summary") {
     const rows = this.getConfirmedPrepareRows();
     const filtered = view === "safety"
       ? rows.filter((row) => row.category === "안전용품")
       : rows.filter((row) => row.category !== "안전용품");
 
-    return this.sortPrepareRows(filtered, view);
+    return this.sortPrepareRows(filtered, view, tableView);
   },
 
   moveToPrepare() {
@@ -596,7 +626,8 @@ window.ReagentApp.collect = {
     this.initPrepareMonthControl();
 
     const view = this.getPrepareActiveView();
-    const rows = this.getPrepareRowsByView(view);
+    const tableView = this.getPrepareTableView();
+    const rows = this.getPrepareRowsByView(view, tableView);
     const monthKey = request.getCurrentOrderMonth ? request.getCurrentOrderMonth() : "";
     const status = this.getPrepareMonthStatus(monthKey);
     const docLabel = view === "safety" ? "안전용품" : "시약/초자";
@@ -606,6 +637,16 @@ window.ReagentApp.collect = {
     document.querySelectorAll(".prepare-view-btn").forEach((btn) => {
       const isActive = btn.dataset.prepareView === view;
       btn.classList.toggle("primary", isActive);
+    });
+
+    document.querySelectorAll(".prepare-table-view-btn").forEach((btn) => {
+      const isActive = btn.dataset.prepareTableView === tableView;
+      btn.classList.toggle("primary", isActive);
+    });
+
+    document.querySelectorAll(".prepare-table-panel").forEach((panel) => {
+      const isActive = panel.dataset.prepareTablePanel === tableView;
+      panel.classList.toggle("active", isActive);
     });
 
     if (els.desc) {
@@ -680,6 +721,10 @@ window.ReagentApp.collect = {
         this.saveCollectMeta();
         this.renderPrepare();
       });
+    });
+
+    document.querySelectorAll(".prepare-table-view-btn").forEach((btn) => {
+      btn.addEventListener("click", () => this.setPrepareTableView(btn.dataset.prepareTableView));
     });
   },
 
