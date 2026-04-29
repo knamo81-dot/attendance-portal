@@ -678,6 +678,7 @@ window.ReagentApp.collect = {
   },
 
 
+
   makeGroupKey(row, fields) {
     return fields.map((field) => String(row?.[field] ?? "")).join("||");
   },
@@ -692,7 +693,8 @@ window.ReagentApp.collect = {
   formatVendorWithAmount(vendor, amount) {
     const name = String(vendor || "").trim();
     if (!name) return "";
-    return `${name}\n(${this.formatNumber(amount)}원)`;
+    return `${name}
+(${this.formatNumber(amount)}원)`;
   },
 
   hasCompareData(row) {
@@ -702,6 +704,29 @@ window.ReagentApp.collect = {
       String(row?.compareVendor || "").trim()
     );
   },
+
+  createContiguousMerges(rows, keyFn, colIndex, startRowIndex, valueRequired = true) {
+    const merges = [];
+    let start = 0;
+
+    for (let i = 1; i <= rows.length; i += 1) {
+      const currentValue = String(keyFn(rows[start]) ?? "");
+      const nextValue = String(keyFn(rows[i]) ?? "");
+
+      if (i === rows.length || nextValue !== currentValue) {
+        if ((!valueRequired || currentValue) && i - start > 1) {
+          merges.push({
+            s: { r: startRowIndex + start, c: colIndex },
+            e: { r: startRowIndex + i - 1, c: colIndex }
+          });
+        }
+        start = i;
+      }
+    }
+
+    return merges;
+  },
+
 
 
   downloadExcel() {
@@ -787,7 +812,7 @@ window.ReagentApp.collect = {
     ];
 
     rows.forEach((row, index) => {
-      const purchaseGroupAmount = this.getGroupAmount(rows, row, ["category", "purchaseVendor", "usage"]);
+      const purchaseGroupAmount = this.getGroupAmount(rows, row, ["category", "purchaseVendor"], "purchaseAmount");
       sheet1Data.push([
         index + 1,
         row.category,
@@ -834,12 +859,13 @@ window.ReagentApp.collect = {
 
     // =========================
     // Sheet2: 비교견적표 상세 양식
+    // 비고 컬럼은 만들지 않고, 비교업체가 없을 때만 비교업체 3칸에 비고를 표시
     // =========================
     const sheet2Data = [
       ["제제연구용 시약 및 소모품 비교 견적표"],
       [],
-      ["No", "구분", "품명", "제조원", "등급", "제품번호", "단위", "CAS", "수량", "목적", "구매 업체", "", "", "비교 업체", "", "", "비고"],
-      ["", "", "", "", "", "", "", "", "", "", "단가", "금액", "거래처", "단가", "금액", "거래처", ""]
+      ["No", "구분", "품명", "제조원", "등급", "제품번호", "단위", "CAS", "수량", "목적", "구매 업체", "", "", "비교 업체", "", ""],
+      ["", "", "", "", "", "", "", "", "", "", "단가", "금액", "거래처", "단가", "금액", "거래처"]
     ];
 
     const conditionalCompareMerges = [];
@@ -847,9 +873,9 @@ window.ReagentApp.collect = {
     rows.forEach((row, index) => {
       const excelRowIndex = 4 + index;
       const hasCompare = this.hasCompareData(row);
-      const purchaseGroupAmount = this.getGroupAmount(rows, row, ["category", "purchaseVendor", "usage"]);
+      const purchaseGroupAmount = this.getGroupAmount(rows, row, ["category", "purchaseVendor"], "purchaseAmount");
       const compareGroupAmount = hasCompare
-        ? this.getGroupAmount(rows, row, ["category", "compareVendor", "usage"], "compareAmount")
+        ? this.getGroupAmount(rows.filter((item) => this.hasCompareData(item)), row, ["category", "compareVendor"], "compareAmount")
         : 0;
 
       if (!hasCompare) {
@@ -875,30 +901,28 @@ window.ReagentApp.collect = {
         this.formatVendorWithAmount(row.purchaseVendor, purchaseGroupAmount),
         hasCompare ? row.compareUnit : row.remark,
         hasCompare ? row.compareAmount : "",
-        hasCompare ? this.formatVendorWithAmount(row.compareVendor, compareGroupAmount) : "",
-        hasCompare ? row.remark : ""
+        hasCompare ? this.formatVendorWithAmount(row.compareVendor, compareGroupAmount) : ""
       ]);
     });
 
-    sheet2Data.push(["", "", "", "", "", "", "", "", "", "", "합계", totalAmount, "", "", "", "", ""]);
+    sheet2Data.push(["", "", "", "", "", "", "", "", "", "", "합계", totalAmount, "", "", "", ""]);
 
     const ws2 = XLSX.utils.aoa_to_sheet(sheet2Data);
     ws2["!cols"] = [
       { wch: 6 }, { wch: 10 }, { wch: 32 }, { wch: 18 },
       { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 16 },
       { wch: 8 }, { wch: 38 }, { wch: 14 }, { wch: 16 },
-      { wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 20 },
-      { wch: 16 }
+      { wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 20 }
     ];
     ws2["!rows"] = [{ hpt: 28 }, { hpt: 6 }, { hpt: 28 }, { hpt: 28 }];
 
     const dataStart2 = 4;
     const totalRow2 = dataStart2 + rows.length;
 
-    const compareRowsOnly = rows.map((row, index) => ({ ...row, __index: index })).filter((row) => this.hasCompareData(row));
+    const compareRowsOnly = rows.filter((row) => this.hasCompareData(row));
 
     ws2["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 16 } },
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 15 } },
       { s: { r: 2, c: 0 }, e: { r: 3, c: 0 } },
       { s: { r: 2, c: 1 }, e: { r: 3, c: 1 } },
       { s: { r: 2, c: 2 }, e: { r: 3, c: 2 } },
@@ -911,21 +935,19 @@ window.ReagentApp.collect = {
       { s: { r: 2, c: 9 }, e: { r: 3, c: 9 } },
       { s: { r: 2, c: 10 }, e: { r: 2, c: 12 } },
       { s: { r: 2, c: 13 }, e: { r: 2, c: 15 } },
-      { s: { r: 2, c: 16 }, e: { r: 3, c: 16 } },
       ...this.createSameValueMerges(rows, "usage", 9, dataStart2),
       ...this.createSameValueMerges(rows, "purchaseVendor", 12, dataStart2),
-      ...this.createSameValueMerges(compareRowsOnly, "compareVendor", 15, dataStart2),
-      ...this.createSameValueMerges(compareRowsOnly, "remark", 16, dataStart2),
+      ...this.createContiguousMerges(compareRowsOnly, (row) => this.makeGroupKey(row, ["category", "compareVendor"]), 15, dataStart2),
       ...conditionalCompareMerges
     ];
 
-    this.applyRangeStyle(ws2, "A1:Q1", titleStyle);
-    this.applyRangeStyle(ws2, "A3:Q4", headerStyle);
+    this.applyRangeStyle(ws2, "A1:P1", titleStyle);
+    this.applyRangeStyle(ws2, "A3:P4", headerStyle);
     this.applyRangeStyle(ws2, "K3:M3", groupHeaderStyle);
     this.applyRangeStyle(ws2, "N3:P3", groupHeaderStyle);
 
     for (let r = dataStart2; r < totalRow2; r += 1) {
-      this.applyRangeStyle(ws2, `A${r + 1}:Q${r + 1}`, bodyStyle);
+      this.applyRangeStyle(ws2, `A${r + 1}:P${r + 1}`, bodyStyle);
       if (ws2[`C${r + 1}`]) ws2[`C${r + 1}`].s = leftStyle;
       if (ws2[`J${r + 1}`]) ws2[`J${r + 1}`].s = leftStyle;
       ["I", "K", "L", "N", "O"].forEach((col) => {
@@ -939,7 +961,7 @@ window.ReagentApp.collect = {
       }
     }
 
-    this.applyRangeStyle(ws2, `A${totalRow2 + 1}:Q${totalRow2 + 1}`, totalStyle);
+    this.applyRangeStyle(ws2, `A${totalRow2 + 1}:P${totalRow2 + 1}`, totalStyle);
 
     XLSX.utils.book_append_sheet(wb, ws1, "기안서");
     XLSX.utils.book_append_sheet(wb, ws2, "비교견적표");
