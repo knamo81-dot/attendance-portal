@@ -40,8 +40,7 @@ window.ReagentApp.collect = {
         vendor2: "거래처B",
         unit2: 12000,
         selectedVendor: "",
-        confirmed: false,
-        prepareRemark: "최저가 구매"
+        confirmed: false
       };
     }
 
@@ -232,6 +231,7 @@ window.ReagentApp.collect = {
     meta.confirmedQty = 0;
     meta.pendingQty = 0;
     meta.confirmedAt = "";
+    meta.prepareRemark = "최저가 구매";
 
     this.saveCollectMeta();
     request.renderRequest?.();
@@ -398,22 +398,6 @@ window.ReagentApp.collect = {
     this.renderPrepare();
   },
 
-  getPrepareTableView() {
-    try {
-      return localStorage.getItem("reagent_prepare_table_view") || "summary";
-    } catch (_) {
-      return "summary";
-    }
-  },
-
-  setPrepareTableView(view) {
-    const nextView = view === "quote" ? "quote" : "summary";
-    try {
-      localStorage.setItem("reagent_prepare_table_view", nextView);
-    } catch (_) {}
-    this.renderPrepare();
-  },
-
   getPrepareMonthStatus(monthKey) {
     try {
       const rows = JSON.parse(localStorage.getItem("reagent_prepare_month_status") || "{}");
@@ -439,10 +423,6 @@ window.ReagentApp.collect = {
       finalize: document.getElementById("finalizePrepareMonth"),
       showMain: document.getElementById("showQuoteMain"),
       showSafety: document.getElementById("showQuoteSafety"),
-      showSummary: document.getElementById("showPrepareSummary"),
-      showQuote: document.getElementById("showPrepareQuote"),
-      summaryPanel: document.getElementById("prepareSummaryPanel"),
-      quotePanel: document.getElementById("prepareQuotePanel"),
       count: document.getElementById("prepareCount"),
       qty: document.getElementById("prepareQty"),
       amount: document.getElementById("prepareAmount"),
@@ -513,10 +493,9 @@ window.ReagentApp.collect = {
         const usage = Array.from(new Set((group.entries || []).map((item) => String(item.usage || "").trim()).filter(Boolean))).join(" / ");
         const purchaseAmount = qty * purchaseUnit;
         const compareAmount = qty * compareUnit;
-        const remarkOptions = ["최저가 구매", "제조원 구매", "취급처 구매", "대리점 구매", "온라인 구매"];
-        const remark = remarkOptions.includes(meta.prepareRemark)
-          ? meta.prepareRemark
-          : "최저가 구매";
+        const remark = compareVendor && compareUnit
+          ? (purchaseUnit <= compareUnit ? "최저가 구매" : "확정 거래처")
+          : "비교업체 미입력";
 
         return {
           key: group.key,
@@ -542,38 +521,27 @@ window.ReagentApp.collect = {
       .filter(Boolean);
   },
 
-  sortPrepareRows(rows, view, tableView = "summary") {
+  sortPrepareRows(rows, view) {
     const categoryOrder = { "시약": 1, "초자": 2, "초자/소모품": 2, "안전용품": 3 };
-
     return [...rows].sort((a, b) => {
       if (view === "main") {
         const ca = categoryOrder[a.category] || 99;
         const cb = categoryOrder[b.category] || 99;
         if (ca !== cb) return ca - cb;
       }
-
-      const vendorCompare = String(a.purchaseVendor || "").localeCompare(String(b.purchaseVendor || ""), "ko");
-      if (vendorCompare !== 0) return vendorCompare;
-
-      if (tableView === "quote") {
-        const remarkCompare = String(a.remark || "").localeCompare(String(b.remark || ""), "ko");
-        if (remarkCompare !== 0) return remarkCompare;
-      }
-
-      const usageCompare = String(a.usage || "").localeCompare(String(b.usage || ""), "ko");
-      if (usageCompare !== 0) return usageCompare;
-
-      return String(a.name || "").localeCompare(String(b.name || ""), "ko");
+      return String(a.purchaseVendor || "").localeCompare(String(b.purchaseVendor || ""), "ko") ||
+        String(a.usage || "").localeCompare(String(b.usage || ""), "ko") ||
+        String(a.name || "").localeCompare(String(b.name || ""), "ko");
     });
   },
 
-  getPrepareRowsByView(view, tableView = "summary") {
+  getPrepareRowsByView(view) {
     const rows = this.getConfirmedPrepareRows();
     const filtered = view === "safety"
       ? rows.filter((row) => row.category === "안전용품")
       : rows.filter((row) => row.category !== "안전용품");
 
-    return this.sortPrepareRows(filtered, view, tableView);
+    return this.sortPrepareRows(filtered, view);
   },
 
   moveToPrepare() {
@@ -589,7 +557,7 @@ window.ReagentApp.collect = {
     prepareTab?.classList.add("active");
     preparePage?.classList.add("active");
 
-    window.ReagentApp.toast?.("확정된 취합자료 기준으로 취합정리에 반영했습니다.", "success");
+    window.ReagentApp.toast?.("확정된 취합자료 기준으로 취합정리를 다시 생성했습니다.", "success");
   },
 
   finalizePrepareMonth() {
@@ -626,8 +594,7 @@ window.ReagentApp.collect = {
     this.initPrepareMonthControl();
 
     const view = this.getPrepareActiveView();
-    const tableView = this.getPrepareTableView();
-    const rows = this.getPrepareRowsByView(view, tableView);
+    const rows = this.getPrepareRowsByView(view);
     const monthKey = request.getCurrentOrderMonth ? request.getCurrentOrderMonth() : "";
     const status = this.getPrepareMonthStatus(monthKey);
     const docLabel = view === "safety" ? "안전용품" : "시약/초자";
@@ -637,16 +604,6 @@ window.ReagentApp.collect = {
     document.querySelectorAll(".prepare-view-btn").forEach((btn) => {
       const isActive = btn.dataset.prepareView === view;
       btn.classList.toggle("primary", isActive);
-    });
-
-    document.querySelectorAll(".prepare-table-view-btn").forEach((btn) => {
-      const isActive = btn.dataset.prepareTableView === tableView;
-      btn.classList.toggle("primary", isActive);
-    });
-
-    document.querySelectorAll(".prepare-table-panel").forEach((panel) => {
-      const isActive = panel.dataset.prepareTablePanel === tableView;
-      panel.classList.toggle("active", isActive);
     });
 
     if (els.desc) {
@@ -669,13 +626,13 @@ window.ReagentApp.collect = {
 
     els.summaryList.innerHTML = rows.map((row) => `
       <tr>
-        <td>${this.html(row.category)}</td>
-        <td>${this.html(row.name)}</td>
-        <td style="text-align:right;">${this.formatNumber(row.qty)}</td>
-        <td>${this.html(row.usage)}</td>
-        <td style="text-align:right;">${this.formatNumber(row.purchaseUnit)}</td>
-        <td style="text-align:right;">${this.formatNumber(row.purchaseAmount)}</td>
-        <td>${this.html(row.purchaseVendor)}</td>
+        <td class="txt">${this.html(row.category)}</td>
+        <td class="txt ellipsis">${this.html(row.name)}</td>
+        <td class="num">${this.formatNumber(row.qty)}</td>
+        <td class="txt usage-cell">${this.html(row.usage)}</td>
+        <td class="num">${this.formatNumber(row.purchaseUnit)}</td>
+        <td class="num">${this.formatNumber(row.purchaseAmount)}</td>
+        <td class="txt">${this.html(row.purchaseVendor)}</td>
       </tr>
     `).join("");
 
@@ -696,36 +653,16 @@ window.ReagentApp.collect = {
         <td style="text-align:right;">${row.compareUnit ? this.formatNumber(row.compareUnit) : "-"}</td>
         <td style="text-align:right;">${row.compareAmount ? this.formatNumber(row.compareAmount) : "-"}</td>
         <td>${this.html(row.compareVendor || "-")}</td>
-        <td>
-          <select class="prepare-remark-select" data-key="${this.html(row.key)}">
-            ${["최저가 구매", "제조원 구매", "취급처 구매", "대리점 구매", "온라인 구매"].map((option) => `
-              <option value="${this.html(option)}" ${row.remark === option ? "selected" : ""}>${this.html(option)}</option>
-            `).join("")}
-          </select>
-        </td>
+        <td>${this.html(row.remark)}</td>
       </tr>
     `).join("");
 
     if (els.summaryFoot) {
-      els.summaryFoot.innerHTML = `<tr><th colspan="5" style="text-align:right;">합계</th><th style="text-align:right;">${this.formatNumber(totalAmount)}</th><th></th></tr>`;
+      els.summaryFoot.innerHTML = `<tr><th colspan="5" class="num">합계</th><th class="num">${this.formatNumber(totalAmount)}</th><th></th></tr>`;
     }
     if (els.quoteFoot) {
-      els.quoteFoot.innerHTML = `<tr><th colspan="10" style="text-align:right;">구매 금액 합계</th><th style="text-align:right;">${this.formatNumber(totalAmount)}</th><th colspan="5"></th></tr>`;
+      els.quoteFoot.innerHTML = `<tr><th colspan="10" class="num">구매 금액 합계</th><th class="num">${this.formatNumber(totalAmount)}</th><th colspan="5"></th></tr>`;
     }
-
-    document.querySelectorAll(".prepare-remark-select").forEach((select) => {
-      select.addEventListener("change", (e) => {
-        const key = e.target.dataset.key;
-        const meta = this.getMeta(key);
-        meta.prepareRemark = e.target.value || "최저가 구매";
-        this.saveCollectMeta();
-        this.renderPrepare();
-      });
-    });
-
-    document.querySelectorAll(".prepare-table-view-btn").forEach((btn) => {
-      btn.addEventListener("click", () => this.setPrepareTableView(btn.dataset.prepareTableView));
-    });
   },
 
   html(value) {
@@ -882,3 +819,13 @@ window.ReagentApp.collect = {
     if (els.collectMix) els.collectMix.textContent = `${mixR} / ${mixG} / ${mixS}`;
   }
 };
+
+document.addEventListener("DOMContentLoaded", () => {
+  window.ReagentApp.els?.confirmSelectedCollect?.addEventListener("click", () => {
+    window.ReagentApp.collect?.confirmSelectedCollect?.();
+  });
+
+  window.ReagentApp.els?.excludeSelectedCollect?.addEventListener("click", () => {
+    window.ReagentApp.collect?.excludeSelectedCollect?.();
+  });
+});
