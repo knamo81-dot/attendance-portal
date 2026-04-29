@@ -682,15 +682,19 @@ window.ReagentApp.request = {
 
       const detailRows = this.splitEntryStatus(group).map((item) => {
         const isLocked = item.rowStatus === "취합완료";
+        const isPending = item.rowStatus === "추가신청건";
+        const statusClass = isLocked ? "request-detail-collected" : (isPending ? "request-detail-pending" : "");
+        const qtyClass = isLocked ? "qty-confirmed" : (isPending ? "qty-pending" : "");
+        const statusTextClass = isLocked ? "qty-confirmed" : (isPending ? "qty-pending" : "");
 
         return `
-          <tr class="${isLocked ? "request-detail-collected" : ""}">
+          <tr class="${statusClass}">
             <td>${this.formatDateTime(item.created_at || item.id)}</td>
             <td>${this.html(item.team)} / ${this.html(item.requester)}</td>
             <td>${this.html(item.name)}</td>
-            <td>${item.qty}</td>
+            <td><span class="${qtyClass}">${item.qty}</span></td>
             <td>${this.html(item.usage)}</td>
-            <td>${this.html(item.rowStatus)}</td>
+            <td><span class="${statusTextClass}">${this.html(item.rowStatus)}</span></td>
             <td>
               ${
                 isLocked
@@ -722,8 +726,8 @@ window.ReagentApp.request = {
               group.collectedQty === 0
                 ? `${group.totalQty}`
                 : `
-                  ${group.collectedQty > 0 ? `완료 ${group.collectedQty}<br>` : ""}
-                  ${group.newQty > 0 ? `추가 ${group.newQty}` : ""}
+                  ${group.collectedQty > 0 ? `<span class="qty-confirmed">완료 ${group.collectedQty}</span><br>` : ""}
+                  ${group.newQty > 0 ? `<span class="qty-pending">추가 ${group.newQty}</span>` : ""}
                 `
             }
           </td>
