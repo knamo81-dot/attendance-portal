@@ -704,3 +704,53 @@ html.embed-mode .shell{
   font:inherit;
   font-size:12px;
 }
+
+/* ===== 취합정리 문서/표 선택 UI ===== */
+.prepare-control-wrap{
+  display:flex;
+  gap:14px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  align-items:center;
+}
+
+.prepare-control-group{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  padding:6px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#f8fafc;
+}
+
+.prepare-control-label{
+  font-size:12px;
+  font-weight:800;
+  color:#64748b;
+  padding:0 4px;
+}
+
+.prepare-table-panel{
+  display:none;
+}
+
+.prepare-table-panel.active{
+  display:block;
+}
+
+@media (max-width:760px){
+  .prepare-control-wrap{
+    justify-content:flex-start;
+    width:100%;
+  }
+
+  .prepare-control-group{
+    width:100%;
+  }
+
+  .prepare-control-group .btn{
+    flex:1;
+  }
+}
