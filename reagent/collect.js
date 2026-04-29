@@ -40,7 +40,8 @@ window.ReagentApp.collect = {
         vendor2: "거래처B",
         unit2: 12000,
         selectedVendor: "",
-        confirmed: false
+        confirmed: false,
+        prepareRemark: "최저가 구매"
       };
     }
 
@@ -492,9 +493,10 @@ window.ReagentApp.collect = {
         const usage = Array.from(new Set((group.entries || []).map((item) => String(item.usage || "").trim()).filter(Boolean))).join(" / ");
         const purchaseAmount = qty * purchaseUnit;
         const compareAmount = qty * compareUnit;
-        const remark = compareVendor && compareUnit
-          ? (purchaseUnit <= compareUnit ? "최저가 구매" : "확정 거래처")
-          : "비교업체 미입력";
+        const remarkOptions = ["최저가 구매", "제조원 구매", "취급처 구매", "대리점 구매", "온라인 구매"];
+        const remark = remarkOptions.includes(meta.prepareRemark)
+          ? meta.prepareRemark
+          : "최저가 구매";
 
         return {
           key: group.key,
@@ -652,7 +654,13 @@ window.ReagentApp.collect = {
         <td style="text-align:right;">${row.compareUnit ? this.formatNumber(row.compareUnit) : "-"}</td>
         <td style="text-align:right;">${row.compareAmount ? this.formatNumber(row.compareAmount) : "-"}</td>
         <td>${this.html(row.compareVendor || "-")}</td>
-        <td>${this.html(row.remark)}</td>
+        <td>
+          <select class="prepare-remark-select" data-key="${this.html(row.key)}">
+            ${["최저가 구매", "제조원 구매", "취급처 구매", "대리점 구매", "온라인 구매"].map((option) => `
+              <option value="${this.html(option)}" ${row.remark === option ? "selected" : ""}>${this.html(option)}</option>
+            `).join("")}
+          </select>
+        </td>
       </tr>
     `).join("");
 
@@ -662,6 +670,16 @@ window.ReagentApp.collect = {
     if (els.quoteFoot) {
       els.quoteFoot.innerHTML = `<tr><th colspan="10" style="text-align:right;">구매 금액 합계</th><th style="text-align:right;">${this.formatNumber(totalAmount)}</th><th colspan="5"></th></tr>`;
     }
+
+    document.querySelectorAll(".prepare-remark-select").forEach((select) => {
+      select.addEventListener("change", (e) => {
+        const key = e.target.dataset.key;
+        const meta = this.getMeta(key);
+        meta.prepareRemark = e.target.value || "최저가 구매";
+        this.saveCollectMeta();
+        this.renderPrepare();
+      });
+    });
   },
 
   html(value) {
