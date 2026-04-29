@@ -547,24 +547,27 @@ window.ReagentApp.collect = {
     const categoryOrder = { "시약": 1, "초자": 2, "초자/소모품": 2, "안전용품": 3 };
 
     return [...rows].sort((a, b) => {
+      // 1순위: 구분
       if (view === "main") {
         const ca = categoryOrder[a.category] || 99;
         const cb = categoryOrder[b.category] || 99;
         if (ca !== cb) return ca - cb;
       }
 
+      // 2순위: 구매 거래처
       const vendorCompare = String(a.purchaseVendor || "").localeCompare(String(b.purchaseVendor || ""), "ko");
       if (vendorCompare !== 0) return vendorCompare;
 
-      if (tableView === "quote") {
-        const remarkCompare = String(a.remark || "").localeCompare(String(b.remark || ""), "ko");
-        if (remarkCompare !== 0) return remarkCompare;
-      }
-
+      // 3순위: 용도
       const usageCompare = String(a.usage || "").localeCompare(String(b.usage || ""), "ko");
       if (usageCompare !== 0) return usageCompare;
 
-      return String(a.name || "").localeCompare(String(b.name || ""), "ko");
+      // 4순위: 품명
+      const nameCompare = String(a.name || "").localeCompare(String(b.name || ""), "ko");
+      if (nameCompare !== 0) return nameCompare;
+
+      // 5순위: 비고
+      return String(a.remark || "").localeCompare(String(b.remark || ""), "ko");
     });
   },
 
