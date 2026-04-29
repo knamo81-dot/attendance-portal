@@ -807,3 +807,18 @@ html.embed-mode .shell{
     width:100%;
   }
 }
+
+/* ===== 제품신청 상세내역 추가신청건 색상 ===== */
+.request-detail-pending > td{
+  background:#fff !important;
+}
+
+.request-detail-pending .qty-pending{
+  color:#ea580c !important;
+  font-weight:800;
+}
+
+.request-detail-collected .qty-confirmed{
+  color:#2563eb !important;
+  font-weight:800;
+}
