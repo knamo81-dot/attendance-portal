@@ -690,130 +690,17 @@ html.embed-mode .shell{
     line-height:1.4;
   }
 }
-/* ===== 취합정리(기안/비교견적) 화면 ===== */
-#page-prepare .card-head{
-  align-items:flex-start;
-}
 
-#page-prepare .actions .prepare-view-btn{
-  min-width:160px;
-}
-
-#page-prepare .prepare-view-btn.primary{
-  background:var(--primary) !important;
-  border-color:var(--primary) !important;
-  color:#fff !important;
-}
-
-#page-prepare .table-wrap table{
-  min-width:1180px;
-}
-
-#page-prepare tfoot td{
-  background:#f8fafc;
-  font-weight:800;
-  color:#0f172a;
-  border-top:2px solid var(--line);
-}
-
-.prepare-row-main td:first-child{
-  font-weight:800;
-  color:#1d4ed8;
-}
-
-.prepare-row-safety td:first-child{
-  font-weight:800;
-  color:#b45309;
-}
-
-.prepare-total-row td{
-  background:#eff6ff !important;
-  color:#1e3a8a !important;
-  font-weight:900 !important;
-}
-
-.prepare-note-lowest{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  padding:4px 8px;
-  border-radius:999px;
-  background:#dcfce7;
-  color:#166534;
+/* ===== 취합정리 비교견적 비고 선택 ===== */
+.prepare-remark-select{
+  width:100%;
+  min-width:110px;
+  height:34px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:0 8px;
+  background:#fff;
+  color:var(--text);
+  font:inherit;
   font-size:12px;
-  font-weight:800;
-  white-space:nowrap;
-}
-
-.prepare-note-compare{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  padding:4px 8px;
-  border-radius:999px;
-  background:#fef3c7;
-  color:#92400e;
-  font-size:12px;
-  font-weight:800;
-  white-space:nowrap;
-}
-
-#finalizePrepareMonth.finalized,
-#finalizePrepareMonth:disabled{
-  background:#e2e8f0 !important;
-  border-color:#cbd5e1 !important;
-  color:#475569 !important;
-  cursor:not-allowed;
-}
-
-#sendToPrepare{
-  background:#f8fafc;
-  border-color:#cbd5e1;
-  font-weight:800;
-}
-
-#sendToPrepare:hover,
-#refreshPrepare:hover{
-  filter:brightness(.98);
-}
-
-@media print{
-  body{
-    background:#fff !important;
-  }
-
-  .tabs,
-  #page-request,
-  #page-collect,
-  .toast-wrap,
-  #searchModal,
-  #refreshPrepare,
-  #finalizePrepareMonth,
-  .prepare-view-btn{
-    display:none !important;
-  }
-
-  #page-prepare{
-    display:block !important;
-  }
-
-  .card{
-    box-shadow:none !important;
-    border:1px solid #d1d5db !important;
-    break-inside:avoid;
-  }
-
-  .table-wrap{
-    overflow:visible !important;
-  }
-
-  table{
-    min-width:0 !important;
-    font-size:11px;
-  }
-
-  th,td{
-    padding:6px 5px !important;
-    font-size:10.5px !important;
-  }
 }
