@@ -19,7 +19,7 @@
     </div>
   </div>
 </section>
-<div class="tabs"><button class="tab-btn active" data-tab="request">제품신청</button><button class="tab-btn" data-tab="collect">제품취합</button></div>
+<div class="tabs"><button class="tab-btn active" data-tab="request">제품신청</button><button class="tab-btn" data-tab="collect">제품취합</button><button class="tab-btn" data-tab="prepare">취합정리</button></div>
 <section class="page active" id="page-request"><section class="card"><div class="card-head"><div style="min-width:0;"><div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><h2 style="margin:0;">제품 신청</h2><div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:700; font-size:13px; color:#334155;">주문월</span><select id="orderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:130px;"></select><span class="small" id="orderMonthDesc" style="color:#6b7280;">선택한 주문월에 발주할 품목을 신청합니다.</span></div></div><p>제품은 검색해서 선택하고 수량/용도만 입력합니다.</p></div><div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;"><button class="btn primary" id="openSearch" style="width:auto; padding:10px 14px; white-space:nowrap;">제품검색</button><span class="badge blue">검색 → 자동입력 → 수량/용도</span></div></div>
 <div class="card-body"><div class="form-grid">
 <div class="field"><label>분류</label><input id="category" placeholder="자동입력" readonly/></div>
@@ -45,9 +45,95 @@
 <div class="small" style="margin-top:10px;">체크박스 선택 후 취합추가를 눌러야 제품취합에 반영됩니다.</div>
 <div class="table-wrap" style="margin-top:16px;"><table><thead><tr><th>선택</th><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>CAS</th><th>등급</th><th>규격</th><th>총수량</th><th>신청자수</th><th>용도</th><th>작업</th></tr></thead><tbody id="draftTableBody"><tr><td class="empty" colspan="12">아직 추가된 신청 항목이 없습니다.</td></tr></tbody></table></div></div></section></section>
 <section class="page" id="page-collect"><section class="card"><div class="card-head"><div style="min-width:0;"><div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><h2 style="margin:0;">제품 취합</h2><div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:700; font-size:13px; color:#334155;">주문월</span><select id="collectOrderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:130px;"></select><span class="small" id="collectOrderMonthDesc" style="color:#6b7280;">선택한 주문월 기준으로 취합합니다.</span></div></div><p>신청 목록에서 체크 후 취합추가한 항목만 표시됩니다.</p></div><span class="badge blue">신청 데이터 연동</span></div>
-<div class="card-body"><div class="collect-filters"><div class="field"><label>구분</label><select id="collectCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div><div class="field"><label>검색</label><input id="collectKeyword" placeholder="품명 / 제조사 / 코드 검색"/></div><div class="field"><label>&nbsp;</label><button class="btn primary" id="confirmSelectedCollect">선택 거래처 확정</button></div></div>
+<div class="card-body"><div class="collect-filters"><div class="field"><label>구분</label><select id="collectCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div><div class="field"><label>검색</label><input id="collectKeyword" placeholder="품명 / 제조사 / 코드 검색"/></div><div class="field"><label>&nbsp;</label><button class="btn primary" id="confirmSelectedCollect">선택 거래처 확정</button></div><div class="field"><label>&nbsp;</label><button class="btn" id="sendToPrepare">취합정리 반영</button></div></div>
 <div class="summary" style="margin-top:16px;"><div class="tile"><div class="k">통합 품목 수</div><div class="v" id="collectCount">0</div></div><div class="tile"><div class="k">취합 총수량</div><div class="v" id="collectQty">0</div></div><div class="tile"><div class="k">시약 / 초자 / 안전</div><div class="v" id="collectMix">0 / 0 / 0</div></div><div class="tile"><div class="k">견적 비교 시안</div><div class="v">2 SET</div></div></div>
-<div class="table-wrap" style="margin-top:16px;"><table><thead><tr><th>선택</th><th>품명</th><th>제조사</th><th>제품코드</th><th>CAS</th><th>등급</th><th>규격</th><th>총수량</th><th>상세</th><th>단가</th><th>가격</th><th>거래처1</th><th>단가</th><th>가격</th><th>거래처2</th><th>작업</th></tr></thead><tbody id="collectList"><tr><td class="empty" colspan="16">취합할 항목이 없습니다.</td></tr></tbody></table></div></div></section></section></div>
+<div class="table-wrap" style="margin-top:16px;"><table><thead><tr><th>선택</th><th>품명</th><th>제조사</th><th>제품코드</th><th>CAS</th><th>등급</th><th>규격</th><th>총수량</th><th>상세</th><th>단가</th><th>가격</th><th>거래처1</th><th>단가</th><th>가격</th><th>거래처2</th><th>작업</th></tr></thead><tbody id="collectList"><tr><td class="empty" colspan="16">취합할 항목이 없습니다.</td></tr></tbody></table></div></div></section></section>
+
+<section class="page" id="page-prepare">
+  <section class="card">
+    <div class="card-head">
+      <div style="min-width:0;">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <h2 style="margin:0;">취합정리</h2>
+          <div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span style="font-weight:700; font-size:13px; color:#334155;">주문월</span>
+            <select id="prepareOrderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:130px;"></select>
+            <span class="small" id="prepareOrderMonthDesc" style="color:#6b7280;">확정된 취합자료 기준으로 기안서용 표와 비교견적표를 생성합니다.</span>
+          </div>
+        </div>
+        <p>제품취합에서 거래처 확정된 자료만 정리됩니다. 해당월 확정 전까지는 다시 반영할 수 있습니다.</p>
+      </div>
+      <span class="badge blue">기안 / 비교견적</span>
+    </div>
+    <div class="card-body">
+      <div class="actions" style="margin-top:0; justify-content:space-between; align-items:center;">
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn primary" id="refreshPrepare">취합정리 다시 생성</button>
+          <button class="btn" id="finalizePrepareMonth">해당월 확정</button>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn prepare-view-btn primary" id="showQuoteMain" data-prepare-view="main">시약/초자 비교견적서</button>
+          <button class="btn prepare-view-btn" id="showQuoteSafety" data-prepare-view="safety">안전용품 비교견적서</button>
+        </div>
+      </div>
+
+      <div class="summary" style="margin-top:16px;">
+        <div class="tile"><div class="k">확정 품목 수</div><div class="v" id="prepareCount">0</div></div>
+        <div class="tile"><div class="k">총 수량</div><div class="v" id="prepareQty">0</div></div>
+        <div class="tile"><div class="k">예상 금액</div><div class="v" id="prepareAmount">0</div></div>
+        <div class="tile"><div class="k">문서 구분</div><div class="v" id="prepareDocType" style="font-size:20px;">시약/초자</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:12px;">
+    <div class="card-head">
+      <div>
+        <h3>기안서용 요약표</h3>
+        <p>기안서 본문에 붙여 넣을 구매 예정 내역입니다.</p>
+      </div>
+      <span class="badge orange" id="prepareSummaryBadge">0건</span>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>구분</th><th>품명</th><th>수량</th><th>용도</th><th>단가</th><th>금액</th><th>거래처</th></tr>
+          </thead>
+          <tbody id="prepareSummaryList"><tr><td class="empty" colspan="7">취합정리 반영된 자료가 없습니다.</td></tr></tbody>
+          <tfoot id="prepareSummaryFoot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:12px;">
+    <div class="card-head">
+      <div>
+        <h3>비교견적표</h3>
+        <p>최저가 구매 근거를 확인하기 위한 비교 거래처 내역입니다.</p>
+      </div>
+      <span class="badge blue" id="prepareQuoteBadge">비교견적</span>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>구분</th><th>품명</th><th>제조사</th><th>등급</th><th>제품코드</th><th>규격</th><th>CAS</th><th>수량</th><th>용도</th>
+              <th>구매 단가</th><th>구매 금액</th><th>구매 거래처</th>
+              <th>비교 단가</th><th>비교 금액</th><th>비교 거래처</th><th>비고</th>
+            </tr>
+          </thead>
+          <tbody id="prepareQuoteList"><tr><td class="empty" colspan="16">비교견적 자료가 없습니다.</td></tr></tbody>
+          <tfoot id="prepareQuoteFoot"></tfoot>
+        </table>
+      </div>
+      <div class="small" style="margin-top:10px;">정렬 기준: 시약 → 초자 / 거래처 / 용도 / 품명. 안전용품은 별도 비교견적서로 분리됩니다.</div>
+    </div>
+  </section>
+</section>
+</div>
 <div class="modal-backdrop" id="searchModal"><div class="modal"><div class="modal-head"><div><h3>제품 검색</h3><div class="small">품명, 제품코드, 제조사, CAS 번호로 검색할 수 있습니다.</div></div><button class="btn" id="closeSearch">닫기</button></div>
 <div class="modal-search"><div class="field"><label>키워드</label><input id="searchInput" placeholder="예: ethanol, 459844, Sigma, 64-17-5"/><div class="search-hint">부분 검색 가능</div></div><div class="field"><label>분류</label><select id="searchCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div><div class="field"><label>제조사</label><select id="searchMaker"><option value="">전체</option></select></div><div class="field"><label>정렬</label><select id="sortMode"><option value="relevance">관련도순</option><option value="name">품명순</option><option value="maker">제조사순</option></select></div></div>
 <div class="modal-body" id="searchResults"></div><div class="modal-foot"><div class="small" id="resultInfo">검색 결과 0건</div><div class="small">원하는 제품이 없으면 <span class="product-link" id="inlineRequest">제품 등록 요청</span>으로 넘길 수 있습니다.</div></div></div></div>
