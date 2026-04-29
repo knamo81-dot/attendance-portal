@@ -68,12 +68,19 @@
     <div class="card-body">
       <div class="actions" style="margin-top:0; justify-content:space-between; align-items:center;">
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn primary" id="refreshPrepare">취합정리 다시 생성</button>
           <button class="btn" id="finalizePrepareMonth">해당월 확정</button>
         </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="btn prepare-view-btn primary" id="showQuoteMain" data-prepare-view="main">시약/초자 비교견적서</button>
-          <button class="btn prepare-view-btn" id="showQuoteSafety" data-prepare-view="safety">안전용품 비교견적서</button>
+        <div class="prepare-control-wrap">
+          <div class="prepare-control-group">
+            <span class="prepare-control-label">문서 선택</span>
+            <button class="btn prepare-view-btn primary" id="showQuoteMain" data-prepare-view="main">시약/초자</button>
+            <button class="btn prepare-view-btn" id="showQuoteSafety" data-prepare-view="safety">안전용품</button>
+          </div>
+          <div class="prepare-control-group">
+            <span class="prepare-control-label">표 선택</span>
+            <button class="btn prepare-table-view-btn primary" id="showPrepareSummary" data-prepare-table-view="summary">기안서용 요약표</button>
+            <button class="btn prepare-table-view-btn" id="showPrepareQuote" data-prepare-table-view="quote">비교견적표</button>
+          </div>
         </div>
       </div>
 
@@ -86,7 +93,7 @@
     </div>
   </section>
 
-  <section class="card" style="margin-top:12px;">
+  <section class="card prepare-table-panel active" id="prepareSummaryPanel" data-prepare-table-panel="summary" style="margin-top:12px;">
     <div class="card-head">
       <div>
         <h3>기안서용 요약표</h3>
@@ -96,15 +103,15 @@
     </div>
     <div class="card-body">
       <div class="table-wrap">
-        <table class="prepare-summary-table fixed-table">
+        <table class="prepare-summary-table prepare-fixed-table">
           <colgroup>
-            <col class="col-category">
-            <col class="col-name">
-            <col class="col-qty">
-            <col class="col-usage">
-            <col class="col-unit">
-            <col class="col-amount">
-            <col class="col-vendor">
+            <col style="width:90px;">
+            <col style="width:260px;">
+            <col style="width:80px;">
+            <col style="width:420px;">
+            <col style="width:120px;">
+            <col style="width:140px;">
+            <col style="width:170px;">
           </colgroup>
           <thead>
             <tr><th class="txt">구분</th><th class="txt">품명</th><th class="num">수량</th><th class="txt">용도</th><th class="num">단가</th><th class="num">금액</th><th class="txt">거래처</th></tr>
@@ -116,7 +123,7 @@
     </div>
   </section>
 
-  <section class="card" style="margin-top:12px;">
+  <section class="card prepare-table-panel" id="prepareQuotePanel" data-prepare-table-panel="quote" style="margin-top:12px;">
     <div class="card-head">
       <div>
         <h3>비교견적표</h3>
@@ -126,24 +133,24 @@
     </div>
     <div class="card-body">
       <div class="table-wrap">
-        <table class="prepare-quote-table fixed-table">
+        <table class="prepare-quote-table prepare-fixed-table">
           <colgroup>
-            <col class="col-category">
-            <col class="col-name">
-            <col class="col-maker">
-            <col class="col-grade">
-            <col class="col-code">
-            <col class="col-capacity">
-            <col class="col-cas">
-            <col class="col-qty">
-            <col class="col-usage">
-            <col class="col-unit">
-            <col class="col-amount">
-            <col class="col-vendor">
-            <col class="col-unit">
-            <col class="col-amount">
-            <col class="col-vendor">
-            <col class="col-remark">
+            <col style="width:80px;">
+            <col style="width:180px;">
+            <col style="width:130px;">
+            <col style="width:80px;">
+            <col style="width:120px;">
+            <col style="width:100px;">
+            <col style="width:120px;">
+            <col style="width:70px;">
+            <col style="width:260px;">
+            <col style="width:120px;">
+            <col style="width:130px;">
+            <col style="width:140px;">
+            <col style="width:120px;">
+            <col style="width:130px;">
+            <col style="width:140px;">
+            <col style="width:170px;">
           </colgroup>
           <thead>
             <tr>
@@ -156,7 +163,7 @@
           <tfoot id="prepareQuoteFoot"></tfoot>
         </table>
       </div>
-      <div class="small" style="margin-top:10px;">정렬 기준: 시약 → 초자 / 거래처 / 용도 / 품명. 안전용품은 별도 비교견적서로 분리됩니다.</div>
+      <div class="small" style="margin-top:10px;">정렬 기준: 기안서용 요약표는 구분 → 거래처 → 용도 → 품명, 비교견적표는 구분 → 거래처 → 비고 → 용도 → 품명 순입니다.</div>
     </div>
   </section>
 </section>
