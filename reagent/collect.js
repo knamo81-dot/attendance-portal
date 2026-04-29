@@ -1080,9 +1080,12 @@ window.ReagentApp.collect = {
       btn.addEventListener("click", () => this.setPrepareTableView(btn.dataset.prepareTableView));
     });
 
-    document.getElementById("downloadExcel")?.addEventListener("click", () => {
-      this.downloadExcel();
-    });
+    const downloadExcelBtn = document.getElementById("downloadExcel");
+    if (downloadExcelBtn) {
+      downloadExcelBtn.onclick = () => {
+        this.downloadExcel();
+      };
+    }
   },
 
   html(value) {
