@@ -754,3 +754,8 @@ html.embed-mode .shell{
     flex:1;
   }
 }
+
+/* ===== 취합정리 엑셀 다운로드 버튼 ===== */
+#downloadExcel{
+  font-weight:800;
+}
