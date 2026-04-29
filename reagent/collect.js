@@ -556,7 +556,7 @@ window.ReagentApp.collect = {
     prepareTab?.classList.add("active");
     preparePage?.classList.add("active");
 
-    window.ReagentApp.toast?.("확정된 취합자료 기준으로 취합정리를 다시 생성했습니다.", "success");
+    window.ReagentApp.toast?.("확정된 취합자료 기준으로 취합정리에 반영했습니다.", "success");
   },
 
   finalizePrepareMonth() {
@@ -818,13 +818,3 @@ window.ReagentApp.collect = {
     if (els.collectMix) els.collectMix.textContent = `${mixR} / ${mixG} / ${mixS}`;
   }
 };
-
-document.addEventListener("DOMContentLoaded", () => {
-  window.ReagentApp.els?.confirmSelectedCollect?.addEventListener("click", () => {
-    window.ReagentApp.collect?.confirmSelectedCollect?.();
-  });
-
-  window.ReagentApp.els?.excludeSelectedCollect?.addEventListener("click", () => {
-    window.ReagentApp.collect?.excludeSelectedCollect?.();
-  });
-});
