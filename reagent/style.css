@@ -766,3 +766,44 @@ html.embed-mode .shell{
 #downloadExcel:hover{
   filter:brightness(1.05);
 }
+
+/* ===== 취합정리 월 상태 토글 버튼 ===== */
+.prepare-finalize-group{
+  gap:4px;
+}
+
+.prepare-finalize-group .prepare-finalize-btn{
+  height:38px;
+  padding:8px 14px;
+  border-radius:10px;
+  font-weight:800;
+  background:#fff;
+  border-color:#d9e2ec;
+  color:#334155;
+}
+
+.prepare-finalize-group .prepare-finalize-btn.primary,
+.prepare-finalize-group .prepare-finalize-btn.active{
+  background:var(--primary);
+  border-color:var(--primary);
+  color:#fff;
+}
+
+.prepare-finalize-group .prepare-finalize-btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+
+@media (max-width:760px){
+  .prepare-finalize-group{
+    width:100%;
+  }
+
+  .prepare-finalize-group .prepare-finalize-btn{
+    flex:1;
+  }
+
+  #downloadExcel{
+    width:100%;
+  }
+}
