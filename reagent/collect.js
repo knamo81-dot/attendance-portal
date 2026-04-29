@@ -381,6 +381,297 @@ window.ReagentApp.collect = {
     window.ReagentApp.toast("선택 항목이 취합에서 제외되었습니다.", "success");
   },
 
+  getPrepareActiveView() {
+    try {
+      return localStorage.getItem("reagent_prepare_view") || "main";
+    } catch (_) {
+      return "main";
+    }
+  },
+
+  setPrepareActiveView(view) {
+    const nextView = view === "safety" ? "safety" : "main";
+    try {
+      localStorage.setItem("reagent_prepare_view", nextView);
+    } catch (_) {}
+    this.renderPrepare();
+  },
+
+  getPrepareMonthStatus(monthKey) {
+    try {
+      const rows = JSON.parse(localStorage.getItem("reagent_prepare_month_status") || "{}");
+      return rows?.[monthKey] || "진행중";
+    } catch (_) {
+      return "진행중";
+    }
+  },
+
+  setPrepareMonthStatus(monthKey, status) {
+    try {
+      const rows = JSON.parse(localStorage.getItem("reagent_prepare_month_status") || "{}");
+      rows[monthKey] = status;
+      localStorage.setItem("reagent_prepare_month_status", JSON.stringify(rows));
+    } catch (_) {}
+  },
+
+  getPrepareEls() {
+    return {
+      monthSelect: document.getElementById("prepareOrderMonthSelect"),
+      desc: document.getElementById("prepareOrderMonthDesc"),
+      refresh: document.getElementById("refreshPrepare"),
+      finalize: document.getElementById("finalizePrepareMonth"),
+      showMain: document.getElementById("showQuoteMain"),
+      showSafety: document.getElementById("showQuoteSafety"),
+      count: document.getElementById("prepareCount"),
+      qty: document.getElementById("prepareQty"),
+      amount: document.getElementById("prepareAmount"),
+      docType: document.getElementById("prepareDocType"),
+      summaryBadge: document.getElementById("prepareSummaryBadge"),
+      summaryList: document.getElementById("prepareSummaryList"),
+      summaryFoot: document.getElementById("prepareSummaryFoot"),
+      quoteBadge: document.getElementById("prepareQuoteBadge"),
+      quoteList: document.getElementById("prepareQuoteList"),
+      quoteFoot: document.getElementById("prepareQuoteFoot")
+    };
+  },
+
+  initPrepareMonthControl() {
+    const request = window.ReagentApp.request;
+    const els = this.getPrepareEls();
+    if (!request || !els.monthSelect) return;
+
+    const current = request.getMonthKey ? request.getMonthKey(new Date(), 0) : "";
+    const next = request.getMonthKey ? request.getMonthKey(new Date(), 1) : "";
+    const selected = request.getCurrentOrderMonth ? request.getCurrentOrderMonth() : (next || current);
+    const existingMonths = Array.from(new Set((request.requestRows || []).map((row) => row.order_month).filter(Boolean)));
+    const months = Array.from(new Set([current, next, selected, ...existingMonths].filter(Boolean))).sort();
+
+    els.monthSelect.innerHTML = months
+      .map((month) => `<option value="${this.attr(month)}">${this.html(request.formatOrderMonthLabel ? request.formatOrderMonthLabel(month) : month)}</option>`)
+      .join("");
+    els.monthSelect.value = selected;
+
+    els.monthSelect.onchange = (e) => {
+      request.setCurrentOrderMonth?.(e.target.value);
+      this.renderPrepare();
+    };
+  },
+
+  getConfirmedPrepareRows() {
+    this.loadCollectMeta();
+
+    const request = window.ReagentApp.request;
+    if (!request) return [];
+
+    const groups = request.groupItems(request.getRowsForCurrentOrderMonth ? request.getRowsForCurrentOrderMonth() : request.requestRows)
+      .filter((group) => Number(request.collectedMeta?.[group.key] || 0) > 0);
+
+    return groups
+      .map((group) => {
+        const meta = this.getMeta(group.key);
+        if (!meta.confirmed) return null;
+
+        const selectedVendor = meta.selectedVendor || this.autoSelectVendor(meta);
+        if (!selectedVendor) return null;
+
+        const qty = Number(meta.confirmedQty || group.collectedQty || 0);
+        if (!qty) return null;
+
+        const unit1 = this.normalizeNumber(meta.unit1);
+        const unit2 = this.normalizeNumber(meta.unit2);
+        const vendor1 = String(meta.vendor1 || "").trim();
+        const vendor2 = String(meta.vendor2 || "").trim();
+
+        const purchaseUnit = selectedVendor === "vendor1" ? unit1 : unit2;
+        const purchaseVendor = selectedVendor === "vendor1" ? vendor1 : vendor2;
+        const compareUnit = selectedVendor === "vendor1" ? unit2 : unit1;
+        const compareVendor = selectedVendor === "vendor1" ? vendor2 : vendor1;
+
+        if (!purchaseVendor || !purchaseUnit) return null;
+
+        const usage = Array.from(new Set((group.entries || []).map((item) => String(item.usage || "").trim()).filter(Boolean))).join(" / ");
+        const purchaseAmount = qty * purchaseUnit;
+        const compareAmount = qty * compareUnit;
+        const remark = compareVendor && compareUnit
+          ? (purchaseUnit <= compareUnit ? "최저가 구매" : "확정 거래처")
+          : "비교업체 미입력";
+
+        return {
+          key: group.key,
+          order_month: group.order_month,
+          category: group.category || "",
+          name: group.name || "",
+          maker: group.maker || "",
+          code: group.code || "",
+          capacity: group.capacity || "",
+          cas: group.cas || "",
+          grade: group.grade || "",
+          qty,
+          usage,
+          purchaseUnit,
+          purchaseAmount,
+          purchaseVendor,
+          compareUnit,
+          compareAmount,
+          compareVendor,
+          remark
+        };
+      })
+      .filter(Boolean);
+  },
+
+  sortPrepareRows(rows, view) {
+    const categoryOrder = { "시약": 1, "초자": 2, "초자/소모품": 2, "안전용품": 3 };
+    return [...rows].sort((a, b) => {
+      if (view === "main") {
+        const ca = categoryOrder[a.category] || 99;
+        const cb = categoryOrder[b.category] || 99;
+        if (ca !== cb) return ca - cb;
+      }
+      return String(a.purchaseVendor || "").localeCompare(String(b.purchaseVendor || ""), "ko") ||
+        String(a.usage || "").localeCompare(String(b.usage || ""), "ko") ||
+        String(a.name || "").localeCompare(String(b.name || ""), "ko");
+    });
+  },
+
+  getPrepareRowsByView(view) {
+    const rows = this.getConfirmedPrepareRows();
+    const filtered = view === "safety"
+      ? rows.filter((row) => row.category === "안전용품")
+      : rows.filter((row) => row.category !== "안전용품");
+
+    return this.sortPrepareRows(filtered, view);
+  },
+
+  moveToPrepare() {
+    this.initPrepareMonthControl();
+    this.renderPrepare();
+
+    document.querySelectorAll(".tab-btn").forEach((btn) => btn.classList.remove("active"));
+    document.querySelectorAll(".page").forEach((page) => page.classList.remove("active"));
+
+    const prepareTab = document.querySelector('.tab-btn[data-tab="prepare"]');
+    const preparePage = document.getElementById("page-prepare");
+
+    prepareTab?.classList.add("active");
+    preparePage?.classList.add("active");
+
+    window.ReagentApp.toast?.("확정된 취합자료 기준으로 취합정리를 다시 생성했습니다.", "success");
+  },
+
+  finalizePrepareMonth() {
+    const request = window.ReagentApp.request;
+    const monthKey = request?.getCurrentOrderMonth ? request.getCurrentOrderMonth() : "";
+    if (!monthKey) return;
+
+    const rows = this.getConfirmedPrepareRows();
+    if (!rows.length) {
+      return window.ReagentApp.toast?.("확정할 취합정리 자료가 없습니다.", "warn");
+    }
+
+    const ok = confirm("해당 주문월의 취합정리 자료를 확정하시겠습니까?\n확정 후에는 이 달의 기안/비교견적 기준 자료로 사용됩니다.");
+    if (!ok) return;
+
+    try {
+      localStorage.setItem(`reagent_prepare_snapshot_${monthKey}`, JSON.stringify({
+        month: monthKey,
+        finalized_at: new Date().toISOString(),
+        rows
+      }));
+    } catch (_) {}
+
+    this.setPrepareMonthStatus(monthKey, "확정");
+    this.renderPrepare();
+    window.ReagentApp.toast?.("해당월 취합정리 자료가 확정되었습니다.", "success");
+  },
+
+  renderPrepare() {
+    const request = window.ReagentApp.request;
+    const els = this.getPrepareEls();
+    if (!request || !els.summaryList || !els.quoteList) return;
+
+    this.initPrepareMonthControl();
+
+    const view = this.getPrepareActiveView();
+    const rows = this.getPrepareRowsByView(view);
+    const monthKey = request.getCurrentOrderMonth ? request.getCurrentOrderMonth() : "";
+    const status = this.getPrepareMonthStatus(monthKey);
+    const docLabel = view === "safety" ? "안전용품" : "시약/초자";
+    const totalQty = rows.reduce((sum, row) => sum + Number(row.qty || 0), 0);
+    const totalAmount = rows.reduce((sum, row) => sum + Number(row.purchaseAmount || 0), 0);
+
+    document.querySelectorAll(".prepare-view-btn").forEach((btn) => {
+      const isActive = btn.dataset.prepareView === view;
+      btn.classList.toggle("primary", isActive);
+    });
+
+    if (els.desc) {
+      els.desc.textContent = `${docLabel} 기준으로 확정된 취합자료를 정리합니다. 현재 상태: ${status}`;
+    }
+    if (els.count) els.count.textContent = String(rows.length);
+    if (els.qty) els.qty.textContent = this.formatNumber(totalQty);
+    if (els.amount) els.amount.textContent = this.formatNumber(totalAmount);
+    if (els.docType) els.docType.textContent = docLabel;
+    if (els.summaryBadge) els.summaryBadge.textContent = `${rows.length}건`;
+    if (els.quoteBadge) els.quoteBadge.textContent = `${docLabel} 비교견적`;
+
+    if (!rows.length) {
+      els.summaryList.innerHTML = `<tr><td class="empty" colspan="7">확정된 취합정리 자료가 없습니다.</td></tr>`;
+      els.quoteList.innerHTML = `<tr><td class="empty" colspan="16">비교견적 자료가 없습니다.</td></tr>`;
+      if (els.summaryFoot) els.summaryFoot.innerHTML = "";
+      if (els.quoteFoot) els.quoteFoot.innerHTML = "";
+      return;
+    }
+
+    els.summaryList.innerHTML = rows.map((row) => `
+      <tr>
+        <td>${this.html(row.category)}</td>
+        <td>${this.html(row.name)}</td>
+        <td style="text-align:right;">${this.formatNumber(row.qty)}</td>
+        <td>${this.html(row.usage)}</td>
+        <td style="text-align:right;">${this.formatNumber(row.purchaseUnit)}</td>
+        <td style="text-align:right;">${this.formatNumber(row.purchaseAmount)}</td>
+        <td>${this.html(row.purchaseVendor)}</td>
+      </tr>
+    `).join("");
+
+    els.quoteList.innerHTML = rows.map((row) => `
+      <tr>
+        <td>${this.html(row.category)}</td>
+        <td>${this.html(row.name)}</td>
+        <td>${this.html(row.maker)}</td>
+        <td>${this.html(row.grade)}</td>
+        <td>${this.html(row.code)}</td>
+        <td>${this.html(row.capacity)}</td>
+        <td>${this.html(row.cas)}</td>
+        <td style="text-align:right;">${this.formatNumber(row.qty)}</td>
+        <td>${this.html(row.usage)}</td>
+        <td style="text-align:right;">${this.formatNumber(row.purchaseUnit)}</td>
+        <td style="text-align:right;">${this.formatNumber(row.purchaseAmount)}</td>
+        <td>${this.html(row.purchaseVendor)}</td>
+        <td style="text-align:right;">${row.compareUnit ? this.formatNumber(row.compareUnit) : "-"}</td>
+        <td style="text-align:right;">${row.compareAmount ? this.formatNumber(row.compareAmount) : "-"}</td>
+        <td>${this.html(row.compareVendor || "-")}</td>
+        <td>${this.html(row.remark)}</td>
+      </tr>
+    `).join("");
+
+    if (els.summaryFoot) {
+      els.summaryFoot.innerHTML = `<tr><th colspan="5" style="text-align:right;">합계</th><th style="text-align:right;">${this.formatNumber(totalAmount)}</th><th></th></tr>`;
+    }
+    if (els.quoteFoot) {
+      els.quoteFoot.innerHTML = `<tr><th colspan="10" style="text-align:right;">구매 금액 합계</th><th style="text-align:right;">${this.formatNumber(totalAmount)}</th><th colspan="5"></th></tr>`;
+    }
+  },
+
+  html(value) {
+    return window.ReagentApp.escapeHtml ? window.ReagentApp.escapeHtml(value) : String(value ?? "");
+  },
+
+  attr(value) {
+    return this.html(value);
+  },
+
   renderCollect() {
     this.loadCollectMeta();
     this.loadSelectedKeys();
