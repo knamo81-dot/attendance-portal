@@ -335,8 +335,9 @@ window.ReagentApp.request = {
       return;
     }
 
+    const currentUser = this.getCurrentUser();
+
     const row = {
-      id: Date.now(),
       order_month: orderMonth,
       category: els.category?.value || "",
       name: productName,
@@ -347,47 +348,90 @@ window.ReagentApp.request = {
       grade: els.grade?.value || "",
       qty,
       usage,
-      employee_no: this.getCurrentUser().employee_no,
-      department: this.getCurrentUser().department,
-      team: this.getCurrentUser().team,
-      requester: this.getCurrentUser().name,
-      position: this.getCurrentUser().position,
-      role: this.getCurrentUser().role,
-      created_at: new Date().toISOString()
+      employee_no: currentUser.employee_no,
+      department: currentUser.department,
+      team: currentUser.team,
+      requester: currentUser.name,
+      position: currentUser.position,
+      role: currentUser.role,
+      status: "신청"
     };
 
-    this.requestRows.push(row);
-    this.saveRequestRows();
+    const sb = window.ReagentApp.sb;
+
+    if (!sb) {
+      toast("Supabase 연결 정보가 없습니다. supabase.js 로딩을 확인하세요.", "warn");
+      return;
+    }
+
+    const { data, error } = await sb
+      .from("reagent_requests")
+      .insert(row)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("신청 저장 실패:", error);
+      toast(`서버 저장 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      return;
+    }
+
+    this.requestRows.unshift(data);
     this.clearForm();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
     window.ReagentApp.collect?.renderPrepare?.();
-    toast("신청이 저장되었습니다.", "success");
+    toast("신청이 서버에 저장되었습니다.", "success");
   },
 
-  clearAllRows(options = {}) {
+  async clearAllRows(options = {}) {
     const skipConfirm = options.skipConfirm === true;
 
     if (!skipConfirm) {
       const ok = confirm(
-        "신청 목록과 취합 상태를 모두 삭제합니다.\n\n정말 전체 데이터를 비우시겠습니까?"
+        "신청 목록과 취합 상태를 모두 삭제합니다.\n\n서버 데이터까지 모두 비우시겠습니까?"
       );
       if (!ok) return;
+    }
+
+    const sb = window.ReagentApp.sb;
+
+    if (sb) {
+      const { error } = await sb
+        .from("reagent_requests")
+        .delete()
+        .neq("id", 0);
+
+      if (error) {
+        console.error("전체 삭제 실패:", error);
+        window.ReagentApp.toast?.(`서버 데이터 삭제 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+        return;
+      }
     }
 
     this.requestRows = [];
     this.selectedKeys = [];
     this.collectedMeta = {};
-    this.saveRequestRows();
+
+    localStorage.removeItem("reagent_request_rows");
+    localStorage.removeItem("reagent_selected_keys");
+    localStorage.removeItem("reagent_collected_meta");
+    localStorage.removeItem("reagent_collect_meta");
+    localStorage.removeItem("reagent_collect_selected_keys");
+    localStorage.removeItem("reagent_prepare_month_status");
+
     this.saveSelectedKeys();
     this.saveCollectedMeta();
+    window.ReagentApp.collect && (window.ReagentApp.collect.collectMeta = {});
+    window.ReagentApp.collect && (window.ReagentApp.collect.selectedKeys = []);
+
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
     window.ReagentApp.collect?.renderPrepare?.();
     window.ReagentApp.toast("전체 데이터가 비워졌습니다.", "success");
   },
 
-  clearUncollectedRows(options = {}) {
+  async clearUncollectedRows(options = {}) {
     const skipConfirm = options.skipConfirm === true;
 
     if (!skipConfirm) {
@@ -404,7 +448,10 @@ window.ReagentApp.request = {
         .map((group) => group.key)
     );
 
-    this.requestRows = this.requestRows.filter((row) => {
+    const deleteIds = [];
+    const remainRows = [];
+
+    this.requestRows.forEach((row) => {
       const key = [
         row.order_month || this.getCurrentOrderMonth(),
         row.category || "",
@@ -416,16 +463,35 @@ window.ReagentApp.request = {
         row.grade || ""
       ].join("||");
 
-      return completedKeys.has(key);
+      if (completedKeys.has(key)) {
+        remainRows.push(row);
+      } else if (row.id) {
+        deleteIds.push(row.id);
+      }
     });
 
+    const sb = window.ReagentApp.sb;
+
+    if (sb && deleteIds.length) {
+      const { error } = await sb
+        .from("reagent_requests")
+        .delete()
+        .in("id", deleteIds);
+
+      if (error) {
+        console.error("미취합/추가신청 삭제 실패:", error);
+        window.ReagentApp.toast?.(`서버 데이터 삭제 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+        return;
+      }
+    }
+
+    this.requestRows = remainRows;
     this.selectedKeys = this.selectedKeys.filter((key) => completedKeys.has(key));
 
     Object.keys(this.collectedMeta || {}).forEach((key) => {
       if (!completedKeys.has(key)) delete this.collectedMeta[key];
     });
 
-    this.saveRequestRows();
     this.saveSelectedKeys();
     this.saveCollectedMeta();
     this.renderRequest();
@@ -456,12 +522,10 @@ window.ReagentApp.request = {
     window.ReagentApp.toast?.("삭제 옵션은 1 또는 2만 입력할 수 있습니다.", "warn");
   },
 
-  insertSample() {
-    const now = Date.now();
+  async insertSample() {
     const orderMonth = this.getCurrentOrderMonth();
-    this.requestRows.push(
+    const sampleRows = [
       {
-        id: now + 1,
         order_month: orderMonth,
         category: "시약",
         name: "Ethanol",
@@ -474,10 +538,9 @@ window.ReagentApp.request = {
         usage: "전처리용",
         team: "연구1팀",
         requester: "홍길동",
-        created_at: new Date().toISOString()
+        status: "신청"
       },
       {
-        id: now + 2,
         order_month: orderMonth,
         category: "시약",
         name: "Ethanol",
@@ -490,10 +553,9 @@ window.ReagentApp.request = {
         usage: "분석용",
         team: "연구2팀",
         requester: "김민수",
-        created_at: new Date().toISOString()
+        status: "신청"
       },
       {
-        id: now + 3,
         order_month: orderMonth,
         category: "초자",
         name: "비커",
@@ -506,20 +568,58 @@ window.ReagentApp.request = {
         usage: "실험용",
         team: "연구1팀",
         requester: "이수진",
-        created_at: new Date().toISOString()
+        status: "신청"
       }
-    );
+    ];
 
-    this.saveRequestRows();
+    const sb = window.ReagentApp.sb;
+
+    if (!sb) {
+      window.ReagentApp.toast?.("Supabase 연결 정보가 없습니다.", "warn");
+      return;
+    }
+
+    const { data, error } = await sb
+      .from("reagent_requests")
+      .insert(sampleRows)
+      .select();
+
+    if (error) {
+      console.error("샘플 저장 실패:", error);
+      window.ReagentApp.toast?.(`샘플 저장 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      return;
+    }
+
+    this.requestRows = [...(data || []), ...this.requestRows];
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
     window.ReagentApp.collect?.renderPrepare?.();
-    window.ReagentApp.toast("샘플 3건이 추가되었습니다.", "success");
+    window.ReagentApp.toast("샘플 3건이 서버에 추가되었습니다.", "success");
   },
 
   async fetchData() {
     this.initOrderMonthControls();
-    this.loadRequestRows();
+
+    const sb = window.ReagentApp.sb;
+
+    if (!sb) {
+      window.ReagentApp.toast?.("Supabase 연결 정보가 없습니다. supabase.js 로딩을 확인하세요.", "warn");
+      this.requestRows = [];
+    } else {
+      const { data, error } = await sb
+        .from("reagent_requests")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("신청 목록 조회 실패:", error);
+        window.ReagentApp.toast?.(`서버 데이터를 불러오지 못했습니다: ${error.message || "원인을 확인하세요."}`, "warn");
+        this.requestRows = [];
+      } else {
+        this.requestRows = data || [];
+      }
+    }
+
     this.loadSelectedKeys();
     this.loadCollectedMeta();
     this.renderRequest();
@@ -607,7 +707,7 @@ window.ReagentApp.request = {
     detailRow.style.display = detailRow.style.display === "none" ? "" : "none";
   },
 
-  editItem(id) {
+  async editItem(id) {
     const row = this.requestRows.find((r) => Number(r.id) === Number(id));
     if (!row) return;
 
@@ -617,20 +717,56 @@ window.ReagentApp.request = {
     const newUsage = prompt("용도 수정", row.usage || "");
     if (newUsage === null) return;
 
-    row.qty = Number(newQty || row.qty);
-    row.usage = newUsage;
-    this.saveRequestRows();
+    const nextQty = Number(newQty || row.qty);
+    const nextUsage = newUsage;
+
+    const sb = window.ReagentApp.sb;
+
+    if (sb) {
+      const { data, error } = await sb
+        .from("reagent_requests")
+        .update({ qty: nextQty, usage: nextUsage })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("수정 실패:", error);
+        window.ReagentApp.toast?.(`서버 수정 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+        return;
+      }
+
+      Object.assign(row, data);
+    } else {
+      row.qty = nextQty;
+      row.usage = nextUsage;
+    }
+
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
     window.ReagentApp.collect?.renderPrepare?.();
     window.ReagentApp.toast("수정되었습니다.", "success");
   },
 
-  deleteItem(id) {
+  async deleteItem(id) {
     if (!confirm("삭제하시겠습니까?")) return;
 
+    const sb = window.ReagentApp.sb;
+
+    if (sb) {
+      const { error } = await sb
+        .from("reagent_requests")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        console.error("삭제 실패:", error);
+        window.ReagentApp.toast?.(`서버 삭제 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+        return;
+      }
+    }
+
     this.requestRows = this.requestRows.filter((r) => Number(r.id) !== Number(id));
-    this.saveRequestRows();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
     window.ReagentApp.collect?.renderPrepare?.();
