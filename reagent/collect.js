@@ -958,7 +958,7 @@ window.ReagentApp.collect = {
     ];
 
     rows.forEach((row, index) => {
-      const purchaseGroupAmount = this.getGroupAmount(rows, row, ["category", "purchaseVendor"], "purchaseAmount");
+      const purchaseGroupAmount = this.getGroupAmount(rows, row, ["purchaseVendor"], "purchaseAmount");
       sheet1Data.push([
         index + 1,
         row.category,
@@ -1019,9 +1019,9 @@ window.ReagentApp.collect = {
     rows.forEach((row, index) => {
       const excelRowIndex = 4 + index;
       const hasCompare = this.hasCompareData(row);
-      const purchaseGroupAmount = this.getGroupAmount(rows, row, ["category", "purchaseVendor"], "purchaseAmount");
+      const purchaseGroupAmount = this.getGroupAmount(rows, row, ["purchaseVendor"], "purchaseAmount");
       const compareGroupAmount = hasCompare
-        ? this.getGroupAmount(rows.filter((item) => this.hasCompareData(item)), row, ["category", "compareVendor"], "compareAmount")
+        ? this.getGroupAmount(rows.filter((item) => this.hasCompareData(item)), row, ["compareVendor"], "compareAmount")
         : 0;
 
       if (!hasCompare) {
@@ -1083,7 +1083,7 @@ window.ReagentApp.collect = {
       { s: { r: 2, c: 13 }, e: { r: 2, c: 15 } },
       ...this.createSameValueMerges(rows, "usage", 9, dataStart2),
       ...this.createSameValueMerges(rows, "purchaseVendor", 12, dataStart2),
-      ...this.createContiguousMerges(compareRowsOnly, (row) => this.makeGroupKey(row, ["category", "compareVendor"]), 15, dataStart2),
+      ...this.createContiguousMerges(compareRowsOnly, (row) => this.makeGroupKey(row, ["compareVendor"]), 15, dataStart2),
       ...conditionalCompareMerges
     ];
 
