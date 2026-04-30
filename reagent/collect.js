@@ -1372,26 +1372,30 @@ if (els.count) els.count.textContent = String(rows.length);
         ? `<span style="color:#94a3b8;">잠김</span>`
         : `<button type="button" class="ghost-btn collect-exclude-btn" data-key="${escapeHtml(group.key)}">제외</button>`;
 
-      let remainingCollectedQty = Number(group.collectedQty || 0);
+      let remainingConfirmedQty = meta.confirmed ? Number(meta.confirmedQty || group.collectedQty || 0) : 0;
 
       const detailRows = group.entries.map((item) => {
         const itemQty = Number(item.qty || 0);
-        let statusClass = "";
+        const isConfirmedEntry = remainingConfirmedQty > 0 && remainingConfirmedQty >= itemQty;
+        const isPendingEntry = !isConfirmedEntry && Number(group.collectedQty || 0) > 0;
 
-        if (remainingCollectedQty > 0) {
-          statusClass = meta.confirmed ? "qty-confirmed" : "";
-          remainingCollectedQty = Math.max(0, remainingCollectedQty - itemQty);
-        } else if (Number(group.collectedQty || 0) > 0) {
-          statusClass = meta.confirmed ? "qty-pending" : "";
+        const rowClass = isConfirmedEntry ? "collect-detail-confirmed" : "";
+        const qtyClass = isConfirmedEntry ? "qty-confirmed" : "";
+        const statusText = isConfirmedEntry ? "거래처확정" : (isPendingEntry ? "추가신청" : "신청");
+        const statusClass = isConfirmedEntry ? "qty-confirmed" : "";
+
+        if (isConfirmedEntry) {
+          remainingConfirmedQty = Math.max(0, remainingConfirmedQty - itemQty);
         }
 
         return `
-          <tr>
+          <tr class="${rowClass}" style="${isConfirmedEntry ? 'background:#f1f5f9;' : ''}">
             <td>${request.formatDateTime ? request.formatDateTime(item.created_at || item.id) : escapeHtml(item.created_at || "")}</td>
             <td>${escapeHtml(item.team)} / ${escapeHtml(item.requester)}</td>
             <td>${escapeHtml(item.name)}</td>
-            <td><span class="${statusClass}">${item.qty}</span></td>
+            <td><span class="${qtyClass}">${item.qty}</span></td>
             <td>${escapeHtml(item.usage)}</td>
+            <td><span class="${statusClass}">${statusText}</span></td>
           </tr>
         `;
       }).join("");
@@ -1451,6 +1455,7 @@ if (els.count) els.count.textContent = String(rows.length);
                   <col style="width:28%;">
                   <col style="width:80px;">
                   <col style="width:30%;">
+                  <col style="width:110px;">
                 </colgroup>
                 <thead>
                   <tr>
@@ -1459,6 +1464,7 @@ if (els.count) els.count.textContent = String(rows.length);
                     <th>품명</th>
                     <th>수량</th>
                     <th>용도</th>
+                    <th>상태</th>
                   </tr>
                 </thead>
                 <tbody>${detailRows}</tbody>
