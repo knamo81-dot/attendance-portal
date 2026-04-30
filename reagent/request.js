@@ -863,8 +863,12 @@ window.ReagentApp.request = {
         const isLocked = item.rowStatus === "취합완료";
         const isPending = item.rowStatus === "추가신청건";
         const statusClass = isLocked ? "request-detail-collected" : (isPending ? "request-detail-pending" : "");
-        const qtyClass = isLocked ? "qty-confirmed" : (isPending ? "qty-pending" : "");
-        const statusTextClass = isLocked ? "qty-confirmed" : (isPending ? "qty-pending" : "");
+        const qtyClass = isVendorConfirmed
+          ? (isLocked ? "qty-confirmed" : (isPending ? "qty-pending" : ""))
+          : "";
+        const statusTextClass = isVendorConfirmed
+          ? (isLocked ? "qty-confirmed" : (isPending ? "qty-pending" : ""))
+          : "";
 
         return `
           <tr class="${statusClass}">
