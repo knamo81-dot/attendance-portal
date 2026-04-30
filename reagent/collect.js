@@ -1366,7 +1366,7 @@ if (els.count) els.count.textContent = String(rows.length);
       const readonlyAttr = meta.confirmed ? "readonly" : "";
       const rowId = this.simpleKey(group.key);
       const cancelButton = meta.confirmed
-        ? `<button type="button" class="ghost-btn collect-cancel-btn" data-key="${escapeHtml(group.key)}" style="margin-right:6px;">취소</button>`
+        ? `<button type="button" class="ghost-btn collect-cancel-btn" data-key="${escapeHtml(group.key)}" title="거래처 확정 취소">취소</button>`
         : "";
       const actionCell = meta.confirmed
         ? `<span style="color:#94a3b8;">잠김</span>`
@@ -1380,9 +1380,9 @@ if (els.count) els.count.textContent = String(rows.length);
         const isPendingEntry = !isConfirmedEntry && Number(group.collectedQty || 0) > 0;
 
         const rowClass = isConfirmedEntry ? "collect-detail-confirmed" : "";
-        const qtyClass = isConfirmedEntry ? "qty-confirmed" : "";
+        const qtyClass = isConfirmedEntry ? "qty-confirmed" : (isPendingEntry ? "qty-pending" : "");
         const statusText = isConfirmedEntry ? "거래처확정" : (isPendingEntry ? "추가신청" : "신청");
-        const statusClass = isConfirmedEntry ? "qty-confirmed" : "";
+        const statusClass = isConfirmedEntry ? "qty-confirmed" : (isPendingEntry ? "qty-pending" : "");
 
         if (isConfirmedEntry) {
           remainingConfirmedQty = Math.max(0, remainingConfirmedQty - itemQty);
@@ -1402,8 +1402,11 @@ if (els.count) els.count.textContent = String(rows.length);
 
       return `
         <tr class="${meta.confirmed ? "collect-row-confirmed" : ""}">
-          <td><input type="checkbox" class="collect-check" data-key="${escapeHtml(group.key)}" ${checked} ${lockedAttr}></td>
-          <td>${cancelButton}${escapeHtml(group.name)} ${confirmedBadge}</td>
+          <td class="collect-select-cell">
+            <input type="checkbox" class="collect-check" data-key="${escapeHtml(group.key)}" ${checked} ${lockedAttr}>
+            ${cancelButton}
+          </td>
+          <td class="collect-name-cell">${escapeHtml(group.name)} ${confirmedBadge}</td>
           <td>${escapeHtml(group.maker)}</td>
           <td>${escapeHtml(group.code)}</td>
           <td>${escapeHtml(group.cas)}</td>
