@@ -1123,3 +1123,58 @@ tr:not(.collect-row-confirmed) input.collect-input{
   box-shadow:none !important;
 }
 
+
+/* ===== final minimal patch: 제품취합 상세보기 상태/색상 기준 ===== */
+/* 거래처 확정된 상세 행만 음영 */
+.collect-detail-row .collect-detail-confirmed > td,
+.collect-detail-confirmed > td{
+  background:#f1f5f9 !important;
+  color:#64748b !important;
+}
+
+/* 제품취합 상세보기: 확정 후 확정건=파랑, 미확정/추가신청=주황 */
+.collect-detail-row .qty-confirmed{
+  color:#2563eb !important;
+  font-weight:800 !important;
+}
+
+.collect-detail-row .qty-pending{
+  color:#ea580c !important;
+  font-weight:800 !important;
+}
+
+/* 거래처 확정 전 상세 행은 음영 없이 기본 배경 */
+.collect-detail-row tbody tr:not(.collect-detail-confirmed) > td{
+  background:#fff !important;
+}
+
+/* 체크박스 칸은 체크박스만 보이도록 유지 */
+.collect-select-cell{
+  display:table-cell !important;
+  text-align:center !important;
+  vertical-align:middle !important;
+}
+
+.collect-select-cell .collect-cancel-btn{
+  display:none !important;
+}
+
+/* 확정 행 input 밑줄/위치 보정 유지 */
+.collect-row-confirmed input.collect-input,
+.collect-row-confirmed .vendor-cell input.collect-input,
+.collect-row-confirmed input[readonly]{
+  border:none !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  outline:none !important;
+  padding:0 2px !important;
+  height:auto !important;
+  min-height:0 !important;
+  line-height:1.4 !important;
+  pointer-events:none !important;
+}
+
+.collect-row-confirmed > td{
+  vertical-align:middle !important;
+}
+
