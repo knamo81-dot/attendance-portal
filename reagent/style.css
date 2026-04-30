@@ -1508,3 +1508,108 @@ tr:not(.collect-row-confirmed) input.collect-input{
   background-clip:border-box !important;
 }
 
+
+/* ===== final structural patch: 거래처 3칸을 하나의 라운드 박스로 묶기 ===== */
+/* 기존 vendor-cell 파란 td 방식은 사용하지 않고, colspan 셀 안쪽 박스로 표시 */
+.table-wrap table:has(#collectList) .vendor-group-td{
+  padding:4px 5px !important;
+  vertical-align:middle !important;
+  background:inherit !important;
+}
+
+/* 확정 행은 전체 회색을 먼저 깐다 */
+.table-wrap table:has(#collectList) tr.collect-row-confirmed{
+  background:#f1f5f9 !important;
+}
+
+.table-wrap table:has(#collectList) tr.collect-row-confirmed > td{
+  background:#f1f5f9 !important;
+}
+
+/* 미확정 행은 흰색 */
+.table-wrap table:has(#collectList) tr:not(.collect-row-confirmed) > td{
+  background:#fff;
+}
+
+/* 거래처 입력 묶음 기본 박스 */
+.vendor-quote-box{
+  display:grid !important;
+  grid-template-columns:82px 100px 1fr !important;
+  align-items:center !important;
+  gap:6px !important;
+  width:100% !important;
+  min-height:34px !important;
+  padding:4px 8px !important;
+  border-radius:14px !important;
+  background:transparent !important;
+}
+
+/* 선택된 거래처: 파란색 라운드 박스 */
+.vendor-quote-box.auto-vendor-selected{
+  background:#dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 파란 박스 바깥은 td/row 배경이 보이므로, 확정 행에서는 회색만 보임 */
+.collect-row-confirmed .vendor-group-td{
+  background:#f1f5f9 !important;
+}
+
+/* 미확정 행에서는 파란 박스 바깥 흰색이 정상 */
+tr:not(.collect-row-confirmed) .vendor-group-td{
+  background:#fff !important;
+}
+
+/* vendor-group-td 자체에는 파란색을 주지 않음: 흰 틈 방지 핵심 */
+.vendor-group-td.auto-vendor-selected{
+  background:inherit !important;
+  box-shadow:none !important;
+}
+
+/* 입력칸 */
+.vendor-quote-box input.collect-input{
+  width:100% !important;
+  height:26px !important;
+  min-height:26px !important;
+  padding:2px 4px !important;
+  border-radius:7px !important;
+  font-size:12px !important;
+  line-height:1.2 !important;
+}
+
+/* 선택된 파란 박스 안 입력칸은 투명 */
+.vendor-quote-box.auto-vendor-selected input.collect-input{
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 확정 행 입력칸도 텍스트처럼 보이게 */
+.collect-row-confirmed .vendor-quote-box input.collect-input{
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+  pointer-events:none !important;
+}
+
+/* 헤더와 colspan 셀 폭 균형 보정 */
+.table-wrap table:has(#collectList) .vendor-unit-input{ text-align:right !important; }
+.table-wrap table:has(#collectList) .vendor-price-input{ text-align:right !important; }
+.table-wrap table:has(#collectList) .vendor-name-input{ text-align:left !important; }
+
+/* 품명 구분선/표 구분선 유지 */
+.table-wrap table:has(#collectList) th,
+.table-wrap table:has(#collectList) td{
+  border-bottom:1px solid var(--line) !important;
+}
+
+.table-wrap table:has(#collectList) .collect-name-cell{
+  display:table-cell !important;
+  border-bottom:1px solid var(--line) !important;
+  vertical-align:middle !important;
+}
+
