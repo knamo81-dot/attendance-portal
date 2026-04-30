@@ -1379,17 +1379,29 @@ if (els.count) els.count.textContent = String(rows.length);
         const isConfirmedEntry = remainingConfirmedQty > 0 && remainingConfirmedQty >= itemQty;
         const isPendingEntry = !isConfirmedEntry && Number(group.collectedQty || 0) > 0;
 
-        const rowClass = isConfirmedEntry ? "collect-detail-confirmed" : "";
-        const qtyClass = isConfirmedEntry ? "qty-confirmed" : (isPendingEntry ? "qty-pending" : "");
-        const statusText = isConfirmedEntry ? "거래처확정" : (isPendingEntry ? "추가신청" : "신청");
-        const statusClass = isConfirmedEntry ? "qty-confirmed" : (isPendingEntry ? "qty-pending" : "");
+        const isVendorConfirmed = meta.confirmed === true;
+        const rowClass = isVendorConfirmed && isConfirmedEntry ? "collect-detail-confirmed" : "";
+
+        // 거래처 확정 전에는 상세보기 수량/상태에 색상을 주지 않는다.
+        // 거래처 확정 후에는 확정된 신청건만 파랑+음영, 미확정/추가신청건은 주황+흰색으로 표시한다.
+        const qtyClass = isVendorConfirmed
+          ? (isConfirmedEntry ? "qty-confirmed" : (isPendingEntry ? "qty-pending" : ""))
+          : "";
+
+        const statusText = isVendorConfirmed
+          ? (isConfirmedEntry ? "거래처확정" : (isPendingEntry ? "추가신청" : "신청"))
+          : (isPendingEntry ? "추가신청" : "신청");
+
+        const statusClass = isVendorConfirmed
+          ? (isConfirmedEntry ? "qty-confirmed" : (isPendingEntry ? "qty-pending" : ""))
+          : "";
 
         if (isConfirmedEntry) {
           remainingConfirmedQty = Math.max(0, remainingConfirmedQty - itemQty);
         }
 
         return `
-          <tr class="${rowClass}" style="${isConfirmedEntry ? 'background:#f1f5f9;' : ''}">
+          <tr class="${rowClass}" style="${rowClass ? 'background:#f1f5f9;' : ''}">
             <td>${request.formatDateTime ? request.formatDateTime(item.created_at || item.id) : escapeHtml(item.created_at || "")}</td>
             <td>${escapeHtml(item.team)} / ${escapeHtml(item.requester)}</td>
             <td>${escapeHtml(item.name)}</td>
