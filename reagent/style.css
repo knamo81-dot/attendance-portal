@@ -822,3 +822,127 @@ html.embed-mode .shell{
   color:#2563eb !important;
   font-weight:800;
 }
+
+/* ===== 제품취합 테이블 레이아웃 정렬 패치 v1 ===== */
+/* 품명 영역을 넓히고, 단가/가격/거래처 영역을 오른쪽으로 정리 */
+.table-wrap table:has(#collectList){
+  table-layout:fixed;
+  min-width:1680px;
+}
+
+.table-wrap table:has(#collectList) th,
+.table-wrap table:has(#collectList) td{
+  padding:8px 6px;
+  vertical-align:middle;
+  white-space:nowrap;
+}
+
+.table-wrap table:has(#collectList) th:nth-child(1),
+.table-wrap table:has(#collectList) td:nth-child(1){width:78px;text-align:center;}
+.table-wrap table:has(#collectList) th:nth-child(2),
+.table-wrap table:has(#collectList) td:nth-child(2){width:330px;white-space:normal;line-height:1.35;}
+.table-wrap table:has(#collectList) th:nth-child(3),
+.table-wrap table:has(#collectList) td:nth-child(3){width:120px;}
+.table-wrap table:has(#collectList) th:nth-child(4),
+.table-wrap table:has(#collectList) td:nth-child(4){width:110px;}
+.table-wrap table:has(#collectList) th:nth-child(5),
+.table-wrap table:has(#collectList) td:nth-child(5){width:110px;}
+.table-wrap table:has(#collectList) th:nth-child(6),
+.table-wrap table:has(#collectList) td:nth-child(6){width:80px;}
+.table-wrap table:has(#collectList) th:nth-child(7),
+.table-wrap table:has(#collectList) td:nth-child(7){width:90px;}
+.table-wrap table:has(#collectList) th:nth-child(8),
+.table-wrap table:has(#collectList) td:nth-child(8){width:78px;text-align:center;}
+.table-wrap table:has(#collectList) th:nth-child(9),
+.table-wrap table:has(#collectList) td:nth-child(9){width:82px;text-align:center;}
+.table-wrap table:has(#collectList) th:nth-child(10),
+.table-wrap table:has(#collectList) td:nth-child(10){width:90px;text-align:right;}
+.table-wrap table:has(#collectList) th:nth-child(11),
+.table-wrap table:has(#collectList) td:nth-child(11){width:108px;text-align:right;}
+.table-wrap table:has(#collectList) th:nth-child(12),
+.table-wrap table:has(#collectList) td:nth-child(12){width:120px;}
+.table-wrap table:has(#collectList) th:nth-child(13),
+.table-wrap table:has(#collectList) td:nth-child(13){width:90px;text-align:right;}
+.table-wrap table:has(#collectList) th:nth-child(14),
+.table-wrap table:has(#collectList) td:nth-child(14){width:108px;text-align:right;}
+.table-wrap table:has(#collectList) th:nth-child(15),
+.table-wrap table:has(#collectList) td:nth-child(15){width:120px;}
+.table-wrap table:has(#collectList) th:nth-child(16),
+.table-wrap table:has(#collectList) td:nth-child(16){width:80px;text-align:center;}
+
+.table-wrap table:has(#collectList) input.collect-input{
+  height:30px !important;
+  padding:4px 6px !important;
+  border-radius:0 !important;
+  font-size:12px;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell{
+  padding-left:4px;
+  padding-right:4px;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="unit1"],
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="unit2"]{
+  width:82px !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="price1"],
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="price2"]{
+  width:100px !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="vendor1"],
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="vendor2"]{
+  width:110px !important;
+}
+
+.collect-action-box{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+}
+
+.collect-action-box .ghost-btn,
+.table-wrap table:has(#collectList) .ghost-btn{
+  padding:6px 9px;
+  font-size:12px;
+  border-radius:10px;
+}
+
+.collect-name-cell{
+  display:block;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.collect-name-cell:hover{
+  white-space:normal;
+  overflow:visible;
+}
+
+.collect-detail-row td{
+  white-space:normal !important;
+}
+
+/* 거래처 확정 행: 행 전체 음영은 유지하되, 미확정 추가 신청건과 혼동되지 않도록 상세 영역은 차분하게 */
+.collect-row-confirmed > td{
+  background:#f1f5f9 !important;
+}
+
+.collect-row-confirmed + .collect-detail-row td{
+  background:#f8fafc !important;
+}
+
+@media (max-width:1200px){
+  .table-wrap table:has(#collectList){
+    min-width:1560px;
+  }
+  .table-wrap table:has(#collectList) th:nth-child(2),
+  .table-wrap table:has(#collectList) td:nth-child(2){
+    width:280px;
+  }
+}
