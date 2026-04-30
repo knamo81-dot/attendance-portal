@@ -1614,8 +1614,8 @@ tr:not(.collect-row-confirmed) .vendor-group-td{
 }
 
 
-/* ===== FINAL RESET: 제품취합 안정화 최종 패치 ===== */
-/* 1. 제품취합 테이블 구분선/품명 셀 복원 */
+/* ===== SAFE PATCH: 취합 기능 보존 + 표시만 최소 보정 ===== */
+/* 품명 구분선 복원 */
 .table-wrap table:has(#collectList) th,
 .table-wrap table:has(#collectList) td{
   border-bottom:1px solid var(--line) !important;
@@ -1631,38 +1631,42 @@ tr:not(.collect-row-confirmed) .vendor-group-td{
   line-height:1.35 !important;
 }
 
-/* 2. 체크박스 칸은 체크박스만 */
+/* 체크박스 칸은 체크박스만 */
 .table-wrap table:has(#collectList) .collect-select-cell{
   display:table-cell !important;
   text-align:center !important;
   vertical-align:middle !important;
 }
+
 .table-wrap table:has(#collectList) .collect-select-cell .collect-cancel-btn{
   display:none !important;
 }
 
-/* 3. 확정 행은 전체 회색 음영 */
+/* 확정 행 회색 */
 .table-wrap table:has(#collectList) tr.collect-row-confirmed,
 .table-wrap table:has(#collectList) tr.collect-row-confirmed > td{
   background:#f1f5f9 !important;
   background-color:#f1f5f9 !important;
 }
 
-/* 4-A. 기존 td 3칸 방식 거래처 파란 박스 */
+/* 자동 선택 거래처 파란 음영: 기존 td 구조 유지 */
 .table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected{
   background:#dbeafe !important;
   background-color:#dbeafe !important;
   color:#1d4ed8 !important;
   font-weight:800 !important;
 }
+
 .table-wrap table:has(#collectList) td.vendor-cell-start.auto-vendor-selected{
   border-top-left-radius:14px !important;
   border-bottom-left-radius:14px !important;
 }
+
 .table-wrap table:has(#collectList) td.vendor-cell-end.auto-vendor-selected{
   border-top-right-radius:14px !important;
   border-bottom-right-radius:14px !important;
 }
+
 .table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected input.collect-input,
 .table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected input[readonly]{
   background:transparent !important;
@@ -1673,57 +1677,7 @@ tr:not(.collect-row-confirmed) .vendor-group-td{
   font-weight:800 !important;
 }
 
-/* 4-B. colspan + div 그룹박스 방식 거래처 파란 박스 */
-.table-wrap table:has(#collectList) .vendor-group-td{
-  padding:4px 5px !important;
-  vertical-align:middle !important;
-  background:inherit !important;
-}
-.table-wrap table:has(#collectList) tr.collect-row-confirmed .vendor-group-td{
-  background:#f1f5f9 !important;
-}
-.table-wrap table:has(#collectList) tr:not(.collect-row-confirmed) .vendor-group-td{
-  background:#fff !important;
-}
-.table-wrap table:has(#collectList) .vendor-group-td.auto-vendor-selected{
-  background:inherit !important;
-  box-shadow:none !important;
-}
-.table-wrap table:has(#collectList) .vendor-quote-box{
-  display:grid !important;
-  grid-template-columns:82px 100px 1fr !important;
-  align-items:center !important;
-  gap:6px !important;
-  width:100% !important;
-  min-height:34px !important;
-  padding:4px 8px !important;
-  border-radius:14px !important;
-  background:transparent !important;
-}
-.table-wrap table:has(#collectList) .vendor-quote-box.auto-vendor-selected{
-  background:#dbeafe !important;
-  color:#1d4ed8 !important;
-  font-weight:800 !important;
-}
-.table-wrap table:has(#collectList) .vendor-quote-box input.collect-input{
-  width:100% !important;
-  height:26px !important;
-  min-height:26px !important;
-  padding:2px 4px !important;
-  border-radius:7px !important;
-  font-size:12px !important;
-  line-height:1.2 !important;
-}
-.table-wrap table:has(#collectList) .vendor-quote-box.auto-vendor-selected input.collect-input{
-  background:transparent !important;
-  border:none !important;
-  box-shadow:none !important;
-  outline:none !important;
-  color:#1d4ed8 !important;
-  font-weight:800 !important;
-}
-
-/* 5. 확정 행 입력칸은 텍스트처럼 보이게 */
+/* 확정 행 input */
 .table-wrap table:has(#collectList) tr.collect-row-confirmed input.collect-input,
 .table-wrap table:has(#collectList) tr.collect-row-confirmed input[readonly]{
   border:none !important;
@@ -1732,31 +1686,24 @@ tr:not(.collect-row-confirmed) .vendor-group-td{
   pointer-events:none !important;
 }
 
-/* 6. 상세보기 상태 표시 */
+/* 상세보기 */
 .collect-detail-confirmed > td,
 .collect-detail-row .collect-detail-confirmed > td{
   background:#f1f5f9 !important;
   color:#64748b !important;
 }
+
 .collect-detail-row tbody tr:not(.collect-detail-confirmed) > td{
   background:#fff !important;
 }
+
 .collect-detail-row .qty-confirmed{
   color:#2563eb !important;
   font-weight:800 !important;
 }
+
 .collect-detail-row .qty-pending{
   color:#ea580c !important;
   font-weight:800 !important;
-}
-
-/* 7. 작업 버튼 */
-.table-wrap table:has(#collectList) td:last-child{
-  text-align:center !important;
-}
-.table-wrap table:has(#collectList) td:last-child .ghost-btn{
-  min-width:48px !important;
-  padding:6px 9px !important;
-  border-radius:9px !important;
 }
 
