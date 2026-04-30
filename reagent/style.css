@@ -1065,3 +1065,61 @@ tr:not(.collect-row-confirmed) input.collect-input{
   background:#fff !important;
 }
 
+
+/* ===== final patch v2: 체크박스 칸 정리 / 취소 버튼 작업 칸 이동 ===== */
+.collect-select-cell{
+  display:table-cell !important;
+  text-align:center !important;
+  vertical-align:middle !important;
+  padding-left:6px !important;
+  padding-right:6px !important;
+  white-space:nowrap !important;
+}
+
+.collect-select-cell .collect-check{
+  margin:0 auto !important;
+  display:block !important;
+}
+
+.collect-select-cell .collect-cancel-btn{
+  display:none !important;
+}
+
+/* 작업 칸 버튼 정렬 */
+.table-wrap table:has(#collectList) td:last-child{
+  text-align:center !important;
+  vertical-align:middle !important;
+}
+
+.table-wrap table:has(#collectList) td:last-child .ghost-btn{
+  min-width:48px !important;
+  padding:6px 9px !important;
+  border-radius:9px !important;
+}
+
+/* 확정 행에서도 작업 칸 취소 버튼은 보이게 */
+.collect-row-confirmed td:last-child .ghost-btn{
+  background:#e2e8f0 !important;
+  border-color:#cbd5e1 !important;
+  color:#334155 !important;
+  pointer-events:auto !important;
+  cursor:pointer !important;
+}
+
+/* 확정 행에서 체크박스는 흐리게만 */
+.collect-row-confirmed .collect-check{
+  opacity:.45 !important;
+}
+
+/* 품명 밑줄처럼 보이는 잔상 제거 재보정 */
+.collect-row-confirmed .collect-name-cell,
+.collect-name-cell{
+  border-bottom:none !important;
+  vertical-align:middle !important;
+}
+
+.collect-row-confirmed .collect-name-cell *{
+  border-bottom:none !important;
+  box-shadow:none !important;
+}
+
