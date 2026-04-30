@@ -1376,7 +1376,7 @@ if (els.count) els.count.textContent = String(rows.length);
         ? `<button type="button" class="ghost-btn collect-cancel-btn" data-key="${escapeHtml(group.key)}">취소</button>`
         : `<button type="button" class="ghost-btn collect-exclude-btn" data-key="${escapeHtml(group.key)}">제외</button>`;
 
-      let remainingConfirmedQty = meta.confirmed ? Number(meta.confirmedQty || group.collectedQty || 0) : 0;
+      let remainingConfirmedQty = meta.confirmed ? Number(meta.confirmedQty || group.collectedQty || 0) : Number(group.collectedQty || 0);
 
       const detailRows = group.entries.map((item) => {
         const itemQty = Number(item.qty || 0);
@@ -1387,7 +1387,7 @@ if (els.count) els.count.textContent = String(rows.length);
         const rowClass = isVendorConfirmed && isConfirmedEntry ? "collect-detail-confirmed" : "";
 
         // 상태 문구는 취합 기준, 색상은 거래처 확정 후에만 적용
-        const statusText = isConfirmedEntry ? "취합완료" : (isPendingEntry ? "추가신청" : "신청");
+        const statusText = isConfirmedEntry ? (isVendorConfirmed ? "거래처확정" : "취합완료") : (isPendingEntry ? "추가신청" : "신청");
 
         const qtyClass = isVendorConfirmed
           ? (isConfirmedEntry ? "qty-confirmed" : (isPendingEntry ? "qty-pending" : ""))
