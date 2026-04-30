@@ -1444,3 +1444,67 @@ tr:not(.collect-row-confirmed) input.collect-input{
 .table-wrap table:has(#collectList) .collect-select-cell .collect-cancel-btn{
   display:none !important;
 }
+
+
+/* ===== final patch: 확정 행 회색 바탕을 tr까지 깔아서 파란 라운드 바깥 흰 틈 제거 ===== */
+/* 라운드 모서리 밖에 보이는 부모 배경도 회색으로 강제 */
+.table-wrap table:has(#collectList) tr.collect-row-confirmed{
+  background:#f1f5f9 !important;
+  background-color:#f1f5f9 !important;
+}
+
+/* 확정 행 전체 td는 먼저 회색으로 깔기 */
+.table-wrap table:has(#collectList) tr.collect-row-confirmed > td{
+  background:#f1f5f9 !important;
+  background-color:#f1f5f9 !important;
+}
+
+/* 선택 거래처 3칸만 회색 위에 파란색으로 덮기 */
+.table-wrap table:has(#collectList) tr.collect-row-confirmed > td.vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) tr:not(.collect-row-confirmed) > td.vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  background-color:#dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 파란 라운드 모서리 유지 */
+.table-wrap table:has(#collectList) td.vendor-cell-start.auto-vendor-selected{
+  border-top-left-radius:14px !important;
+  border-bottom-left-radius:14px !important;
+}
+
+.table-wrap table:has(#collectList) td.vendor-cell-end.auto-vendor-selected{
+  border-top-right-radius:14px !important;
+  border-bottom-right-radius:14px !important;
+}
+
+/* 파란 셀 내부 input은 완전 투명 */
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected input.collect-input,
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected input[readonly]{
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* border-collapse 환경에서 모서리 흰 틈을 가리는 보조 레이어 */
+.table-wrap table:has(#collectList) tr.collect-row-confirmed > td.vendor-cell.auto-vendor-selected{
+  box-shadow:
+    inset 0 0 0 9999px #dbeafe,
+    0 0 0 1px #dbeafe !important;
+}
+
+/* 선택 거래처 셀끼리 사이 흰 선 제거 */
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected + td.vendor-cell.auto-vendor-selected{
+  border-left-color:#dbeafe !important;
+}
+
+/* 선택 거래처 주변 셀과 맞닿는 부분의 흰 틈 최소화 */
+.table-wrap table:has(#collectList) tr.collect-row-confirmed > td.vendor-cell.auto-vendor-selected:first-child,
+.table-wrap table:has(#collectList) tr.collect-row-confirmed > td.vendor-cell.auto-vendor-selected:last-child{
+  background-clip:border-box !important;
+}
+
