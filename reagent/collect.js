@@ -1443,23 +1443,19 @@ if (els.count) els.count.textContent = String(rows.length);
           <td>
             <button type="button" class="ghost-btn collect-detail-btn" data-key="${escapeHtml(group.key)}">상세보기</button>
           </td>
-          <td class="vendor-cell vendor-cell-start ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1">
-            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit1" value="${this.formatMoneyInput(unit1)}" style="width:90px; text-align:right;" ${readonlyAttr}>
+          <td colspan="3" class="vendor-group-td ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1">
+            <div class="vendor-quote-box ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1">
+              <input class="collect-input vendor-unit-input" data-key="${escapeHtml(group.key)}" data-field="unit1" value="${this.formatMoneyInput(unit1)}" style="text-align:right;" ${readonlyAttr}>
+              <input class="collect-input vendor-price-input" data-key="${escapeHtml(group.key)}" data-field="price1" data-row-id="${rowId}" data-price-field="price1" value="${this.formatMoneyInput(price1)}" title="배송비/부가세 포함 금액은 직접 수정하세요." style="text-align:right;" ${readonlyAttr}>
+              <input class="collect-input vendor-name-input" data-key="${escapeHtml(group.key)}" data-field="vendor1" value="${escapeHtml(meta.vendor1 || "")}" ${readonlyAttr}>
+            </div>
           </td>
-          <td class="vendor-cell vendor-cell-middle ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1">
-            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="price1" data-row-id="${rowId}" data-price-field="price1" value="${this.formatMoneyInput(price1)}" title="배송비/부가세 포함 금액은 직접 수정하세요." style="width:110px; text-align:right;" ${readonlyAttr}>
-          </td>
-          <td class="vendor-cell vendor-cell-end ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1">
-            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor1" value="${escapeHtml(meta.vendor1 || "")}" style="width:110px;" ${readonlyAttr}>
-          </td>
-          <td class="vendor-cell vendor-cell-start ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
-            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit2" value="${this.formatMoneyInput(unit2)}" style="width:90px; text-align:right;" ${readonlyAttr}>
-          </td>
-          <td class="vendor-cell vendor-cell-middle ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
-            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="price2" data-row-id="${rowId}" data-price-field="price2" value="${this.formatMoneyInput(price2)}" title="배송비/부가세 포함 금액은 직접 수정하세요." style="width:110px; text-align:right;" ${readonlyAttr}>
-          </td>
-          <td class="vendor-cell vendor-cell-end ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
-            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor2" value="${escapeHtml(meta.vendor2 || "")}" style="width:110px;" ${readonlyAttr}>
+          <td colspan="3" class="vendor-group-td ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
+            <div class="vendor-quote-box ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
+              <input class="collect-input vendor-unit-input" data-key="${escapeHtml(group.key)}" data-field="unit2" value="${this.formatMoneyInput(unit2)}" style="text-align:right;" ${readonlyAttr}>
+              <input class="collect-input vendor-price-input" data-key="${escapeHtml(group.key)}" data-field="price2" data-row-id="${rowId}" data-price-field="price2" value="${this.formatMoneyInput(price2)}" title="배송비/부가세 포함 금액은 직접 수정하세요." style="text-align:right;" ${readonlyAttr}>
+              <input class="collect-input vendor-name-input" data-key="${escapeHtml(group.key)}" data-field="vendor2" value="${escapeHtml(meta.vendor2 || "")}" ${readonlyAttr}>
+            </div>
           </td>
           <td>${actionCell}</td>
         </tr>
