@@ -1379,10 +1379,10 @@ if (els.count) els.count.textContent = String(rows.length);
         let statusClass = "";
 
         if (remainingCollectedQty > 0) {
-          statusClass = "qty-confirmed";
+          statusClass = meta.confirmed ? "qty-confirmed" : "";
           remainingCollectedQty = Math.max(0, remainingCollectedQty - itemQty);
         } else if (Number(group.collectedQty || 0) > 0) {
-          statusClass = "qty-pending";
+          statusClass = meta.confirmed ? "qty-pending" : "";
         }
 
         return `
