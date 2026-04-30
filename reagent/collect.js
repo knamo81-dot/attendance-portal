@@ -1342,6 +1342,32 @@ if (els.count) els.count.textContent = String(rows.length);
       groups = groups.filter((g) => g.category === category);
     }
 
+    // 제품취합 정렬: 미확정 거래처 우선 → 시약/초자/안전용품 순 → 기존 신청순 유지
+    groups.sort((a, b) => {
+      const aConfirmed = this.getMeta(a.key)?.confirmed ? 1 : 0;
+      const bConfirmed = this.getMeta(b.key)?.confirmed ? 1 : 0;
+
+      if (aConfirmed !== bConfirmed) {
+        return aConfirmed - bConfirmed;
+      }
+
+      const categoryOrder = {
+        "시약": 1,
+        "초자": 2,
+        "초자/소모품": 2,
+        "안전용품": 3
+      };
+
+      const aCategoryOrder = categoryOrder[a.category] || 99;
+      const bCategoryOrder = categoryOrder[b.category] || 99;
+
+      if (aCategoryOrder !== bCategoryOrder) {
+        return aCategoryOrder - bCategoryOrder;
+      }
+
+      return 0;
+    });
+
     if (!groups.length) {
       els.collectList.innerHTML = `<tr><td colspan="16" class="empty">취합할 항목이 없습니다.</td></tr>`;
       if (els.collectCount) els.collectCount.textContent = "0";
