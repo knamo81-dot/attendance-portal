@@ -1178,3 +1178,51 @@ tr:not(.collect-row-confirmed) input.collect-input{
   vertical-align:middle !important;
 }
 
+
+/* ===== final patch: 확정 거래처 파란 라운드 박스 복원 ===== */
+/* 거래처 확정 전/후 모두 선택된 거래처 묶음은 파란색 라운드 박스로 표시 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell-start.auto-vendor-selected{
+  border-top-left-radius:14px !important;
+  border-bottom-left-radius:14px !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell-end.auto-vendor-selected{
+  border-top-right-radius:14px !important;
+  border-bottom-right-radius:14px !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected input.collect-input{
+  background:rgba(255,255,255,0.55) !important;
+  border-color:transparent !important;
+  box-shadow:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 확정 행에서도 선택 거래처 파란 박스를 유지 */
+.collect-row-confirmed .vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+.collect-row-confirmed .vendor-cell.auto-vendor-selected input.collect-input,
+.collect-row-confirmed .vendor-cell.auto-vendor-selected input[readonly]{
+  background:rgba(255,255,255,0.38) !important;
+  border-color:transparent !important;
+  box-shadow:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 파란 박스가 확정 행 회색 음영보다 우선 보이도록 보정 */
+.collect-row-confirmed > td.vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+}
+
