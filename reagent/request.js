@@ -397,6 +397,17 @@ window.ReagentApp.request = {
     const sb = window.ReagentApp.sb;
 
     if (sb) {
+      const { error: collectDeleteError } = await sb
+        .from("reagent_collect_items")
+        .delete()
+        .neq("id", 0);
+
+      if (collectDeleteError) {
+        console.error("취합 데이터 전체 삭제 실패:", collectDeleteError);
+        window.ReagentApp.toast?.(`취합 서버 데이터 삭제 실패: ${collectDeleteError.message || "원인을 확인하세요."}`, "warn");
+        return;
+      }
+
       const { error } = await sb
         .from("reagent_requests")
         .delete()
@@ -605,6 +616,7 @@ window.ReagentApp.request = {
     if (!sb) {
       window.ReagentApp.toast?.("Supabase 연결 정보가 없습니다. supabase.js 로딩을 확인하세요.", "warn");
       this.requestRows = [];
+      this.collectedMeta = {};
     } else {
       const { data, error } = await sb
         .from("reagent_requests")
@@ -618,10 +630,36 @@ window.ReagentApp.request = {
       } else {
         this.requestRows = data || [];
       }
+
+      const { data: collectData, error: collectError } = await sb
+        .from("reagent_collect_items")
+        .select("*");
+
+      if (collectError) {
+        console.error("취합 목록 조회 실패:", collectError);
+        window.ReagentApp.toast?.(`취합 데이터를 불러오지 못했습니다: ${collectError.message || "원인을 확인하세요."}`, "warn");
+        this.collectedMeta = {};
+      } else {
+        this.collectedMeta = {};
+        (collectData || []).forEach((row) => {
+          if (row.item_key) this.collectedMeta[row.item_key] = Number(row.collected_qty || 0);
+        });
+
+        const collect = window.ReagentApp.collect;
+        if (collect) {
+          collect.collectMeta = collect.collectMeta || {};
+          (collectData || []).forEach((row) => {
+            if (!row.item_key) return;
+            const meta = collect.getMeta ? collect.getMeta(row.item_key) : (collect.collectMeta[row.item_key] || {});
+            meta.confirmed = row.confirmed === true;
+            meta.confirmedQty = Number(row.collected_qty || 0);
+            collect.collectMeta[row.item_key] = meta;
+          });
+        }
+      }
     }
 
     this.loadSelectedKeys();
-    this.loadCollectedMeta();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
     window.ReagentApp.collect?.renderPrepare?.();
