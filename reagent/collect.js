@@ -16,6 +16,26 @@ window.ReagentApp.collect = {
     } catch (_) {
       this.collectMeta = {};
     }
+
+    // 이전 테스트 기본값(거래처A/B, 10000/12000)이 남아 있으면 빈값으로 정리합니다.
+    Object.values(this.collectMeta || {}).forEach((meta) => {
+      if (!meta || typeof meta !== "object") return;
+
+      const isOldDefault =
+        String(meta.vendor1 || "") === "거래처A" &&
+        Number(meta.unit1 || 0) === 10000 &&
+        String(meta.vendor2 || "") === "거래처B" &&
+        Number(meta.unit2 || 0) === 12000 &&
+        !meta.confirmed;
+
+      if (isOldDefault) {
+        meta.vendor1 = "";
+        meta.unit1 = "";
+        meta.vendor2 = "";
+        meta.unit2 = "";
+        meta.selectedVendor = "";
+      }
+    });
   },
 
   saveSelectedKeys() {
@@ -77,10 +97,10 @@ window.ReagentApp.collect = {
   getMeta(key) {
     if (!this.collectMeta[key]) {
       this.collectMeta[key] = {
-        vendor1: "거래처A",
-        unit1: 10000,
-        vendor2: "거래처B",
-        unit2: 12000,
+        vendor1: "",
+        unit1: "",
+        vendor2: "",
+        unit2: "",
         selectedVendor: "",
         confirmed: false,
         prepareRemark: "최저가 구매"
@@ -128,6 +148,19 @@ window.ReagentApp.collect = {
 
   formatNumber(value) {
     return Number(value || 0).toLocaleString("ko-KR");
+  },
+
+  formatUnitInput(value) {
+    const raw = String(value ?? "").trim();
+    if (!raw) return "";
+    const num = this.normalizeNumber(raw);
+    return num > 0 ? this.formatNumber(num) : "";
+  },
+
+  formatPriceByUnit(qty, unitValue) {
+    const unit = this.normalizeNumber(unitValue);
+    if (!unit) return "";
+    return this.formatNumber(Number(qty || 0) * unit);
   },
 
   autoSelectVendor(meta) {
@@ -218,7 +251,7 @@ window.ReagentApp.collect = {
       input.addEventListener("blur", (e) => {
         const field = e.target.dataset.field;
         if (field === "unit1" || field === "unit2") {
-          e.target.value = this.formatNumber(this.normalizeNumber(e.target.value));
+          e.target.value = this.formatUnitInput(e.target.value);
         }
       });
     });
@@ -233,15 +266,15 @@ window.ReagentApp.collect = {
     const meta = this.getMeta(key);
     const qty = Number(group.collectedQty || 0);
 
-    const price1 = qty * this.normalizeNumber(meta.unit1);
-    const price2 = qty * this.normalizeNumber(meta.unit2);
+    const price1 = this.formatPriceByUnit(qty, meta.unit1);
+    const price2 = this.formatPriceByUnit(qty, meta.unit2);
     const rowId = this.simpleKey(key);
 
     const price1El = document.querySelector(`[data-row-id="${rowId}"][data-price-field="price1"]`);
     const price2El = document.querySelector(`[data-row-id="${rowId}"][data-price-field="price2"]`);
 
-    if (price1El) price1El.textContent = this.formatNumber(price1);
-    if (price2El) price2El.textContent = this.formatNumber(price2);
+    if (price1El) price1El.textContent = price1;
+    if (price2El) price2El.textContent = price2;
   },
 
   updateAutoBadges(key) {
@@ -1296,8 +1329,10 @@ if (els.count) els.count.textContent = String(rows.length);
       const qty = Number(group.collectedQty || 0);
       const unit1 = this.normalizeNumber(meta.unit1);
       const unit2 = this.normalizeNumber(meta.unit2);
-      const price1 = qty * unit1;
-      const price2 = qty * unit2;
+      const unit1Input = this.formatUnitInput(meta.unit1);
+      const unit2Input = this.formatUnitInput(meta.unit2);
+      const price1 = this.formatPriceByUnit(qty, meta.unit1);
+      const price2 = this.formatPriceByUnit(qty, meta.unit2);
       const calculatedVendor = this.autoSelectVendor(meta);
       if (!meta.confirmed) {
         meta.selectedVendor = calculatedVendor;
@@ -1365,16 +1400,16 @@ if (els.count) els.count.textContent = String(rows.length);
             <button type="button" class="ghost-btn collect-detail-btn" data-key="${escapeHtml(group.key)}">상세보기</button>
           </td>
           <td class="vendor-cell vendor-cell-start ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1">
-            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit1" value="${this.formatNumber(unit1)}" style="width:90px; text-align:right;" ${readonlyAttr}>
+            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit1" value="${unit1Input}" style="width:90px; text-align:right;" ${readonlyAttr}>
           </td>
-          <td class="vendor-cell vendor-cell-middle ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1" data-price-field="price1">${this.formatNumber(price1)}</td>
+          <td class="vendor-cell vendor-cell-middle ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1" data-price-field="price1">${price1}</td>
           <td class="vendor-cell vendor-cell-end ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1">
             <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor1" value="${escapeHtml(meta.vendor1 || "")}" style="width:110px;" ${readonlyAttr}>
           </td>
           <td class="vendor-cell vendor-cell-start ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
-            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit2" value="${this.formatNumber(unit2)}" style="width:90px; text-align:right;" ${readonlyAttr}>
+            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit2" value="${unit2Input}" style="width:90px; text-align:right;" ${readonlyAttr}>
           </td>
-          <td class="vendor-cell vendor-cell-middle ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2" data-price-field="price2">${this.formatNumber(price2)}</td>
+          <td class="vendor-cell vendor-cell-middle ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2" data-price-field="price2">${price2}</td>
           <td class="vendor-cell vendor-cell-end ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
             <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor2" value="${escapeHtml(meta.vendor2 || "")}" style="width:110px;" ${readonlyAttr}>
           </td>
