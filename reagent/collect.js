@@ -16,26 +16,6 @@ window.ReagentApp.collect = {
     } catch (_) {
       this.collectMeta = {};
     }
-
-    // 이전 테스트 기본값(거래처A/B, 10000/12000)이 남아 있으면 빈값으로 정리합니다.
-    Object.values(this.collectMeta || {}).forEach((meta) => {
-      if (!meta || typeof meta !== "object") return;
-
-      const isOldDefault =
-        String(meta.vendor1 || "") === "거래처A" &&
-        Number(meta.unit1 || 0) === 10000 &&
-        String(meta.vendor2 || "") === "거래처B" &&
-        Number(meta.unit2 || 0) === 12000 &&
-        !meta.confirmed;
-
-      if (isOldDefault) {
-        meta.vendor1 = "";
-        meta.unit1 = "";
-        meta.vendor2 = "";
-        meta.unit2 = "";
-        meta.selectedVendor = "";
-      }
-    });
   },
 
   saveSelectedKeys() {
@@ -99,13 +79,23 @@ window.ReagentApp.collect = {
       this.collectMeta[key] = {
         vendor1: "",
         unit1: "",
+        price1: "",
+        price1Manual: false,
         vendor2: "",
         unit2: "",
+        price2: "",
+        price2Manual: false,
         selectedVendor: "",
         confirmed: false,
         prepareRemark: "최저가 구매"
       };
     }
+
+    // 기존 localStorage 데이터 보정
+    if (typeof this.collectMeta[key].price1Manual !== "boolean") this.collectMeta[key].price1Manual = false;
+    if (typeof this.collectMeta[key].price2Manual !== "boolean") this.collectMeta[key].price2Manual = false;
+    if (typeof this.collectMeta[key].price1 === "undefined") this.collectMeta[key].price1 = "";
+    if (typeof this.collectMeta[key].price2 === "undefined") this.collectMeta[key].price2 = "";
 
     return this.collectMeta[key];
   },
@@ -150,33 +140,52 @@ window.ReagentApp.collect = {
     return Number(value || 0).toLocaleString("ko-KR");
   },
 
-  formatUnitInput(value) {
-    const raw = String(value ?? "").trim();
-    if (!raw) return "";
-    const num = this.normalizeNumber(raw);
+  formatMoneyInput(value) {
+    const num = this.normalizeNumber(value);
     return num > 0 ? this.formatNumber(num) : "";
   },
 
-  formatPriceByUnit(qty, unitValue) {
-    const unit = this.normalizeNumber(unitValue);
-    if (!unit) return "";
-    return this.formatNumber(Number(qty || 0) * unit);
+  getAutoAmount(qty, unit) {
+    const q = Number(qty || 0);
+    const u = this.normalizeNumber(unit);
+    return q > 0 && u > 0 ? q * u : 0;
   },
 
-  autoSelectVendor(meta) {
-    const unit1 = this.normalizeNumber(meta.unit1);
-    const unit2 = this.normalizeNumber(meta.unit2);
+  getEffectiveAmount(meta, vendorNo, qty) {
+    const priceField = vendorNo === 1 ? "price1" : "price2";
+    const manualField = vendorNo === 1 ? "price1Manual" : "price2Manual";
+    const unitField = vendorNo === 1 ? "unit1" : "unit2";
+
+    if (meta?.[manualField]) {
+      return this.normalizeNumber(meta?.[priceField]);
+    }
+
+    return this.getAutoAmount(qty, meta?.[unitField]);
+  },
+
+  setAutoPriceIfNeeded(meta, vendorNo, qty) {
+    const priceField = vendorNo === 1 ? "price1" : "price2";
+    const manualField = vendorNo === 1 ? "price1Manual" : "price2Manual";
+
+    if (!meta?.[manualField]) {
+      meta[priceField] = this.getAutoAmount(qty, vendorNo === 1 ? meta.unit1 : meta.unit2);
+    }
+  },
+
+  autoSelectVendor(meta, qty = 1) {
+    const amount1 = this.getEffectiveAmount(meta, 1, qty);
+    const amount2 = this.getEffectiveAmount(meta, 2, qty);
     const vendor1 = String(meta.vendor1 || "").trim();
     const vendor2 = String(meta.vendor2 || "").trim();
 
-    const hasVendor1 = vendor1 !== "" && unit1 > 0;
-    const hasVendor2 = vendor2 !== "" && unit2 > 0;
+    const hasVendor1 = vendor1 !== "" && amount1 > 0;
+    const hasVendor2 = vendor2 !== "" && amount2 > 0;
 
     if (hasVendor1 && !hasVendor2) return "vendor1";
     if (!hasVendor1 && hasVendor2) return "vendor2";
 
     if (hasVendor1 && hasVendor2) {
-      return unit1 <= unit2 ? "vendor1" : "vendor2";
+      return amount1 <= amount2 ? "vendor1" : "vendor2";
     }
 
     return "";
@@ -239,6 +248,15 @@ window.ReagentApp.collect = {
 
         if (field === "unit1" || field === "unit2") {
           meta[field] = this.normalizeNumber(e.target.value);
+          const group = window.ReagentApp.request
+            ?.groupItems(window.ReagentApp.request.getRowsForCurrentOrderMonth ? window.ReagentApp.request.getRowsForCurrentOrderMonth() : window.ReagentApp.request.requestRows)
+            ?.find((g) => g.key === key);
+          const qty = Number(group?.collectedQty || 0);
+          this.setAutoPriceIfNeeded(meta, field === "unit1" ? 1 : 2, qty);
+        } else if (field === "price1" || field === "price2") {
+          const num = this.normalizeNumber(e.target.value);
+          meta[field] = num;
+          meta[`${field}Manual`] = num > 0;
         } else {
           meta[field] = e.target.value;
         }
@@ -250,8 +268,8 @@ window.ReagentApp.collect = {
 
       input.addEventListener("blur", (e) => {
         const field = e.target.dataset.field;
-        if (field === "unit1" || field === "unit2") {
-          e.target.value = this.formatUnitInput(e.target.value);
+        if (field === "unit1" || field === "unit2" || field === "price1" || field === "price2") {
+          e.target.value = this.formatMoneyInput(e.target.value);
         }
       });
     });
@@ -266,15 +284,15 @@ window.ReagentApp.collect = {
     const meta = this.getMeta(key);
     const qty = Number(group.collectedQty || 0);
 
-    const price1 = this.formatPriceByUnit(qty, meta.unit1);
-    const price2 = this.formatPriceByUnit(qty, meta.unit2);
+    const price1 = this.getEffectiveAmount(meta, 1, qty);
+    const price2 = this.getEffectiveAmount(meta, 2, qty);
     const rowId = this.simpleKey(key);
 
     const price1El = document.querySelector(`[data-row-id="${rowId}"][data-price-field="price1"]`);
     const price2El = document.querySelector(`[data-row-id="${rowId}"][data-price-field="price2"]`);
 
-    if (price1El) price1El.textContent = price1;
-    if (price2El) price2El.textContent = price2;
+    if (price1El && price1El.tagName === "INPUT" && !meta.price1Manual) price1El.value = this.formatMoneyInput(price1);
+    if (price2El && price2El.tagName === "INPUT" && !meta.price2Manual) price2El.value = this.formatMoneyInput(price2);
   },
 
   updateAutoBadges(key) {
@@ -405,7 +423,7 @@ window.ReagentApp.collect = {
         continue;
       }
 
-      const autoSelectedVendor = this.autoSelectVendor(meta);
+      const autoSelectedVendor = this.autoSelectVendor(meta, confirmedQty);
       if (!autoSelectedVendor) {
         skippedCount += 1;
         continue;
@@ -623,8 +641,12 @@ window.ReagentApp.collect = {
         if (!purchaseVendor || !purchaseUnit) return null;
 
         const usage = Array.from(new Set((group.entries || []).map((item) => String(item.usage || "").trim()).filter(Boolean))).join(" / ");
-        const purchaseAmount = qty * purchaseUnit;
-        const compareAmount = qty * compareUnit;
+        const purchaseAmount = selectedVendor === "vendor1"
+          ? this.getEffectiveAmount(meta, 1, qty)
+          : this.getEffectiveAmount(meta, 2, qty);
+        const compareAmount = selectedVendor === "vendor1"
+          ? this.getEffectiveAmount(meta, 2, qty)
+          : this.getEffectiveAmount(meta, 1, qty);
         const remarkOptions = ["최저가 구매", "제조원 구매", "취급처 구매", "대리점 구매", "온라인 구매"];
         const remark = remarkOptions.includes(meta.prepareRemark)
           ? meta.prepareRemark
@@ -1329,11 +1351,11 @@ if (els.count) els.count.textContent = String(rows.length);
       const qty = Number(group.collectedQty || 0);
       const unit1 = this.normalizeNumber(meta.unit1);
       const unit2 = this.normalizeNumber(meta.unit2);
-      const unit1Input = this.formatUnitInput(meta.unit1);
-      const unit2Input = this.formatUnitInput(meta.unit2);
-      const price1 = this.formatPriceByUnit(qty, meta.unit1);
-      const price2 = this.formatPriceByUnit(qty, meta.unit2);
-      const calculatedVendor = this.autoSelectVendor(meta);
+      this.setAutoPriceIfNeeded(meta, 1, qty);
+      this.setAutoPriceIfNeeded(meta, 2, qty);
+      const price1 = this.getEffectiveAmount(meta, 1, qty);
+      const price2 = this.getEffectiveAmount(meta, 2, qty);
+      const calculatedVendor = this.autoSelectVendor(meta, qty);
       if (!meta.confirmed) {
         meta.selectedVendor = calculatedVendor;
       }
@@ -1400,16 +1422,20 @@ if (els.count) els.count.textContent = String(rows.length);
             <button type="button" class="ghost-btn collect-detail-btn" data-key="${escapeHtml(group.key)}">상세보기</button>
           </td>
           <td class="vendor-cell vendor-cell-start ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1">
-            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit1" value="${unit1Input}" style="width:90px; text-align:right;" ${readonlyAttr}>
+            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit1" value="${this.formatMoneyInput(unit1)}" style="width:90px; text-align:right;" ${readonlyAttr}>
           </td>
-          <td class="vendor-cell vendor-cell-middle ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1" data-price-field="price1">${price1}</td>
+          <td class="vendor-cell vendor-cell-middle ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1">
+            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="price1" data-row-id="${rowId}" data-price-field="price1" value="${this.formatMoneyInput(price1)}" title="배송비/부가세 포함 금액은 직접 수정하세요." style="width:110px; text-align:right;" ${readonlyAttr}>
+          </td>
           <td class="vendor-cell vendor-cell-end ${autoSelectedVendor === "vendor1" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor1">
             <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor1" value="${escapeHtml(meta.vendor1 || "")}" style="width:110px;" ${readonlyAttr}>
           </td>
           <td class="vendor-cell vendor-cell-start ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
-            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit2" value="${unit2Input}" style="width:90px; text-align:right;" ${readonlyAttr}>
+            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="unit2" value="${this.formatMoneyInput(unit2)}" style="width:90px; text-align:right;" ${readonlyAttr}>
           </td>
-          <td class="vendor-cell vendor-cell-middle ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2" data-price-field="price2">${price2}</td>
+          <td class="vendor-cell vendor-cell-middle ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
+            <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="price2" data-row-id="${rowId}" data-price-field="price2" value="${this.formatMoneyInput(price2)}" title="배송비/부가세 포함 금액은 직접 수정하세요." style="width:110px; text-align:right;" ${readonlyAttr}>
+          </td>
           <td class="vendor-cell vendor-cell-end ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
             <input class="collect-input" data-key="${escapeHtml(group.key)}" data-field="vendor2" value="${escapeHtml(meta.vendor2 || "")}" style="width:110px;" ${readonlyAttr}>
           </td>
