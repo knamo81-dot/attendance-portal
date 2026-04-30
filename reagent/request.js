@@ -704,7 +704,16 @@ window.ReagentApp.request = {
     });
 
     Object.values(grouped).forEach((group) => {
+      group.entries.sort((a, b) => {
+        const at = new Date(a.created_at || a.id || 0).getTime();
+        const bt = new Date(b.created_at || b.id || 0).getTime();
+        if (Number.isNaN(at) && Number.isNaN(bt)) return Number(a.id || 0) - Number(b.id || 0);
+        if (Number.isNaN(at)) return 1;
+        if (Number.isNaN(bt)) return -1;
+        return at - bt || Number(a.id || 0) - Number(b.id || 0);
+      });
       group.newQty = Math.max(0, group.totalQty - group.collectedQty);
+      group.isConfirmed = Boolean(window.ReagentApp.collect?.collectMeta?.[group.key]?.confirmed);
     });
 
     return Object.values(grouped);
@@ -717,16 +726,11 @@ window.ReagentApp.request = {
       const qty = Number(entry.qty || 0);
       let rowStatus = "신청";
 
-      if (remainCollected > 0) {
-        if (remainCollected >= qty) {
-          rowStatus = "취합완료";
-          remainCollected -= qty;
-        } else {
-          rowStatus = "추가신청건";
-          remainCollected = 0;
-        }
-      } else {
-        rowStatus = Number(this.collectedMeta[group.key] || 0) > 0 ? "추가신청건" : "신청";
+      if (remainCollected > 0 && remainCollected >= qty) {
+        rowStatus = "취합완료";
+        remainCollected -= qty;
+      } else if (Number(this.collectedMeta[group.key] || 0) > 0) {
+        rowStatus = "추가신청건";
       }
 
       return { ...entry, rowStatus };
@@ -843,6 +847,7 @@ window.ReagentApp.request = {
     els.draftTableBody.innerHTML = groups.map((group) => {
       const isCompletedOnly = group.collectedQty > 0 && group.newQty === 0;
       const isAdditional = group.collectedQty > 0 && group.newQty > 0;
+      const isVendorConfirmed = group.isConfirmed === true;
 
       let checked = "";
       let disabled = "";
@@ -899,10 +904,15 @@ window.ReagentApp.request = {
             ${
               group.collectedQty === 0
                 ? `${group.totalQty}`
-                : `
-                  ${group.collectedQty > 0 ? `<span class="qty-confirmed">완료 ${group.collectedQty}</span><br>` : ""}
-                  ${group.newQty > 0 ? `<span class="qty-pending">추가 ${group.newQty}</span>` : ""}
-                `
+                : isVendorConfirmed
+                  ? `
+                    ${group.collectedQty > 0 ? `<span class="qty-confirmed">완료 ${group.collectedQty}</span><br>` : ""}
+                    ${group.newQty > 0 ? `<span class="qty-pending">추가 ${group.newQty}</span>` : ""}
+                  `
+                  : `
+                    ${group.collectedQty > 0 ? `완료 ${group.collectedQty}<br>` : ""}
+                    ${group.newQty > 0 ? `추가 ${group.newQty}` : ""}
+                  `
             }
           </td>
           <td>
