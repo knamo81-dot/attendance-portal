@@ -32,6 +32,48 @@ window.ReagentApp.collect = {
     }
   },
 
+  getCurrentUserName() {
+    const user = window.ReagentApp.currentUser || {};
+    return user.name || user.user_name || user.userName || user.employee_no || user.employeeNo || "";
+  },
+
+  getOrderMonthFromKey(key) {
+    const first = String(key || "").split("||")[0];
+    return first || window.ReagentApp.request?.getCurrentOrderMonth?.() || "";
+  },
+
+  async upsertCollectItem(key, collectedQty, extra = {}) {
+    const sb = window.ReagentApp.sb;
+    if (!sb) throw new Error("Supabase 연결 정보가 없습니다.");
+
+    const row = {
+      item_key: key,
+      order_month: this.getOrderMonthFromKey(key),
+      collected_qty: Number(collectedQty || 0),
+      updated_by: this.getCurrentUserName(),
+      ...extra
+    };
+
+    const { error } = await sb
+      .from("reagent_collect_items")
+      .upsert(row, { onConflict: "item_key,order_month" });
+
+    if (error) throw error;
+  },
+
+  async deleteCollectItem(key) {
+    const sb = window.ReagentApp.sb;
+    if (!sb) throw new Error("Supabase 연결 정보가 없습니다.");
+
+    const { error } = await sb
+      .from("reagent_collect_items")
+      .delete()
+      .eq("item_key", key)
+      .eq("order_month", this.getOrderMonthFromKey(key));
+
+    if (error) throw error;
+  },
+
   getMeta(key) {
     if (!this.collectMeta[key]) {
       this.collectMeta[key] = {
@@ -48,7 +90,7 @@ window.ReagentApp.collect = {
     return this.collectMeta[key];
   },
 
-  addSelectedToCollect() {
+  async addSelectedToCollect() {
     const request = window.ReagentApp.request;
     const groups = request.groupItems(request.getRowsForCurrentOrderMonth ? request.getRowsForCurrentOrderMonth() : request.requestRows);
     const selected = groups.filter((g) => request.selectedKeys.includes(g.key));
@@ -57,10 +99,16 @@ window.ReagentApp.collect = {
       return window.ReagentApp.toast("선택된 품목이 없습니다.", "warn");
     }
 
-    selected.forEach((group) => {
-      request.collectedMeta[group.key] = group.totalQty;
-      this.getMeta(group.key);
-    });
+    try {
+      for (const group of selected) {
+        request.collectedMeta[group.key] = group.totalQty;
+        this.getMeta(group.key);
+        await this.upsertCollectItem(group.key, group.totalQty, { confirmed: false });
+      }
+    } catch (error) {
+      console.error("취합 저장 실패:", error);
+      return window.ReagentApp.toast(`취합 서버 저장 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+    }
 
     request.saveCollectedMeta();
     this.saveCollectMeta();
@@ -71,7 +119,7 @@ window.ReagentApp.collect = {
     request.renderRequest();
     this.renderCollect();
 
-    window.ReagentApp.toast("선택한 항목이 제품취합에 반영되었습니다.", "success");
+    window.ReagentApp.toast("선택한 항목이 제품취합에 서버 저장되었습니다.", "success");
   },
 
   normalizeNumber(value) {
@@ -217,7 +265,7 @@ window.ReagentApp.collect = {
     row.style.display = row.style.display === "none" ? "" : "none";
   },
 
-  cancelConfirmByKey(key) {
+  async cancelConfirmByKey(key) {
     const request = window.ReagentApp.request;
     const meta = this.getMeta(key);
 
@@ -234,6 +282,13 @@ window.ReagentApp.collect = {
     meta.confirmedAt = "";
     meta.prepareRemark = "최저가 구매";
 
+    try {
+      await this.upsertCollectItem(key, request.collectedMeta?.[key] || meta.confirmedQty || 0, { confirmed: false });
+    } catch (error) {
+      console.error("확정 취소 저장 실패:", error);
+      return window.ReagentApp.toast(`확정 취소 서버 저장 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+    }
+
     this.saveCollectMeta();
     request.renderRequest?.();
     this.renderCollect();
@@ -241,7 +296,7 @@ window.ReagentApp.collect = {
     window.ReagentApp.toast("확정이 취소되었습니다.", "success");
   },
 
-  excludeCollectByKey(key) {
+  async excludeCollectByKey(key) {
     const request = window.ReagentApp.request;
     const meta = this.getMeta(key);
 
@@ -251,6 +306,13 @@ window.ReagentApp.collect = {
 
     const ok = confirm("이 품목을 제품취합에서 제외하시겠습니까?\\n신청 목록에서는 미취합 상태로 다시 표시됩니다.");
     if (!ok) return;
+
+    try {
+      await this.deleteCollectItem(key);
+    } catch (error) {
+      console.error("취합 제외 저장 실패:", error);
+      return window.ReagentApp.toast(`취합 제외 서버 저장 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+    }
 
     delete request.collectedMeta[key];
     delete this.collectMeta[key];
@@ -267,7 +329,7 @@ window.ReagentApp.collect = {
     window.ReagentApp.toast("선택 항목이 취합에서 제외되었습니다.", "success");
   },
 
-  confirmSelectedCollect() {
+  async confirmSelectedCollect() {
     const request = window.ReagentApp.request;
     const checkedKeys = this.getCheckedKeysFromDOM();
     const targetKeys = checkedKeys.length ? checkedKeys : this.selectedKeys;
@@ -297,23 +359,23 @@ window.ReagentApp.collect = {
     let confirmedCount = 0;
     let skippedCount = 0;
 
-    targetGroups.forEach((group) => {
+    for (const group of targetGroups) {
       const key = group.key;
       const meta = this.getMeta(key);
 
-      if (meta.confirmed) return;
+      if (meta.confirmed) continue;
 
       const confirmedQty = Number(group.collectedQty || 0);
 
       if (!confirmedQty) {
         skippedCount += 1;
-        return;
+        continue;
       }
 
       const autoSelectedVendor = this.autoSelectVendor(meta);
       if (!autoSelectedVendor) {
         skippedCount += 1;
-        return;
+        continue;
       }
 
       meta.selectedVendor = autoSelectedVendor;
@@ -321,8 +383,17 @@ window.ReagentApp.collect = {
       meta.confirmedQty = confirmedQty;
       meta.pendingQty = Number(group.newQty || 0);
       meta.confirmedAt = new Date().toISOString();
+
+      try {
+        await this.upsertCollectItem(key, confirmedQty, { confirmed: true });
+      } catch (error) {
+        console.error("거래처 확정 저장 실패:", error);
+        meta.confirmed = false;
+        return window.ReagentApp.toast(`거래처 확정 서버 저장 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      }
+
       confirmedCount += 1;
-    });
+    }
 
     if (!confirmedCount) {
       return window.ReagentApp.toast("확정할 수 있는 거래처 정보가 없습니다. 거래처명과 단가를 입력하세요.", "warn");
@@ -343,7 +414,7 @@ window.ReagentApp.collect = {
     }
   },
 
-  excludeSelectedCollect() {
+  async excludeSelectedCollect() {
     const checkedKeys = this.getCheckedKeysFromDOM();
     const targetKeys = checkedKeys.length ? checkedKeys : this.selectedKeys;
 
@@ -352,7 +423,7 @@ window.ReagentApp.collect = {
     }
 
     if (targetKeys.length === 1) {
-      this.excludeCollectByKey(targetKeys[0]);
+      await this.excludeCollectByKey(targetKeys[0]);
       return;
     }
 
@@ -366,10 +437,16 @@ window.ReagentApp.collect = {
 
     const request = window.ReagentApp.request;
 
-    targetKeys.forEach((key) => {
-      delete request.collectedMeta[key];
-      delete this.collectMeta[key];
-    });
+    try {
+      for (const key of targetKeys) {
+        await this.deleteCollectItem(key);
+        delete request.collectedMeta[key];
+        delete this.collectMeta[key];
+      }
+    } catch (error) {
+      console.error("선택 취합 제외 저장 실패:", error);
+      return window.ReagentApp.toast(`선택 취합 제외 서버 저장 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+    }
 
     this.selectedKeys = this.selectedKeys.filter((key) => !targetKeys.includes(key));
 
