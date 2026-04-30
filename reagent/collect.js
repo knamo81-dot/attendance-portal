@@ -1359,7 +1359,7 @@ if (els.count) els.count.textContent = String(rows.length);
       if (!meta.confirmed) {
         meta.selectedVendor = calculatedVendor;
       }
-      const autoSelectedVendor = meta.confirmed ? meta.selectedVendor : "";
+      const autoSelectedVendor = meta.confirmed ? meta.selectedVendor : calculatedVendor;
       const checked = this.selectedKeys.includes(group.key) ? "checked" : "";
       const confirmedBadge = meta.confirmed ? `<span style="color:#16a34a; font-weight:700;">확정</span>` : "";
       const lockedAttr = meta.confirmed ? "disabled" : "";
