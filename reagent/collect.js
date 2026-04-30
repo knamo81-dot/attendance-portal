@@ -297,7 +297,11 @@ window.ReagentApp.collect = {
 
   updateAutoBadges(key) {
     const meta = this.getMeta(key);
-    const selectedVendor = meta.confirmed ? meta.selectedVendor : "";
+    const request = window.ReagentApp.request;
+    const group = request?.groupItems(request.getRowsForCurrentOrderMonth ? request.getRowsForCurrentOrderMonth() : request.requestRows)
+      ?.find((g) => g.key === key);
+    const qty = Number(group?.collectedQty || 0);
+    const selectedVendor = meta.confirmed ? meta.selectedVendor : this.autoSelectVendor(meta, qty);
     const rowId = this.simpleKey(key);
 
     ["vendor1", "vendor2"].forEach((vendorKey) => {
