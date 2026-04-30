@@ -1369,7 +1369,7 @@ if (els.count) els.count.textContent = String(rows.length);
         ? `<button type="button" class="ghost-btn collect-cancel-btn" data-key="${escapeHtml(group.key)}" title="거래처 확정 취소">취소</button>`
         : "";
       const actionCell = meta.confirmed
-        ? `<span style="color:#94a3b8;">잠김</span>`
+        ? `<button type="button" class="ghost-btn collect-cancel-btn" data-key="${escapeHtml(group.key)}">취소</button>`
         : `<button type="button" class="ghost-btn collect-exclude-btn" data-key="${escapeHtml(group.key)}">제외</button>`;
 
       let remainingConfirmedQty = meta.confirmed ? Number(meta.confirmedQty || group.collectedQty || 0) : 0;
@@ -1404,7 +1404,6 @@ if (els.count) els.count.textContent = String(rows.length);
         <tr class="${meta.confirmed ? "collect-row-confirmed" : ""}">
           <td class="collect-select-cell">
             <input type="checkbox" class="collect-check" data-key="${escapeHtml(group.key)}" ${checked} ${lockedAttr}>
-            ${cancelButton}
           </td>
           <td class="collect-name-cell">${escapeHtml(group.name)} ${confirmedBadge}</td>
           <td>${escapeHtml(group.maker)}</td>
