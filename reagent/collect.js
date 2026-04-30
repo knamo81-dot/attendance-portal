@@ -1384,17 +1384,18 @@ if (els.count) els.count.textContent = String(rows.length);
         const isPendingEntry = !isConfirmedEntry && Number(group.collectedQty || 0) > 0;
 
         const isVendorConfirmed = meta.confirmed === true;
+        const isVendorConfirmed = meta.confirmed === true;
         const rowClass = isVendorConfirmed && isConfirmedEntry ? "collect-detail-confirmed" : "";
 
-        // 거래처 확정 전에는 상세보기 수량/상태에 색상을 주지 않는다.
-        // 거래처 확정 후에는 확정된 신청건만 파랑+음영, 미확정/추가신청건은 주황+흰색으로 표시한다.
+        // 상태 문구는 거래처 확정 여부와 분리한다.
+        // 취합된 수량 안에 포함된 건은 취합완료, 나머지는 추가신청으로 표시한다.
+        const statusText = isConfirmedEntry ? "취합완료" : (isPendingEntry ? "추가신청" : "신청");
+
+        // 색상은 거래처 확정 후에만 적용한다.
+        // 확정된 신청건: 파랑, 미확정/추가신청건: 주황
         const qtyClass = isVendorConfirmed
           ? (isConfirmedEntry ? "qty-confirmed" : (isPendingEntry ? "qty-pending" : ""))
           : "";
-
-        const statusText = isVendorConfirmed
-          ? (isConfirmedEntry ? "거래처확정" : (isPendingEntry ? "추가신청" : "신청"))
-          : (isPendingEntry ? "추가신청" : "신청");
 
         const statusClass = isVendorConfirmed
           ? (isConfirmedEntry ? "qty-confirmed" : (isPendingEntry ? "qty-pending" : ""))
