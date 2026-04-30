@@ -1226,3 +1226,125 @@ tr:not(.collect-row-confirmed) input.collect-input{
   background:#dbeafe !important;
 }
 
+
+/* ===== final patch: 미확정/확정 자동선택 거래처 파란 박스 통일 ===== */
+/* 낮은 금액 자동 선택 거래처는 확정 전에도 파란 라운드 박스로 표시 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) tr:not(.collect-row-confirmed) .vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) .collect-row-confirmed .vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 거래처1/2 묶음의 좌우 라운드 */
+.table-wrap table:has(#collectList) .vendor-cell-start.auto-vendor-selected{
+  border-top-left-radius:14px !important;
+  border-bottom-left-radius:14px !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell-end.auto-vendor-selected{
+  border-top-right-radius:14px !important;
+  border-bottom-right-radius:14px !important;
+}
+
+/* 파란 박스 안의 input 흰색 섬 제거: 하나의 파란 박스처럼 보이게 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected input.collect-input,
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected input[readonly],
+.table-wrap table:has(#collectList) .collect-row-confirmed .vendor-cell.auto-vendor-selected input.collect-input,
+.table-wrap table:has(#collectList) .collect-row-confirmed .vendor-cell.auto-vendor-selected input[readonly]{
+  background:transparent !important;
+  border-color:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 확정 행의 회색 배경보다 선택 거래처 파란 박스가 우선 */
+.table-wrap table:has(#collectList) .collect-row-confirmed > td.vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+}
+
+/* 파란 박스 내부 여백을 맞춰 흰 틈처럼 보이는 부분 최소화 */
+.table-wrap table:has(#collectList) .vendor-cell{
+  background-clip:padding-box !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected{
+  padding-top:6px !important;
+  padding-bottom:6px !important;
+}
+
+/* 선택 거래처 박스 안 input 크기 정렬 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected input.collect-input{
+  height:24px !important;
+  line-height:24px !important;
+  padding:0 4px !important;
+}
+
+
+/* ===== final patch: 파란 거래처 박스 바깥 흰 틈 제거 ===== */
+/* 선택 거래처 셀 자체를 끝까지 파란색으로 채워 회색 행 배경과의 흰 틈 제거 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) tr:not(.collect-row-confirmed) > td.vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) .collect-row-confirmed > td.vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  background-color:#dbeafe !important;
+  background-clip:border-box !important;
+  box-shadow:inset 0 0 0 9999px #dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 거래처1/2 묶음의 좌우 라운드 유지 */
+.table-wrap table:has(#collectList) .vendor-cell-start.auto-vendor-selected{
+  border-top-left-radius:14px !important;
+  border-bottom-left-radius:14px !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell-end.auto-vendor-selected{
+  border-top-right-radius:14px !important;
+  border-bottom-right-radius:14px !important;
+}
+
+/* 파란 셀끼리 맞닿는 부분의 흰 선 제거 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected + .vendor-cell.auto-vendor-selected{
+  border-left-color:#dbeafe !important;
+}
+
+/* 확정 행의 회색 배경보다 파란 박스가 무조건 우선 */
+.table-wrap table:has(#collectList) .collect-row-confirmed > td.vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  background-color:#dbeafe !important;
+  box-shadow:inset 0 0 0 9999px #dbeafe !important;
+}
+
+/* 파란 박스 안 input은 흰 칸처럼 보이지 않게 투명 처리 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected input.collect-input,
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected input[readonly]{
+  background:transparent !important;
+  border:none !important;
+  border-color:transparent !important;
+  box-shadow:none !important;
+  outline:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* border-collapse 구조에서 td 사이 미세 흰 틈을 줄이기 위한 보정 */
+.table-wrap table:has(#collectList){
+  border-spacing:0 !important;
+}
+
+.table-wrap table:has(#collectList) td.vendor-cell{
+  border-bottom-color:#d9e2ec !important;
+}
+
+/* 파란 라운드 박스가 행 안에서 떠 보이지 않도록 상하 여백 최소화 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected{
+  padding-top:6px !important;
+  padding-bottom:6px !important;
+}
+
