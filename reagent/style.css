@@ -1707,3 +1707,35 @@ tr:not(.collect-row-confirmed) .vendor-group-td{
   font-weight:800 !important;
 }
 
+
+/* ===== unified compact filter UI ===== */
+.compact-filter-row{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  gap:10px !important;
+  align-items:flex-end !important;
+}
+
+.compact-filter-row .compact-filter-item{
+  flex:0 0 22% !important;
+  min-width:140px !important;
+  max-width:220px !important;
+}
+
+.compact-filter-row .compact-filter-item input,
+.compact-filter-row .compact-filter-item select,
+.compact-filter-row .compact-filter-item button{
+  width:100% !important;
+}
+
+.compact-filter-row .compact-filter-item .badge{
+  min-height:46px;
+  justify-content:center;
+}
+
+@media (max-width:760px){
+  .compact-filter-row .compact-filter-item{
+    flex:0 0 100% !important;
+    max-width:none !important;
+  }
+}
