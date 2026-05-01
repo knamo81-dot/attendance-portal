@@ -699,10 +699,208 @@ window.ReagentApp.request = {
           <td>${this.html(row.grade)}</td>
           <td>${this.html(row.capacity)}</td>
           <td>${this.html(row.usage)}</td>
-          <td>${this.html(handledText)}</td>
+          <td>
+            <div>${this.html(handledText)}</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+              ${
+                status === "요청"
+                  ? `
+                    <button type="button" class="ghost-btn my-registration-edit-btn" data-id="${row.id}">수정</button>
+                    <button type="button" class="ghost-btn my-registration-delete-btn" data-id="${row.id}">삭제</button>
+                  `
+                  : status === "반려"
+                    ? `<button type="button" class="ghost-btn my-registration-delete-btn" data-id="${row.id}">삭제</button>`
+                    : ""
+              }
+            </div>
+          </td>
         </tr>
       `;
     }).join("");
+
+    tbody.querySelectorAll(".my-registration-edit-btn").forEach((btn) => {
+      btn.addEventListener("click", () => this.openMyRegistrationRequestEditModal(Number(btn.dataset.id)));
+    });
+
+    tbody.querySelectorAll(".my-registration-delete-btn").forEach((btn) => {
+      btn.addEventListener("click", () => this.deleteMyRegistrationRequest(Number(btn.dataset.id)));
+    });
+  },
+
+  ensureMyRegistrationRequestEditModal() {
+    let modal = document.getElementById("myRegistrationRequestEditModal");
+    if (modal) return modal;
+
+    modal = document.createElement("div");
+    modal.className = "modal-backdrop";
+    modal.id = "myRegistrationRequestEditModal";
+    modal.innerHTML = `
+      <div class="modal" style="width:min(860px,100%);">
+        <div class="modal-head">
+          <div>
+            <h3>제품 등록 요청 수정</h3>
+            <div class="small">등록 또는 반려 처리 전 요청 내용을 수정합니다.</div>
+          </div>
+          <button type="button" class="btn" id="closeMyReqEditModal">닫기</button>
+        </div>
+        <div class="card-body">
+          <input type="hidden" id="myReqEditId" />
+          <div class="form-grid" style="grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start;">
+            <div class="field"><label>분류</label><select id="myReqEditCategory"><option value="">선택</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div>
+            <div class="field"><label>품명 <span style="color:#dc2626;">*</span></label><input id="myReqEditName" placeholder="예: Ethanol"/></div>
+            <div class="field"><label>제조사</label><input id="myReqEditMaker" placeholder="예: Sigma"/></div>
+            <div class="field"><label>제품코드</label><input id="myReqEditCode" placeholder="예: E7023"/></div>
+            <div class="field"><label>CAS</label><input id="myReqEditCas" placeholder="예: 64-17-5"/></div>
+            <div class="field"><label>등급</label><input id="myReqEditGrade" placeholder="예: ACS"/></div>
+            <div class="field"><label>규격</label><input id="myReqEditCapacity" placeholder="예: 500 mL"/></div>
+            <div class="field"><label>요청사유 / 용도</label><input id="myReqEditUsage" placeholder="예: 효능평가 전처리용"/></div>
+          </div>
+          <div class="actions" style="justify-content:flex-end; margin-top:18px;">
+            <button type="button" class="btn" id="cancelMyReqEdit">취소</button>
+            <button type="button" class="btn primary" id="saveMyReqEdit">수정 저장</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => modal.classList.remove("show");
+    modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+    modal.querySelector("#closeMyReqEditModal")?.addEventListener("click", close);
+    modal.querySelector("#cancelMyReqEdit")?.addEventListener("click", close);
+    modal.querySelector("#saveMyReqEdit")?.addEventListener("click", () => this.saveMyRegistrationRequestEdit());
+
+    return modal;
+  },
+
+  setMyReqEditValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.value = value || "";
+  },
+
+  getMyReqEditValue(id) {
+    return String(document.getElementById(id)?.value || "").trim();
+  },
+
+  openMyRegistrationRequestEditModal(id) {
+    const row = (this.myRegistrationRequests || []).find((item) => Number(item.id) === Number(id));
+    if (!row) {
+      window.ReagentApp.toast?.("수정할 요청을 찾지 못했습니다.", "warn");
+      return;
+    }
+
+    const status = this.getDisplayRequestStatus(row.status);
+    if (status !== "요청") {
+      window.ReagentApp.toast?.("요청 상태에서만 수정할 수 있습니다.", "warn");
+      return;
+    }
+
+    const modal = this.ensureMyRegistrationRequestEditModal();
+    this.setMyReqEditValue("myReqEditId", row.id);
+    this.setMyReqEditValue("myReqEditCategory", row.category || "");
+    this.setMyReqEditValue("myReqEditName", row.name || "");
+    this.setMyReqEditValue("myReqEditMaker", row.maker || "");
+    this.setMyReqEditValue("myReqEditCode", row.code || "");
+    this.setMyReqEditValue("myReqEditCas", row.cas || "");
+    this.setMyReqEditValue("myReqEditGrade", row.grade || "");
+    this.setMyReqEditValue("myReqEditCapacity", row.capacity || "");
+    this.setMyReqEditValue("myReqEditUsage", row.usage || "");
+
+    modal.classList.add("show");
+    setTimeout(() => document.getElementById("myReqEditName")?.focus(), 0);
+  },
+
+  async saveMyRegistrationRequestEdit() {
+    const sb = window.ReagentApp.sb;
+    if (!sb) {
+      window.ReagentApp.toast?.("Supabase 연결 정보가 없습니다.", "warn");
+      return;
+    }
+
+    const id = Number(this.getMyReqEditValue("myReqEditId"));
+    if (!id) {
+      window.ReagentApp.toast?.("요청 ID를 찾지 못했습니다.", "warn");
+      return;
+    }
+
+    const row = {
+      category: this.getMyReqEditValue("myReqEditCategory"),
+      name: this.getMyReqEditValue("myReqEditName"),
+      maker: this.getMyReqEditValue("myReqEditMaker"),
+      code: this.getMyReqEditValue("myReqEditCode"),
+      capacity: this.getMyReqEditValue("myReqEditCapacity"),
+      cas: this.getMyReqEditValue("myReqEditCas"),
+      grade: this.getMyReqEditValue("myReqEditGrade"),
+      usage: this.getMyReqEditValue("myReqEditUsage"),
+      status: "요청",
+      reject_reason: ""
+    };
+
+    if (!row.name) {
+      window.ReagentApp.toast?.("제품명은 필수입니다.", "warn");
+      return;
+    }
+
+    const { data, error } = await sb
+      .from("product_registration_requests")
+      .update(row)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("제품 등록 요청 수정 실패:", error);
+      window.ReagentApp.toast?.(`제품 등록 요청 수정 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      return;
+    }
+
+    const idx = this.myRegistrationRequests.findIndex((item) => Number(item.id) === id);
+    if (idx >= 0) this.myRegistrationRequests[idx] = data || { ...this.myRegistrationRequests[idx], ...row };
+
+    document.getElementById("myRegistrationRequestEditModal")?.classList.remove("show");
+    this.renderMyRegistrationRequests();
+    window.ReagentApp.productManagement?.loadRequests?.();
+    window.ReagentApp.toast?.("제품 등록 요청이 수정되었습니다.", "success");
+  },
+
+  async deleteMyRegistrationRequest(id) {
+    const row = (this.myRegistrationRequests || []).find((item) => Number(item.id) === Number(id));
+    if (!row) {
+      window.ReagentApp.toast?.("삭제할 요청을 찾지 못했습니다.", "warn");
+      return;
+    }
+
+    const status = this.getDisplayRequestStatus(row.status);
+    if (status === "등록") {
+      window.ReagentApp.toast?.("등록 완료된 요청은 삭제할 수 없습니다.", "warn");
+      return;
+    }
+
+    const ok = confirm("이 제품 등록 요청을 삭제하시겠습니까?");
+    if (!ok) return;
+
+    const sb = window.ReagentApp.sb;
+    if (!sb) {
+      window.ReagentApp.toast?.("Supabase 연결 정보가 없습니다.", "warn");
+      return;
+    }
+
+    const { error } = await sb
+      .from("product_registration_requests")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("제품 등록 요청 삭제 실패:", error);
+      window.ReagentApp.toast?.(`제품 등록 요청 삭제 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      return;
+    }
+
+    this.myRegistrationRequests = this.myRegistrationRequests.filter((item) => Number(item.id) !== Number(id));
+    this.renderMyRegistrationRequests();
+    window.ReagentApp.productManagement?.loadRequests?.();
+    window.ReagentApp.toast?.("제품 등록 요청이 삭제되었습니다.", "success");
   },
 
   getCurrentUser() {
