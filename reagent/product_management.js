@@ -98,23 +98,13 @@ window.ReagentApp.productManagement = {
     const legacyStatus = document.getElementById("pmRequestStatus");
     const statusField = legacyStatus?.closest?.(".field");
 
-    if (statusField && !document.getElementById("pmRequestProgressFilter")) {
+    if (statusField && !document.getElementById("pmRequestStatusFilter")) {
       statusField.innerHTML = `
-        <label>업무상태</label>
-        <select id="pmRequestProgressFilter">
-          <option value="처리대기" selected>처리대기</option>
-          <option value="처리완료">처리완료</option>
+        <label>상태</label>
+        <select id="pmRequestStatusFilter">
           <option value="">전체</option>
-        </select>
-      `;
-
-      const resultField = document.createElement("div");
-      resultField.className = "field";
-      resultField.innerHTML = `
-        <label>결과상태</label>
-        <select id="pmRequestResultFilter">
-          <option value="">전체</option>
-          <option value="등록완료">등록완료</option>
+          <option value="요청" selected>요청</option>
+          <option value="등록">등록</option>
           <option value="반려">반려</option>
         </select>
       `;
@@ -131,14 +121,12 @@ window.ReagentApp.productManagement = {
         </select>
       `;
 
-      statusField.insertAdjacentElement("afterend", resultField);
-      resultField.insertAdjacentElement("afterend", periodField);
+      statusField.insertAdjacentElement("afterend", periodField);
     }
   },
 
   getRequestProgressStatus(status) {
-    const value = String(status || "요청").trim();
-    return ["등록완료", "반려"].includes(value) ? "처리완료" : "처리대기";
+    return this.getDisplayRequestStatus(status);
   },
 
   isWithinRequestPeriod(createdAt, period = "3m") {
@@ -171,8 +159,7 @@ window.ReagentApp.productManagement = {
 
     [
       els.requestKeyword,
-      document.getElementById("pmRequestProgressFilter"),
-      document.getElementById("pmRequestResultFilter"),
+      document.getElementById("pmRequestStatusFilter"),
       document.getElementById("pmRequestPeriodFilter")
     ].forEach((el) => {
       el?.addEventListener("input", () => this.renderRequests());
@@ -410,8 +397,7 @@ window.ReagentApp.productManagement = {
 
     const els = this.getEls();
     const keyword = String(els.requestKeyword?.value || "").trim().toLowerCase();
-    const progressFilter = document.getElementById("pmRequestProgressFilter")?.value || "처리대기";
-    const resultFilter = document.getElementById("pmRequestResultFilter")?.value || "";
+    const statusFilter = document.getElementById("pmRequestStatusFilter")?.value ?? "요청";
     const periodFilter = document.getElementById("pmRequestPeriodFilter")?.value || "3m";
 
     return this.requests.filter((r) => {
@@ -419,12 +405,10 @@ window.ReagentApp.productManagement = {
         .join(" ")
         .toLowerCase();
 
-      const status = String(r.status || "요청").trim();
-      const progressStatus = this.getRequestProgressStatus(status);
+      const displayStatus = this.getDisplayRequestStatus(r.status);
 
       if (keyword && !text.includes(keyword)) return false;
-      if (progressFilter && progressStatus !== progressFilter) return false;
-      if (resultFilter && status !== resultFilter) return false;
+      if (statusFilter && displayStatus !== statusFilter) return false;
       if (!this.isWithinRequestPeriod(r.created_at || r.id, periodFilter)) return false;
       return true;
     });
@@ -442,9 +426,11 @@ window.ReagentApp.productManagement = {
       return;
     }
 
-    els.requestList.innerHTML = rows.map((r) => `
+    els.requestList.innerHTML = rows.map((r) => {
+      const displayStatus = this.getDisplayRequestStatus(r.status);
+      return `
       <tr>
-        <td>${this.html(r.status || "요청")}</td>
+        <td>${this.html(displayStatus)}</td>
         <td>${this.html(r.category)}</td>
         <td>${this.html(r.name)}</td>
         <td>${this.html(r.maker)}</td>
@@ -463,7 +449,8 @@ window.ReagentApp.productManagement = {
           </div>
         </td>
       </tr>
-    `).join("");
+    `;
+    }).join("");
 
     els.requestList.querySelectorAll("[data-pm-request-edit]").forEach((btn) => {
       btn.addEventListener("click", () => this.openRequestEditModal(Number(btn.dataset.pmRequestEdit)));
