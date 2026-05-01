@@ -6,6 +6,8 @@ window.ReagentApp.productManagement = {
   editingProductId: null,
   activeRequestStatus: "",
   activeManagementPanel: "product",
+  operatorEmployees: [],
+  operators: [],
 
   get sb() {
     return window.ReagentApp.sb;
@@ -885,6 +887,281 @@ window.ReagentApp.productManagement = {
     this.toast("요청이 반려 처리되었습니다.", "success");
     await this.loadRequests();
     await this.refreshLinkedRequestStatus();
+  },
+
+  isSystemAdminUser() {
+    const user = window.ReagentApp.currentUser || {};
+    return window.ReagentApp.isSystemAdminRole?.(user) === true;
+  },
+
+  applyAdminFeatureButtonVisibility() {
+    const els = this.getEls();
+    if (!els.adminFeatureButton) return;
+    els.adminFeatureButton.style.display = this.isSystemAdminUser() ? "" : "none";
+  },
+
+  bindOperatorEvents() {
+    const els = this.getEls();
+
+    if (els.adminFeatureButton && !els.adminFeatureButton.dataset.bound) {
+      els.adminFeatureButton.dataset.bound = "1";
+      els.adminFeatureButton.addEventListener("click", () => this.openOperatorManager());
+    }
+
+    if (els.closeOperatorModal && !els.closeOperatorModal.dataset.bound) {
+      els.closeOperatorModal.dataset.bound = "1";
+      els.closeOperatorModal.addEventListener("click", () => this.closeOperatorManager());
+    }
+
+    if (els.operatorModal && !els.operatorModal.dataset.bound) {
+      els.operatorModal.dataset.bound = "1";
+      els.operatorModal.addEventListener("click", (event) => {
+        if (event.target === els.operatorModal) this.closeOperatorManager();
+      });
+    }
+
+    if (els.operatorKeyword && !els.operatorKeyword.dataset.bound) {
+      els.operatorKeyword.dataset.bound = "1";
+      els.operatorKeyword.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") this.searchOperatorEmployees();
+      });
+    }
+
+    if (els.operatorSearchButton && !els.operatorSearchButton.dataset.bound) {
+      els.operatorSearchButton.dataset.bound = "1";
+      els.operatorSearchButton.addEventListener("click", () => this.searchOperatorEmployees());
+    }
+
+    if (els.operatorRefreshButton && !els.operatorRefreshButton.dataset.bound) {
+      els.operatorRefreshButton.dataset.bound = "1";
+      els.operatorRefreshButton.addEventListener("click", () => this.loadReagentOperators());
+    }
+
+    if (els.operatorSearchResults && !els.operatorSearchResults.dataset.bound) {
+      els.operatorSearchResults.dataset.bound = "1";
+      els.operatorSearchResults.addEventListener("click", (event) => {
+        const btn = event.target.closest("[data-operator-add]");
+        if (!btn) return;
+        this.addReagentOperator(btn.dataset.operatorAdd);
+      });
+    }
+
+    if (els.operatorList && !els.operatorList.dataset.bound) {
+      els.operatorList.dataset.bound = "1";
+      els.operatorList.addEventListener("click", (event) => {
+        const btn = event.target.closest("[data-operator-remove]");
+        if (!btn) return;
+        this.removeReagentOperator(btn.dataset.operatorRemove);
+      });
+    }
+  },
+
+  openOperatorManager() {
+    if (!this.isSystemAdminUser()) {
+      this.toast("관리자만 운영자를 지정할 수 있습니다.", "warn");
+      return;
+    }
+
+    const els = this.getEls();
+    this.bindOperatorEvents?.();
+    els.operatorModal?.classList.add("show");
+    this.loadReagentOperators();
+    this.renderOperatorEmployeeResults([]);
+    setTimeout(() => els.operatorKeyword?.focus(), 0);
+  },
+
+  closeOperatorManager() {
+    const els = this.getEls();
+    els.operatorModal?.classList.remove("show");
+  },
+
+  normalizeEmployeeRow(row = {}) {
+    return {
+      employee_no: row.employee_no || row.employeeNo || "",
+      name: row.name || row.user_name || row.userName || "",
+      department: row.department || row.division_name || row.division_code || "",
+      team: row.team || row.team_name || row.team_code || "",
+      position: row.position || "",
+      authority: row.authority || row.role || "",
+      status: row.status || ""
+    };
+  },
+
+  async searchOperatorEmployees() {
+    if (!this.sb) {
+      this.toast("Supabase 연결 정보가 없습니다.", "warn");
+      return;
+    }
+
+    const els = this.getEls();
+    const keyword = String(els.operatorKeyword?.value || "").trim();
+
+    if (!keyword) {
+      this.toast("사번 또는 이름을 입력하세요.", "warn");
+      return;
+    }
+
+    els.operatorSearchResults.innerHTML = `<tr><td class="empty" colspan="6">사원정보를 검색하는 중입니다.</td></tr>`;
+
+    try {
+      const safeKeyword = keyword.replaceAll("%", "").replaceAll(",", " ");
+      const { data, error } = await this.sb
+        .from("employees")
+        .select("employee_no,name,division_code,team_code,position,authority,email,status")
+        .or(`employee_no.ilike.%${safeKeyword}%,name.ilike.%${safeKeyword}%`)
+        .limit(30);
+
+      if (error) throw error;
+
+      this.operatorEmployees = (Array.isArray(data) ? data : []).map((row) => this.normalizeEmployeeRow(row));
+      this.renderOperatorEmployeeResults(this.operatorEmployees);
+    } catch (error) {
+      console.error("사원 검색 실패:", error);
+      this.toast(`사원 검색 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      this.renderOperatorEmployeeResults([]);
+    }
+  },
+
+  renderOperatorEmployeeResults(rows = []) {
+    const els = this.getEls();
+    if (!els.operatorSearchResults) return;
+
+    if (!rows.length) {
+      els.operatorSearchResults.innerHTML = `<tr><td class="empty" colspan="6">검색 결과가 없습니다.</td></tr>`;
+      return;
+    }
+
+    els.operatorSearchResults.innerHTML = rows.map((employee) => `
+      <tr>
+        <td>${this.html(employee.employee_no)}</td>
+        <td>${this.html(employee.name)}</td>
+        <td>${this.html([employee.department, employee.team].filter(Boolean).join(" / "))}</td>
+        <td>${this.html(employee.position)}</td>
+        <td>${this.html(employee.status || "-")}</td>
+        <td><button class="ghost-btn" type="button" data-operator-add="${this.html(employee.employee_no)}">운영자 지정</button></td>
+      </tr>
+    `).join("");
+  },
+
+  async loadReagentOperators() {
+    if (!this.sb) return;
+
+    const els = this.getEls();
+    if (els.operatorList) {
+      els.operatorList.innerHTML = `<tr><td class="empty" colspan="7">운영자 목록을 불러오는 중입니다.</td></tr>`;
+    }
+
+    try {
+      const { data, error } = await this.sb
+        .from("reagent_operators")
+        .select("id,employee_no,name,department,team,role,is_active,created_at,created_by")
+        .eq("is_active", true)
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+
+      this.operators = Array.isArray(data) ? data : [];
+      this.renderReagentOperators();
+    } catch (error) {
+      console.error("운영자 목록 조회 실패:", error);
+      this.toast(`운영자 목록 조회 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      this.operators = [];
+      this.renderReagentOperators();
+    }
+  },
+
+  renderReagentOperators() {
+    const els = this.getEls();
+    if (!els.operatorList) return;
+
+    const rows = Array.isArray(this.operators) ? this.operators : [];
+    if (els.operatorCount) els.operatorCount.textContent = `운영자 ${rows.length}명`;
+
+    if (!rows.length) {
+      els.operatorList.innerHTML = `<tr><td class="empty" colspan="7">등록된 운영자가 없습니다.</td></tr>`;
+      return;
+    }
+
+    els.operatorList.innerHTML = rows.map((operator) => `
+      <tr>
+        <td>${this.html(operator.employee_no)}</td>
+        <td>${this.html(operator.name)}</td>
+        <td>${this.html(operator.department)}</td>
+        <td>${this.html(operator.team)}</td>
+        <td>${this.html(operator.role || "운영자")}</td>
+        <td>${this.html(operator.created_by || "")}</td>
+        <td><button class="ghost-btn" type="button" data-operator-remove="${this.html(operator.employee_no)}">해제</button></td>
+      </tr>
+    `).join("");
+  },
+
+  async addReagentOperator(employeeNo) {
+    if (!this.sb) return;
+    if (!this.isSystemAdminUser()) {
+      this.toast("관리자만 운영자를 지정할 수 있습니다.", "warn");
+      return;
+    }
+
+    const employee = this.operatorEmployees.find((row) => String(row.employee_no) === String(employeeNo));
+    if (!employee) {
+      this.toast("선택한 사원 정보를 찾지 못했습니다.", "warn");
+      return;
+    }
+
+    const ok = confirm(`${employee.name} (${employee.employee_no}) 님을 시약·초자 운영자로 지정하시겠습니까?`);
+    if (!ok) return;
+
+    const user = this.getCurrentUser();
+    const row = {
+      employee_no: employee.employee_no,
+      name: employee.name,
+      department: employee.department || "",
+      team: employee.team || "",
+      role: "운영자",
+      is_active: true,
+      created_by: user.name || ""
+    };
+
+    try {
+      const { error } = await this.sb
+        .from("reagent_operators")
+        .upsert(row, { onConflict: "employee_no" });
+
+      if (error) throw error;
+
+      this.toast("운영자로 지정되었습니다.", "success");
+      await this.loadReagentOperators();
+    } catch (error) {
+      console.error("운영자 지정 실패:", error);
+      this.toast(`운영자 지정 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+    }
+  },
+
+  async removeReagentOperator(employeeNo) {
+    if (!this.sb) return;
+    if (!this.isSystemAdminUser()) {
+      this.toast("관리자만 운영자를 해제할 수 있습니다.", "warn");
+      return;
+    }
+
+    const operator = this.operators.find((row) => String(row.employee_no) === String(employeeNo));
+    const ok = confirm(`${operator?.name || employeeNo} 운영자 권한을 해제하시겠습니까?`);
+    if (!ok) return;
+
+    try {
+      const { error } = await this.sb
+        .from("reagent_operators")
+        .update({ is_active: false })
+        .eq("employee_no", employeeNo);
+
+      if (error) throw error;
+
+      this.toast("운영자 권한이 해제되었습니다.", "success");
+      await this.loadReagentOperators();
+    } catch (error) {
+      console.error("운영자 해제 실패:", error);
+      this.toast(`운영자 해제 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+    }
   },
 
 };
