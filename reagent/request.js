@@ -514,24 +514,29 @@ window.ReagentApp.request = {
     const legacyFilter = document.getElementById("myRequestStatusFilter");
     const filterField = legacyFilter?.closest?.(".field");
 
-    if (filterField && legacyFilter && legacyFilter.options && !Array.from(legacyFilter.options).some((opt) => opt.value === "요청")) {
-      legacyFilter.innerHTML = `
-        <option value="">전체</option>
-        <option value="요청">요청</option>
-        <option value="등록">등록</option>
-        <option value="반려">반려</option>
+    if (filterField && !document.getElementById("myRequestProgressFilter")) {
+      filterField.innerHTML = `
+        <label>진행상태</label>
+        <select id="myRequestProgressFilter">
+          <option value="">전체</option>
+          <option value="요청중">요청중</option>
+          <option value="처리완료">처리완료</option>
+        </select>
       `;
-    }
 
-    const filterRow = filterField?.parentElement;
-    if (filterRow) {
-      filterRow.classList.add("compact-filter-row");
-      filterRow.querySelectorAll(".field").forEach((field) => field.classList.add("compact-filter-item"));
-    }
+      const resultField = document.createElement("div");
+      resultField.className = "field";
+      resultField.innerHTML = `
+        <label>결과상태</label>
+        <select id="myRequestResultFilter">
+          <option value="">전체</option>
+          <option value="등록">등록</option>
+          <option value="반려">반려</option>
+        </select>
+      `;
 
-    if (filterField && !document.getElementById("myRequestPeriodFilter")) {
       const periodField = document.createElement("div");
-      periodField.className = "field compact-filter-item";
+      periodField.className = "field";
       periodField.innerHTML = `
         <label>기간</label>
         <select id="myRequestPeriodFilter">
@@ -541,16 +546,29 @@ window.ReagentApp.request = {
           <option value="all">전체</option>
         </select>
       `;
-      filterField.insertAdjacentElement("afterend", periodField);
+
+      filterField.insertAdjacentElement("afterend", resultField);
+      resultField.insertAdjacentElement("afterend", periodField);
     }
   },
 
   getRequestProgressStatus(status) {
-    const displayStatus = this.getDisplayRequestStatus(status) {
-    const value = String(status || "요청").trim();
-    if (value === "등록완료") return "등록";
-    if (value === "반려") return "반려";
-    return "요청";
+    const displayStatus = this.getDisplayRequestStatus(status);
+    return displayStatus === "요청중" ? "요청중" : "처리완료";
+  },
+
+  isWithinRequestPeriod(createdAt, period = "3m") {
+    if (!period || period === "all") return true;
+
+    const created = new Date(createdAt);
+    if (Number.isNaN(created.getTime())) return true;
+
+    const months = period === "1m" ? 1 : period === "6m" ? 6 : 3;
+    const start = new Date();
+    start.setMonth(start.getMonth() - months);
+    start.setHours(0, 0, 0, 0);
+
+    return created >= start;
   },
 
   bindRegistrationStatusPanel() {
@@ -558,7 +576,8 @@ window.ReagentApp.request = {
 
     const listBtn = document.getElementById("showRequestListPanel");
     const statusBtn = document.getElementById("showRequestStatusPanel");
-    const statusFilter = document.getElementById("myRequestStatusFilter");
+    const progressFilter = document.getElementById("myRequestProgressFilter");
+    const resultFilter = document.getElementById("myRequestResultFilter");
     const periodFilter = document.getElementById("myRequestPeriodFilter");
     const refresh = document.getElementById("refreshMyRegistrationRequests");
 
@@ -575,51 +594,17 @@ window.ReagentApp.request = {
       });
     }
 
-    [statusFilter, periodFilter].forEach((filterEl) => {
+    [progressFilter, resultFilter, periodFilter].forEach((filterEl) => {
       if (filterEl && !filterEl.dataset.bound) {
         filterEl.dataset.bound = "1";
-        filterEl.addEventListener("change", () => this.renderMyRegistrationRequests() {
-    const tbody = document.getElementById("myRegistrationRequestList");
-    const badge = document.getElementById("myRequestStatusBadge");
-    const statusFilter = document.getElementById("myRequestStatusFilter")?.value || "";
-    const periodFilter = document.getElementById("myRequestPeriodFilter")?.value || "3m";
-    if (!tbody) return;
-
-    const rows = (this.myRegistrationRequests || []).filter((row) => {
-      const displayStatus = this.getDisplayRequestStatus(row.status);
-      if (statusFilter && displayStatus !== statusFilter) return false;
-      if (!this.isWithinRequestPeriod(row.created_at || row.id, periodFilter)) return false;
-      return true;
+        filterEl.addEventListener("change", () => this.renderMyRegistrationRequests());
+      }
     });
 
-    if (badge) badge.textContent = "내 요청 " + rows.length + "건";
-
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td class="empty" colspan="11">제품 등록 요청 현황이 없습니다.</td></tr>';
-      return;
+    if (refresh && !refresh.dataset.bound) {
+      refresh.dataset.bound = "1";
+      refresh.addEventListener("click", () => this.loadMyRegistrationRequests(true));
     }
-
-    tbody.innerHTML = rows.map((row) => {
-      const status = this.getDisplayRequestStatus(row.status);
-      const statusColor = status === "등록" ? "#16a34a" : (status === "반려" ? "#dc2626" : "#1d4ed8");
-      const handledText = row.reject_reason || row.handled_by || "";
-      return `
-        <tr>
-          <td>${this.html(this.formatDateTime(row.created_at || row.id))}</td>
-          <td><span style="font-weight:800; color:${statusColor};">${this.html(status)}</span></td>
-          <td>${this.html(row.category)}</td>
-          <td>${this.html(row.name)}</td>
-          <td>${this.html(row.maker)}</td>
-          <td>${this.html(row.code)}</td>
-          <td>${this.html(row.cas)}</td>
-          <td>${this.html(row.grade)}</td>
-          <td>${this.html(row.capacity)}</td>
-          <td>${this.html(row.usage)}</td>
-          <td>${this.html(handledText)}</td>
-        </tr>
-      `;
-    }).join("");
-  },
   },
 
   setRequestPanelView(view = "list") {
