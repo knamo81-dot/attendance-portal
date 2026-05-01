@@ -514,22 +514,12 @@ window.ReagentApp.request = {
     const legacyFilter = document.getElementById("myRequestStatusFilter");
     const filterField = legacyFilter?.closest?.(".field");
 
-    if (filterField && !document.getElementById("myRequestProgressFilter")) {
+    if (filterField && !document.getElementById("myRequestUnifiedStatusFilter")) {
       filterField.innerHTML = `
-        <label>진행상태</label>
-        <select id="myRequestProgressFilter">
+        <label>상태</label>
+        <select id="myRequestUnifiedStatusFilter">
           <option value="">전체</option>
-          <option value="요청중">요청중</option>
-          <option value="처리완료">처리완료</option>
-        </select>
-      `;
-
-      const resultField = document.createElement("div");
-      resultField.className = "field";
-      resultField.innerHTML = `
-        <label>결과상태</label>
-        <select id="myRequestResultFilter">
-          <option value="">전체</option>
+          <option value="요청">요청</option>
           <option value="등록">등록</option>
           <option value="반려">반려</option>
         </select>
@@ -547,14 +537,12 @@ window.ReagentApp.request = {
         </select>
       `;
 
-      filterField.insertAdjacentElement("afterend", resultField);
-      resultField.insertAdjacentElement("afterend", periodField);
+      filterField.insertAdjacentElement("afterend", periodField);
     }
   },
 
   getRequestProgressStatus(status) {
-    const displayStatus = this.getDisplayRequestStatus(status);
-    return displayStatus === "요청중" ? "요청중" : "처리완료";
+    return this.getDisplayRequestStatus(status);
   },
 
   isWithinRequestPeriod(createdAt, period = "3m") {
@@ -576,8 +564,7 @@ window.ReagentApp.request = {
 
     const listBtn = document.getElementById("showRequestListPanel");
     const statusBtn = document.getElementById("showRequestStatusPanel");
-    const progressFilter = document.getElementById("myRequestProgressFilter");
-    const resultFilter = document.getElementById("myRequestResultFilter");
+    const statusFilter = document.getElementById("myRequestUnifiedStatusFilter");
     const periodFilter = document.getElementById("myRequestPeriodFilter");
     const refresh = document.getElementById("refreshMyRegistrationRequests");
 
@@ -594,7 +581,7 @@ window.ReagentApp.request = {
       });
     }
 
-    [progressFilter, resultFilter, periodFilter].forEach((filterEl) => {
+    [statusFilter, periodFilter].forEach((filterEl) => {
       if (filterEl && !filterEl.dataset.bound) {
         filterEl.dataset.bound = "1";
         filterEl.addEventListener("change", () => this.renderMyRegistrationRequests());
@@ -632,7 +619,7 @@ window.ReagentApp.request = {
     const value = String(status || "요청").trim();
     if (value === "등록완료") return "등록";
     if (value === "반려") return "반려";
-    return "요청중";
+    return "요청";
   },
 
   async loadMyRegistrationRequests(force = false) {
@@ -676,17 +663,14 @@ window.ReagentApp.request = {
 
     const tbody = document.getElementById("myRegistrationRequestList");
     const badge = document.getElementById("myRequestStatusBadge");
-    const progressFilter = document.getElementById("myRequestProgressFilter")?.value || "";
-    const resultFilter = document.getElementById("myRequestResultFilter")?.value || "";
+    const statusFilter = document.getElementById("myRequestUnifiedStatusFilter")?.value || "";
     const periodFilter = document.getElementById("myRequestPeriodFilter")?.value || "3m";
     if (!tbody) return;
 
     const rows = (this.myRegistrationRequests || []).filter((row) => {
       const displayStatus = this.getDisplayRequestStatus(row.status);
-      const progressStatus = this.getRequestProgressStatus(row.status);
 
-      if (progressFilter && progressStatus !== progressFilter) return false;
-      if (resultFilter && displayStatus !== resultFilter) return false;
+      if (statusFilter && displayStatus !== statusFilter) return false;
       if (!this.isWithinRequestPeriod(row.created_at || row.id, periodFilter)) return false;
 
       return true;
