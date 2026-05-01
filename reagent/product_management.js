@@ -36,15 +36,26 @@ window.ReagentApp.productManagement = {
     const user = window.ReagentApp.currentUser || {};
     return {
       name: user.name || user.user_name || user.userName || user.employee_no || user.employeeNo || "미지정",
-      team: user.team || "",
-      role: user.role || ""
+      team: user.team || user.team_name || "",
+      employee_no: user.employee_no || user.employeeNo || "",
+      role: user.role || user.authority || "",
+      authority: user.authority || user.role || "",
+      is_reagent_operator: user.is_reagent_operator === true
     };
   },
 
   isAdminUser() {
     const user = window.ReagentApp.currentUser || {};
-    const role = String(user.role || "").trim();
-    return ["관리자", "운영자", "admin", "operator", "Admin", "Operator"].includes(role) || window.ReagentApp.isRequestAdmin?.() === true;
+    const rawRole = String(user.role || user.authority || "").trim();
+    const lowerRole = rawRole.toLowerCase();
+    const allowedRoles = ["관리자", "운영자", "admin", "operator"];
+
+    if (allowedRoles.includes(rawRole) || allowedRoles.includes(lowerRole)) return true;
+    if (user.is_reagent_operator === true) return true;
+    if (window.ReagentApp.hasReagentManagementAccess?.() === true) return true;
+    if (window.ReagentApp.isRequestAdmin?.() === true) return true;
+
+    return false;
   },
 
   getDisplayRequestStatus(status) {
@@ -108,7 +119,11 @@ window.ReagentApp.productManagement = {
     );
   },
 
-  init() {
+  async init() {
+    // 제품관리 화면 진입 시점에 운영자 권한을 한 번 더 확인합니다.
+    // 포탈/iframe 로딩 순서 때문에 권한 조회보다 탭 클릭이 먼저 실행되는 경우를 방지합니다.
+    await window.ReagentApp.loadReagentOperatorPermission?.();
+
     if (!this.isAdminUser()) {
       const page = document.getElementById("page-product-management");
       if (page) {
