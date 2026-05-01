@@ -94,7 +94,70 @@ window.ReagentApp.productManagement = {
     };
   },
 
+  ensureRequestFilterControls() {
+    const legacyStatus = document.getElementById("pmRequestStatus");
+    const statusField = legacyStatus?.closest?.(".field");
+
+    if (statusField && !document.getElementById("pmRequestProgressFilter")) {
+      statusField.innerHTML = `
+        <label>업무상태</label>
+        <select id="pmRequestProgressFilter">
+          <option value="처리대기" selected>처리대기</option>
+          <option value="처리완료">처리완료</option>
+          <option value="">전체</option>
+        </select>
+      `;
+
+      const resultField = document.createElement("div");
+      resultField.className = "field";
+      resultField.innerHTML = `
+        <label>결과상태</label>
+        <select id="pmRequestResultFilter">
+          <option value="">전체</option>
+          <option value="등록완료">등록완료</option>
+          <option value="반려">반려</option>
+        </select>
+      `;
+
+      const periodField = document.createElement("div");
+      periodField.className = "field";
+      periodField.innerHTML = `
+        <label>기간</label>
+        <select id="pmRequestPeriodFilter">
+          <option value="1m">최근 1개월</option>
+          <option value="3m" selected>최근 3개월</option>
+          <option value="6m">최근 6개월</option>
+          <option value="all">전체</option>
+        </select>
+      `;
+
+      statusField.insertAdjacentElement("afterend", resultField);
+      resultField.insertAdjacentElement("afterend", periodField);
+    }
+  },
+
+  getRequestProgressStatus(status) {
+    const value = String(status || "요청").trim();
+    return ["등록완료", "반려"].includes(value) ? "처리완료" : "처리대기";
+  },
+
+  isWithinRequestPeriod(createdAt, period = "3m") {
+    if (!period || period === "all") return true;
+
+    const created = new Date(createdAt);
+    if (Number.isNaN(created.getTime())) return true;
+
+    const months = period === "1m" ? 1 : period === "6m" ? 6 : 3;
+    const start = new Date();
+    start.setMonth(start.getMonth() - months);
+    start.setHours(0, 0, 0, 0);
+
+    return created >= start;
+  },
+
   bindEvents() {
+    this.ensureRequestFilterControls?.();
+
     const els = this.getEls();
 
     [els.productKeyword, els.productCategory, els.productActive].forEach((el) => {
@@ -106,7 +169,12 @@ window.ReagentApp.productManagement = {
     els.resetProduct?.addEventListener("click", () => this.resetProductForm());
     els.deactivateProduct?.addEventListener("click", () => this.deactivateCurrentProduct());
 
-    [els.requestKeyword, els.requestStatus].forEach((el) => {
+    [
+      els.requestKeyword,
+      document.getElementById("pmRequestProgressFilter"),
+      document.getElementById("pmRequestResultFilter"),
+      document.getElementById("pmRequestPeriodFilter")
+    ].forEach((el) => {
       el?.addEventListener("input", () => this.renderRequests());
       el?.addEventListener("change", () => this.renderRequests());
     });
@@ -338,17 +406,26 @@ window.ReagentApp.productManagement = {
   },
 
   getFilteredRequests() {
+    this.ensureRequestFilterControls?.();
+
     const els = this.getEls();
     const keyword = String(els.requestKeyword?.value || "").trim().toLowerCase();
-    const status = els.requestStatus?.value || "";
+    const progressFilter = document.getElementById("pmRequestProgressFilter")?.value || "처리대기";
+    const resultFilter = document.getElementById("pmRequestResultFilter")?.value || "";
+    const periodFilter = document.getElementById("pmRequestPeriodFilter")?.value || "3m";
 
     return this.requests.filter((r) => {
-      const text = [r.category, r.name, r.maker, r.code, r.capacity, r.cas, r.grade, r.usage, r.requester, r.team, r.reject_reason]
+      const text = [r.category, r.name, r.maker, r.code, r.capacity, r.cas, r.grade, r.usage, r.requester, r.team, r.reject_reason, r.handled_by]
         .join(" ")
         .toLowerCase();
 
+      const status = String(r.status || "요청").trim();
+      const progressStatus = this.getRequestProgressStatus(status);
+
       if (keyword && !text.includes(keyword)) return false;
-      if (status && r.status !== status) return false;
+      if (progressFilter && progressStatus !== progressFilter) return false;
+      if (resultFilter && status !== resultFilter) return false;
+      if (!this.isWithinRequestPeriod(r.created_at || r.id, periodFilter)) return false;
       return true;
     });
   },
