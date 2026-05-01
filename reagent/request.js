@@ -355,42 +355,108 @@ window.ReagentApp.request = {
     };
   },
 
+  ensureRegistrationRequestModal() {
+    let modal = document.getElementById("productRegistrationRequestModal");
+    if (modal) return modal;
+
+    modal = document.createElement("div");
+    modal.className = "modal-backdrop";
+    modal.id = "productRegistrationRequestModal";
+    modal.innerHTML = `
+      <div class="modal" style="width:min(860px,100%);">
+        <div class="modal-head">
+          <div>
+            <h3>제품 등록 요청</h3>
+            <div class="small">검색되지 않는 제품을 관리자/운영자에게 등록 요청합니다.</div>
+          </div>
+          <button type="button" class="btn" id="closeProductRequestModal">닫기</button>
+        </div>
+        <div class="card-body">
+          <div class="form-grid" style="grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start;">
+            <div class="field"><label>분류</label><select id="reqCategory"><option value="">선택</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div>
+            <div class="field"><label>품명 <span style="color:#dc2626;">*</span></label><input id="reqName" placeholder="예: Ethanol"/></div>
+            <div class="field"><label>제조사</label><input id="reqMaker" placeholder="예: Sigma"/></div>
+            <div class="field"><label>제품코드</label><input id="reqCode" placeholder="예: E7023"/></div>
+            <div class="field"><label>CAS</label><input id="reqCas" placeholder="예: 64-17-5"/></div>
+            <div class="field"><label>등급</label><input id="reqGrade" placeholder="예: ACS"/></div>
+            <div class="field"><label>규격</label><input id="reqCapacity" placeholder="예: 500 mL"/></div>
+            <div class="field"><label>요청사유 / 용도</label><input id="reqUsage" placeholder="예: 효능평가 전처리용"/></div>
+          </div>
+          <div class="actions" style="justify-content:flex-end; margin-top:18px;">
+            <button type="button" class="btn" id="cancelProductRequest">취소</button>
+            <button type="button" class="btn primary" id="submitProductRequest">요청</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => modal.classList.remove("show");
+    modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+    modal.querySelector("#closeProductRequestModal")?.addEventListener("click", close);
+    modal.querySelector("#cancelProductRequest")?.addEventListener("click", close);
+    modal.querySelector("#submitProductRequest")?.addEventListener("click", async () => { await this.submitRegistrationRequestFromModal(); });
+
+    return modal;
+  },
+
+  setModalValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.value = value || "";
+  },
+
+  getModalValue(id) {
+    return (document.getElementById(id)?.value || "").trim();
+  },
+
   async openRegistrationRequestDialog() {
-    const { toast } = window.ReagentApp;
+    const modal = this.ensureRegistrationRequestModal();
     const draft = this.getCurrentSearchDraft();
+
+    this.setModalValue("reqCategory", draft.category || "");
+    this.setModalValue("reqName", draft.name || "");
+    this.setModalValue("reqMaker", draft.maker || "");
+    this.setModalValue("reqCode", draft.code || "");
+    this.setModalValue("reqCas", draft.cas || "");
+    this.setModalValue("reqGrade", draft.grade || "");
+    this.setModalValue("reqCapacity", draft.capacity || "");
+    this.setModalValue("reqUsage", draft.usage || "");
+
+    modal.classList.add("show");
+    setTimeout(() => document.getElementById("reqName")?.focus(), 0);
+  },
+
+  async submitRegistrationRequestFromModal() {
     const currentUser = this.getCurrentUser();
-
-    const name = prompt("등록 요청할 제품명을 입력하세요.", draft.name || "");
-    if (name === null) return;
-    if (!String(name).trim()) {
-      toast?.("제품명은 필수입니다.", "warn");
-      return;
-    }
-
-    const maker = prompt("제조사를 입력하세요. 모르면 비워두세요.", draft.maker || "");
-    if (maker === null) return;
-
-    const code = prompt("제품코드를 입력하세요. 모르면 비워두세요.", draft.code || "");
-    if (code === null) return;
-
-    const capacity = prompt("규격을 입력하세요. 모르면 비워두세요.", draft.capacity || "");
-    if (capacity === null) return;
-
-    const usage = prompt("요청 사유 또는 용도를 입력하세요.", draft.usage || "");
-    if (usage === null) return;
-
-    await this.createRegistrationRequest({
-      category: draft.category || "",
-      name: String(name).trim(),
-      maker: String(maker || "").trim(),
-      code: String(code || "").trim(),
-      capacity: String(capacity || "").trim(),
-      cas: draft.cas || "",
-      grade: draft.grade || "",
-      usage: String(usage || "").trim(),
+    const row = {
+      category: this.getModalValue("reqCategory"),
+      name: this.getModalValue("reqName"),
+      maker: this.getModalValue("reqMaker"),
+      code: this.getModalValue("reqCode"),
+      capacity: this.getModalValue("reqCapacity"),
+      cas: this.getModalValue("reqCas"),
+      grade: this.getModalValue("reqGrade"),
+      usage: this.getModalValue("reqUsage"),
       requester: currentUser.name,
       team: currentUser.team
-    });
+    };
+
+    const ok = await this.createRegistrationRequest(row);
+    if (!ok) return;
+
+    document.getElementById("productRegistrationRequestModal")?.classList.remove("show");
+    this.closeSearchModal?.();
+
+    document.querySelectorAll(".tab-btn").forEach((btn) => btn.classList.remove("active"));
+    document.querySelectorAll(".page").forEach((page) => page.classList.remove("active"));
+
+    document.querySelector(".tab-btn[data-tab=\"product-management\"]")?.classList.add("active");
+    document.getElementById("page-product-management")?.classList.add("active");
+
+    window.ReagentApp.productManagement?.init?.();
+    window.ReagentApp.productManagement?.loadRequests?.();
+    return true;
   },
 
   async createRegistrationRequest(row) {
@@ -398,7 +464,7 @@ window.ReagentApp.request = {
 
     if (!sb) {
       window.ReagentApp.toast?.("Supabase 연결 정보가 없습니다. supabase.js 로딩을 확인하세요.", "warn");
-      return;
+      return false;
     }
 
     const payload = {
@@ -417,7 +483,7 @@ window.ReagentApp.request = {
 
     if (!payload.name) {
       window.ReagentApp.toast?.("제품명은 필수입니다.", "warn");
-      return;
+      return false;
     }
 
     const { error } = await sb
@@ -427,11 +493,12 @@ window.ReagentApp.request = {
     if (error) {
       console.error("제품 등록 요청 실패:", error);
       window.ReagentApp.toast?.(`제품 등록 요청 실패: ${error.message || "원인을 확인하세요."}`, "warn");
-      return;
+      return false;
     }
 
     window.ReagentApp.toast?.("제품 등록 요청이 저장되었습니다.", "success");
     window.ReagentApp.productManagement?.loadRequests?.();
+    return true;
   },
 
   getCurrentUser() {
