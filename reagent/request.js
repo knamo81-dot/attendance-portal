@@ -709,7 +709,10 @@ window.ReagentApp.request = {
                     <button type="button" class="ghost-btn my-registration-delete-btn" data-id="${row.id}">삭제</button>
                   `
                   : status === "반려"
-                    ? `<button type="button" class="ghost-btn my-registration-delete-btn" data-id="${row.id}">삭제</button>`
+                    ? `
+                      <button type="button" class="ghost-btn my-registration-rerequest-btn" data-id="${row.id}">재요청</button>
+                      <button type="button" class="ghost-btn my-registration-delete-btn" data-id="${row.id}">삭제</button>
+                    `
                     : ""
               }
             </div>
@@ -724,6 +727,10 @@ window.ReagentApp.request = {
 
     tbody.querySelectorAll(".my-registration-delete-btn").forEach((btn) => {
       btn.addEventListener("click", () => this.deleteMyRegistrationRequest(Number(btn.dataset.id)));
+    });
+
+    tbody.querySelectorAll(".my-registration-rerequest-btn").forEach((btn) => {
+      btn.addEventListener("click", () => this.reRequestMyRegistrationRequest(Number(btn.dataset.id)));
     });
   },
 
@@ -901,6 +908,68 @@ window.ReagentApp.request = {
     this.renderMyRegistrationRequests();
     window.ReagentApp.productManagement?.loadRequests?.();
     window.ReagentApp.toast?.("제품 등록 요청이 삭제되었습니다.", "success");
+  },
+
+  async reRequestMyRegistrationRequest(id) {
+    const row = (this.myRegistrationRequests || []).find((item) => Number(item.id) === Number(id));
+    if (!row) {
+      window.ReagentApp.toast?.("재요청할 요청을 찾지 못했습니다.", "warn");
+      return;
+    }
+
+    const status = this.getDisplayRequestStatus(row.status);
+    if (status !== "반려") {
+      window.ReagentApp.toast?.("반려 상태의 요청만 재요청할 수 있습니다.", "warn");
+      return;
+    }
+
+    const ok = confirm("반려된 내용을 복사해서 새 요청으로 다시 등록하시겠습니까?
+기존 반려건은 기록으로 남습니다.");
+    if (!ok) return;
+
+    const sb = window.ReagentApp.sb;
+    if (!sb) {
+      window.ReagentApp.toast?.("Supabase 연결 정보가 없습니다.", "warn");
+      return;
+    }
+
+    const currentUser = this.getCurrentUser();
+    const payload = {
+      category: row.category || "",
+      name: row.name || "",
+      maker: row.maker || "",
+      code: row.code || "",
+      capacity: row.capacity || "",
+      cas: row.cas || "",
+      grade: row.grade || "",
+      usage: row.usage || "",
+      requester: row.requester || currentUser.name || "미지정",
+      team: row.team || currentUser.team || "미지정팀",
+      status: "요청",
+      reject_reason: ""
+    };
+
+    if (!payload.name) {
+      window.ReagentApp.toast?.("제품명은 필수입니다.", "warn");
+      return;
+    }
+
+    const { data, error } = await sb
+      .from("product_registration_requests")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("제품 등록 재요청 실패:", error);
+      window.ReagentApp.toast?.(`제품 등록 재요청 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      return;
+    }
+
+    if (data) this.myRegistrationRequests.unshift(data);
+    this.renderMyRegistrationRequests();
+    window.ReagentApp.productManagement?.loadRequests?.();
+    window.ReagentApp.toast?.("제품 등록 요청을 다시 등록했습니다.", "success");
   },
 
   getCurrentUser() {
