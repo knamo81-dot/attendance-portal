@@ -431,7 +431,6 @@ window.ReagentApp.productManagement = {
         const editBtn = e.target.closest("[data-pm-request-edit]");
         const approveBtn = e.target.closest("[data-pm-request-approve]");
         const rejectBtn = e.target.closest("[data-pm-request-reject]");
-        const cancelRejectBtn = e.target.closest("[data-pm-request-cancel-reject]");
 
         if (editBtn) {
           this.openRequestEditModal(Number(editBtn.dataset.pmRequestEdit));
@@ -448,9 +447,6 @@ window.ReagentApp.productManagement = {
           return;
         }
 
-        if (cancelRejectBtn) {
-          this.cancelRejectRequest(Number(cancelRejectBtn.dataset.pmRequestCancelReject));
-        }
       });
     }
 
@@ -483,9 +479,6 @@ window.ReagentApp.productManagement = {
               <button class="ghost-btn" data-pm-request-edit="${r.id}" type="button">수정</button>
               <button class="ghost-btn" data-pm-request-approve="${r.id}" type="button">승인</button>
               <button class="ghost-btn" data-pm-request-reject="${r.id}" type="button">반려</button>
-            ` : ""}
-            ${displayStatus === "반려" ? `
-              <button class="ghost-btn" data-pm-request-cancel-reject="${r.id}" type="button">반려취소</button>
             ` : ""}
           </div>
         </td>
@@ -736,40 +729,4 @@ window.ReagentApp.productManagement = {
     await this.refreshLinkedRequestStatus();
   },
 
-  async cancelRejectRequest(id) {
-    const request = this.requests.find((r) => Number(r.id) === Number(id));
-    if (!request) {
-      this.toast("반려취소할 요청을 찾지 못했습니다.", "warn");
-      return;
-    }
-
-    const displayStatus = this.getDisplayRequestStatus(request.status);
-    if (displayStatus !== "반려") {
-      this.toast("반려 상태의 요청만 반려취소할 수 있습니다.", "warn");
-      return;
-    }
-
-    const ok = confirm("이 요청의 반려를 취소하고 다시 요청 상태로 되돌리시겠습니까?");
-    if (!ok) return;
-
-    const { error } = await this.sb
-      .from("product_registration_requests")
-      .update({
-        status: "요청",
-        reject_reason: "",
-        handled_by: "",
-        handled_at: null
-      })
-      .eq("id", id);
-
-    if (error) {
-      console.error("반려취소 실패:", error);
-      this.toast(`반려취소 실패: ${error.message || "원인을 확인하세요."}`, "warn");
-      return;
-    }
-
-    this.toast("반려가 취소되어 요청 상태로 돌아갔습니다.", "success");
-    await this.loadRequests();
-    await this.refreshLinkedRequestStatus();
-  }
 };
