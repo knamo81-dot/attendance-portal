@@ -252,8 +252,10 @@ window.ReagentApp.productManagement = {
     const { data, error } = await this.sb
       .from("product_master")
       .select("*")
-      .order("is_active", { ascending: false })
-      .order("name", { ascending: true });
+      .order("maker", { ascending: true })
+      .order("name", { ascending: true })
+      .order("capacity", { ascending: true })
+      .order("code", { ascending: true });
 
     if (error) {
       console.error("제품 마스터 조회 실패:", error);
