@@ -51,6 +51,60 @@ window.ReagentApp.productManagement = {
     return "요청";
   },
 
+  normalizeDuplicateValue(value) {
+    return String(value || "").trim().toLowerCase();
+  },
+
+  async confirmProductMasterDuplicate(row = {}, options = {}) {
+    const nameKey = this.normalizeDuplicateValue(row.name);
+    const codeKey = this.normalizeDuplicateValue(row.code);
+
+    if (!nameKey && !codeKey) return true;
+
+    let masterRows = Array.isArray(this.products) ? this.products : [];
+
+    if (!masterRows.length && this.sb) {
+      const { data, error } = await this.sb
+        .from("product_master")
+        .select("id, category, name, maker, code, capacity, cas, grade, default_vendor, memo, is_active")
+        .limit(3000);
+
+      if (error) {
+        console.warn("제품 마스터 중복 확인 실패:", error);
+        return true;
+      }
+
+      masterRows = Array.isArray(data) ? data : [];
+    }
+
+    const excludeProductId = options.excludeProductId ? Number(options.excludeProductId) : null;
+    const duplicateProducts = masterRows.filter((product) => {
+      if (excludeProductId && Number(product.id) === excludeProductId) return false;
+
+      const sameName = nameKey && this.normalizeDuplicateValue(product.name) === nameKey;
+      const sameCode = codeKey && this.normalizeDuplicateValue(product.code) === codeKey;
+      return sameName || sameCode;
+    });
+
+    if (!duplicateProducts.length) return true;
+
+    const sample = duplicateProducts[0] || {};
+    const sameName = nameKey && this.normalizeDuplicateValue(sample.name) === nameKey;
+    const sameCode = codeKey && this.normalizeDuplicateValue(sample.code) === codeKey;
+    const reasonText = [sameName ? "품명" : "", sameCode ? "제품코드" : ""].filter(Boolean).join(" / ") || "품명 또는 제품코드";
+    const prefix = options.prefix || "이미 등록된 제품이 있습니다.";
+
+    return confirm(
+      `${prefix}\n\n` +
+      `${reasonText}가 같은 제품이 이미 제품 마스터에 등록되어 있습니다.\n\n` +
+      `기존 품명: ${sample.name || "-"}\n` +
+      `기존 제품코드: ${sample.code || "-"}\n` +
+      `기존 제조사: ${sample.maker || "-"}\n` +
+      `중복 후보: ${duplicateProducts.length}건\n\n` +
+      "그래도 계속 진행하시겠습니까?"
+    );
+  },
+
   init() {
     if (!this.isAdminUser()) {
       const page = document.getElementById("page-product-management");
@@ -330,40 +384,12 @@ window.ReagentApp.productManagement = {
       return;
     }
 
-    const normalizeDuplicateValue = (value) => String(value || "").trim().toLowerCase();
-    const inputNameKey = normalizeDuplicateValue(row.name);
-    const inputCodeKey = normalizeDuplicateValue(row.code);
+    const canSaveProduct = await this.confirmProductMasterDuplicate(row, {
+      excludeProductId: this.editingProductId,
+      prefix: this.editingProductId ? "제품 수정 중 중복 가능성이 있습니다." : "제품 등록 중 중복 가능성이 있습니다."
+    });
 
-    if (inputNameKey || inputCodeKey) {
-      const duplicateProducts = (this.products || []).filter((product) => {
-        const isCurrentEditingProduct =
-          this.editingProductId && Number(product.id) === Number(this.editingProductId);
-
-        if (isCurrentEditingProduct) return false;
-
-        const sameName = inputNameKey && normalizeDuplicateValue(product.name) === inputNameKey;
-        const sameCode = inputCodeKey && normalizeDuplicateValue(product.code) === inputCodeKey;
-
-        return sameName || sameCode;
-      });
-
-      if (duplicateProducts.length) {
-        const sample = duplicateProducts[0] || {};
-        const sameName = inputNameKey && normalizeDuplicateValue(sample.name) === inputNameKey;
-        const sameCode = inputCodeKey && normalizeDuplicateValue(sample.code) === inputCodeKey;
-        const reasonText = [sameName ? "품명" : "", sameCode ? "제품코드" : ""].filter(Boolean).join(" / ");
-
-        const ok = confirm(
-          `${reasonText || "품명 또는 제품코드"}가 같은 제품이 이미 등록되어 있습니다.\n\n` +
-          `기존 품명: ${sample.name || "-"}\n` +
-          `기존 제품코드: ${sample.code || "-"}\n` +
-          `기존 제조사: ${sample.maker || "-"}\n\n` +
-          "그래도 계속 저장하시겠습니까?"
-        );
-
-        if (!ok) return;
-      }
-    }
+    if (!canSaveProduct) return;
 
     try {
       let error;
@@ -663,6 +689,12 @@ window.ReagentApp.productManagement = {
       return;
     }
 
+    const canSaveRequestEdit = await this.confirmProductMasterDuplicate(row, {
+      prefix: "제품 등록 요청 수정 중 중복 가능성이 있습니다."
+    });
+
+    if (!canSaveRequestEdit) return;
+
     const { error } = await this.sb
       .from("product_registration_requests")
       .update(row)
@@ -720,6 +752,12 @@ window.ReagentApp.productManagement = {
         created_by: user.name,
         updated_by: user.name
       };
+
+      const canApprove = await this.confirmProductMasterDuplicate(productRow, {
+        prefix: "요청 승인 중 중복 가능성이 있습니다."
+      });
+
+      if (!canApprove) return;
 
       const { error: insertError } = await this.sb
         .from("product_master")
