@@ -149,7 +149,6 @@ window.ReagentApp.bindEvents = function () {
 
   els.addItem?.addEventListener("click", () => request.addCurrentItem());
   els.clearForm?.addEventListener("click", () => request.clearForm());
-  els.loadSample?.addEventListener("click", () => request.insertSample());
   els.clearDraft?.addEventListener("click", () => {
     request.openClearDataDialog?.();
   });
@@ -389,6 +388,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.ReagentApp.bindTabs();
   window.ReagentApp.request.populateMakerOptions();
   window.ReagentApp.bindEvents();
+  window.ReagentApp.request.bindRegistrationStatusPanel?.();
+  window.ReagentApp.request.setRequestPanelView?.("list");
   window.ReagentApp.request.renderSearchResults();
   window.ReagentApp.request.fetchData();
 
