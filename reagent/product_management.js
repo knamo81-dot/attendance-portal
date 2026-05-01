@@ -261,11 +261,9 @@ window.ReagentApp.productManagement = {
     els.showProductPanel?.classList.toggle("primary", !showRequest);
     els.showRequestPanel?.classList.toggle("primary", showRequest);
 
-    if (els.pageTitle) els.pageTitle.textContent = showRequest ? "제품 등록 요청 관리" : "제품 마스터 관리";
+    if (els.pageTitle) els.pageTitle.textContent = "제품관리";
     if (els.pageDesc) {
-      els.pageDesc.textContent = showRequest
-        ? "담당자가 제품신청 화면에서 요청한 미등록 제품을 확인하고 승인 또는 반려합니다."
-        : "제품신청 화면의 제품검색과 자동입력에 사용되는 기준 데이터를 관리합니다.";
+      els.pageDesc.textContent = "관리자·운영자 전용 제품 마스터 및 미등록 제품 요청 관리 화면입니다.";
     }
 
     if (showRequest) {
