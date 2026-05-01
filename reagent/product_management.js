@@ -450,9 +450,14 @@ window.ReagentApp.productManagement = {
         <td>${this.html(r.reject_reason || r.handled_by || "")}</td>
         <td>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            <button class="ghost-btn" data-pm-request-edit="${r.id}" type="button">수정</button>
-            ${r.status !== "등록완료" ? `<button class="ghost-btn" data-pm-request-approve="${r.id}" type="button">승인</button>` : ""}
-            ${r.status !== "등록완료" ? `<button class="ghost-btn" data-pm-request-reject="${r.id}" type="button">반려</button>` : ""}
+            ${displayStatus === "요청" ? `
+              <button class="ghost-btn" data-pm-request-edit="${r.id}" type="button">수정</button>
+              <button class="ghost-btn" data-pm-request-approve="${r.id}" type="button">승인</button>
+              <button class="ghost-btn" data-pm-request-reject="${r.id}" type="button">반려</button>
+            ` : ""}
+            ${displayStatus === "반려" ? `
+              <button class="ghost-btn" data-pm-request-cancel-reject="${r.id}" type="button">반려취소</button>
+            ` : ""}
           </div>
         </td>
       </tr>
@@ -473,6 +478,10 @@ window.ReagentApp.productManagement = {
 
     els.requestList.querySelectorAll("[data-pm-request-reject]").forEach((btn) => {
       btn.addEventListener("click", () => this.rejectRequest(Number(btn.dataset.pmRequestReject)));
+    });
+
+    els.requestList.querySelectorAll("[data-pm-request-cancel-reject]").forEach((btn) => {
+      btn.addEventListener("click", () => this.cancelRejectRequest(Number(btn.dataset.pmRequestCancelReject)));
     });
   },
 
@@ -588,8 +597,9 @@ window.ReagentApp.productManagement = {
       cas: this.getRequestEditValue("pmReqCas"),
       grade: this.getRequestEditValue("pmReqGrade"),
       usage: this.getRequestEditValue("pmReqUsage"),
-      status: "확인중",
-      handled_by: user.name,
+      status: "요청",
+      handled_by: "",
+      handled_at: null,
       reject_reason: ""
     };
 
@@ -710,6 +720,43 @@ window.ReagentApp.productManagement = {
     }
 
     this.toast("요청이 반려 처리되었습니다.", "success");
+    await this.loadRequests();
+    await this.refreshLinkedRequestStatus();
+  },
+
+  async cancelRejectRequest(id) {
+    const request = this.requests.find((r) => Number(r.id) === Number(id));
+    if (!request) {
+      this.toast("반려취소할 요청을 찾지 못했습니다.", "warn");
+      return;
+    }
+
+    const displayStatus = this.getDisplayRequestStatus(request.status);
+    if (displayStatus !== "반려") {
+      this.toast("반려 상태의 요청만 반려취소할 수 있습니다.", "warn");
+      return;
+    }
+
+    const ok = confirm("이 요청의 반려를 취소하고 다시 요청 상태로 되돌리시겠습니까?");
+    if (!ok) return;
+
+    const { error } = await this.sb
+      .from("product_registration_requests")
+      .update({
+        status: "요청",
+        reject_reason: "",
+        handled_by: "",
+        handled_at: null
+      })
+      .eq("id", id);
+
+    if (error) {
+      console.error("반려취소 실패:", error);
+      this.toast(`반려취소 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      return;
+    }
+
+    this.toast("반려가 취소되어 요청 상태로 돌아갔습니다.", "success");
     await this.loadRequests();
     await this.refreshLinkedRequestStatus();
   }
