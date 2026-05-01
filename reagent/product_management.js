@@ -139,6 +139,10 @@ window.ReagentApp.productManagement = {
       productActive: document.getElementById("pmProductActive"),
       productList: document.getElementById("pmProductList"),
       productCount: document.getElementById("pmProductCount"),
+      totalCount: document.getElementById("pmTotalCount"),
+      activeCount: document.getElementById("pmActiveCount"),
+      inactiveCount: document.getElementById("pmInactiveCount"),
+      pendingCount: document.getElementById("pmPendingCount"),
 
       formTitle: document.getElementById("pmFormTitle"),
       productId: document.getElementById("pmProductId"),
@@ -329,12 +333,32 @@ window.ReagentApp.productManagement = {
     });
   },
 
+  updateManagementKpi() {
+    const els = this.getEls();
+    const products = Array.isArray(this.products) ? this.products : [];
+    const requests = Array.isArray(this.requests) ? this.requests : [];
+
+    const total = products.length;
+    const active = products.filter((p) => p.is_active !== false).length;
+    const inactive = products.filter((p) => p.is_active === false).length;
+    const pending = requests.filter((r) => this.getDisplayRequestStatus(r.status) === "요청").length;
+
+    if (els.totalCount) els.totalCount.textContent = `${total}건`;
+    if (els.activeCount) els.activeCount.textContent = `${active}건`;
+    if (els.inactiveCount) els.inactiveCount.textContent = `${inactive}건`;
+    if (els.pendingCount) els.pendingCount.textContent = `${pending}건`;
+
+    // 이전 버전 index.html과 같이 쓰더라도 카운트가 깨지지 않도록 유지합니다.
+    if (els.productCount) els.productCount.textContent = `제품 ${total}건`;
+    if (els.requestCount) els.requestCount.textContent = `요청 ${pending}건`;
+  },
+
   renderProducts() {
     const els = this.getEls();
     if (!els.productList) return;
 
     const rows = this.getFilteredProducts();
-    if (els.productCount) els.productCount.textContent = `제품 ${rows.length}건`;
+    this.updateManagementKpi();
 
     if (!rows.length) {
       els.productList.innerHTML = `<tr><td class="empty" colspan="11">등록된 제품이 없습니다.</td></tr>`;
@@ -572,6 +596,7 @@ window.ReagentApp.productManagement = {
     }
 
     const rows = this.getFilteredRequests();
+    this.updateManagementKpi();
     if (els.requestCount) els.requestCount.textContent = `요청 ${rows.length}건`;
 
     if (!rows.length) {
