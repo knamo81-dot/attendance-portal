@@ -245,7 +245,7 @@ window.ReagentApp.productManagement = {
     els.productList.innerHTML = rows.map((p) => `
       <tr class="${p.is_active ? "" : "request-row-collected"}">
         <td>${this.html(p.category)}</td>
-        <td><button class="product-link" data-pm-edit="${p.id}" type="button">${this.html(p.name)}</button></td>
+        <td>${this.html(p.name)}</td>
         <td>${this.html(p.maker)}</td>
         <td>${this.html(p.code)}</td>
         <td>${this.html(p.capacity)}</td>
