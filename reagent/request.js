@@ -270,9 +270,20 @@ window.ReagentApp.request = {
     const { els } = window.ReagentApp;
     if (!els.searchResults) return;
 
-    els.searchResults.innerHTML = `<div class="empty">제품 마스터를 조회하는 중입니다.</div>`;
+    // 검색 입력 시 모달 높이가 순간적으로 줄었다 늘어나는 현상을 줄이기 위해
+    // 결과 영역의 최소 높이를 고정하고, 캐시가 있을 때는 로딩 문구로 전체 교체하지 않습니다.
+    els.searchResults.style.minHeight = "164px";
+
+    const searchSeq = (this._searchRenderSeq || 0) + 1;
+    this._searchRenderSeq = searchSeq;
+
+    if (!this.productMasterRows.length) {
+      els.searchResults.innerHTML = `<div class="empty">제품 마스터를 조회하는 중입니다.</div>`;
+    }
 
     const rows = await this.loadProductMaster();
+    if (searchSeq !== this._searchRenderSeq) return;
+
     const results = this.filterProductMasterRows(rows);
 
     if (els.resultInfo) {
@@ -499,10 +510,56 @@ window.ReagentApp.request = {
   },
 
 
+  ensureMyRegistrationRequestFilters() {
+    const legacyFilter = document.getElementById("myRequestStatusFilter");
+    const filterField = legacyFilter?.closest?.(".field");
+
+    if (filterField && legacyFilter && legacyFilter.options && !Array.from(legacyFilter.options).some((opt) => opt.value === "요청")) {
+      legacyFilter.innerHTML = `
+        <option value="">전체</option>
+        <option value="요청">요청</option>
+        <option value="등록">등록</option>
+        <option value="반려">반려</option>
+      `;
+    }
+
+    const filterRow = filterField?.parentElement;
+    if (filterRow) {
+      filterRow.classList.add("compact-filter-row");
+      filterRow.querySelectorAll(".field").forEach((field) => field.classList.add("compact-filter-item"));
+    }
+
+    if (filterField && !document.getElementById("myRequestPeriodFilter")) {
+      const periodField = document.createElement("div");
+      periodField.className = "field compact-filter-item";
+      periodField.innerHTML = `
+        <label>기간</label>
+        <select id="myRequestPeriodFilter">
+          <option value="1m">최근 1개월</option>
+          <option value="3m" selected>최근 3개월</option>
+          <option value="6m">최근 6개월</option>
+          <option value="all">전체</option>
+        </select>
+      `;
+      filterField.insertAdjacentElement("afterend", periodField);
+    }
+  },
+
+  getRequestProgressStatus(status) {
+    const displayStatus = this.getDisplayRequestStatus(status) {
+    const value = String(status || "요청").trim();
+    if (value === "등록완료") return "등록";
+    if (value === "반려") return "반려";
+    return "요청";
+  },
+
   bindRegistrationStatusPanel() {
+    this.ensureMyRegistrationRequestFilters?.();
+
     const listBtn = document.getElementById("showRequestListPanel");
     const statusBtn = document.getElementById("showRequestStatusPanel");
-    const filter = document.getElementById("myRequestStatusFilter");
+    const statusFilter = document.getElementById("myRequestStatusFilter");
+    const periodFilter = document.getElementById("myRequestPeriodFilter");
     const refresh = document.getElementById("refreshMyRegistrationRequests");
 
     if (listBtn && !listBtn.dataset.bound) {
@@ -518,15 +575,51 @@ window.ReagentApp.request = {
       });
     }
 
-    if (filter && !filter.dataset.bound) {
-      filter.dataset.bound = "1";
-      filter.addEventListener("change", () => this.renderMyRegistrationRequests());
+    [statusFilter, periodFilter].forEach((filterEl) => {
+      if (filterEl && !filterEl.dataset.bound) {
+        filterEl.dataset.bound = "1";
+        filterEl.addEventListener("change", () => this.renderMyRegistrationRequests() {
+    const tbody = document.getElementById("myRegistrationRequestList");
+    const badge = document.getElementById("myRequestStatusBadge");
+    const statusFilter = document.getElementById("myRequestStatusFilter")?.value || "";
+    const periodFilter = document.getElementById("myRequestPeriodFilter")?.value || "3m";
+    if (!tbody) return;
+
+    const rows = (this.myRegistrationRequests || []).filter((row) => {
+      const displayStatus = this.getDisplayRequestStatus(row.status);
+      if (statusFilter && displayStatus !== statusFilter) return false;
+      if (!this.isWithinRequestPeriod(row.created_at || row.id, periodFilter)) return false;
+      return true;
+    });
+
+    if (badge) badge.textContent = "내 요청 " + rows.length + "건";
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td class="empty" colspan="11">제품 등록 요청 현황이 없습니다.</td></tr>';
+      return;
     }
 
-    if (refresh && !refresh.dataset.bound) {
-      refresh.dataset.bound = "1";
-      refresh.addEventListener("click", () => this.loadMyRegistrationRequests(true));
-    }
+    tbody.innerHTML = rows.map((row) => {
+      const status = this.getDisplayRequestStatus(row.status);
+      const statusColor = status === "등록" ? "#16a34a" : (status === "반려" ? "#dc2626" : "#1d4ed8");
+      const handledText = row.reject_reason || row.handled_by || "";
+      return `
+        <tr>
+          <td>${this.html(this.formatDateTime(row.created_at || row.id))}</td>
+          <td><span style="font-weight:800; color:${statusColor};">${this.html(status)}</span></td>
+          <td>${this.html(row.category)}</td>
+          <td>${this.html(row.name)}</td>
+          <td>${this.html(row.maker)}</td>
+          <td>${this.html(row.code)}</td>
+          <td>${this.html(row.cas)}</td>
+          <td>${this.html(row.grade)}</td>
+          <td>${this.html(row.capacity)}</td>
+          <td>${this.html(row.usage)}</td>
+          <td>${this.html(handledText)}</td>
+        </tr>
+      `;
+    }).join("");
+  },
   },
 
   setRequestPanelView(view = "list") {
@@ -538,8 +631,6 @@ window.ReagentApp.request = {
     const statusBtn = document.getElementById("showRequestStatusPanel");
     const title = document.getElementById("requestListSectionTitle");
     const desc = document.getElementById("requestListSectionDesc");
-    const badge = window.ReagentApp.els?.draftCountBadge;
-
     const showStatus = this.activeRequestPanel === "status";
     if (appPanel) appPanel.style.display = showStatus ? "none" : "";
     if (statusPanel) statusPanel.style.display = showStatus ? "" : "none";
@@ -549,8 +640,6 @@ window.ReagentApp.request = {
 
     if (title) title.textContent = showStatus ? "제품 등록 요청 현황" : "신청 목록";
     if (desc) desc.textContent = showStatus ? "내가 요청한 미등록 제품의 진행상황을 확인합니다." : "체크한 품목만 취합 탭으로 반영됩니다.";
-    if (badge) badge.style.display = showStatus ? "none" : "inline-flex";
-
     if (showStatus) this.renderMyRegistrationRequests();
   },
 
@@ -598,14 +687,24 @@ window.ReagentApp.request = {
   },
 
   renderMyRegistrationRequests() {
+    this.ensureMyRegistrationRequestFilters?.();
+
     const tbody = document.getElementById("myRegistrationRequestList");
     const badge = document.getElementById("myRequestStatusBadge");
-    const filter = document.getElementById("myRequestStatusFilter")?.value || "";
+    const progressFilter = document.getElementById("myRequestProgressFilter")?.value || "";
+    const resultFilter = document.getElementById("myRequestResultFilter")?.value || "";
+    const periodFilter = document.getElementById("myRequestPeriodFilter")?.value || "3m";
     if (!tbody) return;
 
     const rows = (this.myRegistrationRequests || []).filter((row) => {
       const displayStatus = this.getDisplayRequestStatus(row.status);
-      return !filter || displayStatus === filter;
+      const progressStatus = this.getRequestProgressStatus(row.status);
+
+      if (progressFilter && progressStatus !== progressFilter) return false;
+      if (resultFilter && displayStatus !== resultFilter) return false;
+      if (!this.isWithinRequestPeriod(row.created_at || row.id, periodFilter)) return false;
+
+      return true;
     });
 
     if (badge) badge.textContent = "내 요청 " + rows.length + "건";
@@ -1210,7 +1309,6 @@ window.ReagentApp.request = {
       if (els.sumReagent) els.sumReagent.textContent = "0";
       if (els.sumGlass) els.sumGlass.textContent = "0";
       if (els.sumSafety) els.sumSafety.textContent = "0";
-      if (els.draftCountBadge) els.draftCountBadge.textContent = "통합 항목 0건";
       return;
     }
 
@@ -1367,7 +1465,6 @@ window.ReagentApp.request = {
     if (els.sumReagent) els.sumReagent.textContent = String(groups.filter((g) => g.category === "시약").length);
     if (els.sumGlass) els.sumGlass.textContent = String(groups.filter((g) => g.category === "초자").length);
     if (els.sumSafety) els.sumSafety.textContent = String(groups.filter((g) => g.category === "안전용품").length);
-    if (els.draftCountBadge) els.draftCountBadge.textContent = `통합 항목 ${groups.length}건`;
   },
 
   formatDateTime(value) {
