@@ -395,7 +395,22 @@ window.ReagentApp.productManagement = {
       return;
     }
 
-    this.requests = Array.isArray(data) ? data : [];
+    const statusOrder = { "요청": 0, "반려": 1, "등록": 2 };
+    this.requests = (Array.isArray(data) ? data : []).sort((a, b) => {
+      const statusA = this.getDisplayRequestStatus(a.status);
+      const statusB = this.getDisplayRequestStatus(b.status);
+      const orderA = Object.prototype.hasOwnProperty.call(statusOrder, statusA) ? statusOrder[statusA] : 99;
+      const orderB = Object.prototype.hasOwnProperty.call(statusOrder, statusB) ? statusOrder[statusB] : 99;
+
+      if (orderA !== orderB) return orderA - orderB;
+
+      const timeA = new Date(a.created_at || a.id || 0).getTime();
+      const timeB = new Date(b.created_at || b.id || 0).getTime();
+      const safeTimeA = Number.isNaN(timeA) ? 0 : timeA;
+      const safeTimeB = Number.isNaN(timeB) ? 0 : timeB;
+
+      return safeTimeB - safeTimeA;
+    });
     this.renderRequests();
   },
 
