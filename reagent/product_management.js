@@ -124,17 +124,25 @@ window.ReagentApp.productManagement = {
     // 포탈/iframe 로딩 순서 때문에 권한 조회보다 탭 클릭이 먼저 실행되는 경우를 방지합니다.
     await window.ReagentApp.loadReagentOperatorPermission?.();
 
+    const page = document.getElementById("page-product-management");
+
+    // 권한이 없을 때도 기존 제품관리 HTML을 삭제하지 않습니다.
+    // 기존처럼 page.innerHTML로 덮어쓰면, 이후 권한 조회가 정상 완료되어도 화면을 복구할 수 없습니다.
     if (!this.isAdminUser()) {
-      const page = document.getElementById("page-product-management");
-      if (page) {
-        page.innerHTML = `
+      if (page && !document.getElementById("pmNoAuthNotice")) {
+        const notice = document.createElement("div");
+        notice.id = "pmNoAuthNotice";
+        notice.innerHTML = `
           <section class="card">
             <div class="card-body empty">제품관리 기능은 관리자·운영자만 사용할 수 있습니다.</div>
           </section>
         `;
+        page.prepend(notice);
       }
       return;
     }
+
+    document.getElementById("pmNoAuthNotice")?.remove();
 
     this.bindEvents();
     this.setProductManagementPanel("product");
