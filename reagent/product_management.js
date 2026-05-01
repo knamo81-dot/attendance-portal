@@ -425,6 +425,35 @@ window.ReagentApp.productManagement = {
     const els = this.getEls();
     if (!els.requestList) return;
 
+    if (!els.requestList.dataset.pmRequestDelegatedBound) {
+      els.requestList.dataset.pmRequestDelegatedBound = "1";
+      els.requestList.addEventListener("click", (e) => {
+        const editBtn = e.target.closest("[data-pm-request-edit]");
+        const approveBtn = e.target.closest("[data-pm-request-approve]");
+        const rejectBtn = e.target.closest("[data-pm-request-reject]");
+        const cancelRejectBtn = e.target.closest("[data-pm-request-cancel-reject]");
+
+        if (editBtn) {
+          this.openRequestEditModal(Number(editBtn.dataset.pmRequestEdit));
+          return;
+        }
+
+        if (approveBtn) {
+          this.approveRequest(Number(approveBtn.dataset.pmRequestApprove));
+          return;
+        }
+
+        if (rejectBtn) {
+          this.rejectRequest(Number(rejectBtn.dataset.pmRequestReject));
+          return;
+        }
+
+        if (cancelRejectBtn) {
+          this.cancelRejectRequest(Number(cancelRejectBtn.dataset.pmRequestCancelReject));
+        }
+      });
+    }
+
     const rows = this.getFilteredRequests();
     if (els.requestCount) els.requestCount.textContent = `요청 ${rows.length}건`;
 
@@ -464,25 +493,8 @@ window.ReagentApp.productManagement = {
     `;
     }).join("");
 
-    els.requestList.querySelectorAll("[data-pm-request-edit]").forEach((btn) => {
-      btn.addEventListener("click", () => this.openRequestEditModal(Number(btn.dataset.pmRequestEdit)));
-    });
+    // 버튼 클릭은 renderRequests 시작 부분의 이벤트 위임에서 처리합니다.
 
-    els.requestList.querySelectorAll("[data-pm-request-progress]").forEach((btn) => {
-      btn.addEventListener("click", () => this.markRequestInProgress(Number(btn.dataset.pmRequestProgress)));
-    });
-
-    els.requestList.querySelectorAll("[data-pm-request-approve]").forEach((btn) => {
-      btn.addEventListener("click", () => this.approveRequest(Number(btn.dataset.pmRequestApprove)));
-    });
-
-    els.requestList.querySelectorAll("[data-pm-request-reject]").forEach((btn) => {
-      btn.addEventListener("click", () => this.rejectRequest(Number(btn.dataset.pmRequestReject)));
-    });
-
-    els.requestList.querySelectorAll("[data-pm-request-cancel-reject]").forEach((btn) => {
-      btn.addEventListener("click", () => this.cancelRejectRequest(Number(btn.dataset.pmRequestCancelReject)));
-    });
   },
 
   ensureRequestEditModal() {
