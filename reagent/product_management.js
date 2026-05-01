@@ -365,12 +365,17 @@ window.ReagentApp.productManagement = {
         <td>${this.html(r.reject_reason || r.handled_by || "")}</td>
         <td>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            ${["요청", "확인중", "반려"].includes(r.status || "요청") ? `<button class="ghost-btn" data-pm-request-edit="${r.id}" type="button">수정</button>` : ""}
             ${r.status === "요청" ? `<button class="ghost-btn" data-pm-request-progress="${r.id}" type="button">확인중</button>` : ""}
             ${["요청", "확인중"].includes(r.status || "요청") ? `<button class="ghost-btn" data-pm-request-approve="${r.id}" type="button">승인</button><button class="ghost-btn" data-pm-request-reject="${r.id}" type="button">반려</button>` : ""}
           </div>
         </td>
       </tr>
     `).join("");
+
+    els.requestList.querySelectorAll("[data-pm-request-edit]").forEach((btn) => {
+      btn.addEventListener("click", () => this.openRequestEditModal(Number(btn.dataset.pmRequestEdit)));
+    });
 
     els.requestList.querySelectorAll("[data-pm-request-progress]").forEach((btn) => {
       btn.addEventListener("click", () => this.markRequestInProgress(Number(btn.dataset.pmRequestProgress)));
@@ -383,6 +388,144 @@ window.ReagentApp.productManagement = {
     els.requestList.querySelectorAll("[data-pm-request-reject]").forEach((btn) => {
       btn.addEventListener("click", () => this.rejectRequest(Number(btn.dataset.pmRequestReject)));
     });
+  },
+
+  ensureRequestEditModal() {
+    let modal = document.getElementById("pmRequestEditModal");
+    if (modal) return modal;
+
+    modal = document.createElement("div");
+    modal.className = "modal-backdrop";
+    modal.id = "pmRequestEditModal";
+    modal.innerHTML = `
+      <div class="modal" style="width:min(860px,100%);">
+        <div class="modal-head">
+          <div>
+            <h3>제품 등록 요청 수정</h3>
+            <div class="small">담당자가 요청한 내용을 확인한 뒤 표준 규격으로 수정해 저장합니다.</div>
+          </div>
+          <button type="button" class="btn" id="pmCloseRequestEditModal">닫기</button>
+        </div>
+        <div class="card-body">
+          <input type="hidden" id="pmEditRequestId" />
+          <div class="form-grid" style="grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start;">
+            <div class="field">
+              <label>분류</label>
+              <select id="pmReqCategory">
+                <option value="">선택</option>
+                <option value="시약">시약</option>
+                <option value="초자">초자</option>
+                <option value="안전용품">안전용품</option>
+              </select>
+            </div>
+            <div class="field"><label>품명 <span style="color:#dc2626;">*</span></label><input id="pmReqName" placeholder="예: Ethanol"/></div>
+            <div class="field"><label>제조사</label><input id="pmReqMaker" placeholder="예: Sigma"/></div>
+            <div class="field"><label>제품코드</label><input id="pmReqCode" placeholder="예: E7023"/></div>
+            <div class="field"><label>CAS</label><input id="pmReqCas" placeholder="예: 64-17-5"/></div>
+            <div class="field"><label>등급</label><input id="pmReqGrade" placeholder="예: ACS"/></div>
+            <div class="field"><label>규격</label><input id="pmReqCapacity" placeholder="예: 500 mL"/></div>
+            <div class="field"><label>요청사유 / 용도</label><input id="pmReqUsage" placeholder="예: 효능평가 전처리용"/></div>
+          </div>
+          <div class="small" style="margin-top:12px; color:#64748b;">
+            수정 저장 후 승인하면 이 값 그대로 제품 마스터에 등록됩니다.
+          </div>
+          <div class="actions" style="justify-content:flex-end; margin-top:18px;">
+            <button type="button" class="btn" id="pmCancelRequestEdit">취소</button>
+            <button type="button" class="btn primary" id="pmSaveRequestEdit">수정 저장</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => modal.classList.remove("show");
+    modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+    modal.querySelector("#pmCloseRequestEditModal")?.addEventListener("click", close);
+    modal.querySelector("#pmCancelRequestEdit")?.addEventListener("click", close);
+    modal.querySelector("#pmSaveRequestEdit")?.addEventListener("click", () => this.saveRequestEditFromModal());
+
+    return modal;
+  },
+
+  setRequestEditValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.value = value || "";
+  },
+
+  getRequestEditValue(id) {
+    return String(document.getElementById(id)?.value || "").trim();
+  },
+
+  openRequestEditModal(id) {
+    const request = this.requests.find((r) => Number(r.id) === Number(id));
+    if (!request) {
+      this.toast("수정할 요청을 찾지 못했습니다.", "warn");
+      return;
+    }
+
+    const modal = this.ensureRequestEditModal();
+
+    this.setRequestEditValue("pmEditRequestId", request.id);
+    this.setRequestEditValue("pmReqCategory", request.category || "");
+    this.setRequestEditValue("pmReqName", request.name || "");
+    this.setRequestEditValue("pmReqMaker", request.maker || "");
+    this.setRequestEditValue("pmReqCode", request.code || "");
+    this.setRequestEditValue("pmReqCas", request.cas || "");
+    this.setRequestEditValue("pmReqGrade", request.grade || "");
+    this.setRequestEditValue("pmReqCapacity", request.capacity || "");
+    this.setRequestEditValue("pmReqUsage", request.usage || "");
+
+    modal.classList.add("show");
+    setTimeout(() => document.getElementById("pmReqName")?.focus(), 0);
+  },
+
+  async saveRequestEditFromModal() {
+    if (!this.sb) {
+      this.toast("Supabase 연결 정보가 없습니다.", "warn");
+      return;
+    }
+
+    const id = Number(this.getRequestEditValue("pmEditRequestId"));
+    if (!id) {
+      this.toast("요청 ID를 찾지 못했습니다.", "warn");
+      return;
+    }
+
+    const user = this.getCurrentUser();
+    const row = {
+      category: this.getRequestEditValue("pmReqCategory"),
+      name: this.getRequestEditValue("pmReqName"),
+      maker: this.getRequestEditValue("pmReqMaker"),
+      code: this.getRequestEditValue("pmReqCode"),
+      capacity: this.getRequestEditValue("pmReqCapacity"),
+      cas: this.getRequestEditValue("pmReqCas"),
+      grade: this.getRequestEditValue("pmReqGrade"),
+      usage: this.getRequestEditValue("pmReqUsage"),
+      status: "확인중",
+      handled_by: user.name,
+      reject_reason: ""
+    };
+
+    if (!row.name) {
+      this.toast("품명은 필수입니다.", "warn");
+      return;
+    }
+
+    const { error } = await this.sb
+      .from("product_registration_requests")
+      .update(row)
+      .eq("id", id);
+
+    if (error) {
+      console.error("제품 등록 요청 수정 실패:", error);
+      this.toast(`제품 등록 요청 수정 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      return;
+    }
+
+    document.getElementById("pmRequestEditModal")?.classList.remove("show");
+    this.toast("제품 등록 요청이 수정되었습니다.", "success");
+    await this.loadRequests();
   },
 
   async markRequestInProgress(id) {
