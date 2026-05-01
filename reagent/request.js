@@ -733,7 +733,7 @@ window.ReagentApp.request = {
                   `
                   : status === "반려"
                     ? `
-                      <button type="button" class="ghost-btn my-registration-rerequest-btn" data-id="${row.id}">재요청</button>
+                      ${row.retry_created ? "" : `<button type="button" class="ghost-btn my-registration-rerequest-btn" data-id="${row.id}">재요청</button>`}
                       <button type="button" class="ghost-btn my-registration-delete-btn" data-id="${row.id}">삭제</button>
                     `
                     : ""
@@ -959,7 +959,8 @@ window.ReagentApp.request = {
       requester: row.requester || currentUser.name || "미지정",
       team: row.team || currentUser.team || "미지정팀",
       status: "요청",
-      reject_reason: ""
+      reject_reason: "",
+      retry_created: false
     };
 
     if (!payload.name) {
@@ -979,7 +980,26 @@ window.ReagentApp.request = {
       return;
     }
 
+    const { error: markError } = await sb
+      .from("product_registration_requests")
+      .update({ retry_created: true })
+      .eq("id", id);
+
+    if (markError) {
+      console.error("기존 반려건 재요청 표시 업데이트 실패:", markError);
+      window.ReagentApp.toast?.(`재요청은 저장되었지만 기존 반려건 표시 업데이트에 실패했습니다: ${markError.message || "원인을 확인하세요."}`, "warn");
+    }
+
     if (data) this.myRegistrationRequests.unshift(data);
+
+    const originalIdx = this.myRegistrationRequests.findIndex((item) => Number(item.id) === Number(id));
+    if (originalIdx >= 0) {
+      this.myRegistrationRequests[originalIdx] = {
+        ...this.myRegistrationRequests[originalIdx],
+        retry_created: true
+      };
+    }
+
     this.renderMyRegistrationRequests();
     window.ReagentApp.productManagement?.loadRequests?.();
     window.ReagentApp.toast?.("제품 등록 요청을 다시 등록했습니다.", "success");
