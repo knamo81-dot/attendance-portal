@@ -19,7 +19,7 @@
     </div>
   </div>
 </section>
-<div class="tabs"><button class="tab-btn active" data-tab="request">제품신청</button><button class="tab-btn" data-tab="collect">제품취합</button><button class="tab-btn" data-tab="prepare">취합정리</button></div>
+<div class="tabs"><button class="tab-btn active" data-tab="request">제품신청</button><button class="tab-btn" data-tab="collect">제품취합</button><button class="tab-btn" data-tab="prepare">취합정리</button><button class="tab-btn" data-tab="product-management">제품관리</button></div>
 <section class="page active" id="page-request"><section class="card"><div class="card-head"><div style="min-width:0;"><div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><h2 style="margin:0;">제품 신청</h2><div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:700; font-size:13px; color:#334155;">주문월</span><select id="orderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:130px;"></select><span class="small" id="orderMonthDesc" style="color:#6b7280;">선택한 주문월에 발주할 품목을 신청합니다.</span></div></div><p>제품은 검색해서 선택하고 수량/용도만 입력합니다.</p></div><div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;"><button class="btn primary" id="openSearch" style="width:auto; padding:10px 14px; white-space:nowrap;">제품검색</button><span class="badge blue">검색 → 자동입력 → 수량/용도</span></div></div>
 <div class="card-body"><div class="form-grid">
 <div class="field"><label>분류</label><input id="category" placeholder="자동입력" readonly/></div>
@@ -200,6 +200,102 @@
     </div>
   </section>
 </section>
+
+<section class="page" id="page-product-management">
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>제품관리</h2>
+        <p>관리자·운영자 전용 제품 마스터 및 미등록 제품 요청 관리 화면입니다.</p>
+      </div>
+      <span class="badge blue">제품 마스터 / 등록 요청</span>
+    </div>
+    <div class="card-body">
+      <div class="summary">
+        <div class="tile"><div class="k">제품 마스터</div><div class="v" id="pmProductCount">제품 0건</div></div>
+        <div class="tile"><div class="k">등록 요청</div><div class="v" id="pmRequestCount">요청 0건</div></div>
+        <div class="tile"><div class="k">기본 정책</div><div class="v" style="font-size:20px;">사용중지</div></div>
+        <div class="tile"><div class="k">검색 기준</div><div class="v" style="font-size:20px;">사용 제품</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:12px;">
+    <div class="card-head">
+      <div>
+        <h3>제품 마스터 관리</h3>
+        <p>제품신청 화면의 제품검색과 자동입력에 사용되는 기준 데이터입니다.</p>
+      </div>
+      <span class="badge orange">product_master</span>
+    </div>
+    <div class="card-body">
+      <div class="collect-filters">
+        <div class="field"><label>검색</label><input id="pmProductKeyword" placeholder="품명 / 제조사 / 제품코드 / CAS / 거래처 검색"/></div>
+        <div class="field"><label>구분</label><select id="pmProductCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div>
+        <div class="field"><label>사용여부</label><select id="pmProductActive"><option value="">전체</option><option value="active">사용</option><option value="inactive">사용중지</option></select></div>
+        <div class="field"><label>&nbsp;</label><button class="btn" id="pmResetProduct">신규 입력</button></div>
+      </div>
+
+      <div class="form-grid" style="margin-top:16px; grid-template-columns:1fr 2fr 1.2fr 1.2fr 1fr 1fr 1fr 1.3fr 1fr;">
+        <input id="pmProductId" type="hidden"/>
+        <div class="field"><label>구분</label><select id="pmCategory"><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div>
+        <div class="field"><label>품명</label><input id="pmName" placeholder="제품명"/></div>
+        <div class="field"><label>제조사</label><input id="pmMaker" placeholder="제조사"/></div>
+        <div class="field"><label>제품코드</label><input id="pmCode" placeholder="제품코드"/></div>
+        <div class="field"><label>규격</label><input id="pmCapacity" placeholder="규격"/></div>
+        <div class="field"><label>CAS</label><input id="pmCas" placeholder="CAS"/></div>
+        <div class="field"><label>등급</label><input id="pmGrade" placeholder="등급"/></div>
+        <div class="field"><label>기본거래처</label><input id="pmDefaultVendor" placeholder="거래처"/></div>
+        <div class="field"><label>사용여부</label><select id="pmIsActive"><option value="true">사용</option><option value="false">사용중지</option></select></div>
+      </div>
+
+      <div class="field" style="margin-top:10px;"><label>비고</label><input id="pmMemo" placeholder="비고"/></div>
+      <div class="actions" style="justify-content:space-between; align-items:center;">
+        <div><strong id="pmFormTitle">제품 등록</strong></div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn primary" id="pmSaveProduct">저장</button>
+          <button class="btn" id="pmDeactivateProduct" style="display:none;">사용중지</button>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="margin-top:16px;">
+        <table>
+          <thead>
+            <tr><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>규격</th><th>CAS</th><th>등급</th><th>기본거래처</th><th>사용여부</th><th>수정자</th><th>작업</th></tr>
+          </thead>
+          <tbody id="pmProductList"><tr><td class="empty" colspan="11">제품 마스터를 불러오는 중입니다.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:12px;">
+    <div class="card-head">
+      <div>
+        <h3>제품 등록 요청 관리</h3>
+        <p>담당자가 제품신청 화면에서 요청한 미등록 제품을 확인하고 승인 또는 반려합니다.</p>
+      </div>
+      <span class="badge blue">product_registration_requests</span>
+    </div>
+    <div class="card-body">
+      <div class="collect-filters">
+        <div class="field"><label>검색</label><input id="pmRequestKeyword" placeholder="품명 / 제조사 / 요청자 / 팀 / 용도 검색"/></div>
+        <div class="field"><label>상태</label><select id="pmRequestStatus"><option value="">전체</option><option value="요청">요청</option><option value="확인중">확인중</option><option value="등록완료">등록완료</option><option value="반려">반려</option></select></div>
+        <div class="field"><label>&nbsp;</label><button class="btn" id="pmRefreshRequests">요청 새로고침</button></div>
+        <div class="field"><label>&nbsp;</label><div class="small" style="padding:12px 0;">승인 시 제품 마스터에 자동 등록됩니다.</div></div>
+      </div>
+      <div class="table-wrap" style="margin-top:16px;">
+        <table>
+          <thead>
+            <tr><th>상태</th><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>규격</th><th>CAS</th><th>등급</th><th>용도</th><th>요청자</th><th>처리/반려사유</th><th>작업</th></tr>
+          </thead>
+          <tbody id="pmRequestList"><tr><td class="empty" colspan="12">제품 등록 요청을 불러오는 중입니다.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</section>
+
 </div>
 <div class="modal-backdrop" id="searchModal"><div class="modal"><div class="modal-head"><div><h3>제품 검색</h3><div class="small">품명, 제품코드, 제조사, CAS 번호로 검색할 수 있습니다.</div></div><button class="btn" id="closeSearch">닫기</button></div>
 <div class="modal-search"><div class="field"><label>키워드</label><input id="searchInput" placeholder="예: ethanol, 459844, Sigma, 64-17-5"/><div class="search-hint">부분 검색 가능</div></div><div class="field"><label>분류</label><select id="searchCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div><div class="field"><label>제조사</label><select id="searchMaker"><option value="">전체</option></select></div><div class="field"><label>정렬</label><select id="sortMode"><option value="relevance">관련도순</option><option value="name">품명순</option><option value="maker">제조사순</option></select></div></div>
@@ -215,5 +311,20 @@
 <script src="supabase.js"></script>
 <script src="request.js"></script>
 <script src="collect.js"></script>
+<script src="product_management.js"></script>
 <script src="app.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    let pmInitialized = false;
+    const initProductManagement = () => {
+      if (pmInitialized) return;
+      pmInitialized = true;
+      window.ReagentApp.productManagement?.init?.();
+    };
+
+    document.querySelector('.tab-btn[data-tab="product-management"]')?.addEventListener("click", () => {
+      setTimeout(initProductManagement, 0);
+    });
+  });
+</script>
 </body></html>
