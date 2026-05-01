@@ -19,15 +19,7 @@
     </div>
   </div>
 </section>
-<div class="tabs-row" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-  <div class="tabs" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-    <button class="tab-btn active" data-tab="request">제품 신청</button>
-    <button class="tab-btn" data-tab="collect">제품 취합</button>
-    <button class="tab-btn" data-tab="prepare">취합 정리</button>
-    <button class="tab-btn" data-tab="product-management">제품 관리</button>
-  </div>
-  <button class="btn" id="openReagentAdmin" type="button" style="height:42px; padding:0 16px; border-radius:12px;">관리자 기능</button>
-</div>
+<div class="tabs"><button class="tab-btn active" data-tab="request">제품 신청</button><button class="tab-btn" data-tab="collect">제품 취합</button><button class="tab-btn" data-tab="prepare">취합 정리</button><button class="tab-btn" data-tab="product-management">제품 관리</button></div>
 <section class="page active" id="page-request"><section class="card"><div class="card-head"><div style="min-width:0;"><div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><h2 style="margin:0;">제품 신청</h2><div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:700; font-size:13px; color:#334155;">주문월</span><select id="orderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:130px;"></select><span class="small" id="orderMonthDesc" style="color:#6b7280;">선택한 주문월에 발주할 품목을 신청합니다.</span></div></div><p>제품은 검색해서 선택하고 수량/용도만 입력합니다.</p></div><div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;"><button class="btn primary" id="openSearch" style="width:auto; padding:10px 14px; white-space:nowrap;">제품검색</button><span class="badge blue">검색 → 자동입력 → 수량/용도</span></div></div>
 <div class="card-body"><div class="form-grid">
 <div class="field"><label>분류</label><input id="category" placeholder="자동입력" readonly/></div>
@@ -320,80 +312,6 @@
             <tr><th>상태</th><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>규격</th><th>CAS</th><th>등급</th><th>용도</th><th>요청자</th><th>처리/반려사유</th><th>작업</th></tr>
           </thead>
           <tbody id="pmRequestList"><tr><td class="empty" colspan="12">제품 등록 요청을 불러오는 중입니다.</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-</section>
-
-
-<section class="page" id="page-admin-management">
-  <section class="card">
-    <div class="card-head">
-      <div>
-        <h2>관리자 기능</h2>
-        <p>시약·초자 프로그램 운영자를 검색하고 지정합니다.</p>
-      </div>
-      <span class="badge blue">운영자 관리</span>
-    </div>
-    <div class="card-body">
-      <div class="summary">
-        <div class="tile"><div class="k">운영자 권한</div><div class="v" id="opCurrentCount">0명</div></div>
-        <div class="tile"><div class="k">검색 기준</div><div class="v" style="font-size:20px;">사번 / 이름</div></div>
-        <div class="tile"><div class="k">권한 범위</div><div class="v" style="font-size:20px;">전체 기능</div></div>
-        <div class="tile"><div class="k">권한 테이블</div><div class="v" style="font-size:20px;">reagent_operators</div></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="card" style="margin-top:12px;">
-    <div class="card-head">
-      <div>
-        <h3>운영자 지정</h3>
-        <p>사원정보에서 사번 또는 이름으로 검색한 뒤 운영자로 지정합니다.</p>
-      </div>
-    </div>
-    <div class="card-body">
-      <div class="collect-filters">
-        <div class="field">
-          <label>사원 검색</label>
-          <input id="opEmployeeKeyword" placeholder="사번 / 이름 / 이메일 검색"/>
-        </div>
-        <div class="field">
-          <label>&nbsp;</label>
-          <button class="btn primary" id="opSearchEmployees" type="button">검색</button>
-        </div>
-        <div class="field">
-          <label>&nbsp;</label>
-          <button class="btn" id="opRefreshOperators" type="button">운영자 새로고침</button>
-        </div>
-      </div>
-
-      <div class="table-wrap" style="margin-top:16px;">
-        <table>
-          <thead>
-            <tr><th>사번</th><th>이름</th><th>부서</th><th>팀</th><th>직급</th><th>이메일</th><th>작업</th></tr>
-          </thead>
-          <tbody id="opEmployeeSearchList"><tr><td class="empty" colspan="7">사번 또는 이름으로 검색하세요.</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section class="card" style="margin-top:12px;">
-    <div class="card-head">
-      <div>
-        <h3>현재 운영자 목록</h3>
-        <p>운영자로 지정된 사원은 시약·초자 프로그램의 전체 기능에 접근할 수 있습니다.</p>
-      </div>
-    </div>
-    <div class="card-body">
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>사번</th><th>이름</th><th>부서</th><th>팀</th><th>권한</th><th>지정자</th><th>지정일</th><th>작업</th></tr>
-          </thead>
-          <tbody id="opOperatorList"><tr><td class="empty" colspan="8">운영자 목록을 불러오는 중입니다.</td></tr></tbody>
         </table>
       </div>
     </div>
