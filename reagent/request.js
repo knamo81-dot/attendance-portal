@@ -4,6 +4,8 @@ window.ReagentApp.request = {
   requestRows: [],
   selectedKeys: [],
   collectedMeta: {},
+  productMasterRows: [],
+  productMasterLoadedAt: 0,
 
   saveRequestRows() {
     try {
@@ -146,23 +148,111 @@ window.ReagentApp.request = {
     return this.requestRows.filter((row) => (row.order_month || month) === month);
   },
 
-  populateMakerOptions() {
+  normalizeProductRow(row = {}) {
+    return {
+      id: row.id || "",
+      category: row.category || "",
+      name: row.name || "",
+      maker: row.maker || "",
+      code: row.code || "",
+      capacity: row.capacity || "",
+      cas: row.cas || "",
+      grade: row.grade || "",
+      default_vendor: row.default_vendor || "",
+      memo: row.memo || "",
+      is_active: row.is_active !== false
+    };
+  },
+
+  async loadProductMaster(force = false) {
+    const now = Date.now();
+    const cacheMs = 1000 * 60 * 3;
+
+    if (!force && this.productMasterRows.length && now - this.productMasterLoadedAt < cacheMs) {
+      return this.productMasterRows;
+    }
+
+    const sb = window.ReagentApp.sb;
+
+    if (!sb) {
+      this.productMasterRows = this.mockProducts.map((row) => this.normalizeProductRow(row));
+      this.productMasterLoadedAt = now;
+      return this.productMasterRows;
+    }
+
+    const { data, error } = await sb
+      .from("product_master")
+      .select("id, category, name, maker, code, capacity, cas, grade, default_vendor, memo, is_active")
+      .eq("is_active", true)
+      .order("name", { ascending: true })
+      .limit(3000);
+
+    if (error) {
+      console.error("제품 마스터 조회 실패:", error);
+      window.ReagentApp.toast?.(`제품 마스터 조회 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      this.productMasterRows = this.mockProducts.map((row) => this.normalizeProductRow(row));
+    } else {
+      this.productMasterRows = (data || []).map((row) => this.normalizeProductRow(row));
+    }
+
+    this.productMasterLoadedAt = now;
+    return this.productMasterRows;
+  },
+
+  filterProductMasterRows(rows = []) {
+    const { els } = window.ReagentApp;
+    const keyword = (els.searchInput?.value || "").trim().toLowerCase();
+    const category = els.searchCategory?.value || "";
+    const maker = els.searchMaker?.value || "";
+    const sortMode = els.sortMode?.value || "relevance";
+
+    let results = rows.filter((p) => p.is_active !== false);
+
+    if (keyword) {
+      results = results.filter((p) =>
+        [p.category, p.name, p.maker, p.code, p.capacity, p.cas, p.grade, p.default_vendor, p.memo]
+          .join(" ")
+          .toLowerCase()
+          .includes(keyword)
+      );
+    }
+
+    if (category) results = results.filter((p) => p.category === category);
+    if (maker) results = results.filter((p) => p.maker === maker);
+
+    if (sortMode === "name") {
+      results.sort((a, b) => (a.name || "").localeCompare(b.name || "", "ko"));
+    } else if (sortMode === "maker") {
+      results.sort((a, b) => (a.maker || "").localeCompare(b.maker || "", "ko"));
+    }
+
+    return results;
+  },
+
+  async populateMakerOptions() {
     const { els } = window.ReagentApp;
     if (!els.searchMaker) return;
 
-    const makers = [...new Set(this.mockProducts.map((p) => p.maker).filter(Boolean))].sort((a, b) =>
+    const rows = await this.loadProductMaster();
+    const currentValue = els.searchMaker.value || "";
+    const makers = [...new Set(rows.map((p) => p.maker).filter(Boolean))].sort((a, b) =>
       a.localeCompare(b, "ko")
     );
 
     els.searchMaker.innerHTML =
       `<option value="">전체</option>` +
       makers.map((maker) => `<option value="${this.attr(maker)}">${this.html(maker)}</option>`).join("");
+
+    if (currentValue && makers.includes(currentValue)) {
+      els.searchMaker.value = currentValue;
+    }
   },
 
-  openSearchModal() {
+  async openSearchModal() {
     const { els } = window.ReagentApp;
     if (!els.searchModal) return;
     els.searchModal.classList.add("show");
+    await this.populateMakerOptions();
     this.renderSearchResults();
     setTimeout(() => {
       els.searchInput?.focus();
@@ -174,46 +264,27 @@ window.ReagentApp.request = {
     els.searchModal?.classList.remove("show");
   },
 
-  renderSearchResults() {
+  async renderSearchResults() {
     const { els } = window.ReagentApp;
     if (!els.searchResults) return;
 
-    const keyword = (els.searchInput?.value || "").trim().toLowerCase();
-    const category = els.searchCategory?.value || "";
-    const maker = els.searchMaker?.value || "";
-    const sortMode = els.sortMode?.value || "relevance";
+    els.searchResults.innerHTML = `<div class="empty">제품 마스터를 조회하는 중입니다.</div>`;
 
-    let results = [...this.mockProducts];
-
-    if (keyword) {
-      results = results.filter((p) =>
-        [p.category, p.name, p.maker, p.code, p.capacity, p.cas, p.grade]
-          .join(" ")
-          .toLowerCase()
-          .includes(keyword)
-      );
-    }
-
-    if (category) {
-      results = results.filter((p) => p.category === category);
-    }
-
-    if (maker) {
-      results = results.filter((p) => p.maker === maker);
-    }
-
-    if (sortMode === "name") {
-      results.sort((a, b) => a.name.localeCompare(b.name, "ko"));
-    } else if (sortMode === "maker") {
-      results.sort((a, b) => a.maker.localeCompare(b.maker, "ko"));
-    }
+    const rows = await this.loadProductMaster();
+    const results = this.filterProductMasterRows(rows);
 
     if (els.resultInfo) {
       els.resultInfo.textContent = `검색 결과 ${results.length}건`;
     }
 
     if (!results.length) {
-      els.searchResults.innerHTML = `<div class="empty">검색 결과가 없습니다.</div>`;
+      els.searchResults.innerHTML = `
+        <div class="empty">
+          검색 결과가 없습니다.<br/>
+          <button type="button" class="btn" id="emptyRequestProduct" style="margin-top:10px;">제품 등록 요청</button>
+        </div>
+      `;
+      document.getElementById("emptyRequestProduct")?.addEventListener("click", () => this.openRegistrationRequestDialog());
       return;
     }
 
@@ -269,6 +340,99 @@ window.ReagentApp.request = {
     setValue(els.usage, "");
   },
 
+
+  getCurrentSearchDraft() {
+    const { els } = window.ReagentApp;
+    return {
+      category: els.searchCategory?.value || els.category?.value || "",
+      name: els.searchInput?.value || els.productName?.value || "",
+      maker: els.searchMaker?.value || els.maker?.value || "",
+      code: els.code?.value || "",
+      capacity: els.capacity?.value || "",
+      cas: els.cas?.value || "",
+      grade: els.grade?.value || "",
+      usage: els.usage?.value || ""
+    };
+  },
+
+  async openRegistrationRequestDialog() {
+    const { toast } = window.ReagentApp;
+    const draft = this.getCurrentSearchDraft();
+    const currentUser = this.getCurrentUser();
+
+    const name = prompt("등록 요청할 제품명을 입력하세요.", draft.name || "");
+    if (name === null) return;
+    if (!String(name).trim()) {
+      toast?.("제품명은 필수입니다.", "warn");
+      return;
+    }
+
+    const maker = prompt("제조사를 입력하세요. 모르면 비워두세요.", draft.maker || "");
+    if (maker === null) return;
+
+    const code = prompt("제품코드를 입력하세요. 모르면 비워두세요.", draft.code || "");
+    if (code === null) return;
+
+    const capacity = prompt("규격을 입력하세요. 모르면 비워두세요.", draft.capacity || "");
+    if (capacity === null) return;
+
+    const usage = prompt("요청 사유 또는 용도를 입력하세요.", draft.usage || "");
+    if (usage === null) return;
+
+    await this.createRegistrationRequest({
+      category: draft.category || "",
+      name: String(name).trim(),
+      maker: String(maker || "").trim(),
+      code: String(code || "").trim(),
+      capacity: String(capacity || "").trim(),
+      cas: draft.cas || "",
+      grade: draft.grade || "",
+      usage: String(usage || "").trim(),
+      requester: currentUser.name,
+      team: currentUser.team
+    });
+  },
+
+  async createRegistrationRequest(row) {
+    const sb = window.ReagentApp.sb;
+
+    if (!sb) {
+      window.ReagentApp.toast?.("Supabase 연결 정보가 없습니다. supabase.js 로딩을 확인하세요.", "warn");
+      return;
+    }
+
+    const payload = {
+      category: row.category || "",
+      name: row.name || "",
+      maker: row.maker || "",
+      code: row.code || "",
+      capacity: row.capacity || "",
+      cas: row.cas || "",
+      grade: row.grade || "",
+      usage: row.usage || "",
+      requester: row.requester || "미지정",
+      team: row.team || "미지정팀",
+      status: "요청"
+    };
+
+    if (!payload.name) {
+      window.ReagentApp.toast?.("제품명은 필수입니다.", "warn");
+      return;
+    }
+
+    const { error } = await sb
+      .from("product_registration_requests")
+      .insert(payload);
+
+    if (error) {
+      console.error("제품 등록 요청 실패:", error);
+      window.ReagentApp.toast?.(`제품 등록 요청 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      return;
+    }
+
+    window.ReagentApp.toast?.("제품 등록 요청이 저장되었습니다.", "success");
+    window.ReagentApp.productManagement?.loadRequests?.();
+  },
 
   getCurrentUser() {
     const user = window.ReagentApp.currentUser || {};
@@ -610,6 +774,8 @@ window.ReagentApp.request = {
 
   async fetchData() {
     this.initOrderMonthControls();
+    await this.loadProductMaster(true);
+    await this.populateMakerOptions();
 
     const sb = window.ReagentApp.sb;
 
