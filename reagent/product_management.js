@@ -365,9 +365,9 @@ window.ReagentApp.productManagement = {
         <td>${this.html(r.reject_reason || r.handled_by || "")}</td>
         <td>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            ${["요청", "확인중", "반려"].includes(r.status || "요청") ? `<button class="ghost-btn" data-pm-request-edit="${r.id}" type="button">수정</button>` : ""}
-            ${r.status === "요청" ? `<button class="ghost-btn" data-pm-request-progress="${r.id}" type="button">확인중</button>` : ""}
-            ${["요청", "확인중"].includes(r.status || "요청") ? `<button class="ghost-btn" data-pm-request-approve="${r.id}" type="button">승인</button><button class="ghost-btn" data-pm-request-reject="${r.id}" type="button">반려</button>` : ""}
+            <button class="ghost-btn" data-pm-request-edit="${r.id}" type="button">수정</button>
+            ${r.status !== "등록완료" ? `<button class="ghost-btn" data-pm-request-approve="${r.id}" type="button">승인</button>` : ""}
+            ${r.status !== "등록완료" && r.status !== "반려" ? `<button class="ghost-btn" data-pm-request-reject="${r.id}" type="button">반려</button>` : ""}
           </div>
         </td>
       </tr>
