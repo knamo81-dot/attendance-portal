@@ -367,7 +367,7 @@ window.ReagentApp.productManagement = {
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <button class="ghost-btn" data-pm-request-edit="${r.id}" type="button">수정</button>
             ${r.status !== "등록완료" ? `<button class="ghost-btn" data-pm-request-approve="${r.id}" type="button">승인</button>` : ""}
-            ${r.status !== "등록완료" && r.status !== "반려" ? `<button class="ghost-btn" data-pm-request-reject="${r.id}" type="button">반려</button>` : ""}
+            ${r.status !== "등록완료" ? `<button class="ghost-btn" data-pm-request-reject="${r.id}" type="button">반려</button>` : ""}
           </div>
         </td>
       </tr>
