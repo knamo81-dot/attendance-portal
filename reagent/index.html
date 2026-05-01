@@ -46,13 +46,12 @@
 <div class="table-wrap" style="margin-top:16px;"><table><thead><tr><th>선택</th><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>CAS</th><th>등급</th><th>규격</th><th>총수량</th><th>신청자수</th><th>용도</th><th>작업</th></tr></thead><tbody id="draftTableBody"><tr><td class="empty" colspan="12">아직 추가된 신청 항목이 없습니다.</td></tr></tbody></table></div>
 </div>
 <div id="registrationRequestStatusPanel" style="display:none;">
-  <div class="collect-filters compact-filter-row" style="margin-top:0;">
-    <div class="field compact-filter-item"><label>상태</label><select id="myRequestStatusFilter"><option value="">전체</option><option value="요청">요청</option><option value="등록">등록</option><option value="반려">반려</option></select></div>
-    <div class="field compact-filter-item"><label>기간</label><select id="myRequestPeriodFilter"><option value="1m">최근 1개월</option><option value="3m" selected>최근 3개월</option><option value="6m">최근 6개월</option><option value="all">전체</option></select></div>
-    <div class="field compact-filter-item"><label>&nbsp;</label><button class="btn" id="refreshMyRegistrationRequests" type="button">새로고침</button></div>
-    <div class="field compact-filter-item"><label>&nbsp;</label><span class="badge blue" id="myRequestStatusBadge">내 요청 0건</span></div>
+  <div class="collect-filters" style="margin-top:0;">
+    <div class="field"><label>상태</label><select id="myRequestStatusFilter"><option value="">전체</option><option value="요청중">요청중</option><option value="등록">등록</option><option value="반려">반려</option></select></div>
+    <div class="field"><label>&nbsp;</label><button class="btn" id="refreshMyRegistrationRequests" type="button">새로고침</button></div>
+    <div class="field"><label>&nbsp;</label><span class="badge blue" id="myRequestStatusBadge">내 요청 0건</span></div>
   </div>
-  <div class="small" style="margin-top:10px;">내가 요청한 미등록 제품의 처리 상태를 누계로 확인합니다. 요청/확인중은 요청으로 표시됩니다.</div>
+  <div class="small" style="margin-top:10px;">내가 요청한 미등록 제품의 처리 상태를 누계로 확인합니다. 요청/확인중은 요청중으로 표시됩니다.</div>
   <div class="table-wrap" style="margin-top:16px;">
     <table>
       <thead><tr><th>요청일</th><th>상태</th><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>CAS</th><th>등급</th><th>규격</th><th>요청사유/용도</th><th>처리/반려 사유</th></tr></thead>
@@ -294,11 +293,11 @@
       <span class="badge blue">product_registration_requests</span>
     </div>
     <div class="card-body">
-      <div class="collect-filters compact-filter-row">
-        <div class="field compact-filter-item"><label>검색</label><input id="pmRequestKeyword" placeholder="품명 / 제조사 / 요청자 / 팀 / 용도 검색"/></div>
-        <div class="field compact-filter-item"><label>상태</label><select id="pmRequestStatus"><option value="">전체</option><option value="요청" selected>요청</option><option value="등록">등록</option><option value="반려">반려</option></select></div>
-        <div class="field compact-filter-item"><label>기간</label><select id="pmRequestPeriodFilter"><option value="1m">최근 1개월</option><option value="3m" selected>최근 3개월</option><option value="6m">최근 6개월</option><option value="all">전체</option></select></div>
-        <div class="field compact-filter-item"><label>&nbsp;</label><button class="btn" id="pmRefreshRequests">요청 새로고침</button></div>
+      <div class="collect-filters">
+        <div class="field"><label>검색</label><input id="pmRequestKeyword" placeholder="품명 / 제조사 / 요청자 / 팀 / 용도 검색"/></div>
+        <div class="field"><label>상태</label><select id="pmRequestStatus"><option value="">전체</option><option value="요청">요청</option><option value="확인중">확인중</option><option value="등록완료">등록완료</option><option value="반려">반려</option></select></div>
+        <div class="field"><label>&nbsp;</label><button class="btn" id="pmRefreshRequests">요청 새로고침</button></div>
+        <div class="field"><label>&nbsp;</label><div class="small" style="padding:12px 0;">승인 시 제품 마스터에 자동 등록됩니다.</div></div>
       </div>
       <div class="table-wrap" style="margin-top:16px;">
         <table>
