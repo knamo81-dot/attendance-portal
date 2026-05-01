@@ -270,9 +270,20 @@ window.ReagentApp.request = {
     const { els } = window.ReagentApp;
     if (!els.searchResults) return;
 
-    els.searchResults.innerHTML = `<div class="empty">제품 마스터를 조회하는 중입니다.</div>`;
+    // 검색 입력 시 모달 높이가 순간적으로 줄었다 늘어나는 현상을 줄이기 위해
+    // 결과 영역의 최소 높이를 고정하고, 캐시가 있을 때는 로딩 문구로 전체 교체하지 않습니다.
+    els.searchResults.style.minHeight = "164px";
+
+    const searchSeq = (this._searchRenderSeq || 0) + 1;
+    this._searchRenderSeq = searchSeq;
+
+    if (!this.productMasterRows.length) {
+      els.searchResults.innerHTML = `<div class="empty">제품 마스터를 조회하는 중입니다.</div>`;
+    }
 
     const rows = await this.loadProductMaster();
+    if (searchSeq !== this._searchRenderSeq) return;
+
     const results = this.filterProductMasterRows(rows);
 
     if (els.resultInfo) {
@@ -538,8 +549,6 @@ window.ReagentApp.request = {
     const statusBtn = document.getElementById("showRequestStatusPanel");
     const title = document.getElementById("requestListSectionTitle");
     const desc = document.getElementById("requestListSectionDesc");
-    const badge = window.ReagentApp.els?.draftCountBadge;
-
     const showStatus = this.activeRequestPanel === "status";
     if (appPanel) appPanel.style.display = showStatus ? "none" : "";
     if (statusPanel) statusPanel.style.display = showStatus ? "" : "none";
@@ -549,8 +558,6 @@ window.ReagentApp.request = {
 
     if (title) title.textContent = showStatus ? "제품 등록 요청 현황" : "신청 목록";
     if (desc) desc.textContent = showStatus ? "내가 요청한 미등록 제품의 진행상황을 확인합니다." : "체크한 품목만 취합 탭으로 반영됩니다.";
-    if (badge) badge.style.display = showStatus ? "none" : "inline-flex";
-
     if (showStatus) this.renderMyRegistrationRequests();
   },
 
@@ -1210,7 +1217,6 @@ window.ReagentApp.request = {
       if (els.sumReagent) els.sumReagent.textContent = "0";
       if (els.sumGlass) els.sumGlass.textContent = "0";
       if (els.sumSafety) els.sumSafety.textContent = "0";
-      if (els.draftCountBadge) els.draftCountBadge.textContent = "통합 항목 0건";
       return;
     }
 
@@ -1367,7 +1373,6 @@ window.ReagentApp.request = {
     if (els.sumReagent) els.sumReagent.textContent = String(groups.filter((g) => g.category === "시약").length);
     if (els.sumGlass) els.sumGlass.textContent = String(groups.filter((g) => g.category === "초자").length);
     if (els.sumSafety) els.sumSafety.textContent = String(groups.filter((g) => g.category === "안전용품").length);
-    if (els.draftCountBadge) els.draftCountBadge.textContent = `통합 항목 ${groups.length}건`;
   },
 
   formatDateTime(value) {
