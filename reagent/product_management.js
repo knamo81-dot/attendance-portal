@@ -94,7 +94,74 @@ window.ReagentApp.productManagement = {
     };
   },
 
+  ensureRequestFilterControls() {
+    const statusSelect = document.getElementById("pmRequestStatus");
+    const statusField = statusSelect?.closest?.(".field");
+
+    if (statusSelect && !statusSelect.dataset.unifiedStatus) {
+      statusSelect.dataset.unifiedStatus = "1";
+      statusSelect.innerHTML = `
+        <option value="">전체</option>
+        <option value="요청" selected>요청</option>
+        <option value="등록">등록</option>
+        <option value="반려">반려</option>
+      `;
+    }
+
+    const filterRow = statusField?.parentElement;
+    if (filterRow) {
+      filterRow.classList.add("compact-filter-row");
+      filterRow.querySelectorAll(".field").forEach((field) => field.classList.add("compact-filter-item"));
+    }
+
+    if (statusField && !document.getElementById("pmRequestPeriodFilter")) {
+      const periodField = document.createElement("div");
+      periodField.className = "field compact-filter-item";
+      periodField.innerHTML = `
+        <label>기간</label>
+        <select id="pmRequestPeriodFilter">
+          <option value="1m">최근 1개월</option>
+          <option value="3m" selected>최근 3개월</option>
+          <option value="6m">최근 6개월</option>
+          <option value="all">전체</option>
+        </select>
+      `;
+      statusField.insertAdjacentElement("afterend", periodField);
+    }
+
+    const periodFilter = document.getElementById("pmRequestPeriodFilter");
+    [statusSelect, periodFilter].forEach((el) => {
+      if (el && !el.dataset.pmFilterBound) {
+        el.dataset.pmFilterBound = "1";
+        el.addEventListener("change", () => this.renderRequests());
+      }
+    });
+  },
+
+  getRequestDisplayStatus(status) {
+    const value = String(status || "요청").trim();
+    if (value === "등록완료") return "등록";
+    if (value === "반려") return "반려";
+    return "요청";
+  },
+
+  isWithinRequestPeriod(createdAt, period = "3m") {
+    if (!period || period === "all") return true;
+
+    const created = new Date(createdAt);
+    if (Number.isNaN(created.getTime())) return true;
+
+    const months = period === "1m" ? 1 : period === "6m" ? 6 : 3;
+    const start = new Date();
+    start.setMonth(start.getMonth() - months);
+    start.setHours(0, 0, 0, 0);
+
+    return created >= start;
+  },
+
   bindEvents() {
+    this.ensureRequestFilterControls?.();
+
     const els = this.getEls();
 
     [els.productKeyword, els.productCategory, els.productActive].forEach((el) => {
@@ -106,12 +173,30 @@ window.ReagentApp.productManagement = {
     els.resetProduct?.addEventListener("click", () => this.resetProductForm());
     els.deactivateProduct?.addEventListener("click", () => this.deactivateCurrentProduct());
 
-    [els.requestKeyword, els.requestStatus].forEach((el) => {
+    [
+      els.requestKeyword,
+      document.getElementById("pmRequestProgressFilter"),
+      document.getElementById("pmRequestResultFilter"),
+      document.getElementById("pmRequestPeriodFilter")
+    ].forEach((el) => {
       el?.addEventListener("input", () => this.renderRequests());
       el?.addEventListener("change", () => this.renderRequests());
     });
 
     els.refreshRequests?.addEventListener("click", () => this.loadRequests());
+  },
+
+
+  async refreshLinkedRequestStatus() {
+    // 관리자 처리 결과가 담당자 화면의 [제품 등록 요청 현황]에도 즉시 반영되도록 동기화합니다.
+    try {
+      await window.ReagentApp.request?.loadMyRegistrationRequests?.(true);
+      if (window.ReagentApp.request?.activeRequestPanel === "status") {
+        window.ReagentApp.request?.renderMyRegistrationRequests?.();
+      }
+    } catch (error) {
+      console.warn("내 요청 현황 갱신 실패:", error);
+    }
   },
 
   async loadProducts() {
@@ -275,6 +360,7 @@ window.ReagentApp.productManagement = {
       this.toast(this.editingProductId ? "제품 정보가 수정되었습니다." : "제품이 등록되었습니다.", "success");
       this.resetProductForm();
       await this.loadProducts();
+      window.ReagentApp.request?.loadProductMaster?.(true);
     } catch (error) {
       console.error("제품 저장 실패:", error);
       this.toast(`제품 저장 실패: ${error.message || "원인을 확인하세요."}`, "warn");
@@ -302,6 +388,7 @@ window.ReagentApp.productManagement = {
     this.toast("제품이 사용중지 처리되었습니다.", "success");
     this.resetProductForm();
     await this.loadProducts();
+    window.ReagentApp.request?.loadProductMaster?.(true);
   },
 
   async loadRequests() {
@@ -323,17 +410,23 @@ window.ReagentApp.productManagement = {
   },
 
   getFilteredRequests() {
+    this.ensureRequestFilterControls?.();
+
     const els = this.getEls();
     const keyword = String(els.requestKeyword?.value || "").trim().toLowerCase();
-    const status = els.requestStatus?.value || "";
+    const statusFilter = document.getElementById("pmRequestStatus")?.value || "요청";
+    const periodFilter = document.getElementById("pmRequestPeriodFilter")?.value || "3m";
 
     return this.requests.filter((r) => {
-      const text = [r.category, r.name, r.maker, r.code, r.capacity, r.cas, r.grade, r.usage, r.requester, r.team, r.reject_reason]
+      const text = [r.category, r.name, r.maker, r.code, r.capacity, r.cas, r.grade, r.usage, r.requester, r.team, r.reject_reason, r.handled_by]
         .join(" ")
         .toLowerCase();
 
+      const displayStatus = this.getRequestDisplayStatus(r.status || "요청");
+
       if (keyword && !text.includes(keyword)) return false;
-      if (status && r.status !== status) return false;
+      if (statusFilter && displayStatus !== statusFilter) return false;
+      if (!this.isWithinRequestPeriod(r.created_at || r.id, periodFilter)) return false;
       return true;
     });
   },
@@ -352,7 +445,7 @@ window.ReagentApp.productManagement = {
 
     els.requestList.innerHTML = rows.map((r) => `
       <tr>
-        <td>${this.html(r.status || "요청")}</td>
+        <td>${this.html(this.getRequestDisplayStatus(r.status || "요청"))}</td>
         <td>${this.html(r.category)}</td>
         <td>${this.html(r.name)}</td>
         <td>${this.html(r.maker)}</td>
@@ -526,6 +619,7 @@ window.ReagentApp.productManagement = {
     document.getElementById("pmRequestEditModal")?.classList.remove("show");
     this.toast("제품 등록 요청이 수정되었습니다.", "success");
     await this.loadRequests();
+    await this.refreshLinkedRequestStatus();
   },
 
   async markRequestInProgress(id) {
@@ -542,6 +636,7 @@ window.ReagentApp.productManagement = {
 
     this.toast("요청 상태가 확인중으로 변경되었습니다.", "success");
     await this.loadRequests();
+    await this.refreshLinkedRequestStatus();
   },
 
   async approveRequest(id) {
@@ -588,6 +683,8 @@ window.ReagentApp.productManagement = {
 
       this.toast("제품 마스터 등록 및 요청 처리가 완료되었습니다.", "success");
       await Promise.all([this.loadProducts(), this.loadRequests()]);
+      await this.refreshLinkedRequestStatus();
+      window.ReagentApp.request?.loadProductMaster?.(true);
     } catch (error) {
       console.error("요청 승인 실패:", error);
       this.toast(`요청 승인 실패: ${error.message || "원인을 확인하세요."}`, "warn");
@@ -621,5 +718,6 @@ window.ReagentApp.productManagement = {
 
     this.toast("요청이 반려 처리되었습니다.", "success");
     await this.loadRequests();
+    await this.refreshLinkedRequestStatus();
   }
 };
