@@ -1185,6 +1185,7 @@ window.ReagentApp.request = {
   },
 
   renderRequest() {
+    this.bindRegistrationStatusPanel?.();
     const { els } = window.ReagentApp;
     if (!els.draftTableBody) return;
 
