@@ -334,22 +334,27 @@ window.ReagentApp.productManagement = {
     const inputNameKey = normalizeDuplicateValue(row.name);
     const inputCodeKey = normalizeDuplicateValue(row.code);
 
-    if (inputNameKey && inputCodeKey) {
+    if (inputNameKey || inputCodeKey) {
       const duplicateProducts = (this.products || []).filter((product) => {
-        const isSameProduct =
-          normalizeDuplicateValue(product.name) === inputNameKey &&
-          normalizeDuplicateValue(product.code) === inputCodeKey;
-
         const isCurrentEditingProduct =
           this.editingProductId && Number(product.id) === Number(this.editingProductId);
 
-        return isSameProduct && !isCurrentEditingProduct;
+        if (isCurrentEditingProduct) return false;
+
+        const sameName = inputNameKey && normalizeDuplicateValue(product.name) === inputNameKey;
+        const sameCode = inputCodeKey && normalizeDuplicateValue(product.code) === inputCodeKey;
+
+        return sameName || sameCode;
       });
 
       if (duplicateProducts.length) {
         const sample = duplicateProducts[0] || {};
+        const sameName = inputNameKey && normalizeDuplicateValue(sample.name) === inputNameKey;
+        const sameCode = inputCodeKey && normalizeDuplicateValue(sample.code) === inputCodeKey;
+        const reasonText = [sameName ? "품명" : "", sameCode ? "제품코드" : ""].filter(Boolean).join(" / ");
+
         const ok = confirm(
-          "동일한 품명과 제품코드를 가진 제품이 이미 등록되어 있습니다.\n\n" +
+          `${reasonText || "품명 또는 제품코드"}가 같은 제품이 이미 등록되어 있습니다.\n\n` +
           `기존 품명: ${sample.name || "-"}\n` +
           `기존 제품코드: ${sample.code || "-"}\n` +
           `기존 제조사: ${sample.maker || "-"}\n\n` +
