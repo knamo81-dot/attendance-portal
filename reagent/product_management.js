@@ -114,6 +114,19 @@ window.ReagentApp.productManagement = {
     els.refreshRequests?.addEventListener("click", () => this.loadRequests());
   },
 
+
+  async refreshLinkedRequestStatus() {
+    // 관리자 처리 결과가 담당자 화면의 [제품 등록 요청 현황]에도 즉시 반영되도록 동기화합니다.
+    try {
+      await window.ReagentApp.request?.loadMyRegistrationRequests?.(true);
+      if (window.ReagentApp.request?.activeRequestPanel === "status") {
+        window.ReagentApp.request?.renderMyRegistrationRequests?.();
+      }
+    } catch (error) {
+      console.warn("내 요청 현황 갱신 실패:", error);
+    }
+  },
+
   async loadProducts() {
     if (!this.sb) {
       this.toast("Supabase 연결 정보가 없습니다. supabase.js 로딩을 확인하세요.", "warn");
@@ -275,6 +288,7 @@ window.ReagentApp.productManagement = {
       this.toast(this.editingProductId ? "제품 정보가 수정되었습니다." : "제품이 등록되었습니다.", "success");
       this.resetProductForm();
       await this.loadProducts();
+      window.ReagentApp.request?.loadProductMaster?.(true);
     } catch (error) {
       console.error("제품 저장 실패:", error);
       this.toast(`제품 저장 실패: ${error.message || "원인을 확인하세요."}`, "warn");
@@ -302,6 +316,7 @@ window.ReagentApp.productManagement = {
     this.toast("제품이 사용중지 처리되었습니다.", "success");
     this.resetProductForm();
     await this.loadProducts();
+    window.ReagentApp.request?.loadProductMaster?.(true);
   },
 
   async loadRequests() {
@@ -526,6 +541,7 @@ window.ReagentApp.productManagement = {
     document.getElementById("pmRequestEditModal")?.classList.remove("show");
     this.toast("제품 등록 요청이 수정되었습니다.", "success");
     await this.loadRequests();
+    await this.refreshLinkedRequestStatus();
   },
 
   async markRequestInProgress(id) {
@@ -542,6 +558,7 @@ window.ReagentApp.productManagement = {
 
     this.toast("요청 상태가 확인중으로 변경되었습니다.", "success");
     await this.loadRequests();
+    await this.refreshLinkedRequestStatus();
   },
 
   async approveRequest(id) {
@@ -588,6 +605,8 @@ window.ReagentApp.productManagement = {
 
       this.toast("제품 마스터 등록 및 요청 처리가 완료되었습니다.", "success");
       await Promise.all([this.loadProducts(), this.loadRequests()]);
+      await this.refreshLinkedRequestStatus();
+      window.ReagentApp.request?.loadProductMaster?.(true);
     } catch (error) {
       console.error("요청 승인 실패:", error);
       this.toast(`요청 승인 실패: ${error.message || "원인을 확인하세요."}`, "warn");
@@ -621,5 +640,6 @@ window.ReagentApp.productManagement = {
 
     this.toast("요청이 반려 처리되었습니다.", "success");
     await this.loadRequests();
+    await this.refreshLinkedRequestStatus();
   }
 };
