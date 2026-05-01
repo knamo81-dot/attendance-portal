@@ -95,28 +95,32 @@ window.ReagentApp.productManagement = {
   },
 
   ensureRequestFilterControls() {
-    const statusSelect = document.getElementById("pmRequestStatus");
-    const statusField = statusSelect?.closest?.(".field");
+    const legacyStatus = document.getElementById("pmRequestStatus");
+    const statusField = legacyStatus?.closest?.(".field");
 
-    if (statusSelect && !statusSelect.dataset.unifiedStatus) {
-      statusSelect.dataset.unifiedStatus = "1";
-      statusSelect.innerHTML = `
-        <option value="">전체</option>
-        <option value="요청" selected>요청</option>
-        <option value="등록">등록</option>
-        <option value="반려">반려</option>
+    if (statusField && !document.getElementById("pmRequestProgressFilter")) {
+      statusField.innerHTML = `
+        <label>업무상태</label>
+        <select id="pmRequestProgressFilter">
+          <option value="처리대기" selected>처리대기</option>
+          <option value="처리완료">처리완료</option>
+          <option value="">전체</option>
+        </select>
       `;
-    }
 
-    const filterRow = statusField?.parentElement;
-    if (filterRow) {
-      filterRow.classList.add("compact-filter-row");
-      filterRow.querySelectorAll(".field").forEach((field) => field.classList.add("compact-filter-item"));
-    }
+      const resultField = document.createElement("div");
+      resultField.className = "field";
+      resultField.innerHTML = `
+        <label>결과상태</label>
+        <select id="pmRequestResultFilter">
+          <option value="">전체</option>
+          <option value="등록완료">등록완료</option>
+          <option value="반려">반려</option>
+        </select>
+      `;
 
-    if (statusField && !document.getElementById("pmRequestPeriodFilter")) {
       const periodField = document.createElement("div");
-      periodField.className = "field compact-filter-item";
+      periodField.className = "field";
       periodField.innerHTML = `
         <label>기간</label>
         <select id="pmRequestPeriodFilter">
@@ -126,23 +130,15 @@ window.ReagentApp.productManagement = {
           <option value="all">전체</option>
         </select>
       `;
-      statusField.insertAdjacentElement("afterend", periodField);
-    }
 
-    const periodFilter = document.getElementById("pmRequestPeriodFilter");
-    [statusSelect, periodFilter].forEach((el) => {
-      if (el && !el.dataset.pmFilterBound) {
-        el.dataset.pmFilterBound = "1";
-        el.addEventListener("change", () => this.renderRequests());
-      }
-    });
+      statusField.insertAdjacentElement("afterend", resultField);
+      resultField.insertAdjacentElement("afterend", periodField);
+    }
   },
 
-  getRequestDisplayStatus(status) {
+  getRequestProgressStatus(status) {
     const value = String(status || "요청").trim();
-    if (value === "등록완료") return "등록";
-    if (value === "반려") return "반려";
-    return "요청";
+    return ["등록완료", "반려"].includes(value) ? "처리완료" : "처리대기";
   },
 
   isWithinRequestPeriod(createdAt, period = "3m") {
@@ -414,7 +410,8 @@ window.ReagentApp.productManagement = {
 
     const els = this.getEls();
     const keyword = String(els.requestKeyword?.value || "").trim().toLowerCase();
-    const statusFilter = document.getElementById("pmRequestStatus")?.value || "요청";
+    const progressFilter = document.getElementById("pmRequestProgressFilter")?.value || "처리대기";
+    const resultFilter = document.getElementById("pmRequestResultFilter")?.value || "";
     const periodFilter = document.getElementById("pmRequestPeriodFilter")?.value || "3m";
 
     return this.requests.filter((r) => {
@@ -422,10 +419,12 @@ window.ReagentApp.productManagement = {
         .join(" ")
         .toLowerCase();
 
-      const displayStatus = this.getRequestDisplayStatus(r.status || "요청");
+      const status = String(r.status || "요청").trim();
+      const progressStatus = this.getRequestProgressStatus(status);
 
       if (keyword && !text.includes(keyword)) return false;
-      if (statusFilter && displayStatus !== statusFilter) return false;
+      if (progressFilter && progressStatus !== progressFilter) return false;
+      if (resultFilter && status !== resultFilter) return false;
       if (!this.isWithinRequestPeriod(r.created_at || r.id, periodFilter)) return false;
       return true;
     });
@@ -445,7 +444,7 @@ window.ReagentApp.productManagement = {
 
     els.requestList.innerHTML = rows.map((r) => `
       <tr>
-        <td>${this.html(this.getRequestDisplayStatus(r.status || "요청"))}</td>
+        <td>${this.html(r.status || "요청")}</td>
         <td>${this.html(r.category)}</td>
         <td>${this.html(r.name)}</td>
         <td>${this.html(r.maker)}</td>
