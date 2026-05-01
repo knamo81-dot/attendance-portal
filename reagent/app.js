@@ -94,6 +94,10 @@ window.ReagentApp.bindTabs = function () {
         window.ReagentApp.collect?.initPrepareMonthControl?.();
         window.ReagentApp.collect?.renderPrepare?.();
       }
+
+      if (btn.dataset.tab === "product-management") {
+        window.ReagentApp.productManagement?.init?.();
+      }
     });
   });
 };
@@ -156,8 +160,13 @@ window.ReagentApp.bindEvents = function () {
   els.collectKeyword?.addEventListener("input", () => collect.renderCollect());
   els.collectCategory?.addEventListener("change", () => collect.renderCollect());
 
-  els.requestNew?.addEventListener("click", () => toast("제품 등록 요청 기능은 다음 단계에서 연결하면 됩니다.", "warn"));
-  els.inlineRequest?.addEventListener("click", () => toast("제품 등록 요청 기능은 다음 단계에서 연결하면 됩니다.", "warn"));
+  els.requestNew?.addEventListener("click", async () => {
+    await request.openRegistrationRequestDialog?.();
+  });
+
+  els.inlineRequest?.addEventListener("click", async () => {
+    await request.openRegistrationRequestDialog?.();
+  });
 
   els.confirmSelectedCollect?.addEventListener("click", () => collect.confirmSelectedCollect?.());
   els.excludeSelectedCollect?.addEventListener("click", () => collect.excludeSelectedCollect?.());
@@ -382,4 +391,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.ReagentApp.bindEvents();
   window.ReagentApp.request.renderSearchResults();
   window.ReagentApp.request.fetchData();
+
+  if (document.querySelector('.tab-btn[data-tab="product-management"]')?.classList.contains("active")) {
+    window.ReagentApp.productManagement?.init?.();
+  }
 });
