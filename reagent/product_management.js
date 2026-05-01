@@ -5,6 +5,7 @@ window.ReagentApp.productManagement = {
   requests: [],
   editingProductId: null,
   activeRequestStatus: "",
+  activeManagementPanel: "product",
 
   get sb() {
     return window.ReagentApp.sb;
@@ -119,12 +120,20 @@ window.ReagentApp.productManagement = {
     }
 
     this.bindEvents();
+    this.setProductManagementPanel("product");
     this.loadProducts();
     this.loadRequests();
   },
 
   getEls() {
     return {
+      pageTitle: document.getElementById("pmPageTitle"),
+      pageDesc: document.getElementById("pmPageDesc"),
+      showProductPanel: document.getElementById("showPmProductPanel"),
+      showRequestPanel: document.getElementById("showPmRequestPanel"),
+      productPanel: document.getElementById("pmProductMasterPanel"),
+      requestPanel: document.getElementById("pmRegistrationRequestPanel"),
+
       productKeyword: document.getElementById("pmProductKeyword"),
       productCategory: document.getElementById("pmProductCategory"),
       productActive: document.getElementById("pmProductActive"),
@@ -209,6 +218,16 @@ window.ReagentApp.productManagement = {
 
     const els = this.getEls();
 
+    if (els.showProductPanel && !els.showProductPanel.dataset.bound) {
+      els.showProductPanel.dataset.bound = "1";
+      els.showProductPanel.addEventListener("click", () => this.setProductManagementPanel("product"));
+    }
+
+    if (els.showRequestPanel && !els.showRequestPanel.dataset.bound) {
+      els.showRequestPanel.dataset.bound = "1";
+      els.showRequestPanel.addEventListener("click", () => this.setProductManagementPanel("request"));
+    }
+
     [els.productKeyword, els.productCategory, els.productActive].forEach((el) => {
       el?.addEventListener("input", () => this.renderProducts());
       el?.addEventListener("change", () => this.renderProducts());
@@ -228,6 +247,32 @@ window.ReagentApp.productManagement = {
     });
 
     els.refreshRequests?.addEventListener("click", () => this.loadRequests());
+  },
+
+
+  setProductManagementPanel(panel = "product") {
+    const els = this.getEls();
+    const showRequest = panel === "request";
+    this.activeManagementPanel = showRequest ? "request" : "product";
+
+    if (els.productPanel) els.productPanel.style.display = showRequest ? "none" : "";
+    if (els.requestPanel) els.requestPanel.style.display = showRequest ? "" : "none";
+
+    els.showProductPanel?.classList.toggle("primary", !showRequest);
+    els.showRequestPanel?.classList.toggle("primary", showRequest);
+
+    if (els.pageTitle) els.pageTitle.textContent = showRequest ? "제품 등록 요청 관리" : "제품 마스터 관리";
+    if (els.pageDesc) {
+      els.pageDesc.textContent = showRequest
+        ? "담당자가 제품신청 화면에서 요청한 미등록 제품을 확인하고 승인 또는 반려합니다."
+        : "제품신청 화면의 제품검색과 자동입력에 사용되는 기준 데이터를 관리합니다.";
+    }
+
+    if (showRequest) {
+      this.renderRequests();
+    } else {
+      this.renderProducts();
+    }
   },
 
 
