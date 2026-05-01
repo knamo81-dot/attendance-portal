@@ -6,6 +6,8 @@ window.ReagentApp.request = {
   collectedMeta: {},
   productMasterRows: [],
   productMasterLoadedAt: 0,
+  myRegistrationRequests: [],
+  activeRequestPanel: "list",
 
   saveRequestRows() {
     try {
@@ -448,13 +450,8 @@ window.ReagentApp.request = {
     document.getElementById("productRegistrationRequestModal")?.classList.remove("show");
     this.closeSearchModal?.();
 
-    document.querySelectorAll(".tab-btn").forEach((btn) => btn.classList.remove("active"));
-    document.querySelectorAll(".page").forEach((page) => page.classList.remove("active"));
-
-    document.querySelector(".tab-btn[data-tab=\"product-management\"]")?.classList.add("active");
-    document.getElementById("page-product-management")?.classList.add("active");
-
-    window.ReagentApp.productManagement?.init?.();
+    await this.loadMyRegistrationRequests?.(true);
+    this.setRequestPanelView?.("status");
     window.ReagentApp.productManagement?.loadRequests?.();
     return true;
   },
@@ -499,6 +496,145 @@ window.ReagentApp.request = {
     window.ReagentApp.toast?.("제품 등록 요청이 저장되었습니다.", "success");
     window.ReagentApp.productManagement?.loadRequests?.();
     return true;
+  },
+
+
+  bindRegistrationStatusPanel() {
+    const listBtn = document.getElementById("showRequestListPanel");
+    const statusBtn = document.getElementById("showRequestStatusPanel");
+    const filter = document.getElementById("myRequestStatusFilter");
+    const refresh = document.getElementById("refreshMyRegistrationRequests");
+
+    if (listBtn && !listBtn.dataset.bound) {
+      listBtn.dataset.bound = "1";
+      listBtn.addEventListener("click", () => this.setRequestPanelView("list"));
+    }
+
+    if (statusBtn && !statusBtn.dataset.bound) {
+      statusBtn.dataset.bound = "1";
+      statusBtn.addEventListener("click", async () => {
+        await this.loadMyRegistrationRequests(true);
+        this.setRequestPanelView("status");
+      });
+    }
+
+    if (filter && !filter.dataset.bound) {
+      filter.dataset.bound = "1";
+      filter.addEventListener("change", () => this.renderMyRegistrationRequests());
+    }
+
+    if (refresh && !refresh.dataset.bound) {
+      refresh.dataset.bound = "1";
+      refresh.addEventListener("click", () => this.loadMyRegistrationRequests(true));
+    }
+  },
+
+  setRequestPanelView(view = "list") {
+    this.activeRequestPanel = view === "status" ? "status" : "list";
+
+    const appPanel = document.getElementById("requestApplicationPanel");
+    const statusPanel = document.getElementById("registrationRequestStatusPanel");
+    const listBtn = document.getElementById("showRequestListPanel");
+    const statusBtn = document.getElementById("showRequestStatusPanel");
+    const title = document.getElementById("requestListSectionTitle");
+    const desc = document.getElementById("requestListSectionDesc");
+    const badge = window.ReagentApp.els?.draftCountBadge;
+
+    const showStatus = this.activeRequestPanel === "status";
+    if (appPanel) appPanel.style.display = showStatus ? "none" : "";
+    if (statusPanel) statusPanel.style.display = showStatus ? "" : "none";
+
+    listBtn?.classList.toggle("primary", !showStatus);
+    statusBtn?.classList.toggle("primary", showStatus);
+
+    if (title) title.textContent = showStatus ? "제품 등록 요청 현황" : "신청 목록";
+    if (desc) desc.textContent = showStatus ? "내가 요청한 미등록 제품의 진행상황을 확인합니다." : "체크한 품목만 취합 탭으로 반영됩니다.";
+    if (badge) badge.style.display = showStatus ? "none" : "inline-flex";
+
+    if (showStatus) this.renderMyRegistrationRequests();
+  },
+
+  getDisplayRequestStatus(status) {
+    const value = String(status || "요청").trim();
+    if (value === "등록완료") return "등록";
+    if (value === "반려") return "반려";
+    return "요청중";
+  },
+
+  async loadMyRegistrationRequests(force = false) {
+    const sb = window.ReagentApp.sb;
+    const user = this.getCurrentUser();
+    const requester = user.name || "미지정";
+
+    if (!sb) {
+      this.myRegistrationRequests = [];
+      this.renderMyRegistrationRequests();
+      return;
+    }
+
+    let query = sb
+      .from("product_registration_requests")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (requester && requester !== "미지정") {
+      query = query.eq("requester", requester);
+    } else if (user.team) {
+      query = query.eq("team", user.team);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("내 제품 등록 요청 조회 실패:", error);
+      window.ReagentApp.toast?.("내 제품 등록 요청 조회 실패: " + (error.message || "원인을 확인하세요."), "warn");
+      this.myRegistrationRequests = [];
+      this.renderMyRegistrationRequests();
+      return;
+    }
+
+    this.myRegistrationRequests = Array.isArray(data) ? data : [];
+    this.renderMyRegistrationRequests();
+  },
+
+  renderMyRegistrationRequests() {
+    const tbody = document.getElementById("myRegistrationRequestList");
+    const badge = document.getElementById("myRequestStatusBadge");
+    const filter = document.getElementById("myRequestStatusFilter")?.value || "";
+    if (!tbody) return;
+
+    const rows = (this.myRegistrationRequests || []).filter((row) => {
+      const displayStatus = this.getDisplayRequestStatus(row.status);
+      return !filter || displayStatus === filter;
+    });
+
+    if (badge) badge.textContent = "내 요청 " + rows.length + "건";
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td class="empty" colspan="11">제품 등록 요청 현황이 없습니다.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map((row) => {
+      const status = this.getDisplayRequestStatus(row.status);
+      const statusColor = status === "등록" ? "#16a34a" : (status === "반려" ? "#dc2626" : "#1d4ed8");
+      const handledText = row.reject_reason || row.handled_by || "";
+      return `
+        <tr>
+          <td>${this.html(this.formatDateTime(row.created_at || row.id))}</td>
+          <td><span style="font-weight:800; color:${statusColor};">${this.html(status)}</span></td>
+          <td>${this.html(row.category)}</td>
+          <td>${this.html(row.name)}</td>
+          <td>${this.html(row.maker)}</td>
+          <td>${this.html(row.code)}</td>
+          <td>${this.html(row.cas)}</td>
+          <td>${this.html(row.grade)}</td>
+          <td>${this.html(row.capacity)}</td>
+          <td>${this.html(row.usage)}</td>
+          <td>${this.html(handledText)}</td>
+        </tr>
+      `;
+    }).join("");
   },
 
   getCurrentUser() {
