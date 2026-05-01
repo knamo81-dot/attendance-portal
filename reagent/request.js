@@ -494,6 +494,12 @@ window.ReagentApp.request = {
       return false;
     }
 
+    const canCreateRequest = await this.confirmProductMasterDuplicate(payload, {
+      prefix: "제품 등록 요청 중 중복 가능성이 있습니다."
+    });
+
+    if (!canCreateRequest) return false;
+
     const { error } = await sb
       .from("product_registration_requests")
       .insert(payload);
@@ -620,6 +626,42 @@ window.ReagentApp.request = {
     if (value === "등록완료") return "등록";
     if (value === "반려") return "반려";
     return "요청";
+  },
+
+  normalizeDuplicateValue(value) {
+    return String(value || "").trim().toLowerCase();
+  },
+
+  async confirmProductMasterDuplicate(row = {}, options = {}) {
+    const nameKey = this.normalizeDuplicateValue(row.name);
+    const codeKey = this.normalizeDuplicateValue(row.code);
+
+    if (!nameKey && !codeKey) return true;
+
+    const masterRows = await this.loadProductMaster(true);
+    const duplicateProducts = (masterRows || []).filter((product) => {
+      const sameName = nameKey && this.normalizeDuplicateValue(product.name) === nameKey;
+      const sameCode = codeKey && this.normalizeDuplicateValue(product.code) === codeKey;
+      return sameName || sameCode;
+    });
+
+    if (!duplicateProducts.length) return true;
+
+    const sample = duplicateProducts[0] || {};
+    const sameName = nameKey && this.normalizeDuplicateValue(sample.name) === nameKey;
+    const sameCode = codeKey && this.normalizeDuplicateValue(sample.code) === codeKey;
+    const reasonText = [sameName ? "품명" : "", sameCode ? "제품코드" : ""].filter(Boolean).join(" / ") || "품명 또는 제품코드";
+    const prefix = options.prefix || "이미 등록된 제품이 있습니다.";
+
+    return confirm(
+      `${prefix}\n\n` +
+      `${reasonText}가 같은 제품이 이미 제품 마스터에 등록되어 있습니다.\n\n` +
+      `기존 품명: ${sample.name || "-"}\n` +
+      `기존 제품코드: ${sample.code || "-"}\n` +
+      `기존 제조사: ${sample.maker || "-"}\n` +
+      `중복 후보: ${duplicateProducts.length}건\n\n` +
+      "그래도 계속 진행하시겠습니까?"
+    );
   },
 
   async loadMyRegistrationRequests(force = false) {
@@ -863,6 +905,12 @@ window.ReagentApp.request = {
       return;
     }
 
+    const canSaveRequestEdit = await this.confirmProductMasterDuplicate(row, {
+      prefix: "제품 등록 요청 수정 중 중복 가능성이 있습니다."
+    });
+
+    if (!canSaveRequestEdit) return;
+
     const { data, error } = await sb
       .from("product_registration_requests")
       .update(row)
@@ -967,6 +1015,12 @@ window.ReagentApp.request = {
       window.ReagentApp.toast?.("제품명은 필수입니다.", "warn");
       return;
     }
+
+    const canReRequest = await this.confirmProductMasterDuplicate(payload, {
+      prefix: "제품 등록 재요청 중 중복 가능성이 있습니다."
+    });
+
+    if (!canReRequest) return;
 
     const { data, error } = await sb
       .from("product_registration_requests")
