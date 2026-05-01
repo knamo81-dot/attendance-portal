@@ -220,10 +220,17 @@
   <section class="card">
     <div class="card-head">
       <div>
-        <h2>제품관리</h2>
-        <p>관리자·운영자 전용 제품 마스터 및 미등록 제품 요청 관리 화면입니다.</p>
+        <h2 id="pmPageTitle">제품 마스터 관리</h2>
+        <p id="pmPageDesc">제품신청 화면의 제품검색과 자동입력에 사용되는 기준 데이터를 관리합니다.</p>
       </div>
-      <span class="badge blue">제품 마스터 / 등록 요청</span>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
+        <div class="request-list-toggle" style="display:inline-flex; align-items:center; gap:4px; padding:4px; border:1px solid #d9e2ec; border-radius:14px; background:#f8fafc;">
+          <span style="font-weight:800; font-size:13px; color:#334155; padding:0 8px; white-space:nowrap;">관리 선택</span>
+          <button class="btn primary" id="showPmProductPanel" type="button" style="height:36px; padding:0 14px; border-radius:10px;">제품 마스터 관리</button>
+          <button class="btn" id="showPmRequestPanel" type="button" style="height:36px; padding:0 14px; border-radius:10px;">제품 등록 요청 관리</button>
+        </div>
+        <span class="badge blue">제품 마스터 / 등록 요청</span>
+      </div>
     </div>
     <div class="card-body">
       <div class="summary">
@@ -235,7 +242,7 @@
     </div>
   </section>
 
-  <section class="card" style="margin-top:12px;">
+  <section class="card" id="pmProductMasterPanel" style="margin-top:12px;">
     <div class="card-head">
       <div>
         <h3>제품 마스터 관리</h3>
@@ -284,7 +291,7 @@
     </div>
   </section>
 
-  <section class="card" style="margin-top:12px;">
+  <section class="card" id="pmRegistrationRequestPanel" style="margin-top:12px; display:none;">
     <div class="card-head">
       <div>
         <h3>제품 등록 요청 관리</h3>
