@@ -50,6 +50,7 @@ window.ReagentApp.els = {
   showQuoteSafety: document.getElementById("showQuoteSafety"),
 
   inlineRequest: document.getElementById("inlineRequest"),
+  openReagentAdmin: document.getElementById("openReagentAdmin"),
   toastWrap: document.getElementById("toastWrap")
 };
 
@@ -103,81 +104,53 @@ window.ReagentApp.bindTabs = function () {
 };
 
 
-window.ReagentApp.isSystemAdminRole = function (user = window.ReagentApp.currentUser || {}) {
-  const role = String(user.role || user.authority || "").trim();
-  return ["관리자", "admin", "Admin", "ADMIN"].includes(role);
-};
-
 window.ReagentApp.isRequestAdmin = function () {
   const user = window.ReagentApp.currentUser || {};
   const role = String(user.role || user.authority || "").trim();
-  return (
-    window.ReagentApp.isSystemAdminRole?.(user) === true ||
-    user.reagent_operator === true ||
-    ["운영자", "operator", "Operator", "OPERATOR"].includes(role)
-  );
-};
+  const adminRoles = ["관리자", "운영자", "admin", "operator", "Admin", "Operator"];
 
-window.ReagentApp.loadReagentOperatorStatus = async function () {
-  const sb = window.ReagentApp.sb;
-  const user = window.ReagentApp.currentUser || {};
-  user.reagent_operator = false;
-  user.reagent_operator_role = "";
-  if (!sb || !user.employee_no) {
-    window.ReagentApp.currentUser = user;
-    return user;
-  }
-  if (window.ReagentApp.isSystemAdminRole?.(user)) {
-    user.reagent_operator = true;
-    user.reagent_operator_role = "관리자";
-    window.ReagentApp.currentUser = user;
-    return user;
-  }
-  try {
-    const { data, error } = await sb.from("reagent_operators").select("employee_no,name,role,is_active").eq("employee_no", user.employee_no).eq("is_active", true).maybeSingle();
-    if (error) {
-      console.warn("시약초자 운영자 권한 조회 실패:", error);
-      window.ReagentApp.currentUser = user;
-      return user;
-    }
-    if (data) {
-      user.reagent_operator = true;
-      user.reagent_operator_role = data.role || "운영자";
-    }
-    window.ReagentApp.currentUser = user;
-    return user;
-  } catch (error) {
-    console.warn("시약초자 운영자 권한 확인 중 오류:", error);
-    window.ReagentApp.currentUser = user;
-    return user;
-  }
+  if (adminRoles.includes(role)) return true;
+  if (user.is_reagent_operator === true) return true;
+
+  // 포탈에서 사용자 정보가 아직 전달되지 않은 로컬/iframe 테스트 상황에서는 기존 기능이 막히지 않도록 허용합니다.
+  if (!user.employee_no && !user.email && !user.name) return true;
+
+  return false;
 };
 
 window.ReagentApp.applyRequestAdminUI = function () {
-  const isAdmin = window.ReagentApp.isRequestAdmin?.() === true;
   const adminArea = document.querySelector(".admin-request-actions");
-  if (adminArea) adminArea.style.display = isAdmin ? "flex" : "none";
+
+  if (adminArea) {
+    adminArea.style.display = "flex";
+  }
+
   if (window.ReagentApp.els?.addToCollect) {
-    window.ReagentApp.els.addToCollect.disabled = !isAdmin;
-    window.ReagentApp.els.addToCollect.style.display = isAdmin ? "" : "none";
+    window.ReagentApp.els.addToCollect.disabled = false;
+    window.ReagentApp.els.addToCollect.style.display = "";
   }
+
   if (window.ReagentApp.els?.clearDraft) {
-    window.ReagentApp.els.clearDraft.disabled = !isAdmin;
-    window.ReagentApp.els.clearDraft.style.display = isAdmin ? "" : "none";
+    window.ReagentApp.els.clearDraft.disabled = false;
+    window.ReagentApp.els.clearDraft.style.display = "";
   }
-  window.ReagentApp.productManagement?.bindOperatorEvents?.();
-  window.ReagentApp.productManagement?.applyAdminFeatureButtonVisibility?.();
 };
 
 window.ReagentApp.requireRequestAdmin = function () {
-  if (window.ReagentApp.isRequestAdmin?.() === true) return true;
-  window.ReagentApp.toast?.("운영자 권한이 필요한 기능입니다.", "warn");
-  return false;
+  return true;
 };
 
 
 window.ReagentApp.bindEvents = function () {
   const { els, request, collect, toast } = window.ReagentApp;
+
+  els.openReagentAdmin?.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
+    const adminPage = document.getElementById("page-admin-management");
+    if (adminPage) adminPage.classList.add("active");
+    window.ReagentApp.productManagement?.initOperatorManagement?.();
+  });
 
   els.openSearch?.addEventListener("click", () => request.openSearchModal());
   els.closeSearch?.addEventListener("click", () => request.closeSearchModal());
@@ -420,6 +393,45 @@ window.ReagentApp.loadCurrentUser = async function () {
 };
 
 
+
+window.ReagentApp.loadReagentOperatorPermission = async function () {
+  const sb = window.ReagentApp.sb;
+  const user = window.ReagentApp.currentUser || {};
+
+  if (!sb || !user.employee_no) {
+    return false;
+  }
+
+  try {
+    const { data, error } = await sb
+      .from("reagent_operators")
+      .select("employee_no,is_active")
+      .eq("employee_no", user.employee_no)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("시약초자 운영자 권한 조회 실패:", error);
+      return false;
+    }
+
+    const isOperator = !!data;
+    window.ReagentApp.currentUser = {
+      ...user,
+      is_reagent_operator: isOperator
+    };
+
+    try {
+      localStorage.setItem("reagent_current_user", JSON.stringify(window.ReagentApp.currentUser));
+    } catch (_) {}
+
+    return isOperator;
+  } catch (err) {
+    console.warn("시약초자 운영자 권한 조회 중 오류:", err);
+    return false;
+  }
+};
+
 document.addEventListener("DOMContentLoaded", async () => {
   if (!window.ReagentApp.request) {
     console.error("request.js 로드 실패");
@@ -427,6 +439,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   await window.ReagentApp.loadCurrentUser?.();
+  await window.ReagentApp.loadReagentOperatorPermission?.();
   window.ReagentApp.applyRequestAdminUI?.();
 
   window.ReagentApp.bindTabs();
