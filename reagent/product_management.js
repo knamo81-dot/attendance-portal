@@ -44,6 +44,13 @@ window.ReagentApp.productManagement = {
     return ["관리자", "운영자", "admin", "operator", "Admin", "Operator"].includes(role) || window.ReagentApp.isRequestAdmin?.() === true;
   },
 
+  getDisplayRequestStatus(status) {
+    const value = String(status || "요청").trim();
+    if (["등록완료", "등록"].includes(value)) return "등록";
+    if (value === "반려") return "반려";
+    return "요청";
+  },
+
   init() {
     if (!this.isAdminUser()) {
       const page = document.getElementById("page-product-management");
