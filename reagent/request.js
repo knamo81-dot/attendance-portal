@@ -667,6 +667,29 @@ window.ReagentApp.request = {
     const periodFilter = document.getElementById("myRequestPeriodFilter")?.value || "3m";
     if (!tbody) return;
 
+    if (!tbody.dataset.myRegistrationDelegatedBound) {
+      tbody.dataset.myRegistrationDelegatedBound = "1";
+      tbody.addEventListener("click", (e) => {
+        const editBtn = e.target.closest(".my-registration-edit-btn");
+        const deleteBtn = e.target.closest(".my-registration-delete-btn");
+        const reRequestBtn = e.target.closest(".my-registration-rerequest-btn");
+
+        if (editBtn) {
+          this.openMyRegistrationRequestEditModal(Number(editBtn.dataset.id));
+          return;
+        }
+
+        if (deleteBtn) {
+          this.deleteMyRegistrationRequest(Number(deleteBtn.dataset.id));
+          return;
+        }
+
+        if (reRequestBtn) {
+          this.reRequestMyRegistrationRequest(Number(reRequestBtn.dataset.id));
+        }
+      });
+    }
+
     const rows = (this.myRegistrationRequests || []).filter((row) => {
       const displayStatus = this.getDisplayRequestStatus(row.status);
 
@@ -721,17 +744,8 @@ window.ReagentApp.request = {
       `;
     }).join("");
 
-    tbody.querySelectorAll(".my-registration-edit-btn").forEach((btn) => {
-      btn.addEventListener("click", () => this.openMyRegistrationRequestEditModal(Number(btn.dataset.id)));
-    });
+    // 버튼 클릭은 renderMyRegistrationRequests 시작 부분의 이벤트 위임에서 처리합니다.
 
-    tbody.querySelectorAll(".my-registration-delete-btn").forEach((btn) => {
-      btn.addEventListener("click", () => this.deleteMyRegistrationRequest(Number(btn.dataset.id)));
-    });
-
-    tbody.querySelectorAll(".my-registration-rerequest-btn").forEach((btn) => {
-      btn.addEventListener("click", () => this.reRequestMyRegistrationRequest(Number(btn.dataset.id)));
-    });
   },
 
   ensureMyRegistrationRequestEditModal() {
@@ -923,8 +937,7 @@ window.ReagentApp.request = {
       return;
     }
 
-    const ok = confirm("반려된 내용을 복사해서 새 요청으로 다시 등록하시겠습니까?
-기존 반려건은 기록으로 남습니다.");
+    const ok = confirm("반려된 내용을 복사해서 새 요청으로 다시 등록하시겠습니까?\n기존 반려건은 기록으로 남습니다.");
     if (!ok) return;
 
     const sb = window.ReagentApp.sb;
