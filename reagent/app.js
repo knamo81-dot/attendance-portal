@@ -376,6 +376,26 @@ window.ReagentApp.loadCurrentUser = async function () {
 };
 
 
+
+// ===== 안전 보강: 취합정리 문서 선택 버튼 이벤트 위임 =====
+// 일부 배포 환경에서 기존 개별 바인딩이 적용되지 않는 경우를 대비합니다.
+document.addEventListener("click", (e) => {
+  const viewBtn = e.target.closest(".prepare-view-btn");
+  if (viewBtn) {
+    e.preventDefault();
+    const view = viewBtn.dataset.prepareView || (viewBtn.id === "showQuoteSafety" ? "safety" : "main");
+    window.ReagentApp.collect?.setPrepareActiveView?.(view);
+    return;
+  }
+
+  const tableBtn = e.target.closest(".prepare-table-view-btn");
+  if (tableBtn) {
+    e.preventDefault();
+    const tableView = tableBtn.dataset.prepareTableView || (tableBtn.id === "showPrepareQuote" ? "quote" : "summary");
+    window.ReagentApp.collect?.setPrepareTableView?.(tableView);
+  }
+});
+
 document.addEventListener("DOMContentLoaded", async () => {
   if (!window.ReagentApp.request) {
     console.error("request.js 로드 실패");
