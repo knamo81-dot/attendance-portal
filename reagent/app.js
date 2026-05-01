@@ -104,18 +104,23 @@ window.ReagentApp.bindTabs = function () {
 };
 
 
-window.ReagentApp.isRequestAdmin = function () {
+window.ReagentApp.hasReagentManagementAccess = function () {
   const user = window.ReagentApp.currentUser || {};
-  const role = String(user.role || user.authority || "").trim();
-  const adminRoles = ["관리자", "운영자", "admin", "operator", "Admin", "Operator"];
+  const rawRole = String(user.role || user.authority || user.permission || "").trim();
+  const lowerRole = rawRole.toLowerCase();
+  const adminRoles = ["관리자", "운영자", "admin", "operator"];
 
-  if (adminRoles.includes(role)) return true;
+  if (adminRoles.includes(rawRole) || adminRoles.includes(lowerRole)) return true;
   if (user.is_reagent_operator === true) return true;
 
   // 포탈에서 사용자 정보가 아직 전달되지 않은 로컬/iframe 테스트 상황에서는 기존 기능이 막히지 않도록 허용합니다.
-  if (!user.employee_no && !user.email && !user.name) return true;
+  if (!user.employee_no && !user.employeeNo && !user.email && !user.name) return true;
 
   return false;
+};
+
+window.ReagentApp.isRequestAdmin = function () {
+  return window.ReagentApp.hasReagentManagementAccess?.() === true;
 };
 
 window.ReagentApp.applyRequestAdminUI = function () {
