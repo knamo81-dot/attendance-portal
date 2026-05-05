@@ -428,30 +428,64 @@ window.ReagentApp.productManagement = {
       return;
     }
 
-    const { data: admins, error: adminError } = await this.sb
-      .from("employees")
+    // 관리자 권한은 사원정보관리에서 저장되는 public.users.role 기준으로 자동 포함합니다.
+    const { data: adminUsers, error: adminUserError } = await this.sb
+      .from("users")
       .select("*")
-      .eq("authority", "관리자");
+      .eq("role", "관리자");
 
-    if (adminError) {
-      console.warn("관리자 목록 조회 실패:", adminError);
-      this.toast(`관리자 목록 조회 실패: ${adminError.message || "원인을 확인하세요."}`, "warn");
+    if (adminUserError) {
+      console.warn("관리자 권한 조회 실패:", adminUserError);
+      this.toast(`관리자 권한 조회 실패: ${adminUserError.message || "원인을 확인하세요."}`, "warn");
     }
 
-    const adminRows = (Array.isArray(admins) ? admins : []).map((row) => ({
-      employee_no: row.employee_no || row.employeeNo || "",
-      name: row.name || "",
-      department: this.getEmployeeDepartment(row),
-      team: this.getEmployeeTeam(row),
-      role: "관리자",
-      is_active: true,
-      is_admin: true,
-      created_by: "사원정보",
-      created_at: row.updated_at || row.created_at || ""
-    }));
+    const adminEmails = (Array.isArray(adminUsers) ? adminUsers : [])
+      .map((row) => String(row.email || row.user_email || "").trim())
+      .filter(Boolean);
+
+    let adminEmployees = [];
+
+    if (adminEmails.length) {
+      const { data: employeeRows, error: employeeError } = await this.sb
+        .from("employees")
+        .select("*")
+        .in("email", adminEmails);
+
+      if (employeeError) {
+        console.warn("관리자 사원정보 매칭 실패:", employeeError);
+        this.toast(`관리자 사원정보 매칭 실패: ${employeeError.message || "원인을 확인하세요."}`, "warn");
+      } else {
+        adminEmployees = Array.isArray(employeeRows) ? employeeRows : [];
+      }
+    }
+
+    const adminRows = (Array.isArray(adminUsers) ? adminUsers : []).map((userRow) => {
+      const email = String(userRow.email || userRow.user_email || "").trim();
+      const employee = adminEmployees.find((emp) => String(emp.email || "").trim() === email) || {};
+
+      return {
+        employee_no: employee.employee_no || userRow.employee_no || userRow.employeeNo || "",
+        name: employee.name || userRow.name || userRow.user_name || email || "",
+        department: this.getEmployeeDepartment(employee),
+        team: this.getEmployeeTeam(employee),
+        role: "관리자",
+        is_active: true,
+        is_admin: true,
+        created_by: "사원정보",
+        created_at: userRow.updated_at || userRow.created_at || employee.updated_at || employee.created_at || "",
+        email
+      };
+    });
 
     const operatorRows = (Array.isArray(operators) ? operators : [])
-      .filter((op) => !adminRows.some((admin) => String(admin.employee_no) === String(op.employee_no)))
+      .filter((op) => {
+        const opEmployeeNo = String(op.employee_no || "");
+        const opEmail = String(op.email || "");
+        return !adminRows.some((admin) =>
+          (admin.employee_no && String(admin.employee_no) === opEmployeeNo) ||
+          (admin.email && String(admin.email) === opEmail)
+        );
+      })
       .map((op) => ({
         ...op,
         role: op.role || "운영자",
