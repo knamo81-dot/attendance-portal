@@ -1,4 +1,5 @@
 window.ReagentApp = window.ReagentApp || {};
+
 window.ReagentApp.els = {
   category: document.getElementById("category"),
   productName: document.getElementById("productName"),
@@ -121,7 +122,12 @@ window.ReagentApp.getTabAccessLevel = function (target) {
     return "operator";
   }
 
-  if (tab === "request" || label === "제품신청") return "all";
+  if (
+    tab === "request" ||
+    label === "제품신청"
+  ) {
+    return "all";
+  }
 
   return "operator";
 };
@@ -135,16 +141,17 @@ window.ReagentApp.canAccessTab = function (target) {
 };
 
 window.ReagentApp.enforcePermissionDom = function () {
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
+  document.querySelectorAll(".tab-btn, button[data-tab]").forEach((btn) => {
     const allowed = window.ReagentApp.canAccessTab?.(btn) === true;
-
     if (!allowed) {
-      btn.style.display = "none";
+      btn.style.setProperty("display", "none", "important");
+      btn.style.setProperty("visibility", "hidden", "important");
       btn.disabled = true;
       btn.setAttribute("aria-hidden", "true");
       btn.dataset.permissionHidden = "1";
     } else {
-      btn.style.display = "";
+      btn.style.removeProperty("display");
+      btn.style.removeProperty("visibility");
       btn.disabled = false;
       btn.setAttribute("aria-hidden", "false");
       btn.dataset.permissionHidden = "0";
@@ -154,12 +161,18 @@ window.ReagentApp.enforcePermissionDom = function () {
   const adminButton = window.ReagentApp.els?.openReagentAdmin || document.getElementById("openReagentAdmin");
   if (adminButton) {
     const allowed = window.ReagentApp.hasReagentAdminAccess?.() === true;
-    adminButton.style.display = allowed ? "" : "none";
-    adminButton.disabled = !allowed;
-    adminButton.setAttribute("aria-hidden", allowed ? "false" : "true");
+    if (!allowed) {
+      adminButton.style.setProperty("display", "none", "important");
+      adminButton.disabled = true;
+      adminButton.setAttribute("aria-hidden", "true");
+    } else {
+      adminButton.style.removeProperty("display");
+      adminButton.disabled = false;
+      adminButton.setAttribute("aria-hidden", "false");
+    }
   }
 
-  const activeBtn = document.querySelector(".tab-btn.active");
+  const activeBtn = document.querySelector(".tab-btn.active, button[data-tab].active");
   if (activeBtn && window.ReagentApp.canAccessTab?.(activeBtn) === false) {
     window.ReagentApp.showTab?.("request");
   }
@@ -167,24 +180,46 @@ window.ReagentApp.enforcePermissionDom = function () {
 
 window.ReagentApp.applyPermissionUI = function () {
   window.ReagentApp.enforcePermissionDom?.();
+
+  if (!window.ReagentApp._permissionObserver) {
+    window.ReagentApp._permissionObserver = new MutationObserver(() => {
+      window.ReagentApp.enforcePermissionDom?.();
+    });
+    window.ReagentApp._permissionObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class", "style"]
+    });
+  }
+
+  clearInterval(window.ReagentApp._permissionInterval);
+  let count = 0;
+  window.ReagentApp._permissionInterval = setInterval(() => {
+    window.ReagentApp.enforcePermissionDom?.();
+    count += 1;
+    if (count > 100) clearInterval(window.ReagentApp._permissionInterval);
+  }, 100);
 };
 
 window.ReagentApp.showTab = function (tab) {
-  const targetTab = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+  const targetTab = document.querySelector(`.tab-btn[data-tab="${tab}"], button[data-tab="${tab}"]`);
 
   if (targetTab && window.ReagentApp.canAccessTab?.(targetTab) === false) {
     window.ReagentApp.toast?.("접근 권한이 없는 기능입니다.", "warn");
     tab = "request";
   }
 
-  const finalTab = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+  const finalTab = document.querySelector(`.tab-btn[data-tab="${tab}"], button[data-tab="${tab}"]`);
   const finalPage = document.getElementById(`page-${tab}`);
 
-  document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+  document.querySelectorAll(".tab-btn, button[data-tab]").forEach((b) => b.classList.remove("active"));
   document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
 
   finalTab?.classList.add("active");
   finalPage?.classList.add("active");
+
+  window.ReagentApp.enforcePermissionDom?.();
 
   if (tab === "prepare") {
     window.ReagentApp.collect?.initPrepareMonthControl?.();
@@ -198,8 +233,6 @@ window.ReagentApp.showTab = function (tab) {
   if (tab === "admin-management") {
     window.ReagentApp.productManagement?.initOperatorManagement?.();
   }
-
-  window.ReagentApp.applyPermissionUI?.();
 };
 
 window.ReagentApp.loadReagentPermission = async function () {
@@ -266,8 +299,22 @@ window.ReagentApp.loadReagentPermission = async function () {
   return user;
 };
 
+document.addEventListener("click", function (e) {
+  const btn = e.target.closest?.(".tab-btn, button[data-tab]");
+  if (!btn) return;
+
+  if (window.ReagentApp.canAccessTab?.(btn) === false) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    window.ReagentApp.toast?.("접근 권한이 없는 기능입니다.", "warn");
+    window.ReagentApp.showTab?.("request");
+  }
+}, true);
+
+
 window.ReagentApp.bindTabs = function () {
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
+  document.querySelectorAll(".tab-btn, button[data-tab]").forEach((btn) => {
     if (btn.dataset.bound === "1") return;
     btn.dataset.bound = "1";
 
@@ -284,6 +331,7 @@ window.ReagentApp.bindTabs = function () {
     });
   });
 };
+
 
 window.ReagentApp.isRequestAdmin = function () {
   return window.ReagentApp.hasReagentOperatorAccess?.() === true;
