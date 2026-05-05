@@ -113,8 +113,6 @@ window.ReagentApp.productManagement = {
       return;
     }
 
-    document.getElementById("pmNoAuthNotice")?.remove();
-
     this.bindEvents();
     this.setProductManagementPanel("product");
     this.loadProducts();
