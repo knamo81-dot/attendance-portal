@@ -1711,3 +1711,22 @@ tr:not(.collect-row-confirmed) .vendor-group-td{
 .admin-tab {
   margin-left: auto;
 }
+
+
+/* ===== 권한 확인 전 메뉴 깜빡임 방지 ===== */
+html.permission-loading .tab-btn,
+html.permission-loading button[data-tab],
+html.permission-loading #openReagentAdmin,
+body.permission-loading .tab-btn,
+body.permission-loading button[data-tab],
+body.permission-loading #openReagentAdmin{
+  visibility:hidden !important;
+}
+
+/* 권한 계산 후 JS에서 숨긴 버튼은 계속 숨김 */
+.tab-btn[data-permission-hidden="1"],
+button[data-tab][data-permission-hidden="1"],
+#openReagentAdmin[aria-hidden="true"]{
+  display:none !important;
+  visibility:hidden !important;
+}
