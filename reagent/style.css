@@ -1706,3 +1706,8 @@ tr:not(.collect-row-confirmed) .vendor-group-td{
   color:#ea580c !important;
   font-weight:800 !important;
 }
+
+/* === 관리자 기능 탭 오른쪽 정렬 === */
+.admin-tab {
+  margin-left: auto;
+}
