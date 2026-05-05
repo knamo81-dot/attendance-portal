@@ -131,7 +131,7 @@
 <script>
 (function () {
   const SUPABASE_URL = 'https://mbqpsovlwvedwrtbbauj.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhc2VfYW5vbiIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
 
   const HOME_SRC = 'portal-home.html';
   const LAST_PAGE_KEY = 'portalLastPage';
@@ -155,42 +155,6 @@
     });
   }
 
-  function isReagentSrc(src) {
-    return String(src || '').includes('reagent/index.html');
-  }
-
-  async function getCurrentUser() {
-    const { data } = await supabaseClient.auth.getUser();
-    return data?.user || null;
-  }
-
-  async function ensureAuthenticated() {
-    const { data } = await supabaseClient.auth.getSession();
-
-    if (!data.session) {
-      localStorage.removeItem(LAST_PAGE_KEY);
-      if (frame) frame.src = HOME_SRC;
-      if (homeBtn) setActiveNav(homeBtn);
-      return false;
-    }
-
-    return true;
-  }
-
-  function buildSrcWithUser(src, user) {
-    if (!src || !user) return src;
-
-    const params = [];
-    if (user.email) params.push('email=' + encodeURIComponent(user.email));
-
-    // 시약초자는 캐시 때문에 예전 JS가 남으면 권한/버튼 문제가 반복될 수 있어 캐시 회피값만 붙입니다.
-    if (isReagentSrc(src)) params.push('v=' + Date.now());
-
-    if (!params.length) return src;
-
-    return src + (src.includes('?') ? '&' : '?') + params.join('&');
-  }
-
   function postAuthToFrame(user) {
     if (!frame || !frame.contentWindow || !user) return;
 
@@ -205,12 +169,296 @@
     );
   }
 
+  async function getCurrentUser() {
+    const { data } = await supabaseClient.auth.getUser();
+    return data?.user || null;
+  }
+
+  async function ensureAuthenticated() {
+    const { data } = await supabaseClient.auth.getSession();
+
+    if (!data.session) {
+      localStorage.removeItem(LAST_PAGE_KEY);
+
+      if (frame) {
+        frame.src = HOME_SRC;
+      }
+      if (homeBtn) {
+        setActiveNav(homeBtn);
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+
+  function isReagentSrc(src) {
+    return String(src || '').includes('reagent/index.html');
+  }
+
+  async function getPortalAccessProfile(user) {
+    const base = {
+      email: user?.email || '',
+      employee_no: '',
+      name: '',
+      user_role: '',
+      is_global_admin: false,
+      is_reagent_operator: false,
+      reagent_role: ''
+    };
+
+    if (!base.email) return base;
+
+    try {
+      const { data: userRow, error: userError } = await supabaseClient
+        .from('users')
+        .select('email,name,role')
+        .eq('email', base.email)
+        .maybeSingle();
+
+      if (userError) {
+        console.warn('users 권한 조회 실패:', userError);
+      }
+
+      if (userRow) {
+        base.name = userRow.name || base.name || '';
+        base.user_role = userRow.role || '';
+        base.is_global_admin = String(userRow.role || '').trim() === 'admin';
+      }
+
+      const { data: empRow, error: empError } = await supabaseClient
+        .from('employees')
+        .select('*')
+        .eq('email', base.email)
+        .maybeSingle();
+
+      if (empError) {
+        console.warn('employees 사원 조회 실패:', empError);
+      }
+
+      if (empRow) {
+        base.employee_no = empRow.employee_no || '';
+        base.name = empRow.name || base.name || '';
+        base.division_code = empRow.division_code || '';
+        base.team_code = empRow.team_code || '';
+        base.position = empRow.position || '';
+        base.authority = empRow.authority || '';
+        base.status = empRow.status || '';
+      }
+
+      if (base.is_global_admin) {
+        base.is_reagent_operator = true;
+        base.reagent_role = '관리자';
+      } else if (base.employee_no) {
+        const { data: opRow, error: opError } = await supabaseClient
+          .from('reagent_operators')
+          .select('employee_no,role,is_active')
+          .eq('employee_no', base.employee_no)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (opError) {
+          console.warn('시약초자 운영자 조회 실패:', opError);
+        }
+
+        if (opRow) {
+          base.is_reagent_operator = true;
+          base.reagent_role = opRow.role || '운영자';
+        }
+      }
+    } catch (error) {
+      console.warn('권한 프로필 조회 중 오류:', error);
+    }
+
+    return base;
+  }
+
+  function saveReagentUserHint(access) {
+    if (!access) return;
+
+    try {
+      localStorage.setItem('reagent_current_user', JSON.stringify({
+        email: access.email || '',
+        employee_no: access.employee_no || '',
+        name: access.name || '',
+        user_role: access.user_role || '',
+        role: access.reagent_role || '',
+        is_global_admin: access.is_global_admin === true,
+        is_reagent_operator: access.is_reagent_operator === true,
+        reagent_role: access.reagent_role || '',
+        division_code: access.division_code || '',
+        team_code: access.team_code || '',
+        position: access.position || '',
+        authority: access.authority || '',
+        status: access.status || ''
+      }));
+    } catch (_) {}
+  }
+
+  function canReagentAccess(access, level) {
+    if (level === 'all') return true;
+    if (level === 'admin') return access?.is_global_admin === true;
+    if (level === 'operator') return access?.is_global_admin === true || access?.is_reagent_operator === true;
+    return false;
+  }
+
+  function getReagentButtonLevel(btn) {
+    const tab = String(btn?.dataset?.tab || '');
+    const label = String(btn?.textContent || '').replace(/\s+/g, '').trim();
+
+    if (tab === 'admin-management' || label === '관리자기능') return 'admin';
+    if (
+      tab === 'collect' ||
+      tab === 'prepare' ||
+      tab === 'product-management' ||
+      label === '제품취합' ||
+      label === '취합정리' ||
+      label === '제품관리'
+    ) return 'operator';
+
+    if (tab === 'request' || label === '제품신청') return 'all';
+
+    return 'operator';
+  }
+
+  function switchReagentToRequest(doc) {
+    if (!doc) return;
+
+    const requestBtn = Array.from(doc.querySelectorAll('.tab-btn, button[data-tab]'))
+      .find((btn) => String(btn.dataset?.tab || '') === 'request' || String(btn.textContent || '').replace(/\s+/g, '').trim() === '제품신청');
+    const requestPage = doc.getElementById('page-request');
+
+    doc.querySelectorAll('.tab-btn, button[data-tab]').forEach((btn) => btn.classList.remove('active'));
+    doc.querySelectorAll('.page').forEach((page) => page.classList.remove('active'));
+
+    requestBtn?.classList.add('active');
+    requestPage?.classList.add('active');
+  }
+
+  function enforceReagentFramePermissions(access) {
+    if (!frame || !isReagentSrc(frame.getAttribute('src'))) return;
+
+    let doc;
+    try {
+      doc = frame.contentDocument || frame.contentWindow?.document;
+    } catch (error) {
+      console.warn('시약초자 iframe 접근 실패:', error);
+      return;
+    }
+
+    if (!doc) return;
+
+    const buttons = Array.from(doc.querySelectorAll('.tab-btn, button[data-tab]'));
+    buttons.forEach((btn) => {
+      const level = getReagentButtonLevel(btn);
+      const allowed = canReagentAccess(access, level);
+
+      if (!allowed) {
+        btn.style.setProperty('display', 'none', 'important');
+        btn.style.setProperty('visibility', 'hidden', 'important');
+        btn.disabled = true;
+        btn.setAttribute('aria-hidden', 'true');
+
+        if (!btn.dataset.portalPermissionBound) {
+          btn.dataset.portalPermissionBound = '1';
+          btn.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            switchReagentToRequest(doc);
+          }, true);
+        }
+      } else {
+        btn.style.removeProperty('display');
+        btn.style.removeProperty('visibility');
+        btn.disabled = false;
+        btn.setAttribute('aria-hidden', 'false');
+      }
+    });
+
+    const adminButton = doc.getElementById('openReagentAdmin') ||
+      Array.from(doc.querySelectorAll('button')).find((btn) => String(btn.textContent || '').replace(/\s+/g, '').trim() === '관리자기능');
+
+    if (adminButton) {
+      const allowed = canReagentAccess(access, 'admin');
+      if (!allowed) {
+        adminButton.style.setProperty('display', 'none', 'important');
+        adminButton.disabled = true;
+        adminButton.setAttribute('aria-hidden', 'true');
+      } else {
+        adminButton.style.removeProperty('display');
+        adminButton.disabled = false;
+        adminButton.setAttribute('aria-hidden', 'false');
+      }
+    }
+
+    const activeBtn = Array.from(doc.querySelectorAll('.tab-btn.active, button[data-tab].active'))[0];
+    if (activeBtn && !canReagentAccess(access, getReagentButtonLevel(activeBtn))) {
+      switchReagentToRequest(doc);
+    }
+
+    if (!frame.__reagentPermissionObserver) {
+      try {
+        frame.__reagentPermissionObserver = new frame.contentWindow.MutationObserver(function () {
+          enforceReagentFramePermissions(access);
+        });
+        frame.__reagentPermissionObserver.observe(doc.body, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['class', 'style']
+        });
+      } catch (error) {
+        console.warn('시약초자 권한 감시 설정 실패:', error);
+      }
+    }
+  }
+
+  function bindReagentFramePermission(access) {
+    if (!access || !isReagentSrc(frame?.getAttribute('src'))) return;
+
+    saveReagentUserHint(access);
+
+    let count = 0;
+    const timer = setInterval(function () {
+      enforceReagentFramePermissions(access);
+      count += 1;
+      if (count > 40) clearInterval(timer);
+    }, 100);
+  }
+
+
+  function buildSrcWithUser(src, user, access) {
+    if (!src || !user) return src;
+
+    const params = [];
+    const email = user.email || access?.email || '';
+
+    if (email) params.push('email=' + encodeURIComponent(email));
+
+    if (isReagentSrc(src) && access) {
+      if (access.employee_no) params.push('employee_no=' + encodeURIComponent(access.employee_no));
+      if (access.name) params.push('name=' + encodeURIComponent(access.name));
+      if (access.user_role) params.push('user_role=' + encodeURIComponent(access.user_role));
+      if (access.reagent_role) params.push('reagent_role=' + encodeURIComponent(access.reagent_role));
+      params.push('portal_auth=1');
+      params.push('v=' + Date.now());
+    }
+
+    if (!params.length) return src;
+
+    const separator = src.includes('?') ? '&' : '?';
+    return src + separator + params.join('&');
+  }
+
   async function navigate(btn, options) {
     options = options || {};
 
-    const src = btn.getAttribute('data-portal-src');
+    var src = btn.getAttribute('data-portal-src');
     if (!src || !frame) return;
 
+    // 홈은 로그인 전에도 열 수 있게 둡니다.
     if (src === HOME_SRC) {
       frame.src = HOME_SRC;
       localStorage.removeItem(LAST_PAGE_KEY);
@@ -222,16 +470,26 @@
     if (!ok) return;
 
     const user = await getCurrentUser();
+    const access = isReagentSrc(src) ? await getPortalAccessProfile(user) : null;
 
+    if (isReagentSrc(src)) {
+      saveReagentUserHint(access);
+    }
+
+    // 사용자가 선택한 앱만 마지막 페이지로 저장합니다.
     if (!options.skipSave) {
       localStorage.setItem(LAST_PAGE_KEY, src);
     }
 
     frame.onload = function () {
       postAuthToFrame(user);
+      if (isReagentSrc(src)) {
+        bindReagentFramePermission(access);
+      }
     };
 
-    frame.src = buildSrcWithUser(src, user);
+    const finalSrc = buildSrcWithUser(src, user, access);
+    frame.src = finalSrc;
     setActiveNav(btn);
   }
 
@@ -242,8 +500,14 @@
     const hasSession = !!data.session;
     const savedSrc = localStorage.getItem(LAST_PAGE_KEY);
 
-    if (!hasSession || !savedSrc || savedSrc === HOME_SRC) {
+    if (!hasSession) {
       localStorage.removeItem(LAST_PAGE_KEY);
+      frame.src = HOME_SRC;
+      if (homeBtn) setActiveNav(homeBtn);
+      return;
+    }
+
+    if (!savedSrc || savedSrc === HOME_SRC) {
       frame.src = HOME_SRC;
       if (homeBtn) setActiveNav(homeBtn);
       return;
@@ -258,12 +522,21 @@
     }
 
     const user = await getCurrentUser();
+    const access = isReagentSrc(savedSrc) ? await getPortalAccessProfile(user) : null;
+
+    if (isReagentSrc(savedSrc)) {
+      saveReagentUserHint(access);
+    }
 
     frame.onload = function () {
       postAuthToFrame(user);
+      if (isReagentSrc(savedSrc)) {
+        bindReagentFramePermission(access);
+      }
     };
 
-    frame.src = buildSrcWithUser(savedSrc, user);
+    const finalSrc = buildSrcWithUser(savedSrc, user, access);
+    frame.src = finalSrc;
     setActiveNav(targetBtn);
   }
 
@@ -277,23 +550,38 @@
     try {
       await supabaseClient.auth.signOut();
       localStorage.removeItem(LAST_PAGE_KEY);
-      if (frame) frame.src = HOME_SRC;
-      if (homeBtn) setActiveNav(homeBtn);
+
+      if (frame) {
+        frame.src = HOME_SRC;
+      }
+
+      if (homeBtn) {
+        setActiveNav(homeBtn);
+      }
+
       window.location.reload();
+
     } catch (e) {
       console.error('logout failed:', e);
       alert('로그아웃 중 오류가 발생했습니다.');
     }
   });
 
+  // 새 접속은 항상 홈에서 시작하고, 브라우저 새로고침일 때만 마지막 프로그램을 복원합니다.
+  // - 일반 접속/새 탭/주소 직접 입력: portal-home.html
+  // - F5 또는 브라우저 새로고침: localStorage의 마지막 프로그램 유지
   const navEntry = performance.getEntriesByType('navigation')[0];
   const navType = navEntry && navEntry.type ? navEntry.type : '';
 
   if (navType === 'reload') {
     restoreLastPage();
   } else {
-    if (frame) frame.src = HOME_SRC;
-    if (homeBtn) setActiveNav(homeBtn);
+    if (frame) {
+      frame.src = HOME_SRC;
+    }
+    if (homeBtn) {
+      setActiveNav(homeBtn);
+    }
   }
 })();
 </script>
