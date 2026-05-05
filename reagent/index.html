@@ -318,16 +318,80 @@
   </section>
 </section>
 
+
 <section class="page" id="page-admin-management">
   <section class="card">
     <div class="card-head">
       <div>
         <h2>관리자 기능</h2>
-        <p>시약·초자 프로그램 관리자 기능을 구성할 예정입니다.</p>
+        <p>시약·초자 프로그램의 운영자를 지정하고 해제합니다.</p>
       </div>
+      <span class="badge blue">운영자 관리</span>
     </div>
     <div class="card-body">
-      <div class="empty">관리자 기능 탭이 추가되었습니다.</div>
+      <div class="summary">
+        <div class="tile"><div class="k">현재 운영자</div><div class="v" id="opCurrentCount">0명</div></div>
+        <div class="tile"><div class="k">권한 범위</div><div class="v" style="font-size:20px;">전체 기능</div></div>
+        <div class="tile"><div class="k">기준 정보</div><div class="v" style="font-size:20px;">사원정보</div></div>
+        <div class="tile"><div class="k">상태</div><div class="v" style="font-size:20px;">사용</div></div>
+      </div>
+
+      <section class="card" style="margin-top:16px; box-shadow:none;">
+        <div class="card-head">
+          <div>
+            <h3>운영자 추가</h3>
+            <p>설정의 사원정보를 기준으로 사번 또는 이름을 검색해 운영자를 지정합니다.</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="collect-filters" style="grid-template-columns:2fr 1fr 1fr 1fr;">
+            <div class="field">
+              <label>사번 / 이름 / 이메일</label>
+              <input id="opEmployeeKeyword" placeholder="예: 100123 또는 홍길동"/>
+            </div>
+            <div class="field">
+              <label>&nbsp;</label>
+              <button class="btn primary" id="opSearchEmployees" type="button">사원 검색</button>
+            </div>
+            <div class="field">
+              <label>&nbsp;</label>
+              <button class="btn" id="opRefreshOperators" type="button">운영자 새로고침</button>
+            </div>
+            <div class="field">
+              <label>&nbsp;</label>
+              <div class="small" style="padding:12px 0;">운영자는 제품 신청/취합/정리/관리 기능에 접근합니다.</div>
+            </div>
+          </div>
+
+          <div class="table-wrap" style="margin-top:16px;">
+            <table>
+              <thead>
+                <tr><th>사번</th><th>이름</th><th>부서</th><th>팀</th><th>직급</th><th>이메일</th><th>작업</th></tr>
+              </thead>
+              <tbody id="opEmployeeSearchList"><tr><td class="empty" colspan="7">사번 또는 이름으로 검색하세요.</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" style="margin-top:16px; box-shadow:none;">
+        <div class="card-head">
+          <div>
+            <h3>현재 운영자 목록</h3>
+            <p>시약·초자 프로그램 운영자 권한을 가진 사원 목록입니다.</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>사번</th><th>이름</th><th>부서</th><th>팀</th><th>권한</th><th>등록자</th><th>등록일</th><th>작업</th></tr>
+              </thead>
+              <tbody id="opOperatorList"><tr><td class="empty" colspan="8">운영자 목록을 불러오는 중입니다.</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </div>
   </section>
 </section>
