@@ -428,11 +428,11 @@ window.ReagentApp.productManagement = {
       return;
     }
 
-    // 관리자 권한은 사원정보관리에서 저장되는 public.users.role 기준으로 자동 포함합니다.
+    // 관리자 권한은 사원정보관리에서 저장되는 public.users.role = admin 기준으로 자동 포함합니다.
     const { data: adminUsers, error: adminUserError } = await this.sb
       .from("users")
       .select("*")
-      .eq("role", "관리자");
+      .eq("role", "admin");
 
     if (adminUserError) {
       console.warn("관리자 권한 조회 실패:", adminUserError);
