@@ -50,6 +50,7 @@ window.ReagentApp.els = {
   showQuoteSafety: document.getElementById("showQuoteSafety"),
 
   inlineRequest: document.getElementById("inlineRequest"),
+  openReagentAdmin: document.getElementById("openReagentAdmin"),
   toastWrap: document.getElementById("toastWrap")
 };
 
@@ -98,6 +99,10 @@ window.ReagentApp.bindTabs = function () {
       if (btn.dataset.tab === "product-management") {
         window.ReagentApp.productManagement?.init?.();
       }
+
+      if (btn.dataset.tab === "admin-management") {
+        window.ReagentApp.productManagement?.initOperatorManagement?.();
+      }
     });
   });
 };
@@ -134,6 +139,16 @@ window.ReagentApp.requireRequestAdmin = function () {
 
 window.ReagentApp.bindEvents = function () {
   const { els, request, collect, toast } = window.ReagentApp;
+
+  els.openReagentAdmin?.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
+    const adminTab = document.querySelector('.tab-btn[data-tab="admin-management"]');
+    const adminPage = document.getElementById("page-admin-management");
+    adminTab?.classList.add("active");
+    adminPage?.classList.add("active");
+    window.ReagentApp.productManagement?.initOperatorManagement?.();
+  });
 
   els.openSearch?.addEventListener("click", () => request.openSearchModal());
   els.closeSearch?.addEventListener("click", () => request.closeSearchModal());
@@ -395,5 +410,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (document.querySelector('.tab-btn[data-tab="product-management"]')?.classList.contains("active")) {
     window.ReagentApp.productManagement?.init?.();
+  }
+
+  if (document.querySelector('.tab-btn[data-tab="admin-management"]')?.classList.contains("active")) {
+    window.ReagentApp.productManagement?.initOperatorManagement?.();
   }
 });
