@@ -709,26 +709,167 @@ window.ReagentApp.productManagement = {
     });
   },
 
-  fillProductForm(id) {
+
+  ensureProductEditModal() {
+    let modal = document.getElementById("pmProductEditModal");
+    if (modal) return modal;
+
+    modal = document.createElement("div");
+    modal.className = "modal-backdrop";
+    modal.id = "pmProductEditModal";
+    modal.innerHTML = `
+      <div class="modal" style="width:min(920px,100%);">
+        <div class="modal-head">
+          <div>
+            <h3>제품 정보 수정</h3>
+            <div class="small">선택한 제품 마스터 정보를 팝업에서 바로 수정합니다.</div>
+          </div>
+          <button type="button" class="btn" id="pmCloseProductEditModal">닫기</button>
+        </div>
+        <div class="card-body">
+          <input type="hidden" id="pmEditProductModalId" />
+          <div class="form-grid" style="grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start;">
+            <div class="field">
+              <label>구분</label>
+              <select id="pmEditProductCategory">
+                <option value="">선택</option>
+                <option value="시약">시약</option>
+                <option value="초자">초자</option>
+                <option value="안전용품">안전용품</option>
+              </select>
+            </div>
+            <div class="field"><label>품명 <span style="color:#dc2626;">*</span></label><input id="pmEditProductName" placeholder="제품명"/></div>
+            <div class="field"><label>제조사</label><input id="pmEditProductMaker" placeholder="제조사"/></div>
+            <div class="field"><label>제품코드</label><input id="pmEditProductCode" placeholder="제품코드"/></div>
+            <div class="field"><label>규격</label><input id="pmEditProductCapacity" placeholder="규격"/></div>
+            <div class="field"><label>CAS</label><input id="pmEditProductCas" placeholder="CAS"/></div>
+            <div class="field"><label>등급</label><input id="pmEditProductGrade" placeholder="등급"/></div>
+            <div class="field"><label>기본거래처</label><input id="pmEditProductDefaultVendor" placeholder="거래처"/></div>
+            <div class="field">
+              <label>사용여부</label>
+              <select id="pmEditProductIsActive">
+                <option value="true">사용</option>
+                <option value="false">사용중지</option>
+              </select>
+            </div>
+          </div>
+          <div class="field" style="margin-top:12px;">
+            <label>비고</label>
+            <input id="pmEditProductMemo" placeholder="비고"/>
+          </div>
+          <div class="actions" style="justify-content:flex-end; margin-top:18px;">
+            <button type="button" class="btn" id="pmCancelProductEdit">취소</button>
+            <button type="button" class="btn primary" id="pmSaveProductEdit">수정 저장</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => modal.classList.remove("show");
+    modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+    modal.querySelector("#pmCloseProductEditModal")?.addEventListener("click", close);
+    modal.querySelector("#pmCancelProductEdit")?.addEventListener("click", close);
+    modal.querySelector("#pmSaveProductEdit")?.addEventListener("click", () => this.saveProductEditFromModal());
+
+    return modal;
+  },
+
+  setProductEditValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.value = value ?? "";
+  },
+
+  getProductEditValue(id) {
+    return String(document.getElementById(id)?.value || "").trim();
+  },
+
+  openProductEditModal(id) {
     const product = this.products.find((p) => Number(p.id) === Number(id));
-    if (!product) return;
+    if (!product) {
+      this.toast("수정할 제품을 찾지 못했습니다.", "warn");
+      return;
+    }
 
-    const els = this.getEls();
-    this.editingProductId = product.id;
+    const modal = this.ensureProductEditModal();
 
-    if (els.formTitle) els.formTitle.textContent = "제품 수정";
-    if (els.productId) els.productId.value = product.id || "";
-    if (els.category) els.category.value = product.category || "";
-    if (els.name) els.name.value = product.name || "";
-    if (els.maker) els.maker.value = product.maker || "";
-    if (els.code) els.code.value = product.code || "";
-    if (els.capacity) els.capacity.value = product.capacity || "";
-    if (els.cas) els.cas.value = product.cas || "";
-    if (els.grade) els.grade.value = product.grade || "";
-    if (els.defaultVendor) els.defaultVendor.value = product.default_vendor || "";
-    if (els.memo) els.memo.value = product.memo || "";
-    if (els.isActive) els.isActive.value = product.is_active ? "true" : "false";
-    if (els.deactivateProduct) els.deactivateProduct.style.display = product.is_active ? "" : "none";
+    this.setProductEditValue("pmEditProductModalId", product.id || "");
+    this.setProductEditValue("pmEditProductCategory", product.category || "");
+    this.setProductEditValue("pmEditProductName", product.name || "");
+    this.setProductEditValue("pmEditProductMaker", product.maker || "");
+    this.setProductEditValue("pmEditProductCode", product.code || "");
+    this.setProductEditValue("pmEditProductCapacity", product.capacity || "");
+    this.setProductEditValue("pmEditProductCas", product.cas || "");
+    this.setProductEditValue("pmEditProductGrade", product.grade || "");
+    this.setProductEditValue("pmEditProductDefaultVendor", product.default_vendor || "");
+    this.setProductEditValue("pmEditProductMemo", product.memo || "");
+    this.setProductEditValue("pmEditProductIsActive", product.is_active === false ? "false" : "true");
+
+    modal.classList.add("show");
+    setTimeout(() => document.getElementById("pmEditProductName")?.focus(), 0);
+  },
+
+  async saveProductEditFromModal() {
+    if (!this.sb) {
+      this.toast("Supabase 연결 정보가 없습니다.", "warn");
+      return;
+    }
+
+    const id = Number(this.getProductEditValue("pmEditProductModalId"));
+    if (!id) {
+      this.toast("제품 ID를 찾지 못했습니다.", "warn");
+      return;
+    }
+
+    const user = this.getCurrentUser();
+    const row = {
+      category: this.getProductEditValue("pmEditProductCategory"),
+      name: this.getProductEditValue("pmEditProductName"),
+      maker: this.getProductEditValue("pmEditProductMaker"),
+      code: this.getProductEditValue("pmEditProductCode"),
+      capacity: this.getProductEditValue("pmEditProductCapacity"),
+      cas: this.getProductEditValue("pmEditProductCas"),
+      grade: this.getProductEditValue("pmEditProductGrade"),
+      default_vendor: this.getProductEditValue("pmEditProductDefaultVendor"),
+      memo: this.getProductEditValue("pmEditProductMemo"),
+      is_active: this.getProductEditValue("pmEditProductIsActive") !== "false",
+      updated_by: user.name
+    };
+
+    if (!row.name) {
+      this.toast("품명은 필수입니다.", "warn");
+      return;
+    }
+
+    const canSave = await this.confirmProductMasterDuplicate(row, {
+      excludeProductId: id,
+      prefix: "제품 수정 중 중복 가능성이 있습니다."
+    });
+
+    if (!canSave) return;
+
+    const { error } = await this.sb
+      .from("product_master")
+      .update(row)
+      .eq("id", id);
+
+    if (error) {
+      console.error("제품 정보 수정 실패:", error);
+      this.toast(`제품 정보 수정 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      return;
+    }
+
+    document.getElementById("pmProductEditModal")?.classList.remove("show");
+    this.toast("제품 정보가 수정되었습니다.", "success");
+    this.resetProductForm?.();
+    await this.loadProducts();
+    window.ReagentApp.request?.loadProductMaster?.(true);
+  },
+
+
+  fillProductForm(id) {
+    this.openProductEditModal(id);
   },
 
   resetProductForm() {
