@@ -413,4 +413,18 @@
 <script src="collect.js"></script>
 <script src="product_management.js"></script>
 <script src="app.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    let pmInitialized = false;
+    const initProductManagement = () => {
+      if (pmInitialized) return;
+      pmInitialized = true;
+      window.ReagentApp.productManagement?.init?.();
+    };
+
+    document.querySelector('.tab-btn[data-tab="product-management"]')?.addEventListener("click", () => {
+      setTimeout(initProductManagement, 0);
+    });
+  });
+</script>
 </body></html>
