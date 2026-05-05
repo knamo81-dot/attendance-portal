@@ -1,5 +1,4 @@
 window.ReagentApp = window.ReagentApp || {};
-
 try {
   document.documentElement.classList.remove("permission-ready");
   document.body?.classList.remove("permission-ready");
@@ -147,7 +146,7 @@ window.ReagentApp.canAccessTab = function (target) {
 };
 
 window.ReagentApp.enforcePermissionDom = function () {
-  document.querySelectorAll(".tab-btn, button[data-tab]").forEach((btn) => {
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
     const allowed = window.ReagentApp.canAccessTab?.(btn) === true;
     if (!allowed) {
       btn.style.setProperty("display", "none", "important");
@@ -178,7 +177,7 @@ window.ReagentApp.enforcePermissionDom = function () {
     }
   }
 
-  const activeBtn = document.querySelector(".tab-btn.active, button[data-tab].active");
+  const activeBtn = document.querySelector(".tab-btn.active");
   if (activeBtn && window.ReagentApp.canAccessTab?.(activeBtn) === false) {
     window.ReagentApp.showTab?.("request");
   }
@@ -209,22 +208,22 @@ window.ReagentApp.applyPermissionUI = function () {
   window.ReagentApp._permissionInterval = setInterval(() => {
     window.ReagentApp.enforcePermissionDom?.();
     count += 1;
-    if (count > 100) clearInterval(window.ReagentApp._permissionInterval);
+    if (count > 50) clearInterval(window.ReagentApp._permissionInterval);
   }, 100);
 };
 
 window.ReagentApp.showTab = function (tab) {
-  const targetTab = document.querySelector(`.tab-btn[data-tab="${tab}"], button[data-tab="${tab}"]`);
+  const targetTab = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
 
   if (targetTab && window.ReagentApp.canAccessTab?.(targetTab) === false) {
     window.ReagentApp.toast?.("접근 권한이 없는 기능입니다.", "warn");
     tab = "request";
   }
 
-  const finalTab = document.querySelector(`.tab-btn[data-tab="${tab}"], button[data-tab="${tab}"]`);
+  const finalTab = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
   const finalPage = document.getElementById(`page-${tab}`);
 
-  document.querySelectorAll(".tab-btn, button[data-tab]").forEach((b) => b.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
   document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
 
   finalTab?.classList.add("active");
@@ -310,22 +309,8 @@ window.ReagentApp.loadReagentPermission = async function () {
   return user;
 };
 
-document.addEventListener("click", function (e) {
-  const btn = e.target.closest?.(".tab-btn, button[data-tab]");
-  if (!btn) return;
-
-  if (window.ReagentApp.canAccessTab?.(btn) === false) {
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-    window.ReagentApp.toast?.("접근 권한이 없는 기능입니다.", "warn");
-    window.ReagentApp.showTab?.("request");
-  }
-}, true);
-
-
 window.ReagentApp.bindTabs = function () {
-  document.querySelectorAll(".tab-btn, button[data-tab]").forEach((btn) => {
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
     if (btn.dataset.bound === "1") return;
     btn.dataset.bound = "1";
 
@@ -686,4 +671,3 @@ setTimeout(() => {
     document.body?.classList.add("permission-ready");
   } catch (_) {}
 }, 2500);
-
