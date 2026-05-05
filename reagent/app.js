@@ -1,11 +1,5 @@
 window.ReagentApp = window.ReagentApp || {};
 
-try {
-  document.documentElement.classList.add("permission-loading");
-  document.body?.classList.add("permission-loading");
-} catch (_) {}
-
-
 window.ReagentApp.els = {
   category: document.getElementById("category"),
   productName: document.getElementById("productName"),
@@ -187,13 +181,6 @@ window.ReagentApp.enforcePermissionDom = function () {
 window.ReagentApp.applyPermissionUI = function () {
   window.ReagentApp.enforcePermissionDom?.();
 
-  try {
-    document.documentElement.classList.remove("permission-loading");
-    document.body?.classList.remove("permission-loading");
-    document.documentElement.classList.add("permission-ready");
-    document.body?.classList.add("permission-ready");
-  } catch (_) {}
-
   if (!window.ReagentApp._permissionObserver) {
     window.ReagentApp._permissionObserver = new MutationObserver(() => {
       window.ReagentApp.enforcePermissionDom?.();
@@ -202,7 +189,7 @@ window.ReagentApp.applyPermissionUI = function () {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["class", "style", "data-permission-hidden", "aria-hidden"]
+      attributeFilter: ["class", "style"]
     });
   }
 
@@ -678,13 +665,3 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.ReagentApp.productManagement?.initOperatorManagement?.();
   }
 });
-
-
-// permission-loading fallback release
-setTimeout(() => {
-  try {
-    window.ReagentApp.applyPermissionUI?.();
-    document.documentElement.classList.remove("permission-loading");
-    document.body?.classList.remove("permission-loading");
-  } catch (_) {}
-}, 2500);
