@@ -198,7 +198,7 @@ window.ReagentApp.applyPermissionUI = function () {
   window.ReagentApp._permissionInterval = setInterval(() => {
     window.ReagentApp.enforcePermissionDom?.();
     count += 1;
-    if (count > 30) clearInterval(window.ReagentApp._permissionInterval);
+    if (count > 100) clearInterval(window.ReagentApp._permissionInterval);
   }, 100);
 };
 
@@ -238,10 +238,13 @@ window.ReagentApp.showTab = function (tab) {
 window.ReagentApp.loadReagentPermission = async function () {
   const sb = window.ReagentApp.sb;
   const user = window.ReagentApp.currentUser || {};
+  const urlHint = window.ReagentApp.getUrlUserHint?.() || {};
+  const storedHint = window.ReagentApp.getStoredUserHint?.() || {};
 
-  user.is_global_admin = false;
-  user.is_reagent_operator = false;
-  user.user_role = "";
+  user.user_role = urlHint.user_role || user.user_role || storedHint.user_role || "";
+  user.reagent_role = urlHint.reagent_role || user.reagent_role || storedHint.reagent_role || "";
+  user.is_global_admin = user.user_role === "admin" || user.is_global_admin === true || storedHint.is_global_admin === true;
+  user.is_reagent_operator = user.is_global_admin === true || user.is_reagent_operator === true || storedHint.is_reagent_operator === true || user.reagent_role === "관리자" || user.reagent_role === "운영자";
 
   if (!sb) {
     window.ReagentApp.currentUser = user;
@@ -472,6 +475,20 @@ window.ReagentApp.getUrlUserHint = function () {
       params.get("name") ||
       params.get("user_name") ||
       params.get("userName") ||
+      "",
+
+    user_role:
+      params.get("user_role") ||
+      params.get("userRole") ||
+      "",
+
+    reagent_role:
+      params.get("reagent_role") ||
+      params.get("reagentRole") ||
+      "",
+
+    portal_auth:
+      params.get("portal_auth") ||
       ""
   };
 };
@@ -516,7 +533,11 @@ window.ReagentApp.loadCurrentUser = async function () {
     team: storedHint.team || storedHint.team_name || "",
     team_name: storedHint.team_name || storedHint.team || "",
     position: storedHint.position || "",
-    role: storedHint.role || storedHint.authority || ""
+    role: storedHint.role || storedHint.authority || "",
+    user_role: urlHint.user_role || storedHint.user_role || "",
+    reagent_role: urlHint.reagent_role || storedHint.reagent_role || "",
+    is_global_admin: storedHint.is_global_admin === true || urlHint.user_role === "admin",
+    is_reagent_operator: storedHint.is_reagent_operator === true || urlHint.reagent_role === "관리자" || urlHint.reagent_role === "운영자"
   };
 
   if (!sb) {
@@ -590,7 +611,11 @@ window.ReagentApp.loadCurrentUser = async function () {
         team: displayTeam,
         team_name: teamName,
         position: data.position || "",
-        role: data.authority || ""
+        role: data.authority || "",
+        user_role: urlHint.user_role || storedHint.user_role || "",
+        reagent_role: urlHint.reagent_role || storedHint.reagent_role || "",
+        is_global_admin: storedHint.is_global_admin === true || urlHint.user_role === "admin",
+        is_reagent_operator: storedHint.is_reagent_operator === true || urlHint.reagent_role === "관리자" || urlHint.reagent_role === "운영자"
       };
 
       try {
@@ -628,6 +653,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.ReagentApp.request.setRequestPanelView?.("list");
   window.ReagentApp.request.renderSearchResults();
   window.ReagentApp.request.fetchData();
+  setTimeout(() => window.ReagentApp.applyPermissionUI?.(), 100);
+  setTimeout(() => window.ReagentApp.applyPermissionUI?.(), 500);
+  setTimeout(() => window.ReagentApp.applyPermissionUI?.(), 1500);
 
   if (document.querySelector('.tab-btn[data-tab="product-management"]')?.classList.contains("active")) {
     window.ReagentApp.productManagement?.init?.();
