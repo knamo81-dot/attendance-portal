@@ -400,7 +400,7 @@ window.ReagentApp.productManagement = {
           <td>${this.html(row.email || "")}</td>
           <td>
             ${isAlready
-              ? `<span class="badge blue">운영자</span>`
+              ? `<span class="badge blue">${this.reagentOperators.find((op) => String(op.employee_no) === String(employeeNo))?.is_admin ? "관리자" : "운영자"}</span>`
               : `<button class="ghost-btn" data-op-add="${index}" type="button">운영자 지정</button>`}
           </td>
         </tr>
@@ -416,19 +416,59 @@ window.ReagentApp.productManagement = {
       return;
     }
 
-    const { data, error } = await this.sb
+    const { data: operators, error: operatorError } = await this.sb
       .from("reagent_operators")
       .select("*")
       .eq("is_active", true)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("운영자 목록 조회 실패:", error);
-      this.toast(`운영자 목록 조회 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+    if (operatorError) {
+      console.error("운영자 목록 조회 실패:", operatorError);
+      this.toast(`운영자 목록 조회 실패: ${operatorError.message || "원인을 확인하세요."}`, "warn");
       return;
     }
 
-    this.reagentOperators = Array.isArray(data) ? data : [];
+    const { data: admins, error: adminError } = await this.sb
+      .from("employees")
+      .select("*")
+      .eq("authority", "관리자");
+
+    if (adminError) {
+      console.warn("관리자 목록 조회 실패:", adminError);
+      this.toast(`관리자 목록 조회 실패: ${adminError.message || "원인을 확인하세요."}`, "warn");
+    }
+
+    const adminRows = (Array.isArray(admins) ? admins : []).map((row) => ({
+      employee_no: row.employee_no || row.employeeNo || "",
+      name: row.name || "",
+      department: this.getEmployeeDepartment(row),
+      team: this.getEmployeeTeam(row),
+      role: "관리자",
+      is_active: true,
+      is_admin: true,
+      created_by: "사원정보",
+      created_at: row.updated_at || row.created_at || ""
+    }));
+
+    const operatorRows = (Array.isArray(operators) ? operators : [])
+      .filter((op) => !adminRows.some((admin) => String(admin.employee_no) === String(op.employee_no)))
+      .map((op) => ({
+        ...op,
+        role: op.role || "운영자",
+        is_admin: false
+      }));
+
+    this.reagentOperators = [...adminRows, ...operatorRows].sort((a, b) => {
+      if (a.is_admin && !b.is_admin) return -1;
+      if (!a.is_admin && b.is_admin) return 1;
+
+      const teamA = String(a.team || "");
+      const teamB = String(b.team || "");
+      if (teamA !== teamB) return teamA.localeCompare(teamB, "ko");
+
+      return String(a.name || "").localeCompare(String(b.name || ""), "ko");
+    });
+
     this.renderReagentOperators();
     this.renderEmployeeSearchResults();
   },
@@ -450,16 +490,20 @@ window.ReagentApp.productManagement = {
         ? createdAt.toLocaleDateString("ko-KR")
         : "";
 
+      const actionHtml = row.is_admin
+        ? `<span class="badge blue">자동 포함</span>`
+        : `<button class="ghost-btn" data-op-remove="${this.html(row.employee_no)}" type="button">해제</button>`;
+
       return `
         <tr>
           <td>${this.html(row.employee_no)}</td>
           <td>${this.html(row.name)}</td>
           <td>${this.html(row.department || "")}</td>
           <td>${this.html(row.team || "")}</td>
-          <td>${this.html(row.role || "운영자")}</td>
+          <td>${row.is_admin ? `<span class="badge blue">관리자</span>` : this.html(row.role || "운영자")}</td>
           <td>${this.html(row.created_by || "")}</td>
           <td>${this.html(dateText)}</td>
-          <td><button class="ghost-btn" data-op-remove="${this.html(row.employee_no)}" type="button">해제</button></td>
+          <td>${actionHtml}</td>
         </tr>
       `;
     }).join("");
