@@ -1,10 +1,4 @@
 window.ReagentApp = window.ReagentApp || {};
-try {
-  document.documentElement.classList.remove("permission-ready");
-  document.body?.classList.remove("permission-ready");
-} catch (_) {}
-
-
 window.ReagentApp.els = {
   category: document.getElementById("category"),
   productName: document.getElementById("productName"),
@@ -127,12 +121,7 @@ window.ReagentApp.getTabAccessLevel = function (target) {
     return "operator";
   }
 
-  if (
-    tab === "request" ||
-    label === "제품신청"
-  ) {
-    return "all";
-  }
+  if (tab === "request" || label === "제품신청") return "all";
 
   return "operator";
 };
@@ -148,15 +137,14 @@ window.ReagentApp.canAccessTab = function (target) {
 window.ReagentApp.enforcePermissionDom = function () {
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     const allowed = window.ReagentApp.canAccessTab?.(btn) === true;
+
     if (!allowed) {
-      btn.style.setProperty("display", "none", "important");
-      btn.style.setProperty("visibility", "hidden", "important");
+      btn.style.display = "none";
       btn.disabled = true;
       btn.setAttribute("aria-hidden", "true");
       btn.dataset.permissionHidden = "1";
     } else {
-      btn.style.removeProperty("display");
-      btn.style.removeProperty("visibility");
+      btn.style.display = "";
       btn.disabled = false;
       btn.setAttribute("aria-hidden", "false");
       btn.dataset.permissionHidden = "0";
@@ -166,15 +154,9 @@ window.ReagentApp.enforcePermissionDom = function () {
   const adminButton = window.ReagentApp.els?.openReagentAdmin || document.getElementById("openReagentAdmin");
   if (adminButton) {
     const allowed = window.ReagentApp.hasReagentAdminAccess?.() === true;
-    if (!allowed) {
-      adminButton.style.setProperty("display", "none", "important");
-      adminButton.disabled = true;
-      adminButton.setAttribute("aria-hidden", "true");
-    } else {
-      adminButton.style.removeProperty("display");
-      adminButton.disabled = false;
-      adminButton.setAttribute("aria-hidden", "false");
-    }
+    adminButton.style.display = allowed ? "" : "none";
+    adminButton.disabled = !allowed;
+    adminButton.setAttribute("aria-hidden", allowed ? "false" : "true");
   }
 
   const activeBtn = document.querySelector(".tab-btn.active");
@@ -185,31 +167,6 @@ window.ReagentApp.enforcePermissionDom = function () {
 
 window.ReagentApp.applyPermissionUI = function () {
   window.ReagentApp.enforcePermissionDom?.();
-
-  try {
-    document.documentElement.classList.add("permission-ready");
-    document.body?.classList.add("permission-ready");
-  } catch (_) {}
-
-  if (!window.ReagentApp._permissionObserver) {
-    window.ReagentApp._permissionObserver = new MutationObserver(() => {
-      window.ReagentApp.enforcePermissionDom?.();
-    });
-    window.ReagentApp._permissionObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["class", "style", "data-permission-hidden", "aria-hidden"]
-    });
-  }
-
-  clearInterval(window.ReagentApp._permissionInterval);
-  let count = 0;
-  window.ReagentApp._permissionInterval = setInterval(() => {
-    window.ReagentApp.enforcePermissionDom?.();
-    count += 1;
-    if (count > 50) clearInterval(window.ReagentApp._permissionInterval);
-  }, 100);
 };
 
 window.ReagentApp.showTab = function (tab) {
@@ -229,8 +186,6 @@ window.ReagentApp.showTab = function (tab) {
   finalTab?.classList.add("active");
   finalPage?.classList.add("active");
 
-  window.ReagentApp.enforcePermissionDom?.();
-
   if (tab === "prepare") {
     window.ReagentApp.collect?.initPrepareMonthControl?.();
     window.ReagentApp.collect?.renderPrepare?.();
@@ -243,6 +198,8 @@ window.ReagentApp.showTab = function (tab) {
   if (tab === "admin-management") {
     window.ReagentApp.productManagement?.initOperatorManagement?.();
   }
+
+  window.ReagentApp.applyPermissionUI?.();
 };
 
 window.ReagentApp.loadReagentPermission = async function () {
@@ -327,7 +284,6 @@ window.ReagentApp.bindTabs = function () {
     });
   });
 };
-
 
 window.ReagentApp.isRequestAdmin = function () {
   return window.ReagentApp.hasReagentOperatorAccess?.() === true;
@@ -661,13 +617,3 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.ReagentApp.productManagement?.initOperatorManagement?.();
   }
 });
-
-
-// permission-ready fallback
-setTimeout(() => {
-  try {
-    window.ReagentApp.applyPermissionUI?.();
-    document.documentElement.classList.add("permission-ready");
-    document.body?.classList.add("permission-ready");
-  } catch (_) {}
-}, 2500);
