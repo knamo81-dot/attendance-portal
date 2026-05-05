@@ -413,47 +413,4 @@
 <script src="collect.js"></script>
 <script src="product_management.js"></script>
 <script src="app.js"></script>
-<script>
-  document.addEventListener("DOMContentLoaded", async () => {
-    try {
-      if (!window.ReagentApp) {
-        console.error("ReagentApp not loaded");
-        return;
-      }
-
-      // 1. 사용자 정보 로드
-      await window.ReagentApp.loadCurrentUser?.();
-
-      // 2. 권한 정보 로드
-      await window.ReagentApp.loadReagentPermission?.();
-
-      // 3. 권한 UI 먼저 적용
-      window.ReagentApp.applyRequestAdminUI?.();
-      window.ReagentApp.applyPermissionUI?.();
-
-      // 4. 탭/이벤트 바인딩
-      window.ReagentApp.bindTabs?.();
-      window.ReagentApp.bindEvents?.();
-
-      // 5. 제품신청 기본 화면 초기화
-      window.ReagentApp.request?.populateMakerOptions?.();
-      window.ReagentApp.request?.bindRegistrationStatusPanel?.();
-      window.ReagentApp.request?.setRequestPanelView?.("list");
-      window.ReagentApp.request?.renderSearchResults?.();
-      await window.ReagentApp.request?.fetchData?.();
-
-      // 6. 기본 탭은 항상 제품신청으로 시작
-      window.ReagentApp.showTab?.("request");
-
-      // 7. 권한 UI 재적용: 데이터/렌더링 이후 메뉴 깜빡임 및 재노출 방지
-      setTimeout(() => window.ReagentApp.applyPermissionUI?.(), 0);
-      setTimeout(() => window.ReagentApp.applyPermissionUI?.(), 300);
-      setTimeout(() => window.ReagentApp.applyPermissionUI?.(), 1000);
-
-    } catch (e) {
-      console.error("시약·초자 초기화 오류", e);
-      alert("시약·초자 화면 초기화 중 오류가 발생했습니다. 콘솔을 확인해 주세요.");
-    }
-  });
-</script>
 </body></html>
