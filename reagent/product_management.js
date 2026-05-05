@@ -42,9 +42,7 @@ window.ReagentApp.productManagement = {
   },
 
   isAdminUser() {
-    const user = window.ReagentApp.currentUser || {};
-    const role = String(user.role || "").trim();
-    return ["관리자", "운영자", "admin", "operator", "Admin", "Operator"].includes(role) || window.ReagentApp.isRequestAdmin?.() === true;
+    return window.ReagentApp.hasReagentOperatorAccess?.() === true;
   },
 
   getDisplayRequestStatus(status) {
@@ -110,16 +108,12 @@ window.ReagentApp.productManagement = {
 
   init() {
     if (!this.isAdminUser()) {
-      const page = document.getElementById("page-product-management");
-      if (page) {
-        page.innerHTML = `
-          <section class="card">
-            <div class="card-body empty">제품관리 기능은 관리자·운영자만 사용할 수 있습니다.</div>
-          </section>
-        `;
-      }
+      window.ReagentApp.toast?.("제품관리 기능은 관리자·운영자만 사용할 수 있습니다.", "warn");
+      window.ReagentApp.showTab?.("request");
       return;
     }
+
+    document.getElementById("pmNoAuthNotice")?.remove();
 
     this.bindEvents();
     this.setProductManagementPanel("product");
@@ -293,6 +287,12 @@ window.ReagentApp.productManagement = {
   },
 
   initOperatorManagement() {
+    if (window.ReagentApp.hasReagentAdminAccess?.() !== true) {
+      window.ReagentApp.toast?.("관리자 기능은 관리자만 사용할 수 있습니다.", "warn");
+      window.ReagentApp.showTab?.("request");
+      return;
+    }
+
     this.bindOperatorEvents();
     this.loadReagentOperators();
   },
