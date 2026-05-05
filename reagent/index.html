@@ -5,6 +5,50 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>시약·초자 신청/취합</title>
 <link rel="stylesheet" href="style.css"/>
+<script>
+  /*
+    초기 권한 표시 보정
+    - 포탈 iframe에서 권한 적용 전 운영자 탭이 잠깐 보이는 현상을 방지합니다.
+    - 기존 신청/취합/정리/제품관리/운영자 지정 로직은 변경하지 않습니다.
+  */
+  (function () {
+    var root = document.documentElement;
+    var roleClass = 'reagent-role-general';
+
+    try {
+      var params = new URLSearchParams(window.location.search || '');
+      var userRole = String(params.get('user_role') || '').trim();
+      var reagentRole = String(params.get('reagent_role') || '').trim();
+      var saved = JSON.parse(localStorage.getItem('reagent_current_user') || '{}');
+
+      var isAdmin = userRole === 'admin' || saved.is_global_admin === true || String(saved.user_role || '').trim() === 'admin';
+      var isOperator = isAdmin || reagentRole !== '' || saved.is_reagent_operator === true || String(saved.reagent_role || '').trim() !== '';
+
+      if (isAdmin) {
+        roleClass = 'reagent-role-admin';
+      } else if (isOperator) {
+        roleClass = 'reagent-role-operator';
+      }
+    } catch (_) {}
+
+    root.classList.add(roleClass);
+  })();
+</script>
+<style>
+  /* 권한 JS 적용 전 초기 노출 방지: 일반 사용자는 제품신청만 표시 */
+  html.reagent-role-general .tab-btn[data-tab="collect"],
+  html.reagent-role-general .tab-btn[data-tab="prepare"],
+  html.reagent-role-general .tab-btn[data-tab="product-management"],
+  html.reagent-role-general .tab-btn[data-tab="admin-management"],
+  html.reagent-role-general .admin-request-actions {
+    display: none !important;
+  }
+
+  /* 운영자는 관리자 기능만 초기부터 숨김 */
+  html.reagent-role-operator .tab-btn[data-tab="admin-management"] {
+    display: none !important;
+  }
+</style>
     
 </head>
 <body>
