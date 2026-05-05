@@ -1711,19 +1711,3 @@ tr:not(.collect-row-confirmed) .vendor-group-td{
 .admin-tab {
   margin-left: auto;
 }
-
-
-/* ===== 시약초자 권한 메뉴 표시 안정화 ===== */
-/* 제품신청은 모든 사용자에게 항상 보입니다. */
-.tab-btn[data-tab="request"]{
-  display:inline-flex;
-  visibility:visible;
-}
-
-/* JS 권한 판정 후 숨긴 메뉴만 숨깁니다. */
-.tab-btn[data-permission-hidden="1"],
-#openReagentAdmin[aria-hidden="true"]{
-  display:none !important;
-  visibility:hidden !important;
-}
-
