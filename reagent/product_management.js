@@ -6,6 +6,8 @@ window.ReagentApp.productManagement = {
   editingProductId: null,
   activeRequestStatus: "",
   activeManagementPanel: "product",
+  operatorSearchResults: [],
+  reagentOperators: [],
 
   get sb() {
     return window.ReagentApp.sb;
@@ -277,6 +279,251 @@ window.ReagentApp.productManagement = {
     }
   },
 
+
+
+  getOperatorEls() {
+    return {
+      keyword: document.getElementById("opEmployeeKeyword"),
+      searchBtn: document.getElementById("opSearchEmployees"),
+      refreshBtn: document.getElementById("opRefreshOperators"),
+      searchList: document.getElementById("opEmployeeSearchList"),
+      operatorList: document.getElementById("opOperatorList"),
+      currentCount: document.getElementById("opCurrentCount")
+    };
+  },
+
+  initOperatorManagement() {
+    this.bindOperatorEvents();
+    this.loadReagentOperators();
+  },
+
+  bindOperatorEvents() {
+    const els = this.getOperatorEls();
+
+    if (els.searchBtn && !els.searchBtn.dataset.bound) {
+      els.searchBtn.dataset.bound = "1";
+      els.searchBtn.addEventListener("click", () => this.searchEmployeesForOperator());
+    }
+
+    if (els.keyword && !els.keyword.dataset.bound) {
+      els.keyword.dataset.bound = "1";
+      els.keyword.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") this.searchEmployeesForOperator();
+      });
+    }
+
+    if (els.refreshBtn && !els.refreshBtn.dataset.bound) {
+      els.refreshBtn.dataset.bound = "1";
+      els.refreshBtn.addEventListener("click", () => this.loadReagentOperators());
+    }
+
+    if (els.searchList && !els.searchList.dataset.bound) {
+      els.searchList.dataset.bound = "1";
+      els.searchList.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-op-add]");
+        if (!btn) return;
+        this.addReagentOperator(Number(btn.dataset.opAdd));
+      });
+    }
+
+    if (els.operatorList && !els.operatorList.dataset.bound) {
+      els.operatorList.dataset.bound = "1";
+      els.operatorList.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-op-remove]");
+        if (!btn) return;
+        this.removeReagentOperator(btn.dataset.opRemove);
+      });
+    }
+  },
+
+  getEmployeeDepartment(row = {}) {
+    return row.department || row.division_name || row.division || row.division_code || "";
+  },
+
+  getEmployeeTeam(row = {}) {
+    return row.team || row.team_name || row.team_code || "";
+  },
+
+  async searchEmployeesForOperator() {
+    const els = this.getOperatorEls();
+    const keyword = String(els.keyword?.value || "").trim();
+
+    if (!this.sb) {
+      this.toast("Supabase 연결 정보가 없습니다.", "warn");
+      return;
+    }
+
+    if (!keyword) {
+      if (els.searchList) els.searchList.innerHTML = `<tr><td class="empty" colspan="7">사번 또는 이름을 입력하세요.</td></tr>`;
+      return;
+    }
+
+    const safeKeyword = keyword.replaceAll("%", "\\\\%").replaceAll(",", " ");
+    const pattern = `%${safeKeyword}%`;
+
+    const { data, error } = await this.sb
+      .from("employees")
+      .select("*")
+      .or(`employee_no.ilike.${pattern},name.ilike.${pattern},email.ilike.${pattern}`)
+      .limit(20);
+
+    if (error) {
+      console.error("사원 검색 실패:", error);
+      this.toast(`사원 검색 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      return;
+    }
+
+    this.operatorSearchResults = Array.isArray(data) ? data : [];
+    this.renderEmployeeSearchResults();
+  },
+
+  renderEmployeeSearchResults() {
+    const els = this.getOperatorEls();
+    if (!els.searchList) return;
+
+    if (!this.operatorSearchResults.length) {
+      els.searchList.innerHTML = `<tr><td class="empty" colspan="7">검색된 사원이 없습니다.</td></tr>`;
+      return;
+    }
+
+    els.searchList.innerHTML = this.operatorSearchResults.map((row, index) => {
+      const employeeNo = row.employee_no || row.employeeNo || "";
+      const isAlready = this.reagentOperators.some((op) => String(op.employee_no) === String(employeeNo) && op.is_active !== false);
+
+      return `
+        <tr>
+          <td>${this.html(employeeNo)}</td>
+          <td>${this.html(row.name || "")}</td>
+          <td>${this.html(this.getEmployeeDepartment(row))}</td>
+          <td>${this.html(this.getEmployeeTeam(row))}</td>
+          <td>${this.html(row.position || "")}</td>
+          <td>${this.html(row.email || "")}</td>
+          <td>
+            ${isAlready
+              ? `<span class="badge blue">운영자</span>`
+              : `<button class="ghost-btn" data-op-add="${index}" type="button">운영자 지정</button>`}
+          </td>
+        </tr>
+      `;
+    }).join("");
+  },
+
+  async loadReagentOperators() {
+    const els = this.getOperatorEls();
+
+    if (!this.sb) {
+      if (els.operatorList) els.operatorList.innerHTML = `<tr><td class="empty" colspan="8">Supabase 연결 정보가 없습니다.</td></tr>`;
+      return;
+    }
+
+    const { data, error } = await this.sb
+      .from("reagent_operators")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("운영자 목록 조회 실패:", error);
+      this.toast(`운영자 목록 조회 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      return;
+    }
+
+    this.reagentOperators = Array.isArray(data) ? data : [];
+    this.renderReagentOperators();
+    this.renderEmployeeSearchResults();
+  },
+
+  renderReagentOperators() {
+    const els = this.getOperatorEls();
+    if (!els.operatorList) return;
+
+    if (els.currentCount) els.currentCount.textContent = `${this.reagentOperators.length}명`;
+
+    if (!this.reagentOperators.length) {
+      els.operatorList.innerHTML = `<tr><td class="empty" colspan="8">지정된 운영자가 없습니다.</td></tr>`;
+      return;
+    }
+
+    els.operatorList.innerHTML = this.reagentOperators.map((row) => {
+      const createdAt = row.created_at ? new Date(row.created_at) : null;
+      const dateText = createdAt && !Number.isNaN(createdAt.getTime())
+        ? createdAt.toLocaleDateString("ko-KR")
+        : "";
+
+      return `
+        <tr>
+          <td>${this.html(row.employee_no)}</td>
+          <td>${this.html(row.name)}</td>
+          <td>${this.html(row.department || "")}</td>
+          <td>${this.html(row.team || "")}</td>
+          <td>${this.html(row.role || "운영자")}</td>
+          <td>${this.html(row.created_by || "")}</td>
+          <td>${this.html(dateText)}</td>
+          <td><button class="ghost-btn" data-op-remove="${this.html(row.employee_no)}" type="button">해제</button></td>
+        </tr>
+      `;
+    }).join("");
+  },
+
+  async addReagentOperator(index) {
+    const employee = this.operatorSearchResults[index];
+    if (!employee) return;
+
+    const employeeNo = employee.employee_no || employee.employeeNo || "";
+    if (!employeeNo) {
+      this.toast("사번이 없는 사원은 운영자로 지정할 수 없습니다.", "warn");
+      return;
+    }
+
+    const ok = confirm(`${employee.name || employeeNo} 님을 시약·초자 프로그램 운영자로 지정하시겠습니까?`);
+    if (!ok) return;
+
+    const user = this.getCurrentUser();
+    const row = {
+      employee_no: employeeNo,
+      name: employee.name || "",
+      department: this.getEmployeeDepartment(employee),
+      team: this.getEmployeeTeam(employee),
+      role: "운영자",
+      is_active: true,
+      created_by: user.name
+    };
+
+    const { error } = await this.sb
+      .from("reagent_operators")
+      .upsert(row, { onConflict: "employee_no" });
+
+    if (error) {
+      console.error("운영자 지정 실패:", error);
+      this.toast(`운영자 지정 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      return;
+    }
+
+    this.toast("운영자로 지정되었습니다.", "success");
+    await this.loadReagentOperators();
+  },
+
+  async removeReagentOperator(employeeNo) {
+    if (!employeeNo) return;
+
+    const ok = confirm("이 운영자 권한을 해제하시겠습니까?");
+    if (!ok) return;
+
+    const user = this.getCurrentUser();
+    const { error } = await this.sb
+      .from("reagent_operators")
+      .update({ is_active: false, updated_by: user.name })
+      .eq("employee_no", employeeNo);
+
+    if (error) {
+      console.error("운영자 해제 실패:", error);
+      this.toast(`운영자 해제 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      return;
+    }
+
+    this.toast("운영자 권한이 해제되었습니다.", "success");
+    await this.loadReagentOperators();
+  },
 
   async refreshLinkedRequestStatus() {
     // 관리자 처리 결과가 담당자 화면의 [제품 등록 요청 현황]에도 즉시 반영되도록 동기화합니다.
