@@ -6,7 +6,10 @@ const DAILY_TABLE='wastewater';
 const DAILY_VIEW='wastewater_calendar_view';
 const PICKUP_TABLE='wastewater_pickups';
 const USERS_TABLE='users';
+const EMPLOYEES_TABLE='employees';
 const WASTEWATER_ROLE_VIEW='wastewater_role_view';
+const WASTEWATER_OPERATORS_TABLE='wastewater_operators';
+const WASTEWATER_APPROVERS_TABLE='wastewater_approvers';
 const LOG_TABLE='activity_logs';
 const APPROVAL_TABLE='monthly_approvals';
 const APPROVAL_LOG_TABLE='approval_logs';
@@ -16,12 +19,46 @@ const TON_TO_CM=22;
 const MAX_TON_M3=7;
 
 async function getMyRoles(email){
-  const { data, error } = await sb.from(WASTEWATER_ROLE_VIEW).select('role_name').ilike('email', email);
-  if(error){
-    console.error('role load failed:', error);
-    return [];
+  const roles = [];
+  const targetEmail = String(email || '').trim();
+  if(!targetEmail) return roles;
+
+  const pushRole = (role) => {
+    if(role && !roles.includes(role)) roles.push(role);
+  };
+
+  try{
+    const { data, error } = await sb.from(WASTEWATER_ROLE_VIEW).select('role_name').ilike('email', targetEmail);
+    if(error){
+      console.warn('role view load failed:', error);
+    }else{
+      (data||[]).forEach(r => pushRole(r.role_name));
+    }
+  }catch(error){
+    console.warn('role view load skipped:', error);
   }
-  return (data||[]).map(r => r.role_name).filter(Boolean);
+
+  try{
+    const { data: commonUser } = await sb.from(USERS_TABLE).select('email,role').ilike('email', targetEmail).maybeSingle();
+    if(String(commonUser?.role || '').trim() === 'admin') pushRole('wastewater_admin');
+  }catch(error){
+    console.warn('common admin role load skipped:', error);
+  }
+
+  try{
+    const { data: employee } = await sb.from(EMPLOYEES_TABLE).select('employee_no,email').ilike('email', targetEmail).maybeSingle();
+    const employeeNo = employee?.employee_no;
+    if(employeeNo){
+      const { data: op } = await sb.from(WASTEWATER_OPERATORS_TABLE).select('employee_no,is_active').eq('employee_no', employeeNo).eq('is_active', true).maybeSingle();
+      if(op) pushRole('wastewater_operator');
+      const { data: ap } = await sb.from(WASTEWATER_APPROVERS_TABLE).select('employee_no,is_active').eq('employee_no', employeeNo).eq('is_active', true).maybeSingle();
+      if(ap) pushRole('wastewater_approver');
+    }
+  }catch(error){
+    console.warn('wastewater dedicated role load skipped:', error);
+  }
+
+  return roles;
 }
 
 function loadAllData(includeAdmin){
@@ -69,6 +106,103 @@ function approveUserByEmail(email){ return sb.from(USERS_TABLE).update({approved
 function deleteUserByEmail(email){ return sb.from(USERS_TABLE).delete().eq('email',email); }
 function updateUserSignature(email,signatureUrl){ return sb.from(USERS_TABLE).update({signature_url:signatureUrl}).eq('email',email); }
 
+function getEmployeeDepartment(row = {}){ return row.department || row.division_name || row.division || row.division_code || ''; }
+function getEmployeeTeam(row = {}){ return row.team || row.team_name || row.team_code || ''; }
+function getEmployeeNo(row = {}){ return row.employee_no || row.employeeNo || ''; }
+function getEmployeeEmail(row = {}){ return row.email || row.user_email || ''; }
+
+async function searchEmployees(keyword){
+  const value = String(keyword || '').trim();
+  if(!value) return { data: [], error: null };
+  const safeKeyword = value.replaceAll('%','\\%').replaceAll(',',' ');
+  const pattern = `%${safeKeyword}%`;
+  return sb
+    .from(EMPLOYEES_TABLE)
+    .select('*')
+    .or(`employee_no.ilike.${pattern},name.ilike.${pattern},email.ilike.${pattern}`)
+    .limit(30);
+}
+
+async function loadWastewaterManagers(){
+  const [adminRes, operatorRes, approverRes] = await Promise.all([
+    sb.from(USERS_TABLE).select('*').eq('role','admin'),
+    sb.from(WASTEWATER_OPERATORS_TABLE).select('*').eq('is_active', true).order('created_at',{ascending:false}),
+    sb.from(WASTEWATER_APPROVERS_TABLE).select('*').eq('is_active', true).order('created_at',{ascending:false})
+  ]);
+
+  let adminEmployees = [];
+  const adminUsers = Array.isArray(adminRes.data) ? adminRes.data : [];
+  const adminEmails = adminUsers.map(row => String(row.email || row.user_email || '').trim()).filter(Boolean);
+
+  if(adminEmails.length){
+    const { data: employeeRows, error: employeeError } = await sb.from(EMPLOYEES_TABLE).select('*').in('email', adminEmails);
+    if(employeeError) console.warn('관리자 사원정보 매칭 실패:', employeeError);
+    adminEmployees = Array.isArray(employeeRows) ? employeeRows : [];
+  }
+
+  const admins = adminUsers.map((userRow) => {
+    const email = String(userRow.email || userRow.user_email || '').trim();
+    const employee = adminEmployees.find(emp => String(emp.email || '').trim() === email) || {};
+    return {
+      employee_no: getEmployeeNo(employee) || userRow.employee_no || userRow.employeeNo || '',
+      name: employee.name || userRow.name || userRow.user_name || email || '',
+      department: getEmployeeDepartment(employee),
+      team: getEmployeeTeam(employee),
+      position: employee.position || '',
+      email,
+      role: '관리자',
+      created_by: '사원정보',
+      created_at: userRow.updated_at || userRow.created_at || employee.updated_at || employee.created_at || '',
+      is_admin: true,
+      is_active: true
+    };
+  });
+
+  return {
+    data: {
+      admins,
+      operators: Array.isArray(operatorRes.data) ? operatorRes.data : [],
+      approvers: Array.isArray(approverRes.data) ? approverRes.data : []
+    },
+    errors: {
+      admins: adminRes.error || null,
+      operators: operatorRes.error || null,
+      approvers: approverRes.error || null
+    }
+  };
+}
+
+function buildWastewaterRolePayload(employee, roleLabel, actorName){
+  return {
+    employee_no: getEmployeeNo(employee),
+    name: employee.name || '',
+    department: getEmployeeDepartment(employee),
+    team: getEmployeeTeam(employee),
+    position: employee.position || '',
+    email: getEmployeeEmail(employee),
+    role: roleLabel,
+    is_active: true,
+    created_by: actorName || '',
+    updated_by: actorName || ''
+  };
+}
+
+function addWastewaterOperator(employee, actorName){
+  return sb.from(WASTEWATER_OPERATORS_TABLE).upsert(buildWastewaterRolePayload(employee, '운영자', actorName), { onConflict: 'employee_no' });
+}
+
+function removeWastewaterOperator(employeeNo, actorName){
+  return sb.from(WASTEWATER_OPERATORS_TABLE).update({ is_active:false, updated_by:actorName || '' }).eq('employee_no', employeeNo);
+}
+
+function addWastewaterApprover(employee, actorName){
+  return sb.from(WASTEWATER_APPROVERS_TABLE).upsert(buildWastewaterRolePayload(employee, '결재자', actorName), { onConflict: 'employee_no' });
+}
+
+function removeWastewaterApprover(employeeNo, actorName){
+  return sb.from(WASTEWATER_APPROVERS_TABLE).update({ is_active:false, updated_by:actorName || '' }).eq('employee_no', employeeNo);
+}
+
 async function logActivity(actorEmail,action,targetType,targetId,details){
   return sb.from(LOG_TABLE).insert([{actor_email:actorEmail||'unknown',action,target_type:targetType,target_id:String(targetId||''),details:JSON.stringify(details||{})}]);
 }
@@ -79,6 +213,6 @@ async function logApprovalAction(actorEmail,monthKey,action,reason=''){
 
 window.WastewaterApi={
   SUPABASE_URL,SUPABASE_KEY,
-  DAILY_TABLE,DAILY_VIEW,PICKUP_TABLE,USERS_TABLE,WASTEWATER_ROLE_VIEW,LOG_TABLE,APPROVAL_TABLE,APPROVAL_LOG_TABLE,REFERENCE_TABLE,CM_LIMIT,TON_TO_CM,MAX_TON_M3,
-  getMyRoles,loadAllData,saveReferenceDoc,deleteReferenceDocById,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,logActivity,logApprovalAction
+  DAILY_TABLE,DAILY_VIEW,PICKUP_TABLE,USERS_TABLE,EMPLOYEES_TABLE,WASTEWATER_ROLE_VIEW,WASTEWATER_OPERATORS_TABLE,WASTEWATER_APPROVERS_TABLE,LOG_TABLE,APPROVAL_TABLE,APPROVAL_LOG_TABLE,REFERENCE_TABLE,CM_LIMIT,TON_TO_CM,MAX_TON_M3,
+  getMyRoles,loadAllData,saveReferenceDoc,deleteReferenceDocById,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,searchEmployees,loadWastewaterManagers,addWastewaterOperator,removeWastewaterOperator,addWastewaterApprover,removeWastewaterApprover,logActivity,logApprovalAction
 };
