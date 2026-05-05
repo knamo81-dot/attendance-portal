@@ -1713,26 +1713,17 @@ tr:not(.collect-row-confirmed) .vendor-group-td{
 }
 
 
-/* ===== 권한별 메뉴 깜빡임 방지 - 안전형 ===== */
-/* 제품신청은 숨기지 않습니다. 권한 확정 전에는 운영자/관리자 전용 메뉴만 숨깁니다. */
-html:not(.permission-ready) .tab-btn[data-tab="collect"],
-html:not(.permission-ready) .tab-btn[data-tab="prepare"],
-html:not(.permission-ready) .tab-btn[data-tab="product-management"],
-html:not(.permission-ready) .tab-btn[data-tab="admin-management"],
-html:not(.permission-ready) #openReagentAdmin{
-  display:none !important;
-}
-
-/* 권한 계산 후 JS에서 숨긴 버튼만 숨김 */
-.tab-btn[data-permission-hidden="1"],
-#openReagentAdmin[aria-hidden="true"]{
-  display:none !important;
-}
-
-
-
-/* 제품신청 버튼 보호 */
+/* ===== 시약초자 권한 메뉴 표시 안정화 ===== */
+/* 제품신청은 모든 사용자에게 항상 보입니다. */
 .tab-btn[data-tab="request"]{
   display:inline-flex;
   visibility:visible;
 }
+
+/* JS 권한 판정 후 숨긴 메뉴만 숨깁니다. */
+.tab-btn[data-permission-hidden="1"],
+#openReagentAdmin[aria-hidden="true"]{
+  display:none !important;
+  visibility:hidden !important;
+}
+
