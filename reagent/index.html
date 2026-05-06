@@ -312,7 +312,7 @@
         <div class="field"><label>CAS</label><input id="pmCas" placeholder="CAS"/></div>
         <div class="field"><label>등급</label><input id="pmGrade" placeholder="등급"/></div>
         <div class="field"><label>기본거래처</label><input id="pmDefaultVendor" placeholder="거래처"/></div>
-        <div class="field"><label>사용여부</label><select id="pmIsActive"><option value="true">사용</option><option value="false">사용중지</option></select></div>
+        <div class="field"><label>선정사유</label><select id="pmDefaultVendorReason"><option value="최저가 구매">최저가 구매</option><option value="제조원 구매">제조원 구매</option><option value="취급처 구매">취급처 구매</option><option value="대리점 구매">대리점 구매</option><option value="온라인 구매">온라인 구매</option></select></div>
       </div>
 
       <div class="field" style="margin-top:10px;"><label>비고</label><input id="pmMemo" placeholder="비고"/></div>
@@ -327,9 +327,9 @@
       <div class="table-wrap" style="margin-top:16px;">
         <table>
           <thead>
-            <tr><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>규격</th><th>CAS</th><th>등급</th><th>기본거래처</th><th>사용여부</th><th>수정자</th><th>작업</th></tr>
+            <tr><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>규격</th><th>CAS</th><th>등급</th><th>기본거래처</th><th>선정사유</th><th>사용여부</th><th>수정자</th><th>작업</th></tr>
           </thead>
-          <tbody id="pmProductList"><tr><td class="empty" colspan="11">제품 마스터를 불러오는 중입니다.</td></tr></tbody>
+          <tbody id="pmProductList"><tr><td class="empty" colspan="12">제품 마스터를 불러오는 중입니다.</td></tr></tbody>
         </table>
       </div>
     </div>
