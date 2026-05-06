@@ -1064,6 +1064,117 @@ function renderManagerRows(rows=[],type='operator'){
     </tr>`;
   }).join('');
 }
+
+function canManageRelatedDocs(){
+  return canOperatorEdit() || canAdmin();
+}
+
+function renderRelatedDocsPanel(){
+  const docs = [...referenceDocs].sort((a,b)=>{
+    return new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
+  });
+
+  const writeForm = canManageRelatedDocs() ? `
+    <div class="related-doc-form">
+      <div class="section-title">📁 관련서류 등록</div>
+      <div class="field">
+        <label>서류명</label>
+        <input id="relatedDocTitle" class="input" placeholder="예: 폐수배출시설 허가증">
+      </div>
+      <div class="field">
+        <label>구분</label>
+        <input id="relatedDocCategory" class="input" placeholder="예: 허가증 / 계약서 / 사업자등록증">
+      </div>
+      <div class="field">
+        <label>설명</label>
+        <textarea id="relatedDocDesc" class="textarea" placeholder="관련 설명 입력"></textarea>
+      </div>
+      <div class="field">
+        <label>파일 링크 또는 파일명</label>
+        <input id="relatedDocFile" class="input" placeholder="예: 허가증_2026.pdf">
+      </div>
+      <button class="btn primary" onclick="saveRelatedDoc()">관련서류 저장</button>
+    </div>
+  ` : '';
+
+  const rows = docs.length ? docs.map(doc=>{
+    const title = doc.title || doc.doc_key || '관련서류';
+    const category = doc.category || '기타';
+    const desc = doc.content || doc.description || '';
+    const fileName = doc.file_name || '';
+    const created = new Date(doc.updated_at || doc.created_at || Date.now()).toLocaleDateString('ko-KR');
+
+    return `
+      <div class="related-doc-item">
+        <div class="related-doc-head">
+          <div>
+            <div class="related-doc-title">${escapeHtml(title)}</div>
+            <div class="related-doc-meta">${escapeHtml(category)} · ${escapeHtml(created)}</div>
+          </div>
+          ${canManageRelatedDocs() ? `<button class="small-btn danger" onclick="deleteRelatedDoc('${doc.id}')">삭제</button>` : ''}
+        </div>
+
+        <div class="related-doc-desc">${escapeHtml(desc)}</div>
+
+        <div class="related-doc-actions">
+          ${fileName ? `<span class="inline-badge wastewater">${escapeHtml(fileName)}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('') : `<div class="msg muted">등록된 관련서류가 없습니다.</div>`;
+
+  return `
+    <div class="card ref-card">
+      <div class="section-title">📚 관련서류</div>
+      <div class="msg muted" style="margin-bottom:18px;">
+        허가증, 사업자등록증, 계약서 등 운영 관련 서류를 보관합니다.
+      </div>
+      ${writeForm}
+      <div class="related-doc-list">
+        ${rows}
+      </div>
+    </div>
+  `;
+}
+
+async function saveRelatedDoc(){
+  if(!canManageRelatedDocs()) return renderApp('운영자 또는 관리자만 등록 가능합니다.','err');
+
+  const title = document.getElementById('relatedDocTitle')?.value?.trim();
+  const category = document.getElementById('relatedDocCategory')?.value?.trim();
+  const desc = document.getElementById('relatedDocDesc')?.value?.trim();
+  const fileName = document.getElementById('relatedDocFile')?.value?.trim();
+
+  if(!title) return renderApp('서류명을 입력하세요.','err');
+
+  const payload = {
+    doc_key: 'related_' + Date.now(),
+    title,
+    category,
+    content: desc,
+    file_name: fileName,
+    updated_at: new Date().toISOString()
+  };
+
+  const { error } = await api.saveReferenceDoc(null, payload);
+
+  if(error) return renderApp('관련서류 저장 실패: ' + error.message, 'err');
+
+  await loadAll('관련서류 저장 완료','ok');
+}
+
+async function deleteRelatedDoc(id){
+  if(!canManageRelatedDocs()) return;
+  if(!confirm('관련서류를 삭제하시겠습니까?')) return;
+
+  const { error } = await api.deleteReferenceDocById(id);
+
+  if(error) return renderApp('삭제 실패: ' + error.message, 'err');
+
+  await loadAll('관련서류 삭제 완료','ok');
+}
+
+
 function renderAdminManagementPanel(){
   const admins=wastewaterAdminState.admins||[];
   const operators=wastewaterAdminState.operators||[];
@@ -1227,6 +1338,7 @@ document.getElementById('app').innerHTML=`<div class="app-shell">
     <button class="tab-btn ${currentTab==='pickup'?'active':''}" onclick="switchTab('pickup')">수거 등록</button>
     <button class="tab-btn ${currentTab==='ledger'?'active':''}" onclick="switchTab('ledger')">운영일지</button>
     <button class="tab-btn ${currentTab==='reference'?'active':''}" onclick="switchTab('reference')">운영 관련자료</button>
+          <button class=\"tab-btn ${currentTab==='relatedDocs'?'active':''}\" onclick=\"switchTab('relatedDocs')\">관련서류</button>
   </div>
   ${canAdmin()?`<button class="btn soft admin-mini-btn ${currentTab==='adminPanel'?'active':''}" onclick="switchTab('adminPanel')">관리자기능</button>`:''}
 </div>
