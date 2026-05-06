@@ -1416,30 +1416,86 @@ if (els.count) els.count.textContent = String(rows.length);
       groups = groups.filter((g) => g.category === category);
     }
 
-    // 제품취합 정렬: 미확정 거래처 우선 → 시약/초자/안전용품 순 → 기존 신청순 유지
-    groups.sort((a, b) => {
-      const aConfirmed = this.getMeta(a.key)?.confirmed ? 1 : 0;
-      const bConfirmed = this.getMeta(b.key)?.confirmed ? 1 : 0;
+    // 제품취합 정렬: 미확정 우선 → 시약/초자/안전용품 → 기본거래처/일반/온라인 구매 순
+    // ※ 취합정리/엑셀 정렬은 건드리지 않고, 제품취합 화면 표시 순서만 조정합니다.
+    const categoryOrder = {
+      "시약": 1,
+      "초자": 2,
+      "초자/소모품": 2,
+      "안전용품": 3
+    };
 
-      if (aConfirmed !== bConfirmed) {
-        return aConfirmed - bConfirmed;
-      }
+    const getCollectSortInfo = (group) => {
+      const meta = this.applyDefaultVendorToMeta(group, this.getMeta(group.key));
+      const defaultInfo = this.getDefaultVendorInfoForGroup(group);
+      const reason = String(meta.prepareRemark || defaultInfo.reason || "").trim();
+      const vendor = String(meta.vendor1 || defaultInfo.vendor || "").trim();
 
-      const categoryOrder = {
-        "시약": 1,
-        "초자": 2,
-        "초자/소모품": 2,
-        "안전용품": 3
+      return {
+        category: String(group.category || ""),
+        categoryOrder: categoryOrder[group.category] || 99,
+        confirmedOrder: meta.confirmed ? 1 : 0,
+        reason,
+        vendor,
+        isOnline: reason === "온라인 구매",
+        isGeneral: !vendor && reason !== "온라인 구매"
       };
+    };
 
-      const aCategoryOrder = categoryOrder[a.category] || 99;
-      const bCategoryOrder = categoryOrder[b.category] || 99;
+    // 각 구분(시약/초자 등) 안에서 첫 번째 기본거래처 그룹만 일반 비교견적보다 위에 두고,
+    // 나머지 기본거래처 그룹은 일반 비교견적 아래에 배치합니다.
+    const firstVendorByBucket = {};
+    groups.forEach((group) => {
+      const info = getCollectSortInfo(group);
+      if (info.isOnline || info.isGeneral || !info.vendor) return;
 
-      if (aCategoryOrder !== bCategoryOrder) {
-        return aCategoryOrder - bCategoryOrder;
+      const bucketKey = `${info.confirmedOrder}||${info.category}`;
+      if (!firstVendorByBucket[bucketKey]) {
+        firstVendorByBucket[bucketKey] = info.vendor;
+      }
+    });
+
+    const getCollectBlockOrder = (group) => {
+      const info = getCollectSortInfo(group);
+      if (info.isOnline) return 9;
+      if (info.isGeneral) return 2;
+
+      const bucketKey = `${info.confirmedOrder}||${info.category}`;
+      const firstVendor = firstVendorByBucket[bucketKey] || "";
+
+      if (info.vendor && info.vendor === firstVendor) return 1;
+      if (info.vendor) return 3;
+      return 2;
+    };
+
+    groups.sort((a, b) => {
+      const aInfo = getCollectSortInfo(a);
+      const bInfo = getCollectSortInfo(b);
+
+      if (aInfo.confirmedOrder !== bInfo.confirmedOrder) {
+        return aInfo.confirmedOrder - bInfo.confirmedOrder;
       }
 
-      return 0;
+      if (aInfo.categoryOrder !== bInfo.categoryOrder) {
+        return aInfo.categoryOrder - bInfo.categoryOrder;
+      }
+
+      const aBlockOrder = getCollectBlockOrder(a);
+      const bBlockOrder = getCollectBlockOrder(b);
+
+      if (aBlockOrder !== bBlockOrder) {
+        return aBlockOrder - bBlockOrder;
+      }
+
+      const vendorCompare = aInfo.vendor.localeCompare(bInfo.vendor, "ko");
+      if (vendorCompare !== 0) return vendorCompare;
+
+      const usageA = String((a.entries || [])[0]?.usage || "");
+      const usageB = String((b.entries || [])[0]?.usage || "");
+      const usageCompare = usageA.localeCompare(usageB, "ko");
+      if (usageCompare !== 0) return usageCompare;
+
+      return String(a.name || "").localeCompare(String(b.name || ""), "ko");
     });
 
     if (!groups.length) {
