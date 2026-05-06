@@ -753,32 +753,134 @@ window.ReagentApp.collect = {
       .filter(Boolean);
   },
 
-  sortPrepareRows(rows, view, tableView = "summary") {
-    const categoryOrder = { "시약": 1, "초자": 2, "초자/소모품": 2, "안전용품": 3 };
+  isOnlinePurchaseRow(row = {}) {
+    return String(row.remark || "").trim() === "온라인 구매";
+  },
 
-    return [...rows].sort((a, b) => {
-      // 1순위: 구분
-      if (view === "main") {
-        const ca = categoryOrder[a.category] || 99;
-        const cb = categoryOrder[b.category] || 99;
-        if (ca !== cb) return ca - cb;
+  isGeneralQuoteRow(row = {}) {
+    const remark = String(row.remark || "").trim();
+    const hasCompare = this.hasCompareData ? this.hasCompareData(row) : Boolean(row.compareVendor || row.compareUnit || row.compareAmount);
+    return !this.isOnlinePurchaseRow(row) && (remark === "" || remark === "최저가 구매" || hasCompare || !String(row.purchaseVendor || "").trim());
+  },
+
+  getPrepareCategoryOrder(category = "") {
+    const categoryOrder = { "시약": 1, "초자": 2, "초자/소모품": 2, "안전용품": 3 };
+    return categoryOrder[category] || 99;
+  },
+
+  getPrepareBlockKey(row = {}) {
+    if (this.isOnlinePurchaseRow(row)) return `온라인 구매||온라인 구매`;
+    if (this.isGeneralQuoteRow(row)) return `${row.category || "기타"}||일반 비교견적`;
+    return `${row.category || "기타"}||${row.purchaseVendor || "지정거래처"}||${row.remark || "지정 구매"}`;
+  },
+
+  getPrepareBlockLabel(block = {}) {
+    const rows = block.rows || [];
+    const sample = rows[0] || {};
+    if (block.type === "online") return "온라인 구매";
+    if (block.type === "general") return `${sample.category || "기타"} · 일반 비교견적`;
+    return `${sample.category || "기타"} · ${sample.purchaseVendor || "기본거래처"} (${sample.remark || "지정 구매"})`;
+  },
+
+  getPrepareBlockType(row = {}) {
+    if (this.isOnlinePurchaseRow(row)) return "online";
+    if (this.isGeneralQuoteRow(row)) return "general";
+    return "default";
+  },
+
+  groupPrepareRowsForRequest(rows = []) {
+    const source = Array.isArray(rows) ? rows : [];
+    const byCategory = new Map();
+    const onlineRows = [];
+
+    source.forEach((row, index) => {
+      const safeRow = { ...row, _originalIndex: index };
+      if (this.isOnlinePurchaseRow(safeRow)) {
+        onlineRows.push(safeRow);
+        return;
       }
 
-      // 2순위: 구매 거래처
+      const categoryKey = String(safeRow.category || "기타");
+      if (!byCategory.has(categoryKey)) byCategory.set(categoryKey, []);
+      byCategory.get(categoryKey).push(safeRow);
+    });
+
+    const blocks = [];
+    const categoryEntries = Array.from(byCategory.entries()).sort((a, b) => this.getPrepareCategoryOrder(a[0]) - this.getPrepareCategoryOrder(b[0]));
+
+    categoryEntries.forEach(([category, categoryRows]) => {
+      const defaultMap = new Map();
+      const generalRows = [];
+
+      categoryRows.forEach((row) => {
+        if (this.isGeneralQuoteRow(row)) {
+          generalRows.push(row);
+          return;
+        }
+
+        const key = `${row.purchaseVendor || "기본거래처"}||${row.remark || "지정 구매"}`;
+        if (!defaultMap.has(key)) defaultMap.set(key, []);
+        defaultMap.get(key).push(row);
+      });
+
+      const defaultBlocks = Array.from(defaultMap.entries()).map(([key, blockRows], idx) => ({
+        key: `${category}||${key}`,
+        type: "default",
+        category,
+        rows: this.sortRowsInsidePrepareBlock(blockRows),
+        index: idx
+      }));
+
+      if (defaultBlocks.length) {
+        blocks.push(defaultBlocks[0]);
+      }
+
+      if (generalRows.length) {
+        blocks.push({
+          key: `${category}||일반 비교견적`,
+          type: "general",
+          category,
+          rows: this.sortRowsInsidePrepareBlock(generalRows),
+          index: 999
+        });
+      }
+
+      if (defaultBlocks.length > 1) {
+        blocks.push(...defaultBlocks.slice(1));
+      }
+    });
+
+    if (onlineRows.length) {
+      blocks.push({
+        key: "온라인 구매",
+        type: "online",
+        category: "온라인 구매",
+        rows: this.sortRowsInsidePrepareBlock(onlineRows),
+        index: 9999
+      });
+    }
+
+    return blocks;
+  },
+
+  sortRowsInsidePrepareBlock(rows = []) {
+    return [...rows].sort((a, b) => {
       const vendorCompare = String(a.purchaseVendor || "").localeCompare(String(b.purchaseVendor || ""), "ko");
       if (vendorCompare !== 0) return vendorCompare;
 
-      // 3순위: 용도
       const usageCompare = String(a.usage || "").localeCompare(String(b.usage || ""), "ko");
       if (usageCompare !== 0) return usageCompare;
 
-      // 4순위: 품명
       const nameCompare = String(a.name || "").localeCompare(String(b.name || ""), "ko");
       if (nameCompare !== 0) return nameCompare;
 
-      // 5순위: 비고
-      return String(a.remark || "").localeCompare(String(b.remark || ""), "ko");
+      return Number(a._originalIndex || 0) - Number(b._originalIndex || 0);
     });
+  },
+
+  sortPrepareRows(rows, view, tableView = "summary") {
+    const blocks = this.groupPrepareRowsForRequest(rows);
+    return blocks.flatMap((block) => block.rows || []);
   },
 
   getPrepareRowsByView(view, tableView = "summary") {
@@ -1314,32 +1416,55 @@ if (els.count) els.count.textContent = String(rows.length);
       </tr>
     `).join("");
 
-    els.quoteList.innerHTML = rows.map((row) => `
-      <tr>
-        <td class="txt">${this.html(row.category)}</td>
-        <td class="txt">${this.html(row.name)}</td>
-        <td class="txt">${this.html(row.maker)}</td>
-        <td class="txt">${this.html(row.grade)}</td>
-        <td class="txt">${this.html(row.code)}</td>
-        <td class="txt">${this.html(row.capacity)}</td>
-        <td class="txt">${this.html(row.cas)}</td>
-        <td class="num">${this.formatNumber(row.qty)}</td>
-        <td class="txt usage-cell">${this.html(row.usage)}</td>
-        <td class="num">${this.formatNumber(row.purchaseUnit)}</td>
-        <td class="num">${this.formatNumber(row.purchaseAmount)}</td>
-        <td class="txt">${this.html(row.purchaseVendor)}</td>
-        <td class="num dash">${row.compareUnit ? this.formatNumber(row.compareUnit) : "-"}</td>
-        <td class="num dash">${row.compareAmount ? this.formatNumber(row.compareAmount) : "-"}</td>
-        <td class="txt">${this.html(row.compareVendor || "-")}</td>
-        <td class="remark-cell">
-          <select class="prepare-remark-select" data-key="${this.html(row.key)}">
-            ${["최저가 구매", "제조원 구매", "취급처 구매", "대리점 구매", "온라인 구매"].map((option) => `
-              <option value="${this.html(option)}" ${row.remark === option ? "selected" : ""}>${this.html(option)}</option>
-            `).join("")}
-          </select>
-        </td>
-      </tr>
-    `).join("");
+    const quoteBlocks = this.groupPrepareRowsForRequest(rows);
+    els.quoteList.innerHTML = quoteBlocks.map((block) => {
+      const blockAmount = (block.rows || []).reduce((sum, row) => sum + Number(row.purchaseAmount || 0), 0);
+      const blockQty = (block.rows || []).reduce((sum, row) => sum + Number(row.qty || 0), 0);
+      const blockLabel = this.getPrepareBlockLabel(block);
+      const blockHelp = block.type === "general"
+        ? "일반 비교견적 대상"
+        : (block.type === "online" ? "온라인 구매 / 하단 고정" : "기본거래처 단독 견적 요청 대상");
+
+      const header = `
+        <tr class="prepare-request-block-header" data-block-type="${this.html(block.type)}">
+          <td colspan="16" style="background:#eef4ff; font-weight:900; color:#0f172a; padding:12px 14px; border-top:2px solid #94a3b8;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
+              <span>${this.html(blockLabel)}</span>
+              <span style="font-size:12px; color:#64748b; font-weight:700;">${this.html(blockHelp)} · ${this.html((block.rows || []).length)}건 · 수량 ${this.formatNumber(blockQty)} · ${this.formatNumber(blockAmount)}원</span>
+            </div>
+          </td>
+        </tr>
+      `;
+
+      const body = (block.rows || []).map((row) => `
+        <tr>
+          <td class="txt">${this.html(row.category)}</td>
+          <td class="txt">${this.html(row.name)}</td>
+          <td class="txt">${this.html(row.maker)}</td>
+          <td class="txt">${this.html(row.grade)}</td>
+          <td class="txt">${this.html(row.code)}</td>
+          <td class="txt">${this.html(row.capacity)}</td>
+          <td class="txt">${this.html(row.cas)}</td>
+          <td class="num">${this.formatNumber(row.qty)}</td>
+          <td class="txt usage-cell">${this.html(row.usage)}</td>
+          <td class="num">${this.formatNumber(row.purchaseUnit)}</td>
+          <td class="num">${this.formatNumber(row.purchaseAmount)}</td>
+          <td class="txt">${this.html(row.purchaseVendor)}</td>
+          <td class="num dash">${row.compareUnit ? this.formatNumber(row.compareUnit) : "-"}</td>
+          <td class="num dash">${row.compareAmount ? this.formatNumber(row.compareAmount) : "-"}</td>
+          <td class="txt">${this.html(row.compareVendor || "-")}</td>
+          <td class="remark-cell">
+            <select class="prepare-remark-select" data-key="${this.html(row.key)}">
+              ${["최저가 구매", "제조원 구매", "취급처 구매", "대리점 구매", "온라인 구매"].map((option) => `
+                <option value="${this.html(option)}" ${row.remark === option ? "selected" : ""}>${this.html(option)}</option>
+              `).join("")}
+            </select>
+          </td>
+        </tr>
+      `).join("");
+
+      return header + body;
+    }).join("");
 
     if (els.summaryFoot) {
       els.summaryFoot.innerHTML = `<tr><th colspan="5" class="num">합계</th><th class="num">${this.formatNumber(totalAmount)}</th><th></th></tr>`;
