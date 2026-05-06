@@ -148,6 +148,7 @@ window.ReagentApp.productManagement = {
       cas: document.getElementById("pmCas"),
       grade: document.getElementById("pmGrade"),
       defaultVendor: document.getElementById("pmDefaultVendor"),
+      defaultVendorReason: document.getElementById("pmDefaultVendorReason"),
       memo: document.getElementById("pmMemo"),
       isActive: document.getElementById("pmIsActive"),
       saveProduct: document.getElementById("pmSaveProduct"),
@@ -644,7 +645,7 @@ window.ReagentApp.productManagement = {
     const active = els.productActive?.value || "";
 
     return this.products.filter((p) => {
-      const text = [p.category, p.name, p.maker, p.code, p.capacity, p.cas, p.grade, p.default_vendor, p.memo]
+      const text = [p.category, p.name, p.maker, p.code, p.capacity, p.cas, p.grade, p.default_vendor, p.default_vendor_reason, p.memo]
         .join(" ")
         .toLowerCase();
 
@@ -684,7 +685,7 @@ window.ReagentApp.productManagement = {
     this.updateManagementKpi();
 
     if (!rows.length) {
-      els.productList.innerHTML = `<tr><td class="empty" colspan="11">등록된 제품이 없습니다.</td></tr>`;
+      els.productList.innerHTML = `<tr><td class="empty" colspan="12">등록된 제품이 없습니다.</td></tr>`;
       return;
     }
 
@@ -698,6 +699,7 @@ window.ReagentApp.productManagement = {
         <td>${this.html(p.cas)}</td>
         <td>${this.html(p.grade)}</td>
         <td>${this.html(p.default_vendor)}</td>
+        <td>${this.html(p.default_vendor_reason || "")}</td>
         <td>${p.is_active ? "사용" : "사용중지"}</td>
         <td>${this.html(p.updated_by || p.created_by || "")}</td>
         <td><button class="ghost-btn" data-pm-edit="${p.id}" type="button">수정</button></td>
@@ -745,6 +747,16 @@ window.ReagentApp.productManagement = {
             <div class="field"><label>CAS</label><input id="pmEditProductCas" placeholder="CAS"/></div>
             <div class="field"><label>등급</label><input id="pmEditProductGrade" placeholder="등급"/></div>
             <div class="field"><label>기본거래처</label><input id="pmEditProductDefaultVendor" placeholder="거래처"/></div>
+            <div class="field">
+              <label>선정사유</label>
+              <select id="pmEditProductDefaultVendorReason">
+                <option value="최저가 구매">최저가 구매</option>
+                <option value="제조원 구매">제조원 구매</option>
+                <option value="취급처 구매">취급처 구매</option>
+                <option value="대리점 구매">대리점 구매</option>
+                <option value="온라인 구매">온라인 구매</option>
+              </select>
+            </div>
             <div class="field">
               <label>사용여부</label>
               <select id="pmEditProductIsActive">
@@ -803,6 +815,7 @@ window.ReagentApp.productManagement = {
     this.setProductEditValue("pmEditProductCas", product.cas || "");
     this.setProductEditValue("pmEditProductGrade", product.grade || "");
     this.setProductEditValue("pmEditProductDefaultVendor", product.default_vendor || "");
+    this.setProductEditValue("pmEditProductDefaultVendorReason", product.default_vendor_reason || "최저가 구매");
     this.setProductEditValue("pmEditProductMemo", product.memo || "");
     this.setProductEditValue("pmEditProductIsActive", product.is_active === false ? "false" : "true");
 
@@ -832,6 +845,7 @@ window.ReagentApp.productManagement = {
       cas: this.getProductEditValue("pmEditProductCas"),
       grade: this.getProductEditValue("pmEditProductGrade"),
       default_vendor: this.getProductEditValue("pmEditProductDefaultVendor"),
+      default_vendor_reason: this.getProductEditValue("pmEditProductDefaultVendorReason") || "최저가 구매",
       memo: this.getProductEditValue("pmEditProductMemo"),
       is_active: this.getProductEditValue("pmEditProductIsActive") !== "false",
       updated_by: user.name
@@ -877,9 +891,10 @@ window.ReagentApp.productManagement = {
     this.editingProductId = null;
 
     if (els.formTitle) els.formTitle.textContent = "제품 등록";
-    [els.productId, els.category, els.name, els.maker, els.code, els.capacity, els.cas, els.grade, els.defaultVendor, els.memo].forEach((el) => {
+    [els.productId, els.category, els.name, els.maker, els.code, els.capacity, els.cas, els.grade, els.defaultVendor, els.defaultVendorReason, els.memo].forEach((el) => {
       if (el) el.value = "";
     });
+    if (els.defaultVendorReason) els.defaultVendorReason.value = "최저가 구매";
     if (els.isActive) els.isActive.value = "true";
     if (els.deactivateProduct) els.deactivateProduct.style.display = "none";
   },
@@ -897,6 +912,7 @@ window.ReagentApp.productManagement = {
       cas: String(els.cas?.value || "").trim(),
       grade: String(els.grade?.value || "").trim(),
       default_vendor: String(els.defaultVendor?.value || "").trim(),
+      default_vendor_reason: String(els.defaultVendorReason?.value || "최저가 구매").trim(),
       memo: String(els.memo?.value || "").trim(),
       is_active: els.isActive?.value !== "false",
       updated_by: user.name
