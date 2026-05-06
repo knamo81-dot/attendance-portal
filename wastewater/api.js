@@ -183,24 +183,45 @@ function buildWastewaterRolePayload(employee, roleLabel, actorName){
     role: roleLabel,
     is_active: true,
     created_by: actorName || '',
-    updated_by: actorName || ''
+    updated_by: actorName || '',
+    updated_at: new Date().toISOString()
   };
 }
 
 function addWastewaterOperator(employee, actorName){
-  return sb.from(WASTEWATER_OPERATORS_TABLE).upsert(buildWastewaterRolePayload(employee, '운영자', actorName), { onConflict: 'employee_no' });
+  const payload = buildWastewaterRolePayload(employee, '운영자', actorName);
+  return sb
+    .from(WASTEWATER_OPERATORS_TABLE)
+    .upsert(payload, { onConflict: 'employee_no' })
+    .select('*')
+    .maybeSingle();
 }
 
 function removeWastewaterOperator(employeeNo, actorName){
-  return sb.from(WASTEWATER_OPERATORS_TABLE).update({ is_active:false, updated_by:actorName || '' }).eq('employee_no', employeeNo);
+  return sb
+    .from(WASTEWATER_OPERATORS_TABLE)
+    .update({ is_active:false, updated_by:actorName || '', updated_at:new Date().toISOString() })
+    .eq('employee_no', employeeNo)
+    .select('*')
+    .maybeSingle();
 }
 
 function addWastewaterApprover(employee, actorName){
-  return sb.from(WASTEWATER_APPROVERS_TABLE).upsert(buildWastewaterRolePayload(employee, '결재자', actorName), { onConflict: 'employee_no' });
+  const payload = buildWastewaterRolePayload(employee, '결재자', actorName);
+  return sb
+    .from(WASTEWATER_APPROVERS_TABLE)
+    .upsert(payload, { onConflict: 'employee_no' })
+    .select('*')
+    .maybeSingle();
 }
 
 function removeWastewaterApprover(employeeNo, actorName){
-  return sb.from(WASTEWATER_APPROVERS_TABLE).update({ is_active:false, updated_by:actorName || '' }).eq('employee_no', employeeNo);
+  return sb
+    .from(WASTEWATER_APPROVERS_TABLE)
+    .update({ is_active:false, updated_by:actorName || '', updated_at:new Date().toISOString() })
+    .eq('employee_no', employeeNo)
+    .select('*')
+    .maybeSingle();
 }
 
 async function logActivity(actorEmail,action,targetType,targetId,details){
