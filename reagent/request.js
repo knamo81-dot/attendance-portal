@@ -161,6 +161,7 @@ window.ReagentApp.request = {
       cas: row.cas || "",
       grade: row.grade || "",
       default_vendor: row.default_vendor || "",
+      default_vendor_reason: row.default_vendor_reason || "",
       memo: row.memo || "",
       is_active: row.is_active !== false
     };
@@ -184,7 +185,7 @@ window.ReagentApp.request = {
 
     const { data, error } = await sb
       .from("product_master")
-      .select("id, category, name, maker, code, capacity, cas, grade, default_vendor, memo, is_active")
+      .select("id, category, name, maker, code, capacity, cas, grade, default_vendor, default_vendor_reason, memo, is_active")
       .eq("is_active", true)
       .order("name", { ascending: true })
       .limit(3000);
@@ -212,7 +213,7 @@ window.ReagentApp.request = {
 
     if (keyword) {
       results = results.filter((p) =>
-        [p.category, p.name, p.maker, p.code, p.capacity, p.cas, p.grade, p.default_vendor, p.memo]
+        [p.category, p.name, p.maker, p.code, p.capacity, p.cas, p.grade, p.default_vendor, p.default_vendor_reason, p.memo]
           .join(" ")
           .toLowerCase()
           .includes(keyword)
@@ -336,6 +337,9 @@ window.ReagentApp.request = {
     setValue(els.cas, product.cas || "");
     setValue(els.grade, product.grade || "");
 
+    // 제품마스터의 기본거래처/선정사유를 신청 저장 시 함께 넘기기 위해 보관합니다.
+    this.selectedProduct = this.normalizeProductRow(product);
+
     this.closeSearchModal();
     toast("제품이 선택되었습니다.", "success");
   },
@@ -349,6 +353,7 @@ window.ReagentApp.request = {
     setValue(els.capacity, "");
     setValue(els.cas, "");
     setValue(els.grade, "");
+    this.selectedProduct = null;
     setValue(els.qty, "");
     setValue(els.usage, "");
   },
@@ -1124,6 +1129,18 @@ window.ReagentApp.request = {
       return;
     }
 
+    const selectedProduct = this.selectedProduct || {};
+    const matchedProduct = this.productMasterRows.find((product) =>
+      String(product.name || "") === productName &&
+      String(product.maker || "") === String(els.maker?.value || "") &&
+      String(product.code || "") === String(els.code?.value || "") &&
+      String(product.capacity || "") === String(els.capacity?.value || "") &&
+      String(product.cas || "") === String(els.cas?.value || "") &&
+      String(product.grade || "") === String(els.grade?.value || "")
+    ) || {};
+    const defaultVendor = String(selectedProduct.default_vendor || matchedProduct.default_vendor || "").trim();
+    const defaultVendorReason = String(selectedProduct.default_vendor_reason || matchedProduct.default_vendor_reason || "").trim();
+
     const currentUser = this.getCurrentUser();
 
     const row = {
@@ -1135,6 +1152,8 @@ window.ReagentApp.request = {
       capacity: els.capacity?.value || "",
       cas: els.cas?.value || "",
       grade: els.grade?.value || "",
+      default_vendor: defaultVendor,
+      default_vendor_reason: defaultVendorReason,
       qty,
       usage,
       employee_no: currentUser.employee_no,
@@ -1483,6 +1502,8 @@ window.ReagentApp.request = {
           capacity: row.capacity || "",
           cas: row.cas || "",
           grade: row.grade || "",
+          default_vendor: row.default_vendor || "",
+          default_vendor_reason: row.default_vendor_reason || "",
           entries: [],
           totalQty: 0,
           collectedQty: Number(this.collectedMeta[key] || 0),
@@ -1490,6 +1511,8 @@ window.ReagentApp.request = {
         };
       }
 
+      if (!grouped[key].default_vendor && row.default_vendor) grouped[key].default_vendor = row.default_vendor;
+      if (!grouped[key].default_vendor_reason && row.default_vendor_reason) grouped[key].default_vendor_reason = row.default_vendor_reason;
       grouped[key].entries.push(row);
       grouped[key].totalQty += Number(row.qty || 0);
     });
