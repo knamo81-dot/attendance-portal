@@ -1435,7 +1435,7 @@ document.getElementById('app').innerHTML=`<div class="app-shell">
     <button class="tab-btn ${currentTab==='pickup'?'active':''}" onclick="switchTab('pickup')">수거 등록</button>
     <button class="tab-btn ${currentTab==='ledger'?'active':''}" onclick="switchTab('ledger')">운영일지</button>
     <button class="tab-btn ${currentTab==='reference'?'active':''}" onclick="switchTab('reference')">운영 관련자료</button>
-          <button class=\"tab-btn ${currentTab==='relatedDocs'?'active':''}\" onclick=\"switchTab('relatedDocs')\">관련서류</button>
+          <button class="tab-btn ${currentTab==='relatedDocs'?'active':''}" onclick="switchTab('relatedDocs')">관련서류</button>
   </div>
   ${canAdmin()?`<button class="btn soft admin-mini-btn ${currentTab==='adminPanel'?'active':''}" onclick="switchTab('adminPanel')">관리자기능</button>`:''}
 </div>
@@ -1548,6 +1548,10 @@ ${canWrite()?`<button class="btn primary block" onclick="savePickupRow()">💾 �
 
 <div class="tab-panel ${currentTab==='reference'?'active':''}">
 <div class="card ref-card">${renderReferenceContent()}</div>
+</div>
+
+<div class="tab-panel ${currentTab==='relatedDocs'?'active':''}">
+${renderRelatedDocsPanel()}
 </div>
 
 </div>`;
