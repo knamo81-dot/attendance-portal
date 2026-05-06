@@ -1030,8 +1030,22 @@ function renderAdminSearchRows(){
     </tr>`;
   }).join('');
 }
+function renderSignatureUploadCell(row={}){
+  const email = getManagerEmail(row);
+  const signatureUrl = row.signature_url || '';
+  if(!email) return '-';
+  const inputId = `sig-${escapeId(email)}`;
+  const preview = signatureUrl
+    ? `<img src="${signatureUrl}" class="signature-preview" style="margin:0 auto 8px;max-width:120px;max-height:48px;">`
+    : `<div class="msg muted" style="margin:0 0 8px;font-size:12px;">미등록</div>`;
+  return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+    ${preview}
+    <input id="${inputId}" type="file" accept="image/*" style="display:none" onchange="uploadSignatureForUser('${escapeHtml(email)}',this.files[0]); this.value='';">
+    <button class="small-btn" type="button" onclick="document.getElementById('${inputId}').click()">사인 업로드</button>
+  </div>`;
+}
 function renderManagerRows(rows=[],type='operator'){
-  if(!rows.length) return `<tr><td colspan="8">지정된 대상자가 없습니다.</td></tr>`;
+  if(!rows.length) return `<tr><td colspan="9">지정된 대상자가 없습니다.</td></tr>`;
   return rows.map(row=>{
     const employeeNo=getManagerEmployeeNo(row);
     const dateText=formatAdminDate(row.created_at);
@@ -1044,6 +1058,7 @@ function renderManagerRows(rows=[],type='operator'){
       <td>${escapeHtml(row.team||'')}</td>
       <td>${escapeHtml(row.email||'')}</td>
       <td>${isAdmin?`<span class="inline-badge wastewater">관리자</span>`:escapeHtml(row.role || (type==='approver'?'결재자':'운영자'))}</td>
+      <td>${renderSignatureUploadCell(row)}</td>
       <td>${escapeHtml(row.created_by||'')}${dateText?`<br>${escapeHtml(dateText)}`:''}</td>
       <td>${action}</td>
     </tr>`;
@@ -1085,19 +1100,19 @@ function renderAdminManagementPanel(){
     <div class="card admin-card">
       <div class="section-title">👑 자동 포함 관리자</div>
       <div class="msg muted">공통 사용자 정보의 admin 권한 계정은 폐수 관리자로 자동 포함됩니다.</div>
-      <div class="table-wrap"><table><thead><tr><th>사번</th><th>이름</th><th>부서</th><th>팀</th><th>이메일</th><th>권한</th><th>등록정보</th><th>작업</th></tr></thead><tbody>${renderManagerRows(admins,'admin')}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>사번</th><th>이름</th><th>부서</th><th>팀</th><th>이메일</th><th>권한</th><th>사인/도장</th><th>등록정보</th><th>작업</th></tr></thead><tbody>${renderManagerRows(admins,'admin')}</tbody></table></div>
     </div>
 
     <div class="card admin-card">
       <div class="section-title">🛠️ 현재 운영자 목록</div>
       <div class="msg muted">운영자는 일일 입력, 수거 등록, 운영일지 삭제, 작성자 결재가 가능합니다.</div>
-      <div class="table-wrap"><table><thead><tr><th>사번</th><th>이름</th><th>부서</th><th>팀</th><th>이메일</th><th>권한</th><th>등록정보</th><th>작업</th></tr></thead><tbody>${renderManagerRows(operators,'operator')}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>사번</th><th>이름</th><th>부서</th><th>팀</th><th>이메일</th><th>권한</th><th>사인/도장</th><th>등록정보</th><th>작업</th></tr></thead><tbody>${renderManagerRows(operators,'operator')}</tbody></table></div>
     </div>
 
     <div class="card admin-card">
       <div class="section-title">✅ 현재 결재자 목록</div>
       <div class="msg muted">결재자는 운영일지에서 검토자 결재와 월 잠금을 진행합니다.</div>
-      <div class="table-wrap"><table><thead><tr><th>사번</th><th>이름</th><th>부서</th><th>팀</th><th>이메일</th><th>권한</th><th>등록정보</th><th>작업</th></tr></thead><tbody>${renderManagerRows(approvers,'approver')}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>사번</th><th>이름</th><th>부서</th><th>팀</th><th>이메일</th><th>권한</th><th>사인/도장</th><th>등록정보</th><th>작업</th></tr></thead><tbody>${renderManagerRows(approvers,'approver')}</tbody></table></div>
     </div>
 
     <div class="card log-card">
@@ -1374,10 +1389,21 @@ async function signWriter(monthKey){
   const row = getApprovalRow(monthKey);
   if(row?.writer_signed_at) return renderApp('이미 작성자 결재가 완료된 월입니다.','err');
 
+  let writerSignatureUrl = '';
+  try{
+    if(typeof api.getUserSignature === 'function'){
+      const sigRes = await api.getUserSignature(user.email);
+      writerSignatureUrl = sigRes?.data?.signature_url || '';
+    }
+  }catch(err){
+    console.warn('작성자 사인 조회 실패:', err);
+  }
+
   const payload = {
     month_key: monthKey,
     writer_email: user.email,
     writer_signed_at: new Date().toISOString(),
+    writer_signature_url: writerSignatureUrl,
     is_locked: false
   };
 
@@ -1394,22 +1420,71 @@ async function signWriter(monthKey){
   approvalAlertDismissed=false;
   await loadAll('작성자 결재 완료','ok');
 }
-async function unsignWriter(monthKey){if(!canWriterApprove()) return renderApp('작성자 결재 취소 권한이 없습니다.','err'); const row=getApprovalRow(monthKey); if(!row?.writer_signed_at) return renderApp('작성자 결재 정보가 없습니다.','err'); if(row?.reviewer_signed_at) return renderApp('검토자 결재를 먼저 취소해야 합니다.','err'); const {error}=await api.updateApprovalByMonth(monthKey,{writer_email:null,writer_signed_at:null,is_locked:false}); if(error) return renderApp('작성자 결재 취소 실패: '+error.message,'err'); await logApprovalAction(monthKey,'writer_unsign'); await loadAll('작성자 결재 취소 완료','ok');}
-async function signReviewer(monthKey){if(!canReviewerApprove()) return renderApp('검토자 결재 권한이 없습니다.','err'); const row=getApprovalRow(monthKey); if(!row?.writer_signed_at) return renderApp('작성자 결재가 먼저 필요합니다.','err'); if(row?.reviewer_signed_at) return renderApp('이미 검토자 결재가 완료된 월입니다.','err'); const {error}=await api.updateApprovalByMonth(monthKey,{reviewer_email:user.email,reviewer_signed_at:new Date().toISOString(),is_locked:true}); if(error) return renderApp('검토자 결재 실패: '+error.message,'err'); await logApprovalAction(monthKey,'reviewer_sign'); await loadAll('검토자 결재 완료 / 월 잠금','ok');}
-async function unsignReviewer(monthKey){if(!canReviewerApprove()) return renderApp('검토자 결재 취소 권한이 없습니다.','err'); const row=getApprovalRow(monthKey); if(!row?.reviewer_signed_at) return renderApp('검토자 결재 정보가 없습니다.','err'); const {error}=await api.updateApprovalByMonth(monthKey,{reviewer_email:null,reviewer_signed_at:null,is_locked:false}); if(error) return renderApp('검토자 결재 취소 실패: '+error.message,'err'); await logApprovalAction(monthKey,'reviewer_unsign'); await loadAll('검토자 결재 취소 / 잠금 해제 완료','ok');}
-async function resetApproval(monthKey){if(!canAdmin()) return renderApp('관리자만 전체 취소 가능합니다.','err'); if(!confirm(`${monthKey} 결재를 전체 취소하시겠습니까?`)) return; const {error}=await api.updateApprovalByMonth(monthKey,{writer_email:null,writer_signed_at:null,reviewer_email:null,reviewer_signed_at:null,is_locked:false}); if(error) return renderApp('전체 취소 실패: '+error.message,'err'); await logApprovalAction(monthKey,'admin_reset'); await loadAll('결재 전체 취소 완료','ok');}
+async function unsignWriter(monthKey){if(!canWriterApprove()) return renderApp('작성자 결재 취소 권한이 없습니다.','err'); const row=getApprovalRow(monthKey); if(!row?.writer_signed_at) return renderApp('작성자 결재 정보가 없습니다.','err'); if(row?.reviewer_signed_at) return renderApp('검토자 결재를 먼저 취소해야 합니다.','err'); const {error}=await api.updateApprovalByMonth(monthKey,{writer_email:null,writer_signed_at:null,writer_signature_url:null,is_locked:false}); if(error) return renderApp('작성자 결재 취소 실패: '+error.message,'err'); await logApprovalAction(monthKey,'writer_unsign'); await loadAll('작성자 결재 취소 완료','ok');}
+async function signReviewer(monthKey){
+  if(!canReviewerApprove()) return renderApp('검토자 결재 권한이 없습니다.','err');
+
+  const row=getApprovalRow(monthKey);
+  if(!row?.writer_signed_at) return renderApp('작성자 결재가 먼저 필요합니다.','err');
+  if(row?.reviewer_signed_at) return renderApp('이미 검토자 결재가 완료된 월입니다.','err');
+
+  let reviewerSignatureUrl = '';
+  try{
+    if(typeof api.getUserSignature === 'function'){
+      const sigRes = await api.getUserSignature(user.email);
+      reviewerSignatureUrl = sigRes?.data?.signature_url || '';
+    }
+  }catch(err){
+    console.warn('검토자 사인 조회 실패:', err);
+  }
+
+  const {error}=await api.updateApprovalByMonth(monthKey,{
+    reviewer_email:user.email,
+    reviewer_signed_at:new Date().toISOString(),
+    reviewer_signature_url:reviewerSignatureUrl,
+    is_locked:true
+  });
+  if(error) return renderApp('검토자 결재 실패: '+error.message,'err');
+
+  await logApprovalAction(monthKey,'reviewer_sign');
+  await loadAll('검토자 결재 완료 / 월 잠금','ok');
+}
+async function unsignReviewer(monthKey){if(!canReviewerApprove()) return renderApp('검토자 결재 취소 권한이 없습니다.','err'); const row=getApprovalRow(monthKey); if(!row?.reviewer_signed_at) return renderApp('검토자 결재 정보가 없습니다.','err'); const {error}=await api.updateApprovalByMonth(monthKey,{reviewer_email:null,reviewer_signed_at:null,reviewer_signature_url:null,is_locked:false}); if(error) return renderApp('검토자 결재 취소 실패: '+error.message,'err'); await logApprovalAction(monthKey,'reviewer_unsign'); await loadAll('검토자 결재 취소 / 잠금 해제 완료','ok');}
+async function resetApproval(monthKey){if(!canAdmin()) return renderApp('관리자만 전체 취소 가능합니다.','err'); if(!confirm(`${monthKey} 결재를 전체 취소하시겠습니까?`)) return; const {error}=await api.updateApprovalByMonth(monthKey,{writer_email:null,writer_signed_at:null,writer_signature_url:null,reviewer_email:null,reviewer_signed_at:null,reviewer_signature_url:null,is_locked:false}); if(error) return renderApp('전체 취소 실패: '+error.message,'err'); await logApprovalAction(monthKey,'admin_reset'); await loadAll('결재 전체 취소 완료','ok');}
 async function changeRole(email){if(!canAdmin()) return renderApp('관리자만 권한 변경 가능합니다.','err'); const newRole=document.getElementById(`role-${escapeId(email)}`).value; const {error}=await api.updateUserRole(email,newRole); if(error) return renderApp('권한 변경 실패: '+error.message,'err'); await logActivity('role_change','user',email,{newRole}); await loadAll('권한 변경 완료','ok');}
 async function approveUser(email){if(!canAdmin()) return renderApp('관리자만 승인 가능합니다.','err'); const ok=confirm(`${email} 계정을 승인하시겠습니까?`); if(!ok) return; const {error}=await api.approveUserByEmail(email); if(error) return renderApp('계정 승인 실패: '+error.message,'err'); await logActivity('approve_user','user',email,{approved:true}); await loadAll('계정 승인 완료','ok');}
 async function deleteUser(email){if(!canAdmin()) return renderApp('관리자만 계정 삭제 가능합니다.','err'); if(email===user?.email) return renderApp('현재 로그인한 본인 계정은 삭제할 수 없습니다.','err'); const ok=confirm(`${email} 계정을 삭제하시겠습니까?\n\n앱 사용자 목록에서 제거되며, 이후 로그인도 차단됩니다.`); if(!ok) return; const {error}=await api.deleteUserByEmail(email); if(error) return renderApp('계정 삭제 실패: '+error.message,'err'); await logActivity('delete_user','user',email,{}); await loadAll('계정 삭제 완료','ok');}
-async function uploadSignatureForUser(email,file){if(!canAdmin()) return renderApp('관리자만 사인 업로드 가능합니다.','err'); if(!file) return; if(file.size>700*1024) return renderApp('사인 이미지는 700KB 이하 권장입니다.','err'); const reader=new FileReader(); reader.onload=async ()=>{const dataUrl=reader.result; const {error}=await api.updateUserSignature(email,dataUrl); if(error) return renderApp('사인 업로드 실패: '+error.message,'err'); await logActivity('upload_signature','user',email,{size:file.size}); await loadAll('사인 업로드 완료','ok');}; reader.readAsDataURL(file);}
+async function uploadSignatureForUser(email,file){
+  if(!canAdmin()) return renderApp('관리자만 사인 업로드 가능합니다.','err');
+  if(!file) return;
+  if(!email) return renderApp('이메일 정보가 없어 사인을 저장할 수 없습니다.','err');
+  if(file.size>700*1024) return renderApp('사인 이미지는 700KB 이하 권장입니다.','err');
+
+  const reader=new FileReader();
+  reader.onload=async ()=>{
+    const dataUrl=reader.result;
+    if(typeof api.updateUserSignature!=='function') return renderApp('사인 저장 함수가 없습니다. api.js를 확인해 주세요.','err');
+
+    const {error}=await api.updateUserSignature(email,dataUrl);
+    if(error) return renderApp('사인 업로드 실패: '+error.message,'err');
+
+    await logActivity('upload_signature','user',email,{size:file.size});
+    currentTab='adminPanel';
+    await loadAll('사인 이미지가 등록되었습니다.','ok');
+  };
+  reader.readAsDataURL(file);
+}
 async function transferAdmin(targetEmail){return renderApp('관리자 권한 변경은 포탈/attendance 설정에서 처리하세요.','muted');}
 function escapeId(email){return email.replace(/[^a-zA-Z0-9]/g,'_');}
 function seedSampleData(){renderApp('샘플 초기화 버튼은 안내용입니다.','muted');}
 function getUserByEmail(email){return userRows.find(u=>u.email===email)||null;}
-function renderSignatureHtml(email,signedAt){
+function renderSignatureHtml(email,signedAt,signatureUrl=''){
   if(!signedAt) return `<div class="sign-image-wrap"></div><div class="sign-date"></div>`;
   const u=getUserByEmail(email);
-  const imgHtml = u?.signature_url ? `<div class="sign-image-wrap"><img src="${u.signature_url}" class="sign-image"></div>` : `<div class="sign-image-wrap"></div>`;
+  const finalSignature = signatureUrl || u?.signature_url || '';
+  const imgHtml = finalSignature
+    ? `<div class="sign-image-wrap"><img src="${finalSignature}" class="sign-image"></div>`
+    : `<div class="sign-image-wrap"></div>`;
   return `${imgHtml}<div class="sign-date">${escapeHtml(new Date(signedAt).toLocaleDateString('ko-KR'))}</div>`;
 }
 function getReportBaseStyle(){return `<style>@page{size:A4 portrait;margin:14mm;} body{font-family:Arial,sans-serif;color:#1d2939;margin:0;} .page{page-break-after:always;min-height:100vh;} .page:last-child{page-break-after:auto;} .header{border-bottom:3px solid #0f172a;padding-bottom:12px;margin-bottom:18px;} .title{font-size:24px;font-weight:800;margin-bottom:6px;} .sub{color:#667085;font-size:13px;} .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0;} .kpi{border:1px solid #d0d5dd;border-radius:12px;padding:12px 12px 12px 16px;background:#f8fafc;} .kpi-label{font-size:12px;color:#667085;font-weight:700;margin-bottom:8px;} .kpi-value{font-size:22px;font-weight:800;color:#101828;}.kpi-sub{font-size:11px;color:#667085;margin-top:6px;} .section{margin:18px 0;} .section-title{font-size:15px;font-weight:800;margin-bottom:10px;color:#101828;} .box{border:1px solid #d0d5dd;border-radius:12px;padding:12px;background:#fff;} .badge-red,.badge-blue,.badge-amber{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700;} .badge-red{background:#fee4e2;color:#b42318;} .badge-blue{background:#eaf2ff;color:#175cd3;} .badge-amber{background:#fff1e8;color:#c4320a;} .kpi-accent{position:relative;overflow:hidden}.kpi-accent::before{content:'';position:absolute;left:0;top:0;bottom:0;width:6px}.kpi-accent .kpi-icon{font-size:18px;line-height:1;margin-bottom:10px}.kpi-accent.water{background:#eef6ff;border-color:#cfe0ff}.kpi-accent.water::before{background:#175cd3}.kpi-accent.water .kpi-value{color:#175cd3}.kpi-accent.wastewater{background:#eefbf3;border-color:#c8ead2}.kpi-accent.wastewater::before{background:#0f9d58}.kpi-accent.wastewater .kpi-value{color:#0f9d58}.kpi-accent.waste{background:#fff7ed;border-color:#f7d6a8}.kpi-accent.waste::before{background:#b54708}.kpi-accent.waste .kpi-value{color:#b54708}.kpi-accent.over{background:#fff1f3;border-color:#f5c2cc}.kpi-accent.over::before{background:#c01048}.kpi-accent.over .kpi-value{color:#c01048}.sign-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:22px}.sign-box{border:1px solid #d0d5dd;border-radius:12px;padding:14px;min-height:120px;text-align:center;background:#fff;display:flex;flex-direction:column;justify-content:space-between}.sign-title{font-weight:800;font-size:13px;color:#101828;margin-bottom:8px}.sign-image-wrap{height:80px;display:flex;align-items:center;justify-content:center}.sign-image{max-width:180px;max-height:76px;object-fit:contain}.sign-date{font-size:12px;color:#667085;margin-top:8px} table{width:100%;border-collapse:collapse;font-size:11px;page-break-inside:auto;} th,td{border:1px solid #d0d5dd;padding:7px 8px;text-align:left;vertical-align:top;} th{background:#f2f4f7;font-weight:800;} td.num{text-align:right;} tr{page-break-inside:avoid;} tr.over-row td{background:#fff1f3;} .small{font-size:11px;} .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;} .three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
@@ -1431,7 +1506,7 @@ function getReportBaseStyle(){return `<style>@page{size:A4 portrait;margin:14mm;
 </style>`;}
 function makeBarChartSvg({title,labels,values,unit='',color='#2f6fed',height=220}){const width=760, chartLeft=52, chartRight=20, chartTop=30, chartBottom=42, chartWidth=width-chartLeft-chartRight, chartHeight=height-chartTop-chartBottom, max=Math.max(...values,1), barWidth=chartWidth/Math.max(values.length,1)*0.55, gap=chartWidth/Math.max(values.length,1); const bars=values.map((v,i)=>{const barHeight=max===0?0:(v/max)*chartHeight; const x=chartLeft+(i*gap)+(gap-barWidth)/2; const y=chartTop+(chartHeight-barHeight); const labelX=x+barWidth/2; return `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="6" fill="${color}"></rect><text x="${labelX}" y="${y-6}" text-anchor="middle" font-size="11" fill="#344054">${v}</text><text x="${labelX}" y="${height-16}" text-anchor="middle" font-size="11" fill="#667085">${labels[i]}</text>`;}).join(''); const grid=[0.25,0.5,0.75,1].map(r=>{const y=chartTop+chartHeight-(chartHeight*r); const label=Math.round(max*r*100)/100; return `<line x1="${chartLeft}" y1="${y}" x2="${width-chartRight}" y2="${y}" stroke="#e4e7ec" stroke-width="1"></line><text x="${chartLeft-8}" y="${y+4}" text-anchor="end" font-size="10" fill="#98a2b3">${label}</text>`;}).join(''); return `<div style="margin-bottom:18px;"><div style="font-size:14px;font-weight:800;margin-bottom:8px;color:#101828;">${escapeHtml(title)} ${unit?`<span style="font-size:12px;color:#667085;">(${escapeHtml(unit)})</span>`:''}</div><svg width="100%" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">${grid}<line x1="${chartLeft}" y1="${chartTop+chartHeight}" x2="${width-chartRight}" y2="${chartTop+chartHeight}" stroke="#98a2b3" stroke-width="1"></line>${bars}</svg></div>`;}
 function makeStackedBarChartSvg({title,labels,series,colors,unit='',height=260}){const width=760, chartLeft=52, chartRight=20, chartTop=30, chartBottom=42, chartWidth=width-chartLeft-chartRight, chartHeight=height-chartTop-chartBottom; const totals=labels.map((_,idx)=>series.reduce((sum,s)=>sum+safeNumber(s.values[idx]),0)); const max=Math.max(...totals,1); const barWidth=chartWidth/Math.max(labels.length,1)*0.55, gap=chartWidth/Math.max(labels.length,1); let bars=''; labels.forEach((label,i)=>{const x=chartLeft+(i*gap)+(gap-barWidth)/2; let currentTop=chartTop+chartHeight; series.forEach((s,sIdx)=>{const value=safeNumber(s.values[i]); const segHeight=max===0?0:(value/max)*chartHeight; const y=currentTop-segHeight; const textY=y+(segHeight/2)+4; if(segHeight>0){bars+=`<rect x="${x}" y="${y}" width="${barWidth}" height="${segHeight}" rx="2" fill="${colors[sIdx]}"></rect>`; if(value>0&&segHeight>=18){bars+=`<text x="${x+barWidth/2}" y="${textY}" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">${value}</text>`;} else if(value>0){bars+=`<text x="${x+barWidth/2}" y="${y-2}" text-anchor="middle" font-size="9" font-weight="700" fill="#344054">${value}</text>`;}} currentTop=y;}); bars+=`<text x="${x+barWidth/2}" y="${chartTop+chartHeight-((totals[i]/max)*chartHeight)-6}" text-anchor="middle" font-size="11" fill="#344054">${totals[i]}</text><text x="${x+barWidth/2}" y="${height-16}" text-anchor="middle" font-size="11" fill="#667085">${label}</text>`;}); const grid=[0.25,0.5,0.75,1].map(r=>{const y=chartTop+chartHeight-(chartHeight*r); const label=Math.round(max*r*100)/100; return `<line x1="${chartLeft}" y1="${y}" x2="${width-chartRight}" y2="${y}" stroke="#e4e7ec" stroke-width="1"></line><text x="${chartLeft-8}" y="${y+4}" text-anchor="end" font-size="10" fill="#98a2b3">${label}</text>`;}).join(''); const legend=series.map((s,idx)=>`<div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#475467;margin-right:14px;"><svg width="10" height="10" viewBox="0 0 10 10" style="display:block;"><rect x="0" y="0" width="10" height="10" rx="2" fill="${colors[idx]}" stroke="${colors[idx]}"></rect></svg><span>${escapeHtml(s.name)}</span></div>`).join(''); return `<div style="margin-bottom:18px;"><div style="font-size:14px;font-weight:800;margin-bottom:8px;color:#101828;">${escapeHtml(title)} ${unit?`<span style="font-size:12px;color:#667085;">(${escapeHtml(unit)})</span>`:''}</div><div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;">${legend}</div><svg width="100%" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">${grid}<line x1="${chartLeft}" y1="${chartTop+chartHeight}" x2="${width-chartRight}" y2="${chartTop+chartHeight}" stroke="#98a2b3" stroke-width="1"></line>${bars}</svg></div>`;}
-function buildMonthlyReportHtml(monthKey){const data=getMonthlyReportData(monthKey); const overDates=data.overRows.length?data.overRows.map(r=>`${r.date} (${formatNum(r.total_cm,1)}cm)`).join(', '):'없음'; const ledgerRows=data.ledgerRows.map(r=>{const rowClass=safeNumber(r.total_cm)>CM_LIMIT?'over-row':''; return `<tr class="${rowClass}"><td>${escapeHtml(r.date)}</td><td class="num">${formatNum(r.water_prev,2)}</td><td class="num">${formatNum(r.usage,2)}</td><td class="num">${formatNum(r.water_used,2)}</td><td class="num">${formatNum(r.height,1)}</td><td>${r.has_external?`${formatNum(r.external_ton||0,1)}T / ${formatNum(r.external_cm,1)}cm`:'-'}</td><td class="num">${formatNum(r.total_cm,1)}</td><td>${escapeHtml(r.guideline_text)}</td><td>${escapeHtml(r.generated_text)}</td><td>${escapeHtml(r.note||'')}</td></tr>`;}).join(''); const pickupRowsHtml=data.pickupMonthRows.map(r=>`<tr><td>${escapeHtml(r.pickup_date)}</td><td>${escapeHtml(r.pickup_type||'폐수')}</td><td>${escapeHtml(getPickupDetailText(r))}</td><td>${escapeHtml(r.certificate_no||'')}</td><td>${escapeHtml(r.contractor||'')}</td><td>${escapeHtml(r.note||'')}</td></tr>`).join(''); const approval=data.approval||{}; return `<html><head><meta charset="UTF-8"><title>월간 운영 보고서</title>${getReportBaseStyle()}</head><body><div class="page"><div class="header"><div class="title">폐수배출시설 월간 운영 보고서</div><div class="sub">${escapeHtml(formatMonthLabel(monthKey))} 기준</div></div><div class="kpi-grid"><div class="kpi kpi-accent water"><div class="kpi-icon">💧</div><div class="kpi-label">총 용수 사용량</div><div class="kpi-value">${formatNum(data.totalWaterUse,2)} m³</div></div><div class="kpi kpi-accent wastewater"><div class="kpi-icon">♻️</div><div class="kpi-label">총 폐수 위탁량</div><div class="kpi-value">${formatNum(data.totalEntrusted,2)} m³</div></div><div class="kpi kpi-accent waste"><div class="kpi-icon">🧪</div><div class="kpi-label">폐기물 수거 건수</div><div class="kpi-value">${data.wastePickupCount}건</div></div><div class="kpi kpi-accent over"><div class="kpi-icon">⚠️</div><div class="kpi-label">OVER 발생일수</div><div class="kpi-value">${data.overCount}일</div></div></div><div class="two-col"><div class="section"><div class="section-title">이상 발생 요약</div><div class="box small"><div style="margin-bottom:8px;"><span class="badge-red">OVER 날짜</span></div><div>${escapeHtml(overDates)}</div><div style="margin-top:10px;"><b>최고 수위:</b> ${formatNum(data.maxHeight,1)} cm</div><div style="margin-top:6px;"><b>외부보관 발생:</b> ${data.externalCount}일</div></div></div><div class="section"><div class="section-title">수거 요약</div><div class="box small"><div><span class="badge-blue">폐수 수거</span> ${data.wastewaterPickupCount}건 / 총 ${formatNum(data.totalEntrusted,2)}m³</div><div style="margin-top:8px;"><span class="badge-amber">폐기물 수거</span> ${data.wastePickupCount}건</div><div style="margin-top:10px;">폐알칼리 ${data.wasteCounts.alkali} / 폐산 ${data.wasteCounts.acid} / 고상 ${data.wasteCounts.organicSolid} / 폐시약병 ${data.wasteCounts.organicBottle}</div></div></div></div><div class="section"><div class="section-title">특이사항</div><div class="box small">${data.overCount>0?`당월 OVER ${data.overCount}일 발생.`:`당월 OVER 발생 없음.`} ${data.externalCount>0?`외부보관 발생 ${data.externalCount}일 확인.`:`외부보관 발생 없음.`}</div></div><div class="sign-row"><div class="sign-box"><div class="sign-title">작성자</div>${renderSignatureHtml(approval.writer_email,approval.writer_signed_at)}</div><div class="sign-box"><div class="sign-title">검토자</div>${renderSignatureHtml(approval.reviewer_email,approval.reviewer_signed_at)}</div><div class="sign-box"><div class="sign-title">작성일</div><div class="sign-image-wrap"></div><div class="sign-date">${escapeHtml(new Date().toLocaleDateString('ko-KR'))}</div></div></div></div><div class="page"><div class="header"><div class="title">상세 내역</div><div class="sub">${escapeHtml(formatMonthLabel(monthKey))}</div></div><div class="section"><div class="section-title">운영일지 내역</div><table><thead><tr><th>날짜</th><th>용수 전일</th><th>용수 금일</th><th>당일 사용량</th><th>저장고 높이</th><th>외부보관</th><th>총높이</th><th>금일지침</th><th>총 발생량</th><th>비고</th></tr></thead><tbody>${ledgerRows||`<tr><td colspan="10">데이터 없음</td></tr>`}</tbody></table></div><div class="section"><div class="section-title">수거내역</div><table><thead><tr><th>수거일</th><th>구분</th><th>세부내용</th><th>확인서번호</th><th>처리업소</th><th>비고</th></tr></thead><tbody>${pickupRowsHtml||`<tr><td colspan="6">데이터 없음</td></tr>`}</tbody></table></div></div></body></html>`;}
+function buildMonthlyReportHtml(monthKey){const data=getMonthlyReportData(monthKey); const overDates=data.overRows.length?data.overRows.map(r=>`${r.date} (${formatNum(r.total_cm,1)}cm)`).join(', '):'없음'; const ledgerRows=data.ledgerRows.map(r=>{const rowClass=safeNumber(r.total_cm)>CM_LIMIT?'over-row':''; return `<tr class="${rowClass}"><td>${escapeHtml(r.date)}</td><td class="num">${formatNum(r.water_prev,2)}</td><td class="num">${formatNum(r.usage,2)}</td><td class="num">${formatNum(r.water_used,2)}</td><td class="num">${formatNum(r.height,1)}</td><td>${r.has_external?`${formatNum(r.external_ton||0,1)}T / ${formatNum(r.external_cm,1)}cm`:'-'}</td><td class="num">${formatNum(r.total_cm,1)}</td><td>${escapeHtml(r.guideline_text)}</td><td>${escapeHtml(r.generated_text)}</td><td>${escapeHtml(r.note||'')}</td></tr>`;}).join(''); const pickupRowsHtml=data.pickupMonthRows.map(r=>`<tr><td>${escapeHtml(r.pickup_date)}</td><td>${escapeHtml(r.pickup_type||'폐수')}</td><td>${escapeHtml(getPickupDetailText(r))}</td><td>${escapeHtml(r.certificate_no||'')}</td><td>${escapeHtml(r.contractor||'')}</td><td>${escapeHtml(r.note||'')}</td></tr>`).join(''); const approval=data.approval||{}; return `<html><head><meta charset="UTF-8"><title>월간 운영 보고서</title>${getReportBaseStyle()}</head><body><div class="page"><div class="header"><div class="title">폐수배출시설 월간 운영 보고서</div><div class="sub">${escapeHtml(formatMonthLabel(monthKey))} 기준</div></div><div class="kpi-grid"><div class="kpi kpi-accent water"><div class="kpi-icon">💧</div><div class="kpi-label">총 용수 사용량</div><div class="kpi-value">${formatNum(data.totalWaterUse,2)} m³</div></div><div class="kpi kpi-accent wastewater"><div class="kpi-icon">♻️</div><div class="kpi-label">총 폐수 위탁량</div><div class="kpi-value">${formatNum(data.totalEntrusted,2)} m³</div></div><div class="kpi kpi-accent waste"><div class="kpi-icon">🧪</div><div class="kpi-label">폐기물 수거 건수</div><div class="kpi-value">${data.wastePickupCount}건</div></div><div class="kpi kpi-accent over"><div class="kpi-icon">⚠️</div><div class="kpi-label">OVER 발생일수</div><div class="kpi-value">${data.overCount}일</div></div></div><div class="two-col"><div class="section"><div class="section-title">이상 발생 요약</div><div class="box small"><div style="margin-bottom:8px;"><span class="badge-red">OVER 날짜</span></div><div>${escapeHtml(overDates)}</div><div style="margin-top:10px;"><b>최고 수위:</b> ${formatNum(data.maxHeight,1)} cm</div><div style="margin-top:6px;"><b>외부보관 발생:</b> ${data.externalCount}일</div></div></div><div class="section"><div class="section-title">수거 요약</div><div class="box small"><div><span class="badge-blue">폐수 수거</span> ${data.wastewaterPickupCount}건 / 총 ${formatNum(data.totalEntrusted,2)}m³</div><div style="margin-top:8px;"><span class="badge-amber">폐기물 수거</span> ${data.wastePickupCount}건</div><div style="margin-top:10px;">폐알칼리 ${data.wasteCounts.alkali} / 폐산 ${data.wasteCounts.acid} / 고상 ${data.wasteCounts.organicSolid} / 폐시약병 ${data.wasteCounts.organicBottle}</div></div></div></div><div class="section"><div class="section-title">특이사항</div><div class="box small">${data.overCount>0?`당월 OVER ${data.overCount}일 발생.`:`당월 OVER 발생 없음.`} ${data.externalCount>0?`외부보관 발생 ${data.externalCount}일 확인.`:`외부보관 발생 없음.`}</div></div><div class="sign-row"><div class="sign-box"><div class="sign-title">작성자</div>${renderSignatureHtml(approval.writer_email,approval.writer_signed_at,approval.writer_signature_url)}</div><div class="sign-box"><div class="sign-title">검토자</div>${renderSignatureHtml(approval.reviewer_email,approval.reviewer_signed_at,approval.reviewer_signature_url)}</div><div class="sign-box"><div class="sign-title">작성일</div><div class="sign-image-wrap"></div><div class="sign-date">${escapeHtml(new Date().toLocaleDateString('ko-KR'))}</div></div></div></div><div class="page"><div class="header"><div class="title">상세 내역</div><div class="sub">${escapeHtml(formatMonthLabel(monthKey))}</div></div><div class="section"><div class="section-title">운영일지 내역</div><table><thead><tr><th>날짜</th><th>용수 전일</th><th>용수 금일</th><th>당일 사용량</th><th>저장고 높이</th><th>외부보관</th><th>총높이</th><th>금일지침</th><th>총 발생량</th><th>비고</th></tr></thead><tbody>${ledgerRows||`<tr><td colspan="10">데이터 없음</td></tr>`}</tbody></table></div><div class="section"><div class="section-title">수거내역</div><table><thead><tr><th>수거일</th><th>구분</th><th>세부내용</th><th>확인서번호</th><th>처리업소</th><th>비고</th></tr></thead><tbody>${pickupRowsHtml||`<tr><td colspan="6">데이터 없음</td></tr>`}</tbody></table></div></div></body></html>`;}
 function buildYearlyReportHtml(year){
   const data=getYearlyReportData(year);
   const approval=getYearApprovalSummary(year);
