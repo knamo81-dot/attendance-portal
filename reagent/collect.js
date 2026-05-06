@@ -100,76 +100,76 @@ window.ReagentApp.collect = {
     return this.collectMeta[key];
   },
 
-  getDefaultVendorInfoFromGroup(group = {}) {
-    const entries = Array.isArray(group.entries) ? group.entries : [];
-    const candidates = [group, ...entries].filter(Boolean);
+  getDefaultVendorInfoForGroup(group = {}) {
+    const directVendor = String(group.default_vendor || "").trim();
+    const directReason = String(group.default_vendor_reason || "").trim();
+    if (directVendor || directReason) {
+      return { vendor: directVendor, reason: directReason };
+    }
 
-    const pick = (row, keys) => {
-      for (const key of keys) {
-        const value = String(row?.[key] || "").trim();
-        if (value) return value;
-      }
-      return "";
+    const entry = (group.entries || []).find((item) => item.default_vendor || item.default_vendor_reason) || {};
+    const entryVendor = String(entry.default_vendor || "").trim();
+    const entryReason = String(entry.default_vendor_reason || "").trim();
+    if (entryVendor || entryReason) {
+      return { vendor: entryVendor, reason: entryReason };
+    }
+
+    const request = window.ReagentApp.request;
+    const masterRows = request?.productMasterRows || [];
+    const matched = masterRows.find((product) =>
+      String(product.name || "") === String(group.name || "") &&
+      String(product.maker || "") === String(group.maker || "") &&
+      String(product.code || "") === String(group.code || "") &&
+      String(product.capacity || "") === String(group.capacity || "") &&
+      String(product.cas || "") === String(group.cas || "") &&
+      String(product.grade || "") === String(group.grade || "")
+    ) || {};
+
+    return {
+      vendor: String(matched.default_vendor || "").trim(),
+      reason: String(matched.default_vendor_reason || "").trim()
     };
+  },
 
-    for (const row of candidates) {
-      const vendor = pick(row, [
-        "default_vendor",
-        "defaultVendor",
-        "default_vendor_name",
-        "defaultVendorName",
-        "master_default_vendor"
-      ]);
+  applyDefaultVendorToMeta(group = {}, meta = this.getMeta(group.key)) {
+    const info = this.getDefaultVendorInfoForGroup(group);
+    if (!info.vendor && !info.reason) return meta;
 
-      if (vendor) {
-        return {
-          vendor,
-          reason: pick(row, [
-            "default_vendor_reason",
-            "defaultVendorReason",
-            "default_vendor_memo",
-            "defaultVendorMemo",
-            "master_default_vendor_reason"
-          ])
-        };
+    // 기본거래처가 있는 품목은 거래처1에 자동 표시합니다.
+    // 사용자가 이미 거래처1을 직접 입력한 경우에는 덮어쓰지 않습니다.
+    if (info.vendor && !String(meta.vendor1 || "").trim()) {
+      meta.vendor1 = info.vendor;
+    }
+
+    // 기본거래처 선정사유는 취합정리 비고로 자동 사용합니다.
+    if (info.reason) {
+      const currentRemark = String(meta.prepareRemark || "").trim();
+      if (!currentRemark || currentRemark === "최저가 구매") {
+        meta.prepareRemark = info.reason;
       }
     }
 
-    return { vendor: "", reason: "" };
+    return meta;
   },
 
-  normalizeDefaultVendorReason(reason) {
-    const value = String(reason || "").trim();
-    const allowed = ["최저가 구매", "제조원 구매", "취급처 구매", "대리점 구매", "온라인 구매"];
-    return allowed.includes(value) ? value : "";
-  },
+  hydrateDefaultVendorInfoOnce() {
+    const request = window.ReagentApp.request;
+    if (!request?.loadProductMaster || this._defaultVendorHydrating) return;
 
-  applyDefaultVendorToMeta(group = {}, meta = null) {
-    const targetMeta = meta || this.getMeta(group.key);
-    const info = this.getDefaultVendorInfoFromGroup(group);
-    const defaultVendor = String(info.vendor || "").trim();
-    const defaultReason = this.normalizeDefaultVendorReason(info.reason);
+    const hasMaster = Array.isArray(request.productMasterRows) && request.productMasterRows.length > 0;
+    if (hasMaster) return;
 
-    if (!defaultVendor) return false;
-
-    let changed = false;
-
-    // 기본거래처가 등록된 품목은 제품취합의 거래처1에 자동 표시합니다.
-    // 단가/가격은 제품취합 단계에서 직접 입력합니다.
-    if (!targetMeta.confirmed && !String(targetMeta.vendor1 || "").trim()) {
-      targetMeta.vendor1 = defaultVendor;
-      changed = true;
-    }
-
-    // 취합정리 비고에는 제품마스터의 선정사유를 우선 반영합니다.
-    // 사용자가 이미 다른 사유로 바꾼 경우는 덮어쓰지 않습니다.
-    if (defaultReason && (!String(targetMeta.prepareRemark || "").trim() || targetMeta.prepareRemark === "최저가 구매")) {
-      targetMeta.prepareRemark = defaultReason;
-      changed = true;
-    }
-
-    if (changed) this._defaultVendorApplied = true;
-    return changed;
+    this._defaultVendorHydrating = true;
+    request.loadProductMaster(true)
+      .then(() => {
+        this._defaultVendorHydrating = false;
+        this.renderCollect?.();
+        this.renderPrepare?.();
+      })
+      .catch((error) => {
+        this._defaultVendorHydrating = false;
+        console.warn("기본거래처 정보 조회 실패:", error);
+      });
   },
 
   async addSelectedToCollect() {
@@ -184,8 +184,7 @@ window.ReagentApp.collect = {
     try {
       for (const group of selected) {
         request.collectedMeta[group.key] = group.totalQty;
-        const meta = this.getMeta(group.key);
-        this.applyDefaultVendorToMeta(group, meta);
+        const meta = this.applyDefaultVendorToMeta(group, this.getMeta(group.key));
         await this.upsertCollectItem(group.key, group.totalQty, { confirmed: false });
       }
     } catch (error) {
@@ -696,8 +695,7 @@ window.ReagentApp.collect = {
 
     return groups
       .map((group) => {
-        const meta = this.getMeta(group.key);
-        this.applyDefaultVendorToMeta(group, meta);
+        const meta = this.applyDefaultVendorToMeta(group, this.getMeta(group.key));
         if (!meta.confirmed) return null;
 
         const selectedVendor = meta.selectedVendor || this.autoSelectVendor(meta);
@@ -726,9 +724,10 @@ window.ReagentApp.collect = {
           ? this.getEffectiveAmount(meta, 2, qty)
           : this.getEffectiveAmount(meta, 1, qty);
         const remarkOptions = ["최저가 구매", "제조원 구매", "취급처 구매", "대리점 구매", "온라인 구매"];
+        const defaultInfo = this.getDefaultVendorInfoForGroup(group);
         const remark = remarkOptions.includes(meta.prepareRemark)
           ? meta.prepareRemark
-          : "최저가 구매";
+          : (remarkOptions.includes(defaultInfo.reason) ? defaultInfo.reason : "최저가 구매");
 
         return {
           key: group.key,
@@ -1399,6 +1398,7 @@ if (els.count) els.count.textContent = String(rows.length);
 
     const { els, escapeHtml } = window.ReagentApp;
     const request = window.ReagentApp.request;
+    this.hydrateDefaultVendorInfoOnce();
 
     let groups = request.groupItems(request.getRowsForCurrentOrderMonth ? request.getRowsForCurrentOrderMonth() : request.requestRows)
       .filter((g) => Number(request.collectedMeta[g.key] || 0) > 0);
@@ -1450,11 +1450,8 @@ if (els.count) els.count.textContent = String(rows.length);
       return;
     }
 
-    this._defaultVendorApplied = false;
-
     els.collectList.innerHTML = groups.map((group) => {
-      const meta = this.getMeta(group.key);
-      this.applyDefaultVendorToMeta(group, meta);
+      const meta = this.applyDefaultVendorToMeta(group, this.getMeta(group.key));
       const qty = Number(group.collectedQty || 0);
       const unit1 = this.normalizeNumber(meta.unit1);
       const unit2 = this.normalizeNumber(meta.unit2);
@@ -1589,12 +1586,8 @@ if (els.count) els.count.textContent = String(rows.length);
       `;
     }).join("");
 
+    this.saveCollectMeta();
     this.bindCollectEvents();
-
-    if (this._defaultVendorApplied) {
-      this.saveCollectMeta();
-      this._defaultVendorApplied = false;
-    }
 
     if (els.collectCount) els.collectCount.textContent = String(groups.length);
     if (els.collectQty) els.collectQty.textContent = String(groups.reduce((sum, g) => sum + Number(g.collectedQty || g.totalQty || 0), 0));
