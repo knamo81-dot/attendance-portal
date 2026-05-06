@@ -228,24 +228,42 @@ window.ReagentApp.productManagement = {
     }
 
     [els.productKeyword, els.productCategory, els.productActive].forEach((el) => {
-      el?.addEventListener("input", () => this.renderProducts());
-      el?.addEventListener("change", () => this.renderProducts());
+      if (!el || el.dataset.pmFilterBound) return;
+      el.dataset.pmFilterBound = "1";
+      el.addEventListener("input", () => this.renderProducts());
+      el.addEventListener("change", () => this.renderProducts());
     });
 
-    els.saveProduct?.addEventListener("click", () => this.saveProduct());
-    els.resetProduct?.addEventListener("click", () => this.resetProductForm());
-    els.deactivateProduct?.addEventListener("click", () => this.deactivateCurrentProduct());
+    if (els.saveProduct && !els.saveProduct.dataset.bound) {
+      els.saveProduct.dataset.bound = "1";
+      els.saveProduct.addEventListener("click", () => this.saveProduct());
+    }
+
+    if (els.resetProduct && !els.resetProduct.dataset.bound) {
+      els.resetProduct.dataset.bound = "1";
+      els.resetProduct.addEventListener("click", () => this.resetProductForm());
+    }
+
+    if (els.deactivateProduct && !els.deactivateProduct.dataset.bound) {
+      els.deactivateProduct.dataset.bound = "1";
+      els.deactivateProduct.addEventListener("click", () => this.deactivateCurrentProduct());
+    }
 
     [
       els.requestKeyword,
       document.getElementById("pmRequestStatusFilter"),
       document.getElementById("pmRequestPeriodFilter")
     ].forEach((el) => {
-      el?.addEventListener("input", () => this.renderRequests());
-      el?.addEventListener("change", () => this.renderRequests());
+      if (!el || el.dataset.pmRequestFilterBound) return;
+      el.dataset.pmRequestFilterBound = "1";
+      el.addEventListener("input", () => this.renderRequests());
+      el.addEventListener("change", () => this.renderRequests());
     });
 
-    els.refreshRequests?.addEventListener("click", () => this.loadRequests());
+    if (els.refreshRequests && !els.refreshRequests.dataset.bound) {
+      els.refreshRequests.dataset.bound = "1";
+      els.refreshRequests.addEventListener("click", () => this.loadRequests());
+    }
   },
 
 
@@ -926,21 +944,27 @@ window.ReagentApp.productManagement = {
   },
 
   async saveProduct() {
+    if (this._savingProduct) return;
+
     if (!this.sb) {
       this.toast("Supabase 연결 정보가 없습니다.", "warn");
       return;
     }
+
+    this._savingProduct = true;
 
     const row = this.getProductFormRow();
     const user = this.getCurrentUser();
 
     if (!row.name) {
       this.toast("품명은 필수입니다.", "warn");
+      this._savingProduct = false;
       return;
     }
 
     if (row.default_vendor && !row.default_vendor_reason) {
       this.toast("기본거래처 선정사유를 선택하세요.", "warn");
+      this._savingProduct = false;
       return;
     }
 
@@ -949,7 +973,10 @@ window.ReagentApp.productManagement = {
       prefix: this.editingProductId ? "제품 수정 중 중복 가능성이 있습니다." : "제품 등록 중 중복 가능성이 있습니다."
     });
 
-    if (!canSaveProduct) return;
+    if (!canSaveProduct) {
+      this._savingProduct = false;
+      return;
+    }
 
     try {
       let error;
@@ -975,6 +1002,8 @@ window.ReagentApp.productManagement = {
     } catch (error) {
       console.error("제품 저장 실패:", error);
       this.toast(`제품 저장 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+    } finally {
+      this._savingProduct = false;
     }
   },
 
