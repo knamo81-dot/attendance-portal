@@ -1,7 +1,7 @@
 const DEFAULT_REFERENCE_DOCS={"facilities": {"title": "시설운영정보", "source": "1. 폐기물-폐수배출시설 운영일지(기본설명)(upd.26.02).xlsx", "lines": ["폐수배출시설 운영일지", "UPDATE: 2026-02-04", "① 용수 → 폐수 / 말통 흐름 요약 (내부용 도식 설명문 )", "[용수 사용 → 배출 경로 구분 설명]", "연구소에서 사용된 용수는 성상에 따라 두 가지 경로로 구분하여 관리된다.", "① 일반 세척수 및 비위험성 액상 폐수는 실험실 배관을 통해 폐수저장고로 유입되며, 폐수배출시설 운영일지 기준으로 계량·관리된다.", "폐수저장고의 총 저장 용량은 7톤이며, 계기판의 전체 높이는 154cm이다.", "", "계기판은 기본적으로 1톤 단위로 눈금 표시가 되어 있으나, 일일 점검 시 보다 정확한 현재 저장량 확인을 위해 실측 높이 기반 환산 방식을 병행하여 사용한다.", "즉, 계기판에서 확인한 현재 폐수 수위(cm)에 총 용량 7톤을 곱한 후, 계기판 총 높이 154cm로 나누는 방식을 통해 현재 저장된 폐수량(톤)을 산출할 수 있다.", "(현재 폐수량 = 측정 높이 × 7톤 ÷ 154cm)", "② 산·유기계 등 반응성 또는 위험성이 있는 액상 폐수는 폐수저장고로 유입하지 않고, 실험실 내 20L 말통에 별도로 수거하여 지정폐기물로 분류한다.", "해당 폐수는 폐기물 위탁처리 업체를 통해 외부 반출·처리되며, 모든 반출 이력은 폐기물 인계서를 통해 관리된다.", "③ 이로 인해 용수 사용량은 실험실 전체 사용량을 반영하는 반면, 폐수 발생량은 폐수저장고 유입 기준으로 계량되므로 두 수치는 구조적으로 1:1로 일치하지 않는다.", "※ 연구소에서는 폐수를 ‘폐수저장고 유입 폐수’와 ‘말통 수거 지정폐기물’로 구분 관리하고 있어, 용수사용량 대비 폐수저장고 기준 폐수량이 적게 나타나는 것은 정상이며 각 항목은 운영일지와 폐기물 인계서로", "분리 관리하고 있다. 각 항목은 운영일지와 폐기물 인계서로 분리 관리하고 있다.", "용수사용량 (세척실위치) 폐수사용량 (말통보관-폐기물처리)", "구분 : 용수계량기\n위치 : 세척실\n확인 : 매일 구분 : 산/유기용제\n위치 : 실험실 배치 및 폐기물실 보관\n확인 : 실험실 매일 확인 및 폐기물실의 경우 수거시 배출량 확인", "폐수사용량 (저장고보관-폐수처리)", "구분 : 폐수저장고(3.5T 2개)\n위치 : 폐수실\n확인 : 매일", "② 왜 연구소는 폐수가 적게 발생하는가", "1. 적용 범위", "제약회사 연구소", "연구용 소규모 제형 개발 및 평가 공정", "2. 용수 사용 대비 폐수 회수율 개념", "용수사용량: 실험, 세척, 인원 사용, 공정 보조수 포함", "폐수발생량: 폐수저장고로 유입되어 액상 상태로 회수·계량된 수량", "👉 산·유기계 일부 폐수는 실험실 내 20L 말통에 수거 후 외부 위탁 처리", "👉 두 수치는 구조적으로 동일할 수 없음", "3. 폐수 회수율이 낮아지는 주요 원인", "① 공정 특성", "가열·교반 공정 → 수분 증발", "소량 다회 실험 → 세척수 분산", "② 제형 특성", "겔·현탁·유화 제형 → 고형/반고형 폐기", "여과·흡착 공정 → 액상 회수 불가", "③ 세척 및 건조", "IPA/EtOH 세척 후 공기 건조", "와이퍼·거즈·여과지 흡착", "④ 폐수 관리 방식", "산·유기계 폐수 → 실험실 내 말통 수거", "폐수저장고 미유입 → 위탁 폐기물로 처리", "4. 일반적인 연구소 폐수 회수율 (참고 범위)", "항목 비율", "용수 대비 폐수 (저장고 기준) :    약 40~70%", "증발·흡착·고형·별도 위탁 처리 :    약 30~60%", "※ 연구실 운영 형태에 따라 변동 가능", "③ 왜 연구소는 폐업업체 폐수 수거량 대비 사업장 폐수 감소량이 적은가", "1. 계측 기준 차이", "사업장: 폐수저장고 수위 기준 부피 환산", "폐수업체: 수거 폐수 차량 계근(무게)", "2. 폐수 성상 차이", "용존, 부유 고형물 포함 -> 물 대비 비중 증가", "부피 기준 환산량 < 계근 기준 수거량", "3. 회수 방식 차이", "폐수는 저장고 하부 흡입  방식으로 회수", "하부 슬러지 포함 수거", "④ 관리 원칙", "실제 계량값 기준 기록", "산·유기계 폐수는 위탁 처리 내역으로 관리", "수치 보정 금지", "운영일지 비고란에 사유 명시", "월별 추세 관리 중심", "⑤ 최종정리", "※ 연구소에서는 공정 특성에 따른 증발·흡착 손실과 더불어 산·유기계 일부 폐수를 말통 수거 후 위탁 처리하고 있어, 용수사용량 대비 폐수저장고 기준 폐수 발생량이 약 2배 차이 나는 것은 자연스러운 현상이며", "실제 계량값을 기준으로 일관되게 기록·설명하는 것이 가장 안전한 관리 방법이다."]}, "qa": {"title": "환경점검 대응 Q&A", "source": "2. 폐기물-폐수배출시설 환경점검 대응(upd.26.02)Q&A.xlsx", "lines": ["폐기물-폐수배출시설 환경점검 대응 Q&A (실무용)", "UPDATE: 2026-02-04", "Q1. 왜 용수사용량 대비 폐수 발생량이 적습니까?", "A. 연구소는 가열·교반 공정, 반고형 제형 취급, 용기 세척 및 공기 건조 과정이 많아 증발 손실과 고형물 흡착 손실이 발생합니다.", "또한 산·유기계 등 일부 폐수는 배관을 통한 폐수저장고로 이동하지 않고 실험실에서 20L 말통에 별도 수거 후 폐기물 업체를 통해 위탁 처리하고 있어, 폐수저장고 기준의 계량량은 용수사용량 대비 낮게 나타납니다.", "Q2. 왜 폐수업체 폐수 수거량 대비 사업장 폐수 감소량이 적습니까?", "A. 사업장에서는 폐수 저장조 수위를 기준으로 부피 환산 방식으로 폐수량을 관리하고 있으며, 폐수 수거업체는 실제 수고 폐수를 차량 계근을 통해 무게 기준으로 산정하고 있습니다.", "이로 인해 폐수의 비중, 슬러지 포함 여부, 계측 기준 차이 등에 따라 내부 관리상 폐수 감소량과 수거업체 수거량 간 수치 차이가 발생할 수 있습니다.", "Q3. 왜 폐수로 안 보내고 말통에 받습니까?", "A. 산·유기계 폐수는 배관 유입 시 부식, 반응성, 혼합 위험이 있어 관련 기준에 따라 실험실 내에서 별도 용기에 수거하고 지정폐기물로 위탁 처리하고 있습니다.", "Q4. 그럼 폐수량이 실제보다 적게 기록되는 것 아닙니까?", "A. 폐수배출시설 운영일지는 폐수저장고로 유입된 액상 폐수 기준으로 작성하고 있으며, 말통 수거 폐수는 폐기물 인계서로 별도 관리하고 있어 이중 누락은 없습니다.", "Q5. 말통 폐수 양은 어떻게 확인합니까?", "A. 말통 폐수는 발생 시 수거 기록 및 폐기물 인계서를 통해 반출 이력이 관리되고 있으며, 운영일지에는 폐수저장고 유입량만 기재하고 있습니다.", "Q6. 두 자료가 서로 안 맞아도 괜찮습니까?", "A. 관리 대상과 계량 기준이 다르기 때문에 수치 일치는 필요하지 않으며, 각각의 관리 문서가 역할에 맞게 유지되고 있습니다.", "Q7. 싱크에 버린 물은 전부 폐수통으로 가지 않습니까?", "A. 일반 세척수 등은 배관을 통해 폐수저장고로 이동하나, 산·유기계 폐수 등은 관련 규정에 따라 실험실 내에서 별도 용기에 수거하여 위탁 처리하고 있습니다.", "또한 배관 체류 중 증발, 트랩 잔류, 여과지·와이퍼 흡착 등으로 폐수통에 계량되지 않는 수량이 일부 발생합니다.", "Q8. 용수 대비 폐수 비율이 약 50% 수준인데 문제 없습니까?", "A. 연구소의 경우 일반적으로 용수 대비 폐수 회수율은 약 40~70% 범위로 관리됩니다.", "여기에 더해 일부 산·유기계 폐수는 말통 수거 후 외부 위탁 처리되므로, 폐수저장고 기준 폐수량만을 비교할 경우 해당 비율은 충분히 합리적인 범위입니다.", "Q9. 수치를 보정해서 맞춰야 하지 않습니까?", "A. 아닙니다. 운영일지는 실제 계량값 기준으로 작성하는 것이 원칙이며, 산·유기계 폐수의 별도 위탁 처리 역시 실제 관리 방식에 따라 기록하고 있습니다. 임의 보정은 허위 기재로 오해될 수 있어 지양하고 있습니다.", "Q10. 폐수 발생량이 월별로 완전히 일정하지 않은 이유는?", "A. 월별 실험 종류, 제형 유형, 가열 공정 유무뿐 아니라 산·유기계 폐수 발생 빈도 및 위탁 처리량 차이에 따라 폐수저장고로 유입되는 수량이 달라질 수 있습니다."]}, "waterMismatch": {"title": "용수/폐수량 비일치의 건", "source": "3. EPA Guide 및 환경부(산업계) 인용 정리.xlsx", "lines": ["① EPA Guide 인용 논리적 근거 문단", "UPDATE: 2026-01-28", "(실험실 용수사용량 ≠ 폐수발생량 설명용)", "실험실 환경에서는 용수 사용량 전체가 폐수로 회수되지 않는 것이 구조적인 특성이다.\n미국 환경보호청(EPA)이 발간한 Water Efficiency in Laboratories 가이드에서는 연구시설의 물 사용을 평가할 때 facility water balance(물 수지) 개념을 적용하도록 권고하고 있으\n며, 구매된 용수량과 실제 사용·배출량이 반드시 일치하지 않을 수 있음을 전제로 하고 있다.\n해당 가이드는 실험실 내 물이 실험 공정, 장비 세척, 냉각, 증발 및 공정 잔류 등 다양한 경로로 사용·소모되기 때문에, 입력된 용수 전량이 폐수로 배출되지 않는 상황이 일반적임을 설명한다.\n따라서 실험실, 특히 가열·교반·세척 공정이 빈번한 제약회사 제제연구실에서는 용수사용량 대비 실제 액상 폐수 발생량이 낮게 나타나는 현상이 구조적으로 발생할 수 있다.", "② 환경부(산업계) 산업폐수 통계 활용 예시 문단", "(산업계 비교·보조 근거용)", "산업계 전반의 통계 자료에서도 용수 사용량과 폐수 발생량이 1:1로 일치하지 않는 사례가 확인된다.\n환경부 산하 한국환경정책·평가연구원(KEI) 및 관련 기관의 산업 자원효율성 분석 자료에 따르면, 업종별 공업용수 사용량 대비 폐수 방류량(폐수배출율)은 산업 특성에 따라 상이하게 나타나며, 특히 화학물질 및 화학제품 제조업에서는 공업용수 사용량 대비 폐수배출율이 상대적으로 낮은 것으로 분석된다.\n이는 공정 중 용수가 제품에 함유되거나 증발·손실되는 비율이 존재하기 때문으로 설명되고 있으며, 이러한 산업 통계는 실험실 및 연구개발 환경에서도 용수 사용량 대비 폐수 발생량 차이가 구조적으로 발생할 수 있음을 뒷받침하는 참고 자료로 활용될 수 있다."]}, "wastewaterMismatch": {"title": "폐수 배출량 비일치의 건", "source": "4. 폐수 배출량 비일치 인용의 건.xlsx", "lines": ["① 폐수의 비중과 용존고형물(TDS) 관계에 대한 설명 정리문", "UPDATE: 2026-02-04", "폐수는 용존고형물(TDS) 증가에 따라 비중이 변할 수 있으며, 비중–용존고형물 간 상관관계에 대한 경험식이 보고되어 있음", "폐수는 순수한 물이 아니라 다양한 용존고형물(TDS) 및 무기·유기 성분을 포함하고 있어, 해당 성분의 농도 증가에 따라 폐수의 비중(specific gravity) 이 변화할 수 있다.\n일반적으로 용존고형물 농도가 증가할수록 단위 부피당 질량이 증가하므로, 동일한 부피의 폐수라 하더라도 순수 물(비중 1.0) 대비 실제 무게는 더 크게 나타날 수 있다.\n이와 같은 폐수의 비중 변화는 실험실 폐수뿐 아니라 산업폐수 전반에서 관찰되는 현상으로, 용존고형물 농도(TDS)와 비중 간의 관계에 대해서는 경험식(empirical relationship)을 통해 상관관계가 보고된 바 있다.\n따라서 폐수를 부피 기준으로 환산하여 관리하는 경우, 실제 수거·계근 시 측정되는 무게 기준 폐수량과는 폐수 성상(TDS 농도)에 따라 일정 수준의 차이가 발생할 수 있다.\n※ 폐수는 용존고형물(TDS) 함유로 인해 비중이 순수 물과 달라질 수 있으며, TDS 농도 증가에 따른 비중 변화는 경험적 상관관계로 보고되어 있다.", "② Standard Methods 2540(SOLIDS) 내용을 바탕으로 한 정리문", "폐수의 총고형물·부유고형물·용존고형물 개념 및 표준시험법 근거 정리", "폐수는 순수한 물이 아니라 다양한 고형 성분을 포함한 혼합물로, 그 성상은 총고형물(Total Solids, TS), 부유고형물(Total Suspended Solids, TSS), 용존고형물(Total Dissolved Solids, TDS) 개념으로 구분하여 관리된다.\n이러한 고형물 개념은 Standard Methods for the Examination of Water and Wastewater의 Method 2540 (SOLIDS)에서 공식적으로 정의되어 있으며, 각 항목은 표준화된 시험 절차에 따라 측정하도록 규정되어 있다.\n표준시험법에 따르면,\n*총고형물(TS)은 시료를 증발·건조한 후 남는 모든 잔류물의 질량으로 정의되며,\n*부유고형물(TSS)은 여과지에 포집되는 고형물,\n*용존고형물(TDS)은 여과지를 통과한 후 잔류하는 용존 성분으로 구분된다.\n즉, 폐수는 단순한 액체 부피가 아닌, 고형물 함량과 조성에 따라 성상이 달라지는 물질로 정의·관리되며, 이러한 고형물 개념은 폐수의 처리, 규제 기준 설정 및 계측 결과 해석의\n기본 전제로 활용되고 있다.\n※ 폐수는 ‘물’이 아니라, 표준시험법에서 정의한 고형물(TS/TSS/TDS) 개념으로 관리되는 대상이다.", "③ EPA NPDES Compliance Inspection Manual의 실제 취지에 맞춘 정리문", "EPA NPDES 점검 지침의 유량·계측 정확도 관련 근거 정리", "미국 환경보호청(EPA)의 NPDES Compliance Inspection Manual은 폐수 배출시설 점검 시 유량 및 계측 데이터의 정확성을 규제 준수 여부 판단의 핵심 요소로 보고 있다.\n해당 지침에서는 점검관이 단순히 기록된 수치만을 확인하는 것이 아니라, 유량·계측 시스템이 적절하게 설치·운영·유지관리되고 있는지, 측정 방법이 시설 여건에 타당하게 적용되고 있는지, 그리고 보정(calibration) 및 기록 관리가 적정하게 이루어지고 있는지를 함께 평가하도록 하고 있다.\n특히 수위(헤드) 기반 환산 방식이나 유량계 측정 방식은 설치 조건, 관리 상태, 보정 주기 등에 따라 측정값의 정확도에 영향을 받을 수 있음을 전제로 하며, 이에 따라 점검 시 계측 방식의 적정성과 데이터 신뢰성이 중요한 확인 항목으로 다루어진다.\n따라서 폐수량을 수위 또는 유량 기반으로 계측·관리하는 경우, 계측 방식과 관리 조건에 따라 일정 수준의 오차 가능성이 존재함을 점검 대응 시 합리적으로 설명할 수 있다.\n※ EPA는 ‘계측값’보다 ‘계측이 제대로 이루어졌는지’를 본다."]}};
 const api = window.WastewaterApi;
 
-let user=null,currentRole='user',currentRoles=[],currentTab='daily',ledgerMonthFilter='',pickupYearFilter='',pickupTypeFilter='전체',yearlyReportFilter='',refTab='facilities',refSearch='';
+let user=null,currentRole='user',currentRoles=[],currentTab='daily',ledgerMonthFilter='',pickupYearFilter='',pickupTypeFilter='전체',yearlyReportFilter='',refTab='facilities',refSearch='',relatedDocCategoryFilter='삼천당계약 사업자등록증';
 let approvalAlertDismissed=false;
 let dailyRows=[],pickupRows=[],userRows=[],logRows=[],approvalRows=[],referenceDocs=[];
 let wastewaterAdminState={admins:[],operators:[],approvers:[],searchResults:[]};
@@ -1065,113 +1065,210 @@ function renderManagerRows(rows=[],type='operator'){
   }).join('');
 }
 
+
+const RELATED_DOC_CATEGORIES=[
+  '삼천당계약 사업자등록증',
+  '폐수배출시설 설치 신고증명서',
+  '폐기물 처리계획(변경)서',
+  '환경기술인 관련 서류',
+  '폐기물 허가증',
+  '폐기물업체 계약서'
+];
+
 function canManageRelatedDocs(){
-  return canOperatorEdit() || canAdmin();
+  return canWrite() || canAdmin();
 }
 
-function renderRelatedDocsPanel(){
-  const docs = [...referenceDocs].sort((a,b)=>{
-    return new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
-  });
+function getRelatedDocs(){
+  return (referenceDocs||[])
+    .filter(doc => String(doc.doc_key||'').startsWith('related_'))
+    .sort((a,b)=>new Date(b.updated_at||b.created_at||0)-new Date(a.updated_at||a.created_at||0));
+}
 
-  const writeForm = canManageRelatedDocs() ? `
-    <div class="related-doc-form">
-      <div class="section-title">📁 관련서류 등록</div>
-      <div class="field">
-        <label>서류명</label>
-        <input id="relatedDocTitle" class="input" placeholder="예: 폐수배출시설 허가증">
-      </div>
-      <div class="field">
-        <label>구분</label>
-        <input id="relatedDocCategory" class="input" placeholder="예: 허가증 / 계약서 / 사업자등록증">
-      </div>
-      <div class="field">
-        <label>설명</label>
-        <textarea id="relatedDocDesc" class="textarea" placeholder="관련 설명 입력"></textarea>
-      </div>
-      <div class="field">
-        <label>파일 링크 또는 파일명</label>
-        <input id="relatedDocFile" class="input" placeholder="예: 허가증_2026.pdf">
-      </div>
-      <button class="btn primary" onclick="saveRelatedDoc()">관련서류 저장</button>
-    </div>
-  ` : '';
+function getRelatedDocsByCategory(category){
+  return getRelatedDocs().filter(doc => (doc.category || RELATED_DOC_CATEGORIES[0]) === category);
+}
 
-  const rows = docs.length ? docs.map(doc=>{
-    const title = doc.title || doc.doc_key || '관련서류';
-    const category = doc.category || '기타';
-    const desc = doc.content || doc.description || '';
-    const fileName = doc.file_name || '';
-    const created = new Date(doc.updated_at || doc.created_at || Date.now()).toLocaleDateString('ko-KR');
+function renderRelatedDocCategoryTabs(){
+  return `<div class="related-doc-board-tabs">
+    ${RELATED_DOC_CATEGORIES.map(cat=>{
+      const count=getRelatedDocsByCategory(cat).length;
+      return `<button class="ref-btn ${relatedDocCategoryFilter===cat?'active':''}" onclick="changeRelatedDocCategory('${escapeHtml(cat)}')">
+        ${escapeHtml(cat)} <span class="related-doc-count">${count}</span>
+      </button>`;
+    }).join('')}
+  </div>`;
+}
 
-    return `
-      <div class="related-doc-item">
-        <div class="related-doc-head">
-          <div>
-            <div class="related-doc-title">${escapeHtml(title)}</div>
-            <div class="related-doc-meta">${escapeHtml(category)} · ${escapeHtml(created)}</div>
-          </div>
-          ${canManageRelatedDocs() ? `<button class="small-btn danger" onclick="deleteRelatedDoc('${doc.id}')">삭제</button>` : ''}
-        </div>
-
-        <div class="related-doc-desc">${escapeHtml(desc)}</div>
-
-        <div class="related-doc-actions">
-          ${fileName ? `<span class="inline-badge wastewater">${escapeHtml(fileName)}</span>` : ''}
-        </div>
-      </div>
-    `;
-  }).join('') : `<div class="msg muted">등록된 관련서류가 없습니다.</div>`;
+function renderRelatedDocEditor(){
+  if(!canManageRelatedDocs()) return '';
 
   return `
-    <div class="card ref-card">
-      <div class="section-title">📚 관련서류</div>
-      <div class="msg muted" style="margin-bottom:18px;">
-        허가증, 사업자등록증, 계약서 등 운영 관련 서류를 보관합니다.
+    <div class="related-doc-form">
+      <div class="section-title">✍️ ${escapeHtml(relatedDocCategoryFilter)} 글 작성</div>
+      <div class="field">
+        <label>제목</label>
+        <input id="relatedDocTitle" class="input" placeholder="예: 2026년 폐수배출시설 설치 신고증명서">
       </div>
-      ${writeForm}
-      <div class="related-doc-list">
-        ${rows}
+      <div class="field">
+        <label>게시판 구분</label>
+        <select id="relatedDocCategory" class="select">
+          ${RELATED_DOC_CATEGORIES.map(cat=>`<option value="${escapeHtml(cat)}" ${cat===relatedDocCategoryFilter?'selected':''}>${escapeHtml(cat)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>내용</label>
+        <div class="rich-toolbar">
+          <div class="rich-toolbar-group">
+            <button type="button" class="btn soft icon" onclick="relatedDocCommand('bold')"><b>B</b></button>
+            <button type="button" class="btn soft" onclick="relatedDocCommand('insertUnorderedList')">목록</button>
+            <button type="button" class="btn soft" onclick="insertRelatedDocImage()">이미지</button>
+            <input id="relatedDocImageInput" type="file" accept="image/*" style="display:none" onchange="handleRelatedDocImage(this.files[0]); this.value='';">
+          </div>
+        </div>
+        <div id="relatedDocBody" class="rich-editor related-doc-editor" contenteditable="true" data-placeholder="서류 변경 이력, 보관 위치, 주요 내용 등을 입력하세요. 이미지도 삽입할 수 있습니다."></div>
+      </div>
+      <div class="field">
+        <label>파일명/보관 위치/링크</label>
+        <input id="relatedDocFile" class="input" placeholder="예: 공용폴더 > 환경서류 > 허가증_2026.pdf">
+      </div>
+      <div class="toolbar-row" style="margin-bottom:0;">
+        <div class="msg muted">이미지는 본문 안에 저장됩니다. 너무 큰 이미지는 700KB 이하로 줄여서 올리는 것을 권장합니다.</div>
+        <button class="btn primary" onclick="saveRelatedDoc()">게시글 저장</button>
       </div>
     </div>
   `;
 }
 
+function renderRelatedDocCard(doc){
+  const title=doc.title || '제목 없음';
+  const category=doc.category || RELATED_DOC_CATEGORIES[0];
+  const body=doc.content || doc.body || '';
+  const fileName=doc.file_name || doc.source || '';
+  const updated=new Date(doc.updated_at || doc.created_at || Date.now()).toLocaleString('ko-KR');
+  const writer=doc.updated_by || doc.created_by || '';
+
+  return `
+    <div class="related-doc-item">
+      <div class="related-doc-head">
+        <div>
+          <div class="related-doc-title">${escapeHtml(title)}</div>
+          <div class="related-doc-meta">${escapeHtml(category)} · ${escapeHtml(updated)}${writer?` · ${escapeHtml(writer)}`:''}</div>
+        </div>
+        ${canManageRelatedDocs()?`<button class="small-btn danger" onclick="deleteRelatedDoc('${doc.id}')">삭제</button>`:''}
+      </div>
+      ${fileName?`<div class="related-doc-file">📎 ${escapeHtml(fileName)}</div>`:''}
+      <div class="related-doc-body">${body || '<span class="msg muted">본문 없음</span>'}</div>
+    </div>
+  `;
+}
+
+function renderRelatedDocsPanel(){
+  if(!RELATED_DOC_CATEGORIES.includes(relatedDocCategoryFilter)) relatedDocCategoryFilter=RELATED_DOC_CATEGORIES[0];
+
+  const rows=getRelatedDocsByCategory(relatedDocCategoryFilter);
+
+  return `
+    <div class="card ref-card">
+      <div class="related-doc-toolbar">
+        <div>
+          <div class="section-title">📚 관련서류</div>
+          <div class="msg muted">허가증, 사업자등록증, 계약서 등 서류를 게시판별로 누적 관리합니다. 전체 사용자는 조회할 수 있고, 운영자/관리자만 작성·삭제할 수 있습니다.</div>
+        </div>
+      </div>
+
+      <div class="related-doc-layout">
+        <div class="related-doc-sidebar">
+          ${renderRelatedDocCategoryTabs()}
+        </div>
+        <div class="related-doc-content">
+          ${renderRelatedDocEditor()}
+          <div class="related-doc-list">
+            ${rows.length?rows.map(renderRelatedDocCard).join(''):`<div class="msg muted">이 게시판에 등록된 글이 없습니다.</div>`}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function changeRelatedDocCategory(category){
+  relatedDocCategoryFilter=category;
+  renderApp();
+}
+
+function relatedDocCommand(command){
+  const editor=document.getElementById('relatedDocBody');
+  if(!editor) return;
+  editor.focus();
+  document.execCommand('styleWithCSS', false, true);
+  document.execCommand(command, false, null);
+}
+
+function insertRelatedDocImage(){
+  const input=document.getElementById('relatedDocImageInput');
+  if(input) input.click();
+}
+
+function handleRelatedDocImage(file){
+  if(!file) return;
+  if(file.size>1200*1024){
+    renderApp('이미지는 1.2MB 이하로 줄여서 등록해 주세요.','err');
+    return;
+  }
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const editor=document.getElementById('relatedDocBody');
+    if(!editor) return;
+    editor.focus();
+    const img=`<p><img src="${reader.result}" class="related-doc-inline-image"></p>`;
+    document.execCommand('insertHTML', false, img);
+  };
+  reader.readAsDataURL(file);
+}
+
 async function saveRelatedDoc(){
   if(!canManageRelatedDocs()) return renderApp('운영자 또는 관리자만 등록 가능합니다.','err');
 
-  const title = document.getElementById('relatedDocTitle')?.value?.trim();
-  const category = document.getElementById('relatedDocCategory')?.value?.trim();
-  const desc = document.getElementById('relatedDocDesc')?.value?.trim();
-  const fileName = document.getElementById('relatedDocFile')?.value?.trim();
+  const title=document.getElementById('relatedDocTitle')?.value?.trim();
+  const category=document.getElementById('relatedDocCategory')?.value || relatedDocCategoryFilter;
+  const body=document.getElementById('relatedDocBody')?.innerHTML || '';
+  const fileName=document.getElementById('relatedDocFile')?.value?.trim();
 
-  if(!title) return renderApp('서류명을 입력하세요.','err');
+  if(!title) return renderApp('제목을 입력하세요.','err');
+  if(!body || body.trim()==='') return renderApp('내용을 입력하세요.','err');
 
-  const payload = {
-    doc_key: 'related_' + Date.now(),
+  const payload={
+    doc_key:'related_'+Date.now(),
     title,
     category,
-    content: desc,
-    file_name: fileName,
-    updated_at: new Date().toISOString()
+    content:body,
+    body:body,
+    file_name:fileName,
+    source:fileName,
+    updated_by:user?.name || user?.email || '',
+    updated_at:new Date().toISOString()
   };
 
-  const { error } = await api.saveReferenceDoc(null, payload);
+  const fn = typeof api.saveRelatedDocument==='function' ? api.saveRelatedDocument : api.saveReferenceDoc;
+  const {error}=await fn(null,payload);
+  if(error) return renderApp('관련서류 저장 실패: '+error.message,'err');
 
-  if(error) return renderApp('관련서류 저장 실패: ' + error.message, 'err');
-
-  await loadAll('관련서류 저장 완료','ok');
+  relatedDocCategoryFilter=category;
+  await logActivity('save_related_doc','reference',payload.doc_key,{title,category});
+  await loadAll('관련서류 게시글 저장 완료','ok');
 }
 
 async function deleteRelatedDoc(id){
-  if(!canManageRelatedDocs()) return;
-  if(!confirm('관련서류를 삭제하시겠습니까?')) return;
+  if(!canManageRelatedDocs()) return renderApp('운영자 또는 관리자만 삭제 가능합니다.','err');
+  if(!confirm('이 게시글을 삭제하시겠습니까?')) return;
 
-  const { error } = await api.deleteReferenceDocById(id);
+  const fn = typeof api.deleteRelatedDocumentById==='function' ? api.deleteRelatedDocumentById : api.deleteReferenceDocById;
+  const {error}=await fn(id);
+  if(error) return renderApp('관련서류 삭제 실패: '+error.message,'err');
 
-  if(error) return renderApp('삭제 실패: ' + error.message, 'err');
-
-  await loadAll('관련서류 삭제 완료','ok');
+  await logActivity('delete_related_doc','reference',id,{});
+  await loadAll('관련서류 게시글 삭제 완료','ok');
 }
 
 
