@@ -100,6 +100,78 @@ window.ReagentApp.collect = {
     return this.collectMeta[key];
   },
 
+  getDefaultVendorInfoFromGroup(group = {}) {
+    const entries = Array.isArray(group.entries) ? group.entries : [];
+    const candidates = [group, ...entries].filter(Boolean);
+
+    const pick = (row, keys) => {
+      for (const key of keys) {
+        const value = String(row?.[key] || "").trim();
+        if (value) return value;
+      }
+      return "";
+    };
+
+    for (const row of candidates) {
+      const vendor = pick(row, [
+        "default_vendor",
+        "defaultVendor",
+        "default_vendor_name",
+        "defaultVendorName",
+        "master_default_vendor"
+      ]);
+
+      if (vendor) {
+        return {
+          vendor,
+          reason: pick(row, [
+            "default_vendor_reason",
+            "defaultVendorReason",
+            "default_vendor_memo",
+            "defaultVendorMemo",
+            "master_default_vendor_reason"
+          ])
+        };
+      }
+    }
+
+    return { vendor: "", reason: "" };
+  },
+
+  normalizeDefaultVendorReason(reason) {
+    const value = String(reason || "").trim();
+    const allowed = ["최저가 구매", "제조원 구매", "취급처 구매", "대리점 구매", "온라인 구매"];
+    return allowed.includes(value) ? value : "";
+  },
+
+  applyDefaultVendorToMeta(group = {}, meta = null) {
+    const targetMeta = meta || this.getMeta(group.key);
+    const info = this.getDefaultVendorInfoFromGroup(group);
+    const defaultVendor = String(info.vendor || "").trim();
+    const defaultReason = this.normalizeDefaultVendorReason(info.reason);
+
+    if (!defaultVendor) return false;
+
+    let changed = false;
+
+    // 기본거래처가 등록된 품목은 제품취합의 거래처1에 자동 표시합니다.
+    // 단가/가격은 제품취합 단계에서 직접 입력합니다.
+    if (!targetMeta.confirmed && !String(targetMeta.vendor1 || "").trim()) {
+      targetMeta.vendor1 = defaultVendor;
+      changed = true;
+    }
+
+    // 취합정리 비고에는 제품마스터의 선정사유를 우선 반영합니다.
+    // 사용자가 이미 다른 사유로 바꾼 경우는 덮어쓰지 않습니다.
+    if (defaultReason && (!String(targetMeta.prepareRemark || "").trim() || targetMeta.prepareRemark === "최저가 구매")) {
+      targetMeta.prepareRemark = defaultReason;
+      changed = true;
+    }
+
+    if (changed) this._defaultVendorApplied = true;
+    return changed;
+  },
+
   async addSelectedToCollect() {
     const request = window.ReagentApp.request;
     const groups = request.groupItems(request.getRowsForCurrentOrderMonth ? request.getRowsForCurrentOrderMonth() : request.requestRows);
@@ -112,7 +184,8 @@ window.ReagentApp.collect = {
     try {
       for (const group of selected) {
         request.collectedMeta[group.key] = group.totalQty;
-        this.getMeta(group.key);
+        const meta = this.getMeta(group.key);
+        this.applyDefaultVendorToMeta(group, meta);
         await this.upsertCollectItem(group.key, group.totalQty, { confirmed: false });
       }
     } catch (error) {
@@ -624,6 +697,7 @@ window.ReagentApp.collect = {
     return groups
       .map((group) => {
         const meta = this.getMeta(group.key);
+        this.applyDefaultVendorToMeta(group, meta);
         if (!meta.confirmed) return null;
 
         const selectedVendor = meta.selectedVendor || this.autoSelectVendor(meta);
@@ -1376,8 +1450,11 @@ if (els.count) els.count.textContent = String(rows.length);
       return;
     }
 
+    this._defaultVendorApplied = false;
+
     els.collectList.innerHTML = groups.map((group) => {
       const meta = this.getMeta(group.key);
+      this.applyDefaultVendorToMeta(group, meta);
       const qty = Number(group.collectedQty || 0);
       const unit1 = this.normalizeNumber(meta.unit1);
       const unit2 = this.normalizeNumber(meta.unit2);
@@ -1513,6 +1590,11 @@ if (els.count) els.count.textContent = String(rows.length);
     }).join("");
 
     this.bindCollectEvents();
+
+    if (this._defaultVendorApplied) {
+      this.saveCollectMeta();
+      this._defaultVendorApplied = false;
+    }
 
     if (els.collectCount) els.collectCount.textContent = String(groups.length);
     if (els.collectQty) els.collectQty.textContent = String(groups.reduce((sum, g) => sum + Number(g.collectedQty || g.totalQty || 0), 0));
