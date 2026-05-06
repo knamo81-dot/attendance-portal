@@ -1,3 +1,18 @@
+(function injectRelatedDocAttachmentStyle(){
+  if(document.getElementById('related-doc-attachment-style')) return;
+  const style=document.createElement('style');
+  style.id='related-doc-attachment-style';
+  style.textContent=`
+    .related-doc-attachments{border:1px solid var(--line);border-radius:16px;background:#f8fbff;padding:14px;margin:14px 0}
+    .related-doc-attach-title{font-size:13px;font-weight:900;color:#344054;margin-bottom:10px}
+    .related-doc-attach-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #e6edf7}
+    .related-doc-attach-row:first-of-type{border-top:0}
+    .related-doc-attach-name{font-weight:800;color:#071b49;word-break:break-all}
+    .related-doc-attach-row a.small-btn{text-decoration:none;display:inline-flex;align-items:center}
+  `;
+  document.head.appendChild(style);
+})();
+
 (function injectRelatedDocDetailStyle(){
   if(document.getElementById('related-doc-detail-style')) return;
   const style=document.createElement('style');
@@ -1134,6 +1149,113 @@ function renderRelatedDocCategoryTabs(){
   </div>`;
 }
 
+
+function getRelatedDocAttachments(doc={}){
+  if(Array.isArray(doc.attachments)) return doc.attachments;
+  if(typeof doc.attachments === 'string' && doc.attachments.trim()){
+    try{
+      const parsed=JSON.parse(doc.attachments);
+      return Array.isArray(parsed)?parsed:[];
+    }catch(e){
+      return [];
+    }
+  }
+  if(doc.pdf_url){
+    return [{
+      name: doc.pdf_name || doc.file_name || '첨부파일',
+      url: doc.pdf_url,
+      path: doc.pdf_path || '',
+      type: doc.pdf_type || 'application/pdf',
+      size: doc.pdf_size || 0
+    }];
+  }
+  return [];
+}
+
+function isPdfAttachment(att={}){
+  const name=String(att.name||'').toLowerCase();
+  const type=String(att.type||'').toLowerCase();
+  return type.includes('pdf') || name.endsWith('.pdf');
+}
+
+function formatFileSize(bytes){
+  const n=Number(bytes||0);
+  if(!n) return '';
+  if(n<1024) return `${n}B`;
+  if(n<1024*1024) return `${Math.round(n/1024)}KB`;
+  return `${(n/1024/1024).toFixed(1)}MB`;
+}
+
+function renderRelatedDocAttachments(doc={}){
+  const attachments=getRelatedDocAttachments(doc);
+  if(!attachments.length) return '';
+  return `<div class="related-doc-attachments">
+    <div class="related-doc-attach-title">첨부파일</div>
+    ${attachments.map((att,index)=>{
+      const sizeText=formatFileSize(att.size);
+      const badge=isPdfAttachment(att)?'<span class="inline-badge partial">PDF</span>':'<span class="inline-badge wastewater">FILE</span>';
+      return `<div class="related-doc-attach-row">
+        <div class="related-doc-attach-name">📎 ${escapeHtml(att.name||'첨부파일')} ${badge} ${sizeText?`<span class="related-doc-meta">${escapeHtml(sizeText)}</span>`:''}</div>
+        <div class="toolbar-right">
+          <button type="button" class="small-btn" onclick="openRelatedDocAttachment('${escapeHtml(att.url||'')}')">보기</button>
+          <a class="small-btn" href="${escapeHtml(att.url||'#')}" target="_blank" download="${escapeHtml(att.name||'')}">다운로드</a>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function openRelatedDocAttachment(url){
+  if(!url) return renderApp('첨부파일 주소가 없습니다.','err');
+  window.open(url,'_blank','noopener,noreferrer');
+}
+
+async function uploadRelatedDocAttachment(file){
+  if(!file) return null;
+
+  const allowed=[
+    'application/pdf',
+    'image/png','image/jpeg','image/jpg','image/gif','image/webp',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/zip'
+  ];
+
+  const lowerName=String(file.name||'').toLowerCase();
+  const isAllowed=allowed.includes(file.type) || lowerName.endsWith('.pdf') || lowerName.endsWith('.hwp') || lowerName.endsWith('.hwpx');
+  if(!isAllowed){
+    throw new Error('PDF, 이미지, Word, Excel, ZIP 파일만 첨부할 수 있습니다.');
+  }
+
+  if(file.size>20*1024*1024){
+    throw new Error('첨부파일은 20MB 이하만 등록할 수 있습니다.');
+  }
+
+  if(!api || typeof api.uploadRelatedDocFile!=='function'){
+    throw new Error('파일 업로드 함수가 없습니다. api.js도 최신본으로 교체해 주세요.');
+  }
+
+  const safeName=String(file.name||'file').replace(/[^\w.\-가-힣]/g,'_');
+  const path=`related-docs/${new Date().getFullYear()}/${Date.now()}_${safeName}`;
+  const uploadRes=await api.uploadRelatedDocFile(file,path);
+  if(uploadRes?.error) throw uploadRes.error;
+
+  const publicRes=api.getRelatedDocPublicUrl(path);
+  const url=publicRes?.data?.publicUrl || '';
+
+  if(!url) throw new Error('첨부파일 URL 생성에 실패했습니다.');
+
+  return {
+    name:file.name,
+    size:file.size,
+    type:file.type || (lowerName.endsWith('.pdf')?'application/pdf':''),
+    path,
+    url
+  };
+}
+
 function renderRelatedDocEditor(){
   const editingDoc = relatedDocEditId ? getRelatedDocs().find(item => String(item.id) === String(relatedDocEditId)) : null;
 
@@ -1176,6 +1298,12 @@ function renderRelatedDocEditor(){
         <label>파일명/보관 위치/링크</label>
         <input id="relatedDocFile" class="input" value="${escapeHtml(editFile)}" placeholder="예: 공용폴더 > 환경서류 > 허가증_2026.pdf">
       </div>
+      <div class="field">
+        <label>첨부파일</label>
+        <input id="relatedDocAttachment" class="input" type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx,.zip,.hwp,.hwpx">
+        <div class="msg muted">PDF는 본문에 바로 표시하지 않고 상세보기에서 보기/다운로드 버튼으로 열립니다.</div>
+      </div>
+      ${editingDoc && getRelatedDocAttachments(editingDoc).length ? renderRelatedDocAttachments(editingDoc) : ''}
       <div id="relatedDocSaveMsg" class="msg muted" style="margin-bottom:10px;"></div>
       <div class="toolbar-row" style="margin-bottom:0;">
         <div class="msg muted">이미지는 본문 안에 저장됩니다. 너무 큰 이미지는 700KB 이하로 줄여서 올리는 것을 권장합니다.</div>
@@ -1222,13 +1350,14 @@ function renderRelatedDocTable(rows=[]){
           : '-';
         const hasImage = /<img\s/i.test(String(doc.content || doc.body || ''));
         const fileName = doc.file_name || doc.source || '';
+        const attachments = getRelatedDocAttachments(doc);
         return `<tr>
           <td style="width:70px;">${index+1}</td>
           <td style="width:150px;">${escapeHtml(date)}</td>
           <td class="col-note" style="font-weight:800;">
             <button type="button" class="related-doc-title-link" onclick="openRelatedDocDetail('${doc.id}')">${escapeHtml(title)}</button>
             ${hasImage?` <span class="inline-badge wastewater">이미지</span>`:''}
-            ${fileName?` <span class="inline-badge partial">첨부</span>`:''}
+            ${(fileName||attachments.length)?` <span class="inline-badge partial">첨부</span>`:''}
           </td>
           <td style="width:170px;">${escapeHtml(writer)}</td>
           <td style="width:90px;">${canManageRelatedDocs()?`<button class="small-btn danger" onclick="deleteRelatedDoc('${doc.id}')">삭제</button>`:'-'}</td>
@@ -1285,6 +1414,7 @@ function renderRelatedDocDetail(){
         </div>
       </div>
       ${fileName?`<div class="related-doc-file">📎 ${escapeHtml(fileName)}</div>`:''}
+      ${renderRelatedDocAttachments(doc)}
       <div class="related-doc-body related-doc-detail-body">${body}</div>
     </div>
   `;
@@ -1428,25 +1558,50 @@ async function saveRelatedDoc(){
   const plain=(bodyEl?.textContent || '').replace(/\u00a0/g,' ').trim();
   const hasImage=/<img\s/i.test(body);
   const fileName=document.getElementById('relatedDocFile')?.value?.trim();
+  const attachmentFile=document.getElementById('relatedDocAttachment')?.files?.[0] || null;
 
   if(!title){
     showSaveMsg('제목을 입력하세요.','err');
     return;
   }
-  if(!plain && !hasImage){
-    showSaveMsg('내용을 입력하세요.','err');
+  if(!plain && !hasImage && !attachmentFile && !getRelatedDocAttachments(editingDoc||{}).length){
+    showSaveMsg('내용 또는 첨부파일을 입력하세요.','err');
     return;
   }
 
   const now = new Date().toISOString();
+
+  if(btn) btn.disabled=true;
+  showSaveMsg(attachmentFile ? '첨부파일 업로드 중입니다...' : (editingDoc ? '수정 저장 중입니다...' : '저장 중입니다...'),'muted');
+
+  let attachments = editingDoc ? getRelatedDocAttachments(editingDoc) : [];
+  if(attachmentFile){
+    try{
+      const uploaded=await uploadRelatedDocAttachment(attachmentFile);
+      if(uploaded) attachments=[...attachments, uploaded];
+    }catch(err){
+      if(btn) btn.disabled=false;
+      showSaveMsg('첨부파일 업로드 실패: '+(err?.message || err),'err');
+      return;
+    }
+  }
+
+  const firstPdf = attachments.find(isPdfAttachment) || null;
+
   const payload={
     doc_key: editingDoc?.doc_key || 'related_'+Date.now(),
     title:title,
     category:category,
     content:body,
     body:body,
-    file_name:fileName || '',
-    source:fileName || '',
+    file_name:fileName || attachments.map(a=>a.name).join(', ') || '',
+    source:fileName || attachments.map(a=>a.name).join(', ') || '',
+    attachments:JSON.stringify(attachments),
+    pdf_url:firstPdf?.url || null,
+    pdf_name:firstPdf?.name || null,
+    pdf_path:firstPdf?.path || null,
+    pdf_size:firstPdf?.size || null,
+    pdf_type:firstPdf?.type || null,
     updated_by:user?.name || user?.email || '',
     updated_at:now
   };
@@ -1456,7 +1611,6 @@ async function saveRelatedDoc(){
     payload.created_at=now;
   }
 
-  if(btn) btn.disabled=true;
   showSaveMsg(editingDoc ? '수정 저장 중입니다...' : '저장 중입니다...','muted');
 
   let result;
@@ -1503,11 +1657,11 @@ async function saveRelatedDoc(){
 
   relatedDocCategoryFilter=category;
   relatedDocWriteMode=false;
-  relatedDocViewId=editingDoc ? editingDoc.id : null;
+  relatedDocViewId=editingDoc ? editingDoc.id : (savedRow.id || null);
   relatedDocEditId=null;
 
   try{
-    await logActivity(editingDoc?'update_related_doc':'save_related_doc','reference',savedRow.id || payload.doc_key,{title,category});
+    await logActivity(editingDoc?'update_related_doc':'save_related_doc','reference',savedRow.id || payload.doc_key,{title,category,attachments:attachments.length});
   }catch(e){
     console.warn('관련서류 저장 로그 실패:', e);
   }
@@ -2016,6 +2170,7 @@ function downloadMonthlyExcel(){if(!canDownload()) return renderApp('엑셀 다�
 function tableToHtml(title,rows){return `<table border="1"><tr><th colspan="${rows[0]?.length||1}" style="background:#dbe5f1;">${escapeHtml(title)}</th></tr>${rows.map((row,idx)=>`<tr>${row.map(cell=>idx===0?`<th>${escapeHtml(cell)}</th>`:`<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</table>`;}
 window.login=login; window.signup=signup; window.logout=logout; window.approveUser=approveUser; window.deleteUser=deleteUser; window.sendApprovalMail=sendApprovalMail; window.dismissApprovalAlert=dismissApprovalAlert; window.goToPendingApproval=goToPendingApproval; window.saveReferenceDoc=saveReferenceDoc; window.toggleWriterApproval=toggleWriterApproval; window.toggleReviewerApproval=toggleReviewerApproval; window.sendReviewerRequestMail=sendReviewerRequestMail; window.formatText=formatText; window.applyEditorFontSize=applyEditorFontSize; window.applyEditorLineHeight=applyEditorLineHeight; window.execEditorCommand=execEditorCommand; window.editorUndo=editorUndo; window.editorRedo=editorRedo; window.insertEditorLink=insertEditorLink; window.triggerEditorImageUpload=triggerEditorImageUpload; window.handleEditorImage=handleEditorImage; window.switchTab=switchTab; window.changeLedgerMonth=changeLedgerMonth; window.changePickupYear=changePickupYear; window.changePickupTypeFilter=changePickupTypeFilter; window.changeYearlyReportYear=changeYearlyReportYear; window.changeRefTab=changeRefTab; window.changeRefSearch=changeRefSearch; window.setPickupType=setPickupType; window.togglePickupType=togglePickupType; window.updateDailyPreview=updateDailyPreview; window.toggleExternalBox=toggleExternalBox; window.saveDailyRow=saveDailyRow; window.savePickupRow=savePickupRow; window.deleteDailyRow=deleteDailyRow; window.deletePickupRow=deletePickupRow; window.signWriter=signWriter; window.unsignWriter=unsignWriter; window.signReviewer=signReviewer; window.unsignReviewer=unsignReviewer; window.resetApproval=resetApproval; window.changeRole=changeRole; window.uploadSignatureForUser=uploadSignatureForUser; window.refreshWastewaterManagers=refreshWastewaterManagers; window.searchWastewaterEmployees=searchWastewaterEmployees; window.addWastewaterOperatorFromSearch=addWastewaterOperatorFromSearch; window.removeWastewaterOperator=removeWastewaterOperator; window.addWastewaterApproverFromSearch=addWastewaterApproverFromSearch; window.removeWastewaterApprover=removeWastewaterApprover; window.transferAdmin=transferAdmin; window.seedSampleData=seedSampleData; window.downloadMonthlyExcel=downloadMonthlyExcel; window.downloadMonthlyReportPdf=downloadMonthlyReportPdf; window.downloadYearlyReportPdf=downloadYearlyReportPdf;
 
+window.openRelatedDocAttachment = openRelatedDocAttachment;
 window.editRelatedDoc = editRelatedDoc;
 window.openRelatedDocDetail = openRelatedDocDetail;
 window.closeRelatedDocDetail = closeRelatedDocDetail;
