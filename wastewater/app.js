@@ -1131,14 +1131,27 @@ async function searchWastewaterEmployees(){
 }
 async function addWastewaterOperatorFromSearch(index){
   if(!canAdmin()) return renderApp('관리자만 운영자를 지정할 수 있습니다.','err');
-  const employee=wastewaterAdminState.searchResults[index]; if(!employee) return;
-  const employeeNo=getManagerEmployeeNo(employee); if(!employeeNo) return renderApp('사번이 없는 사원은 지정할 수 없습니다.','err');
+  const employee=wastewaterAdminState.searchResults[index];
+  if(!employee) return renderApp('선택한 사원 정보를 찾을 수 없습니다. 다시 검색해 주세요.','err');
+  const employeeNo=getManagerEmployeeNo(employee);
+  if(!employeeNo) return renderApp('사번이 없는 사원은 지정할 수 없습니다.','err');
   if(!confirm(`${employee.name||employeeNo} 님을 폐수 운영자로 지정하시겠습니까?`)) return;
-  const {error}=await api.addWastewaterOperator(employee,getCurrentActorName());
-  if(error) return renderApp('운영자 지정 실패: '+error.message,'err');
-  await logActivity('wastewater_operator_add','user',employeeNo,{name:employee.name||''});
-  await loadMyRoles();
-  await loadAll('운영자로 지정되었습니다.','ok');
+  try{
+    if(typeof api.addWastewaterOperator!=='function'){
+      return renderApp('운영자 저장 함수가 없습니다. api.js가 최신 파일인지 확인해 주세요.','err');
+    }
+    const {error}=await api.addWastewaterOperator(employee,getCurrentActorName());
+    if(error){
+      console.error('운영자 지정 실패:', error);
+      return renderApp('운영자 지정 실패: '+(error.message||JSON.stringify(error)),'err');
+    }
+    await logActivity('wastewater_operator_add','user',employeeNo,{name:employee.name||''});
+    await loadMyRoles();
+    await loadAll('운영자로 지정되었습니다.','ok');
+  }catch(err){
+    console.error('운영자 지정 처리 오류:', err);
+    return renderApp('운영자 지정 처리 오류: '+(err.message||String(err)),'err');
+  }
 }
 async function removeWastewaterOperator(employeeNo){
   if(!canAdmin()) return renderApp('관리자만 운영자를 해제할 수 있습니다.','err');
@@ -1150,14 +1163,27 @@ async function removeWastewaterOperator(employeeNo){
 }
 async function addWastewaterApproverFromSearch(index){
   if(!canAdmin()) return renderApp('관리자만 결재자를 지정할 수 있습니다.','err');
-  const employee=wastewaterAdminState.searchResults[index]; if(!employee) return;
-  const employeeNo=getManagerEmployeeNo(employee); if(!employeeNo) return renderApp('사번이 없는 사원은 지정할 수 없습니다.','err');
+  const employee=wastewaterAdminState.searchResults[index];
+  if(!employee) return renderApp('선택한 사원 정보를 찾을 수 없습니다. 다시 검색해 주세요.','err');
+  const employeeNo=getManagerEmployeeNo(employee);
+  if(!employeeNo) return renderApp('사번이 없는 사원은 지정할 수 없습니다.','err');
   if(!confirm(`${employee.name||employeeNo} 님을 폐수 결재자로 지정하시겠습니까?`)) return;
-  const {error}=await api.addWastewaterApprover(employee,getCurrentActorName());
-  if(error) return renderApp('결재자 지정 실패: '+error.message,'err');
-  await logActivity('wastewater_approver_add','user',employeeNo,{name:employee.name||''});
-  await loadMyRoles();
-  await loadAll('결재자로 지정되었습니다.','ok');
+  try{
+    if(typeof api.addWastewaterApprover!=='function'){
+      return renderApp('결재자 저장 함수가 없습니다. api.js가 최신 파일인지 확인해 주세요.','err');
+    }
+    const {error}=await api.addWastewaterApprover(employee,getCurrentActorName());
+    if(error){
+      console.error('결재자 지정 실패:', error);
+      return renderApp('결재자 지정 실패: '+(error.message||JSON.stringify(error)),'err');
+    }
+    await logActivity('wastewater_approver_add','user',employeeNo,{name:employee.name||''});
+    await loadMyRoles();
+    await loadAll('결재자로 지정되었습니다.','ok');
+  }catch(err){
+    console.error('결재자 지정 처리 오류:', err);
+    return renderApp('결재자 지정 처리 오류: '+(err.message||String(err)),'err');
+  }
 }
 async function removeWastewaterApprover(employeeNo){
   if(!canAdmin()) return renderApp('관리자만 결재자를 해제할 수 있습니다.','err');
