@@ -1166,6 +1166,49 @@ function renderRelatedDocCard(doc){
   `;
 }
 
+
+function renderRelatedDocTable(rows=[]){
+  const body = rows.length
+    ? rows.map((doc,index)=>{
+        const title = doc.title || '제목 없음';
+        const writer = doc.updated_by || doc.created_by || '-';
+        const date = doc.updated_at || doc.created_at
+          ? new Date(doc.updated_at || doc.created_at).toLocaleDateString('ko-KR')
+          : '-';
+        const hasImage = /<img\s/i.test(String(doc.content || doc.body || ''));
+        const fileName = doc.file_name || doc.source || '';
+        return `<tr>
+          <td style="width:70px;">${index+1}</td>
+          <td style="width:150px;">${escapeHtml(date)}</td>
+          <td class="col-note" style="font-weight:800;">
+            ${escapeHtml(title)}
+            ${hasImage?` <span class="inline-badge wastewater">이미지</span>`:''}
+            ${fileName?` <span class="inline-badge partial">첨부</span>`:''}
+          </td>
+          <td style="width:170px;">${escapeHtml(writer)}</td>
+          <td style="width:90px;">${canManageRelatedDocs()?`<button class="small-btn danger" onclick="deleteRelatedDoc('${doc.id}')">삭제</button>`:'-'}</td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="5">이 게시판에 등록된 글이 없습니다.</td></tr>`;
+
+  return `
+    <div class="table-wrap related-doc-table-wrap">
+      <table class="related-doc-table" style="min-width:760px;">
+        <thead>
+          <tr>
+            <th style="width:70px;">순번</th>
+            <th style="width:150px;">작성일</th>
+            <th>제목</th>
+            <th style="width:170px;">작성자</th>
+            <th style="width:90px;">작업</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 function renderRelatedDocsPanel(){
   if(!RELATED_DOC_CATEGORIES.includes(relatedDocCategoryFilter)) relatedDocCategoryFilter=RELATED_DOC_CATEGORIES[0];
 
@@ -1191,11 +1234,7 @@ function renderRelatedDocsPanel(){
         </div>
         <div class="related-doc-content">
           ${formHtml}
-          ${!relatedDocWriteMode ? `
-            <div class="related-doc-list">
-              ${rows.length?rows.map(renderRelatedDocCard).join(''):`<div class="msg muted">이 게시판에 등록된 글이 없습니다.</div>`}
-            </div>
-          ` : ''}
+          ${!relatedDocWriteMode ? renderRelatedDocTable(rows) : ''}
         </div>
       </div>
     </div>
