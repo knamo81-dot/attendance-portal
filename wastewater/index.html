@@ -104,11 +104,16 @@ button,input,textarea,select{font:inherit}
 }
 .tabs-main{
   display:grid;
-  grid-template-columns:repeat(4,1fr);
+  grid-template-columns:repeat(5,minmax(0,1fr));
   gap:12px;
   flex:1;
 }
-.admin-mini-btn{padding:10px 14px;font-size:13px;border-radius:14px;white-space:nowrap}
+.tab-btn{
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.admin-mini-btn{padding:10px 14px;font-size:13px;border-radius:14px;white-space:nowrap;flex:0 0 auto}
 .admin-mini-btn.active{background:#fff;color:var(--navy);box-shadow:var(--shadow);font-weight:800}
 
 /* 핵심 수정 */
@@ -446,6 +451,7 @@ tr.over-row td{background:#fff1f3}
   .stats{grid-template-columns:repeat(2,1fr)}
   .main-grid,.ref-layout{grid-template-columns:1fr}
   .preview-grid{grid-template-columns:repeat(2,1fr)}
+  .tabs-main{grid-template-columns:repeat(5,minmax(0,1fr))}
   .two-col,.three-col{grid-template-columns:1fr}
 }
 
