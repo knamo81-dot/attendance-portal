@@ -1603,13 +1603,39 @@ if (els.count) els.count.textContent = String(rows.length);
               <input class="collect-input vendor-name-input" data-key="${escapeHtml(group.key)}" data-field="vendor1" value="${escapeHtml(meta.vendor1 || "")}" ${readonlyAttr}>
             </div>
           </td>
-          <td colspan="3" class="vendor-group-td ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
-            <div class="vendor-quote-box ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
-              <input class="collect-input vendor-unit-input" data-key="${escapeHtml(group.key)}" data-field="unit2" value="${this.formatMoneyInput(unit2)}" style="text-align:right;" ${readonlyAttr}>
-              <input class="collect-input vendor-price-input" data-key="${escapeHtml(group.key)}" data-field="price2" data-row-id="${rowId}" data-price-field="price2" value="${this.formatMoneyInput(price2)}" title="배송비/부가세 포함 금액은 직접 수정하세요." style="text-align:right;" ${readonlyAttr}>
-              <input class="collect-input vendor-name-input" data-key="${escapeHtml(group.key)}" data-field="vendor2" value="${escapeHtml(meta.vendor2 || "")}" ${readonlyAttr}>
-            </div>
-          </td>
+          ${(() => {
+            const defaultInfo = this.getDefaultVendorInfoForGroup(group);
+            const reason = String(meta.prepareRemark || defaultInfo.reason || "").trim();
+            const hasDefaultVendor = String(meta.vendor1 || "").trim() && reason && reason !== "최저가 구매";
+
+            if (hasDefaultVendor) {
+              return `
+                <td colspan="3" class="vendor-group-td">
+                  <div style="
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    height:100%;
+                    min-height:40px;
+                    font-weight:700;
+                    color:#334155;
+                  ">
+                    ${escapeHtml(reason)}
+                  </div>
+                </td>
+              `;
+            }
+
+            return `
+              <td colspan="3" class="vendor-group-td ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
+                <div class="vendor-quote-box ${autoSelectedVendor === "vendor2" ? "auto-vendor-selected" : ""}" data-row-id="${rowId}" data-vendor-group="vendor2">
+                  <input class="collect-input vendor-unit-input" data-key="${escapeHtml(group.key)}" data-field="unit2" value="${this.formatMoneyInput(unit2)}" style="text-align:right;" ${readonlyAttr}>
+                  <input class="collect-input vendor-price-input" data-key="${escapeHtml(group.key)}" data-field="price2" data-row-id="${rowId}" data-price-field="price2" value="${this.formatMoneyInput(price2)}" title="배송비/부가세 포함 금액은 직접 수정하세요." style="text-align:right;" ${readonlyAttr}>
+                  <input class="collect-input vendor-name-input" data-key="${escapeHtml(group.key)}" data-field="vendor2" value="${escapeHtml(meta.vendor2 || "")}" ${readonlyAttr}>
+                </div>
+              </td>
+            `;
+          })()}
           <td>${actionCell}</td>
         </tr>
         <tr class="collect-detail-row" data-detail-id="${rowId}" style="display:none;">
