@@ -263,6 +263,23 @@ function removeWastewaterApprover(employeeNo, actorName){
     .maybeSingle();
 }
 
+
+function loadRelatedDocuments(){
+  return sb.from(REFERENCE_TABLE)
+    .select('*')
+    .like('doc_key','related_%')
+    .order('updated_at',{ascending:false});
+}
+
+function saveRelatedDocument(existingId,payload){
+  if(existingId) return sb.from(REFERENCE_TABLE).update(payload).eq('id', existingId).select('*').maybeSingle();
+  return sb.from(REFERENCE_TABLE).insert([payload]).select('*').maybeSingle();
+}
+
+function deleteRelatedDocumentById(id){
+  return sb.from(REFERENCE_TABLE).delete().eq('id', id);
+}
+
 async function logActivity(actorEmail,action,targetType,targetId,details){
   return sb.from(LOG_TABLE).insert([{actor_email:actorEmail||'unknown',action,target_type:targetType,target_id:String(targetId||''),details:JSON.stringify(details||{})}]);
 }
@@ -274,5 +291,5 @@ async function logApprovalAction(actorEmail,monthKey,action,reason=''){
 window.WastewaterApi={
   SUPABASE_URL,SUPABASE_KEY,
   DAILY_TABLE,DAILY_VIEW,PICKUP_TABLE,USERS_TABLE,EMPLOYEES_TABLE,WASTEWATER_ROLE_VIEW,WASTEWATER_OPERATORS_TABLE,WASTEWATER_APPROVERS_TABLE,LOG_TABLE,APPROVAL_TABLE,APPROVAL_LOG_TABLE,REFERENCE_TABLE,CM_LIMIT,TON_TO_CM,MAX_TON_M3,
-  getMyRoles,loadAllData,saveReferenceDoc,deleteReferenceDocById,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,getUserSignature,searchEmployees,loadWastewaterManagers,addWastewaterOperator,removeWastewaterOperator,addWastewaterApprover,removeWastewaterApprover,logActivity,logApprovalAction
+  getMyRoles,loadAllData,saveReferenceDoc,deleteReferenceDocById,loadRelatedDocuments,saveRelatedDocument,deleteRelatedDocumentById,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,getUserSignature,searchEmployees,loadWastewaterManagers,addWastewaterOperator,removeWastewaterOperator,addWastewaterApprover,removeWastewaterApprover,logActivity,logApprovalAction
 };
