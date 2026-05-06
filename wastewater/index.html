@@ -237,6 +237,20 @@ th{background:#f5f8fc;color:var(--navy);font-weight:800;position:sticky;top:0}
 .three-col{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .three-col .mini-card{min-width:0}
 
+/* 관리자 기능 상단 요약 카드 4개 한 줄 고정 */
+.admin-card .preview-grid,
+.admin-card .three-col,
+.admin-summary-grid{
+  display:grid !important;
+  grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+  gap:12px !important;
+}
+.admin-card .preview-grid .mini-card,
+.admin-card .three-col .mini-card,
+.admin-summary-grid .mini-card{
+  min-width:0 !important;
+}
+
 .login-wrap{min-height:100vh;display:grid;place-items:center;padding:20px}
 .login-card{width:100%;max-width:430px;padding:28px}
 .login-card h2{margin-top:0;font-size:28px}
@@ -463,6 +477,32 @@ table td {
   text-align: left !important;
 }
   
+/* 관리자 기능 상단 요약 카드 4개 한 줄 최종 보정 */
+.admin-card .preview-grid,
+.admin-card .three-col,
+.admin-summary-grid{
+  display:grid !important;
+  grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+  gap:12px !important;
+}
+.admin-card .preview-grid .mini-card,
+.admin-card .three-col .mini-card,
+.admin-summary-grid .mini-card{
+  min-width:0 !important;
+}
+
+@media (max-width:1100px){
+  .admin-card .preview-grid,
+  .admin-card .three-col,
+  .admin-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
+}
+
+@media (max-width:720px){
+  .admin-card .preview-grid,
+  .admin-card .three-col,
+  .admin-summary-grid{grid-template-columns:1fr !important;}
+}
+
 </style>
 </head>
 <body>
