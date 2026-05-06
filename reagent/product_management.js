@@ -750,6 +750,7 @@ window.ReagentApp.productManagement = {
             <div class="field">
               <label>선정사유</label>
               <select id="pmEditProductDefaultVendorReason">
+                <option value="">선정사유 선택</option>
                 <option value="최저가 구매">최저가 구매</option>
                 <option value="제조원 구매">제조원 구매</option>
                 <option value="취급처 구매">취급처 구매</option>
@@ -815,7 +816,7 @@ window.ReagentApp.productManagement = {
     this.setProductEditValue("pmEditProductCas", product.cas || "");
     this.setProductEditValue("pmEditProductGrade", product.grade || "");
     this.setProductEditValue("pmEditProductDefaultVendor", product.default_vendor || "");
-    this.setProductEditValue("pmEditProductDefaultVendorReason", product.default_vendor_reason || "최저가 구매");
+    this.setProductEditValue("pmEditProductDefaultVendorReason", product.default_vendor_reason || "");
     this.setProductEditValue("pmEditProductMemo", product.memo || "");
     this.setProductEditValue("pmEditProductIsActive", product.is_active === false ? "false" : "true");
 
@@ -845,7 +846,7 @@ window.ReagentApp.productManagement = {
       cas: this.getProductEditValue("pmEditProductCas"),
       grade: this.getProductEditValue("pmEditProductGrade"),
       default_vendor: this.getProductEditValue("pmEditProductDefaultVendor"),
-      default_vendor_reason: this.getProductEditValue("pmEditProductDefaultVendorReason") || "최저가 구매",
+      default_vendor_reason: this.getProductEditValue("pmEditProductDefaultVendorReason"),
       memo: this.getProductEditValue("pmEditProductMemo"),
       is_active: this.getProductEditValue("pmEditProductIsActive") !== "false",
       updated_by: user.name
@@ -853,6 +854,11 @@ window.ReagentApp.productManagement = {
 
     if (!row.name) {
       this.toast("품명은 필수입니다.", "warn");
+      return;
+    }
+
+    if (row.default_vendor && !row.default_vendor_reason) {
+      this.toast("기본거래처 선정사유를 선택하세요.", "warn");
       return;
     }
 
@@ -894,7 +900,7 @@ window.ReagentApp.productManagement = {
     [els.productId, els.category, els.name, els.maker, els.code, els.capacity, els.cas, els.grade, els.defaultVendor, els.defaultVendorReason, els.memo].forEach((el) => {
       if (el) el.value = "";
     });
-    if (els.defaultVendorReason) els.defaultVendorReason.value = "최저가 구매";
+    if (els.defaultVendorReason) els.defaultVendorReason.value = "";
     if (els.isActive) els.isActive.value = "true";
     if (els.deactivateProduct) els.deactivateProduct.style.display = "none";
   },
@@ -912,7 +918,7 @@ window.ReagentApp.productManagement = {
       cas: String(els.cas?.value || "").trim(),
       grade: String(els.grade?.value || "").trim(),
       default_vendor: String(els.defaultVendor?.value || "").trim(),
-      default_vendor_reason: String(els.defaultVendorReason?.value || "최저가 구매").trim(),
+      default_vendor_reason: String(els.defaultVendorReason?.value || "").trim(),
       memo: String(els.memo?.value || "").trim(),
       is_active: els.isActive?.value !== "false",
       updated_by: user.name
@@ -930,6 +936,11 @@ window.ReagentApp.productManagement = {
 
     if (!row.name) {
       this.toast("품명은 필수입니다.", "warn");
+      return;
+    }
+
+    if (row.default_vendor && !row.default_vendor_reason) {
+      this.toast("기본거래처 선정사유를 선택하세요.", "warn");
       return;
     }
 
