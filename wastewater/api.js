@@ -104,7 +104,16 @@ function updateApprovalByMonth(monthKey,payload){
 function updateUserRole(email,newRole){ return sb.from(USERS_TABLE).update({role:newRole}).eq('email',email); }
 function approveUserByEmail(email){ return sb.from(USERS_TABLE).update({approved:true}).eq('email',email); }
 function deleteUserByEmail(email){ return sb.from(USERS_TABLE).delete().eq('email',email); }
-function updateUserSignature(email,signatureUrl){ return sb.from(USERS_TABLE).update({signature_url:signatureUrl}).eq('email',email); }
+function updateUserSignature(email,signatureUrl){
+  return sb.from(USERS_TABLE).update({signature_url:signatureUrl}).ilike('email', String(email||'').trim());
+}
+
+function getUserSignature(email){
+  return sb.from(USERS_TABLE)
+    .select('email,signature_url')
+    .ilike('email', String(email||'').trim())
+    .maybeSingle();
+}
 
 function getEmployeeDepartment(row = {}){ return row.department || row.division_name || row.division || row.division_code || ''; }
 function getEmployeeTeam(row = {}){ return row.team || row.team_name || row.team_code || ''; }
@@ -140,6 +149,25 @@ async function loadWastewaterManagers(){
     adminEmployees = Array.isArray(employeeRows) ? employeeRows : [];
   }
 
+  const signatureEmails = [
+    ...adminUsers.map(row => String(row.email || row.user_email || '').trim()),
+    ...(Array.isArray(operatorRes.data) ? operatorRes.data : []).map(row => String(row.email || '').trim()),
+    ...(Array.isArray(approverRes.data) ? approverRes.data : []).map(row => String(row.email || '').trim())
+  ].filter(Boolean);
+
+  let signatureMap = new Map();
+  if(signatureEmails.length){
+    const uniqueEmails = [...new Set(signatureEmails)];
+    const { data: signatureUsers, error: signatureError } = await sb
+      .from(USERS_TABLE)
+      .select('email,signature_url')
+      .in('email', uniqueEmails);
+    if(signatureError) console.warn('사인 이미지 조회 실패:', signatureError);
+    (Array.isArray(signatureUsers) ? signatureUsers : []).forEach(row => {
+      signatureMap.set(String(row.email || '').trim(), row.signature_url || '');
+    });
+  }
+
   const admins = adminUsers.map((userRow) => {
     const email = String(userRow.email || userRow.user_email || '').trim();
     const employee = adminEmployees.find(emp => String(emp.email || '').trim() === email) || {};
@@ -150,6 +178,7 @@ async function loadWastewaterManagers(){
       team: getEmployeeTeam(employee),
       position: employee.position || '',
       email,
+      signature_url: signatureMap.get(email) || userRow.signature_url || '',
       role: '관리자',
       created_by: '사원정보',
       created_at: userRow.updated_at || userRow.created_at || employee.updated_at || employee.created_at || '',
@@ -158,11 +187,21 @@ async function loadWastewaterManagers(){
     };
   });
 
+  const operators = (Array.isArray(operatorRes.data) ? operatorRes.data : []).map(row => ({
+    ...row,
+    signature_url: signatureMap.get(String(row.email || '').trim()) || row.signature_url || ''
+  }));
+
+  const approvers = (Array.isArray(approverRes.data) ? approverRes.data : []).map(row => ({
+    ...row,
+    signature_url: signatureMap.get(String(row.email || '').trim()) || row.signature_url || ''
+  }));
+
   return {
     data: {
       admins,
-      operators: Array.isArray(operatorRes.data) ? operatorRes.data : [],
-      approvers: Array.isArray(approverRes.data) ? approverRes.data : []
+      operators,
+      approvers
     },
     errors: {
       admins: adminRes.error || null,
@@ -235,5 +274,5 @@ async function logApprovalAction(actorEmail,monthKey,action,reason=''){
 window.WastewaterApi={
   SUPABASE_URL,SUPABASE_KEY,
   DAILY_TABLE,DAILY_VIEW,PICKUP_TABLE,USERS_TABLE,EMPLOYEES_TABLE,WASTEWATER_ROLE_VIEW,WASTEWATER_OPERATORS_TABLE,WASTEWATER_APPROVERS_TABLE,LOG_TABLE,APPROVAL_TABLE,APPROVAL_LOG_TABLE,REFERENCE_TABLE,CM_LIMIT,TON_TO_CM,MAX_TON_M3,
-  getMyRoles,loadAllData,saveReferenceDoc,deleteReferenceDocById,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,searchEmployees,loadWastewaterManagers,addWastewaterOperator,removeWastewaterOperator,addWastewaterApprover,removeWastewaterApprover,logActivity,logApprovalAction
+  getMyRoles,loadAllData,saveReferenceDoc,deleteReferenceDocById,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,getUserSignature,searchEmployees,loadWastewaterManagers,addWastewaterOperator,removeWastewaterOperator,addWastewaterApprover,removeWastewaterApprover,logActivity,logApprovalAction
 };
