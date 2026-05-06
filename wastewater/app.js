@@ -597,9 +597,9 @@ function renderLedgerRows(rows){
         <td class="num">휴일</td>
         <td class="num">휴일</td>
         <td>-</td>
+        <td>휴일</td>
+        <td>휴일</td>
         <td>${contractorHtml}</td>
-        <td>휴일</td>
-        <td>휴일</td>
         <td>${certificateHtml}</td>
         <td class="col-pickup">-</td>
         <td class="col-note">${escapeHtml(row.final_holiday_reason||row.holiday_reason||row.note||'휴일')}</td>
@@ -614,9 +614,9 @@ function renderLedgerRows(rows){
         <td class="num">미입력</td>
         <td class="num">-</td>
         <td>-</td>
+        <td>미입력</td>
+        <td>미입력</td>
         <td>${contractorHtml}</td>
-        <td>미입력</td>
-        <td>미입력</td>
         <td>${certificateHtml}</td>
         <td class="col-pickup">-</td>
         <td class="col-note">평일 미입력</td>
@@ -632,9 +632,9 @@ function renderLedgerRows(rows){
       <td class="num">${formatNum(row.water_used,2)}</td>
       <td class="num">${formatNum(row.height,1)} cm</td>
       <td>${row.has_external ? `${formatNum(row.external_ton||0,1)}T / ${formatNum(row.external_cm,1)}cm` : '-'}</td>
-      <td>${contractorHtml}</td>
       <td>${escapeHtml(row.guideline_text)}</td>
       <td>${escapeHtml(row.generated_text)}</td>
+      <td>${contractorHtml}</td>
       <td>${certificateHtml}</td>
       <td class="col-pickup">
         ${row.pickup
@@ -1946,9 +1946,9 @@ ${canWrite()?`<button class="btn primary block" onclick="savePickupRow()">💾 �
         <th>당일 사용량</th>
         <th>저장고 높이</th>
         <th>외부보관</th>
-        <th>처리업소</th>
         <th>금일지침</th>
         <th>총 발생량</th>
+        <th>처리업소</th>
         <th>확인서번호</th>
         <th class="col-pickup">수거 정보</th>
         <th class="col-note">기타</th>
