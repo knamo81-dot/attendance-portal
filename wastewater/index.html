@@ -234,7 +234,8 @@ th{background:#f5f8fc;color:var(--navy);font-weight:800;position:sticky;top:0}
 .small-btn.danger{color:#b42318;border-color:#f5c0bb}
 
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.three-col{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.three-col .mini-card{min-width:0}
 
 .login-wrap{min-height:100vh;display:grid;place-items:center;padding:20px}
 .login-card{width:100%;max-width:430px;padding:28px}
@@ -470,4 +471,3 @@ table td {
 <script src="./app.js"></script>
 </body>
 </html>
-
