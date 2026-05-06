@@ -14,6 +14,7 @@ const LOG_TABLE='activity_logs';
 const APPROVAL_TABLE='monthly_approvals';
 const APPROVAL_LOG_TABLE='approval_logs';
 const REFERENCE_TABLE='reference_docs';
+const RELATED_DOC_BUCKET='wastewater-docs';
 const CM_LIMIT=154;
 const TON_TO_CM=22;
 const MAX_TON_M3=7;
@@ -264,13 +265,6 @@ function removeWastewaterApprover(employeeNo, actorName){
 }
 
 
-function loadRelatedDocuments(){
-  return sb.from(REFERENCE_TABLE)
-    .select('*')
-    .like('doc_key','related_%')
-    .order('updated_at',{ascending:false});
-}
-
 function saveRelatedDocument(existingId,payload){
   if(existingId) return sb.from(REFERENCE_TABLE).update(payload).eq('id', existingId).select('*').maybeSingle();
   return sb.from(REFERENCE_TABLE).insert([payload]).select('*').maybeSingle();
@@ -278,6 +272,18 @@ function saveRelatedDocument(existingId,payload){
 
 function deleteRelatedDocumentById(id){
   return sb.from(REFERENCE_TABLE).delete().eq('id', id);
+}
+
+async function uploadRelatedDocFile(file,path){
+  return sb.storage.from(RELATED_DOC_BUCKET).upload(path,file,{cacheControl:'3600',upsert:true});
+}
+
+function getRelatedDocPublicUrl(path){
+  return sb.storage.from(RELATED_DOC_BUCKET).getPublicUrl(path);
+}
+
+async function deleteRelatedDocFile(path){
+  return sb.storage.from(RELATED_DOC_BUCKET).remove([path]);
 }
 
 async function logActivity(actorEmail,action,targetType,targetId,details){
@@ -290,6 +296,6 @@ async function logApprovalAction(actorEmail,monthKey,action,reason=''){
 
 window.WastewaterApi={
   SUPABASE_URL,SUPABASE_KEY,
-  DAILY_TABLE,DAILY_VIEW,PICKUP_TABLE,USERS_TABLE,EMPLOYEES_TABLE,WASTEWATER_ROLE_VIEW,WASTEWATER_OPERATORS_TABLE,WASTEWATER_APPROVERS_TABLE,LOG_TABLE,APPROVAL_TABLE,APPROVAL_LOG_TABLE,REFERENCE_TABLE,CM_LIMIT,TON_TO_CM,MAX_TON_M3,
-  getMyRoles,loadAllData,saveReferenceDoc,deleteReferenceDocById,loadRelatedDocuments,saveRelatedDocument,deleteRelatedDocumentById,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,getUserSignature,searchEmployees,loadWastewaterManagers,addWastewaterOperator,removeWastewaterOperator,addWastewaterApprover,removeWastewaterApprover,logActivity,logApprovalAction
+  DAILY_TABLE,DAILY_VIEW,PICKUP_TABLE,USERS_TABLE,EMPLOYEES_TABLE,WASTEWATER_ROLE_VIEW,WASTEWATER_OPERATORS_TABLE,WASTEWATER_APPROVERS_TABLE,LOG_TABLE,APPROVAL_TABLE,APPROVAL_LOG_TABLE,REFERENCE_TABLE,RELATED_DOC_BUCKET,CM_LIMIT,TON_TO_CM,MAX_TON_M3,
+  getMyRoles,loadAllData,saveReferenceDoc,deleteReferenceDocById,saveRelatedDocument,deleteRelatedDocumentById,uploadRelatedDocFile,getRelatedDocPublicUrl,deleteRelatedDocFile,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,getUserSignature,searchEmployees,loadWastewaterManagers,addWastewaterOperator,removeWastewaterOperator,addWastewaterApprover,removeWastewaterApprover,logActivity,logApprovalAction
 };
