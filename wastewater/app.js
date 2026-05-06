@@ -1237,8 +1237,13 @@ async function uploadRelatedDocAttachment(file){
     throw new Error('파일 업로드 함수가 없습니다. api.js도 최신본으로 교체해 주세요.');
   }
 
-  const safeName=String(file.name||'file').replace(/[^\w.\-가-힣]/g,'_');
-  const path=`related-docs/${new Date().getFullYear()}/${Date.now()}_${safeName}`;
+  const originalName=String(file.name||'file');
+  const extMatch=originalName.match(/\.([A-Za-z0-9]+)$/);
+  const ext=extMatch ? extMatch[1].toLowerCase() : 'bin';
+  // Supabase Storage key는 한글/공백/특수문자에서 오류가 날 수 있어 저장 경로는 영문/숫자만 사용합니다.
+  // 화면에는 originalName을 그대로 보여줍니다.
+  const safeName=`doc_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const path=`related-docs/${new Date().getFullYear()}/${safeName}`;
   const uploadRes=await api.uploadRelatedDocFile(file,path);
   if(uploadRes?.error) throw uploadRes.error;
 
