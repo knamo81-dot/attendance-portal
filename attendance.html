@@ -9747,6 +9747,16 @@ function formatMinutesToHM(mins){
   const mm = total % 60;
   return `${hh}:${String(mm).padStart(2,'0')}`;
 }
+
+function getAttendanceLunchDeductionHours(startMinRaw, endMinRaw, fallbackHours = ANALYSIS_LUNCH_HOURS){
+  if(startMinRaw === null || endMinRaw === null) return fallbackHours;
+  let endMin = endMinRaw;
+  if(endMin < startMinRaw) endMin += 24 * 60;
+  const lunchStart = 12 * 60;
+  const lunchEnd = 13 * 60;
+  const overlapMinutes = Math.max(0, Math.min(endMin, lunchEnd) - Math.max(startMinRaw, lunchStart));
+  return Math.min(ANALYSIS_LUNCH_HOURS, overlapMinutes / 60);
+}
 function getAttendanceAnalysisFields(row){
   const rawWorkHours = parseWorkDurationToHours(row?.totalWork);
   const startMinRaw = toMinutesFromHM(row?.displayStart);
@@ -9774,6 +9784,12 @@ function getAttendanceAnalysisFields(row){
     ? hasOvertimeLikeBundle(reasonBundle)
     : /연장근무/.test(String(reasonBundle || ''));
 
+  const isHolidayWorkCandidate = ((typeof HOLIDAY_DATE_SET !== 'undefined' && HOLIDAY_DATE_SET.has(String(row?.date || ''))) ||
+    (typeof isHolidayLike === 'function' && isHolidayLike(String(row?.reason || ''))));
+  const analysisLunchDeductHours = isHolidayWorkCandidate
+    ? getAttendanceLunchDeductionHours(startMinRaw, endMinRaw, ANALYSIS_LUNCH_HOURS)
+    : ANALYSIS_LUNCH_HOURS;
+
   const baseCapHours = isHalfDayLike ? 4 : 8;
   const fallbackWorkHours = isHalfDayLike ? 4 : (isFieldLike ? 8 : null);
 
@@ -9786,7 +9802,7 @@ function getAttendanceAnalysisFields(row){
     morningHalfDayWorkHours = Math.max(0, (endMin - startMin) / 60);
   }
 
-  const analysisWorkHours = rawWorkHours === null ? null : Math.max(0, rawWorkHours - ANALYSIS_LUNCH_HOURS);
+  const analysisWorkHours = rawWorkHours === null ? null : Math.max(0, rawWorkHours - analysisLunchDeductHours);
 
   const hasOnlyMissingClock =
     rawWorkHours !== null &&
@@ -9802,7 +9818,7 @@ function getAttendanceAnalysisFields(row){
     let endMinForAdjusted = endMinRaw;
     if(endMinForAdjusted < startMinRaw) endMinForAdjusted += 24 * 60;
     if(endMinForAdjusted > Math.max(startMinRaw, 8 * 60)){
-      adjustedWorkHours = Math.max(0, (endMinForAdjusted - Math.max(startMinRaw, 8 * 60)) / 60 - ANALYSIS_LUNCH_HOURS);
+      adjustedWorkHours = Math.max(0, (endMinForAdjusted - Math.max(startMinRaw, 8 * 60)) / 60 - analysisLunchDeductHours);
     }
   }else if(hasOnlyMissingClock){
     adjustedWorkHours = analysisWorkHours;
@@ -9852,10 +9868,9 @@ function getAttendanceAnalysisFields(row){
     finalAdjustedWorkHours = missingEndBaseWorkHours + erpOTHoursRaw;
   }
 
-  const isHolidayWorkDay = ((typeof HOLIDAY_DATE_SET !== 'undefined' && HOLIDAY_DATE_SET.has(String(row?.date || ''))) ||
-    (typeof isHolidayLike === 'function' && isHolidayLike(String(row?.reason || ''))))
-      ? (rawWorkHours !== null || hasERPOT || startMinRaw !== null || endMinRaw !== null)
-      : false;
+  const isHolidayWorkDay = isHolidayWorkCandidate
+    ? (rawWorkHours !== null || hasERPOT || startMinRaw !== null || endMinRaw !== null)
+    : false;
 
   let baseWorkHours = null;
   let hiddenOvertimeHours = null;
