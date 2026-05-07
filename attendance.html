@@ -8348,6 +8348,18 @@ function normalizeEarlyStartToEight(value){
   if(min === null) return value;
   return min <= 8 * 60 ? '08:00' : String(value || '').trim();
 }
+
+// ✅ 오전반차 근무시간 계산
+// 오전반차는 오후 근무 기준 시작을 13:00으로 보고, 퇴근시간까지 실제 근무한 만큼 계산한다.
+// 예) 16:50 => 3:50, 17:00 => 4:00, 17:30 => 4:30
+function calcMorningHalfDayWorkText(endText){
+  const endMinRaw = timeStrToMinutes(endText);
+  if(endMinRaw === null) return '';
+  const startMin = 13 * 60;
+  let endMin = endMinRaw;
+  if(endMin < startMin) endMin += 24 * 60;
+  return formatHoursToHM(Math.max(0, (endMin - startMin) / 60));
+}
 function minutesToHourText(mins){
   if(mins === null || mins === undefined || mins === '') return '-';
   const totalMin = Math.max(0, Math.round(Number(mins)));
@@ -8843,9 +8855,18 @@ function decorateAttendanceRow(row, metaByName){
     reason = rawReason;
     seccomOT = 0;
 
-  } else if (rawReason === '오전반차' || rawReason === '오후반차') {
-    displayStart = rawReason === '오전반차' ? '-' : (startRaw || '출근누락');
-    displayEnd = rawReason === '오후반차' ? '-' : (endRaw || '퇴근누락');
+  } else if (rawReason === '오전반차') {
+    displayStart = '-';
+    displayEnd = endRaw || '퇴근누락';
+    totalWork = endRaw ? calcMorningHalfDayWorkText(endRaw) : '-';
+    bucket = '근태사유';
+    statusLabel = '';
+    reason = rawReason;
+    seccomOT = 0;
+
+  } else if (rawReason === '오후반차') {
+    displayStart = startRaw || '출근누락';
+    displayEnd = '-';
     totalWork = '4:30';
     bucket = '근태사유';
     statusLabel = '';
@@ -9756,6 +9777,15 @@ function getAttendanceAnalysisFields(row){
   const baseCapHours = isHalfDayLike ? 4 : 8;
   const fallbackWorkHours = isHalfDayLike ? 4 : (isFieldLike ? 8 : null);
 
+  const isMorningHalfDayLike = /오전반차/.test(String(reasonBundle || ''));
+  let morningHalfDayWorkHours = null;
+  if(isMorningHalfDayLike && endMinRaw !== null){
+    const startMin = 13 * 60;
+    let endMin = endMinRaw;
+    if(endMin < startMin) endMin += 24 * 60;
+    morningHalfDayWorkHours = Math.max(0, (endMin - startMin) / 60);
+  }
+
   const analysisWorkHours = rawWorkHours === null ? null : Math.max(0, rawWorkHours - ANALYSIS_LUNCH_HOURS);
 
   const hasOnlyMissingClock =
@@ -9780,6 +9810,13 @@ function getAttendanceAnalysisFields(row){
   let finalAdjustedWorkHours = adjustedWorkHours;
   if(finalAdjustedWorkHours === null && fallbackWorkHours !== null){
     finalAdjustedWorkHours = fallbackWorkHours;
+  }
+
+  // ✅ 오전반차 분석값 보정
+  // 표시/분석용 값만 13:00~퇴근시간 기준으로 맞추고, 원본 출퇴근/사유/OT 판정은 건드리지 않는다.
+  if(morningHalfDayWorkHours !== null){
+    finalAnalysisWorkHours = morningHalfDayWorkHours;
+    finalAdjustedWorkHours = morningHalfDayWorkHours;
   }
 
   const isHolidayWorkDay = ((typeof HOLIDAY_DATE_SET !== 'undefined' && HOLIDAY_DATE_SET.has(String(row?.date || ''))) ||
@@ -10386,12 +10423,18 @@ function deriveAttendanceRow(row, metaByName){
   }
 
   if (halfDayReasons.includes(rawReason)) {
-    totalWork = totalWork || '4:30';
+    if(rawReason === '오전반차'){
+      displayStart = '-';
+      displayEnd = endRaw || '퇴근누락';
+      totalWork = endRaw ? calcMorningHalfDayWorkText(endRaw) : '';
+    }else{
+      totalWork = totalWork || '4:30';
+      if (!startRaw) displayStart = '출근누락';
+      if (!endRaw) displayEnd = '퇴근누락';
+    }
     bucket = '근태사유';
     statusLabel = '정상출퇴근';
     reason = rawReason;
-    if (!startRaw) displayStart = '출근누락';
-    if (!endRaw) displayEnd = '퇴근누락';
     seccomOT = 0;
   } else if (fullDayReasons.includes(rawReason)) {
     bucket = '근태사유';
