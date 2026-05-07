@@ -8360,6 +8360,13 @@ function calcMorningHalfDayWorkText(endText){
   if(endMin < startMin) endMin += 24 * 60;
   return formatHoursToHM(Math.max(0, (endMin - startMin) / 60));
 }
+
+// ✅ 오후반차 근무시간 계산
+// 오후반차는 오전 근무 기준을 08:00~12:00으로 보고, 점심시간 차감 없이 4:00으로 고정한다.
+// 오전반차(13:00~17:00 = 4:00)와 반차 인정 기준을 대칭으로 맞춘다.
+function calcAfternoonHalfDayWorkText(){
+  return '4:00';
+}
 function minutesToHourText(mins){
   if(mins === null || mins === undefined || mins === '') return '-';
   const totalMin = Math.max(0, Math.round(Number(mins)));
@@ -8870,7 +8877,9 @@ function decorateAttendanceRow(row, metaByName){
   } else if (rawReason === '오후반차') {
     displayStart = startRaw || '출근누락';
     displayEnd = '-';
-    totalWork = '4:30';
+    // ✅ 오후반차는 오전 근무 08:00~12:00 기준 4:00으로 고정
+    // 일반근무의 점심시간 차감 로직을 반차에 중복 적용하지 않는다.
+    totalWork = calcAfternoonHalfDayWorkText();
     bucket = '근태사유';
     statusLabel = '';
     reason = rawReason;
@@ -8879,7 +8888,7 @@ function decorateAttendanceRow(row, metaByName){
   } else if (isHalfDayVacationReason(rawReason)) {
     displayStart = startRaw || '출근누락';
     displayEnd = endRaw || '퇴근누락';
-    totalWork = '4:30';
+    totalWork = '4:00';
     bucket = '근태사유';
     statusLabel = '';
     reason = rawReason;
@@ -9825,6 +9834,7 @@ function getAttendanceAnalysisFields(row){
   const fallbackWorkHours = isHalfDayLike ? 4 : (isFieldLike ? 8 : null);
 
   const isMorningHalfDayLike = /오전반차/.test(String(reasonBundle || ''));
+  const isAfternoonHalfDayLike = /오후반차/.test(String(reasonBundle || ''));
   let morningHalfDayWorkHours = null;
   if(isMorningHalfDayLike && endMinRaw !== null){
     const startMin = 13 * 60;
@@ -9832,6 +9842,9 @@ function getAttendanceAnalysisFields(row){
     if(endMin < startMin) endMin += 24 * 60;
     morningHalfDayWorkHours = Math.max(0, (endMin - startMin) / 60);
   }
+  // ✅ 오후반차 분석 기준
+  // 오후반차는 오전 08:00~12:00 근무 인정 4:00으로 고정하고, 점심 차감은 적용하지 않는다.
+  const afternoonHalfDayWorkHours = isAfternoonHalfDayLike ? 4 : null;
 
   const analysisWorkHours = rawWorkHours === null ? null : Math.max(0, rawWorkHours - analysisLunchDeductHours);
 
@@ -9872,13 +9885,21 @@ function getAttendanceAnalysisFields(row){
     finalAdjustedWorkHours = morningHalfDayWorkHours;
   }
 
+  // ✅ 오후반차 분석값 보정
+  // 오후반차는 오전 근무 인정 4:00으로 고정하고, 점심시간 차감/숨은초과 계산이 끼어들지 않게 한다.
+  if(afternoonHalfDayWorkHours !== null){
+    finalAnalysisWorkHours = afternoonHalfDayWorkHours;
+    finalAdjustedWorkHours = afternoonHalfDayWorkHours;
+  }
+
   // ✅ 오후외근 + 세콤 퇴근시간 없음 보정
   // 오후외근이지만 실제 퇴근시간이 없는 경우만 근무시간 9:00 / 실근무 8:00 / 8시보정 8:00 / 숨은초과 0:00 기준으로 고정한다.
   // 세콤 퇴근시간이 있는 오후외근은 실제 퇴근시간 기준 계산을 그대로 사용한다.
   const isAfternoonOutdoorWithoutEnd =
     /오후외근/.test(String(reasonBundle || '')) &&
     endMinRaw === null &&
-    !isMorningHalfDayLike;
+    !isMorningHalfDayLike &&
+    !isAfternoonHalfDayLike;
 
   if(isAfternoonOutdoorWithoutEnd && !hasERPOT){
     finalAnalysisWorkHours = 8;
@@ -9894,6 +9915,7 @@ function getAttendanceAnalysisFields(row){
     hasERPOT &&
     endMinRaw === null &&
     !isMorningHalfDayLike &&
+    !isAfternoonHalfDayLike &&
     /오후외근/.test(String(reasonBundle || '')) &&
     rawWorkHours !== null;
 
@@ -9901,6 +9923,7 @@ function getAttendanceAnalysisFields(row){
     hasERPOT &&
     endMinRaw === null &&
     !isMorningHalfDayLike &&
+    !isAfternoonHalfDayLike &&
     rawWorkHours !== null &&
     (/퇴근/.test(String(row?.displayEnd || '')) || isAfternoonOutdoorEndBlankWithERPOT);
 
@@ -10532,8 +10555,13 @@ function deriveAttendanceRow(row, metaByName){
       displayStart = '-';
       displayEnd = endRaw || '퇴근누락';
       totalWork = endRaw ? calcMorningHalfDayWorkText(endRaw) : '';
+    }else if(rawReason === '오후반차'){
+      // ✅ 오후반차는 오전 근무 08:00~12:00 기준 4:00으로 고정
+      totalWork = calcAfternoonHalfDayWorkText();
+      displayStart = startRaw || '출근누락';
+      displayEnd = '-';
     }else{
-      totalWork = totalWork || '4:30';
+      totalWork = totalWork || '4:00';
       if (!startRaw) displayStart = '출근누락';
       if (!endRaw) displayEnd = '퇴근누락';
     }
