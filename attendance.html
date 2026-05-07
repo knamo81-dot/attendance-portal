@@ -9759,12 +9759,26 @@ function getAttendanceLunchDeductionHours(startMinRaw, endMinRaw, fallbackHours 
 }
 
 function getAttendanceDinnerDeductionHours(startMinRaw, endMinRaw){
-  if(startMinRaw === null || endMinRaw === null) return 0;
-  let endMin = endMinRaw;
-  if(endMin < startMinRaw) endMin += 24 * 60;
+  if(endMinRaw === null) return 0;
+
   const dinnerStart = 17 * 60;
   const dinnerEnd = 17 * 60 + 30;
-  const overlapMinutes = Math.max(0, Math.min(endMin, dinnerEnd) - Math.max(startMinRaw, dinnerStart));
+
+  // ✅ 출근누락 / 오전외근 대응
+  // 출근시간이 없더라도 17:30 이후까지 근무 + 연장근무가 존재하면
+  // 연구소 저녁시간 30분을 동일하게 차감한다.
+  if(startMinRaw === null){
+    return endMinRaw >= dinnerEnd ? 0.5 : 0;
+  }
+
+  let endMin = endMinRaw;
+  if(endMin < startMinRaw) endMin += 24 * 60;
+
+  const overlapMinutes = Math.max(
+    0,
+    Math.min(endMin, dinnerEnd) - Math.max(startMinRaw, dinnerStart)
+  );
+
   return Math.min(0.5, overlapMinutes / 60);
 }
 function getAttendanceAnalysisFields(row){
