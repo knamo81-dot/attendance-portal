@@ -8339,6 +8339,15 @@ function timeStrToMinutes(v){
   if(!m) return null;
   return Number(m[1]) * 60 + Number(m[2]);
 }
+
+// ✅ 조기출근 보정
+// 08:00 이전(08:00 포함) 출근은 화면 표시와 근무시간 계산 기준을 모두 08:00으로 맞춘다.
+// 단, 원본 startRaw 값은 덮어쓰지 않고 표시/계산 단계에서만 보정한다.
+function normalizeEarlyStartToEight(value){
+  const min = timeStrToMinutes(value);
+  if(min === null) return value;
+  return min <= 8 * 60 ? '08:00' : String(value || '').trim();
+}
 function minutesToHourText(mins){
   if(mins === null || mins === undefined || mins === '') return '-';
   const totalMin = Math.max(0, Math.round(Number(mins)));
@@ -8773,7 +8782,8 @@ function decorateAttendanceRow(row, metaByName){
   const savedAbsenceDecision = String(row.absenceDecision || getSavedAbsenceDecision(row.recordId) || '').trim();
 
   function calcHoursText(startText, endText){
-    const startMin = timeStrToMinutes(startText);
+    const normalizedStartText = normalizeEarlyStartToEight(startText);
+    const startMin = timeStrToMinutes(normalizedStartText);
     let endMin = timeStrToMinutes(endText);
     if(startMin === null || endMin === null) return '';
     if(endMin < startMin){
@@ -9082,6 +9092,9 @@ function decorateAttendanceRow(row, metaByName){
   displayReason = primaryReason && secondaryReason
     ? `${primaryReason}<br><span style="color:#64748b;font-size:12px">(${secondaryReason})</span>`
     : (primaryReason || secondaryReason || '-');
+
+  // ✅ 출근 컬럼 표시도 계산 기준과 동일하게 08:00 이전은 08:00으로 보정
+  displayStart = normalizeEarlyStartToEight(displayStart);
 
   const pendingApprovedOvertime = String(getPendingApprovedOvertime(row.recordId) || '').trim();
   const savedApprovedOvertime = String(pendingApprovedOvertime || getSavedApprovedOvertimeOverride(row) || row.approvedOvertimeDisplay || '').trim();
