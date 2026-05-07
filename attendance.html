@@ -8794,7 +8794,11 @@ function decorateAttendanceRow(row, metaByName){
   let seccomOT = null;
   const applicableSpecialNote = findApplicableSpecialNote({ ...row, name: cleanedName, employeeId: row.employeeId || meta?.id || row.id || '' });
   const specialType = String(applicableSpecialNote?.specialType || '').trim();
-  const dispatchRule = specialType === '파견';
+  // ✅ 파견 + 연차/반차 우선순위 보정
+  // 파견 기간 중 연차휴가가 있는 경우, 계산은 연차/반차 사유를 우선 적용한다.
+  // 단, 사유 표시에는 보조 사유로 '파견'을 유지한다.
+  const isDispatchSpecial = specialType === '파견';
+  const dispatchRule = isDispatchSpecial && !isVacationReason(rawReason);
   const workFromHomeRule = specialType === '재택근무';
   const localOvertimeCheck = getSavedOvertimeCheckOverride(row);
   const savedOvertimeCheck = String(localOvertimeCheck || row.overtimeCheckResult || row.overtime_check_result || '').trim();
@@ -9117,9 +9121,13 @@ function decorateAttendanceRow(row, metaByName){
       primaryReason = '';
       secondaryReason = '재택근무';
     }
-  } else if (dispatchRule) {
-    primaryReason = '';
-    secondaryReason = '파견';
+  } else if (isDispatchSpecial) {
+    if (primaryReason && primaryReason !== '파견') {
+      secondaryReason = '파견';
+    } else {
+      primaryReason = '';
+      secondaryReason = '파견';
+    }
   }
 
   displayReason = primaryReason && secondaryReason
@@ -9810,12 +9818,16 @@ function getAttendanceAnalysisFields(row){
         (typeof getAttendanceBaseReason === 'function' ? getAttendanceBaseReason(row) : '')
       ].filter(Boolean).join(' ');
 
-  const isFieldLike = (typeof isFieldWorkLikeBundle === 'function')
-    ? isFieldWorkLikeBundle(reasonBundle)
-    : /파견|외근|오전외근|오후외근/.test(String(reasonBundle || ''));
   const isHalfDayLike = (typeof isHalfDayLikeBundle === 'function')
     ? isHalfDayLikeBundle(reasonBundle)
     : /오전반차|오후반차/.test(String(reasonBundle || ''));
+  // ✅ 파견 + 연차휴가 분석값 보정
+  // 연차휴가가 포함된 경우에는 파견 fallback 8:00을 적용하지 않는다.
+  // 반차는 isHalfDayLike 기준으로 4:00을 유지한다.
+  const isFullDayVacationLike = /연차휴가|연차/.test(String(reasonBundle || '')) && !isHalfDayLike;
+  const isFieldLike = !isFullDayVacationLike && ((typeof isFieldWorkLikeBundle === 'function')
+    ? isFieldWorkLikeBundle(reasonBundle)
+    : /파견|외근|오전외근|오후외근/.test(String(reasonBundle || '')));
   const hasOvertimeLike = (typeof hasOvertimeLikeBundle === 'function')
     ? hasOvertimeLikeBundle(reasonBundle)
     : /연장근무/.test(String(reasonBundle || ''));
@@ -9890,6 +9902,13 @@ function getAttendanceAnalysisFields(row){
   if(afternoonHalfDayWorkHours !== null){
     finalAnalysisWorkHours = afternoonHalfDayWorkHours;
     finalAdjustedWorkHours = afternoonHalfDayWorkHours;
+  }
+
+  // ✅ 연차휴가 + 파견 분석값 보정
+  // 전일 연차는 다른 일반 연차와 동일하게 실근무/8시보정/기본근무를 '-'로 표시한다.
+  if(isFullDayVacationLike){
+    finalAnalysisWorkHours = null;
+    finalAdjustedWorkHours = null;
   }
 
   // ✅ 오후외근 + 세콤 퇴근시간 없음 보정
