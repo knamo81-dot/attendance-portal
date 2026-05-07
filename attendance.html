@@ -9819,16 +9819,24 @@ function getAttendanceAnalysisFields(row){
     finalAdjustedWorkHours = morningHalfDayWorkHours;
   }
 
-  // ✅ 퇴근누락 + ERP 실제연장 보정
+  // ✅ 퇴근누락/오후외근 퇴근 미입력 + ERP 실제연장 보정
   // 퇴근 시간이 없을 때 근무시간(totalWork)은 기존 기준(9:00)을 유지하되,
   // 공식 ERP OT가 있으면 실근무/8시보정에는 기본 실근무 8:00 + ERP OT를 반영한다.
+  // 오후외근처럼 퇴근 컬럼이 '-'로 표시되는 외근성 퇴근 미입력도 같은 기준으로 처리한다.
   // 숨은초과는 공식 OT가 아니므로 증가시키지 않는다.
+  const isAfternoonOutdoorEndBlankWithERPOT =
+    hasERPOT &&
+    endMinRaw === null &&
+    !isMorningHalfDayLike &&
+    /오후외근/.test(String(reasonBundle || '')) &&
+    rawWorkHours !== null;
+
   const isEndMissingWithERPOT =
     hasERPOT &&
     endMinRaw === null &&
     !isMorningHalfDayLike &&
-    /퇴근/.test(String(row?.displayEnd || '')) &&
-    rawWorkHours !== null;
+    rawWorkHours !== null &&
+    (/퇴근/.test(String(row?.displayEnd || '')) || isAfternoonOutdoorEndBlankWithERPOT);
 
   if(isEndMissingWithERPOT){
     const missingEndBaseWorkHours = Number.isFinite(analysisWorkHours)
