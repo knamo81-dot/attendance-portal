@@ -9796,8 +9796,14 @@ function getAttendanceAnalysisFields(row){
     );
 
   let adjustedWorkHours = null;
-  if(startMinRaw !== null && endMinRaw !== null && endMinRaw > Math.max(startMinRaw, 8 * 60)){
-    adjustedWorkHours = Math.max(0, (endMinRaw - Math.max(startMinRaw, 8 * 60)) / 60 - ANALYSIS_LUNCH_HOURS);
+  if(startMinRaw !== null && endMinRaw !== null){
+    // ✅ 익일(00:00 이후) 퇴근 보정
+    // 예: 출근 08:01 / 퇴근 00:30은 같은 날 00:30이 아니라 다음날 00:30으로 계산한다.
+    let endMinForAdjusted = endMinRaw;
+    if(endMinForAdjusted < startMinRaw) endMinForAdjusted += 24 * 60;
+    if(endMinForAdjusted > Math.max(startMinRaw, 8 * 60)){
+      adjustedWorkHours = Math.max(0, (endMinForAdjusted - Math.max(startMinRaw, 8 * 60)) / 60 - ANALYSIS_LUNCH_HOURS);
+    }
   }else if(hasOnlyMissingClock){
     adjustedWorkHours = analysisWorkHours;
   }
