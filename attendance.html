@@ -9757,6 +9757,16 @@ function getAttendanceLunchDeductionHours(startMinRaw, endMinRaw, fallbackHours 
   const overlapMinutes = Math.max(0, Math.min(endMin, lunchEnd) - Math.max(startMinRaw, lunchStart));
   return Math.min(ANALYSIS_LUNCH_HOURS, overlapMinutes / 60);
 }
+
+function getAttendanceDinnerDeductionHours(startMinRaw, endMinRaw){
+  if(startMinRaw === null || endMinRaw === null) return 0;
+  let endMin = endMinRaw;
+  if(endMin < startMinRaw) endMin += 24 * 60;
+  const dinnerStart = 17 * 60;
+  const dinnerEnd = 17 * 60 + 30;
+  const overlapMinutes = Math.max(0, Math.min(endMin, dinnerEnd) - Math.max(startMinRaw, dinnerStart));
+  return Math.min(0.5, overlapMinutes / 60);
+}
 function getAttendanceAnalysisFields(row){
   const rawWorkHours = parseWorkDurationToHours(row?.totalWork);
   const startMinRaw = toMinutesFromHM(row?.displayStart);
@@ -9783,6 +9793,10 @@ function getAttendanceAnalysisFields(row){
   const hasOvertimeLike = (typeof hasOvertimeLikeBundle === 'function')
     ? hasOvertimeLikeBundle(reasonBundle)
     : /연장근무/.test(String(reasonBundle || ''));
+
+  const dinnerDeductHours = (hasERPOT || hasOvertimeLike)
+    ? getAttendanceDinnerDeductionHours(startMinRaw, endMinRaw)
+    : 0;
 
   const isHolidayWorkCandidate = ((typeof HOLIDAY_DATE_SET !== 'undefined' && HOLIDAY_DATE_SET.has(String(row?.date || ''))) ||
     (typeof isHolidayLike === 'function' && isHolidayLike(String(row?.reason || ''))));
@@ -9871,6 +9885,19 @@ function getAttendanceAnalysisFields(row){
   const isHolidayWorkDay = isHolidayWorkCandidate
     ? (rawWorkHours !== null || hasERPOT || startMinRaw !== null || endMinRaw !== null)
     : false;
+
+  // ✅ 연구소 연장근로 저녁시간 보정
+  // 연장근로가 있는 날 실제 근무구간이 17:00~17:30과 겹치면
+  // 실근무/8시보정에서만 저녁시간을 차감한다.
+  // 근무시간, 기본근무, 숨은초과, ERP OT 원본은 여기서 직접 수정하지 않는다.
+  if(dinnerDeductHours > 0){
+    if(finalAnalysisWorkHours !== null){
+      finalAnalysisWorkHours = Math.max(0, finalAnalysisWorkHours - dinnerDeductHours);
+    }
+    if(finalAdjustedWorkHours !== null){
+      finalAdjustedWorkHours = Math.max(0, finalAdjustedWorkHours - dinnerDeductHours);
+    }
+  }
 
   let baseWorkHours = null;
   let hiddenOvertimeHours = null;
