@@ -18,6 +18,7 @@
 <!-- monthly work display fixed: dashboard/deep/trend 담당자 근무시간 uses 8시보정 합계(monthlyAdjustedWorkHours) instead of raw 근무시간 column 합계 -->
 <!-- totalLoadScore tuned: 0h=0, 0~7h=5, 7h+=10, 8.5h+=35, 9.5h+=75, 10.5h+=100 -->
 <!-- risk floor gate fixed: if monthly adjusted work hours is below 40h including 0h, final personal risk score is 0; period risk adder is not reapplied; total load display remains unchanged -->
+<!-- OT manual override fixed: auto 미인정 is default only; saved/pending 인정·부분인정·미인정 has priority over auto invalid display -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -8825,12 +8826,16 @@ function renderAbsenceCheckSelect(row){
 }
 
 function isAutoOvertimeInvalidDisplayRow(row){
+  const recordId = String(row?.recordId || row?.id || '').trim();
+  const manualOverride = String(getPendingOvertimeCheck(recordId) || getSavedOvertimeCheckOverride(row) || '').trim();
+  // ✅ 자동 미인정은 "기본 판정"으로만 사용한다.
+  // 사용자가 인정/부분인정/미인정으로 저장하거나 현재 화면에서 바꾼 값이 있으면 그 값을 최우선 적용한다.
+  if(['인정','부분인정','미인정','확인필요'].includes(manualOverride)) return false;
+
   const checkValue = String(row?.overtimeCheck || row?.overtimeCheckResult || row?.overtime_check_result || '').trim();
   const reasonText = String([row?.reason, row?.primaryReason, row?.secondaryReason].filter(Boolean).join(' '));
   const statusText = String(row?.statusLabel || row?.status || '').trim();
   const hasErpOvertime = String(row?.erpOTDisplay || '').trim() && String(row?.erpOTDisplay || '').trim() !== '-';
-  // 8시보정 기반 검증 실패로 '문제/연장근무 미인정' 판정된 행은
-  // localStorage/pending에 저장된 과거 '인정' 값보다 자동판정값을 우선한다.
   return hasErpOvertime && checkValue === '미인정' && (reasonText.includes('연장근무 미인정') || statusText === '문제');
 }
 
@@ -9320,10 +9325,12 @@ function decorateAttendanceRow(row, metaByName){
   const pendingOvertimeCheck = String(getPendingOvertimeCheck(row.recordId) || '').trim();
   const effectiveSavedOvertimeCheck = String(pendingOvertimeCheck || savedOvertimeCheck || '').trim();
 
-  // ✅ 8시보정 기반 검증에서 ERP OT보다 인정 가능 시간이 작으면
-  // 저장값이 '인정'이어도 다시 덮어쓰지 않고 무조건 미인정/문제로 유지한다.
-  if (!autoOtInvalid && erpOT > 0 && ['인정','부분인정','미인정','확인필요'].includes(effectiveSavedOvertimeCheck)) {
+  // ✅ 자동판정은 기본값으로만 사용한다.
+  // 사용자가 OT확인을 인정/부분인정/미인정으로 저장하거나 현재 화면에서 변경한 값이 있으면
+  // 8시보정 기반 자동 미인정 판정보다 수동값을 최우선 적용한다.
+  if (erpOT > 0 && ['인정','부분인정','미인정','확인필요'].includes(effectiveSavedOvertimeCheck)) {
     overtimeCheck = (effectiveSavedOvertimeCheck === '확인필요' ? '미인정' : effectiveSavedOvertimeCheck);
+    autoOtInvalid = false;
   } else if (erpOT <= 0) {
     overtimeCheck = '-';
   }
@@ -10982,6 +10989,24 @@ function deriveAttendanceRow(row, metaByName){
       overtimeCheck = '미인정';
       bucket = '문제';
       statusLabel = '문제';
+    }
+
+    const manualOvertimeCheck = String(
+      getPendingOvertimeCheck(row.recordId || row.id) ||
+      getSavedOvertimeCheckOverride(row) ||
+      row.overtimeCheckResult ||
+      row.overtime_check_result ||
+      ''
+    ).trim();
+    if(['인정','부분인정','미인정','확인필요'].includes(manualOvertimeCheck)){
+      overtimeCheck = (manualOvertimeCheck === '확인필요' ? '미인정' : manualOvertimeCheck);
+      if(overtimeCheck === '미인정'){
+        bucket = '문제';
+        statusLabel = '문제';
+      }else{
+        bucket = '주의';
+        statusLabel = '주의';
+      }
     }
   }
 
