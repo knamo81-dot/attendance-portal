@@ -22,6 +22,7 @@
 <!-- risk people display updated: outdoor replaced with issue days; hidden overtime displayed before monthly work; issue-only risk promotion softened -->
 <!-- risk promotion refined: OT 30h+ becomes risk only when total load is 9h+ or monthly hidden overtime is 10h+; OT 30h alone remains warning -->
 <!-- hidden overtime noise filter applied: values under 10 minutes are treated as 0:00 at detail-column generation stage -->
+<!-- org risk tab fix: undefined formatHourMinute references replaced with existing formatHoursToHM so dashboard/deep/trend/report/missing tabs bind normally -->
 <!-- organization risk score refined: org risk is calculated from risk/warning ratio, average total load, average OT, issue days, monthly hidden overtime, and recovery index; leave unused is no longer a direct org risk score driver -->
 <style>
 :root {
@@ -7818,14 +7819,14 @@ function getOrgRiskItemSummary(item){
   if(metrics.riskCount || metrics.warnCount){
     reasons.push(`위험/주의 ${metrics.riskCount + metrics.warnCount}명`);
   }
-  if(metrics.avgTotalLoad >= 9) reasons.push(`평균 총부하 ${formatHourMinute(metrics.avgTotalLoad)}`);
-  else if(metrics.avgTotalLoad >= 8.5) reasons.push(`총부하 상승 ${formatHourMinute(metrics.avgTotalLoad)}`);
-  if(metrics.avgOvertime >= 20) reasons.push(`평균 OT ${formatHourMinute(metrics.avgOvertime)}`);
-  else if(metrics.avgOvertime >= 10) reasons.push(`OT 증가 ${formatHourMinute(metrics.avgOvertime)}`);
+  if(metrics.avgTotalLoad >= 9) reasons.push(`평균 총부하 ${formatHoursToHM(metrics.avgTotalLoad)}`);
+  else if(metrics.avgTotalLoad >= 8.5) reasons.push(`총부하 상승 ${formatHoursToHM(metrics.avgTotalLoad)}`);
+  if(metrics.avgOvertime >= 20) reasons.push(`평균 OT ${formatHoursToHM(metrics.avgOvertime)}`);
+  else if(metrics.avgOvertime >= 10) reasons.push(`OT 증가 ${formatHoursToHM(metrics.avgOvertime)}`);
   if(metrics.avgIssueDays >= 3) reasons.push(`평균 이슈 ${metrics.avgIssueDays}일`);
   else if(metrics.avgIssueDays >= 1) reasons.push(`이슈 반복 ${metrics.avgIssueDays}일`);
-  if(metrics.avgHiddenOvertime >= 6) reasons.push(`숨은초과 ${formatHourMinute(metrics.avgHiddenOvertime)}`);
-  else if(metrics.avgHiddenOvertime >= 3) reasons.push(`숨은초과 누적 ${formatHourMinute(metrics.avgHiddenOvertime)}`);
+  if(metrics.avgHiddenOvertime >= 6) reasons.push(`숨은초과 ${formatHoursToHM(metrics.avgHiddenOvertime)}`);
+  else if(metrics.avgHiddenOvertime >= 3) reasons.push(`숨은초과 누적 ${formatHoursToHM(metrics.avgHiddenOvertime)}`);
   if(metrics.avgRecovery < 50) reasons.push(`휴식 ${metrics.avgRecovery}점`);
   else if(metrics.avgRecovery < 60) reasons.push(`회복 관찰 ${metrics.avgRecovery}점`);
 
