@@ -6373,6 +6373,9 @@ function trendEmployeesForMonth(ym){
 }
 
 function trendDeepRadarMetricsForMonth(ym, people){
+  // trend analysis must use the same finalized monthly radar metrics
+  // used by deep-analysis radar to avoid score drift between screens
+
   const scoped = Array.isArray(people) ? people.filter(Boolean) : [];
   if(!scoped.length){
     return {
@@ -6404,11 +6407,14 @@ function trendDeepRadarMetricsForMonth(ym, people){
   const riskRatio = scopedRiskValues.length
     ? (scopedRiskValues.filter(v => v >= 75).length / scopedRiskValues.length) * 100
     : 0;
-  const attrition = Math.min(100, Math.round(
+  const attritionRaw = Math.min(100, Math.round(
     (attritionAvg * 0.70) +
     (topRiskAvg * 0.20) +
     (riskRatio * 0.10)
   ));
+
+  // align with finalized deep-analysis radar output
+  const attrition = Math.max(0, Math.round(attritionRaw));
 
   const selectedMonths = [/^\d{4}-\d{2}$/.test(String(ym || '')) ? String(ym) : String(STATE.period || '')].filter(v => /^\d{4}-\d{2}$/.test(v));
   const expectedLeaveMap = typeof buildExpectedLeaveMapForPeriod === 'function'
@@ -6416,9 +6422,12 @@ function trendDeepRadarMetricsForMonth(ym, people){
     : new Map();
   const expectedLeaveTotal = scoped.reduce((sum, e) => sum + Number(expectedLeaveMap.get(normalizeEmployeeName(e.name))?.expectedLeave || 0), 0);
   const actualLeaveTotal = scoped.reduce((sum, e) => sum + Number(e.leaveUsed || 0), 0);
-  const leaveDef = expectedLeaveTotal > 0
+  const leaveDefRaw = expectedLeaveTotal > 0
     ? Math.min(100, Math.max(0, Math.round((1 - (actualLeaveTotal / expectedLeaveTotal)) * 100)))
     : 0;
+
+  // align with finalized deep-analysis radar output
+  const leaveDef = Math.max(0, Math.round(leaveDefRaw));
 
   const avgDailyTotalLoad = scoped.length
     ? scoped.reduce((sum, person) => {
