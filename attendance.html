@@ -6373,9 +6373,6 @@ function trendEmployeesForMonth(ym){
 }
 
 function trendDeepRadarMetricsForMonth(ym, people){
-  // trend analysis must use the same finalized monthly radar metrics
-  // used by deep-analysis radar to avoid score drift between screens
-
   const scoped = Array.isArray(people) ? people.filter(Boolean) : [];
   if(!scoped.length){
     return {
@@ -6394,7 +6391,7 @@ function trendDeepRadarMetricsForMonth(ym, people){
   const gradeImbalance = Math.min(100, Math.round(Number(gradeMetrics.gradeImbalanceScore || 0)));
 
   const scopedRiskValues = scoped
-    .map(x => Number(x.scopedRisk || x.risk || 0))
+    .map(x => Number(x.scopedRisk || 0))
     .filter(v => Number.isFinite(v))
     .sort((a,b)=>b-a);
   const attritionAvg = scopedRiskValues.length
@@ -6407,27 +6404,24 @@ function trendDeepRadarMetricsForMonth(ym, people){
   const riskRatio = scopedRiskValues.length
     ? (scopedRiskValues.filter(v => v >= 75).length / scopedRiskValues.length) * 100
     : 0;
-  const attritionRaw = Math.min(100, Math.round(
+  const attrition = Math.min(100, Math.round(
     (attritionAvg * 0.70) +
     (topRiskAvg * 0.20) +
     (riskRatio * 0.10)
   ));
 
-  // align with finalized deep-analysis radar output
-  const attrition = Math.max(0, Math.round(attritionRaw));
-
-  const selectedMonths = [/^\d{4}-\d{2}$/.test(String(ym || '')) ? String(ym) : String(STATE.period || '')].filter(v => /^\d{4}-\d{2}$/.test(v));
+  const selectedYmForDeepRadar = String(getSelectedAttendancePeriodMeta()?.value || STATE.period || '').trim();
+  const trendLeavePeriodItems = (String(ym || '').trim() === selectedYmForDeepRadar && typeof periodMonths === 'function')
+    ? periodMonths()
+    : [{ month: `${Number(String(ym || selectedYmForDeepRadar || '').slice(5,7)) || 0}월` }];
   const expectedLeaveMap = typeof buildExpectedLeaveMapForPeriod === 'function'
-    ? buildExpectedLeaveMapForPeriod(selectedMonths, scoped)
+    ? buildExpectedLeaveMapForPeriod(trendLeavePeriodItems, scoped)
     : new Map();
   const expectedLeaveTotal = scoped.reduce((sum, e) => sum + Number(expectedLeaveMap.get(normalizeEmployeeName(e.name))?.expectedLeave || 0), 0);
   const actualLeaveTotal = scoped.reduce((sum, e) => sum + Number(e.leaveUsed || 0), 0);
-  const leaveDefRaw = expectedLeaveTotal > 0
+  const leaveDef = expectedLeaveTotal > 0
     ? Math.min(100, Math.max(0, Math.round((1 - (actualLeaveTotal / expectedLeaveTotal)) * 100)))
     : 0;
-
-  // align with finalized deep-analysis radar output
-  const leaveDef = Math.max(0, Math.round(leaveDefRaw));
 
   const avgDailyTotalLoad = scoped.length
     ? scoped.reduce((sum, person) => {
@@ -6488,7 +6482,12 @@ function trendDeepRadarMetricsForMonth(ym, people){
 }
 
 function trendMetricsForMonth(ym){
-  const people = trendEmployeesForMonth(ym);
+  // 선택월은 심층분석 레이더와 동일한 현재 월 최종 집계(scopedEmployees)를 그대로 사용한다.
+  // 그 외 월은 월별 trend 집계로 계산하여 비교 흐름을 유지한다.
+  const selectedYmForDeepRadar = String(getSelectedAttendancePeriodMeta()?.value || STATE.period || '').trim();
+  const people = (String(ym || '').trim() === selectedYmForDeepRadar && typeof scopedEmployees === 'function')
+    ? scopedEmployees()
+    : trendEmployeesForMonth(ym);
   const count = people.length;
   if(!count){
     return { ym, label:trendMonthLabel(ym), employeeCount:0, avgOvertimePerPerson:0, highRisk:0, leaveZero:0, fatigueRisk:0, workConcentrationRisk:0, gradeImbalanceRisk:0, attritionRisk:0, leaveDefRisk:0, overtimeRisk:0, mobilityRisk:0, operationalRisk:0, leaveRisk:0, holidayWorkCount:0 };
