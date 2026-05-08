@@ -7452,11 +7452,11 @@ function personMini(item){
     <div style="font-weight:700">${item.name} <span class="label">${item.division} / ${item.team} / ${item.grade}</span></div>
     <div class="metrics" style="margin-top:8px">
       <div><div class="label">위험지수</div><strong>${item.scopedRisk}점</strong></div>
-      <div><div class="label">일평균 총부하시간</div><strong>${formatHoursToHM(dailyTotalLoad)}</strong></div>
-      <div><div class="label">월 총 연장근로</div><strong>${formatHoursToHM(toSafeNumber(item.scopedMonthlyOvertime || 0))}</strong></div>
+      <div><div class="label">일평균 총부하시간</div><strong>${dailyTotalLoad.toFixed(1)}h</strong></div>
+      <div><div class="label">월 총 연장근로</div><strong>${item.scopedMonthlyOvertime}h</strong></div>
       <div><div class="label">이슈일수</div><strong>${issueDays.toFixed(0)}일</strong></div>
-      <div><div class="label">숨은초과</div><strong>${formatHoursToHM(hiddenOvertime)}</strong></div>
-      <div><div class="label">월 총 근무시간</div><strong>${formatHoursToHM(toSafeNumber(item.scopedMonthlyHours || 0))}</strong></div>
+      <div><div class="label">숨은초과</div><strong>${hiddenOvertime.toFixed(1)}h</strong></div>
+      <div><div class="label">월 총 근무시간</div><strong>${item.scopedMonthlyHours}h</strong></div>
       <div><div class="label">휴식지수</div><strong style="color:${recoveryColor}">${recoveryIndex}점 (${recoveryText})</strong></div>
     </div>
   </div>`;
@@ -7865,7 +7865,7 @@ function renderPeople(scoped){
     const recoveryColor = recoveryCls === 'green' ? '#16a34a' : recoveryCls === 'amber' ? '#d97706' : '#ef4444';
     const issueDays = toSafeNumber(item.scopedIssueDays ?? item.issueDays ?? 0);
     const hiddenOvertime = toSafeNumber(item.scopedMonthlyHiddenOvertime ?? item.monthlyHiddenOvertime ?? 0);
-    return `<div class="riskItem"><div><div style="display:flex;gap:8px;align-items:center"><strong>${item.name}</strong><span class="badge ${cls}">${txt}</span></div><div class="label" style="margin-top:6px">${item.division} / ${item.team} / ${item.grade}</div></div><div class="riskInlineMetrics"><div class="riskInlineItem"><span class="k">위험지수</span><span class="v">${item.scopedRisk}점</span></div><div class="riskInlineItem"><span class="k">총부하</span><span class="v">${formatHoursToHM(dailyTotalLoad)}</span></div><div class="riskInlineItem"><span class="k">연장근로</span><span class="v">${formatHoursToHM(toSafeNumber(item.scopedMonthlyOvertime || 0))}</span></div><div class="riskInlineItem"><span class="k">이슈</span><span class="v">${issueDays.toFixed(0)}일</span></div><div class="riskInlineItem"><span class="k">숨은초과</span><span class="v">${formatHoursToHM(hiddenOvertime)}</span></div><div class="riskInlineItem"><span class="k">근무</span><span class="v">${formatHoursToHM(toSafeNumber(item.scopedMonthlyHours || 0))}</span></div><div class="riskInlineItem"><span class="k">휴식</span><span class="v" style="color:${recoveryColor}">${recoveryIndex}점 (${recoveryText})</span></div></div></div>`;
+    return `<div class="riskItem"><div><div style="display:flex;gap:8px;align-items:center"><strong>${item.name}</strong><span class="badge ${cls}">${txt}</span></div><div class="label" style="margin-top:6px">${item.division} / ${item.team} / ${item.grade}</div></div><div class="riskInlineMetrics"><div class="riskInlineItem"><span class="k">위험지수</span><span class="v">${item.scopedRisk}점</span></div><div class="riskInlineItem"><span class="k">총부하</span><span class="v">${dailyTotalLoad.toFixed(1)}h</span></div><div class="riskInlineItem"><span class="k">연장근로</span><span class="v">${item.scopedMonthlyOvertime}h</span></div><div class="riskInlineItem"><span class="k">이슈</span><span class="v">${issueDays.toFixed(0)}일</span></div><div class="riskInlineItem"><span class="k">숨은초과</span><span class="v">${hiddenOvertime.toFixed(1)}h</span></div><div class="riskInlineItem"><span class="k">근무</span><span class="v">${item.scopedMonthlyHours}h</span></div><div class="riskInlineItem"><span class="k">휴식</span><span class="v" style="color:${recoveryColor}">${recoveryIndex}점 (${recoveryText})</span></div></div></div>`;
   }).join('');
 }
 
@@ -8833,15 +8833,20 @@ function renderAbsenceCheckSelect(row){
 
 function isAutoOvertimeInvalidDisplayRow(row){
   const recordId = String(row?.recordId || row?.id || '').trim();
-  const manualOverride = String(getPendingOvertimeCheck(recordId) || getSavedOvertimeCheckOverride(row) || '').trim();
-  // ✅ 자동 미인정은 "기본 판정"으로만 사용한다.
-  // 사용자가 인정/부분인정/미인정으로 저장하거나 현재 화면에서 바꾼 값이 있으면 그 값을 최우선 적용한다.
-  if(['인정','부분인정','미인정','확인필요'].includes(manualOverride)) return false;
+  const pendingOverride = String(getPendingOvertimeCheck(recordId) || '').trim();
+  // 현재 화면에서 사용자가 직접 변경한 값은 즉시 우선한다.
+  if(['인정','부분인정','미인정','확인필요'].includes(pendingOverride)) return false;
+
+  const hasErpOvertime = String(row?.erpOTDisplay || '').trim() && String(row?.erpOTDisplay || '').trim() !== '-';
+  if(hasErpOvertime && row?.autoOtInvalid === true) return true;
+
+  const manualOverride = String(getSavedOvertimeCheckOverride(row) || '').trim();
+  if(['부분인정','미인정','확인필요'].includes(manualOverride)) return false;
+  // 과거 자동값으로 저장된 '인정'은 자동 미인정 판정 표시를 막지 않도록 아래 조건으로 계속 검증한다.
 
   const checkValue = String(row?.overtimeCheck || row?.overtimeCheckResult || row?.overtime_check_result || '').trim();
   const reasonText = String([row?.reason, row?.primaryReason, row?.secondaryReason].filter(Boolean).join(' '));
   const statusText = String(row?.statusLabel || row?.status || '').trim();
-  const hasErpOvertime = String(row?.erpOTDisplay || '').trim() && String(row?.erpOTDisplay || '').trim() !== '-';
   return hasErpOvertime && checkValue === '미인정' && (reasonText.includes('연장근무 미인정') || statusText === '문제');
 }
 
@@ -9311,9 +9316,9 @@ function decorateAttendanceRow(row, metaByName){
       erpOTDisplay: formatHoursToHM(erpOT)
     });
     const adjustedHours = Number(otValidationFields?.adjustedWorkHours);
-    const baseHours = Number(otValidationFields?.baseWorkHours);
-    if (Number.isFinite(adjustedHours) && Number.isFinite(baseHours)) {
-      const comparableBaseHours = baseHours > 0 ? baseHours : 0;
+    const rawBaseHours = Number(otValidationFields?.baseWorkHours);
+    if (Number.isFinite(adjustedHours)) {
+      const comparableBaseHours = Number.isFinite(rawBaseHours) && rawBaseHours > 0 ? rawBaseHours : 0;
       adjustedBasedOT = Math.max(0, +(adjustedHours - comparableBaseHours).toFixed(2));
     }
 
@@ -9331,10 +9336,11 @@ function decorateAttendanceRow(row, metaByName){
   const pendingOvertimeCheck = String(getPendingOvertimeCheck(row.recordId) || '').trim();
   const effectiveSavedOvertimeCheck = String(pendingOvertimeCheck || savedOvertimeCheck || '').trim();
 
-  // ✅ 자동판정은 기본값으로만 사용한다.
-  // 사용자가 OT확인을 인정/부분인정/미인정으로 저장하거나 현재 화면에서 변경한 값이 있으면
-  // 8시보정 기반 자동 미인정 판정보다 수동값을 최우선 적용한다.
-  if (erpOT > 0 && ['인정','부분인정','미인정','확인필요'].includes(effectiveSavedOvertimeCheck)) {
+  // ✅ 자동판정은 기본값으로만 사용하되, 자동 미인정 행의 기존 저장값 '인정'은 무시한다.
+  // 이유: 과거 자동/기본값으로 저장된 '인정'이 있으면 8시보정-기본근무 < ERP OT 행이 다시 인정으로 돌아가는 문제가 발생한다.
+  // 현재 화면에서 직접 바꾼 pending 값이나 부분인정/미인정 저장값은 계속 우선한다.
+  const canUseSavedOvertimeCheck = !!pendingOvertimeCheck || !autoOtInvalid || effectiveSavedOvertimeCheck !== '인정';
+  if (erpOT > 0 && canUseSavedOvertimeCheck && ['인정','부분인정','미인정','확인필요'].includes(effectiveSavedOvertimeCheck)) {
     overtimeCheck = (effectiveSavedOvertimeCheck === '확인필요' ? '미인정' : effectiveSavedOvertimeCheck);
     autoOtInvalid = false;
   } else if (erpOT <= 0) {
@@ -9487,6 +9493,7 @@ function decorateAttendanceRow(row, metaByName){
     overtimeCheck: (dispatchRule || dispatchHalfDayRule || workFromHomeRule) ? '-' : (erpOT > 0 ? overtimeCheck : '-'),
     overtimeCheckResult: (dispatchRule || dispatchHalfDayRule || workFromHomeRule) ? '' : (erpOT > 0 ? overtimeCheck : ''),
     overtime_check_result: (dispatchRule || dispatchHalfDayRule || workFromHomeRule) ? '' : (erpOT > 0 ? overtimeCheck : ''),
+    autoOtInvalid: !!autoOtInvalid,
     approvedOvertimeDisplay: (dispatchRule || dispatchHalfDayRule || workFromHomeRule) ? '-' : (erpOT > 0 ? approvedOvertimeDisplay : ''),
     seccomOTDisplay: (dispatchRule || dispatchHalfDayRule || workFromHomeRule) ? '-' : (seccomOT === null ? '미계산' : formatHoursToHM(seccomOT)),
     erpOTDisplay: (dispatchRule || dispatchHalfDayRule || workFromHomeRule) ? '-' : (erpOT > 0 ? formatHoursToHM(erpOT) : '-')
@@ -10980,9 +10987,10 @@ function deriveAttendanceRow(row, metaByName){
       erpOTDisplay: formatHoursToHM(erpOT)
     });
     const adjustedHours = Number(otValidationFields?.adjustedWorkHours);
-    const baseHours = Number(otValidationFields?.baseWorkHours);
-    if (Number.isFinite(adjustedHours) && Number.isFinite(baseHours)) {
-      adjustedBasedOT = Math.max(0, +(adjustedHours - baseHours).toFixed(2));
+    const rawBaseHours = Number(otValidationFields?.baseWorkHours);
+    if (Number.isFinite(adjustedHours)) {
+      const comparableBaseHours = Number.isFinite(rawBaseHours) && rawBaseHours > 0 ? rawBaseHours : 0;
+      adjustedBasedOT = Math.max(0, +(adjustedHours - comparableBaseHours).toFixed(2));
     }
 
     if (adjustedBasedOT === null) {
@@ -10997,14 +11005,16 @@ function deriveAttendanceRow(row, metaByName){
       statusLabel = '문제';
     }
 
-    const manualOvertimeCheck = String(
-      getPendingOvertimeCheck(row.recordId || row.id) ||
+    const pendingManualOvertimeCheck = String(getPendingOvertimeCheck(row.recordId || row.id) || '').trim();
+    const savedManualOvertimeCheck = String(
       getSavedOvertimeCheckOverride(row) ||
       row.overtimeCheckResult ||
       row.overtime_check_result ||
       ''
     ).trim();
-    if(['인정','부분인정','미인정','확인필요'].includes(manualOvertimeCheck)){
+    const manualOvertimeCheck = String(pendingManualOvertimeCheck || savedManualOvertimeCheck || '').trim();
+    const canUseManualOvertimeCheck = !!pendingManualOvertimeCheck || adjustedBasedOT === null || adjustedBasedOT + 0.001 >= erpOT || manualOvertimeCheck !== '인정';
+    if(canUseManualOvertimeCheck && ['인정','부분인정','미인정','확인필요'].includes(manualOvertimeCheck)){
       overtimeCheck = (manualOvertimeCheck === '확인필요' ? '미인정' : manualOvertimeCheck);
       if(overtimeCheck === '미인정'){
         bucket = '문제';
