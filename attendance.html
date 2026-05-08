@@ -20,7 +20,7 @@
 <!-- risk floor gate fixed: if monthly adjusted work hours is below 40h including 0h, final personal risk score is 0; period risk adder is not reapplied; total load display remains unchanged -->
 <!-- OT manual override fixed: auto 미인정 is default only; saved/pending 인정·부분인정·미인정 has priority over auto invalid display -->
 <!-- risk people display updated: outdoor replaced with issue days; hidden overtime displayed before monthly work; issue-only risk promotion softened -->
-<!-- risk promotion refined: OT 30h+ becomes risk only when total load is 9h+ or hidden overtime is 1h+; OT 30h alone remains warning -->
+<!-- risk promotion refined: OT 30h+ becomes risk only when total load is 9h+ or monthly hidden overtime is 10h+; OT 30h alone remains warning -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -5040,6 +5040,7 @@ function applyAttritionRiskModel(scopedList){
     const ot = toSafeNumber(person.scopedMonthlyOvertime || 0);
     const totalLoad = toSafeNumber(totalLoadDaily);
     const hidden = toSafeNumber(hiddenDaily);
+    const monthlyHidden = toSafeNumber(person.scopedMonthlyHiddenOvertime || person.monthlyHiddenOvertime || 0);
     const issues = toSafeNumber(issueDays);
     const leave = toSafeNumber(person.leaveUsed || 0);
 
@@ -5049,7 +5050,7 @@ function applyAttritionRiskModel(scopedList){
       ot >= 45 ||
       totalLoad >= 10.5 ||
       hidden >= 1.0 ||
-      (ot >= 30 && (totalLoad >= 9 || hidden >= 1.0)) ||
+      (ot >= 30 && (totalLoad >= 9 || monthlyHidden >= 10)) ||
       (ot >= 40 && leave <= 1) ||
       (ot >= 40 && issues >= 5) ||
       (totalLoad >= 10 && hidden >= 0.5)
@@ -7451,11 +7452,11 @@ function personMini(item){
     <div style="font-weight:700">${item.name} <span class="label">${item.division} / ${item.team} / ${item.grade}</span></div>
     <div class="metrics" style="margin-top:8px">
       <div><div class="label">위험지수</div><strong>${item.scopedRisk}점</strong></div>
-      <div><div class="label">일평균 총부하시간</div><strong>${dailyTotalLoad.toFixed(1)}h</strong></div>
-      <div><div class="label">월 총 연장근로</div><strong>${item.scopedMonthlyOvertime}h</strong></div>
+      <div><div class="label">일평균 총부하시간</div><strong>${formatHoursToHM(dailyTotalLoad)}</strong></div>
+      <div><div class="label">월 총 연장근로</div><strong>${formatHoursToHM(toSafeNumber(item.scopedMonthlyOvertime || 0))}</strong></div>
       <div><div class="label">이슈일수</div><strong>${issueDays.toFixed(0)}일</strong></div>
-      <div><div class="label">숨은초과</div><strong>${hiddenOvertime.toFixed(1)}h</strong></div>
-      <div><div class="label">월 총 근무시간</div><strong>${item.scopedMonthlyHours}h</strong></div>
+      <div><div class="label">숨은초과</div><strong>${formatHoursToHM(hiddenOvertime)}</strong></div>
+      <div><div class="label">월 총 근무시간</div><strong>${formatHoursToHM(toSafeNumber(item.scopedMonthlyHours || 0))}</strong></div>
       <div><div class="label">휴식지수</div><strong style="color:${recoveryColor}">${recoveryIndex}점 (${recoveryText})</strong></div>
     </div>
   </div>`;
@@ -7864,7 +7865,7 @@ function renderPeople(scoped){
     const recoveryColor = recoveryCls === 'green' ? '#16a34a' : recoveryCls === 'amber' ? '#d97706' : '#ef4444';
     const issueDays = toSafeNumber(item.scopedIssueDays ?? item.issueDays ?? 0);
     const hiddenOvertime = toSafeNumber(item.scopedMonthlyHiddenOvertime ?? item.monthlyHiddenOvertime ?? 0);
-    return `<div class="riskItem"><div><div style="display:flex;gap:8px;align-items:center"><strong>${item.name}</strong><span class="badge ${cls}">${txt}</span></div><div class="label" style="margin-top:6px">${item.division} / ${item.team} / ${item.grade}</div></div><div class="riskInlineMetrics"><div class="riskInlineItem"><span class="k">위험지수</span><span class="v">${item.scopedRisk}점</span></div><div class="riskInlineItem"><span class="k">총부하</span><span class="v">${dailyTotalLoad.toFixed(1)}h</span></div><div class="riskInlineItem"><span class="k">연장근로</span><span class="v">${item.scopedMonthlyOvertime}h</span></div><div class="riskInlineItem"><span class="k">이슈</span><span class="v">${issueDays.toFixed(0)}일</span></div><div class="riskInlineItem"><span class="k">숨은초과</span><span class="v">${hiddenOvertime.toFixed(1)}h</span></div><div class="riskInlineItem"><span class="k">근무</span><span class="v">${item.scopedMonthlyHours}h</span></div><div class="riskInlineItem"><span class="k">휴식</span><span class="v" style="color:${recoveryColor}">${recoveryIndex}점 (${recoveryText})</span></div></div></div>`;
+    return `<div class="riskItem"><div><div style="display:flex;gap:8px;align-items:center"><strong>${item.name}</strong><span class="badge ${cls}">${txt}</span></div><div class="label" style="margin-top:6px">${item.division} / ${item.team} / ${item.grade}</div></div><div class="riskInlineMetrics"><div class="riskInlineItem"><span class="k">위험지수</span><span class="v">${item.scopedRisk}점</span></div><div class="riskInlineItem"><span class="k">총부하</span><span class="v">${formatHoursToHM(dailyTotalLoad)}</span></div><div class="riskInlineItem"><span class="k">연장근로</span><span class="v">${formatHoursToHM(toSafeNumber(item.scopedMonthlyOvertime || 0))}</span></div><div class="riskInlineItem"><span class="k">이슈</span><span class="v">${issueDays.toFixed(0)}일</span></div><div class="riskInlineItem"><span class="k">숨은초과</span><span class="v">${formatHoursToHM(hiddenOvertime)}</span></div><div class="riskInlineItem"><span class="k">근무</span><span class="v">${formatHoursToHM(toSafeNumber(item.scopedMonthlyHours || 0))}</span></div><div class="riskInlineItem"><span class="k">휴식</span><span class="v" style="color:${recoveryColor}">${recoveryIndex}점 (${recoveryText})</span></div></div></div>`;
   }).join('');
 }
 
