@@ -10325,9 +10325,12 @@ function getAttendanceAnalysisFields(row){
   // ✅ 숨은초과 노이즈 제거
   // 10분 미만의 숨은초과는 출퇴근/근태 상세 단계에서 0:00으로 처리한다.
   // 이후 월 숨은초과, 평균 숨은초과, 총부하, 위험지수는 이 값을 기준으로 자동 집계된다.
-  if(hiddenOvertimeHours !== null && hiddenOvertimeHours * 60 < 10){
-    hiddenOvertimeHours = 0;
-  }
+if(
+  hiddenOvertimeHours !== null &&
+  Math.round(hiddenOvertimeHours * 60) < 10
+){
+  hiddenOvertimeHours = 0;
+}
 
   return {
     analysisWorkDisplay: finalAnalysisWorkHours === null ? '-' : formatHoursToHM(finalAnalysisWorkHours),
