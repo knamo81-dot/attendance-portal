@@ -4170,11 +4170,12 @@ function rebuildDerivedMetricsFromAttendance(){
     if(hasAfternoonOutdoor) person.outdoorDays += 0.5;
     if(hasFullOutdoor) person.outdoorDays += 1;
 
-    if(row.bucket === '문제'){
+    const isRiskIssue = isRiskRelatedIssueReason(row, reason);
+    if(row.bucket === '문제' && isRiskIssue){
       person.risk += 20;
       person.issueDays += 1;
       if(isRecoveryRelatedIssueReason(reason)) person.recoveryIssueDays = Number(person.recoveryIssueDays || 0) + 1;
-    }else if(row.bucket === '주의'){
+    }else if(row.bucket === '주의' && isRiskIssue){
       person.risk += 8;
       person.issueDays += 1;
       if(isRecoveryRelatedIssueReason(reason)) person.recoveryIssueDays = Number(person.recoveryIssueDays || 0) + 1;
@@ -5114,6 +5115,57 @@ function toSafeNumber(value){
   return Number.isFinite(num) ? num : 0;
 }
 
+
+
+function isRecordMissingOnlyRiskIssue(row, reason){
+  const missingTokens = [
+    '출퇴근미입력','출퇴근 미입력',
+    '출근미입력','출근 미입력','출근누락','출근 누락',
+    '퇴근미입력','퇴근 미입력','퇴근누락','퇴근 누락'
+  ];
+  const riskTokens = [
+    '연장근무','연장근로','야근','공휴일근무','휴일근무','휴무일근무',
+    '숨은초과','초과근무','OT','ot','결근','조퇴','지각','근무시간 부족','단축근무 부족'
+  ];
+  const merged = normalizeAttendanceReasonText([
+    reason,
+    row?.reason,
+    row?.originalErpReason,
+    row?.erpReason,
+    row?.statusReason,
+    row?.status,
+    row?.bucket,
+    row?.displayStart,
+    row?.displayEnd
+  ].filter(Boolean).join(' '));
+  const hasMissingToken = missingTokens.some(token => merged.includes(token));
+  if(!hasMissingToken) return false;
+
+  const hasRealRiskToken = riskTokens.some(token => merged.includes(token));
+  if(hasRealRiskToken) return false;
+
+  let withoutMissing = merged;
+  missingTokens.forEach(token => {
+    withoutMissing = withoutMissing.split(token).join(' ');
+  });
+  withoutMissing = withoutMissing
+    .replace(/문제|주의|미입력|없음|-/g, ' ')
+    .replace(/[-|/·,]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const flags = (typeof getAttendanceWarningFlags === 'function')
+    ? getAttendanceWarningFlags(row)
+    : { isOvertime:false, isHoliday:false, isMissingStart:false, isMissingEnd:false };
+
+  return !flags.isOvertime && !flags.isHoliday && (flags.isMissingStart || flags.isMissingEnd || hasMissingToken) && !withoutMissing;
+}
+
+function isRiskRelatedIssueReason(row, reason){
+  // 출근미입력/퇴근미입력/출퇴근미입력은 기록 누락 성격이므로 위험지수 계산에서 제외한다.
+  // 단, 같은 행에 연장근무·공휴일근무·결근·조퇴·지각·근무시간부족 등 실제 업무/피로 리스크가 함께 있으면 위험지수에 반영한다.
+  return !isRecordMissingOnlyRiskIssue(row, reason);
+}
 
 function isRecoveryRelatedIssueReason(reason){
   const normalized = normalizeAttendanceReasonText(reason || '');
@@ -6371,8 +6423,9 @@ function trendEmployeesForMonth(ym){
     if(normalizedReason.includes('오전외근')) person.outdoorDays += 0.5;
     if(normalizedReason.includes('오후외근')) person.outdoorDays += 0.5;
     if(normalizedReason.includes('외근') && !normalizedReason.includes('오전외근') && !normalizedReason.includes('오후외근')) person.outdoorDays += 1;
-    if(row.bucket === '문제'){ person.risk += 20; person.issueDays += 1; if(isRecoveryRelatedIssueReason(reason)) person.recoveryIssueDays = Number(person.recoveryIssueDays || 0) + 1; }
-    else if(row.bucket === '주의'){ person.risk += 8; person.issueDays += 1; if(isRecoveryRelatedIssueReason(reason)) person.recoveryIssueDays = Number(person.recoveryIssueDays || 0) + 1; }
+    const isRiskIssue = isRiskRelatedIssueReason(row, reason);
+    if(row.bucket === '문제' && isRiskIssue){ person.risk += 20; person.issueDays += 1; if(isRecoveryRelatedIssueReason(reason)) person.recoveryIssueDays = Number(person.recoveryIssueDays || 0) + 1; }
+    else if(row.bucket === '주의' && isRiskIssue){ person.risk += 8; person.issueDays += 1; if(isRecoveryRelatedIssueReason(reason)) person.recoveryIssueDays = Number(person.recoveryIssueDays || 0) + 1; }
     if(reason.includes('결근')) person.risk += 20;
     if(reason.includes('조퇴')) person.risk += 8;
     if(reason.includes('지각')) person.risk += 6;
