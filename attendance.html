@@ -16,6 +16,7 @@
 <!-- personal risk model refined: direct risk only absence/overtime; missing clocks, leave, sick leave, dispatch, work-shortage and short-time work excluded; outdoor/early-leave conditional weak only -->
 <!-- dispatch + half-day display fixed: no missing-clock warning and no work-time value in 근무시간 column; analysis columns still show 4:00 -->
 <!-- monthly work display fixed: dashboard/deep/trend 담당자 근무시간 uses 8시보정 합계(monthlyAdjustedWorkHours) instead of raw 근무시간 column 합계 -->
+<!-- totalLoadScore tuned: 0h=0, 0~7h=5, 7h+=10, 8.5h+=35, 9.5h+=75, 10.5h+=100 -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -4981,11 +4982,11 @@ function applyAttritionRiskModel(scopedList){
     const issueDays = toSafeNumber(person.scopedIssueDays || person.issueDays || 0);
 
     const totalLoadScore =
-      totalLoadDaily >= 11 ? 100 :
-      totalLoadDaily >= 10 ? 90 :
+      totalLoadDaily >= 10.5 ? 100 :
       totalLoadDaily >= 9.5 ? 75 :
-      totalLoadDaily >= 9 ? 60 :
-      totalLoadDaily >= 8.5 ? 35 : 10;
+      totalLoadDaily >= 8.5 ? 35 :
+      totalLoadDaily >= 7.0 ? 10 :
+      totalLoadDaily > 0 ? 5 : 0;
 
     const hiddenOvertimeScore =
       hiddenDaily >= 1.5 ? 100 :
@@ -6598,11 +6599,11 @@ function trendDeepRadarMetricsForMonth(ym, people){
     : 0;
 
   const totalLoadScore =
-    avgDailyTotalLoad >= 11 ? 100 :
-    avgDailyTotalLoad >= 10 ? 90 :
+    avgDailyTotalLoad >= 10.5 ? 100 :
     avgDailyTotalLoad >= 9.5 ? 75 :
-    avgDailyTotalLoad >= 9 ? 60 :
-    avgDailyTotalLoad >= 8.5 ? 35 : 10;
+    avgDailyTotalLoad >= 8.5 ? 35 :
+    avgDailyTotalLoad >= 7.0 ? 10 :
+    avgDailyTotalLoad > 0 ? 5 : 0;
   const hiddenScore =
     avgHiddenDaily >= 1.0 ? 100 :
     avgHiddenDaily >= 0.5 ? 75 :
@@ -7218,11 +7219,11 @@ function renderTopCharts(scoped, months){
     : 0;
 
   const totalLoadScore =
-    avgDailyTotalLoad >= 11 ? 100 :
-    avgDailyTotalLoad >= 10 ? 90 :
+    avgDailyTotalLoad >= 10.5 ? 100 :
     avgDailyTotalLoad >= 9.5 ? 75 :
-    avgDailyTotalLoad >= 9 ? 60 :
-    avgDailyTotalLoad >= 8.5 ? 35 : 10;
+    avgDailyTotalLoad >= 8.5 ? 35 :
+    avgDailyTotalLoad >= 7.0 ? 10 :
+    avgDailyTotalLoad > 0 ? 5 : 0;
   const hiddenScore =
     avgHiddenDaily >= 1.0 ? 100 :
     avgHiddenDaily >= 0.5 ? 75 :
