@@ -9928,9 +9928,14 @@ function getAttendanceAnalysisFields(row){
         (typeof getAttendanceBaseReason === 'function' ? getAttendanceBaseReason(row) : '')
       ].filter(Boolean).join(' ');
 
-  const isHalfDayLike = (typeof isHalfDayLikeBundle === 'function')
+  // ✅ 검진휴가 반일 처리
+  // 검진휴가는 오전/오후 모두 가능한 공식 반일 휴가이므로,
+  // 일반근무처럼 점심 1시간을 일괄 차감하지 않고 실제 출퇴근 구간을 그대로 실근무/8시보정에 반영한다.
+  const isMedicalCheckupLeave = /검진휴가/.test(String(reasonBundle || ''));
+
+  const isHalfDayLike = isMedicalCheckupLeave || ((typeof isHalfDayLikeBundle === 'function')
     ? isHalfDayLikeBundle(reasonBundle)
-    : /오전반차|오후반차/.test(String(reasonBundle || ''));
+    : /오전반차|오후반차/.test(String(reasonBundle || '')));
   // ✅ 파견 + 연차휴가 분석값 보정
   // 연차휴가가 포함된 경우에는 파견 fallback 8:00을 적용하지 않는다.
   // 반차는 isHalfDayLike 기준으로 4:00을 유지한다.
@@ -9948,9 +9953,11 @@ function getAttendanceAnalysisFields(row){
 
   const isHolidayWorkCandidate = ((typeof HOLIDAY_DATE_SET !== 'undefined' && HOLIDAY_DATE_SET.has(String(row?.date || ''))) ||
     (typeof isHolidayLike === 'function' && isHolidayLike(String(row?.reason || ''))));
-  const analysisLunchDeductHours = isHolidayWorkCandidate
-    ? getAttendanceLunchDeductionHours(startMinRaw, endMinRaw, ANALYSIS_LUNCH_HOURS)
-    : ANALYSIS_LUNCH_HOURS;
+  const analysisLunchDeductHours = isMedicalCheckupLeave
+    ? 0
+    : (isHolidayWorkCandidate
+      ? getAttendanceLunchDeductionHours(startMinRaw, endMinRaw, ANALYSIS_LUNCH_HOURS)
+      : ANALYSIS_LUNCH_HOURS);
 
   const baseCapHours = isHalfDayLike ? 4 : 8;
   const fallbackWorkHours = isHalfDayLike ? 4 : (isFieldLike ? 8 : null);
