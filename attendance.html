@@ -14,6 +14,7 @@
 <!-- missing analysis stabilized: potential start/end use same blank-clock display rule -->
 <!-- actual overtime source fixed: ERP I column 실제연장_시간 only; 연장신청_시간 excluded from overtime counts -->
 <!-- personal risk model refined: direct risk only absence/overtime; missing clocks, leave, sick leave, dispatch, work-shortage and short-time work excluded; outdoor/early-leave conditional weak only -->
+<!-- dispatch + half-day display fixed: no missing-clock warning and no work-time value in 근무시간 column; analysis columns still show 4:00 -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -8989,6 +8990,10 @@ function decorateAttendanceRow(row, metaByName){
   // 단, 사유 표시에는 보조 사유로 '파견'을 유지한다.
   const isDispatchSpecial = specialType === '파견';
   const dispatchRule = isDispatchSpecial && !isVacationReason(rawReason);
+  // ✅ 파견 + 반차 보정
+  // 파견 기간 중 오전/오후반차는 출퇴근 누락으로 보지 않고,
+  // 근무시간 컬럼은 '-'로 두되 실근무/8시보정/기본근무 분석값은 반차 기준 4:00으로 계산한다.
+  const dispatchHalfDayRule = isDispatchSpecial && isHalfDayVacationReason(rawReason);
   const workFromHomeRule = specialType === '재택근무';
   const localOvertimeCheck = getSavedOvertimeCheckOverride(row);
   const savedOvertimeCheck = String(localOvertimeCheck || row.overtimeCheckResult || row.overtime_check_result || '').trim();
@@ -9005,7 +9010,17 @@ function decorateAttendanceRow(row, metaByName){
     return formatHoursToHM(Math.max(0, (endMin - startMin) / 60));
   }
 
-  if (dispatchRule) {
+  if (dispatchHalfDayRule) {
+    displayStart = '-';
+    displayEnd = '-';
+    totalWork = '-';
+    bucket = '근태사유';
+    statusLabel = '';
+    reason = rawReason;
+    overtimeCheck = '-';
+    seccomOT = 0;
+
+  } else if (dispatchRule) {
     displayStart = '-';
     displayEnd = '-';
     totalWork = '-';
@@ -9384,7 +9399,7 @@ function decorateAttendanceRow(row, metaByName){
   }
 
   // 저장된/선택된 OT확인 값은 연장근로가 있을 때만 상태에 반영
-  if (dispatchRule || workFromHomeRule) {
+  if (dispatchRule || dispatchHalfDayRule || workFromHomeRule) {
     statusLabel = '';
   } else if (erpOT > 0 && overtimeCheck === '미인정') {
     bucket = '문제';
@@ -9424,13 +9439,13 @@ function decorateAttendanceRow(row, metaByName){
     primaryReason,
     secondaryReason,
     reason: displayReason,
-    absenceDecision: (dispatchRule || workFromHomeRule) ? '' : (savedAbsenceDecision || ((displayStart === '출근누락' && displayEnd === '퇴근누락') ? '결근' : '')),
-    overtimeCheck: (dispatchRule || workFromHomeRule) ? '-' : (erpOT > 0 ? overtimeCheck : '-'),
-    overtimeCheckResult: (dispatchRule || workFromHomeRule) ? '' : (erpOT > 0 ? overtimeCheck : ''),
-    overtime_check_result: (dispatchRule || workFromHomeRule) ? '' : (erpOT > 0 ? overtimeCheck : ''),
-    approvedOvertimeDisplay: (dispatchRule || workFromHomeRule) ? '-' : (erpOT > 0 ? approvedOvertimeDisplay : ''),
-    seccomOTDisplay: (dispatchRule || workFromHomeRule) ? '-' : (seccomOT === null ? '미계산' : formatHoursToHM(seccomOT)),
-    erpOTDisplay: (dispatchRule || workFromHomeRule) ? '-' : (erpOT > 0 ? formatHoursToHM(erpOT) : '-')
+    absenceDecision: (dispatchRule || dispatchHalfDayRule || workFromHomeRule) ? '' : (savedAbsenceDecision || ((displayStart === '출근누락' && displayEnd === '퇴근누락') ? '결근' : '')),
+    overtimeCheck: (dispatchRule || dispatchHalfDayRule || workFromHomeRule) ? '-' : (erpOT > 0 ? overtimeCheck : '-'),
+    overtimeCheckResult: (dispatchRule || dispatchHalfDayRule || workFromHomeRule) ? '' : (erpOT > 0 ? overtimeCheck : ''),
+    overtime_check_result: (dispatchRule || dispatchHalfDayRule || workFromHomeRule) ? '' : (erpOT > 0 ? overtimeCheck : ''),
+    approvedOvertimeDisplay: (dispatchRule || dispatchHalfDayRule || workFromHomeRule) ? '-' : (erpOT > 0 ? approvedOvertimeDisplay : ''),
+    seccomOTDisplay: (dispatchRule || dispatchHalfDayRule || workFromHomeRule) ? '-' : (seccomOT === null ? '미계산' : formatHoursToHM(seccomOT)),
+    erpOTDisplay: (dispatchRule || dispatchHalfDayRule || workFromHomeRule) ? '-' : (erpOT > 0 ? formatHoursToHM(erpOT) : '-')
   };
 }
 function hasAttendanceActualWork(row){
@@ -10776,6 +10791,10 @@ function deriveAttendanceRow(row, metaByName){
   const fullDayReasons = ['외근','오전외근','오후외근','출장'];
   const halfDayReasons = ['오전반차','오후반차','반차'];
   const leaveOnlyReasons = ['육아휴직','출산휴가','산전후휴가','병가','가족돌봄휴직','장기휴직','휴직','연차','공가','보건휴가'];
+  const applicableSpecialNote = findApplicableSpecialNote({ ...row, name: cleanedName, employeeId: row.employeeId || meta?.id || row.id || '' });
+  const specialType = String(applicableSpecialNote?.specialType || '').trim();
+  const isDispatchSpecial = specialType === '파견';
+  const dispatchHalfDayRule = isDispatchSpecial && halfDayReasons.includes(rawReason);
 
   let displayStart = startRaw || '';
   let displayEnd = endRaw || '';
@@ -10839,7 +10858,11 @@ function deriveAttendanceRow(row, metaByName){
   }
 
   if (halfDayReasons.includes(rawReason)) {
-    if(rawReason === '오전반차'){
+    if(dispatchHalfDayRule){
+      displayStart = '-';
+      displayEnd = '-';
+      totalWork = '';
+    }else if(rawReason === '오전반차'){
       displayStart = '-';
       displayEnd = endRaw || '퇴근누락';
       totalWork = endRaw ? calcMorningHalfDayWorkText(endRaw) : '';
