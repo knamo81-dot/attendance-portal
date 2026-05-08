@@ -8450,21 +8450,28 @@ function getPendingApprovedOvertime(recordId){
 function getDefaultApprovedOvertimeValue(row, overtimeCheckValue){
   const checkValue = String(overtimeCheckValue || '').trim();
   const recordId = String(row?.recordId || '').trim();
-  const pendingApproved = getPendingApprovedOvertime(recordId);
-  const savedApproved = String(pendingApproved || getSavedApprovedOvertimeOverride(row) || row?.approvedOvertimeDisplay || '').trim();
+  const erpApproved = String(row?.erpOTDisplay || '').trim();
+
+  // ✅ OT확인을 '인정'으로 되돌릴 때는 부분인정에서 입력/생성된 pending/local 값을 보지 않고
+  // ERP 실제연장 시간을 다시 기준값으로 복구한다. (예: 4:30 → 부분인정 0:00 → 인정 4:30)
+  if(checkValue === '인정'){
+    return (erpApproved && erpApproved !== '-') ? erpApproved : '0:00';
+  }
+
   if(checkValue === '미인정'){
     return '0:00';
   }
+
+  const pendingApproved = getPendingApprovedOvertime(recordId);
+  const savedApproved = String(pendingApproved || getSavedApprovedOvertimeOverride(row) || row?.approvedOvertimeDisplay || '').trim();
+
   if(checkValue === '부분인정'){
     if(savedApproved && savedApproved !== '-') return savedApproved;
     if(String(row?.seccomOTDisplay || '').trim() && String(row.seccomOTDisplay).trim() !== '미계산'){
       return String(row.seccomOTDisplay).trim();
     }
-    if(String(row?.erpOTDisplay || '').trim()) return String(row.erpOTDisplay).trim();
+    if(erpApproved && erpApproved !== '-') return erpApproved;
     return '0:00';
-  }
-  if(checkValue === '인정'){
-    return String(row?.erpOTDisplay || '').trim() || '0:00';
   }
   return savedApproved;
 }
@@ -8481,17 +8488,23 @@ function markOvertimeCheckChanged(recordId, value){
     REAL_ATTENDANCE_DATA = REAL_ATTENDANCE_DATA.map(row => {
       if(String(row.recordId || '') !== rid) return row;
       const approvedOvertimeValue = getDefaultApprovedOvertimeValue(row, nextValue);
-      if(nextValue === '인정' || nextValue === '미인정'){
+      if(nextValue === '인정'){
+        // ✅ 인정으로 재변경 시 기존 부분인정값(0:00 등)을 무시하고 ERP OT로 즉시 복구
         PENDING_APPROVED_OVERTIME_CHANGES[rid] = approvedOvertimeValue;
+      } else if(nextValue === '미인정'){
+        PENDING_APPROVED_OVERTIME_CHANGES[rid] = '0:00';
       } else if(nextValue === '부분인정' && !getPendingApprovedOvertime(rid)){
         PENDING_APPROVED_OVERTIME_CHANGES[rid] = approvedOvertimeValue;
       }
+      const displayApprovedOvertime = nextValue === '인정'
+        ? approvedOvertimeValue
+        : (PENDING_APPROVED_OVERTIME_CHANGES[rid] || approvedOvertimeValue);
       return {
         ...row,
         overtimeCheckResult: nextValue,
         overtime_check_result: nextValue,
         overtimeCheck: nextValue,
-        approvedOvertimeDisplay: PENDING_APPROVED_OVERTIME_CHANGES[rid] || approvedOvertimeValue
+        approvedOvertimeDisplay: displayApprovedOvertime
       };
     });
   }
@@ -8649,16 +8662,21 @@ function renderApprovedOvertimeInput(row){
   const hasOvertime = !!String(row?.erpOTDisplay || '').trim();
   if(!hasOvertime) return '-';
   const recordId = String(row?.recordId || '').trim();
-  const currentCheck = String(getPendingOvertimeCheck(recordId) || getSavedOvertimeCheckOverride(row) || row?.overtimeCheck || '').trim();
+  const currentCheck = String(getPendingOvertimeCheck(recordId) || getSavedOvertimeCheckOverride(row) || row?.overtimeCheckResult || row?.overtime_check_result || row?.overtimeCheck || '').trim();
+  const erpApproved = String(row?.erpOTDisplay || '').trim();
   const currentApproved = String(getPendingApprovedOvertime(recordId) || row?.approvedOvertimeDisplay || getSavedApprovedOvertimeOverride(row) || '').trim();
   if(currentCheck === '미인정'){
     return '-';
   }
   if(currentCheck === '부분인정'){
-    const value = currentApproved && currentApproved !== '-' ? currentApproved : (String(row?.seccomOTDisplay || '').trim() && String(row.seccomOTDisplay).trim() !== '미계산' ? String(row.seccomOTDisplay).trim() : String(row?.erpOTDisplay || '').trim());
+    const value = currentApproved && currentApproved !== '-' ? currentApproved : (String(row?.seccomOTDisplay || '').trim() && String(row.seccomOTDisplay).trim() !== '미계산' ? String(row.seccomOTDisplay).trim() : erpApproved);
     return `<input type="text" value="${value}" data-record-id="${recordId}" placeholder="예: 1:30" style="width:86px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px" onchange="markApprovedOvertimeChanged(this.dataset.recordId, this.value)">`;
   }
-  return currentApproved || row?.erpOTDisplay || '-';
+  // ✅ 인정 상태에서는 저장/pending 된 부분인정값이 남아 있어도 ERP OT를 우선 표시
+  if(currentCheck === '인정'){
+    return (erpApproved && erpApproved !== '-') ? erpApproved : '0:00';
+  }
+  return currentApproved || erpApproved || '-';
 }
 
 async function updateOvertimeCheckResult(recordId, value){
