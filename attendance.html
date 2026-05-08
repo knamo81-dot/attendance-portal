@@ -24,6 +24,7 @@
 <!-- hidden overtime noise filter applied: values under 10 minutes are treated as 0:00 at detail-column generation stage -->
 <!-- org risk tab fix: undefined formatHourMinute references replaced with existing formatHoursToHM so dashboard/deep/trend/report/missing tabs bind normally -->
 <!-- organization risk score refined: org risk is calculated from risk/warning ratio, average total load, average OT, issue days, monthly hidden overtime, and recovery index; leave unused is no longer a direct org risk score driver -->
+<!-- org risk visual guide added: title threshold pills + score scale marker for normal/warning/risk 기준 -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -1027,14 +1028,36 @@ html.embed-mode #main-dashboard .kpis{
 #peopleList.scrollBox{max-height:none;overflow:visible;padding-right:0}
 #peopleList.scrollBox::-webkit-scrollbar{width:0}
 #peopleList.scrollBox::-webkit-scrollbar-thumb{background:transparent}
-.orgRiskScoreLabel{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--muted)}
+.orgRiskScoreLabel{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;font-size:12px;color:var(--muted)}
 .orgRiskScoreLabel .score{font-weight:900;color:#0f172a}
 .orgRiskScoreLabel .summary{font-weight:700;color:#64748b;text-align:right}
 .orgRiskOverallCard{border-color:#0f172a;background:#f8fafc}
 .orgRiskInsightCard.green{background:#f7fff8}
 .orgRiskInsightCard.amber{background:#fffaf0}
 .orgRiskInsightCard.red{background:#fff7f7}
-@media (max-width:700px){.orgRiskScoreLabel{flex-direction:column;align-items:flex-start}.orgRiskScoreLabel .summary{text-align:left}}
+.orgRiskTitleWrap{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.orgRiskTitleText{font-size:20px;font-weight:900;color:#0f172a}
+.orgRiskLegend{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.orgRiskLegendPill{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:900;border:1px solid #e2e8f0;background:#fff;white-space:nowrap}
+.orgRiskLegendPill.green{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}
+.orgRiskLegendPill.amber{background:#fffbeb;border-color:#fde68a;color:#b45309}
+.orgRiskLegendPill.red{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
+.orgRiskScale{position:relative;margin-top:12px;padding-top:12px;padding-bottom:24px}
+.orgRiskScaleTrack{height:12px;border-radius:999px;background:linear-gradient(90deg,#16a34a 0%,#16a34a 35%,#d97706 35%,#d97706 65%,#ef4444 65%,#ef4444 100%);box-shadow:inset 0 0 0 1px rgba(15,23,42,.08);overflow:hidden}
+.orgRiskScaleFill{display:none}
+.orgRiskScaleMarker{position:absolute;top:4px;left:var(--pos);transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;z-index:2}
+.orgRiskScaleMarkerDot{width:14px;height:14px;border-radius:999px;background:#0f172a;border:3px solid #fff;box-shadow:0 4px 10px rgba(15,23,42,.18)}
+.orgRiskScaleMarkerLabel{padding:4px 8px;border-radius:999px;background:#0f172a;color:#fff;font-size:11px;font-weight:900;white-space:nowrap;box-shadow:0 4px 10px rgba(15,23,42,.12)}
+.orgRiskThreshold{position:absolute;top:8px;width:1px;height:18px;background:#fff;box-shadow:0 0 0 1px rgba(15,23,42,.15);z-index:1}
+.orgRiskThreshold.t35{left:35%}
+.orgRiskThreshold.t65{left:65%}
+.orgRiskAxis{position:absolute;left:0;right:0;bottom:0;height:18px;font-size:11px;font-weight:900;color:#64748b}
+.orgRiskAxis span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.orgRiskAxis .p0{left:0;transform:none;color:#15803d}
+.orgRiskAxis .p35{left:35%;color:#b45309}
+.orgRiskAxis .p65{left:65%;color:#b91c1c}
+.orgRiskAxis .p100{right:0;left:auto;transform:none;color:#b91c1c}
+@media (max-width:700px){.orgRiskScoreLabel{flex-direction:column;align-items:flex-start}.orgRiskScoreLabel .summary{text-align:left}.orgRiskTitleWrap{align-items:flex-start}.orgRiskLegend{width:100%}.orgRiskLegendPill{font-size:11px;padding:5px 8px}.orgRiskScaleMarkerLabel{font-size:10px;padding:4px 7px}.orgRiskAxis{font-size:10px}.orgRiskAxis .p35{left:38%}.orgRiskAxis .p65{left:68%}}
 
 
 /* ===== Trend Analysis Tab ===== */
@@ -5227,6 +5250,29 @@ function scoreTeam(list){
   return getOrgRiskMetrics(list).score;
 }
 function orgRiskBadge(score){ if(score>=65) return ['위험','red']; if(score>=35) return ['주의','amber']; return ['정상','green']; }
+function orgRiskLegendHtml(){
+  return `<div class="orgRiskLegend" aria-label="조직 위험 점수 기준">
+    <span class="orgRiskLegendPill green">정상 0~34</span>
+    <span class="orgRiskLegendPill amber">주의 35~64</span>
+    <span class="orgRiskLegendPill red">위험 65+</span>
+  </div>`;
+}
+function orgRiskTitleHtml(title){
+  return `<div class="orgRiskTitleWrap"><div class="orgRiskTitleText">${title}</div>${orgRiskLegendHtml()}</div>`;
+}
+function orgRiskScaleHtml(score, statusText){
+  const safeScore = Math.max(0, Math.min(100, Math.round(Number(score || 0))));
+  return `<div class="orgRiskScale" aria-label="조직 위험 점수 구간 기준">
+    <div class="orgRiskScaleTrack"></div>
+    <div class="orgRiskThreshold t35" title="주의 시작 35점"></div>
+    <div class="orgRiskThreshold t65" title="위험 시작 65점"></div>
+    <div class="orgRiskScaleMarker" style="--pos:${safeScore}%">
+      <div class="orgRiskScaleMarkerDot"></div>
+      <div class="orgRiskScaleMarkerLabel">현재 ${safeScore}점 · ${statusText}</div>
+    </div>
+    <div class="orgRiskAxis"><span class="p0">0 정상</span><span class="p35">35 주의</span><span class="p65">65 위험</span><span class="p100">100</span></div>
+  </div>`;
+}
 function riskBadge(score){ if(score>=75) return ['위험','red']; if(score>=50) return ['주의','amber']; return ['정상','green']; }
 function statusBucket(score){ return score>=75?'위험':score>=50?'주의':'정상'; }
 function toSafeNumber(value){
@@ -7896,7 +7942,7 @@ function renderRisk(scoped){
   if(!scoped.length){
     $('#leaveCauseAnalysisCard').innerHTML = `<div class="leaveCauseEmpty">현재 표시할 연차 사용 데이터가 없습니다.</div>`;
     $('#statusCards').innerHTML = `<div class="statusCard"><div class="statusHeader"><div style="font-size:18px;font-weight:800">상태 분포</div></div><div class="desc">현재 표시할 사원/근태 데이터가 없습니다.</div></div>`;
-    $('#scoreTitle').textContent = `${periodLabel()} 조직 위험 점수`;
+    $('#scoreTitle').innerHTML = orgRiskTitleHtml(`${periodLabel()} 조직 위험 점수`);
     $('#scoreList').innerHTML = `<div class="rowCard">데이터 없음</div>`;
     $('#riskInsightList').innerHTML = `<div class="alertCard"><div style="font-weight:800;margin-bottom:8px">안내</div><div class="desc">사원정보와 근태 데이터를 등록한 뒤 위험 조직 분석을 진행하세요.</div></div>`;
     return;
@@ -7912,11 +7958,12 @@ function renderRisk(scoped){
       : scoped.map(x=>({name:x.name,score:x.scopedRisk,list:[x],type:'person'}));
 
   scoreItems = scoreItems.sort((a,b)=>b.score-a.score || String(a.name).localeCompare(String(b.name), 'ko'));
-  $('#scoreTitle').textContent = STATE.division==='전체' && STATE.team==='전체'
+  const orgRiskTitle = STATE.division==='전체' && STATE.team==='전체'
     ? `${periodLabel()} 본부별 조직 위험 점수`
     : STATE.division!=='전체' && STATE.team==='전체'
       ? `${periodLabel()} ${STATE.division} 내 팀별 위험 점수`
       : `${periodLabel()} ${STATE.team} 팀원별 위험 점수`;
+  $('#scoreTitle').innerHTML = orgRiskTitleHtml(orgRiskTitle);
 
   renderLeaveCauseAnalysis(scoped, scoreItems);
 
@@ -7933,7 +7980,7 @@ function renderRisk(scoped){
     const summary = isOverall ? '선택된 범위 기준 전체 조직 위험 점수' : getOrgRiskItemSummary(item);
     return `<div class="rowCard clickable ${isOverall?'orgRiskOverallCard':''} ${active || overallActive ? 'active' : ''}" data-leave-cause-target="${targetName}">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><strong>${isOverall?'전체 조직 평균':item.name}</strong><div class="sub" style="margin-top:4px">${summary}</div></div><span class="badge ${cls}">${txt}</span></div>
-      <div class="barBg"><div class="barFill" style="width:${Math.min(item.score,100)}%"></div></div>
+      ${orgRiskScaleHtml(item.score, txt)}
       <div class="orgRiskScoreLabel"><span class="score">${isOverall?'전체 점수':'위험점수'} ${item.score} / 100</span><span class="summary">${isOverall?'현재 필터 기준':summary}</span></div>
     </div>`;
   };
