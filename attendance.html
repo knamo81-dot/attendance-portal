@@ -20,6 +20,7 @@
 <!-- risk floor gate fixed: if monthly adjusted work hours is below 40h including 0h, final personal risk score is 0; period risk adder is not reapplied; total load display remains unchanged -->
 <!-- OT manual override fixed: auto 미인정 is default only; saved/pending 인정·부분인정·미인정 has priority over auto invalid display -->
 <!-- risk people display updated: outdoor replaced with issue days; hidden overtime displayed before monthly work; issue-only risk promotion softened -->
+<!-- risk promotion refined: OT 30h+ becomes risk only when total load is 9h+ or hidden overtime is 1h+; OT 30h alone remains warning -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -5048,6 +5049,7 @@ function applyAttritionRiskModel(scopedList){
       ot >= 45 ||
       totalLoad >= 10.5 ||
       hidden >= 1.0 ||
+      (ot >= 30 && (totalLoad >= 9 || hidden >= 1.0)) ||
       (ot >= 40 && leave <= 1) ||
       (ot >= 40 && issues >= 5) ||
       (totalLoad >= 10 && hidden >= 0.5)
