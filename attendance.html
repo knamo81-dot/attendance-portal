@@ -15,6 +15,7 @@
 <!-- actual overtime source fixed: ERP I column 실제연장_시간 only; 연장신청_시간 excluded from overtime counts -->
 <!-- personal risk model refined: direct risk only absence/overtime; missing clocks, leave, sick leave, dispatch, work-shortage and short-time work excluded; outdoor/early-leave conditional weak only -->
 <!-- dispatch + half-day display fixed: no missing-clock warning and no work-time value in 근무시간 column; analysis columns still show 4:00 -->
+<!-- monthly work display fixed: dashboard/deep/trend 담당자 근무시간 uses 8시보정 합계(monthlyAdjustedWorkHours) instead of raw 근무시간 column 합계 -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -5084,7 +5085,7 @@ function scopedEmployees(){
   const m = periodMultiplier(), a = periodRiskAdder();
   const base = filteredEmployees().map(e => ({
     ...e,
-    scopedMonthlyHours:+(Number(e.monthlyHours || 0)*m).toFixed(1),
+    scopedMonthlyHours:+(Number(e.monthlyAdjustedWorkHours || e.monthlyBaseWorkHours || e.monthlyHours || 0)*m).toFixed(1),
     scopedDailyHours:+Number(e.avgAdjustedWorkHours || e.avgDailyHours || 0).toFixed(1),
     scopedMonthlyBaseWorkHours:+(Number(e.monthlyBaseWorkHours || 0)*m).toFixed(1),
     scopedDailyBaseWorkHours:+Number(e.avgBaseWorkHours || 0).toFixed(1),
@@ -6451,6 +6452,7 @@ function trendEmployeesForMonth(ym){
       team: meta.team || row.team || '',
       grade: meta.grade || row.grade || '',
       monthlyHours:0, avgDailyHours:0,
+      monthlyAdjustedWorkHours:0, avgAdjustedWorkHours:0,
       monthlyBaseWorkHours:0, avgBaseWorkHours:0,
       monthlyHiddenOvertime:0, avgHiddenOvertime:0,
       overtime:0, avgDailyOvertime:0,
@@ -6467,6 +6469,7 @@ function trendEmployeesForMonth(ym){
     const baseWork = parseWorkDurationToHours(analysisFields.baseWorkDisplay);
     const hiddenOvertime = parseWorkDurationToHours(analysisFields.hiddenOvertimeDisplay);
     if(totalWork !== null) person.monthlyHours += totalWork;
+    if(adjustedWork !== null) person.monthlyAdjustedWorkHours += adjustedWork;
     if(baseWork !== null) person.monthlyBaseWorkHours += baseWork;
     if(hiddenOvertime !== null) person.monthlyHiddenOvertime += hiddenOvertime;
     person.overtime += erpOT;
@@ -6497,7 +6500,8 @@ function trendEmployeesForMonth(ym){
   });
   const base = [...byName.values()].map(e => {
     const days = Math.max(1, Number(e.workDays || 0));
-    const avgDailyHours = Number(e.monthlyHours || 0) / days;
+    const avgDailyHours = Number(e.monthlyAdjustedWorkHours || e.monthlyHours || 0) / days;
+    const avgAdjustedWorkHours = Number(e.monthlyAdjustedWorkHours || 0) / days;
     const avgBaseWorkHours = Number(e.monthlyBaseWorkHours || 0) / days;
     const avgHiddenOvertime = Number(e.monthlyHiddenOvertime || 0) / days;
     const avgDailyOvertime = Number(e.overtime || 0) / days;
@@ -6506,11 +6510,13 @@ function trendEmployeesForMonth(ym){
     const adjustedRisk = Math.min(100, Math.round(Number(e.risk || 0) + Math.min(8, Number(e.conditionalRiskDays || 0) * 2) + Math.max(0,(focusRatio - 1.1) * 10) + (avgHiddenOvertime >= 0.5 ? 4 : 0) + (Number(e.leaveUsed || 0) === 0 && days >= 10 ? 8 : 0)));
     return {
       ...e,
-      monthlyHours:trendRound(e.monthlyHours,1), avgDailyHours:trendRound(avgDailyHours,1),
+      monthlyHours:trendRound(e.monthlyAdjustedWorkHours || e.monthlyHours,1), avgDailyHours:trendRound(avgDailyHours,1),
+      monthlyAdjustedWorkHours:trendRound(e.monthlyAdjustedWorkHours,1), avgAdjustedWorkHours:trendRound(avgAdjustedWorkHours,1),
       monthlyBaseWorkHours:trendRound(e.monthlyBaseWorkHours,1), avgBaseWorkHours:trendRound(avgBaseWorkHours,1),
       monthlyHiddenOvertime:trendRound(e.monthlyHiddenOvertime,1), avgHiddenOvertime:trendRound(avgHiddenOvertime,1),
       overtime:trendRound(e.overtime,1), avgDailyOvertime:trendRound(avgDailyOvertime,1), avgTotalLoad:trendRound(avgTotalLoad,1),
       focusRatio, risk:adjustedRisk,
+      scopedMonthlyHours:trendRound(e.monthlyAdjustedWorkHours || e.monthlyHours,1),
       scopedMonthlyOvertime:trendRound(e.overtime,1), scopedDailyOvertime:trendRound(avgDailyOvertime,1),
       scopedDailyHours:trendRound(avgDailyHours,1), scopedDailyBaseWorkHours:trendRound(avgBaseWorkHours,1),
       scopedDailyHiddenOvertime:trendRound(avgHiddenOvertime,1), scopedDailyTotalLoad:trendRound(avgTotalLoad,1),
