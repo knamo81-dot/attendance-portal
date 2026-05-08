@@ -3142,7 +3142,7 @@ function buildDashboardEmployeesFromMaster(){
       focusRatio: 1,
       leaveUsed: 0,
       workDays: 0,
-      issueDays: 0
+      issueDays: 0, recoveryIssueDays: 0
     }));
 }
 function buildMonthlyFromEmployees(list){
@@ -4118,7 +4118,7 @@ function rebuildDerivedMetricsFromAttendance(){
       focusRatio: 1,
       leaveUsed: 0,
       workDays: 0,
-      issueDays: 0
+      issueDays: 0, recoveryIssueDays: 0
     };
 
     const totalWork = parseWorkDurationToHours(row.totalWork || row.workHours || row.realWorkHours);
@@ -4173,9 +4173,11 @@ function rebuildDerivedMetricsFromAttendance(){
     if(row.bucket === '문제'){
       person.risk += 20;
       person.issueDays += 1;
+      if(isRecoveryRelatedIssueReason(reason)) person.recoveryIssueDays = Number(person.recoveryIssueDays || 0) + 1;
     }else if(row.bucket === '주의'){
       person.risk += 8;
       person.issueDays += 1;
+      if(isRecoveryRelatedIssueReason(reason)) person.recoveryIssueDays = Number(person.recoveryIssueDays || 0) + 1;
     }
 
     if(reason.includes('결근')) person.risk += 20;
@@ -5087,6 +5089,7 @@ function scopedEmployees(){
     scopedDailyOvertime:+Number(e.avgDailyOvertime || 0).toFixed(1),
     scopedDailyTotalLoad:+Number(e.avgTotalLoad || 0).toFixed(1),
     scopedIssueDays:+(Number(e.issueDays || 0)*m).toFixed(1),
+    scopedRecoveryIssueDays:+(Number(e.recoveryIssueDays || 0)*m).toFixed(1),
     scopedRisk:Math.min(100, Number(e.risk || 0)+a)
   }));
   return applyAttritionRiskModel(base).map(item => ({
@@ -5111,9 +5114,43 @@ function toSafeNumber(value){
   return Number.isFinite(num) ? num : 0;
 }
 
+
+function isRecoveryRelatedIssueReason(reason){
+  const normalized = normalizeAttendanceReasonText(reason || '');
+  if(!normalized) return false;
+
+  // 출근/퇴근 미입력은 기록 누락 성격이므로 휴식지수 감점 대상에서 제외한다.
+  // 단, 같은 행에 연장근무/공휴일근무/결근/조퇴/지각/숨은초과 등 실제 피로·부하 사유가 함께 있으면 감점 대상이다.
+  const nonRecoveryTokens = [
+    '출근미입력','퇴근미입력','출근 미입력','퇴근 미입력',
+    '출근누락','퇴근누락','출근 누락','퇴근 누락'
+  ];
+
+  let withoutRecordMissing = normalized;
+  nonRecoveryTokens.forEach(token => {
+    withoutRecordMissing = withoutRecordMissing.split(token).join(' ');
+  });
+  withoutRecordMissing = withoutRecordMissing.replace(/[-|/·,]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  if(!withoutRecordMissing) return false;
+
+  const recoveryRelatedTokens = [
+    '연장근무','연장근로','야근','공휴일근무','휴일근무',
+    '숨은초과','초과근무','ot','OT',
+    '결근','조퇴','지각'
+  ];
+  return recoveryRelatedTokens.some(token => normalized.includes(token));
+}
+
 function getRecoveryIndex(item){
   const leaveUsed = toSafeNumber(item.leaveUsed || 0);
-  const issueDays = toSafeNumber(item.scopedIssueDays || item.issueDays || 0);
+  const issueDays = toSafeNumber(
+    (typeof item.scopedRecoveryIssueDays !== 'undefined' ? item.scopedRecoveryIssueDays : null) ??
+    (typeof item.recoveryIssueDays !== 'undefined' ? item.recoveryIssueDays : null) ??
+    item.scopedIssueDays ??
+    item.issueDays ??
+    0
+  );
   const hiddenDaily = toSafeNumber(item.scopedDailyHiddenOvertime || 0);
   const dailyTotalLoad = toSafeNumber(
     item.scopedDailyTotalLoad ||
@@ -6310,7 +6347,7 @@ function trendEmployeesForMonth(ym){
       monthlyHiddenOvertime:0, avgHiddenOvertime:0,
       overtime:0, avgDailyOvertime:0,
       businessTripDays:0, outdoorDays:0,
-      leaveUsed:0, workDays:0, issueDays:0,
+      leaveUsed:0, workDays:0, issueDays: 0, recoveryIssueDays: 0,
       risk:0, focusRatio:1
     };
     const totalWork = parseWorkDurationToHours(row.totalWork || row.workHours || row.realWorkHours);
@@ -6334,8 +6371,8 @@ function trendEmployeesForMonth(ym){
     if(normalizedReason.includes('오전외근')) person.outdoorDays += 0.5;
     if(normalizedReason.includes('오후외근')) person.outdoorDays += 0.5;
     if(normalizedReason.includes('외근') && !normalizedReason.includes('오전외근') && !normalizedReason.includes('오후외근')) person.outdoorDays += 1;
-    if(row.bucket === '문제'){ person.risk += 20; person.issueDays += 1; }
-    else if(row.bucket === '주의'){ person.risk += 8; person.issueDays += 1; }
+    if(row.bucket === '문제'){ person.risk += 20; person.issueDays += 1; if(isRecoveryRelatedIssueReason(reason)) person.recoveryIssueDays = Number(person.recoveryIssueDays || 0) + 1; }
+    else if(row.bucket === '주의'){ person.risk += 8; person.issueDays += 1; if(isRecoveryRelatedIssueReason(reason)) person.recoveryIssueDays = Number(person.recoveryIssueDays || 0) + 1; }
     if(reason.includes('결근')) person.risk += 20;
     if(reason.includes('조퇴')) person.risk += 8;
     if(reason.includes('지각')) person.risk += 6;
@@ -6366,7 +6403,7 @@ function trendEmployeesForMonth(ym){
       scopedMonthlyOvertime:trendRound(e.overtime,1), scopedDailyOvertime:trendRound(avgDailyOvertime,1),
       scopedDailyHours:trendRound(avgDailyHours,1), scopedDailyBaseWorkHours:trendRound(avgBaseWorkHours,1),
       scopedDailyHiddenOvertime:trendRound(avgHiddenOvertime,1), scopedDailyTotalLoad:trendRound(avgTotalLoad,1),
-      scopedIssueDays:Number(e.issueDays || 0), scopedRisk:adjustedRisk
+      scopedIssueDays:Number(e.issueDays || 0), scopedRecoveryIssueDays:Number(e.recoveryIssueDays || 0), scopedRisk:adjustedRisk
     };
   });
   return applyAttritionRiskModel(base);
