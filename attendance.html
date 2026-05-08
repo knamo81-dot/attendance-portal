@@ -6290,13 +6290,10 @@ function trendRowsForMonth(ym){
   return { rows, metaByName };
 }
 function trendEmployeesForMonth(ym){
-  // 현재 선택 월의 KPI추이는 분석대시보드/심층분석과 동일하게 scopedEmployees() 기준을 사용한다.
-  // 과거 월은 기존 월별 raw 재계산 로직을 유지한다.
-  const selectedYm = String(STATE.period || '').trim();
-  if(/^\d{4}-\d{2}$/.test(selectedYm) && String(ym || '').trim() === selectedYm){
-    return scopedEmployees();
-  }
-
+  // ✅ 월별 추세 안정화
+  // 선택된 기준월과 동일한 월도 scopedEmployees() 전역/현재월 캐시를 쓰지 않고,
+  // trendRowsForMonth(ym)에서 해당 월 raw 데이터만 다시 집계한다.
+  // 이렇게 해야 리스크 변화 흐름의 월별 점수가 선택월 변경에 따라 흔들리지 않는다.
   const { rows, metaByName } = trendRowsForMonth(ym);
   const byName = new Map();
   rows.forEach(row => {
