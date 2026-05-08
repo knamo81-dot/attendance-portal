@@ -8640,15 +8640,28 @@ function renderAbsenceCheckSelect(row){
   </select>`;
 }
 
+function isAutoOvertimeInvalidDisplayRow(row){
+  const checkValue = String(row?.overtimeCheck || row?.overtimeCheckResult || row?.overtime_check_result || '').trim();
+  const reasonText = String([row?.reason, row?.primaryReason, row?.secondaryReason].filter(Boolean).join(' '));
+  const statusText = String(row?.statusLabel || row?.status || '').trim();
+  const hasErpOvertime = String(row?.erpOTDisplay || '').trim() && String(row?.erpOTDisplay || '').trim() !== '-';
+  // 8시보정 기반 검증 실패로 '문제/연장근무 미인정' 판정된 행은
+  // localStorage/pending에 저장된 과거 '인정' 값보다 자동판정값을 우선한다.
+  return hasErpOvertime && checkValue === '미인정' && (reasonText.includes('연장근무 미인정') || statusText === '문제');
+}
+
 function renderOvertimeCheckSelect(row){
   const hasOvertime = !!String(row?.erpOTDisplay || '').trim();
   if(!hasOvertime){
     return '-';
   }
-  const pendingValue = getPendingOvertimeCheck(row?.recordId);
-  const localOverride = getSavedOvertimeCheckOverride(row);
-  const currentValue = String(pendingValue || localOverride || row?.overtimeCheckResult || row?.overtime_check_result || row?.overtimeCheck || '인정').trim();
   const recordId = String(row?.recordId || '').trim();
+  const pendingValue = getPendingOvertimeCheck(recordId);
+  const localOverride = getSavedOvertimeCheckOverride(row);
+  const forcedAutoUnapproved = isAutoOvertimeInvalidDisplayRow(row);
+  const currentValue = forcedAutoUnapproved
+    ? '미인정'
+    : String(pendingValue || localOverride || row?.overtimeCheckResult || row?.overtime_check_result || row?.overtimeCheck || '인정').trim();
   const disabled = !recordId ? 'disabled' : '';
   const normalizedCurrentValue = (currentValue === '확인필요') ? '미인정' : currentValue;
   return `<select ${disabled} data-record-id="${recordId}" onchange="markOvertimeCheckChanged(this.dataset.recordId, this.value)">
@@ -8662,7 +8675,10 @@ function renderApprovedOvertimeInput(row){
   const hasOvertime = !!String(row?.erpOTDisplay || '').trim();
   if(!hasOvertime) return '-';
   const recordId = String(row?.recordId || '').trim();
-  const currentCheck = String(getPendingOvertimeCheck(recordId) || getSavedOvertimeCheckOverride(row) || row?.overtimeCheckResult || row?.overtime_check_result || row?.overtimeCheck || '').trim();
+  const forcedAutoUnapproved = isAutoOvertimeInvalidDisplayRow(row);
+  const currentCheck = forcedAutoUnapproved
+    ? '미인정'
+    : String(getPendingOvertimeCheck(recordId) || getSavedOvertimeCheckOverride(row) || row?.overtimeCheckResult || row?.overtime_check_result || row?.overtimeCheck || '').trim();
   const erpApproved = String(row?.erpOTDisplay || '').trim();
   const currentApproved = String(getPendingApprovedOvertime(recordId) || row?.approvedOvertimeDisplay || getSavedApprovedOvertimeOverride(row) || '').trim();
   if(currentCheck === '미인정'){
