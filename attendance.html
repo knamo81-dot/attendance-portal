@@ -9057,6 +9057,7 @@ function decorateAttendanceRow(row, metaByName){
   // 이유: 8시보정에는 점심/저녁식사 차감 및 반차·외근·파견·누락 보정이 이미 반영되어 있어
   //       기본근무가 0:00인 공휴일근무도 실제 인정 가능한 시간 기준으로 ERP OT를 검증할 수 있다.
   let adjustedBasedOT = null;
+  let autoOtInvalid = false;
   if (erpOT > 0) {
     const otValidationFields = getAttendanceAnalysisFields({
       ...row,
@@ -9077,17 +9078,21 @@ function decorateAttendanceRow(row, metaByName){
 
     if (adjustedBasedOT === null) {
       overtimeCheck = '미인정';
+      autoOtInvalid = true;
     } else if (adjustedBasedOT + 0.001 >= erpOT) {
       overtimeCheck = '인정';
     } else {
       overtimeCheck = '미인정';
+      autoOtInvalid = true;
     }
   }
 
   const pendingOvertimeCheck = String(getPendingOvertimeCheck(row.recordId) || '').trim();
   const effectiveSavedOvertimeCheck = String(pendingOvertimeCheck || savedOvertimeCheck || '').trim();
 
-  if (erpOT > 0 && ['인정','부분인정','미인정','확인필요'].includes(effectiveSavedOvertimeCheck)) {
+  // ✅ 8시보정 기반 검증에서 ERP OT보다 인정 가능 시간이 작으면
+  // 저장값이 '인정'이어도 다시 덮어쓰지 않고 무조건 미인정/문제로 유지한다.
+  if (!autoOtInvalid && erpOT > 0 && ['인정','부분인정','미인정','확인필요'].includes(effectiveSavedOvertimeCheck)) {
     overtimeCheck = (effectiveSavedOvertimeCheck === '확인필요' ? '미인정' : effectiveSavedOvertimeCheck);
   } else if (erpOT <= 0) {
     overtimeCheck = '-';
