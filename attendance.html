@@ -8215,7 +8215,7 @@ function bindAdminSubTabs(){
 
 
 const ERP_CONTINUOUS_REASONS = ['육아휴직','출산휴가','산전후휴가','병가','휴직','가족돌봄휴직','장기휴직'];
-const ERP_DAILY_REASONS = ['연차','반차','외근','출장','조퇴','결근','오후외근','오전외근'];
+const ERP_DAILY_REASONS = ['연차','반차','외근','출장','조퇴','결근','오후외근','오전외근','리프레쉬'];
 
 function isHolidayDateByRows(dateText, rows){
   const raw = String(dateText || '').trim();
@@ -8691,7 +8691,7 @@ function isHolidayLike(reason){
   return ['공휴일','휴일','휴무일'].includes(String(reason || '').trim());
 }
 function isLeaveLike(reason){
-  return ['육아휴직','출산휴가','산전후휴가','병가','가족돌봄휴직','장기휴직','휴직','연차','반차','오전반차','오후반차','공가','보건휴가'].includes(String(reason || '').trim());
+  return ['육아휴직','출산휴가','산전후휴가','병가','가족돌봄휴직','장기휴직','휴직','연차','반차','오전반차','오후반차','공가','보건휴가','리프레쉬'].includes(String(reason || '').trim());
 }
 
 function isHalfDayVacationReason(reason){
@@ -8700,7 +8700,11 @@ function isHalfDayVacationReason(reason){
 }
 function isVacationReason(reason){
   const s = normalizeAttendanceReasonText(reason);
-  return ["연차휴가","연차","오전반차","오후반차","반차"].some(k => s === k || s.includes(k));
+  return ["연차휴가","연차","오전반차","오후반차","반차","리프레쉬"].some(k => s === k || s.includes(k));
+}
+function isRefreshLeaveReason(reason){
+  const s = normalizeAttendanceReasonText(reason);
+  return s === '리프레쉬' || s.includes('리프레쉬');
 }
 function isOutsideReason(reason){
   return ['외근','출장','오전외근','오후외근'].includes(String(reason || '').trim());
@@ -8736,7 +8740,7 @@ function isExcusedReasonBeforeMissing(reason){
   // 이 목록은 "시간이 없어도 누락으로 보면 안 되는" 근태 사유입니다.
   return reasonHasExactOrIncluded(reason, [
     '육아휴직','출산휴가','산전후휴가','병가','가족돌봄휴직','장기휴직','휴직',
-    '연차','연차휴가','반차','오전반차','오후반차','공가','보건휴가',
+    '연차','연차휴가','반차','오전반차','오후반차','공가','보건휴가','리프레쉬',
     '외근','오전외근','오후외근','출장','파견','재택근무','단축근무'
   ]);
 }
@@ -8744,7 +8748,7 @@ function getPrimaryExcusedReason(reason){
   const s = normalizeAttendanceReasonText(reason);
   const ordered = [
     '육아휴직','출산휴가','산전후휴가','가족돌봄휴직','장기휴직','휴직','병가',
-    '오전반차','오후반차','반차','연차휴가','연차','공가','보건휴가',
+    '리프레쉬','오전반차','오후반차','반차','연차휴가','연차','공가','보건휴가',
     '오전외근','오후외근','외근','출장','파견','재택근무','단축근무'
   ];
   return ordered.find(k => s.includes(k)) || '';
@@ -8840,6 +8844,18 @@ function decorateAttendanceRow(row, metaByName){
     bucket = '근태사유';
     statusLabel = '';
     reason = '파견';
+    overtimeCheck = '-';
+    seccomOT = 0;
+
+  } else if (isRefreshLeaveReason(rawReason)) {
+    // ✅ 리프레쉬는 5년차 이상 직원이 연차에서 사용하는 장기휴가 성격이므로
+    // 결근/출근미입력/퇴근미입력보다 우선하는 정상 휴가 사유로 처리한다.
+    displayStart = '-';
+    displayEnd = '-';
+    totalWork = '-';
+    bucket = '근태사유';
+    statusLabel = '';
+    reason = '리프레쉬';
     overtimeCheck = '-';
     seccomOT = 0;
 
@@ -9101,7 +9117,7 @@ function decorateAttendanceRow(row, metaByName){
   const judgedReasonsWarning = ['출근미입력','퇴근미입력','출퇴근미입력','연장근무','휴일근무','공휴일근무'];
   const judgedReasonsIssue = ['결근','근무시간 부족','단축근무 부족'];
 
-  let displayReason = (judgedReasonsWarning.includes(reason) || judgedReasonsIssue.includes(reason) || reason === '단축근무' || reason === '파견' || reason === '재택근무')
+  let displayReason = (judgedReasonsWarning.includes(reason) || judgedReasonsIssue.includes(reason) || reason === '단축근무' || reason === '파견' || reason === '재택근무' || reason === '리프레쉬')
     ? reason
     : ((rawStatus && rawStatus !== '정상근무') ? rawStatus : '-');
 
@@ -10337,7 +10353,7 @@ function renderAttendanceMissingAnalysis(){
     if(!r || r === '-' || r === '정상근무') return true;
     if(typeof isContinuousLeaveReason === 'function' && isContinuousLeaveReason(r)) return true;
     if(typeof isVacationReason === 'function' && isVacationReason(r)) return true;
-    if(/연차|반차|휴가|휴무|휴직|출산|육아|병가|공가|경조|결근|재택근무/.test(r)) return true;
+    if(/연차|반차|휴가|휴무|휴직|출산|육아|병가|공가|경조|결근|재택근무|리프레쉬/.test(r)) return true;
     if(/출근미입력|퇴근미입력|출퇴근미입력|출근누락|퇴근누락/.test(r)) return true;
     return false;
   };
