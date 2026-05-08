@@ -19,6 +19,7 @@
 <!-- totalLoadScore tuned: 0h=0, 0~7h=5, 7h+=10, 8.5h+=35, 9.5h+=75, 10.5h+=100 -->
 <!-- risk floor gate fixed: if monthly adjusted work hours is below 40h including 0h, final personal risk score is 0; period risk adder is not reapplied; total load display remains unchanged -->
 <!-- OT manual override fixed: auto 미인정 is default only; saved/pending 인정·부분인정·미인정 has priority over auto invalid display -->
+<!-- risk people display updated: outdoor replaced with issue days; hidden overtime displayed before monthly work; issue-only risk promotion softened -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -62,7 +63,7 @@ select,button{padding:10px 14px;border:1px solid var(--line);border-radius:12px;
 .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:13px}
 .riskInlineMetrics{
   display:grid;
-  grid-template-columns:repeat(6, minmax(90px, 1fr));
+  grid-template-columns:repeat(7, minmax(82px, 1fr));
   gap:18px;
   align-items:center;
   width:100%;
@@ -5047,7 +5048,6 @@ function applyAttritionRiskModel(scopedList){
       ot >= 45 ||
       totalLoad >= 10.5 ||
       hidden >= 1.0 ||
-      issues >= 8 ||
       (ot >= 40 && leave <= 1) ||
       (ot >= 40 && issues >= 5) ||
       (totalLoad >= 10 && hidden >= 0.5)
@@ -5057,13 +5057,13 @@ function applyAttritionRiskModel(scopedList){
       ot >= 30 ||
       totalLoad >= 9.5 ||
       hidden >= 0.5 ||
-      issues >= 4
+      issues >= 6
     ) {
       finalRisk = Math.max(baseRisk, 50);
     }
 
     // 월 8시보정 근무시간이 40h 미만이면 분석 가능한 최소 근무 데이터가 부족한 것으로 보고 위험지수만 0점 처리한다.
-    // 총부하/근무/연장근로/외근 표시값은 원래 계산값을 유지한다.
+    // 총부하/근무/연장근로/이슈일수/숨은초과 표시값은 원래 계산값을 유지한다.
     const monthlyAdjustedWorkForRisk = toSafeNumber(
       person.scopedMonthlyHours ||
       person.monthlyAdjustedWorkHours ||
@@ -7443,14 +7443,16 @@ function personMini(item){
   const recoveryIndex = getRecoveryIndex(item);
   const [recoveryText, recoveryCls] = recoveryBadge(recoveryIndex);
   const recoveryColor = recoveryCls === 'green' ? '#16a34a' : recoveryCls === 'amber' ? '#d97706' : '#ef4444';
-  const outdoorCount = Number(item.outdoorDays || 0) + Number(item.businessTripDays || 0);
+  const issueDays = toSafeNumber(item.scopedIssueDays ?? item.issueDays ?? 0);
+  const hiddenOvertime = toSafeNumber(item.scopedMonthlyHiddenOvertime ?? item.monthlyHiddenOvertime ?? 0);
   return `<div class="statusMini">
     <div style="font-weight:700">${item.name} <span class="label">${item.division} / ${item.team} / ${item.grade}</span></div>
     <div class="metrics" style="margin-top:8px">
       <div><div class="label">위험지수</div><strong>${item.scopedRisk}점</strong></div>
       <div><div class="label">일평균 총부하시간</div><strong>${dailyTotalLoad.toFixed(1)}h</strong></div>
       <div><div class="label">월 총 연장근로</div><strong>${item.scopedMonthlyOvertime}h</strong></div>
-      <div><div class="label">외근건수</div><strong>${outdoorCount}회</strong></div>
+      <div><div class="label">이슈일수</div><strong>${issueDays.toFixed(0)}일</strong></div>
+      <div><div class="label">숨은초과</div><strong>${hiddenOvertime.toFixed(1)}h</strong></div>
       <div><div class="label">월 총 근무시간</div><strong>${item.scopedMonthlyHours}h</strong></div>
       <div><div class="label">휴식지수</div><strong style="color:${recoveryColor}">${recoveryIndex}점 (${recoveryText})</strong></div>
     </div>
@@ -7858,8 +7860,9 @@ function renderPeople(scoped){
     const recoveryIndex = getRecoveryIndex(item);
     const [recoveryText, recoveryCls] = recoveryBadge(recoveryIndex);
     const recoveryColor = recoveryCls === 'green' ? '#16a34a' : recoveryCls === 'amber' ? '#d97706' : '#ef4444';
-    const outdoorCount = toSafeNumber(item.outdoorDays || 0) + toSafeNumber(item.businessTripDays || 0);
-    return `<div class="riskItem"><div><div style="display:flex;gap:8px;align-items:center"><strong>${item.name}</strong><span class="badge ${cls}">${txt}</span></div><div class="label" style="margin-top:6px">${item.division} / ${item.team} / ${item.grade}</div></div><div class="riskInlineMetrics"><div class="riskInlineItem"><span class="k">위험지수</span><span class="v">${item.scopedRisk}점</span></div><div class="riskInlineItem"><span class="k">총부하</span><span class="v">${dailyTotalLoad.toFixed(1)}h</span></div><div class="riskInlineItem"><span class="k">연장근로</span><span class="v">${item.scopedMonthlyOvertime}h</span></div><div class="riskInlineItem"><span class="k">외근</span><span class="v">${outdoorCount}회</span></div><div class="riskInlineItem"><span class="k">근무</span><span class="v">${item.scopedMonthlyHours}h</span></div><div class="riskInlineItem"><span class="k">휴식</span><span class="v" style="color:${recoveryColor}">${recoveryIndex}점 (${recoveryText})</span></div></div></div>`;
+    const issueDays = toSafeNumber(item.scopedIssueDays ?? item.issueDays ?? 0);
+    const hiddenOvertime = toSafeNumber(item.scopedMonthlyHiddenOvertime ?? item.monthlyHiddenOvertime ?? 0);
+    return `<div class="riskItem"><div><div style="display:flex;gap:8px;align-items:center"><strong>${item.name}</strong><span class="badge ${cls}">${txt}</span></div><div class="label" style="margin-top:6px">${item.division} / ${item.team} / ${item.grade}</div></div><div class="riskInlineMetrics"><div class="riskInlineItem"><span class="k">위험지수</span><span class="v">${item.scopedRisk}점</span></div><div class="riskInlineItem"><span class="k">총부하</span><span class="v">${dailyTotalLoad.toFixed(1)}h</span></div><div class="riskInlineItem"><span class="k">연장근로</span><span class="v">${item.scopedMonthlyOvertime}h</span></div><div class="riskInlineItem"><span class="k">이슈</span><span class="v">${issueDays.toFixed(0)}일</span></div><div class="riskInlineItem"><span class="k">숨은초과</span><span class="v">${hiddenOvertime.toFixed(1)}h</span></div><div class="riskInlineItem"><span class="k">근무</span><span class="v">${item.scopedMonthlyHours}h</span></div><div class="riskInlineItem"><span class="k">휴식</span><span class="v" style="color:${recoveryColor}">${recoveryIndex}점 (${recoveryText})</span></div></div></div>`;
   }).join('');
 }
 
