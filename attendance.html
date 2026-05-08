@@ -17,7 +17,7 @@
 <!-- dispatch + half-day display fixed: no missing-clock warning and no work-time value in 근무시간 column; analysis columns still show 4:00 -->
 <!-- monthly work display fixed: dashboard/deep/trend 담당자 근무시간 uses 8시보정 합계(monthlyAdjustedWorkHours) instead of raw 근무시간 column 합계 -->
 <!-- totalLoadScore tuned: 0h=0, 0~7h=5, 7h+=10, 8.5h+=35, 9.5h+=75, 10.5h+=100 -->
-<!-- minimum work-hours gate: if monthly adjusted work hours < 40h, totalLoad risk scoring uses 0h -->
+<!-- risk floor gate added: if monthly adjusted work hours is below 40h, final personal risk score is 0; total load display remains unchanged -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -4974,18 +4974,11 @@ function applyAttritionRiskModel(scopedList){
     const overloadBase = getEmployeeAnalysisOverloadHours(person);
     const overloadScore = Math.min(100, Math.max(0, (overloadBase / 1.2) * 100));
 
-    const rawTotalLoadDaily = toSafeNumber(
+    const totalLoadDaily = toSafeNumber(
       person.scopedDailyTotalLoad ||
       (toSafeNumber(person.scopedDailyBaseWorkHours || 0) + toSafeNumber(person.scopedDailyOvertime || 0) + toSafeNumber(person.scopedDailyHiddenOvertime || 0)) ||
       person.avgTotalLoad || 0
     );
-    const monthlyWorkForLoadGate = toSafeNumber(
-      person.scopedMonthlyHours ||
-      person.monthlyAdjustedWorkHours ||
-      person.monthlyBaseWorkHours ||
-      person.monthlyHours || 0
-    );
-    const totalLoadDaily = monthlyWorkForLoadGate < 40 ? 0 : rawTotalLoadDaily;
     const hiddenDaily = toSafeNumber(person.scopedDailyHiddenOvertime || 0);
     const issueDays = toSafeNumber(person.scopedIssueDays || person.issueDays || 0);
 
@@ -5066,6 +5059,18 @@ function applyAttritionRiskModel(scopedList){
       issues >= 4
     ) {
       finalRisk = Math.max(baseRisk, 50);
+    }
+
+    // 월 8시보정 근무시간이 40h 미만이면 분석 가능한 최소 근무 데이터가 부족한 것으로 보고 위험지수만 0점 처리한다.
+    // 총부하/근무/연장근로/외근 표시값은 원래 계산값을 유지한다.
+    const monthlyAdjustedWorkForRisk = toSafeNumber(
+      person.scopedMonthlyHours ||
+      person.monthlyAdjustedWorkHours ||
+      person.monthlyBaseWorkHours ||
+      0
+    );
+    if(monthlyAdjustedWorkForRisk > 0 && monthlyAdjustedWorkForRisk < 40){
+      finalRisk = 0;
     }
 
     const attritionRisk = finalRisk;
