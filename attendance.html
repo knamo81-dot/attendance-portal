@@ -9468,8 +9468,39 @@ function renderAttendanceLeaveToggle(){
 }
 
 const ATTENDANCE_REASON_EXCLUDE = ['출근미입력','퇴근미입력','출퇴근미입력','연장근무','휴일근무','공휴일근무'];
+function dedupeAttendanceReasonKeyText(value){
+  let key = String(value || '')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if(!key) return '';
+
+  const tokens = key.split(' ').map(v => v.trim()).filter(Boolean);
+  if(!tokens.length) return '';
+
+  // 같은 사유가 main/sub/original reason에서 중복 결합되는 경우만 제거한다.
+  // 예: "출장추가 출장추가" → "출장추가", "근무시간 부족 근무시간 부족" → "근무시간 부족"
+  const half = tokens.length / 2;
+  if(Number.isInteger(half) && half > 0){
+    const left = tokens.slice(0, half).join(' ');
+    const right = tokens.slice(half).join(' ');
+    if(left && left === right) return left;
+  }
+
+  const unique = [];
+  const seen = new Set();
+  tokens.forEach(token => {
+    if(!seen.has(token)){
+      seen.add(token);
+      unique.push(token);
+    }
+  });
+  return unique.join(' ');
+}
 function normalizeAttendanceReasonKey(value, mode='default'){
-  let key = String(value || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  let key = dedupeAttendanceReasonKeyText(value);
   if(mode === 'warning'){
     if (key.includes('출퇴근미입력')) key = '출퇴근미입력';
     else if (key.includes('출근미입력')) key = '출근미입력';
