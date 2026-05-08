@@ -21,6 +21,7 @@
 <!-- OT manual override fixed: auto 미인정 is default only; saved/pending 인정·부분인정·미인정 has priority over auto invalid display -->
 <!-- risk people display updated: outdoor replaced with issue days; hidden overtime displayed before monthly work; issue-only risk promotion softened -->
 <!-- risk promotion refined: OT 30h+ becomes risk only when total load is 9h+ or monthly hidden overtime is 10h+; OT 30h alone remains warning -->
+<!-- hidden overtime noise filter applied: values under 10 minutes are treated as 0:00 at detail-column generation stage -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -10319,6 +10320,13 @@ function getAttendanceAnalysisFields(row){
   }else if(finalAdjustedWorkHours !== null){
     baseWorkHours = Math.min(finalAdjustedWorkHours, baseCapHours);
     hiddenOvertimeHours = Math.max(0, finalAdjustedWorkHours - baseCapHours);
+  }
+
+  // ✅ 숨은초과 노이즈 제거
+  // 10분 미만의 숨은초과는 출퇴근/근태 상세 단계에서 0:00으로 처리한다.
+  // 이후 월 숨은초과, 평균 숨은초과, 총부하, 위험지수는 이 값을 기준으로 자동 집계된다.
+  if(hiddenOvertimeHours !== null && hiddenOvertimeHours * 60 < 10){
+    hiddenOvertimeHours = 0;
   }
 
   return {
