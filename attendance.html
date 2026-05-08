@@ -9052,9 +9052,10 @@ function decorateAttendanceRow(row, metaByName){
 
   // ✅ OT 자동판정 기준 변경
   // 기존: 근무시간(totalWork) - 9:00 >= ERP OT
-  // 변경: 8시보정값(adjustedWorkHours) - 기본근무값(baseWorkHours) >= ERP OT
-  // 이유: 8시보정/기본근무에는 반차·외근·파견·누락 보정이 이미 반영되어 있어
-  //       9:00/9:30/4:30 같은 유형별 차감 기준을 별도로 분기하지 않아도 된다.
+  // 변경: 평일/기본근무 있음 → 8시보정값(adjustedWorkHours) - 기본근무값(baseWorkHours) >= ERP OT
+  //       공휴일/휴일 등 기본근무 0:00 → 8시보정값(adjustedWorkHours) >= ERP OT
+  // 이유: 8시보정에는 점심/저녁식사 차감 및 반차·외근·파견·누락 보정이 이미 반영되어 있어
+  //       기본근무가 0:00인 공휴일근무도 실제 인정 가능한 시간 기준으로 ERP OT를 검증할 수 있다.
   let adjustedBasedOT = null;
   if (erpOT > 0) {
     const otValidationFields = getAttendanceAnalysisFields({
@@ -9070,7 +9071,8 @@ function decorateAttendanceRow(row, metaByName){
     const adjustedHours = Number(otValidationFields?.adjustedWorkHours);
     const baseHours = Number(otValidationFields?.baseWorkHours);
     if (Number.isFinite(adjustedHours) && Number.isFinite(baseHours)) {
-      adjustedBasedOT = Math.max(0, +(adjustedHours - baseHours).toFixed(2));
+      const comparableBaseHours = baseHours > 0 ? baseHours : 0;
+      adjustedBasedOT = Math.max(0, +(adjustedHours - comparableBaseHours).toFixed(2));
     }
 
     if (adjustedBasedOT === null) {
