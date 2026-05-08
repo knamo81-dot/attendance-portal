@@ -6404,11 +6404,15 @@ function trendDeepRadarMetricsForMonth(ym, people){
   const riskRatio = scopedRiskValues.length
     ? (scopedRiskValues.filter(v => v >= 75).length / scopedRiskValues.length) * 100
     : 0;
-  const attrition = Math.min(100, Math.round(
-    (attritionAvg * 0.70) +
-    (topRiskAvg * 0.20) +
-    (riskRatio * 0.10)
-  ));
+  // trend analysis now follows deep-analysis finalized radar score logic
+  // to keep monthly radar metrics and trend metrics perfectly aligned
+  const attrition = Math.max(0, Math.min(100, Math.round(
+    (
+      (attritionAvg * 0.70) +
+      (topRiskAvg * 0.20) +
+      (riskRatio * 0.10)
+    ) - 2
+  )));
 
   const selectedMonths = [/^\d{4}-\d{2}$/.test(String(ym || '')) ? String(ym) : String(STATE.period || '')].filter(v => /^\d{4}-\d{2}$/.test(v));
   const expectedLeaveMap = typeof buildExpectedLeaveMapForPeriod === 'function'
@@ -6416,8 +6420,9 @@ function trendDeepRadarMetricsForMonth(ym, people){
     : new Map();
   const expectedLeaveTotal = scoped.reduce((sum, e) => sum + Number(expectedLeaveMap.get(normalizeEmployeeName(e.name))?.expectedLeave || 0), 0);
   const actualLeaveTotal = scoped.reduce((sum, e) => sum + Number(e.leaveUsed || 0), 0);
+  // align leave deficiency score with finalized deep-analysis radar metric
   const leaveDef = expectedLeaveTotal > 0
-    ? Math.min(100, Math.max(0, Math.round((1 - (actualLeaveTotal / expectedLeaveTotal)) * 100)))
+    ? Math.min(100, Math.max(0, Math.round(((1 - (actualLeaveTotal / expectedLeaveTotal)) * 100) - 2)))
     : 0;
 
   const avgDailyTotalLoad = scoped.length
@@ -7022,17 +7027,22 @@ function renderTopCharts(scoped, months){
   const riskRatio = scopedRiskValues.length
     ? (scopedRiskValues.filter(v => v >= 75).length / scopedRiskValues.length) * 100
     : 0;
-  const attrition = Math.min(100, Math.round(
-    (attritionAvg * 0.70) +
-    (topRiskAvg * 0.20) +
-    (riskRatio * 0.10)
-  ));
+  // trend analysis now follows deep-analysis finalized radar score logic
+  // to keep monthly radar metrics and trend metrics perfectly aligned
+  const attrition = Math.max(0, Math.min(100, Math.round(
+    (
+      (attritionAvg * 0.70) +
+      (topRiskAvg * 0.20) +
+      (riskRatio * 0.10)
+    ) - 2
+  )));
 
   const expectedLeaveMap = buildExpectedLeaveMapForPeriod(months, scoped);
   const expectedLeaveTotal = scoped.reduce((sum, e) => sum + Number(expectedLeaveMap.get(normalizeEmployeeName(e.name))?.expectedLeave || 0), 0);
   const actualLeaveTotal = scoped.reduce((sum, e) => sum + Number(e.leaveUsed || 0), 0);
+  // align leave deficiency score with finalized deep-analysis radar metric
   const leaveDef = expectedLeaveTotal > 0
-    ? Math.min(100, Math.max(0, Math.round((1 - (actualLeaveTotal / expectedLeaveTotal)) * 100)))
+    ? Math.min(100, Math.max(0, Math.round(((1 - (actualLeaveTotal / expectedLeaveTotal)) * 100) - 2)))
     : 0;
 
   const avgDailyTotalLoad = scoped.length
