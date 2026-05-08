@@ -17,7 +17,7 @@
 <!-- dispatch + half-day display fixed: no missing-clock warning and no work-time value in 근무시간 column; analysis columns still show 4:00 -->
 <!-- monthly work display fixed: dashboard/deep/trend 담당자 근무시간 uses 8시보정 합계(monthlyAdjustedWorkHours) instead of raw 근무시간 column 합계 -->
 <!-- totalLoadScore tuned: 0h=0, 0~7h=5, 7h+=10, 8.5h+=35, 9.5h+=75, 10.5h+=100 -->
-<!-- risk floor gate added: if monthly adjusted work hours is below 40h, final personal risk score is 0; total load display remains unchanged -->
+<!-- risk floor gate fixed: if monthly adjusted work hours is below 40h including 0h, final personal risk score is 0; period risk adder is not reapplied; total load display remains unchanged -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -5069,7 +5069,8 @@ function applyAttritionRiskModel(scopedList){
       person.monthlyBaseWorkHours ||
       0
     );
-    if(monthlyAdjustedWorkForRisk > 0 && monthlyAdjustedWorkForRisk < 40){
+    const riskFloorExcluded = monthlyAdjustedWorkForRisk < 40;
+    if(riskFloorExcluded){
       finalRisk = 0;
     }
 
@@ -5077,6 +5078,7 @@ function applyAttritionRiskModel(scopedList){
 
     return {
       ...person,
+      riskFloorExcluded,
       scopedRisk: attritionRisk,
       scopedAttritionRisk: attritionRisk,
       scopedAttritionDrivers: {
@@ -5112,11 +5114,20 @@ function scopedEmployees(){
     scopedRecoveryIssueDays:+(Number(e.recoveryIssueDays || 0)*m).toFixed(1),
     scopedRisk:Math.min(100, Number(e.risk || 0)+a)
   }));
-  return applyAttritionRiskModel(base).map(item => ({
-    ...item,
-    scopedRisk: Math.min(100, Number(item.scopedRisk || 0) + a),
-    scopedAttritionRisk: Math.min(100, Number(item.scopedAttritionRisk || 0) + a)
-  }));
+  return applyAttritionRiskModel(base).map(item => {
+    if(item.riskFloorExcluded){
+      return {
+        ...item,
+        scopedRisk: 0,
+        scopedAttritionRisk: 0
+      };
+    }
+    return {
+      ...item,
+      scopedRisk: Math.min(100, Number(item.scopedRisk || 0) + a),
+      scopedAttritionRisk: Math.min(100, Number(item.scopedAttritionRisk || 0) + a)
+    };
+  });
 }
 function scoreTeam(list){
   const overtimeAvg = avg(list, list.some(x => typeof x.scopedMonthlyOvertime !== 'undefined') ? 'scopedMonthlyOvertime' : 'overtime');
