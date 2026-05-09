@@ -28,7 +28,7 @@
 <!-- dashboard interpretation/action guide reinforced: no calculation logic changed -->
 <!-- dashboard cleanup applied: bottom summary/alert cards removed, monthly trend hints added inside cause cards only -->
 <!-- hiring report main tab removed: panel/code kept inactive for safe rollback -->
-<!-- access role update fixed: admin auto display reads public.users; operator stored/deleted in public.attendance_operators server table; admin feature access locked to admins only; current admin match checks email/name/employee_no -->
+<!-- access role update fixed: admin auto display reads public.users; operator stored/deleted in public.attendance_operators server table; admin feature access locked to admins only; current admin identity uses trusted portal login only -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -1679,7 +1679,7 @@ table.missingTable td strong{
     <button class="mainTab" data-main="trend-analysis">트렌드분석</button>
     <button class="mainTab" data-main="attendance-missing">출퇴근 누락 분석</button>
     <div class="spacer"></div>
-    <button class="mainTab" data-main="admin">관리자 기능</button>
+    <button class="mainTab" data-main="admin" style="display:none" aria-hidden="true">관리자 기능</button>
   </div>
 
   <div id="main-attendance" class="mainPanel active">
@@ -13840,19 +13840,31 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
         user.role, user.user_role, profile.role, employee.role, member.role
       );
       out.employee_no = out.employee_no || firstText(
-        obj.employee_no, obj.employeeNo, obj.emp_no, obj.empNo, obj.id,
-        user.employee_no, user.employeeNo, user.emp_no, user.id,
-        profile.employee_no, profile.employeeNo, profile.emp_no, profile.id,
-        employee.employee_no, employee.employeeNo, employee.emp_no, employee.id,
-        member.employee_no, member.employeeNo, member.emp_no, member.id
+        obj.employee_no, obj.employeeNo, obj.emp_no, obj.empNo,
+        user.employee_no, user.employeeNo, user.emp_no,
+        profile.employee_no, profile.employeeNo, profile.emp_no,
+        employee.employee_no, employee.employeeNo, employee.emp_no,
+        member.employee_no, member.employeeNo, member.emp_no
       );
     }
-    try{ take(window.__portalCurrentUser); take(window.currentUser); take(window.AttendanceCurrentUser); take(window.portalCurrentUser); }catch(_e){}
+
+    // 관리자 기능 접근 판단은 반드시 "현재 로그인 사용자"로만 판단한다.
+    // 검색/선택 직원(selectedEmployee), 사원 프로필(employeeProfile), 앱 내부 currentUser 같은 느슨한 값은 제외한다.
+    // 운영자 브라우저에 과거 관리자/검색대상 정보가 남아 있어도 관리자 기능이 노출되지 않도록 하기 위함.
+    try{
+      take(window.__portalCurrentUser);
+      take(window.portalCurrentUser);
+      take(window.AttendanceCurrentUser);
+      take(window.attendanceCurrentUser);
+      take(window.__attendanceCurrentUser);
+    }catch(_e){}
     try{
       if(window.parent && window.parent !== window){
         take(window.parent.__portalCurrentUser);
-        take(window.parent.currentUser);
         take(window.parent.portalCurrentUser);
+        take(window.parent.AttendanceCurrentUser);
+        take(window.parent.attendanceCurrentUser);
+        take(window.parent.__attendanceCurrentUser);
       }
     }catch(_e){}
     try{
@@ -13860,33 +13872,18 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
       out.email = out.email || firstText(q.get('email'), q.get('user_email'), q.get('userEmail'), q.get('mail'));
       out.name = out.name || firstText(q.get('name'), q.get('user_name'), q.get('userName'), q.get('employee_name'));
       out.role = out.role || firstText(q.get('role'), q.get('user_role'), q.get('userRole'), q.get('portal_role'));
-      out.employee_no = out.employee_no || firstText(q.get('employee_no'), q.get('employeeNo'), q.get('emp_no'), q.get('empNo'), q.get('id'));
+      out.employee_no = out.employee_no || firstText(q.get('employee_no'), q.get('employeeNo'), q.get('emp_no'), q.get('empNo'));
     }catch(_e){}
     try{
       [
         'portal_auth_user','portalUser','portal_current_user','portalCurrentUser',
         'attendance_portal_user','attendance_current_user','AttendanceCurrentUser',
-        'currentUser','current_user','user','loginUser','login_user',
-        'employeeProfile','employee_profile','selectedEmployee'
+        '__portalCurrentUser','__attendanceCurrentUser'
       ].forEach(function(key){
         [sessionStorage.getItem(key), localStorage.getItem(key)].forEach(function(raw){
-          if(!raw) return;
+          if(!raw || raw.length > 50000) return;
           try{ take(JSON.parse(raw)); }catch(_ignore){}
         });
-      });
-    }catch(_e){}
-    // 포탈/브라우저 저장키 이름이 바뀐 경우를 대비해 전체 storage에서 사용자 프로필 형태 JSON을 한 번 더 탐색합니다.
-    try{
-      [sessionStorage, localStorage].forEach(function(store){
-        if(!store) return;
-        for(var i=0;i<store.length;i++){
-          var key = store.key(i) || '';
-          if(!/(user|portal|employee|auth|login|profile|current)/i.test(key)) continue;
-          var raw = store.getItem(key);
-          if(!raw || raw.length > 50000) continue;
-          try{ take(JSON.parse(raw)); }catch(_ignore){}
-          if(out.email && out.employee_no && out.name) break;
-        }
       });
     }catch(_e){}
     out.email = normalizeAccessEmail(out.email);
@@ -13900,7 +13897,6 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
   }
   function isCurrentAttendanceAdmin(){
     var identity = getAttendanceCurrentIdentity();
-    if(isAccessAdminRole(identity.role)) return true;
     var rows = getCurrentAdminRows();
     if(!rows.length) return false;
     var identityNo = normalizeAttendanceIdentityNo(identity.employee_no);
@@ -13910,9 +13906,10 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
       var rowEmail = normalizeAccessEmail(row.email || row.user_email || '');
       var rowName = String(row.name || row.user_name || '').trim();
       var rowNo = normalizeAttendanceIdentityNo(row.employee_no || row.employeeNo || row.id || row.emp_no || '');
+      // 이름은 보조값으로만 사용한다. 동명이인/검색 저장값 오판을 막기 위해 email 또는 사번이 없으면 이름 단독으로는 관리자 판정하지 않는다.
       return (identityEmail && rowEmail && identityEmail === rowEmail) ||
              (identityNo && rowNo && identityNo === rowNo) ||
-             (identityName && rowName && identityName === rowName);
+             ((identityEmail || identityNo) && identityName && rowName && identityName === rowName);
     });
   }
   function applyAttendanceAdminAccessGuard(){
