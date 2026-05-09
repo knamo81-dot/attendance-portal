@@ -30,6 +30,7 @@
 <!-- hiring report main tab removed: panel/code kept inactive for safe rollback -->
 <!-- access role update fixed: admin auto display reads public.users; operator stored/deleted in public.attendance_operators server table -->
 <!-- admin feature visibility locked: only users.role=admin can see/open 관리자 기능 -->
+<!-- manual check server sync applied: absence_decision + approved_overtime_override saved to Supabase -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -3912,7 +3913,9 @@ function buildAttendanceRecordPayloads(batchId, secomRows = [], erpRows = []){
       overtime_hours: overtime,
       reason: reason || null,
       status: String(row.status || '').trim() || null,
-      overtime_check_result: String(row.overtimeCheckResult || row.overtime_check_result || row.overtimeCheck || '').trim() || null
+      overtime_check_result: String(row.overtimeCheckResult || row.overtime_check_result || row.overtimeCheck || '').trim() || null,
+      approved_overtime_override: String(row.approvedOvertimeDisplay || row.approved_overtime_override || '').trim() || null,
+      absence_decision: String(row.absenceDecision || row.absence_decision || '').trim() || null
     };
   }).filter(row => row.work_date && (row.employee_no || row.employee_name));
 }
@@ -9316,6 +9319,7 @@ function getSavedApprovedOvertimeOverride(rowOrRecordId){
 
 let PENDING_OVERTIME_CHECK_CHANGES = {};
 let PENDING_APPROVED_OVERTIME_CHANGES = {};
+let PENDING_ABSENCE_DECISION_CHANGES = {};
 
 function getPendingOvertimeCheck(recordId){
   const rid = String(recordId || '').trim();
@@ -9327,6 +9331,12 @@ function getPendingApprovedOvertime(recordId){
   const rid = String(recordId || '').trim();
   if(!rid) return '';
   return String(PENDING_APPROVED_OVERTIME_CHANGES[rid] || '').trim();
+}
+
+function getPendingAbsenceDecision(recordId){
+  const rid = String(recordId || '').trim();
+  if(!rid) return '';
+  return String(PENDING_ABSENCE_DECISION_CHANGES[rid] || '').trim();
 }
 
 function getDefaultApprovedOvertimeValue(row, overtimeCheckValue){
@@ -9345,7 +9355,7 @@ function getDefaultApprovedOvertimeValue(row, overtimeCheckValue){
   }
 
   const pendingApproved = getPendingApprovedOvertime(recordId);
-  const savedApproved = String(pendingApproved || getSavedApprovedOvertimeOverride(row) || row?.approvedOvertimeDisplay || '').trim();
+  const savedApproved = String(pendingApproved || row?.approvedOvertimeDisplay || row?.approved_overtime_override || getSavedApprovedOvertimeOverride(row) || '').trim();
 
   if(checkValue === '부분인정'){
     if(savedApproved && savedApproved !== '-') return savedApproved;
@@ -9430,50 +9440,88 @@ async function saveOvertimeCheckChanges(){
     return;
   }
 
-  const entries = Object.entries(PENDING_OVERTIME_CHECK_CHANGES || {});
-  console.log('[SAVE BUTTON] pending entries', entries);
+  const overtimeEntries = Object.entries(PENDING_OVERTIME_CHECK_CHANGES || {});
+  const approvedEntries = Object.entries(PENDING_APPROVED_OVERTIME_CHANGES || {});
+  const absenceEntries = Object.entries(PENDING_ABSENCE_DECISION_CHANGES || {});
+  const targetIds = Array.from(new Set([
+    ...overtimeEntries.map(([rid]) => String(rid)),
+    ...approvedEntries.map(([rid]) => String(rid)),
+    ...absenceEntries.map(([rid]) => String(rid))
+  ].filter(Boolean)));
 
-  if(!entries.length){
+  console.log('[SAVE BUTTON] pending entries', {
+    overtime: overtimeEntries,
+    approvedOvertime: approvedEntries,
+    absence: absenceEntries
+  });
+
+  if(!targetIds.length){
     alert('저장할 변경이 없습니다.');
     return;
   }
 
-  for(const [rid, value] of entries){
+  for(const rid of targetIds){
+    const targetRow = Array.isArray(REAL_ATTENDANCE_DATA)
+      ? REAL_ATTENDANCE_DATA.find(row => String(row.recordId || '') === String(rid))
+      : null;
+    const payload = {};
+
+    if(Object.prototype.hasOwnProperty.call(PENDING_OVERTIME_CHECK_CHANGES, rid)){
+      payload.overtime_check_result = String(PENDING_OVERTIME_CHECK_CHANGES[rid] || '').trim() || null;
+    }
+
+    if(Object.prototype.hasOwnProperty.call(PENDING_APPROVED_OVERTIME_CHANGES, rid)){
+      payload.approved_overtime_override = String(PENDING_APPROVED_OVERTIME_CHANGES[rid] || '').trim() || null;
+    }
+
+    if(Object.prototype.hasOwnProperty.call(PENDING_ABSENCE_DECISION_CHANGES, rid)){
+      payload.absence_decision = String(PENDING_ABSENCE_DECISION_CHANGES[rid] || '').trim() || null;
+    }
+
+    // OT확인을 바꿨는데 부분인정 시간 payload가 없는 경우에도 현재 화면값을 서버에 같이 보관한다.
+    if(payload.overtime_check_result !== undefined && payload.approved_overtime_override === undefined){
+      const approvedValue = String(
+        PENDING_APPROVED_OVERTIME_CHANGES[rid] ||
+        targetRow?.approvedOvertimeDisplay ||
+        targetRow?.approved_overtime_override ||
+        getSavedApprovedOvertimeOverride(targetRow || { recordId: rid }) ||
+        ''
+      ).trim();
+      if(approvedValue) payload.approved_overtime_override = approvedValue;
+    }
+
     const { error } = await supabaseClient
       .from('attendance_records')
-      .update({ overtime_check_result: String(value || '').trim() })
+      .update(payload)
       .eq('id', Number(rid));
 
     if(error){
-      console.error('[SAVE BUTTON] row update failed', { rid, value, error });
+      console.error('[SAVE BUTTON] row update failed', { rid, payload, error });
       alert(`저장 실패: ${rid}`);
       return;
     }
-  }
 
-  try{
-    for (const [rid, value] of entries){
-      const targetRow = Array.isArray(REAL_ATTENDANCE_DATA)
-        ? REAL_ATTENDANCE_DATA.find(row => String(row.recordId || '') === String(rid))
-        : null;
-      const keys = buildOvertimeCheckStorageKeys(targetRow || { recordId: rid });
-      for(const key of keys){
-        localStorage.setItem(key, String(value || '').trim());
-      }
-      const approvedValue = String(PENDING_APPROVED_OVERTIME_CHANGES[rid] || getPendingApprovedOvertime(rid) || targetRow?.approvedOvertimeDisplay || '').trim();
-      if(approvedValue){
-        const approvedKeys = buildApprovedOvertimeStorageKeys(targetRow || { recordId: rid });
-        for(const key of approvedKeys){
-          localStorage.setItem(key, approvedValue);
+    // 기존 브라우저 캐시도 동기화하되, 이후 화면 표시 기준은 Supabase 서버값을 우선한다.
+    try{
+      if(targetRow){
+        if(payload.overtime_check_result !== undefined){
+          for(const key of buildOvertimeCheckStorageKeys(targetRow)){ localStorage.setItem(key, payload.overtime_check_result || ''); }
+        }
+        if(payload.approved_overtime_override !== undefined){
+          for(const key of buildApprovedOvertimeStorageKeys(targetRow)){ localStorage.setItem(key, payload.approved_overtime_override || ''); }
         }
       }
+      if(payload.absence_decision !== undefined){
+        localStorage.setItem(`absenceDecision:${rid}`, payload.absence_decision || '');
+      }
+    }catch(e){
+      console.warn('[SAVE BUTTON] localStorage sync skipped', e);
     }
-  }catch(e){
-    console.warn('[SAVE BUTTON] localStorage save skipped', e);
   }
 
   PENDING_OVERTIME_CHECK_CHANGES = {};
   PENDING_APPROVED_OVERTIME_CHANGES = {};
+  PENDING_ABSENCE_DECISION_CHANGES = {};
 
   try{
     await window.loadAttendanceFromSupabase();
@@ -9485,14 +9533,14 @@ async function saveOvertimeCheckChanges(){
   alert('저장 완료');
 }
 
-
 window.saveOvertimeCheckChanges = saveOvertimeCheckChanges;
 window.markOvertimeCheckChanged = markOvertimeCheckChanged;
 window.markApprovedOvertimeChanged = markApprovedOvertimeChanged;
 window.updateOvertimeCheckResult = updateOvertimeCheckResult;
+window.markAbsenceDecisionChanged = markAbsenceDecisionChanged;
 
 window.addEventListener('beforeunload', function(event){
-  if(Object.keys(PENDING_OVERTIME_CHECK_CHANGES).length > 0 || Object.keys(PENDING_APPROVED_OVERTIME_CHANGES).length > 0){
+  if(Object.keys(PENDING_OVERTIME_CHECK_CHANGES).length > 0 || Object.keys(PENDING_APPROVED_OVERTIME_CHANGES).length > 0 || Object.keys(PENDING_ABSENCE_DECISION_CHANGES).length > 0){
     event.preventDefault();
     event.returnValue = '';
   }
@@ -9517,12 +9565,10 @@ function markAbsenceDecisionChanged(recordId, value){
   const rid = String(recordId || '').trim();
   const nextValue = String(value || '').trim();
   if(!rid) return;
-  try{
-    localStorage.setItem(`absenceDecision:${rid}`, nextValue);
-  }catch(_e){}
+  PENDING_ABSENCE_DECISION_CHANGES[rid] = nextValue;
   if(Array.isArray(REAL_ATTENDANCE_DATA)){
     REAL_ATTENDANCE_DATA = REAL_ATTENDANCE_DATA.map(row =>
-      String(row.recordId || '') === rid ? { ...row, absenceDecision: nextValue } : row
+      String(row.recordId || '') === rid ? { ...row, absenceDecision: nextValue, absence_decision: nextValue } : row
     );
   }
   render();
@@ -9532,7 +9578,7 @@ function renderAbsenceCheckSelect(row){
   const isBothMissing = row?.displayStart === '출근누락' && row?.displayEnd === '퇴근누락';
   if(!isBothMissing) return '-';
   const recordId = String(row?.recordId || '').trim();
-  const currentValue = String(row?.absenceDecision || getSavedAbsenceDecision(recordId) || '결근').trim();
+  const currentValue = String(getPendingAbsenceDecision(recordId) || row?.absenceDecision || row?.absence_decision || getSavedAbsenceDecision(recordId) || '결근').trim();
   const canEdit = canEditAttendanceManualChecks();
   const disabled = (!canEdit || !recordId) ? 'disabled' : '';
   const cls = canEdit ? '' : 'class="attManualReadonly" title="관리자 또는 운영자만 수정할 수 있습니다."';
@@ -9569,10 +9615,11 @@ function renderOvertimeCheckSelect(row){
   const recordId = String(row?.recordId || '').trim();
   const pendingValue = getPendingOvertimeCheck(recordId);
   const localOverride = getSavedOvertimeCheckOverride(row);
+  const serverOverride = String(row?.overtimeCheckResult || row?.overtime_check_result || row?.overtimeCheck || '').trim();
   const forcedAutoUnapproved = isAutoOvertimeInvalidDisplayRow(row);
   const currentValue = forcedAutoUnapproved
     ? '미인정'
-    : String(pendingValue || localOverride || row?.overtimeCheckResult || row?.overtime_check_result || row?.overtimeCheck || '인정').trim();
+    : String(pendingValue || serverOverride || localOverride || '인정').trim();
   const canEdit = canEditAttendanceManualChecks();
   const disabled = (!canEdit || !recordId) ? 'disabled' : '';
   const cls = canEdit ? '' : 'class="attManualReadonly" title="관리자 또는 운영자만 수정할 수 있습니다."';
@@ -9591,9 +9638,9 @@ function renderApprovedOvertimeInput(row){
   const forcedAutoUnapproved = isAutoOvertimeInvalidDisplayRow(row);
   const currentCheck = forcedAutoUnapproved
     ? '미인정'
-    : String(getPendingOvertimeCheck(recordId) || getSavedOvertimeCheckOverride(row) || row?.overtimeCheckResult || row?.overtime_check_result || row?.overtimeCheck || '').trim();
+    : String(getPendingOvertimeCheck(recordId) || row?.overtimeCheckResult || row?.overtime_check_result || row?.overtimeCheck || getSavedOvertimeCheckOverride(row) || '').trim();
   const erpApproved = String(row?.erpOTDisplay || '').trim();
-  const currentApproved = String(getPendingApprovedOvertime(recordId) || row?.approvedOvertimeDisplay || getSavedApprovedOvertimeOverride(row) || '').trim();
+  const currentApproved = String(getPendingApprovedOvertime(recordId) || row?.approvedOvertimeDisplay || row?.approved_overtime_override || getSavedApprovedOvertimeOverride(row) || '').trim();
   if(currentCheck === '미인정'){
     return '-';
   }
@@ -9760,8 +9807,8 @@ function decorateAttendanceRow(row, metaByName){
   const dispatchHalfDayRule = isDispatchSpecial && isHalfDayVacationReason(rawReason);
   const workFromHomeRule = specialType === '재택근무';
   const localOvertimeCheck = getSavedOvertimeCheckOverride(row);
-  const savedOvertimeCheck = String(localOvertimeCheck || row.overtimeCheckResult || row.overtime_check_result || '').trim();
-  const savedAbsenceDecision = String(row.absenceDecision || getSavedAbsenceDecision(row.recordId) || '').trim();
+  const savedOvertimeCheck = String(row.overtimeCheckResult || row.overtime_check_result || localOvertimeCheck || '').trim();
+  const savedAbsenceDecision = String(row.absenceDecision || row.absence_decision || getSavedAbsenceDecision(row.recordId) || '').trim();
 
   function calcHoursText(startText, endText){
     const normalizedStartText = normalizeEarlyStartToEight(startText);
@@ -12015,6 +12062,10 @@ window.addEventListener('resize', renderLightweight);
         overtimeCheck: String(row.overtime_check_result || row.overtime_check || '').trim(),
         overtimeCheckResult: String(row.overtime_check_result || '').trim(),
         overtime_check_result: String(row.overtime_check_result || '').trim(),
+        approvedOvertimeDisplay: String(row.approved_overtime_override || '').trim(),
+        approved_overtime_override: String(row.approved_overtime_override || '').trim(),
+        absenceDecision: String(row.absence_decision || '').trim(),
+        absence_decision: String(row.absence_decision || '').trim(),
         status: String(row.status || '').trim(),
         grade: ''
       }));
