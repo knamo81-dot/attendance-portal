@@ -33,6 +33,7 @@
 <!-- manual check server sync applied: absence_decision + approved_overtime_override saved to Supabase -->
 <!-- general user hard lock applied: only attendance tab, self records, no manual edit; non-admin/operator/auto-authority defaults to general -->
 <!-- general user attendance chart label fixed: division/team label replaced with user name -->
+<!-- scoped authority visibility fixed: director/manager/team leader tabs restored outside general mode -->
 <!-- scoped authority access applied: director/division, manager/managed teams, team leader/team, general/self -->
 <style>
 :root {
@@ -5236,9 +5237,42 @@ function scopeAttendanceRowsForGeneralUser(rows){
   const list = Array.isArray(rows) ? rows : [];
   return list.filter(rowMatchesCurrentAttendanceScope);
 }
+function restoreAttendanceAuthorityUserVisibility(){
+  // 일반사용자가 아닌 권한자(소장/본부장/담당/팀장/운영자)는
+  // 일반사용자 모드에서 숨겨진 분석 탭을 다시 복구합니다.
+  document.querySelectorAll('.mainTab').forEach(btn => {
+    const main = btn?.dataset?.main || '';
+    const isAdminTab = main === 'admin';
+    const adminAllowed = (typeof isCurrentAttendanceAdmin === 'function' && isCurrentAttendanceAdmin());
+    const allowed = !isAdminTab || adminAllowed;
+    if(btn.dataset.generalHidden === 'Y' || btn.dataset.generalHidden === 'N'){
+      delete btn.dataset.generalHidden;
+    }
+    btn.style.removeProperty('display');
+    btn.disabled = !allowed;
+    btn.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+    if(isAdminTab && !adminAllowed){
+      btn.dataset.adminHidden = 'Y';
+    }
+  });
+  document.querySelectorAll('.mainPanel').forEach(panel => {
+    const isAdminPanel = panel?.id === 'main-admin';
+    const adminAllowed = (typeof isCurrentAttendanceAdmin === 'function' && isCurrentAttendanceAdmin());
+    if(panel.dataset.generalHidden === 'Y' || panel.dataset.generalHidden === 'N'){
+      delete panel.dataset.generalHidden;
+    }
+    panel.style.removeProperty('display');
+    panel.setAttribute('aria-hidden', (isAdminPanel && !adminAllowed) ? 'true' : 'false');
+    if(isAdminPanel && !adminAllowed){
+      panel.dataset.adminHidden = 'Y';
+      panel.classList.remove('active');
+    }
+  });
+}
 function applyAttendanceGeneralUserVisibility(){
   const isGeneral = isCurrentAttendanceGeneralUser();
   if(!isGeneral){
+    restoreAttendanceAuthorityUserVisibility();
     if(typeof lockAttendanceScopeFilters === 'function') lockAttendanceScopeFilters();
     else unlockAttendanceGeneralUserFilters();
     return;
