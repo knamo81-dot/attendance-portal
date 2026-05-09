@@ -261,6 +261,8 @@ svg text{fill:var(--muted);font-size:14px}
 .mainTabs{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
 .mainTabs .spacer{flex:1 1 auto}
 .mainTab[data-main="admin"][data-admin-hidden="Y"]{display:none !important}
+.mainTab[data-access-hidden="Y"]{display:none !important}
+.attendance-general-only #division,.attendance-general-only #team,.attendance-general-only #stickyDivision,.attendance-general-only #stickyTeam{display:none !important}
 #main-admin[data-admin-hidden="Y"]{display:none !important}
 .mainTab.active{background:var(--text);color:#fff}
 .mainPanel{display:none}
@@ -4908,6 +4910,187 @@ function readAttendanceUiState(key){
 }
 
 const ATTENDANCE_ADMIN_ACCESS_STATE = { resolved:false, loading:false, isAdmin:false, email:'', reason:'' };
+const ATTENDANCE_USER_ACCESS_STATE = {
+  resolved:false,
+  loading:false,
+  level:'general',
+  isGeneral:true,
+  isLeaderOrAbove:false,
+  isOperator:false,
+  isAdmin:false,
+  employeeNo:'',
+  name:'',
+  email:'',
+  position:'',
+  authority:'',
+  role:'',
+  reason:'default general'
+};
+function normalizeAttendanceText(value){ return String(value || '').trim(); }
+function getAttendanceValueFromIdentity(obj, keys){
+  if(!obj || typeof obj !== 'object') return '';
+  for(const key of keys){
+    try{
+      const value = key.split('.').reduce((acc, k) => acc && acc[k], obj);
+      if(value !== undefined && value !== null && String(value).trim()) return String(value).trim();
+    }catch(e){}
+  }
+  return '';
+}
+function getAttendanceEmployeeNoFromIdentity(obj){
+  return getAttendanceValueFromIdentity(obj, ['employee_no','employeeNo','emp_no','empNo','id','user.employee_no','user.employeeNo','profile.employee_no','profile.employeeNo']);
+}
+function getAttendanceNameFromIdentity(obj){
+  return getAttendanceValueFromIdentity(obj, ['name','employee_name','employeeName','user_name','userName','display_name','displayName','user.name','profile.name','user.user_metadata.name','user.user_metadata.full_name']);
+}
+function getAttendancePositionFromIdentity(obj){
+  return getAttendanceValueFromIdentity(obj, ['position','grade','rank','job_title','jobTitle','authority','duty','title','user.position','profile.position','user.user_metadata.position','user.user_metadata.authority']);
+}
+function isAttendanceLeaderOrAboveText(value){
+  const s = String(value || '').trim();
+  if(!s) return false;
+  if(/팀장|담당|파트장|그룹장|실장|본부장|소장|책임자|supervisor|leader|manager|operator|운영자|관리자|admin/i.test(s)) return true;
+  const order = ['사원','주임','대리','과장','차장','부장','이사부장','이사','전무','부사장','사장'];
+  const idx = order.indexOf(s);
+  // 회사 직급 기준상 과장 이상은 일반 사용자(팀장 미만)로 보지 않고 분석 권한을 유지합니다.
+  return idx >= order.indexOf('과장');
+}
+function getCurrentAttendanceIdentity(){
+  const identities = readAttendanceStoredUsers();
+  const result = { employeeNo:'', name:'', email:'', position:'', authority:'', role:'' };
+  for(const item of identities){
+    result.employeeNo = result.employeeNo || getAttendanceEmployeeNoFromIdentity(item);
+    result.name = result.name || getAttendanceNameFromIdentity(item);
+    result.email = result.email || getAttendanceEmailFromIdentity(item);
+    result.position = result.position || getAttendancePositionFromIdentity(item);
+    result.authority = result.authority || getAttendanceValueFromIdentity(item, ['authority','duty','access_authority','accessAuthority','profile.authority','user.authority']);
+    result.role = result.role || getAttendanceRoleFromIdentity(item);
+  }
+  return result;
+}
+function isCurrentAttendanceGeneralUser(){ return ATTENDANCE_USER_ACCESS_STATE.isGeneral === true; }
+function isAttendanceRowOwnedByCurrentUser(row){
+  if(!isCurrentAttendanceGeneralUser()) return true;
+  const employeeNo = String(ATTENDANCE_USER_ACCESS_STATE.employeeNo || '').trim();
+  const name = (typeof normalizeEmployeeName === 'function') ? normalizeEmployeeName(ATTENDANCE_USER_ACCESS_STATE.name || '') : String(ATTENDANCE_USER_ACCESS_STATE.name || '').trim();
+  const rowNo = String(row?.id || row?.employeeId || row?.employee_no || row?.emp_no || row?.사번 || '').trim();
+  const rowName = (typeof normalizeEmployeeName === 'function') ? normalizeEmployeeName(row?.name || row?.employee_name || row?.이름 || '') : String(row?.name || row?.employee_name || row?.이름 || '').trim();
+  if(employeeNo && rowNo && employeeNo === rowNo) return true;
+  if(name && rowName && name === rowName) return true;
+  return false;
+}
+function filterAttendanceRowsByCurrentAccess(rows){
+  const list = Array.isArray(rows) ? rows : [];
+  return isCurrentAttendanceGeneralUser() ? list.filter(isAttendanceRowOwnedByCurrentUser) : list;
+}
+function applyAttendanceUserAccessVisibility(){
+  const isGeneral = isCurrentAttendanceGeneralUser();
+  document.documentElement.classList.toggle('attendance-general-only', isGeneral);
+  document.body?.classList?.toggle('attendance-general-only', isGeneral);
+  document.querySelectorAll('.mainTab').forEach(btn => {
+    const mainName = String(btn.dataset.main || '').trim();
+    if(!mainName) return;
+    if(isGeneral && mainName !== 'attendance'){
+      btn.dataset.accessHidden = 'Y';
+      btn.setAttribute('aria-hidden', 'true');
+      btn.disabled = true;
+    }else if(mainName !== 'admin'){
+      btn.dataset.accessHidden = 'N';
+      btn.setAttribute('aria-hidden', 'false');
+      btn.disabled = false;
+    }
+  });
+  if(isGeneral){
+    STATE.division = '전체';
+    STATE.team = '전체';
+    if(getActiveAttendanceMainTab('attendance') !== 'attendance'){
+      activateMainTabWithoutRender('attendance');
+      saveAttendanceMainTab('attendance');
+    }
+  }
+}
+function updateAttendanceUserAccessState(next = {}){
+  const merged = { ...ATTENDANCE_USER_ACCESS_STATE, ...next };
+  const isAdmin = merged.isAdmin === true || isAttendanceAdminRole(merged.role);
+  const positionText = [merged.position, merged.authority, merged.role].filter(Boolean).join(' ');
+  const isOperator = merged.isOperator === true || /운영자|operator/i.test(positionText);
+  const isLeaderOrAbove = isAdmin || isOperator || isAttendanceLeaderOrAboveText(positionText);
+  merged.isAdmin = isAdmin;
+  merged.isOperator = isOperator;
+  merged.isLeaderOrAbove = isLeaderOrAbove;
+  merged.isGeneral = !isLeaderOrAbove;
+  merged.level = merged.isGeneral ? 'general' : (isAdmin ? 'admin' : (isOperator ? 'operator' : 'leader'));
+  Object.assign(ATTENDANCE_USER_ACCESS_STATE, merged);
+  applyAttendanceUserAccessVisibility();
+}
+async function resolveAttendanceUserAccess(force){
+  if(ATTENDANCE_USER_ACCESS_STATE.loading && !force) return ATTENDANCE_USER_ACCESS_STATE;
+  if(ATTENDANCE_USER_ACCESS_STATE.resolved && !force) return ATTENDANCE_USER_ACCESS_STATE;
+  ATTENDANCE_USER_ACCESS_STATE.loading = true;
+  try{
+    const local = getCurrentAttendanceIdentity();
+    updateAttendanceUserAccessState({ ...local, reason:'local identity' });
+    const client = window.__attendanceSupabaseClient || (window.supabase && typeof SUPABASE_URL !== 'undefined' && typeof SUPABASE_KEY !== 'undefined' ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null);
+    let email = String(local.email || '').trim().toLowerCase();
+    if(client && client.auth && typeof client.auth.getSession === 'function'){
+      try{
+        const sessionRes = await client.auth.getSession();
+        email = String(sessionRes?.data?.session?.user?.email || email || '').trim().toLowerCase();
+      }catch(e){}
+    }
+    let serverUser = null;
+    if(client && email){
+      try{
+        const res = await client.from('users').select('*').eq('email', email).maybeSingle();
+        if(!res?.error && res?.data) serverUser = res.data;
+      }catch(e){}
+    }
+    let serverEmp = null;
+    if(client){
+      try{
+        let q = client.from('employees').select('*').limit(1);
+        if(email) q = q.eq('email', email);
+        else if(local.employeeNo) q = q.eq('employee_no', local.employeeNo);
+        else if(local.name) q = q.eq('name', local.name);
+        const res = await q.maybeSingle();
+        if(!res?.error && res?.data) serverEmp = res.data;
+      }catch(e){}
+    }
+    let operatorRows = [];
+    try{
+      if(typeof refreshAccessOperatorRowsFromServer === 'function') operatorRows = await refreshAccessOperatorRowsFromServer(false);
+    }catch(e){}
+    const employeeNo = String(serverEmp?.employee_no || serverUser?.employee_no || local.employeeNo || '').trim();
+    const name = String(serverEmp?.name || serverUser?.name || local.name || '').trim();
+    const operatorMatch = Array.isArray(operatorRows) && operatorRows.some(row => {
+      const rowNo = String(row.employee_no || row.employeeNo || row.id || '').trim();
+      const rowEmail = String(row.email || '').trim().toLowerCase();
+      const rowName = String(row.name || '').trim();
+      return (employeeNo && rowNo && employeeNo === rowNo) || (email && rowEmail && email === rowEmail) || (name && rowName && name === rowName);
+    });
+    updateAttendanceUserAccessState({
+      resolved:true,
+      employeeNo,
+      name,
+      email,
+      position:String(serverEmp?.position || serverUser?.position || local.position || '').trim(),
+      authority:String(serverEmp?.authority || serverUser?.authority || local.authority || '').trim(),
+      role:String(serverUser?.role || local.role || '').trim(),
+      isAdmin: ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin === true || isAttendanceAdminRole(serverUser?.role || local.role),
+      isOperator: operatorMatch,
+      reason: serverUser || serverEmp ? 'server identity' : 'local identity only'
+    });
+    return ATTENDANCE_USER_ACCESS_STATE;
+  }catch(e){
+    console.warn('[ATTENDANCE ACCESS] 사용자 권한 확인 실패:', e);
+    updateAttendanceUserAccessState({ resolved:true, reason:'check exception' });
+    return ATTENDANCE_USER_ACCESS_STATE;
+  }finally{
+    ATTENDANCE_USER_ACCESS_STATE.loading = false;
+  }
+}
+window.isCurrentAttendanceGeneralUser = isCurrentAttendanceGeneralUser;
+window.resolveAttendanceUserAccess = resolveAttendanceUserAccess;
 function normalizeAttendanceAdminRole(value){
   const s = String(value || '').trim().toLowerCase();
   if(!s) return '';
@@ -4958,6 +5141,7 @@ function getAttendanceFallbackAdminByStorage(){
 }
 function applyAttendanceAdminVisibility(isAdmin){
   const allowed = isAdmin === true;
+  try{ updateAttendanceUserAccessState({ isAdmin: allowed }); }catch(e){}
   const adminTab = document.querySelector('.mainTab[data-main="admin"]');
   const adminPanel = document.getElementById('main-admin');
   if(adminTab){
@@ -5051,6 +5235,7 @@ function restoreSavedAttendancePeriod(){
 function activateMainTabWithoutRender(tabName){
   const targetName = String(tabName || '').trim();
   if(!targetName) return false;
+  if(isCurrentAttendanceGeneralUser() && targetName !== 'attendance') return false;
   if(targetName === 'admin' && !isCurrentAttendanceAdmin()) return false;
   const btn = document.querySelector(`.mainTab[data-main="${targetName}"]`);
   const panel = document.querySelector(`#main-${targetName}`);
@@ -5077,7 +5262,13 @@ applyAttendanceAdminVisibility(false);
 resolveAttendanceAdminAccess(false).then(function(isAdmin){
   if(isAdmin && readAttendanceMainTab() === 'admin') activateMainTabWithoutRender('admin');
   if(!isAdmin && readAttendanceMainTab() === 'admin') saveAttendanceMainTab('attendance');
+  return resolveAttendanceUserAccess(true);
+}).then(function(){
+  applyAttendanceUserAccessVisibility();
+  try{ updateAttendanceViewsAfterDataChange({ refreshFilters:true, keepMainTab:getActiveAttendanceMainTab('attendance') }); }catch(e){}
 });
+applyAttendanceUserAccessVisibility();
+resolveAttendanceUserAccess(false);
 
 
 const $ = s => document.querySelector(s);
@@ -5799,6 +5990,11 @@ function renderFilters(){
     saveAttendanceUiState(ATTENDANCE_UI_STATE_KEYS.period, STATE.period);
     Promise.resolve(updateAttendanceViewsAfterDataChange({ refreshFilters: false, keepMainTab: keepTab })).finally(() => restoreSavedMainTab(keepTab));
   };
+
+  if(isCurrentAttendanceGeneralUser()){
+    STATE.division = '전체';
+    STATE.team = '전체';
+  }
 
   const divisionMetaByName = new Map(orgMaster.map(div => [div.divisionName, div]));
   const employeeDivisionNames = [...new Set(EMPLOYEES.map(e => e.division).filter(Boolean))];
@@ -10177,8 +10373,9 @@ function buildAttendanceRows(){
   const afterPeriodRows = afterBucketRows.filter(row => rowMatchesSelectedPeriod(row.date));
   const afterDisplayRows = afterPeriodRows.filter(row => !isDisplayExcludedAttendance(row));
   const afterOrgRows = afterDisplayRows.filter(row => (STATE.division === '전체' || row.division === STATE.division) && (STATE.team === '전체' || row.team === STATE.team));
+  const afterAccessRows = filterAttendanceRowsByCurrentAccess(afterOrgRows);
 
-  const rows = afterOrgRows
+  const rows = afterAccessRows
     .filter(matchesAttendanceFilters)
     .sort((a,b) => (String(a.date)+String(a.name)).localeCompare(String(b.date)+String(b.name),'ko'));
 
@@ -10190,6 +10387,7 @@ function buildAttendanceRows(){
   window.__afterPeriodRows = afterPeriodRows;
   window.__afterDisplayRows = afterDisplayRows;
   window.__afterOrgRows = afterOrgRows;
+  window.__afterAccessRows = afterAccessRows;
   window.__attendanceRows = rows;
   window.__attendanceDebugCounts = {
     raw: rawRows.length,
@@ -10200,6 +10398,7 @@ function buildAttendanceRows(){
     afterPeriod: afterPeriodRows.length,
     afterDisplay: afterDisplayRows.length,
     afterOrg: afterOrgRows.length,
+    afterAccess: afterAccessRows.length,
     final: rows.length
   };
 
@@ -11309,6 +11508,13 @@ function bindMainTabs(){
   $$('.mainTab').forEach(btn => {
     btn.onclick = () => {
       const mainName = String(btn.dataset.main || '').trim();
+      if(isCurrentAttendanceGeneralUser() && mainName !== 'attendance'){
+        alert('일반 사용자는 근태관리 화면에서 본인 근태만 확인할 수 있습니다.');
+        applyAttendanceUserAccessVisibility();
+        activateMainTabWithoutRender('attendance');
+        saveAttendanceMainTab('attendance');
+        return;
+      }
       if(mainName === 'admin' && !isCurrentAttendanceAdmin()){
         alert('관리자만 접근할 수 있습니다.');
         applyAttendanceAdminVisibility(false);
