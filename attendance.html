@@ -32,6 +32,7 @@
 <!-- admin feature visibility locked: only users.role=admin can see/open 관리자 기능 -->
 <!-- manual check server sync applied: absence_decision + approved_overtime_override saved to Supabase -->
 <!-- general user hard lock applied: only attendance tab, self records, no manual edit; non-admin/operator/auto-authority defaults to general -->
+<!-- general user attendance chart label fixed: division/team label replaced with user name -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -10848,8 +10849,17 @@ function renderAttendanceKpis(rows){
     ['사유', `${reason}건`, 'ERP 사유 중 주의/문제를 제외한 인정 근태']
   ].map(([label, value, sub]) => `<div class="card"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`).join('');
 }
+function getAttendanceGeneralUserChartLabel(rows){
+  const stateName = String(ATTENDANCE_GENERAL_USER_ACCESS_STATE?.name || '').trim();
+  if(stateName) return stateName;
+  const list = Array.isArray(rows) ? rows : [];
+  const row = list.find(r => String(r?.name || r?.employee_name || '').trim());
+  return String(row?.name || row?.employee_name || '본인').trim() || '본인';
+}
 function renderAttendanceChart(rows){
-  const byKey = (STATE.division === '전체' && STATE.team === '전체') ? 'division' : (STATE.team === '전체' ? 'team' : 'name');
+  const isGeneralUserChart = (typeof isCurrentAttendanceGeneralUser === 'function' && isCurrentAttendanceGeneralUser());
+  const byKey = isGeneralUserChart ? 'name' : ((STATE.division === '전체' && STATE.team === '전체') ? 'division' : (STATE.team === '전체' ? 'team' : 'name'));
+  const generalUserLabel = isGeneralUserChart ? getAttendanceGeneralUserChartLabel(rows) : '';
   const grouped = groupBy(rows, byKey);
   const data = Object.entries(grouped).map(([name, list]) => {
     const reason = getAttendanceReasonCount(list);
@@ -10857,13 +10867,15 @@ function renderAttendanceChart(rows){
     const issue = list.filter(x => x.bucket === '문제').length;
     const total = list.length;
     const normal = Math.max(0, total - warn - issue);
-    return { name, total, normal, warn, issue, reason };
+    return { name: isGeneralUserChart ? generalUserLabel : name, total, normal, warn, issue, reason };
   });
-  $('#attendanceChartTitle').textContent = STATE.division === '전체' && STATE.team === '전체'
-    ? '본부/팀별 근태 운영 상태'
-    : STATE.team === '전체'
-      ? `${STATE.division} 내 팀별 근태 운영 상태`
-      : `${STATE.team} 구성원 근태 운영 상태`;
+  $('#attendanceChartTitle').textContent = isGeneralUserChart
+    ? '내 근태 운영 상태'
+    : (STATE.division === '전체' && STATE.team === '전체'
+      ? '본부/팀별 근태 운영 상태'
+      : STATE.team === '전체'
+        ? `${STATE.division} 내 팀별 근태 운영 상태`
+        : `${STATE.team} 구성원 근태 운영 상태`);
   barSVG($('#attendanceChart'), data, ['total','normal','warn','issue','reason'], ['#94a3b8','#16a34a','#d97706','#ef4444','#2563eb'], data.length > 4);
 }
 function renderAttendanceInsights(rows){
