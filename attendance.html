@@ -28,7 +28,7 @@
 <!-- dashboard interpretation/action guide reinforced: no calculation logic changed -->
 <!-- dashboard cleanup applied: bottom summary/alert cards removed, monthly trend hints added inside cause cards only -->
 <!-- hiring report main tab removed: panel/code kept inactive for safe rollback -->
-<!-- access role update fixed: admin auto display reads public.users; operator stored/deleted in public.attendance_operators server table; admin feature access locked to admins only -->
+<!-- access role update fixed: admin auto display reads public.users; operator stored/deleted in public.attendance_operators server table; admin feature access locked to admins only; current admin match checks email/name/employee_no -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -13812,29 +13812,81 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
   }
   function getAttendanceCurrentIdentity(){
     var out = { email:'', name:'', role:'', employee_no:'' };
+    function firstText(){
+      for(var i=0;i<arguments.length;i++){
+        var v = arguments[i];
+        if(v === undefined || v === null) continue;
+        v = String(v).trim();
+        if(v) return v;
+      }
+      return '';
+    }
     function take(obj){
       if(!obj || typeof obj !== 'object') return;
       var user = obj.user && typeof obj.user === 'object' ? obj.user : {};
       var profile = obj.profile && typeof obj.profile === 'object' ? obj.profile : {};
-      out.email = out.email || String(obj.email || obj.user_email || obj.userEmail || user.email || profile.email || '').trim();
-      out.name = out.name || String(obj.name || obj.user_name || obj.userName || user.name || profile.name || '').trim();
-      out.role = out.role || String(obj.role || obj.user_role || obj.userRole || obj.portal_role || obj.portalRole || user.role || profile.role || '').trim();
-      out.employee_no = out.employee_no || String(obj.employee_no || obj.employeeNo || obj.emp_no || obj.empNo || user.employee_no || profile.employee_no || '').trim();
+      var employee = obj.employee && typeof obj.employee === 'object' ? obj.employee : {};
+      var member = obj.member && typeof obj.member === 'object' ? obj.member : {};
+      out.email = out.email || firstText(
+        obj.email, obj.user_email, obj.userEmail, obj.mail,
+        user.email, user.user_email, profile.email, employee.email, member.email
+      );
+      out.name = out.name || firstText(
+        obj.name, obj.user_name, obj.userName, obj.employee_name, obj.employeeName,
+        user.name, user.user_name, profile.name, employee.name, employee.employee_name, member.name
+      );
+      out.role = out.role || firstText(
+        obj.role, obj.user_role, obj.userRole, obj.portal_role, obj.portalRole,
+        user.role, user.user_role, profile.role, employee.role, member.role
+      );
+      out.employee_no = out.employee_no || firstText(
+        obj.employee_no, obj.employeeNo, obj.emp_no, obj.empNo, obj.id,
+        user.employee_no, user.employeeNo, user.emp_no, user.id,
+        profile.employee_no, profile.employeeNo, profile.emp_no, profile.id,
+        employee.employee_no, employee.employeeNo, employee.emp_no, employee.id,
+        member.employee_no, member.employeeNo, member.emp_no, member.id
+      );
     }
-    try{ take(window.__portalCurrentUser); take(window.currentUser); take(window.AttendanceCurrentUser); }catch(_e){}
+    try{ take(window.__portalCurrentUser); take(window.currentUser); take(window.AttendanceCurrentUser); take(window.portalCurrentUser); }catch(_e){}
     try{
-      var q = new URLSearchParams(window.location.search || '');
-      out.email = out.email || String(q.get('email') || q.get('user_email') || q.get('userEmail') || '').trim();
-      out.name = out.name || String(q.get('name') || q.get('user_name') || q.get('userName') || '').trim();
-      out.role = out.role || String(q.get('role') || q.get('user_role') || q.get('userRole') || '').trim();
-      out.employee_no = out.employee_no || String(q.get('employee_no') || q.get('employeeNo') || q.get('emp_no') || '').trim();
+      if(window.parent && window.parent !== window){
+        take(window.parent.__portalCurrentUser);
+        take(window.parent.currentUser);
+        take(window.parent.portalCurrentUser);
+      }
     }catch(_e){}
     try{
-      ['portal_auth_user','portalUser','attendance_portal_user','currentUser','user'].forEach(function(key){
+      var q = new URLSearchParams(window.location.search || '');
+      out.email = out.email || firstText(q.get('email'), q.get('user_email'), q.get('userEmail'), q.get('mail'));
+      out.name = out.name || firstText(q.get('name'), q.get('user_name'), q.get('userName'), q.get('employee_name'));
+      out.role = out.role || firstText(q.get('role'), q.get('user_role'), q.get('userRole'), q.get('portal_role'));
+      out.employee_no = out.employee_no || firstText(q.get('employee_no'), q.get('employeeNo'), q.get('emp_no'), q.get('empNo'), q.get('id'));
+    }catch(_e){}
+    try{
+      [
+        'portal_auth_user','portalUser','portal_current_user','portalCurrentUser',
+        'attendance_portal_user','attendance_current_user','AttendanceCurrentUser',
+        'currentUser','current_user','user','loginUser','login_user',
+        'employeeProfile','employee_profile','selectedEmployee'
+      ].forEach(function(key){
         [sessionStorage.getItem(key), localStorage.getItem(key)].forEach(function(raw){
           if(!raw) return;
           try{ take(JSON.parse(raw)); }catch(_ignore){}
         });
+      });
+    }catch(_e){}
+    // 포탈/브라우저 저장키 이름이 바뀐 경우를 대비해 전체 storage에서 사용자 프로필 형태 JSON을 한 번 더 탐색합니다.
+    try{
+      [sessionStorage, localStorage].forEach(function(store){
+        if(!store) return;
+        for(var i=0;i<store.length;i++){
+          var key = store.key(i) || '';
+          if(!/(user|portal|employee|auth|login|profile|current)/i.test(key)) continue;
+          var raw = store.getItem(key);
+          if(!raw || raw.length > 50000) continue;
+          try{ take(JSON.parse(raw)); }catch(_ignore){}
+          if(out.email && out.employee_no && out.name) break;
+        }
       });
     }catch(_e){}
     out.email = normalizeAccessEmail(out.email);
@@ -13843,16 +13895,24 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
     out.employee_no = String(out.employee_no || '').trim();
     return out;
   }
+  function normalizeAttendanceIdentityNo(v){
+    return String(v || '').trim();
+  }
   function isCurrentAttendanceAdmin(){
     var identity = getAttendanceCurrentIdentity();
     if(isAccessAdminRole(identity.role)) return true;
     var rows = getCurrentAdminRows();
     if(!rows.length) return false;
+    var identityNo = normalizeAttendanceIdentityNo(identity.employee_no);
+    var identityEmail = normalizeAccessEmail(identity.email);
+    var identityName = String(identity.name || '').trim();
     return rows.some(function(row){
-      var rowEmail = normalizeAccessEmail(row.email);
-      var rowName = String(row.name || '').trim();
-      return (identity.email && rowEmail && identity.email === rowEmail) ||
-             (identity.name && rowName && identity.name === rowName);
+      var rowEmail = normalizeAccessEmail(row.email || row.user_email || '');
+      var rowName = String(row.name || row.user_name || '').trim();
+      var rowNo = normalizeAttendanceIdentityNo(row.employee_no || row.employeeNo || row.id || row.emp_no || '');
+      return (identityEmail && rowEmail && identityEmail === rowEmail) ||
+             (identityNo && rowNo && identityNo === rowNo) ||
+             (identityName && rowName && identityName === rowName);
     });
   }
   function applyAttendanceAdminAccessGuard(){
