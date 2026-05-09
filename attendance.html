@@ -28,7 +28,7 @@
 <!-- dashboard interpretation/action guide reinforced: no calculation logic changed -->
 <!-- dashboard cleanup applied: bottom summary/alert cards removed, monthly trend hints added inside cause cards only -->
 <!-- hiring report main tab removed: panel/code kept inactive for safe rollback -->
-<!-- access role update fixed: admin auto display reads public.users existing columns only; operator saved in public.attendance_operators -->
+<!-- access role update fixed: admin auto display reads public.users; operator stored in public.attendance_operators server table -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -2364,12 +2364,12 @@ table.missingTable td strong{
       <div class="title">접근권한 설정</div>
       <div class="desc">현재 단계에서는 실제 근태 접근제한 로직은 연결하지 않고, 접근권한을 확인·지정하는 화면만 구성합니다. 관리자·소장/본부장·담당·팀장은 자동 표기하고, 운영자는 이 화면에서 검색 후 지정합니다.</div>
       <div class="real-admin-top-note" style="margin-top:12px">
-        자동 권한 기준: 소장/본부장은 사원정보의 직책과 본부코드, 담당은 직책과 관리팀코드, 팀장은 직책과 팀코드 기준으로 표시합니다. 운영자는 검색 후 지정한 서버 저장값을 사용하며, 이후 단계에서 업로드·OT확인·근태상세 수정 권한에 연결합니다.
+        자동 권한 기준: 소장/본부장은 사원정보의 직책과 본부코드, 담당은 직책과 관리팀코드, 팀장은 직책과 팀코드 기준으로 표시합니다. 운영자는 검색 후 지정한 저장값을 사용하며, 이후 단계에서 업로드·OT확인·근태상세 수정 권한에 연결합니다.
       </div>
       <div class="accessGuideGrid">
         <div class="accessGuideCard"><div class="k">자동 표기</div><div class="v">관리자 · 소장 · 담당 · 팀장</div><div class="sub">사원정보/현재 접속정보 기준</div></div>
         <div class="accessGuideCard"><div class="k">수동 설정</div><div class="v">운영자</div><div class="sub">검색 후 지정/해제</div></div>
-        <div class="accessGuideCard"><div class="k">저장 위치</div><div class="v">관리자 설정값 / 운영자 서버</div><div class="sub">관리자는 users.role=admin/Admin/관리자 기준 자동 표기</div></div>
+        <div class="accessGuideCard"><div class="k">저장 위치</div><div class="v">관리자 설정값 / 운영자 서버</div><div class="sub">관리자는 users.role=admin/Admin/관리자, 운영자는 attendance_operators 기준</div></div>
         <div class="accessGuideCard"><div class="k">접근제한 로직</div><div class="v">미연결</div><div class="sub">이번 수정 범위에서 제외</div></div>
       </div>
     </div>
@@ -2416,7 +2416,7 @@ table.missingTable td strong{
           <button id="accessOperatorSearchBtn" type="button" class="adminActionBtn primary">사원 검색</button>
           <button id="accessOperatorRefreshBtn" type="button" class="adminActionBtn">권한 새로고침</button>
         </div>
-        <div class="sub" style="margin-top:8px">검색 결과에서 운영자를 지정하고, 현재 운영자 목록에서 해제합니다. 저장은 브라우저 저장소에 즉시 반영됩니다.</div>
+        <div class="sub" style="margin-top:8px">검색 결과에서 운영자를 지정하고, 현재 운영자 목록에서 해제합니다. 저장은 서버(attendance_operators)에 즉시 반영됩니다.</div>
       </div>
 
       <div class="accessOperatorSectionTitle">검색 결과</div>
@@ -13657,10 +13657,9 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
 
 <script>
 (function(){
-  var OPERATOR_KEY = 'attendance_access_operator_employee_ids_v1'; // legacy localStorage key, not used for current server state
-  var ATTENDANCE_OPERATORS_TABLE = 'attendance_operators';
   var ACCESS_ADMIN_STATE = { loaded:false, loading:false, rows:[] };
-  var ACCESS_OPERATOR_STATE = { loaded:false, loading:false, rows:[], error:'' };
+  var ACCESS_OPERATOR_STATE = { loaded:false, loading:false, rows:[] };
+  var LEGACY_OPERATOR_KEY = 'attendance_access_operator_employee_ids_v1';
 
   function accessEsc(v){
     return String(v ?? '').replace(/[&<>'"]/g, function(ch){
@@ -13689,98 +13688,145 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
   function getAccessName(emp){
     return String(emp?.name || emp?.employee_name || '').trim();
   }
-  function getAttendanceSupabaseClient(){
-    if(window.__attendanceSupabaseClient) return window.__attendanceSupabaseClient;
-    try{
-      if(window.supabase && typeof window.supabase.createClient === 'function'){
-        var url = 'https://mbqpsovlwvedwrtbbauj.supabase.co';
-        var key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
-        window.__attendanceSupabaseClient = window.supabase.createClient(url, key);
-        return window.__attendanceSupabaseClient;
-      }
-    }catch(e){ console.warn('[ATTENDANCE OPERATORS] Supabase client init failed:', e); }
-    return null;
-  }
-  function normalizeOperatorRow(row){
-    return {
-      id: row?.id || '',
-      employee_no: String(row?.employee_no || row?.employeeNo || '').trim(),
-      name: String(row?.name || '').trim(),
-      department: String(row?.department || row?.division || row?.division_name || '').trim(),
-      team: String(row?.team || row?.team_name || '').trim(),
-      position: String(row?.position || row?.authority || '').trim(),
-      email: String(row?.email || '').trim(),
-      role: String(row?.role || '운영자').trim() || '운영자',
-      is_active: row?.is_active !== false,
-      status: row?.status || '재직',
-      created_at: row?.created_at || '',
-      updated_at: row?.updated_at || ''
-    };
-  }
   function getAccessOperatorRows(){
     return Array.isArray(ACCESS_OPERATOR_STATE.rows) ? ACCESS_OPERATOR_STATE.rows.slice() : [];
   }
   function getAccessOperatorIds(){
-    return new Set(getAccessOperatorRows().map(function(row){ return String(row.employee_no || row.employeeNo || row.id || '').trim(); }).filter(Boolean));
+    return new Set(getAccessOperatorRows()
+      .map(function(row){ return String(row.employee_no || row.employeeNo || row.id || '').trim(); })
+      .filter(Boolean));
   }
-  function saveAccessOperatorIds(ids){
-    // 운영자는 서버(attendance_operators) 기준으로만 관리합니다. 기존 브라우저 저장값은 더 이상 사용하지 않습니다.
-    try{ localStorage.removeItem(OPERATOR_KEY); }catch(e){}
-  }
-  async function refreshAccessOperatorRows(force){
-    if(ACCESS_OPERATOR_STATE.loading) return ACCESS_OPERATOR_STATE.rows || [];
-    if(ACCESS_OPERATOR_STATE.loaded && !force) return ACCESS_OPERATOR_STATE.rows || [];
-    ACCESS_OPERATOR_STATE.loading = true;
-    ACCESS_OPERATOR_STATE.error = '';
+  function getCurrentAccessActorName(){
     try{
-      var client = getAttendanceSupabaseClient();
-      if(!client) throw new Error('Supabase 연결 정보가 없습니다.');
+      var keys = ['portal_auth_user','portalUser','attendance_portal_user'];
+      for(var i=0;i<keys.length;i++){
+        var raw = sessionStorage.getItem(keys[i]) || localStorage.getItem(keys[i]);
+        if(!raw) continue;
+        var parsed = JSON.parse(raw);
+        var name = parsed?.name || parsed?.user?.name || parsed?.profile?.name || parsed?.email || parsed?.user?.email || '';
+        if(name) return String(name).trim();
+      }
+    }catch(_e){}
+    return '관리자';
+  }
+  function normalizeAccessOperatorRow(row){
+    row = row || {};
+    return {
+      employee_no: String(row.employee_no || row.employeeNo || row.id || '').trim(),
+      name: String(row.name || row.employee_name || '').trim(),
+      department: String(row.department || row.division || row.division_name || row.division_code || '').trim(),
+      team: String(row.team || row.team_name || row.team_code || '').trim(),
+      position: String(row.position || row.authority || '').trim(),
+      email: String(row.email || row.user_email || '').trim(),
+      role: String(row.role || '운영자').trim() || '운영자',
+      status: row.is_active === false ? '해제' : '재직',
+      is_active: row.is_active !== false,
+      created_at: row.created_at || '',
+      updated_at: row.updated_at || ''
+    };
+  }
+  async function refreshAccessOperatorRowsFromServer(force){
+    if(ACCESS_OPERATOR_STATE.loading) return getAccessOperatorRows();
+    if(ACCESS_OPERATOR_STATE.loaded && !force) return getAccessOperatorRows();
+    ACCESS_OPERATOR_STATE.loading = true;
+    try{
+      var client = window.__attendanceSupabaseClient || null;
+      if(!client){
+        ACCESS_OPERATOR_STATE.rows = [];
+        ACCESS_OPERATOR_STATE.loaded = true;
+        return [];
+      }
       var res = await client
-        .from(ATTENDANCE_OPERATORS_TABLE)
+        .from('attendance_operators')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending:false });
-      if(res && res.error) throw res.error;
-      ACCESS_OPERATOR_STATE.rows = (Array.isArray(res?.data) ? res.data : []).map(normalizeOperatorRow);
+      if(res && res.error){
+        console.warn('[ACCESS OPERATOR] 서버 조회 실패:', res.error);
+        ACCESS_OPERATOR_STATE.rows = [];
+      }else{
+        ACCESS_OPERATOR_STATE.rows = (Array.isArray(res?.data) ? res.data : []).map(normalizeAccessOperatorRow);
+      }
       ACCESS_OPERATOR_STATE.loaded = true;
-      saveAccessOperatorIds();
-      return ACCESS_OPERATOR_STATE.rows;
+      try{ localStorage.removeItem(LEGACY_OPERATOR_KEY); }catch(_e){}
+      return getAccessOperatorRows();
     }catch(e){
-      console.warn('[ATTENDANCE OPERATORS] 서버 조회 실패:', e);
+      console.warn('[ACCESS OPERATOR] 서버 조회 예외:', e);
       ACCESS_OPERATOR_STATE.rows = [];
-      ACCESS_OPERATOR_STATE.error = e?.message || '운영자 서버 조회 실패';
       ACCESS_OPERATOR_STATE.loaded = true;
-      return ACCESS_OPERATOR_STATE.rows;
+      return [];
     }finally{
       ACCESS_OPERATOR_STATE.loading = false;
     }
   }
-  function getAccessOperatorRowById(id){
-    id = String(id || '').trim();
-    return getAccessOperatorRows().find(function(row){ return String(row.employee_no || row.employeeNo || row.id || '').trim() === id; }) || null;
-  }
-  function getAccessActorName(){
-    try{
-      var u = window.currentUser || window.user || window.portalUser || {};
-      return String(u.name || u.user_name || u.email || '').trim() || 'attendance_admin';
-    }catch(e){ return 'attendance_admin'; }
-  }
-  function buildAttendanceOperatorPayload(emp){
+  function buildAttendanceOperatorPayload(emp, active){
     return {
-      employee_no:getAccessId(emp),
-      name:getAccessName(emp),
-      department:getAccessDivision(emp),
-      team:getAccessTeam(emp),
-      position:normalizeAccessAuthority(emp) || emp.position || emp.grade || '',
-      email:getAccessEmail(emp),
-      role:'운영자',
-      is_active:true,
-      created_by:getAccessActorName(),
-      updated_by:getAccessActorName(),
-      updated_at:new Date().toISOString()
+      employee_no: getAccessId(emp),
+      name: getAccessName(emp),
+      department: getAccessDivision(emp),
+      team: getAccessTeam(emp),
+      position: normalizeAccessAuthority(emp),
+      email: getAccessEmail(emp),
+      role: '운영자',
+      is_active: active !== false,
+      updated_by: getCurrentAccessActorName(),
+      updated_at: new Date().toISOString()
     };
   }
-
+  async function upsertAttendanceOperator(emp){
+    var client = window.__attendanceSupabaseClient || null;
+    if(!client) throw new Error('Supabase 연결 객체가 없습니다.');
+    var payload = buildAttendanceOperatorPayload(emp, true);
+    payload.created_by = getCurrentAccessActorName();
+    var result = await client
+      .from('attendance_operators')
+      .upsert(payload, { onConflict:'employee_no' })
+      .select('*')
+      .maybeSingle();
+    if(result?.error){
+      // created_by/updated_by 등 선택 컬럼이 다른 경우를 대비한 최소 저장 재시도
+      var minimal = {
+        employee_no: payload.employee_no,
+        name: payload.name,
+        department: payload.department,
+        team: payload.team,
+        position: payload.position,
+        email: payload.email,
+        role: '운영자',
+        is_active: true
+      };
+      result = await client
+        .from('attendance_operators')
+        .upsert(minimal, { onConflict:'employee_no' })
+        .select('*')
+        .maybeSingle();
+    }
+    if(result?.error) throw result.error;
+    return result?.data || payload;
+  }
+  async function deactivateAttendanceOperator(employeeNo){
+    var client = window.__attendanceSupabaseClient || null;
+    if(!client) throw new Error('Supabase 연결 객체가 없습니다.');
+    employeeNo = String(employeeNo || '').trim();
+    if(!employeeNo) throw new Error('사번이 없습니다.');
+    var payload = { is_active:false, updated_by:getCurrentAccessActorName(), updated_at:new Date().toISOString() };
+    var result = await client
+      .from('attendance_operators')
+      .update(payload)
+      .eq('employee_no', employeeNo)
+      .select('*')
+      .maybeSingle();
+    if(result?.error){
+      result = await client
+        .from('attendance_operators')
+        .update({ is_active:false })
+        .eq('employee_no', employeeNo)
+        .select('*')
+        .maybeSingle();
+    }
+    if(result?.error) throw result.error;
+    return result?.data || null;
+  }
   function normalizeAccessEmail(v){
     return String(v || '').trim().toLowerCase();
   }
@@ -13903,7 +13949,7 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
     return rows;
   }
   function getAccessDivision(emp){
-    return String(emp?.department || emp?.division || emp?.divisionName || emp?.division_code || emp?.divisionCode || '').trim();
+    return String(emp?.division || emp?.divisionName || emp?.division_code || emp?.divisionCode || '').trim();
   }
   function getAccessTeam(emp){
     return String(emp?.team || emp?.teamName || emp?.team_code || emp?.teamCode || '').trim();
@@ -13919,9 +13965,7 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
     return getAccessEmployees().find(function(emp){ return getAccessId(emp) === id; }) || null;
   }
   function renderAccessOperatorCounts(){
-    var operatorIds = getAccessOperatorIds();
-    var employees = getAccessEmployees();
-    var operatorCount = employees.filter(function(e){ return operatorIds.has(getAccessId(e)); }).length;
+    var operatorCount = getAccessOperatorRows().filter(function(row){ return row.is_active !== false; }).length;
     var el = document.getElementById('accessOperatorCount');
     if(el) el.textContent = String(operatorCount);
   }
@@ -13956,25 +14000,32 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
     }).join('');
   }
   function buildAccessEmployeeRow(emp, mode){
-    var id = getAccessId(emp);
+    var serverMode = mode === 'current-server';
+    var id = serverMode ? String(emp.employee_no || '').trim() : getAccessId(emp);
     var operatorIds = getAccessOperatorIds();
     var isOperator = operatorIds.has(id);
     var button = '';
-    if(mode === 'current'){
+    if(mode === 'current' || serverMode){
       button = '<button type="button" class="accessSmallBtn danger" data-access-operator-remove="'+accessEsc(id)+'">해제</button>';
     }else{
       button = isOperator
         ? '<button type="button" class="accessSmallBtn" disabled>지정됨</button>'
         : '<button type="button" class="accessSmallBtn primary" data-access-operator-add="'+accessEsc(id)+'">운영자 지정</button>';
     }
+    var name = serverMode ? emp.name : getAccessName(emp);
+    var email = serverMode ? emp.email : getAccessEmail(emp);
+    var division = serverMode ? emp.department : getAccessDivision(emp);
+    var team = serverMode ? emp.team : getAccessTeam(emp);
+    var position = serverMode ? emp.position : normalizeAccessAuthority(emp);
+    var status = serverMode ? '재직' : normalizeAccessStatus(emp);
     return '<tr>'+
       '<td>'+button+'</td>'+
-      '<td><strong>'+accessEsc(getAccessName(emp) || '-')+'</strong><div class="muted">'+accessEsc(getAccessEmail(emp))+'</div></td>'+
+      '<td><strong>'+accessEsc(name || '-')+'</strong><div class="muted">'+accessEsc(email)+'</div></td>'+
       '<td>'+accessEsc(id || '-')+'</td>'+
-      '<td>'+accessEsc(getAccessDivision(emp) || '-')+'</td>'+
-      '<td>'+accessEsc(getAccessTeam(emp) || '-')+'</td>'+
-      '<td>'+accessEsc(normalizeAccessAuthority(emp) || '-')+'</td>'+
-      '<td>'+accessEsc(normalizeAccessStatus(emp))+'</td>'+
+      '<td>'+accessEsc(division || '-')+'</td>'+
+      '<td>'+accessEsc(team || '-')+'</td>'+
+      '<td>'+accessEsc(position || '-')+'</td>'+
+      '<td>'+accessEsc(status || '-')+'</td>'+
     '</tr>';
   }
   function searchAccessOperatorCandidates(){
@@ -14007,72 +14058,49 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
   function renderCurrentOperatorTable(){
     var tbody = document.getElementById('accessCurrentOperatorTbody');
     if(!tbody) return;
-    var rows = getAccessOperatorRows().sort(function(a,b){
-      var da = getAccessDivision(a).localeCompare(getAccessDivision(b),'ko'); if(da) return da;
-      var ta = getAccessTeam(a).localeCompare(getAccessTeam(b),'ko'); if(ta) return ta;
-      return getAccessName(a).localeCompare(getAccessName(b),'ko');
+    var rows = getAccessOperatorRows().filter(function(row){ return row.is_active !== false; }).sort(function(a,b){
+      var da = String(a.department || '').localeCompare(String(b.department || ''),'ko'); if(da) return da;
+      var ta = String(a.team || '').localeCompare(String(b.team || ''),'ko'); if(ta) return ta;
+      return String(a.name || '').localeCompare(String(b.name || ''),'ko');
     });
-    if(ACCESS_OPERATOR_STATE.error){
-      tbody.innerHTML = '<tr><td colspan="7" class="accessEmpty">운영자 서버 조회 실패: '+accessEsc(ACCESS_OPERATOR_STATE.error)+'</td></tr>';
-      return;
-    }
     if(!rows.length){
       tbody.innerHTML = '<tr><td colspan="7" class="accessEmpty">현재 지정된 운영자가 없습니다.</td></tr>';
       return;
     }
-    tbody.innerHTML = rows.map(function(emp){ return buildAccessEmployeeRow(emp, 'current'); }).join('');
+    tbody.innerHTML = rows.map(function(row){ return buildAccessEmployeeRow(row, 'current-server'); }).join('');
   }
   async function setAccessOperator(id, shouldAdd){
     id = String(id || '').trim();
     if(!id) return;
     var msg = document.getElementById('accessSaveMsg');
     try{
-      var client = getAttendanceSupabaseClient();
-      if(!client) throw new Error('Supabase 연결 정보가 없습니다.');
-      var emp = findAccessEmployeeById(id) || getAccessOperatorRowById(id) || null;
       if(shouldAdd){
-        if(!emp) throw new Error('운영자로 지정할 사원 정보를 찾지 못했습니다.');
-        var payload = buildAttendanceOperatorPayload(emp);
-        var addRes = await client
-          .from(ATTENDANCE_OPERATORS_TABLE)
-          .upsert(payload, { onConflict:'employee_no' })
-          .select('*')
-          .maybeSingle();
-        if(addRes.error) throw addRes.error;
+        var emp = findAccessEmployeeById(id);
+        if(!emp) throw new Error('사원정보에서 대상을 찾지 못했습니다.');
+        await upsertAttendanceOperator(emp);
       }else{
-        var removeRes = await client
-          .from(ATTENDANCE_OPERATORS_TABLE)
-          .update({ is_active:false, updated_by:getAccessActorName(), updated_at:new Date().toISOString() })
-          .eq('employee_no', id)
-          .select('*')
-          .maybeSingle();
-        if(removeRes.error) throw removeRes.error;
+        await deactivateAttendanceOperator(id);
       }
-      ACCESS_OPERATOR_STATE.loaded = false;
-      await refreshAccessOperatorRows(true);
+      await refreshAccessOperatorRowsFromServer(true);
       renderAccessAutoTable();
       renderCurrentOperatorTable();
       searchAccessOperatorCandidates();
       if(msg){
-        msg.textContent = shouldAdd ? '운영자 서버 저장이 완료되었습니다.' : '운영자 해제가 서버에 반영되었습니다.';
+        msg.textContent = shouldAdd ? '운영자가 서버에 저장되었습니다.' : '운영자 해제가 서버에 반영되었습니다.';
         msg.classList.add('show');
         clearTimeout(window.__accessSaveMsgTimer);
         window.__accessSaveMsgTimer = setTimeout(function(){ msg.classList.remove('show'); }, 2200);
       }
     }catch(e){
-      console.error('[ATTENDANCE OPERATORS] 저장/해제 실패:', e);
-      if(msg){
-        msg.textContent = '운영자 서버 반영 실패: ' + (e?.message || '원인을 확인해 주세요.');
-        msg.classList.add('show');
-      }else{
-        alert('운영자 서버 반영 실패: ' + (e?.message || '원인을 확인해 주세요.'));
-      }
+      console.error('[ACCESS OPERATOR] 저장/해제 실패:', e);
+      alert('운영자 서버 반영 실패: ' + (e?.message || e));
     }
   }
   function renderAccessSettings(){
+    try{ localStorage.removeItem(LEGACY_OPERATOR_KEY); }catch(_e){}
     renderAccessAutoTable();
     refreshAccessAdminRowsFromSettings(false).then(function(){ renderAccessAutoTable(); }).catch(function(){});
-    refreshAccessOperatorRows(false).then(function(){
+    refreshAccessOperatorRowsFromServer(true).then(function(){
       renderAccessAutoTable();
       renderCurrentOperatorTable();
       var resultBody = document.getElementById('accessOperatorResultTbody');
@@ -14099,7 +14127,7 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
     var refreshBtn = document.getElementById('accessOperatorRefreshBtn');
     if(refreshBtn && !refreshBtn.__accessBound){
       refreshBtn.__accessBound = true;
-      refreshBtn.addEventListener('click', function(){ ACCESS_ADMIN_STATE.loaded = false; renderAccessSettings(); });
+      refreshBtn.addEventListener('click', function(){ ACCESS_ADMIN_STATE.loaded = false; ACCESS_OPERATOR_STATE.loaded = false; renderAccessSettings(); });
     }
     var panel = document.getElementById('adminFeatureAccessPanel');
     if(panel && !panel.__accessOperatorDelegated){
