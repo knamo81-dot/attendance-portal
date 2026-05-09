@@ -863,7 +863,7 @@ body{
 .accessSettingToolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
 .accessSettingSearch{min-width:220px;flex:0 1 280px}
 .accessSettingFilters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.accessAutoSummary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:12px}
+.accessAutoSummary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:12px}
 .accessAutoCard{border:1px solid var(--line);border-radius:16px;background:#fff;padding:14px}
 .accessAutoCard .k{font-size:12px;color:var(--muted);font-weight:900;margin-bottom:6px}
 .accessAutoCard .v{font-size:24px;font-weight:900;color:var(--text)}
@@ -878,6 +878,7 @@ body{
 .accessRoleBadge.operator{background:#dcfce7;color:#15803d}
 .accessRoleBadge.director{background:#fef3c7;color:#b45309}
 .accessRoleBadge.leader{background:#ede9fe;color:#6d28d9}
+.accessRoleBadge.manager{background:#ffedd5;color:#c2410c}
 .accessRoleBadge.member{background:#f1f5f9;color:#475569}
 .accessOperatorCheck{display:inline-flex;align-items:center;gap:8px;font-weight:900;white-space:nowrap}
 .accessOperatorCheck input{width:16px;height:16px}
@@ -885,6 +886,16 @@ body{
 .accessSaveMsg{font-size:13px;font-weight:800;color:#15803d;display:none}
 .accessSaveMsg.show{display:inline-flex;align-items:center}
 .accessEmpty{padding:24px;text-align:center;color:var(--muted)}
+.accessSearchBox{border:1px solid var(--line);border-radius:18px;background:#fff;padding:16px;margin-top:12px}
+.accessSearchRow{display:grid;grid-template-columns:minmax(260px,1fr) auto auto;gap:10px;align-items:end}
+.accessSearchRow .field{display:grid;gap:6px}
+.accessSearchRow .field label{font-size:13px;font-weight:900;color:var(--muted)}
+.accessOperatorSectionTitle{font-size:16px;font-weight:900;margin-top:18px;margin-bottom:8px;color:var(--text)}
+.accessSmallBtn{padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:12px;font-weight:900;cursor:pointer}
+.accessSmallBtn.primary{background:#0f172a;color:#fff;border-color:#0f172a}
+.accessSmallBtn.danger{background:#fff1f2;color:#b91c1c;border-color:#fecdd3}
+.accessSmallBtn:disabled{opacity:.5;cursor:not-allowed}
+@media (max-width:900px){.accessSearchRow{grid-template-columns:1fr}.accessSearchRow .adminActionBtn{width:100%}}
 @media (max-width:1100px){.accessGuideGrid,.accessTodoGrid,.accessAutoSummary{grid-template-columns:1fr}.accessSettingToolbar{align-items:flex-start}.accessSettingSearch{width:100%;flex:1 1 100%}}
 
 /* iframe: shell already provides .app-like padding + white card frame — no double shell */
@@ -2350,13 +2361,13 @@ table.missingTable td strong{
   <div id="adminFeatureAccessPanel" class="adminFeaturePanel" aria-hidden="true">
     <div class="card">
       <div class="title">접근권한 설정</div>
-      <div class="desc">현재 단계에서는 실제 근태 접근제한 로직은 연결하지 않고, 접근권한을 확인·지정하는 화면만 구성합니다. 관리자·소장/본부장·팀장은 자동 표기하고, 운영자는 이 화면에서 선택 저장합니다.</div>
+      <div class="desc">현재 단계에서는 실제 근태 접근제한 로직은 연결하지 않고, 접근권한을 확인·지정하는 화면만 구성합니다. 관리자·소장/본부장·담당·팀장은 자동 표기하고, 운영자는 이 화면에서 검색 후 지정합니다.</div>
       <div class="real-admin-top-note" style="margin-top:12px">
-        자동 권한 기준: 소장/본부장은 사원정보의 직책과 본부코드, 팀장은 직책과 팀코드 기준으로 표시합니다. 운영자는 별도 체크 저장값을 사용하며, 이후 단계에서 업로드·OT확인·근태상세 수정 권한에 연결합니다.
+        자동 권한 기준: 소장/본부장은 사원정보의 직책과 본부코드, 담당은 직책과 관리팀코드, 팀장은 직책과 팀코드 기준으로 표시합니다. 운영자는 검색 후 지정한 저장값을 사용하며, 이후 단계에서 업로드·OT확인·근태상세 수정 권한에 연결합니다.
       </div>
       <div class="accessGuideGrid">
-        <div class="accessGuideCard"><div class="k">자동 표기</div><div class="v">관리자 · 소장 · 팀장</div><div class="sub">사원정보/현재 접속정보 기준</div></div>
-        <div class="accessGuideCard"><div class="k">수동 설정</div><div class="v">운영자</div><div class="sub">체크 후 저장</div></div>
+        <div class="accessGuideCard"><div class="k">자동 표기</div><div class="v">관리자 · 소장 · 담당 · 팀장</div><div class="sub">사원정보/현재 접속정보 기준</div></div>
+        <div class="accessGuideCard"><div class="k">수동 설정</div><div class="v">운영자</div><div class="sub">검색 후 지정/해제</div></div>
         <div class="accessGuideCard"><div class="k">저장 위치</div><div class="v">브라우저 저장</div><div class="sub">다음 단계에서 DB 연동 가능</div></div>
         <div class="accessGuideCard"><div class="k">접근제한 로직</div><div class="v">미연결</div><div class="sub">이번 수정 범위에서 제외</div></div>
       </div>
@@ -2364,10 +2375,11 @@ table.missingTable td strong{
 
     <div class="card" style="margin-top:16px">
       <div class="title">자동 권한 현황</div>
-      <div class="desc">사원정보를 기준으로 자동 판별되는 관리자/소장·본부장/팀장 목록입니다. 이 표는 읽기 전용이며, 실제 접근제한은 다음 단계에서 연결합니다.</div>
+      <div class="desc">사원정보를 기준으로 자동 판별되는 관리자/소장·본부장/담당/팀장 목록입니다. 이 표는 읽기 전용이며, 실제 접근제한은 다음 단계에서 연결합니다.</div>
       <div class="accessAutoSummary">
         <div class="accessAutoCard"><div class="k">관리자</div><div id="accessAdminCount" class="v">0</div></div>
         <div class="accessAutoCard"><div class="k">소장/본부장</div><div id="accessDirectorCount" class="v">0</div></div>
+        <div class="accessAutoCard"><div class="k">담당</div><div id="accessManagerCount" class="v">0</div></div>
         <div class="accessAutoCard"><div class="k">팀장</div><div id="accessLeaderCount" class="v">0</div></div>
         <div class="accessAutoCard"><div class="k">운영자</div><div id="accessOperatorCount" class="v">0</div></div>
       </div>
@@ -2393,21 +2405,26 @@ table.missingTable td strong{
 
     <div class="card" style="margin-top:16px">
       <div class="title">운영자 설정</div>
-      <div class="desc">운영자는 추후 데이터 업로드, OT확인, 결근확인, 근태상세 수정 같은 운영 기능을 사용할 사람입니다. 지금은 선택 저장 기능만 동작하고, 실제 접근제한은 아직 적용하지 않습니다.</div>
-      <div class="accessSettingToolbar">
-        <input id="accessOperatorSearch" class="filterInput accessSettingSearch" type="text" placeholder="이름 / 사번 / 본부 / 팀 검색">
-        <div class="accessSettingFilters">
-          <select id="accessOperatorDivisionFilter"><option value="">전체 본부</option></select>
-          <select id="accessOperatorTeamFilter"><option value="">전체 팀</option></select>
-          <select id="accessOperatorStatusFilter"><option value="재직">재직</option><option value="">전체 상태</option><option value="퇴사">퇴사</option></select>
+      <div class="desc">운영자는 추후 데이터 업로드, OT확인, 결근확인, 근태상세 수정 같은 운영 기능을 사용할 사람입니다. 전체 사원목록을 계속 펼치지 않고, 폐수 프로그램처럼 사번·이름·이메일로 검색한 뒤 지정합니다. 실제 접근제한은 아직 적용하지 않습니다.</div>
+      <div class="accessSearchBox">
+        <div class="accessSearchRow">
+          <div class="field">
+            <label>권한 대상자 검색</label>
+            <input id="accessOperatorKeyword" class="filterInput" type="text" placeholder="예: 100123 또는 홍길동 또는 email@company.com">
+          </div>
+          <button id="accessOperatorSearchBtn" type="button" class="adminActionBtn primary">사원 검색</button>
+          <button id="accessOperatorRefreshBtn" type="button" class="adminActionBtn">권한 새로고침</button>
         </div>
+        <div class="sub" style="margin-top:8px">검색 결과에서 운영자를 지정하고, 현재 운영자 목록에서 해제합니다. 저장은 브라우저 저장소에 즉시 반영됩니다.</div>
       </div>
+
+      <div class="accessOperatorSectionTitle">검색 결과</div>
       <div class="accessTableWrap">
         <table class="accessTable">
           <thead>
             <tr>
-              <th style="width:90px">운영자</th>
-              <th style="width:100px">이름</th>
+              <th style="width:110px">작업</th>
+              <th style="width:120px">이름</th>
               <th style="width:110px">사번</th>
               <th>본부</th>
               <th>팀</th>
@@ -2415,14 +2432,33 @@ table.missingTable td strong{
               <th style="width:120px">상태</th>
             </tr>
           </thead>
-          <tbody id="accessOperatorTbody">
-            <tr><td colspan="7" class="accessEmpty">사원정보를 불러오는 중입니다.</td></tr>
+          <tbody id="accessOperatorResultTbody">
+            <tr><td colspan="7" class="accessEmpty">검색어를 입력한 뒤 사원 검색을 눌러주세요.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="accessOperatorSectionTitle">현재 운영자 목록</div>
+      <div class="accessTableWrap">
+        <table class="accessTable">
+          <thead>
+            <tr>
+              <th style="width:110px">작업</th>
+              <th style="width:120px">이름</th>
+              <th style="width:110px">사번</th>
+              <th>본부</th>
+              <th>팀</th>
+              <th style="width:100px">직책</th>
+              <th style="width:120px">상태</th>
+            </tr>
+          </thead>
+          <tbody id="accessCurrentOperatorTbody">
+            <tr><td colspan="7" class="accessEmpty">현재 지정된 운영자가 없습니다.</td></tr>
           </tbody>
         </table>
       </div>
       <div class="accessActionBar">
-        <span id="accessSaveMsg" class="accessSaveMsg">저장되었습니다.</span>
-        <button id="accessOperatorSaveBtn" type="button" class="adminActionBtn primary">운영자 설정 저장</button>
+        <span id="accessSaveMsg" class="accessSaveMsg">반영되었습니다.</span>
       </div>
     </div>
 
@@ -2443,6 +2479,7 @@ table.missingTable td strong{
             <tr><td><span class="accessPill admin">관리자</span></td><td>전체 설정/관리</td><td>현재 관리자 기능 접근 권한</td><td>자동 표기</td></tr>
             <tr><td><span class="accessPill operator">운영자</span></td><td>업로드·운영 기능</td><td>접근권한 설정 저장값</td><td>수동 설정</td></tr>
             <tr><td><span class="accessPill auto">소장 / 본부장</span></td><td>해당 본부 전체</td><td>사원정보 직책 + 본부코드</td><td>자동</td></tr>
+            <tr><td><span class="accessPill auto">담당</span></td><td>관리팀코드 산하 팀</td><td>사원정보 직책 + 관리팀코드</td><td>자동</td></tr>
             <tr><td><span class="accessPill auto">팀장</span></td><td>자기 팀 전체</td><td>사원정보 직책 + 팀코드</td><td>자동</td></tr>
             <tr><td><span class="accessPill">일반 구성원</span></td><td>본인 근태관리</td><td>그 외 전체</td><td>자동</td></tr>
           </tbody>
@@ -13677,53 +13714,65 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
     employees.filter(function(emp){ return normalizeAccessStatus(emp) === '재직'; }).forEach(function(emp){
       var authority = normalizeAccessAuthority(emp);
       var isDirector = ['소장','본부장'].includes(authority);
+      var isManager = authority === '담당';
       var isLeader = authority === '팀장';
-      if(!isDirector && !isLeader) return;
+      if(!isDirector && !isManager && !isLeader) return;
+      var type = isDirector ? '소장/본부장' : (isManager ? '담당' : '팀장');
+      var badge = isDirector ? 'director' : (isManager ? 'manager' : 'leader');
+      var basis = isDirector
+        ? '본부코드: ' + accessEsc(emp.divisionCode || emp.division_code || '-') + ' · 하위 팀 전체'
+        : (isManager
+          ? '관리팀코드: ' + accessEsc(getAccessManagedTeams(emp) || '-')
+          : '팀코드: ' + accessEsc(emp.teamCode || emp.team_code || '-'));
       rows.push({
-        type:isDirector ? '소장/본부장' : '팀장',
-        badge:isDirector ? 'director' : 'leader',
+        type:type,
+        badge:badge,
         name:getAccessName(emp),
         id:getAccessId(emp),
         division:String(emp.division || emp.divisionName || emp.division_code || emp.divisionCode || '').trim(),
         team:String(emp.team || emp.teamName || emp.team_code || emp.teamCode || '').trim(),
         authority:authority,
-        basis:isDirector
-          ? '본부코드: ' + accessEsc(emp.divisionCode || emp.division_code || '-') + ' · 하위 팀 전체'
-          : '팀코드: ' + accessEsc(emp.teamCode || emp.team_code || '-')
+        basis:basis
       });
     });
     return rows;
   }
-  function fillAccessOperatorFilters(){
+  function getAccessDivision(emp){
+    return String(emp?.division || emp?.divisionName || emp?.division_code || emp?.divisionCode || '').trim();
+  }
+  function getAccessTeam(emp){
+    return String(emp?.team || emp?.teamName || emp?.team_code || emp?.teamCode || '').trim();
+  }
+  function getAccessEmail(emp){
+    return String(emp?.email || emp?.mail || emp?.user_email || '').trim();
+  }
+  function getAccessManagedTeams(emp){
+    return String(emp?.managedTeams || emp?.managed_teams || emp?.managedTeamCodes || emp?.managed_team_codes || emp?.manageTeamCode || emp?.manage_team_code || emp?.managementTeamCode || emp?.management_team_code || '').trim();
+  }
+  function findAccessEmployeeById(id){
+    id = String(id || '').trim();
+    return getAccessEmployees().find(function(emp){ return getAccessId(emp) === id; }) || null;
+  }
+  function renderAccessOperatorCounts(){
+    var operatorIds = getAccessOperatorIds();
     var employees = getAccessEmployees();
-    var divisionSel = document.getElementById('accessOperatorDivisionFilter');
-    var teamSel = document.getElementById('accessOperatorTeamFilter');
-    if(!divisionSel || !teamSel) return;
-    var currentDivision = divisionSel.value || '';
-    var currentTeam = teamSel.value || '';
-    var divisions = Array.from(new Set(employees.map(function(e){ return String(e.division || '').trim(); }).filter(Boolean))).sort(function(a,b){return a.localeCompare(b,'ko');});
-    divisionSel.innerHTML = '<option value="">전체 본부</option>' + divisions.map(function(v){ return '<option value="'+accessEsc(v)+'">'+accessEsc(v)+'</option>'; }).join('');
-    if(divisions.includes(currentDivision)) divisionSel.value = currentDivision;
-    var filteredForTeam = employees.filter(function(e){ return !divisionSel.value || String(e.division || '').trim() === divisionSel.value; });
-    var teams = Array.from(new Set(filteredForTeam.map(function(e){ return String(e.team || '').trim(); }).filter(Boolean))).sort(function(a,b){return a.localeCompare(b,'ko');});
-    teamSel.innerHTML = '<option value="">전체 팀</option>' + teams.map(function(v){ return '<option value="'+accessEsc(v)+'">'+accessEsc(v)+'</option>'; }).join('');
-    if(teams.includes(currentTeam)) teamSel.value = currentTeam;
+    var operatorCount = employees.filter(function(e){ return operatorIds.has(getAccessId(e)); }).length;
+    var el = document.getElementById('accessOperatorCount');
+    if(el) el.textContent = String(operatorCount);
   }
   function renderAccessAutoTable(){
     var rows = buildAutoAccessRows();
     var tbody = document.getElementById('accessAutoTbody');
-    var operatorCountEl = document.getElementById('accessOperatorCount');
-    var operatorIds = getAccessOperatorIds();
     var directorCount = rows.filter(function(r){ return r.badge === 'director'; }).length;
+    var managerCount = rows.filter(function(r){ return r.badge === 'manager'; }).length;
     var leaderCount = rows.filter(function(r){ return r.badge === 'leader'; }).length;
     var adminCount = rows.filter(function(r){ return r.badge === 'admin'; }).length;
-    var employees = getAccessEmployees();
-    var operatorCount = employees.filter(function(e){ return operatorIds.has(getAccessId(e)); }).length;
     var setText = function(id, v){ var el = document.getElementById(id); if(el) el.textContent = String(v); };
     setText('accessAdminCount', adminCount);
     setText('accessDirectorCount', directorCount);
+    setText('accessManagerCount', managerCount);
     setText('accessLeaderCount', leaderCount);
-    if(operatorCountEl) operatorCountEl.textContent = String(operatorCount);
+    renderAccessOperatorCounts();
     if(!tbody) return;
     if(!rows.length){
       tbody.innerHTML = '<tr><td colspan="7" class="accessEmpty">자동 표기 대상이 없습니다. 사원정보의 직책을 확인해 주세요.</td></tr>';
@@ -13741,66 +13790,80 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
       '</tr>';
     }).join('');
   }
-  function getFilteredOperatorEmployees(){
-    var keyword = String(document.getElementById('accessOperatorSearch')?.value || '').trim().toLowerCase();
-    var division = String(document.getElementById('accessOperatorDivisionFilter')?.value || '').trim();
-    var team = String(document.getElementById('accessOperatorTeamFilter')?.value || '').trim();
-    var status = String(document.getElementById('accessOperatorStatusFilter')?.value || '재직').trim();
-    return getAccessEmployees().filter(function(emp){
-      var id = getAccessId(emp), name = getAccessName(emp), div = String(emp.division || '').trim(), tm = String(emp.team || '').trim();
-      var auth = normalizeAccessAuthority(emp), st = normalizeAccessStatus(emp);
-      if(status && st !== status) return false;
-      if(division && div !== division) return false;
-      if(team && tm !== team) return false;
-      if(keyword){
-        var hay = [id,name,div,tm,auth,st,String(emp.email || '')].join(' ').toLowerCase();
-        if(!hay.includes(keyword)) return false;
-      }
-      return true;
-    }).sort(function(a,b){
-      var da = String(a.division || '').localeCompare(String(b.division || ''),'ko'); if(da) return da;
-      var ta = String(a.team || '').localeCompare(String(b.team || ''),'ko'); if(ta) return ta;
-      return Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || getAccessName(a).localeCompare(getAccessName(b),'ko');
-    });
+  function buildAccessEmployeeRow(emp, mode){
+    var id = getAccessId(emp);
+    var operatorIds = getAccessOperatorIds();
+    var isOperator = operatorIds.has(id);
+    var button = '';
+    if(mode === 'current'){
+      button = '<button type="button" class="accessSmallBtn danger" data-access-operator-remove="'+accessEsc(id)+'">해제</button>';
+    }else{
+      button = isOperator
+        ? '<button type="button" class="accessSmallBtn" disabled>지정됨</button>'
+        : '<button type="button" class="accessSmallBtn primary" data-access-operator-add="'+accessEsc(id)+'">운영자 지정</button>';
+    }
+    return '<tr>'+
+      '<td>'+button+'</td>'+
+      '<td><strong>'+accessEsc(getAccessName(emp) || '-')+'</strong><div class="muted">'+accessEsc(getAccessEmail(emp))+'</div></td>'+
+      '<td>'+accessEsc(id || '-')+'</td>'+
+      '<td>'+accessEsc(getAccessDivision(emp) || '-')+'</td>'+
+      '<td>'+accessEsc(getAccessTeam(emp) || '-')+'</td>'+
+      '<td>'+accessEsc(normalizeAccessAuthority(emp) || '-')+'</td>'+
+      '<td>'+accessEsc(normalizeAccessStatus(emp))+'</td>'+
+    '</tr>';
   }
-  function renderAccessOperatorTable(){
-    var tbody = document.getElementById('accessOperatorTbody');
+  function searchAccessOperatorCandidates(){
+    var input = document.getElementById('accessOperatorKeyword');
+    var keyword = String(input?.value || '').trim().toLowerCase();
+    var tbody = document.getElementById('accessOperatorResultTbody');
     if(!tbody) return;
-    var ids = getAccessOperatorIds();
-    var rows = getFilteredOperatorEmployees();
-    if(!rows.length){
-      tbody.innerHTML = '<tr><td colspan="7" class="accessEmpty">조건에 맞는 사원정보가 없습니다.</td></tr>';
+    if(!keyword){
+      tbody.innerHTML = '<tr><td colspan="7" class="accessEmpty">검색어를 입력한 뒤 사원 검색을 눌러주세요.</td></tr>';
       return;
     }
-    tbody.innerHTML = rows.map(function(emp){
-      var id = getAccessId(emp);
-      var checked = ids.has(id) ? ' checked' : '';
-      return '<tr>'+
-        '<td><label class="accessOperatorCheck"><input type="checkbox" class="accessOperatorCheckbox" value="'+accessEsc(id)+'"'+checked+'>지정</label></td>'+
-        '<td><strong>'+accessEsc(getAccessName(emp) || '-')+'</strong><div class="muted">'+accessEsc(String(emp.email || ''))+'</div></td>'+
-        '<td>'+accessEsc(id || '-')+'</td>'+
-        '<td>'+accessEsc(emp.division || '-')+'</td>'+
-        '<td>'+accessEsc(emp.team || '-')+'</td>'+
-        '<td>'+accessEsc(normalizeAccessAuthority(emp) || '-')+'</td>'+
-        '<td>'+accessEsc(normalizeAccessStatus(emp))+'</td>'+
-      '</tr>';
-    }).join('');
+    var rows = getAccessEmployees().filter(function(emp){
+      if(normalizeAccessStatus(emp) !== '재직') return false;
+      var hay = [
+        getAccessId(emp), getAccessName(emp), getAccessEmail(emp),
+        getAccessDivision(emp), getAccessTeam(emp), normalizeAccessAuthority(emp)
+      ].join(' ').toLowerCase();
+      return hay.includes(keyword);
+    }).sort(function(a,b){
+      var da = getAccessDivision(a).localeCompare(getAccessDivision(b),'ko'); if(da) return da;
+      var ta = getAccessTeam(a).localeCompare(getAccessTeam(b),'ko'); if(ta) return ta;
+      return Number(a.sortOrder || a.sort_order || 0) - Number(b.sortOrder || b.sort_order || 0) || getAccessName(a).localeCompare(getAccessName(b),'ko');
+    }).slice(0, 30);
+    if(!rows.length){
+      tbody.innerHTML = '<tr><td colspan="7" class="accessEmpty">검색된 사원이 없습니다.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(function(emp){ return buildAccessEmployeeRow(emp, 'search'); }).join('');
   }
-  function renderAccessSettings(){
-    fillAccessOperatorFilters();
-    renderAccessAutoTable();
-    renderAccessOperatorTable();
-  }
-  function saveOperatorSelection(){
-    var current = getAccessOperatorIds();
-    document.querySelectorAll('.accessOperatorCheckbox').forEach(function(input){
-      var id = String(input.value || '').trim();
-      if(!id) return;
-      if(input.checked) current.add(id);
-      else current.delete(id);
+  function renderCurrentOperatorTable(){
+    var tbody = document.getElementById('accessCurrentOperatorTbody');
+    if(!tbody) return;
+    var ids = getAccessOperatorIds();
+    var rows = getAccessEmployees().filter(function(emp){ return ids.has(getAccessId(emp)); }).sort(function(a,b){
+      var da = getAccessDivision(a).localeCompare(getAccessDivision(b),'ko'); if(da) return da;
+      var ta = getAccessTeam(a).localeCompare(getAccessTeam(b),'ko'); if(ta) return ta;
+      return getAccessName(a).localeCompare(getAccessName(b),'ko');
     });
-    saveAccessOperatorIds(current);
+    if(!rows.length){
+      tbody.innerHTML = '<tr><td colspan="7" class="accessEmpty">현재 지정된 운영자가 없습니다.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(function(emp){ return buildAccessEmployeeRow(emp, 'current'); }).join('');
+  }
+  function setAccessOperator(id, shouldAdd){
+    id = String(id || '').trim();
+    if(!id) return;
+    var ids = getAccessOperatorIds();
+    if(shouldAdd) ids.add(id);
+    else ids.delete(id);
+    saveAccessOperatorIds(ids);
     renderAccessAutoTable();
+    renderCurrentOperatorTable();
+    searchAccessOperatorCandidates();
     var msg = document.getElementById('accessSaveMsg');
     if(msg){
       msg.classList.add('show');
@@ -13808,20 +13871,43 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
       window.__accessSaveMsgTimer = setTimeout(function(){ msg.classList.remove('show'); }, 1800);
     }
   }
+  function renderAccessSettings(){
+    renderAccessAutoTable();
+    renderCurrentOperatorTable();
+    var resultBody = document.getElementById('accessOperatorResultTbody');
+    if(resultBody && !String(document.getElementById('accessOperatorKeyword')?.value || '').trim()){
+      resultBody.innerHTML = '<tr><td colspan="7" class="accessEmpty">검색어를 입력한 뒤 사원 검색을 눌러주세요.</td></tr>';
+    }else{
+      searchAccessOperatorCandidates();
+    }
+  }
   function bindAccessSettingEvents(){
-    ['accessOperatorSearch','accessOperatorDivisionFilter','accessOperatorTeamFilter','accessOperatorStatusFilter'].forEach(function(id){
-      var el = document.getElementById(id);
-      if(!el || el.__accessBound) return;
-      el.__accessBound = true;
-      el.addEventListener(id === 'accessOperatorSearch' ? 'input' : 'change', function(){
-        if(id === 'accessOperatorDivisionFilter') fillAccessOperatorFilters();
-        renderAccessOperatorTable();
+    var keyword = document.getElementById('accessOperatorKeyword');
+    if(keyword && !keyword.__accessBound){
+      keyword.__accessBound = true;
+      keyword.addEventListener('keydown', function(e){
+        if(e.key === 'Enter') searchAccessOperatorCandidates();
       });
-    });
-    var saveBtn = document.getElementById('accessOperatorSaveBtn');
-    if(saveBtn && !saveBtn.__accessBound){
-      saveBtn.__accessBound = true;
-      saveBtn.addEventListener('click', saveOperatorSelection);
+    }
+    var searchBtn = document.getElementById('accessOperatorSearchBtn');
+    if(searchBtn && !searchBtn.__accessBound){
+      searchBtn.__accessBound = true;
+      searchBtn.addEventListener('click', searchAccessOperatorCandidates);
+    }
+    var refreshBtn = document.getElementById('accessOperatorRefreshBtn');
+    if(refreshBtn && !refreshBtn.__accessBound){
+      refreshBtn.__accessBound = true;
+      refreshBtn.addEventListener('click', renderAccessSettings);
+    }
+    var panel = document.getElementById('adminFeatureAccessPanel');
+    if(panel && !panel.__accessOperatorDelegated){
+      panel.__accessOperatorDelegated = true;
+      panel.addEventListener('click', function(e){
+        var addBtn = e.target.closest('[data-access-operator-add]');
+        if(addBtn){ setAccessOperator(addBtn.getAttribute('data-access-operator-add'), true); return; }
+        var removeBtn = e.target.closest('[data-access-operator-remove]');
+        if(removeBtn){ setAccessOperator(removeBtn.getAttribute('data-access-operator-remove'), false); }
+      });
     }
   }
   function initAdminFeatureTabs(){
