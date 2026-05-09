@@ -715,6 +715,23 @@ body.has-floating-filters{padding-top:0}
   border-radius:8px;
 }
 
+/* 권한 제한: 결근확인/OT확인 수동 판정은 관리자·운영자만 수정 */
+.attManualReadonly,
+.attManualReadonly select,
+.attManualReadonly input,
+select.attManualReadonly,
+input.attManualReadonly{
+  background:#f8fafc !important;
+  color:#64748b !important;
+  cursor:not-allowed !important;
+  opacity:.72;
+}
+.attHeaderBtn.save:disabled{
+  background:#cbd5e1 !important;
+  color:#64748b !important;
+  cursor:not-allowed !important;
+}
+
 
 body{
   margin:0;
@@ -5031,6 +5048,111 @@ async function resolveAttendanceAdminAccess(force){
 window.isCurrentAttendanceAdmin = isCurrentAttendanceAdmin;
 window.resolveAttendanceAdminAccess = resolveAttendanceAdminAccess;
 
+
+const ATTENDANCE_MANUAL_EDIT_ACCESS_STATE = { resolved:false, loading:false, isOperator:false, email:'', employeeNo:'', reason:'' };
+function normalizeAttendanceManualEmail(v){
+  return String(v || '').trim().toLowerCase();
+}
+function getAttendanceEmployeeNoFromIdentity(obj){
+  if(!obj || typeof obj !== 'object') return '';
+  return String(obj.employee_no || obj.employeeNo || obj.emp_no || obj.empNo || obj.id || obj.user_id || obj.userId || obj?.profile?.employee_no || obj?.profile?.employeeNo || '').trim();
+}
+function getAttendanceManualIdentityCandidates(){
+  const identities = readAttendanceStoredUsers();
+  const emails = new Set();
+  const employeeNos = new Set();
+  identities.forEach(item => {
+    const email = getAttendanceEmailFromIdentity(item);
+    const no = getAttendanceEmployeeNoFromIdentity(item);
+    if(email) emails.add(normalizeAttendanceManualEmail(email));
+    if(no) employeeNos.add(String(no).trim());
+  });
+  return { emails, employeeNos };
+}
+function isCurrentAttendanceOperator(){
+  return ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.isOperator === true;
+}
+function canEditAttendanceManualChecks(){
+  return isCurrentAttendanceAdmin() || isCurrentAttendanceOperator();
+}
+function applyAttendanceManualEditControls(){
+  const canEdit = canEditAttendanceManualChecks();
+  try{
+    const saveBtn = document.querySelector('.attHeaderBtn.save');
+    if(saveBtn){
+      saveBtn.disabled = !canEdit;
+      saveBtn.title = canEdit ? '' : '관리자 또는 운영자만 저장할 수 있습니다.';
+    }
+  }catch(_e){}
+}
+async function resolveAttendanceManualEditAccess(force){
+  if(ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.loading && !force) return canEditAttendanceManualChecks();
+  if(ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.resolved && !force) return canEditAttendanceManualChecks();
+  ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.loading = true;
+  try{
+    const admin = await resolveAttendanceAdminAccess(force);
+    if(admin){
+      ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.isOperator = false;
+      ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.reason = 'admin can edit';
+      ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.resolved = true;
+      applyAttendanceManualEditControls();
+      return true;
+    }
+
+    const client = window.__attendanceSupabaseClient || (window.supabase && typeof SUPABASE_URL !== 'undefined' && typeof SUPABASE_KEY !== 'undefined' ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null);
+    const ids = getAttendanceManualIdentityCandidates();
+    let sessionEmail = '';
+    if(client && client.auth && typeof client.auth.getSession === 'function'){
+      try{
+        const sessionRes = await client.auth.getSession();
+        sessionEmail = normalizeAttendanceManualEmail(sessionRes?.data?.session?.user?.email || '');
+        if(sessionEmail) ids.emails.add(sessionEmail);
+      }catch(_e){}
+    }
+    ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.email = Array.from(ids.emails)[0] || '';
+    ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.employeeNo = Array.from(ids.employeeNos)[0] || '';
+
+    if(client && (ids.emails.size || ids.employeeNos.size)){
+      const res = await client
+        .from('attendance_operators')
+        .select('employee_no,email,name,is_active')
+        .eq('is_active', true);
+      if(res && !res.error){
+        const rows = Array.isArray(res.data) ? res.data : [];
+        ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.isOperator = rows.some(row => {
+          const rowEmail = normalizeAttendanceManualEmail(row?.email || '');
+          const rowNo = String(row?.employee_no || row?.employeeNo || '').trim();
+          return (rowEmail && ids.emails.has(rowEmail)) || (rowNo && ids.employeeNos.has(rowNo));
+        });
+        ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.reason = ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.isOperator ? 'attendance_operators match' : 'not operator';
+      }else{
+        console.warn('[ATTENDANCE MANUAL EDIT ACCESS] 운영자 조회 실패:', res?.error);
+        ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.isOperator = false;
+        ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.reason = 'operator lookup failed';
+      }
+    }else{
+      ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.isOperator = false;
+      ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.reason = 'no identity';
+    }
+    ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.resolved = true;
+    applyAttendanceManualEditControls();
+    return canEditAttendanceManualChecks();
+  }catch(e){
+    console.warn('[ATTENDANCE MANUAL EDIT ACCESS] 권한 확인 실패:', e);
+    ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.isOperator = false;
+    ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.reason = 'check exception';
+    ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.resolved = true;
+    applyAttendanceManualEditControls();
+    return canEditAttendanceManualChecks();
+  }finally{
+    ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.loading = false;
+  }
+}
+window.isCurrentAttendanceOperator = isCurrentAttendanceOperator;
+window.canEditAttendanceManualChecks = canEditAttendanceManualChecks;
+window.resolveAttendanceManualEditAccess = resolveAttendanceManualEditAccess;
+window.applyAttendanceManualEditControls = applyAttendanceManualEditControls;
+
 function saveAttendanceMainTab(tabName){
   try{
     const value = String(tabName || '').trim();
@@ -5077,6 +5199,11 @@ applyAttendanceAdminVisibility(false);
 resolveAttendanceAdminAccess(false).then(function(isAdmin){
   if(isAdmin && readAttendanceMainTab() === 'admin') activateMainTabWithoutRender('admin');
   if(!isAdmin && readAttendanceMainTab() === 'admin') saveAttendanceMainTab('attendance');
+  return resolveAttendanceManualEditAccess(false);
+}).then(function(){
+  if(typeof render === 'function') render();
+}).catch(function(e){
+  console.warn('[ATTENDANCE ACCESS INIT] 권한 초기화 실패:', e);
 });
 
 
@@ -9232,6 +9359,10 @@ function getDefaultApprovedOvertimeValue(row, overtimeCheckValue){
 }
 
 function markOvertimeCheckChanged(recordId, value){
+  if(!canEditAttendanceManualChecks()){
+    alert('관리자 또는 운영자만 OT확인을 수정할 수 있습니다.');
+    return;
+  }
   console.log('[OTCHECK] pending changed', { recordId, value });
   const rid = String(recordId || '').trim();
   const nextValue = String(value || '').trim();
@@ -9268,6 +9399,10 @@ function markOvertimeCheckChanged(recordId, value){
 }
 
 function markApprovedOvertimeChanged(recordId, value){
+  if(!canEditAttendanceManualChecks()){
+    alert('관리자 또는 운영자만 OT확인을 수정할 수 있습니다.');
+    return;
+  }
   const rid = String(recordId || '').trim();
   const nextValue = String(value || '').trim();
   if(!rid) return;
@@ -9284,6 +9419,11 @@ function markApprovedOvertimeChanged(recordId, value){
 
 async function saveOvertimeCheckChanges(){
   console.log('[SAVE BUTTON] clicked');
+
+  if(!canEditAttendanceManualChecks()){
+    alert('관리자 또는 운영자만 결근확인/OT확인을 저장할 수 있습니다.');
+    return;
+  }
 
   if(!supabaseClient){
     alert('Supabase 연결이 필요합니다.');
@@ -9370,6 +9510,10 @@ function getSavedAbsenceDecision(recordId){
 }
 
 function markAbsenceDecisionChanged(recordId, value){
+  if(!canEditAttendanceManualChecks()){
+    alert('관리자 또는 운영자만 결근확인을 수정할 수 있습니다.');
+    return;
+  }
   const rid = String(recordId || '').trim();
   const nextValue = String(value || '').trim();
   if(!rid) return;
@@ -9389,7 +9533,10 @@ function renderAbsenceCheckSelect(row){
   if(!isBothMissing) return '-';
   const recordId = String(row?.recordId || '').trim();
   const currentValue = String(row?.absenceDecision || getSavedAbsenceDecision(recordId) || '결근').trim();
-  return `<select data-record-id="${recordId}" onchange="markAbsenceDecisionChanged(this.dataset.recordId, this.value)">
+  const canEdit = canEditAttendanceManualChecks();
+  const disabled = (!canEdit || !recordId) ? 'disabled' : '';
+  const cls = canEdit ? '' : 'class="attManualReadonly" title="관리자 또는 운영자만 수정할 수 있습니다."';
+  return `<select ${disabled} ${cls} data-record-id="${recordId}" onchange="markAbsenceDecisionChanged(this.dataset.recordId, this.value)">
     <option value="결근" ${currentValue==='결근'?'selected':''}>결근</option>
     <option value="정상근무" ${currentValue==='정상근무'?'selected':''}>정상근무</option>
   </select>`;
@@ -9426,9 +9573,11 @@ function renderOvertimeCheckSelect(row){
   const currentValue = forcedAutoUnapproved
     ? '미인정'
     : String(pendingValue || localOverride || row?.overtimeCheckResult || row?.overtime_check_result || row?.overtimeCheck || '인정').trim();
-  const disabled = !recordId ? 'disabled' : '';
+  const canEdit = canEditAttendanceManualChecks();
+  const disabled = (!canEdit || !recordId) ? 'disabled' : '';
+  const cls = canEdit ? '' : 'class="attManualReadonly" title="관리자 또는 운영자만 수정할 수 있습니다."';
   const normalizedCurrentValue = (currentValue === '확인필요') ? '미인정' : currentValue;
-  return `<select ${disabled} data-record-id="${recordId}" onchange="markOvertimeCheckChanged(this.dataset.recordId, this.value)">
+  return `<select ${disabled} ${cls} data-record-id="${recordId}" onchange="markOvertimeCheckChanged(this.dataset.recordId, this.value)">
     <option value="인정" ${normalizedCurrentValue==='인정'?'selected':''}>인정</option>
     <option value="부분인정" ${normalizedCurrentValue==='부분인정'?'selected':''}>부분인정</option>
     <option value="미인정" ${normalizedCurrentValue==='미인정'?'selected':''}>미인정</option>
@@ -9450,7 +9599,11 @@ function renderApprovedOvertimeInput(row){
   }
   if(currentCheck === '부분인정'){
     const value = currentApproved && currentApproved !== '-' ? currentApproved : (String(row?.seccomOTDisplay || '').trim() && String(row.seccomOTDisplay).trim() !== '미계산' ? String(row.seccomOTDisplay).trim() : erpApproved);
-    return `<input type="text" value="${value}" data-record-id="${recordId}" placeholder="예: 1:30" style="width:86px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px" onchange="markApprovedOvertimeChanged(this.dataset.recordId, this.value)">`;
+    const canEdit = canEditAttendanceManualChecks();
+    const disabled = (!canEdit || !recordId) ? 'disabled' : '';
+    const cls = canEdit ? '' : 'attManualReadonly';
+    const title = canEdit ? '' : '관리자 또는 운영자만 수정할 수 있습니다.';
+    return `<input type="text" value="${value}" ${disabled} class="${cls}" title="${title}" data-record-id="${recordId}" placeholder="예: 1:30" style="width:86px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px" onchange="markApprovedOvertimeChanged(this.dataset.recordId, this.value)">`;
   }
   // ✅ 인정 상태에서는 저장/pending 된 부분인정값이 남아 있어도 ERP OT를 우선 표시
   if(currentCheck === '인정'){
@@ -11407,6 +11560,7 @@ function render(){
   bindMainTabs();
   restoreSavedMainTab(keepTab);
   renderTabs();
+  if(typeof applyAttendanceManualEditControls === 'function') applyAttendanceManualEditControls();
 }
 
 
