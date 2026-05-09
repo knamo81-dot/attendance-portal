@@ -30,6 +30,7 @@
 <!-- hiring report main tab removed: panel/code kept inactive for safe rollback -->
 <!-- access role update fixed: admin auto display reads public.users; operator stored/deleted in public.attendance_operators server table -->
 <!-- admin feature visibility locked: only users.role=admin can see/open 관리자 기능 -->
+<!-- general user data scope fixed: rows/dashboard/missing-analysis are restricted to current employee without changing calculation rules -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -5009,6 +5010,26 @@ function applyAttendanceUserAccessVisibility(){
     }
   }
 }
+function scheduleAttendanceAccessScopedRerender(){
+  try{
+    if(window.__attendanceAccessRenderTimer) clearTimeout(window.__attendanceAccessRenderTimer);
+    window.__attendanceAccessRenderTimer = setTimeout(function(){
+      window.__attendanceAccessRenderTimer = null;
+      try{
+        if(typeof updateAttendanceViewsAfterDataChange === 'function'){
+          updateAttendanceViewsAfterDataChange({
+            refreshFilters: true,
+            keepMainTab: (typeof getActiveAttendanceMainTab === 'function' ? getActiveAttendanceMainTab('attendance') : 'attendance')
+          });
+        }else if(typeof renderAttendanceTab === 'function'){
+          renderAttendanceTab();
+        }
+      }catch(e){
+        console.warn('[ATTENDANCE ACCESS] scoped rerender failed:', e);
+      }
+    }, 0);
+  }catch(e){}
+}
 function updateAttendanceUserAccessState(next = {}){
   const merged = { ...ATTENDANCE_USER_ACCESS_STATE, ...next };
   const isAdmin = merged.isAdmin === true || isAttendanceAdminRole(merged.role);
@@ -5022,6 +5043,7 @@ function updateAttendanceUserAccessState(next = {}){
   merged.level = merged.isGeneral ? 'general' : (isAdmin ? 'admin' : (isOperator ? 'operator' : 'leader'));
   Object.assign(ATTENDANCE_USER_ACCESS_STATE, merged);
   applyAttendanceUserAccessVisibility();
+  scheduleAttendanceAccessScopedRerender();
 }
 async function resolveAttendanceUserAccess(force){
   if(ATTENDANCE_USER_ACCESS_STATE.loading && !force) return ATTENDANCE_USER_ACCESS_STATE;
@@ -5352,12 +5374,13 @@ function periodMonths(){ return buildScopedPeriodMonths(scopedEmployees()); }
 function periodMultiplier(){ return 1; }
 function periodRiskAdder(){ return 0; }
 function getDashboardEmployeeBase(){
-  return EMPLOYEES.filter(e =>
+  const base = EMPLOYEES.filter(e =>
     String(e.status || '재직') === '재직' &&
     String(e.attendanceTarget || 'Y') === 'Y' &&
     (STATE.division==='전체' || e.division===STATE.division) &&
     (STATE.team==='전체' || e.team===STATE.team)
   );
+  return filterAttendanceRowsByCurrentAccess(base);
 }
 function filteredEmployees(){
   return getDashboardEmployeeBase();
@@ -11121,7 +11144,7 @@ function renderAttendanceTable(rows){
     if(Number.isFinite(n)) return formatHoursToHM(n);
     return s;
   };
-  rows = filterAttendanceRowsByCurrentAccess(rows).filter(r => !isDisplayExcludedAttendance(r));
+  rows = rows.filter(r => !isDisplayExcludedAttendance(r));
   $('#attendanceTbody').innerHTML = rows.map(r => `
     <tr>
       <td data-label="일자"><span style="white-space:nowrap;display:inline-block">${r.date || '-'}</span></td>
@@ -11167,7 +11190,7 @@ function bindAttendanceFilters(){
     reason: r => getAttendanceReasonTokens(r)
   };
 
-  const baseRows = filterAttendanceRowsByCurrentAccess(getAttendanceManagementRows(buildAttendanceRows.unfiltered ? buildAttendanceRows.unfiltered() : [])).filter(r => !isDisplayExcludedAttendance(r));
+  const baseRows = getAttendanceManagementRows(buildAttendanceRows.unfiltered ? buildAttendanceRows.unfiltered() : []).filter(r => !isDisplayExcludedAttendance(r));
 
   Object.entries(columns).forEach(([key, getter]) => {
     const dd = document.getElementById('dropdown-' + key);
@@ -11229,7 +11252,7 @@ function bindAttendanceFilters(){
 function renderAttendanceTab(){
   bindAttendanceFilters();
   renderAttendanceLeaveToggle();
-  const rows = filterAttendanceRowsByCurrentAccess(getAttendanceManagementRows(buildAttendanceRows()));
+  const rows = getAttendanceManagementRows(buildAttendanceRows());
   renderAttendanceKpis(rows);
   renderAttendanceChart(rows);
   renderAttendanceInsights(rows);
@@ -11327,6 +11350,7 @@ function renderAttendanceMissingAnalysis(){
     .filter(emp => String(emp?.status || '재직').trim() === '재직')
     .filter(emp => String(emp?.attendanceTarget || 'Y').trim().toUpperCase() !== 'N')
     .filter(isInCurrentOrgScope)
+    .filter(emp => !isCurrentAttendanceGeneralUser() || isAttendanceRowOwnedByCurrentUser(emp))
     .forEach(emp => {
       const name = normalizeNameSafe(emp?.name);
       if(!name || leaveOnlyNames.has(name) || byPerson.has(name)) return;
