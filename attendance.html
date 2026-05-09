@@ -28,7 +28,8 @@
 <!-- dashboard interpretation/action guide reinforced: no calculation logic changed -->
 <!-- dashboard cleanup applied: bottom summary/alert cards removed, monthly trend hints added inside cause cards only -->
 <!-- hiring report main tab removed: panel/code kept inactive for safe rollback -->
-<!-- access role update fixed: admin auto display reads public.users; operator stored/deleted in public.attendance_operators server table; admin feature access locked to admins only; current admin identity uses trusted portal login only -->
+<!-- access role update fixed: admin auto display reads public.users; operator stored/deleted in public.attendance_operators server table -->
+<!-- admin feature visibility locked: only users.role=admin can see/open 관리자 기능 -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -259,6 +260,8 @@ svg text{fill:var(--muted);font-size:14px}
 
 .mainTabs{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
 .mainTabs .spacer{flex:1 1 auto}
+.mainTab[data-main="admin"][data-admin-hidden="Y"]{display:none !important}
+#main-admin[data-admin-hidden="Y"]{display:none !important}
 .mainTab.active{background:var(--text);color:#fff}
 .mainPanel{display:none}
 .mainPanel.active{display:block}
@@ -1679,7 +1682,7 @@ table.missingTable td strong{
     <button class="mainTab" data-main="trend-analysis">트렌드분석</button>
     <button class="mainTab" data-main="attendance-missing">출퇴근 누락 분석</button>
     <div class="spacer"></div>
-    <button class="mainTab" data-main="admin" style="display:none" aria-hidden="true">관리자 기능</button>
+    <button class="mainTab" data-main="admin" data-admin-hidden="Y" aria-hidden="true">관리자 기능</button>
   </div>
 
   <div id="main-attendance" class="mainPanel active">
@@ -2264,7 +2267,7 @@ table.missingTable td strong{
     </div>
   </div>
 
-<div id="main-admin" class="mainPanel">
+<div id="main-admin" class="mainPanel" data-admin-hidden="Y" aria-hidden="true">
   <div class="adminFeatureTabs" role="tablist" aria-label="관리자 기능 탭">
     <button type="button" class="adminFeatureTab active" data-admin-feature="upload">데이터 업로드</button>
     <button type="button" class="adminFeatureTab" data-admin-feature="access">접근권한 설정</button>
@@ -4903,6 +4906,131 @@ function saveAttendanceUiState(key, value){
 function readAttendanceUiState(key){
   try{ return String(localStorage.getItem(key) || '').trim(); }catch(e){ return ''; }
 }
+
+const ATTENDANCE_ADMIN_ACCESS_STATE = { resolved:false, loading:false, isAdmin:false, email:'', reason:'' };
+function normalizeAttendanceAdminRole(value){
+  const s = String(value || '').trim().toLowerCase();
+  if(!s) return '';
+  if(s === 'admin' || s === 'administrator' || s === '관리자' || s === '시스템관리자' || s === '시스템 관리자') return 'admin';
+  return s;
+}
+function isAttendanceAdminRole(value){
+  return normalizeAttendanceAdminRole(value) === 'admin';
+}
+function readAttendanceStoredUsers(){
+  const rows = [];
+  const keys = ['portal_auth_user','portalUser','attendance_portal_user','currentUser','__portalCurrentUser'];
+  try{
+    if(window.__portalCurrentUser && typeof window.__portalCurrentUser === 'object') rows.push(window.__portalCurrentUser);
+    if(window.currentUser && typeof window.currentUser === 'object') rows.push(window.currentUser);
+  }catch(e){}
+  keys.forEach(key => {
+    try{
+      const raw = sessionStorage.getItem(key) || localStorage.getItem(key);
+      if(!raw) return;
+      const parsed = JSON.parse(raw);
+      if(parsed && typeof parsed === 'object'){
+        rows.push(parsed);
+        if(parsed.user && typeof parsed.user === 'object') rows.push(parsed.user);
+        if(parsed.profile && typeof parsed.profile === 'object') rows.push(parsed.profile);
+      }
+    }catch(e){}
+  });
+  return rows;
+}
+function getAttendanceRoleFromIdentity(obj){
+  if(!obj || typeof obj !== 'object') return '';
+  return obj.role || obj.system_role || obj.systemRole || obj.user_role || obj.userRole || obj.portal_role || obj.portalRole || obj.access_role || obj.accessRole || obj.auth_role || obj.authRole || '';
+}
+function getAttendanceEmailFromIdentity(obj){
+  if(!obj || typeof obj !== 'object') return '';
+  return String(obj.email || obj.user_email || obj.userEmail || obj.mail || obj?.user?.email || obj?.profile?.email || '').trim().toLowerCase();
+}
+function isCurrentAttendanceAdmin(){
+  return ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin === true;
+}
+function getAttendanceFallbackAdminByStorage(){
+  const identities = readAttendanceStoredUsers();
+  for(const item of identities){
+    if(isAttendanceAdminRole(getAttendanceRoleFromIdentity(item))) return true;
+  }
+  return false;
+}
+function applyAttendanceAdminVisibility(isAdmin){
+  const allowed = isAdmin === true;
+  const adminTab = document.querySelector('.mainTab[data-main="admin"]');
+  const adminPanel = document.getElementById('main-admin');
+  if(adminTab){
+    adminTab.dataset.adminHidden = allowed ? 'N' : 'Y';
+    adminTab.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+    adminTab.disabled = !allowed;
+  }
+  if(adminPanel){
+    adminPanel.dataset.adminHidden = allowed ? 'N' : 'Y';
+    adminPanel.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+  }
+  if(!allowed && adminPanel && adminPanel.classList.contains('active')){
+    activateMainTabWithoutRender('attendance');
+  }
+}
+async function resolveAttendanceAdminAccess(force){
+  if(ATTENDANCE_ADMIN_ACCESS_STATE.loading && !force) return ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin;
+  if(ATTENDANCE_ADMIN_ACCESS_STATE.resolved && !force) return ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin;
+  ATTENDANCE_ADMIN_ACCESS_STATE.loading = true;
+  try{
+    if(getAttendanceFallbackAdminByStorage()){
+      ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin = true;
+      ATTENDANCE_ADMIN_ACCESS_STATE.reason = 'local role admin';
+      ATTENDANCE_ADMIN_ACCESS_STATE.resolved = true;
+      applyAttendanceAdminVisibility(true);
+      return true;
+    }
+    const client = window.__attendanceSupabaseClient || (window.supabase && typeof SUPABASE_URL !== 'undefined' && typeof SUPABASE_KEY !== 'undefined' ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null);
+    let email = '';
+    if(client && client.auth && typeof client.auth.getSession === 'function'){
+      try{
+        const sessionRes = await client.auth.getSession();
+        email = String(sessionRes?.data?.session?.user?.email || '').trim().toLowerCase();
+      }catch(e){}
+    }
+    if(!email){
+      const identities = readAttendanceStoredUsers();
+      for(const item of identities){
+        email = getAttendanceEmailFromIdentity(item);
+        if(email) break;
+      }
+    }
+    ATTENDANCE_ADMIN_ACCESS_STATE.email = email;
+    if(client && email){
+      const res = await client.from('users').select('email,name,role,is_active').eq('email', email).maybeSingle();
+      if(!res?.error && res?.data && res.data.is_active !== false && isAttendanceAdminRole(res.data.role)){
+        ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin = true;
+        ATTENDANCE_ADMIN_ACCESS_STATE.reason = 'users.role admin';
+      }else{
+        ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin = false;
+        ATTENDANCE_ADMIN_ACCESS_STATE.reason = res?.error ? 'users lookup failed' : 'not admin';
+      }
+    }else{
+      ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin = false;
+      ATTENDANCE_ADMIN_ACCESS_STATE.reason = 'no user email';
+    }
+    ATTENDANCE_ADMIN_ACCESS_STATE.resolved = true;
+    applyAttendanceAdminVisibility(ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin);
+    return ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin;
+  }catch(e){
+    console.warn('[ADMIN ACCESS] 관리자 권한 확인 실패:', e);
+    ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin = false;
+    ATTENDANCE_ADMIN_ACCESS_STATE.reason = 'check exception';
+    ATTENDANCE_ADMIN_ACCESS_STATE.resolved = true;
+    applyAttendanceAdminVisibility(false);
+    return false;
+  }finally{
+    ATTENDANCE_ADMIN_ACCESS_STATE.loading = false;
+  }
+}
+window.isCurrentAttendanceAdmin = isCurrentAttendanceAdmin;
+window.resolveAttendanceAdminAccess = resolveAttendanceAdminAccess;
+
 function saveAttendanceMainTab(tabName){
   try{
     const value = String(tabName || '').trim();
@@ -4923,7 +5051,7 @@ function restoreSavedAttendancePeriod(){
 function activateMainTabWithoutRender(tabName){
   const targetName = String(tabName || '').trim();
   if(!targetName) return false;
-  if(targetName === 'admin' && typeof window.canAccessAttendanceAdmin === 'function' && !window.canAccessAttendanceAdmin()) return false;
+  if(targetName === 'admin' && !isCurrentAttendanceAdmin()) return false;
   const btn = document.querySelector(`.mainTab[data-main="${targetName}"]`);
   const panel = document.querySelector(`#main-${targetName}`);
   if(!btn || !panel) return false;
@@ -4945,6 +5073,11 @@ function restoreSavedMainTab(preferredTab){
   if(typeof trendUpdatePeriodControlVisibility === 'function') trendUpdatePeriodControlVisibility();
 }
 restoreSavedAttendancePeriod();
+applyAttendanceAdminVisibility(false);
+resolveAttendanceAdminAccess(false).then(function(isAdmin){
+  if(isAdmin && readAttendanceMainTab() === 'admin') activateMainTabWithoutRender('admin');
+  if(!isAdmin && readAttendanceMainTab() === 'admin') saveAttendanceMainTab('attendance');
+});
 
 
 const $ = s => document.querySelector(s);
@@ -11176,9 +11309,11 @@ function bindMainTabs(){
   $$('.mainTab').forEach(btn => {
     btn.onclick = () => {
       const mainName = String(btn.dataset.main || '').trim();
-      if(mainName === 'admin' && typeof window.canAccessAttendanceAdmin === 'function' && !window.canAccessAttendanceAdmin()){
-        alert('관리자만 접근할 수 있는 기능입니다.');
-        if(typeof window.applyAttendanceAdminAccessGuard === 'function') window.applyAttendanceAdminAccessGuard();
+      if(mainName === 'admin' && !isCurrentAttendanceAdmin()){
+        alert('관리자만 접근할 수 있습니다.');
+        applyAttendanceAdminVisibility(false);
+        activateMainTabWithoutRender('attendance');
+        saveAttendanceMainTab('attendance');
         return;
       }
       if(mainName) saveAttendanceMainTab(mainName);
@@ -13810,130 +13945,6 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
     if(ACCESS_ADMIN_STATE.rows && ACCESS_ADMIN_STATE.rows.length) return ACCESS_ADMIN_STATE.rows.slice();
     return [];
   }
-  function getAttendanceCurrentIdentity(){
-    var out = { email:'', name:'', role:'', employee_no:'' };
-    function firstText(){
-      for(var i=0;i<arguments.length;i++){
-        var v = arguments[i];
-        if(v === undefined || v === null) continue;
-        v = String(v).trim();
-        if(v) return v;
-      }
-      return '';
-    }
-    function take(obj){
-      if(!obj || typeof obj !== 'object') return;
-      var user = obj.user && typeof obj.user === 'object' ? obj.user : {};
-      var profile = obj.profile && typeof obj.profile === 'object' ? obj.profile : {};
-      var employee = obj.employee && typeof obj.employee === 'object' ? obj.employee : {};
-      var member = obj.member && typeof obj.member === 'object' ? obj.member : {};
-      out.email = out.email || firstText(
-        obj.email, obj.user_email, obj.userEmail, obj.mail,
-        user.email, user.user_email, profile.email, employee.email, member.email
-      );
-      out.name = out.name || firstText(
-        obj.name, obj.user_name, obj.userName, obj.employee_name, obj.employeeName,
-        user.name, user.user_name, profile.name, employee.name, employee.employee_name, member.name
-      );
-      out.role = out.role || firstText(
-        obj.role, obj.user_role, obj.userRole, obj.portal_role, obj.portalRole,
-        user.role, user.user_role, profile.role, employee.role, member.role
-      );
-      out.employee_no = out.employee_no || firstText(
-        obj.employee_no, obj.employeeNo, obj.emp_no, obj.empNo,
-        user.employee_no, user.employeeNo, user.emp_no,
-        profile.employee_no, profile.employeeNo, profile.emp_no,
-        employee.employee_no, employee.employeeNo, employee.emp_no,
-        member.employee_no, member.employeeNo, member.emp_no
-      );
-    }
-
-    // 관리자 기능 접근 판단은 반드시 "현재 로그인 사용자"로만 판단한다.
-    // 검색/선택 직원(selectedEmployee), 사원 프로필(employeeProfile), 앱 내부 currentUser 같은 느슨한 값은 제외한다.
-    // 운영자 브라우저에 과거 관리자/검색대상 정보가 남아 있어도 관리자 기능이 노출되지 않도록 하기 위함.
-    try{
-      take(window.__portalCurrentUser);
-      take(window.portalCurrentUser);
-      take(window.AttendanceCurrentUser);
-      take(window.attendanceCurrentUser);
-      take(window.__attendanceCurrentUser);
-    }catch(_e){}
-    try{
-      if(window.parent && window.parent !== window){
-        take(window.parent.__portalCurrentUser);
-        take(window.parent.portalCurrentUser);
-        take(window.parent.AttendanceCurrentUser);
-        take(window.parent.attendanceCurrentUser);
-        take(window.parent.__attendanceCurrentUser);
-      }
-    }catch(_e){}
-    try{
-      var q = new URLSearchParams(window.location.search || '');
-      out.email = out.email || firstText(q.get('email'), q.get('user_email'), q.get('userEmail'), q.get('mail'));
-      out.name = out.name || firstText(q.get('name'), q.get('user_name'), q.get('userName'), q.get('employee_name'));
-      out.role = out.role || firstText(q.get('role'), q.get('user_role'), q.get('userRole'), q.get('portal_role'));
-      out.employee_no = out.employee_no || firstText(q.get('employee_no'), q.get('employeeNo'), q.get('emp_no'), q.get('empNo'));
-    }catch(_e){}
-    try{
-      [
-        'portal_auth_user','portalUser','portal_current_user','portalCurrentUser',
-        'attendance_portal_user','attendance_current_user','AttendanceCurrentUser',
-        '__portalCurrentUser','__attendanceCurrentUser'
-      ].forEach(function(key){
-        [sessionStorage.getItem(key), localStorage.getItem(key)].forEach(function(raw){
-          if(!raw || raw.length > 50000) return;
-          try{ take(JSON.parse(raw)); }catch(_ignore){}
-        });
-      });
-    }catch(_e){}
-    out.email = normalizeAccessEmail(out.email);
-    out.name = String(out.name || '').trim();
-    out.role = String(out.role || '').trim();
-    out.employee_no = String(out.employee_no || '').trim();
-    return out;
-  }
-  function normalizeAttendanceIdentityNo(v){
-    return String(v || '').trim();
-  }
-  function isCurrentAttendanceAdmin(){
-    var identity = getAttendanceCurrentIdentity();
-    var rows = getCurrentAdminRows();
-    if(!rows.length) return false;
-    var identityNo = normalizeAttendanceIdentityNo(identity.employee_no);
-    var identityEmail = normalizeAccessEmail(identity.email);
-    var identityName = String(identity.name || '').trim();
-    return rows.some(function(row){
-      var rowEmail = normalizeAccessEmail(row.email || row.user_email || '');
-      var rowName = String(row.name || row.user_name || '').trim();
-      var rowNo = normalizeAttendanceIdentityNo(row.employee_no || row.employeeNo || row.id || row.emp_no || '');
-      // 이름은 보조값으로만 사용한다. 동명이인/검색 저장값 오판을 막기 위해 email 또는 사번이 없으면 이름 단독으로는 관리자 판정하지 않는다.
-      return (identityEmail && rowEmail && identityEmail === rowEmail) ||
-             (identityNo && rowNo && identityNo === rowNo) ||
-             ((identityEmail || identityNo) && identityName && rowName && identityName === rowName);
-    });
-  }
-  function applyAttendanceAdminAccessGuard(){
-    var canAdmin = isCurrentAttendanceAdmin();
-    var adminBtn = document.querySelector('.mainTab[data-main="admin"]');
-    var adminPanel = document.getElementById('main-admin');
-    if(adminBtn){
-      adminBtn.style.display = canAdmin ? '' : 'none';
-      adminBtn.disabled = !canAdmin;
-      adminBtn.setAttribute('aria-hidden', canAdmin ? 'false' : 'true');
-    }
-    if(!canAdmin && adminPanel && adminPanel.classList.contains('active')){
-      adminPanel.classList.remove('active');
-      if(adminBtn) adminBtn.classList.remove('active');
-      var fallbackBtn = document.querySelector('.mainTab[data-main="attendance"]');
-      var fallbackPanel = document.getElementById('main-attendance');
-      if(fallbackBtn) fallbackBtn.classList.add('active');
-      if(fallbackPanel) fallbackPanel.classList.add('active');
-      try{ saveAttendanceMainTab('attendance'); }catch(_e){}
-    }
-    return canAdmin;
-  }
-  window.canAccessAttendanceAdmin = isCurrentAttendanceAdmin;
-  window.applyAttendanceAdminAccessGuard = applyAttendanceAdminAccessGuard;
   async function refreshAccessAdminRowsFromSettings(force){
     if(ACCESS_ADMIN_STATE.loading) return ACCESS_ADMIN_STATE.rows || [];
     if(ACCESS_ADMIN_STATE.loaded && !force) return ACCESS_ADMIN_STATE.rows || [];
@@ -14186,8 +14197,7 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
   function renderAccessSettings(){
     try{ localStorage.removeItem(LEGACY_OPERATOR_KEY); }catch(_e){}
     renderAccessAutoTable();
-    applyAttendanceAdminAccessGuard();
-    refreshAccessAdminRowsFromSettings(false).then(function(){ renderAccessAutoTable(); applyAttendanceAdminAccessGuard(); }).catch(function(){ applyAttendanceAdminAccessGuard(); });
+    refreshAccessAdminRowsFromSettings(false).then(function(){ renderAccessAutoTable(); }).catch(function(){});
     refreshAccessOperatorRowsFromServer(true).then(function(){
       renderAccessAutoTable();
       renderCurrentOperatorTable();
@@ -14239,6 +14249,12 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
       if(btn.__adminFeatureBound) return;
       btn.__adminFeatureBound = true;
       btn.addEventListener('click', function(){
+        if(typeof isCurrentAttendanceAdmin === 'function' && !isCurrentAttendanceAdmin()){
+          alert('관리자만 접근할 수 있습니다.');
+          if(typeof applyAttendanceAdminVisibility === 'function') applyAttendanceAdminVisibility(false);
+          if(typeof activateMainTabWithoutRender === 'function') activateMainTabWithoutRender('attendance');
+          return;
+        }
         var target = btn.getAttribute('data-admin-feature');
         buttons.forEach(function(b){ b.classList.toggle('active', b === btn); });
         uploadPanel.classList.toggle('active', target === 'upload');
@@ -14253,7 +14269,6 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
     });
     bindAccessSettingEvents();
     renderAccessSettings();
-    applyAttendanceAdminAccessGuard();
   }
   window.renderAttendanceAccessSettings = renderAccessSettings;
   window.refreshAttendanceAccessAdminSettings = function(){ ACCESS_ADMIN_STATE.loaded = false; return refreshAccessAdminRowsFromSettings(true).then(function(){ renderAccessAutoTable(); }); }; 
