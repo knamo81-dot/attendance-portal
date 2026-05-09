@@ -1172,9 +1172,16 @@ html.embed-mode #main-dashboard .kpis{
 /* ===== AI additional data confirmation panel ===== */
 .reportAdditionalPanel{margin:14px 20px 0;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:18px;padding:16px;display:none}
 .reportAdditionalPanel.show{display:block}
+.reportAdditionalPanel.collapsed{padding:14px 16px}
+.reportAdditionalPanel.collapsed .reportAdditionalHead{margin-bottom:0}
+.reportAdditionalPanel.collapsed .reportAdditionalBody{display:none}
 .reportAdditionalHead{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:12px}
+.reportAdditionalHeadActions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .reportAdditionalTitle{font-size:15px;font-weight:900;color:#166534;margin-bottom:4px}
 .reportAdditionalDesc{font-size:12px;line-height:1.55;color:#15803d;font-weight:700}
+.reportAdditionalCollapsedHint{display:none;font-size:12px;color:#15803d;font-weight:800;margin-top:5px}
+.reportAdditionalPanel.collapsed .reportAdditionalCollapsedHint{display:block}
+.reportAdditionalBody{display:block}
 .reportAdditionalGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .reportAdditionalItem{border:1px solid #bbf7d0;background:#fff;border-radius:14px;padding:12px}
 .reportAdditionalItem label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:900;color:#0f172a;margin-bottom:8px}
@@ -1187,7 +1194,7 @@ html.embed-mode #main-dashboard .kpis{
 .reportAdditionalBtn:hover{background:#15803d}
 .reportAdditionalBtn.secondary{background:#fff;color:#166534;border:1px solid #bbf7d0;box-shadow:none}
 .fixedAdditionalData{margin-top:12px;padding:12px 14px;border:1px dashed #86efac;background:#f0fdf4;border-radius:14px;color:#166534;font-size:11px;line-height:1.55}
-@media(max-width:900px){.reportAdditionalGrid{grid-template-columns:1fr}.reportAdditionalHead{flex-direction:column}.reportAdditionalActions{justify-content:flex-start}}
+@media(max-width:900px){.reportAdditionalGrid{grid-template-columns:1fr}.reportAdditionalHead{flex-direction:column}.reportAdditionalHeadActions{justify-content:flex-start}.reportAdditionalActions{justify-content:flex-start}}
 
 @media print{.reportModalTop,.reportSettings{display:none!important}.reportPreviewWrap{padding:0;background:#fff;max-height:none;overflow:visible}.attReportDoc{box-shadow:none;border:none;border-radius:0;max-width:none}.attReportDoc h2,.attReportChart,.attReportCards,.attReportTable{break-inside:avoid}}
 
@@ -12743,7 +12750,7 @@ function normalizeAdditionalDataNeeded(story){
 function hideAdditionalDataPanel(){
   const panel=document.getElementById('attendanceAdditionalDataPanel');
   if(!panel)return;
-  panel.classList.remove('show');
+  panel.classList.remove('show','collapsed');
   panel.setAttribute('aria-hidden','true');
   panel.innerHTML='';
 }
@@ -12753,21 +12760,33 @@ function renderAdditionalDataPanel(story){
   const list=normalizeAdditionalDataNeeded(story);
   currentAdditionalDataNeeded=list;
   if(!list.length){hideAdditionalDataPanel();return;}
-  panel.classList.add('show');
+  panel.classList.add('show','collapsed');
   panel.setAttribute('aria-hidden','false');
   panel.innerHTML=`
     <div class="reportAdditionalHead">
       <div>
         <div class="reportAdditionalTitle">AI 추가 확인 필요 데이터</div>
-        <div class="reportAdditionalDesc">AI가 보고서 정확도를 높이기 위해 아래 자료 확인을 요청했습니다. 확인 여부와 메모를 입력한 뒤 재생성하면 해당 내용이 보고서 프롬프트에 함께 전달됩니다.</div>
+        <div class="reportAdditionalDesc">AI가 보고서 정확도를 높이기 위해 아래 자료 확인을 요청했습니다. 필요할 때만 펼쳐서 확인 여부와 메모를 입력하세요.</div>
+        <div class="reportAdditionalCollapsedHint">접힌 상태입니다. 보고서 확인 공간을 확보하려면 그대로 두고, 자료를 입력할 때만 펼치세요.</div>
       </div>
-      <button id="attendanceAdditionalClearBtn" class="reportAdditionalBtn secondary" type="button">입력 초기화</button>
+      <div class="reportAdditionalHeadActions">
+        <button id="attendanceAdditionalToggleBtn" class="reportAdditionalBtn secondary" type="button" aria-expanded="false">펼치기</button>
+        <button id="attendanceAdditionalClearBtn" class="reportAdditionalBtn secondary" type="button">입력 초기화</button>
+      </div>
     </div>
-    <div class="reportAdditionalGrid">
-      ${list.map((item,i)=>`<div class="reportAdditionalItem"><label><input type="checkbox" class="additionalCheck" data-additional-index="${i}"> ${esc(item)}</label><textarea class="additionalMemo" data-additional-index="${i}" rows="3" placeholder="확인 결과, 보유 자료, 해석에 반영할 내용 등을 입력하세요."></textarea></div>`).join('')}
-    </div>
-    <div class="reportAdditionalMemoWrap"><div class="reportAdditionalMemoLabel">공통 메모</div><textarea id="attendanceAdditionalGeneralMemo" class="reportAdditionalMemo" rows="3" placeholder="추가자료 전반에 대한 공통 의견이나 보고서에 반영할 관리 판단을 입력하세요."></textarea></div>
-    <div class="reportAdditionalActions"><button id="attendanceAdditionalRegenerateBtn" class="reportAdditionalBtn" type="button">추가자료 반영 후 보고서 재생성</button></div>`;
+    <div class="reportAdditionalBody">
+      <div class="reportAdditionalGrid">
+        ${list.map((item,i)=>`<div class="reportAdditionalItem"><label><input type="checkbox" class="additionalCheck" data-additional-index="${i}"> ${esc(item)}</label><textarea class="additionalMemo" data-additional-index="${i}" rows="3" placeholder="확인 결과, 보유 자료, 해석에 반영할 내용 등을 입력하세요."></textarea></div>`).join('')}
+      </div>
+      <div class="reportAdditionalMemoWrap"><div class="reportAdditionalMemoLabel">공통 메모</div><textarea id="attendanceAdditionalGeneralMemo" class="reportAdditionalMemo" rows="3" placeholder="추가자료 전반에 대한 공통 의견이나 보고서에 반영할 관리 판단을 입력하세요."></textarea></div>
+      <div class="reportAdditionalActions"><button id="attendanceAdditionalRegenerateBtn" class="reportAdditionalBtn" type="button">추가자료 반영 후 보고서 재생성</button></div>
+    </div>`;
+  const toggle=document.getElementById('attendanceAdditionalToggleBtn');
+  if(toggle)toggle.addEventListener('click',()=>{
+    const collapsed=panel.classList.toggle('collapsed');
+    toggle.textContent=collapsed?'펼치기':'접기';
+    toggle.setAttribute('aria-expanded', collapsed?'false':'true');
+  });
   const regen=document.getElementById('attendanceAdditionalRegenerateBtn');
   if(regen)regen.addEventListener('click',()=>requestAiReport(currentReportKind,true,{includeAdditionalData:true}));
   const clear=document.getElementById('attendanceAdditionalClearBtn');
