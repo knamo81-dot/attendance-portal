@@ -11121,7 +11121,7 @@ function renderAttendanceTable(rows){
     if(Number.isFinite(n)) return formatHoursToHM(n);
     return s;
   };
-  rows = rows.filter(r => !isDisplayExcludedAttendance(r));
+  rows = filterAttendanceRowsByCurrentAccess(rows).filter(r => !isDisplayExcludedAttendance(r));
   $('#attendanceTbody').innerHTML = rows.map(r => `
     <tr>
       <td data-label="일자"><span style="white-space:nowrap;display:inline-block">${r.date || '-'}</span></td>
@@ -11167,7 +11167,7 @@ function bindAttendanceFilters(){
     reason: r => getAttendanceReasonTokens(r)
   };
 
-  const baseRows = getAttendanceManagementRows(buildAttendanceRows.unfiltered ? buildAttendanceRows.unfiltered() : []).filter(r => !isDisplayExcludedAttendance(r));
+  const baseRows = filterAttendanceRowsByCurrentAccess(getAttendanceManagementRows(buildAttendanceRows.unfiltered ? buildAttendanceRows.unfiltered() : [])).filter(r => !isDisplayExcludedAttendance(r));
 
   Object.entries(columns).forEach(([key, getter]) => {
     const dd = document.getElementById('dropdown-' + key);
@@ -11229,7 +11229,7 @@ function bindAttendanceFilters(){
 function renderAttendanceTab(){
   bindAttendanceFilters();
   renderAttendanceLeaveToggle();
-  const rows = getAttendanceManagementRows(buildAttendanceRows());
+  const rows = filterAttendanceRowsByCurrentAccess(getAttendanceManagementRows(buildAttendanceRows()));
   renderAttendanceKpis(rows);
   renderAttendanceChart(rows);
   renderAttendanceInsights(rows);
