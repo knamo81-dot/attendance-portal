@@ -28,7 +28,7 @@
 <!-- dashboard interpretation/action guide reinforced: no calculation logic changed -->
 <!-- dashboard cleanup applied: bottom summary/alert cards removed, monthly trend hints added inside cause cards only -->
 <!-- hiring report main tab removed: panel/code kept inactive for safe rollback -->
-<!-- access role update: admin auto display now reads users.role admin/Admin/관리자 settings; operator remains search-based manual assignment -->
+<!-- access role update fixed: admin auto display reads public.users existing columns only; operator remains search-based manual assignment -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -13724,9 +13724,11 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
       var client = window.__attendanceSupabaseClient || null;
       var rows = [];
       if(client){
+        // 관리자 자동표기 수정: users 테이블에 없는 컬럼(user_email/user_name/employee_no 등)을 select하면
+        // Supabase가 전체 조회를 실패시켜 관리자 수가 0으로 표시될 수 있으므로 실제 필요한 기본 컬럼만 조회한다.
         var res = await client
           .from('users')
-          .select('email,user_email,name,user_name,employee_no,employeeNo,role,updated_at,created_at');
+          .select('email,name,role,is_active,updated_at,created_at');
         if(res && res.error){
           console.warn('[ACCESS ADMIN SETTINGS] users.role=admin 조회 실패:', res.error);
         }else{
