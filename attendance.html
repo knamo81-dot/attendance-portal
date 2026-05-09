@@ -839,6 +839,28 @@ body{
 @media (max-width:1100px){.adminUploadLayout{grid-template-columns:1fr;}.adminMonthGrid{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media (max-width:700px){.adminMonthGrid{grid-template-columns:1fr;}.adminYearBar{align-items:flex-start}}
 
+/* 관리자 기능 내부 탭 + 접근권한 설정 구조 */
+.adminFeatureTabs{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.adminFeatureTab{border:1px solid var(--line);border-radius:14px;padding:10px 16px;background:#fff;color:var(--text);font-size:14px;font-weight:800;cursor:pointer}
+.adminFeatureTab.active{background:var(--text);color:#fff;border-color:var(--text)}
+.adminFeaturePanel{display:none}
+.adminFeaturePanel.active{display:block}
+.accessGuideGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:16px}
+.accessGuideCard{border:1px solid var(--line);border-radius:18px;background:#fff;padding:16px}
+.accessGuideCard .k{font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:800}
+.accessGuideCard .v{font-size:20px;font-weight:900;color:var(--text)}
+.accessMatrixWrap{overflow:auto;border:1px solid var(--line);border-radius:18px;background:#fff;margin-top:14px}
+.accessMatrixTable{width:100%;border-collapse:collapse;min-width:860px;font-size:14px}
+.accessMatrixTable th,.accessMatrixTable td{padding:13px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.accessMatrixTable th{background:#f8fafc;color:var(--muted);font-size:13px;font-weight:900}
+.accessPill{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:900;background:#f1f5f9;color:#475569}
+.accessPill.admin{background:#e0f2fe;color:#0369a1}
+.accessPill.operator{background:#dcfce7;color:#15803d}
+.accessPill.auto{background:#fef3c7;color:#b45309}
+.accessTodoGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+.accessTodoItem{border:1px dashed #cbd5e1;border-radius:16px;background:#f8fafc;padding:14px;font-size:13px;line-height:1.55;color:#475569}
+@media (max-width:1100px){.accessGuideGrid,.accessTodoGrid{grid-template-columns:1fr}}
+
 /* iframe: shell already provides .app-like padding + white card frame — no double shell */
 html.embed-mode,
 html.embed-mode body{
@@ -2205,6 +2227,11 @@ table.missingTable td strong{
   </div>
 
 <div id="main-admin" class="mainPanel">
+  <div class="adminFeatureTabs" role="tablist" aria-label="관리자 기능 탭">
+    <button type="button" class="adminFeatureTab active" data-admin-feature="upload">데이터 업로드</button>
+    <button type="button" class="adminFeatureTab" data-admin-feature="access">접근권한 설정</button>
+  </div>
+  <div id="adminFeatureUploadPanel" class="adminFeaturePanel active">
   <div class="adminUploadLayout">
     <div>
       <div class="card">
@@ -2291,6 +2318,59 @@ table.missingTable td strong{
       </div>
     </div>
 
+  </div>
+  </div>
+
+  <div id="adminFeatureAccessPanel" class="adminFeaturePanel" aria-hidden="true">
+    <div class="card">
+      <div class="title">접근권한 설정</div>
+      <div class="desc">근태 프로그램의 조회 범위는 사원정보의 직책과 조직정보를 기준으로 자동 적용하는 구조입니다. 이 화면은 우선 구조 안내용이며, 실제 운영자·관리자 지정 기능은 이후 단계에서 연결합니다.</div>
+      <div class="real-admin-top-note" style="margin-top:12px">
+        권한 기준: 소장/본부장은 해당 본부 전체, 담당은 관리팀코드 기준 산하 팀, 팀장은 자기 팀, 일반 구성원은 본인 내역만 조회하도록 설계합니다. 관리자와 운영자는 시스템 기능 접근권한으로 별도 관리합니다.
+      </div>
+      <div class="accessGuideGrid">
+        <div class="accessGuideCard"><div class="k">권한 기준</div><div class="v">사원정보</div><div class="sub">직책 · 본부 · 팀 · 관리팀코드</div></div>
+        <div class="accessGuideCard"><div class="k">조직 연동</div><div class="v">사용</div><div class="sub">포털 설정의 조직/사원정보 기준</div></div>
+        <div class="accessGuideCard"><div class="k">자동 권한</div><div class="v">사용</div><div class="sub">소장 · 담당 · 팀장 자동 판별</div></div>
+        <div class="accessGuideCard"><div class="k">시스템 권한</div><div class="v">관리자 / 운영자</div><div class="sub">업로드·운영 기능 접근 기준</div></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="title">권한 구조</div>
+      <div class="desc">현재 단계에서는 구조만 표시합니다. 실제 조회 제한과 저장 로직은 다음 단계에서 연결합니다.</div>
+      <div class="accessMatrixWrap">
+        <table class="accessMatrixTable">
+          <thead>
+            <tr>
+              <th style="width:150px">구분</th>
+              <th style="width:170px">조회 범위</th>
+              <th>기준값</th>
+              <th style="width:140px">적용 방식</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="accessPill admin">관리자</span></td><td>전체</td><td>시스템 권한 admin</td><td>수동 설정 예정</td></tr>
+            <tr><td><span class="accessPill operator">운영자</span></td><td>운영 기능</td><td>시스템 권한 operator</td><td>수동 설정 예정</td></tr>
+            <tr><td><span class="accessPill auto">소장 / 본부장</span></td><td>해당 본부 전체</td><td>사원정보 직책 + 본부코드</td><td>자동</td></tr>
+            <tr><td><span class="accessPill auto">담당</span></td><td>관리팀코드 산하 팀</td><td>사원정보 직책 + 관리팀코드</td><td>자동</td></tr>
+            <tr><td><span class="accessPill auto">팀장</span></td><td>자기 팀 전체</td><td>사원정보 직책 + 팀코드</td><td>자동</td></tr>
+            <tr><td><span class="accessPill">일반 구성원</span></td><td>본인 내역</td><td>사번</td><td>자동</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="title">향후 기능 예정</div>
+      <div class="desc">다음 단계에서 실제 권한 저장 및 조회 제한 로직을 연결할 수 있습니다.</div>
+      <div class="accessTodoGrid">
+        <div class="accessTodoItem"><strong>운영자 지정</strong><br>업로드·운영 기능을 사용할 사원을 지정합니다.</div>
+        <div class="accessTodoItem"><strong>관리자 지정</strong><br>권한 변경과 전체 설정을 관리할 사원을 지정합니다.</div>
+        <div class="accessTodoItem"><strong>접근 로그</strong><br>누가 어느 조직 데이터를 조회했는지 기록합니다.</div>
+        <div class="accessTodoItem"><strong>권한 이력 관리</strong><br>권한 부여/해제 변경 이력을 남깁니다.</div>
+      </div>
+    </div>
   </div>
 </div>
     </div>
@@ -13458,5 +13538,30 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
 </script>
 
 </div>
+
+<script>
+(function(){
+  function initAdminFeatureTabs(){
+    var root = document.getElementById('main-admin');
+    if(!root) return;
+    var buttons = root.querySelectorAll('[data-admin-feature]');
+    var uploadPanel = document.getElementById('adminFeatureUploadPanel');
+    var accessPanel = document.getElementById('adminFeatureAccessPanel');
+    if(!buttons.length || !uploadPanel || !accessPanel) return;
+    buttons.forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var target = btn.getAttribute('data-admin-feature');
+        buttons.forEach(function(b){ b.classList.toggle('active', b === btn); });
+        uploadPanel.classList.toggle('active', target === 'upload');
+        accessPanel.classList.toggle('active', target === 'access');
+        uploadPanel.setAttribute('aria-hidden', target === 'upload' ? 'false' : 'true');
+        accessPanel.setAttribute('aria-hidden', target === 'access' ? 'false' : 'true');
+      });
+    });
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initAdminFeatureTabs);
+  else initAdminFeatureTabs();
+})();
+</script>
 </body>
 </html>
