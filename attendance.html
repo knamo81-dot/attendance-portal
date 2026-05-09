@@ -25,6 +25,7 @@
 <!-- org risk tab fix: undefined formatHourMinute references replaced with existing formatHoursToHM so dashboard/deep/trend/report/missing tabs bind normally -->
 <!-- organization risk score refined: org risk is calculated from risk/warning ratio, average total load, average OT, issue days, monthly hidden overtime, and recovery index; leave unused is no longer a direct org risk score driver -->
 <!-- org risk visual guide added: title threshold pills + score scale marker for normal/warning/risk 기준 -->
+<!-- dashboard interpretation/action guide reinforced: no calculation logic changed -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -1016,6 +1017,22 @@ html.embed-mode #main-dashboard .kpis{
 .dashboardDetailGroupBody .card[data-kpi-card]{min-height:116px;background:#fff;border-radius:15px;box-shadow:none;}
 .dashboardDetailGroupNote{margin-top:12px;border-radius:14px;padding:11px;font-size:12px;line-height:1.5;color:#475569;background:#f8fafc;border:1px solid #edf2f7;}
 .dashboardCauseBadge{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#ecfdf5;color:#15803d;font-size:12px;font-weight:900;white-space:nowrap;}
+
+/* dashboard decision reinforcement: light interpretation + action guide */
+.dashboardActionStrip{display:grid;grid-template-columns:1.2fr .8fr;gap:12px;margin-top:14px;}
+.dashboardActionBox{border:1px solid #e2e8f0;border-radius:16px;background:#f8fafc;padding:13px 14px;line-height:1.55;color:#475569;font-size:12px;}
+.dashboardActionBox strong{display:block;color:#0f172a;font-size:13px;font-weight:900;margin-bottom:5px;}
+.dashboardActionBox .actionList{display:grid;gap:4px;margin-top:4px;}
+.dashboardActionBox .actionList div{position:relative;padding-left:12px;}
+.dashboardActionBox .actionList div::before{content:'•';position:absolute;left:0;color:#0f172a;font-weight:900;}
+.dashboardSectionMiniNote{margin-top:12px;border:1px dashed #cbd5e1;border-radius:15px;background:#fff;padding:11px 12px;font-size:12px;line-height:1.55;color:#475569;}
+.dashboardCardGuide{margin-top:10px;border-top:1px solid #edf2f7;padding-top:9px;font-size:12px;line-height:1.45;color:#475569;}
+.dashboardCardGuide strong{display:block;color:#0f172a;font-size:12px;font-weight:900;margin-bottom:3px;}
+.dashboardCardGuide .guideAction{margin-top:3px;color:#334155;}
+.dashboardCardGuide .guideAction::before{content:'권장 조치: ';font-weight:900;color:#0f172a;}
+.dashboardTrendHint{display:inline-flex;align-items:center;gap:5px;margin-top:8px;padding:5px 8px;border-radius:999px;background:#f8fafc;border:1px solid #e2e8f0;color:#64748b;font-size:11px;font-weight:800;}
+@media (max-width:760px){.dashboardActionStrip{grid-template-columns:1fr}}
+
 @media (max-width:1300px){.dashboardDecisionGrid,.dashboardCauseGrid,.dashboardInfoGrid,.dashboardDetailGroupGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){.dashboardDecisionGrid,.dashboardCauseGrid,.dashboardInfoGrid,.dashboardDetailGroupGrid{grid-template-columns:1fr}.dashboardSectionHead{flex-direction:column}}
 
@@ -6187,12 +6204,17 @@ function ensureDashboardRelayoutStructure(){
     const cards = [...container.querySelectorAll('[data-kpi-card]')];
     container.innerHTML = `
       <section class="dashboardSection" data-dashboard-section="decision">
-        <div class="dashboardSectionHead"><div><div class="dashboardSectionTitle">1. 결론 요약</div><div class="dashboardSectionDesc">현재 조직 상태를 빠르게 판단할 수 있는 핵심 결과 카드입니다.</div></div></div>
+        <div class="dashboardSectionHead"><div><div class="dashboardSectionTitle">1. 결론 요약</div><div class="dashboardSectionDesc">현재 조직 상태를 빠르게 판단할 수 있는 핵심 결과 카드입니다. 점수는 그대로 유지하고, 해석과 조치 방향만 보강했습니다.</div></div></div>
         <div class="dashboardDecisionGrid" id="dashboardDecisionGrid"></div>
+        <div class="dashboardActionStrip">
+          <div class="dashboardActionBox"><strong>해석 포인트</strong>결론 카드는 현재 조직의 운영 상태를 한 번에 판단하기 위한 영역입니다. 위험/주의가 표시되면 숫자 자체보다 어떤 원인 카드가 함께 높게 나오는지를 먼저 확인합니다.</div>
+          <div class="dashboardActionBox"><strong>관리자 체크</strong><div class="actionList"><div>상위 위험 인원과 반복 연장근로자 확인</div><div>업무 집중·연차 부족·외근 편중 중 주원인 확인</div><div>필요 시 업무 분산 또는 휴식 권고 검토</div></div></div>
+        </div>
       </section>
       <section class="dashboardSection" data-dashboard-section="cause">
-        <div class="dashboardSectionHead"><div><div class="dashboardSectionTitle">2. 핵심 원인</div><div class="dashboardSectionDesc">원인성 지표 후보 중 현재 값이 높은 상위 3개 카드를 자동 배치합니다.</div></div><span class="dashboardCauseBadge">자동 TOP 3</span></div>
+        <div class="dashboardSectionHead"><div><div class="dashboardSectionTitle">2. 핵심 원인</div><div class="dashboardSectionDesc">원인성 지표 후보 중 현재 값이 높은 상위 3개 카드를 자동 배치합니다. 이 영역은 “왜 주의/위험인지”를 설명하는 근거입니다.</div></div><span class="dashboardCauseBadge">자동 TOP 3</span></div>
         <div class="dashboardCauseGrid" id="dashboardCauseGrid"></div>
+        <div class="dashboardSectionMiniNote">전월 대비 방향성은 트렌드분석 탭에서 확인하고, 이 화면에서는 현재 월 기준으로 가장 강하게 나타난 원인을 빠르게 파악하는 용도로 사용합니다.</div>
       </section>
       <section class="dashboardSection" data-dashboard-section="info">
         <div class="dashboardSectionHead"><div><div class="dashboardSectionTitle">3. 조직 상태 요약</div><div class="dashboardSectionDesc">인원, 미사용 연차, 총 연장근로처럼 판단에 필요한 기본 숫자입니다.</div></div></div>
@@ -6203,10 +6225,10 @@ function ensureDashboardRelayoutStructure(){
           <summary>4. 상세 지표 보기</summary>
           <div class="dashboardSectionDesc" style="margin:8px 0 12px">상세 지표는 기본 닫힘 상태로 두고, 열면 전체 내역을 한 번에 확인할 수 있게 그룹별로 모아 표시합니다.</div>
           <div class="dashboardDetailGroupGrid" id="dashboardDetailGroupGrid">
-            <div class="dashboardDetailGroup" data-detail-group="overtime"><div class="dashboardDetailGroupHead"><strong>연장근로</strong><span>부하/집중</span></div><div class="dashboardDetailGroupBody" id="detailGroupOvertime"></div><div class="dashboardDetailGroupNote">연장근로는 총량과 특정 인원 집중 여부를 함께 확인합니다.</div></div>
-            <div class="dashboardDetailGroup" data-detail-group="leave"><div class="dashboardDetailGroupHead"><strong>연차/회복</strong><span>휴식/회복</span></div><div class="dashboardDetailGroupBody" id="detailGroupLeave"></div><div class="dashboardDetailGroupNote">연차 관련 지표는 회복 부족 여부를 판단하는 보조 지표입니다.</div></div>
-            <div class="dashboardDetailGroup" data-detail-group="mobility"><div class="dashboardDetailGroupHead"><strong>외근/출장</strong><span>활동/편중</span></div><div class="dashboardDetailGroupBody" id="detailGroupMobility"></div><div class="dashboardDetailGroupNote">외근/출장은 발생량보다 특정 인원 편중 여부를 함께 확인합니다.</div></div>
-            <div class="dashboardDetailGroup" data-detail-group="operation"><div class="dashboardDetailGroupHead"><strong>조직/운영</strong><span>종합 판단</span></div><div class="dashboardDetailGroupBody" id="detailGroupOperation"></div><div class="dashboardDetailGroupNote">조직/운영 그룹은 결론 카드의 근거를 세부적으로 확인하는 용도입니다.</div></div>
+            <div class="dashboardDetailGroup" data-detail-group="overtime"><div class="dashboardDetailGroupHead"><strong>연장근로</strong><span>부하/집중</span></div><div class="dashboardDetailGroupBody" id="detailGroupOvertime"></div><div class="dashboardDetailGroupNote">총량이 높으면 부하 수준을, 집중도가 높으면 특정 인원 몰림을 우선 확인합니다. 반복자는 업무 재배분 검토 대상입니다.</div></div>
+            <div class="dashboardDetailGroup" data-detail-group="leave"><div class="dashboardDetailGroupHead"><strong>연차/회복</strong><span>휴식/회복</span></div><div class="dashboardDetailGroupBody" id="detailGroupLeave"></div><div class="dashboardDetailGroupNote">연차 부족 또는 미사용 비중이 높으면 회복 부족 신호로 보고, 장기 미사용 인원 사용 권고를 검토합니다.</div></div>
+            <div class="dashboardDetailGroup" data-detail-group="mobility"><div class="dashboardDetailGroupHead"><strong>외근/출장</strong><span>활동/편중</span></div><div class="dashboardDetailGroupBody" id="detailGroupMobility"></div><div class="dashboardDetailGroupNote">외근/출장은 단순 건수보다 특정 인원 편중 여부가 중요합니다. 편중이 높으면 담당 로테이션을 검토합니다.</div></div>
+            <div class="dashboardDetailGroup" data-detail-group="operation"><div class="dashboardDetailGroupHead"><strong>조직/운영</strong><span>종합 판단</span></div><div class="dashboardDetailGroupBody" id="detailGroupOperation"></div><div class="dashboardDetailGroupNote">위험 인원, 업무집중, 퇴직 리스크를 함께 보며 조직 운영의 구조적 부담 여부를 확인합니다.</div></div>
           </div>
         </details>
       </section>
@@ -6240,6 +6262,39 @@ function cloneDashboardCardForDetail(cardId, targetId){
   clone.setAttribute('data-kpi-card', `${cardId}_detail`);
   target.appendChild(clone);
 }
+
+function applyDashboardReinforcementGuides(){
+  const guideMap = {
+    operational_risk_total: { title:'종합 해석', body:'운영 리스크는 연장근로·업무집중·연차·퇴직 신호를 함께 본 최종 운영 판단 카드입니다.', action:'높게 나오면 핵심 원인 TOP3를 먼저 확인하고 담당자별 과부하 여부를 점검' },
+    leave_risk: { title:'회복 해석', body:'미사용 인원과 사용 편중이 함께 높으면 조직 회복력이 낮아진 상태로 봅니다.', action:'연차 미사용자와 장기 과부하 인원에게 사용 권고' },
+    operational_risk: { title:'연장근로 해석', body:'연장근로 리스크는 평균 시간과 특정 인원 집중도를 함께 반영합니다.', action:'반복 야근 업무와 상위 연장근로자 업무 분산 검토' },
+    high_risk_count: { title:'인원 해석', body:'위험 인원은 개인 위험점수 75점 이상 인원으로, 즉시 확인이 필요한 대상입니다.', action:'상위 위험자 상세 사유와 근무 패턴 확인' },
+    work_concentration: { title:'원인 해석', body:'상위 20% 인원이 전체 업무에서 차지하는 비중입니다. 높을수록 특정 인원 의존도가 큽니다.', action:'업무 분배 구조와 대체 가능 인력 확인' },
+    overtime_concentration: { title:'원인 해석', body:'연장근로가 일부 인원에게 몰리는 정도입니다. 평균보다 편중 여부를 함께 봅니다.', action:'상위 연장근로자 반복 업무 확인' },
+    leave_deficiency: { title:'원인 해석', body:'연차/반차 사용량이 기준 대비 부족한 정도입니다. 회복 부족 가능성을 보여줍니다.', action:'연차 사용 계획 안내 및 장기 미사용자 확인' },
+    mobility_concentration: { title:'원인 해석', body:'외근/출장이 일부 인원에게 몰리는 정도입니다. 직무 특성을 고려해 해석합니다.', action:'담당 로테이션 또는 지원 인력 필요 여부 확인' },
+    avg_overtime: { title:'원인 해석', body:'1인당 평균 연장근로 수준입니다. 조직 전체 부하의 기본 신호입니다.', action:'평균 상승 시 업무량 증가 원인 확인' },
+    mobility_activity: { title:'원인 해석', body:'1인당 평균 외근/출장 활동량입니다. 이동성 업무 부담을 보여줍니다.', action:'활동량 증가 시 특정 업무 이벤트 여부 확인' }
+  };
+  Object.entries(guideMap).forEach(([cardId, info]) => {
+    const card = document.querySelector(`[data-kpi-card="${cardId}"]:not([data-detail-clone="Y"])`);
+    if(!card) return;
+    card.querySelectorAll('.dashboardCardGuide').forEach(el => el.remove());
+    const guide = document.createElement('div');
+    guide.className = 'dashboardCardGuide';
+    guide.innerHTML = `<strong>${info.title}</strong><div>${info.body}</div><div class="guideAction">${info.action}</div>`;
+    card.appendChild(guide);
+  });
+  ['work_concentration','overtime_concentration','leave_deficiency','mobility_concentration','avg_overtime','mobility_activity'].forEach(cardId => {
+    const card = document.querySelector(`[data-kpi-card="${cardId}"]:not([data-detail-clone="Y"])`);
+    if(!card || card.querySelector('.dashboardTrendHint')) return;
+    const hint = document.createElement('div');
+    hint.className = 'dashboardTrendHint';
+    hint.textContent = '변화 방향은 트렌드분석에서 확인';
+    card.appendChild(hint);
+  });
+}
+
 function resetDashboardDetailGroups(){
   ['detailGroupOvertime','detailGroupLeave','detailGroupMobility','detailGroupOperation'].forEach(id => {
     const el = document.getElementById(id);
@@ -6272,6 +6327,8 @@ function applyDashboardRelayoutCards(){
   scored.forEach(item => moveDashboardCard(item.id, topCauseIds.has(item.id) ? 'dashboardCauseGrid' : 'dashboardHiddenCardPool'));
 
   infoIds.forEach(id => moveDashboardCard(id, 'dashboardInfoGrid'));
+
+  applyDashboardReinforcementGuides();
 
   const fixedIds = new Set([...decisionIds, ...infoIds, ...existingCandidateIds]);
   [...container.querySelectorAll('[data-kpi-card]:not([data-detail-clone="Y"])')].forEach(card => {
