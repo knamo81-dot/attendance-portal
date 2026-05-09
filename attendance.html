@@ -28,7 +28,7 @@
 <!-- dashboard interpretation/action guide reinforced: no calculation logic changed -->
 <!-- dashboard cleanup applied: bottom summary/alert cards removed, monthly trend hints added inside cause cards only -->
 <!-- hiring report main tab removed: panel/code kept inactive for safe rollback -->
-<!-- access role update fixed: admin auto display reads public.users; operator stored in public.attendance_operators server table -->
+<!-- access role update fixed: admin auto display reads public.users; operator stored/deleted in public.attendance_operators server table -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -13809,23 +13809,17 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
     if(!client) throw new Error('Supabase 연결 객체가 없습니다.');
     employeeNo = String(employeeNo || '').trim();
     if(!employeeNo) throw new Error('사번이 없습니다.');
-    var payload = { is_active:false, updated_by:getCurrentAccessActorName(), updated_at:new Date().toISOString() };
+
+    // 운영자 해제는 이력 비활성화가 아니라 서버 행을 실제 삭제합니다.
+    // 현재 운영자 목록과 Supabase attendance_operators 테이블이 1:1로 맞도록 유지합니다.
     var result = await client
       .from('attendance_operators')
-      .update(payload)
+      .delete()
       .eq('employee_no', employeeNo)
-      .select('*')
-      .maybeSingle();
-    if(result?.error){
-      result = await client
-        .from('attendance_operators')
-        .update({ is_active:false })
-        .eq('employee_no', employeeNo)
-        .select('*')
-        .maybeSingle();
-    }
+      .select('*');
+
     if(result?.error) throw result.error;
-    return result?.data || null;
+    return Array.isArray(result?.data) ? result.data[0] || null : null;
   }
   function normalizeAccessEmail(v){
     return String(v || '').trim().toLowerCase();
@@ -14086,7 +14080,7 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
       renderCurrentOperatorTable();
       searchAccessOperatorCandidates();
       if(msg){
-        msg.textContent = shouldAdd ? '운영자가 서버에 저장되었습니다.' : '운영자 해제가 서버에 반영되었습니다.';
+        msg.textContent = shouldAdd ? '운영자가 서버에 저장되었습니다.' : '운영자 해제가 서버에서 삭제되었습니다.';
         msg.classList.add('show');
         clearTimeout(window.__accessSaveMsgTimer);
         window.__accessSaveMsgTimer = setTimeout(function(){ msg.classList.remove('show'); }, 2200);
