@@ -28,7 +28,7 @@
 <!-- dashboard interpretation/action guide reinforced: no calculation logic changed -->
 <!-- dashboard cleanup applied: bottom summary/alert cards removed, monthly trend hints added inside cause cards only -->
 <!-- hiring report main tab removed: panel/code kept inactive for safe rollback -->
-<!-- access role update: admin auto display now reads users.role=admin settings; operator remains search-based manual assignment -->
+<!-- access role update: admin auto display now reads users.role admin/Admin/관리자 settings; operator remains search-based manual assignment -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -2369,7 +2369,7 @@ table.missingTable td strong{
       <div class="accessGuideGrid">
         <div class="accessGuideCard"><div class="k">자동 표기</div><div class="v">관리자 · 소장 · 담당 · 팀장</div><div class="sub">사원정보/현재 접속정보 기준</div></div>
         <div class="accessGuideCard"><div class="k">수동 설정</div><div class="v">운영자</div><div class="sub">검색 후 지정/해제</div></div>
-        <div class="accessGuideCard"><div class="k">저장 위치</div><div class="v">관리자 설정값 / 운영자 브라우저</div><div class="sub">관리자는 users.role=admin 기준 자동 표기</div></div>
+        <div class="accessGuideCard"><div class="k">저장 위치</div><div class="v">관리자 설정값 / 운영자 브라우저</div><div class="sub">관리자는 users.role=admin/Admin/관리자 기준 자동 표기</div></div>
         <div class="accessGuideCard"><div class="k">접근제한 로직</div><div class="v">미연결</div><div class="sub">이번 수정 범위에서 제외</div></div>
       </div>
     </div>
@@ -13699,6 +13699,19 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
   function normalizeAccessEmail(v){
     return String(v || '').trim().toLowerCase();
   }
+  function normalizeAccessAdminRole(v){
+    var s = String(v || '').trim().toLowerCase();
+    if(!s) return '';
+    if(s === 'admin' || s === 'administrator') return 'admin';
+    if(s === '관리자' || s === '시스템관리자' || s === '시스템 관리자') return 'admin';
+    return s;
+  }
+  function isAccessAdminRole(v){
+    return normalizeAccessAdminRole(v) === 'admin';
+  }
+  function getAccessEmployeeAdminRole(emp){
+    return emp?.system_role || emp?.systemRole || emp?.user_role || emp?.userRole || emp?.portal_role || emp?.portalRole || emp?.access_role || emp?.accessRole || '';
+  }
   function getCurrentAdminRows(){
     if(ACCESS_ADMIN_STATE.rows && ACCESS_ADMIN_STATE.rows.length) return ACCESS_ADMIN_STATE.rows.slice();
     return [];
@@ -13713,12 +13726,13 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
       if(client){
         var res = await client
           .from('users')
-          .select('email,user_email,name,user_name,employee_no,employeeNo,role,updated_at,created_at')
-          .eq('role','admin');
+          .select('email,user_email,name,user_name,employee_no,employeeNo,role,updated_at,created_at');
         if(res && res.error){
           console.warn('[ACCESS ADMIN SETTINGS] users.role=admin 조회 실패:', res.error);
         }else{
-          var adminUsers = Array.isArray(res?.data) ? res.data : [];
+          var adminUsers = (Array.isArray(res?.data) ? res.data : []).filter(function(row){
+            return isAccessAdminRole(row?.role);
+          });
           var employees = getAccessEmployees();
           var employeeByEmail = new Map();
           var employeeByNo = new Map();
@@ -13740,10 +13754,25 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
               division:getAccessDivision(emp) || '-',
               team:getAccessTeam(emp) || '-',
               authority:'관리자',
-              basis:(email ? 'users.role=admin · ' + accessEsc(email) : 'users.role=admin')
+              basis:(email ? 'users.role 관리자 설정값 · ' + accessEsc(email) : 'users.role 관리자 설정값')
             });
           });
         }
+      }
+      if(!rows.length){
+        getAccessEmployees().forEach(function(emp){
+          if(!isAccessAdminRole(getAccessEmployeeAdminRole(emp))) return;
+          rows.push({
+            type:'관리자',
+            badge:'admin',
+            name:getAccessName(emp) || '관리자',
+            id:getAccessId(emp) || '-',
+            division:getAccessDivision(emp) || '-',
+            team:getAccessTeam(emp) || '-',
+            authority:'관리자',
+            basis:'사원정보 관리자 설정값'
+          });
+        });
       }
       ACCESS_ADMIN_STATE.rows = rows;
       ACCESS_ADMIN_STATE.loaded = true;
