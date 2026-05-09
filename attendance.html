@@ -11984,6 +11984,13 @@ window.addEventListener('resize', renderLightweight);
     if(!hero || !floating) return;
     const heroBottom = hero.getBoundingClientRect().bottom;
     const shouldShow = heroBottom <= 12;
+
+    // 스크롤 고정 필터가 표시되는 순간마다 상단 필터의 최신 옵션/선택값을 다시 동기화
+    // - period / division / team 값이 상황에 따라 이전값 또는 기본값으로 보이는 현상 방지
+    if(shouldShow && typeof syncFloatingFilterOptions === 'function'){
+      syncFloatingFilterOptions();
+    }
+
     floating.classList.toggle('show', shouldShow);
     floating.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
   }
