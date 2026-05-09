@@ -28,7 +28,7 @@
 <!-- dashboard interpretation/action guide reinforced: no calculation logic changed -->
 <!-- dashboard cleanup applied: bottom summary/alert cards removed, monthly trend hints added inside cause cards only -->
 <!-- hiring report main tab removed: panel/code kept inactive for safe rollback -->
-<!-- access role update fixed: admin auto display reads public.users; operator stored/deleted in public.attendance_operators server table -->
+<!-- access role update fixed: admin auto display reads public.users; operator stored/deleted in public.attendance_operators server table; admin feature access locked to admins only -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -4923,6 +4923,7 @@ function restoreSavedAttendancePeriod(){
 function activateMainTabWithoutRender(tabName){
   const targetName = String(tabName || '').trim();
   if(!targetName) return false;
+  if(targetName === 'admin' && typeof window.canAccessAttendanceAdmin === 'function' && !window.canAccessAttendanceAdmin()) return false;
   const btn = document.querySelector(`.mainTab[data-main="${targetName}"]`);
   const panel = document.querySelector(`#main-${targetName}`);
   if(!btn || !panel) return false;
@@ -11175,6 +11176,11 @@ function bindMainTabs(){
   $$('.mainTab').forEach(btn => {
     btn.onclick = () => {
       const mainName = String(btn.dataset.main || '').trim();
+      if(mainName === 'admin' && typeof window.canAccessAttendanceAdmin === 'function' && !window.canAccessAttendanceAdmin()){
+        alert('관리자만 접근할 수 있는 기능입니다.');
+        if(typeof window.applyAttendanceAdminAccessGuard === 'function') window.applyAttendanceAdminAccessGuard();
+        return;
+      }
       if(mainName) saveAttendanceMainTab(mainName);
       $$('.mainTab').forEach(x => x.classList.remove('active'));
       $$('.mainPanel').forEach(x => x.classList.remove('active'));
@@ -13804,6 +13810,73 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
     if(ACCESS_ADMIN_STATE.rows && ACCESS_ADMIN_STATE.rows.length) return ACCESS_ADMIN_STATE.rows.slice();
     return [];
   }
+  function getAttendanceCurrentIdentity(){
+    var out = { email:'', name:'', role:'', employee_no:'' };
+    function take(obj){
+      if(!obj || typeof obj !== 'object') return;
+      var user = obj.user && typeof obj.user === 'object' ? obj.user : {};
+      var profile = obj.profile && typeof obj.profile === 'object' ? obj.profile : {};
+      out.email = out.email || String(obj.email || obj.user_email || obj.userEmail || user.email || profile.email || '').trim();
+      out.name = out.name || String(obj.name || obj.user_name || obj.userName || user.name || profile.name || '').trim();
+      out.role = out.role || String(obj.role || obj.user_role || obj.userRole || obj.portal_role || obj.portalRole || user.role || profile.role || '').trim();
+      out.employee_no = out.employee_no || String(obj.employee_no || obj.employeeNo || obj.emp_no || obj.empNo || user.employee_no || profile.employee_no || '').trim();
+    }
+    try{ take(window.__portalCurrentUser); take(window.currentUser); take(window.AttendanceCurrentUser); }catch(_e){}
+    try{
+      var q = new URLSearchParams(window.location.search || '');
+      out.email = out.email || String(q.get('email') || q.get('user_email') || q.get('userEmail') || '').trim();
+      out.name = out.name || String(q.get('name') || q.get('user_name') || q.get('userName') || '').trim();
+      out.role = out.role || String(q.get('role') || q.get('user_role') || q.get('userRole') || '').trim();
+      out.employee_no = out.employee_no || String(q.get('employee_no') || q.get('employeeNo') || q.get('emp_no') || '').trim();
+    }catch(_e){}
+    try{
+      ['portal_auth_user','portalUser','attendance_portal_user','currentUser','user'].forEach(function(key){
+        [sessionStorage.getItem(key), localStorage.getItem(key)].forEach(function(raw){
+          if(!raw) return;
+          try{ take(JSON.parse(raw)); }catch(_ignore){}
+        });
+      });
+    }catch(_e){}
+    out.email = normalizeAccessEmail(out.email);
+    out.name = String(out.name || '').trim();
+    out.role = String(out.role || '').trim();
+    out.employee_no = String(out.employee_no || '').trim();
+    return out;
+  }
+  function isCurrentAttendanceAdmin(){
+    var identity = getAttendanceCurrentIdentity();
+    if(isAccessAdminRole(identity.role)) return true;
+    var rows = getCurrentAdminRows();
+    if(!rows.length) return false;
+    return rows.some(function(row){
+      var rowEmail = normalizeAccessEmail(row.email);
+      var rowName = String(row.name || '').trim();
+      return (identity.email && rowEmail && identity.email === rowEmail) ||
+             (identity.name && rowName && identity.name === rowName);
+    });
+  }
+  function applyAttendanceAdminAccessGuard(){
+    var canAdmin = isCurrentAttendanceAdmin();
+    var adminBtn = document.querySelector('.mainTab[data-main="admin"]');
+    var adminPanel = document.getElementById('main-admin');
+    if(adminBtn){
+      adminBtn.style.display = canAdmin ? '' : 'none';
+      adminBtn.disabled = !canAdmin;
+      adminBtn.setAttribute('aria-hidden', canAdmin ? 'false' : 'true');
+    }
+    if(!canAdmin && adminPanel && adminPanel.classList.contains('active')){
+      adminPanel.classList.remove('active');
+      if(adminBtn) adminBtn.classList.remove('active');
+      var fallbackBtn = document.querySelector('.mainTab[data-main="attendance"]');
+      var fallbackPanel = document.getElementById('main-attendance');
+      if(fallbackBtn) fallbackBtn.classList.add('active');
+      if(fallbackPanel) fallbackPanel.classList.add('active');
+      try{ saveAttendanceMainTab('attendance'); }catch(_e){}
+    }
+    return canAdmin;
+  }
+  window.canAccessAttendanceAdmin = isCurrentAttendanceAdmin;
+  window.applyAttendanceAdminAccessGuard = applyAttendanceAdminAccessGuard;
   async function refreshAccessAdminRowsFromSettings(force){
     if(ACCESS_ADMIN_STATE.loading) return ACCESS_ADMIN_STATE.rows || [];
     if(ACCESS_ADMIN_STATE.loaded && !force) return ACCESS_ADMIN_STATE.rows || [];
@@ -14056,7 +14129,8 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
   function renderAccessSettings(){
     try{ localStorage.removeItem(LEGACY_OPERATOR_KEY); }catch(_e){}
     renderAccessAutoTable();
-    refreshAccessAdminRowsFromSettings(false).then(function(){ renderAccessAutoTable(); }).catch(function(){});
+    applyAttendanceAdminAccessGuard();
+    refreshAccessAdminRowsFromSettings(false).then(function(){ renderAccessAutoTable(); applyAttendanceAdminAccessGuard(); }).catch(function(){ applyAttendanceAdminAccessGuard(); });
     refreshAccessOperatorRowsFromServer(true).then(function(){
       renderAccessAutoTable();
       renderCurrentOperatorTable();
@@ -14122,6 +14196,7 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
     });
     bindAccessSettingEvents();
     renderAccessSettings();
+    applyAttendanceAdminAccessGuard();
   }
   window.renderAttendanceAccessSettings = renderAccessSettings;
   window.refreshAttendanceAccessAdminSettings = function(){ ACCESS_ADMIN_STATE.loaded = false; return refreshAccessAdminRowsFromSettings(true).then(function(){ renderAccessAutoTable(); }); }; 
