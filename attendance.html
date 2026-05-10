@@ -5052,6 +5052,13 @@ function findAttendanceEmployeeForCurrentUser(summary){
   }) || null;
 }
 function isCurrentAttendanceGeneralUser(){
+  const access = (window.currentAccess || (typeof ATTENDANCE_EFFECTIVE_ACCESS_STATE !== 'undefined' ? ATTENDANCE_EFFECTIVE_ACCESS_STATE.access : null) || {});
+  const effectivePrivileged = !!(
+    access.isAdmin || access.isOperator || access.isDirector || access.isManager || access.isTeamLeader || access.isLeader ||
+    access.canViewAll || access.canViewDivision || access.canViewManagedTeams || access.canViewTeam ||
+    ['admin','operator','director','manager','teamLeader','teamleader','leader'].includes(String(access.role || access.primaryRole || '').trim())
+  );
+  if(effectivePrivileged) return false;
   return ATTENDANCE_GENERAL_USER_ACCESS_STATE.isGeneral === true;
 }
 function rowMatchesCurrentGeneralUser(row){
@@ -5135,7 +5142,17 @@ async function resolveAttendanceGeneralUserAccess(force){
     }
     const normalizedRole = normalizeAttendanceGeneralRole(summary.role);
     const normalizedAuthority = normalizeAttendanceGeneralRole(getAttendanceEmployeeAuthority(emp));
-    const privileged = normalizedRole === 'admin' || normalizedRole === 'operator' || normalizedRole === 'privileged' || normalizedAuthority === 'admin' || normalizedAuthority === 'operator' || normalizedAuthority === 'privileged';
+    const effectiveAccessForGeneralCheck = (window.currentAccess || (typeof getAttendanceEffectiveAccess === 'function' ? getAttendanceEffectiveAccess() : {}) || {});
+    const effectiveRoleForGeneralCheck = String(effectiveAccessForGeneralCheck.role || effectiveAccessForGeneralCheck.primaryRole || '').trim();
+    const effectivePrivileged = !!(
+      effectiveAccessForGeneralCheck.isAdmin || effectiveAccessForGeneralCheck.isOperator ||
+      effectiveAccessForGeneralCheck.isDirector || effectiveAccessForGeneralCheck.isManager ||
+      effectiveAccessForGeneralCheck.isTeamLeader || effectiveAccessForGeneralCheck.isLeader ||
+      effectiveAccessForGeneralCheck.canViewAll || effectiveAccessForGeneralCheck.canViewDivision ||
+      effectiveAccessForGeneralCheck.canViewManagedTeams || effectiveAccessForGeneralCheck.canViewTeam ||
+      ['admin','operator','director','manager','teamLeader','teamleader','leader'].includes(effectiveRoleForGeneralCheck)
+    );
+    const privileged = effectivePrivileged || normalizedRole === 'admin' || normalizedRole === 'operator' || normalizedRole === 'privileged' || normalizedAuthority === 'admin' || normalizedAuthority === 'operator' || normalizedAuthority === 'privileged';
     // 일반사용자 기준 고정:
     // 관리자(users.role=admin), 운영자(attendance_operators), 자동권한자(소장/본부장/담당/팀장)가 아니면 모두 일반사용자입니다.
     // 따라서 사원 마스터의 '팀원' 또는 권한 공란/일반 role은 본인조회 전용으로 잠급니다.
@@ -5564,7 +5581,8 @@ function canAccessAttendanceMainTab(tabName){
   const isDirector = !!access.isDirector;
   const isManager = !!access.isManager;
   const isTeamLeader = !!(access.isTeamLeader || access.isLeader);
-  const isGeneral = !!(access.isGeneral || (typeof isCurrentAttendanceGeneralUser === 'function' && isCurrentAttendanceGeneralUser()));
+  const effectivePrivileged = isAdmin || isOperator || isDirector || isManager || isTeamLeader || !!access.canViewAll || !!access.canViewDivision || !!access.canViewManagedTeams || !!access.canViewTeam;
+  const isGeneral = !effectivePrivileged && !!(access.isGeneral || (typeof isCurrentAttendanceGeneralUser === 'function' && isCurrentAttendanceGeneralUser()));
   if(targetName === 'admin') return isAdmin;
   if(isGeneral) return false;
   if(ATTENDANCE_ANALYSIS_MAIN_TABS.includes(targetName)){
