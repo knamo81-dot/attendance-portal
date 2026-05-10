@@ -33,9 +33,8 @@ button, input, select { font: inherit; }
 }
 
 .hero {
-  min-height: 126px;
   border-radius: 28px;
-  padding: 36px 40px;
+  padding: 34px 40px;
   background: linear-gradient(135deg, #111827 0%, #1f2937 55%, #374151 100%);
   color: #fff;
   box-shadow: 0 14px 32px rgba(31,41,55,.18);
@@ -445,7 +444,7 @@ th:first-child {
 
   .hero {
     display: block;
-    padding: 28px 24px;
+    padding: 26px 24px;
     border-radius: 22px;
   }
 
