@@ -556,10 +556,6 @@ th:first-child {
   min-width: 82px;
 }
 
-#adminPageSize {
-  width: 92px;
-  min-width: 92px;
-}
 
 @media (max-width: 720px) {
   #view-admin .panel {
