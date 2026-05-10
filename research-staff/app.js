@@ -1,8 +1,11 @@
 const AppState = {
   employees: [],
   profiles: [],
+  divisions: [],
+  teams: [],
   merged: [],
   currentView: "dashboard",
+  referenceMonth: "",
   isAdmin: true
 };
 
@@ -23,6 +26,17 @@ function bindNavigation() {
 
 function bindCommonEvents() {
   document.getElementById("refreshBtn")?.addEventListener("click", loadAllData);
+
+  const referenceMonthInput = document.getElementById("referenceMonth");
+  if (referenceMonthInput) {
+    referenceMonthInput.value = getCurrentMonthValue();
+    AppState.referenceMonth = referenceMonthInput.value;
+
+    referenceMonthInput.addEventListener("change", () => {
+      AppState.referenceMonth = referenceMonthInput.value || getCurrentMonthValue();
+      renderAll();
+    });
+  }
 }
 
 function setView(view) {
@@ -50,17 +64,28 @@ async function loadAllData() {
   }
 
   try {
-    const [employeesResult, profilesResult] = await Promise.all([
+    const [employeesResult, profilesResult, divisionsResult, teamsResult] = await Promise.all([
       client.from("employees").select("*").order("name", { ascending: true }),
-      client.from("research_staff_profiles").select("*")
+      client.from("research_staff_profiles").select("*"),
+      client.from("divisions").select("*"),
+      client.from("teams").select("*")
     ]);
 
     if (employeesResult.error) throw employeesResult.error;
     if (profilesResult.error) throw profilesResult.error;
+    if (divisionsResult.error) throw divisionsResult.error;
+    if (teamsResult.error) throw teamsResult.error;
 
     AppState.employees = employeesResult.data || [];
     AppState.profiles = profilesResult.data || [];
-    AppState.merged = mergeEmployeeProfiles(AppState.employees, AppState.profiles);
+    AppState.divisions = divisionsResult.data || [];
+    AppState.teams = teamsResult.data || [];
+    AppState.merged = mergeEmployeeProfiles(
+      AppState.employees,
+      AppState.profiles,
+      AppState.divisions,
+      AppState.teams
+    );
 
     setConnectionStatus("서버 연결 완료", "success");
     renderAll();
@@ -72,12 +97,24 @@ async function loadAllData() {
   }
 }
 
-function mergeEmployeeProfiles(employees, profiles) {
+function mergeEmployeeProfiles(employees, profiles, divisions = [], teams = []) {
   const profileMap = new Map(profiles.map(profile => [String(profile.employee_no), profile]));
+  const divisionMap = new Map(divisions.map(division => [
+    String(division.division_code || ""),
+    division.division_name || division.name || division.division_code || ""
+  ]));
+  const teamMap = new Map(teams.map(team => [
+    String(team.team_code || ""),
+    team.team_name || team.name || team.team_code || ""
+  ]));
 
   return employees.map(employee => {
     const employeeNo = String(employee.employee_no || employee.employee_id || employee.id || "");
     const profile = profileMap.get(employeeNo) || {};
+    const divisionCode = String(employee.division_code || "");
+    const teamCode = String(employee.team_code || "");
+    const hireDate = getEmployeeHireDate(employee);
+    const effectiveLabAssignDate = profile.lab_assign_date || hireDate || "";
 
     return {
       ...employee,
@@ -86,12 +123,14 @@ function mergeEmployeeProfiles(employees, profiles) {
         employee.department ||
         employee.division_name ||
         employee.division ||
+        divisionMap.get(divisionCode) ||
         employee.division_code ||
         "",
 
       team:
         employee.team ||
         employee.team_name ||
+        teamMap.get(teamCode) ||
         employee.team_code ||
         "",
 
@@ -101,13 +140,19 @@ function mergeEmployeeProfiles(employees, profiles) {
         employee.job_title ||
         "",
 
+      division_code: employee.division_code || "",
+      team_code: employee.team_code || "",
+      hire_date: hireDate,
+      resignation_date: getEmployeeResignationDate(employee),
+
       employee_no: employeeNo,
       profile_id: profile.id || null,
       is_research_staff: Boolean(profile.is_research_staff),
       research_type: profile.research_type || "",
       gender: profile.gender || "",
       birth_date: profile.birth_date || "",
-      lab_assign_date: profile.lab_assign_date || "",
+      lab_assign_date: effectiveLabAssignDate,
+      saved_lab_assign_date: profile.lab_assign_date || "",
       degree: profile.degree || "",
       remarks: profile.remarks || ""
     };
@@ -128,7 +173,84 @@ function setConnectionStatus(text, type = "muted") {
 }
 
 function getResearchRows() {
-  return AppState.merged.filter(row => row.is_research_staff);
+  return getReferenceFilteredRows(AppState.merged).filter(row => isResearchStaffRow(row));
+}
+
+function getAdminRows() {
+  return getReferenceFilteredRows(AppState.merged);
+}
+
+function isResearchStaffRow(row) {
+  return Boolean(
+    row.profile_id ||
+    row.research_type ||
+    row.degree ||
+    row.gender ||
+    row.birth_date ||
+    row.saved_lab_assign_date
+  );
+}
+
+function getReferenceFilteredRows(rows) {
+  const month = AppState.referenceMonth || getCurrentMonthValue();
+  const { start, end } = getMonthRange(month);
+
+  return rows.filter(row => {
+    const labAssignDate = parseDateOnly(row.lab_assign_date || row.hire_date);
+    const resignationDate = parseDateOnly(row.resignation_date);
+
+    if (!labAssignDate || labAssignDate > end) return false;
+    if (resignationDate && resignationDate < start) return false;
+
+    if (!resignationDate && String(row.status || "").includes("퇴사")) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function getCurrentMonthValue() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getMonthRange(monthValue) {
+  const [year, month] = String(monthValue || getCurrentMonthValue()).split("-").map(Number);
+  return {
+    start: new Date(year, month - 1, 1),
+    end: new Date(year, month, 0)
+  };
+}
+
+function parseDateOnly(value) {
+  if (!value) return null;
+  const text = String(value).slice(0, 10);
+  const date = new Date(`${text}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getEmployeeHireDate(employee) {
+  return (
+    employee.hire_date ||
+    employee.join_date ||
+    employee.joined_date ||
+    employee.employment_date ||
+    employee.enter_date ||
+    employee.start_date ||
+    ""
+  );
+}
+
+function getEmployeeResignationDate(employee) {
+  return (
+    employee.resignation_date ||
+    employee.retire_date ||
+    employee.leave_date ||
+    employee.end_date ||
+    employee.termination_date ||
+    ""
+  );
 }
 
 function calculateAge(birthDate) {
