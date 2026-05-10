@@ -84,29 +84,21 @@ function mergeEmployeeProfiles(employees, profiles) {
 
       department:
         employee.department ||
-        employee.department_name ||
-        employee.dept ||
+        employee.division_name ||
         employee.division ||
-        employee.org ||
-        employee.organization ||
-        employee.bonbu ||
-        employee.headquarters ||
+        employee.division_code ||
         "",
 
       team:
         employee.team ||
         employee.team_name ||
-        employee.part ||
-        employee.group ||
-        employee.unit ||
+        employee.team_code ||
         "",
 
       position:
         employee.position ||
-        employee.position_name ||
+        employee.grade ||
         employee.job_title ||
-        employee.rank ||
-        employee.duty ||
         "",
 
       employee_no: employeeNo,
