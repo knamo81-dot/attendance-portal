@@ -200,6 +200,11 @@
           </div>
           <div class="admin-actions">
             <input id="adminSearch" type="search" placeholder="성명, 부서, 팀 검색" />
+            <select id="adminPageSize" title="표시 개수">
+              <option value="20" selected>20개</option>
+              <option value="50">50개</option>
+              <option value="all">전체</option>
+            </select>
             <button id="saveAllBtn" class="btn">변경사항 저장</button>
           </div>
         </div>
@@ -212,7 +217,7 @@
           <table class="admin-table">
             <thead>
               <tr>
-                <th>연구인력</th>
+                <th class="col-collect">집계</th>
                 <th>사번</th>
                 <th>성명</th>
                 <th>부서</th>
