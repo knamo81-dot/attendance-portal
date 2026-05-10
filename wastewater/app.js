@@ -227,7 +227,7 @@ async function init(){
   if(!currentRoles.length){
     currentRole='user';
   }
-  if(currentTab==='adminPanel' && !canAdmin()) currentTab='daily';
+  if(currentTab==='adminPanel') currentTab='daily';
   approvalAlertDismissed=false;
   await loadAll();
   syncUrlState();
@@ -289,7 +289,6 @@ async function loadAll(message='',cls='muted'){
     approvalRows=approvalsRes.data||[];
 
     if(currentTab==='reference' || currentTab==='relatedDocs') await ensureReferenceDocsLoaded(false);
-    if(currentTab==='adminPanel') await ensureAdminDataLoaded(false);
   }else{
     const [dailyRes,pickupRes,usersRes,logsRes,approvalsRes,referenceRes]=await api.loadAllData(canAdmin());
     dailyRows=dailyRes.data||[]; pickupRows=pickupRes.data||[]; userRows=usersRes.data||[]; logRows=logsRes.data||[]; approvalRows=approvalsRes.data||[]; referenceDocs=referenceRes.data||[];
@@ -1897,7 +1896,6 @@ document.getElementById('app').innerHTML=`<div class="app-shell">
     <button class="tab-btn ${currentTab==='reference'?'active':''}" onclick="switchTab('reference')">운영 관련자료</button>
           <button class="tab-btn ${currentTab==='relatedDocs'?'active':''}" onclick="switchTab('relatedDocs')">관련서류</button>
   </div>
-  ${canAdmin()?`<button class="btn soft admin-mini-btn ${currentTab==='adminPanel'?'active':''}" onclick="switchTab('adminPanel')">관리자기능</button>`:''}
 </div>
 
 <div class="tab-panel ${currentTab==='daily'?'active':''}">
@@ -2002,9 +2000,6 @@ ${canWrite()?`<button class="btn primary block" onclick="savePickupRow()">💾 �
 
 
 
-<div class="tab-panel ${currentTab==='adminPanel'?'active':''}">
-  ${renderAdminManagementPanel()}
-</div>
 
 <div class="tab-panel ${currentTab==='reference'?'active':''}">
 <div class="card ref-card">${renderReferenceContent()}</div>
@@ -2017,7 +2012,7 @@ ${renderRelatedDocsPanel()}
 </div>`;
 updateDailyPreview(); togglePickupType(); showMessage('daily-msg',currentTab==='daily'?message:'',cls); showMessage('pickup-msg',currentTab==='pickup'?message:'',cls);
 }
-async function switchTab(tab){if(tab==='adminPanel'&&!canAdmin()) tab='daily'; currentTab=tab; syncUrlState(); if(tab==='reference'||tab==='relatedDocs') await ensureReferenceDocsLoaded(false); if(tab==='adminPanel') await ensureAdminDataLoaded(false); renderApp();}
+async function switchTab(tab){if(tab==='adminPanel') tab='daily'; currentTab=tab; syncUrlState(); if(tab==='reference'||tab==='relatedDocs') await ensureReferenceDocsLoaded(false); renderApp();}
 function changeLedgerMonth(v){ledgerMonthFilter=v; syncUrlState(); renderApp();}
 function changePickupYear(v){pickupYearFilter=v; renderApp();}
 function changePickupTypeFilter(v){pickupTypeFilter=v; renderApp();}
@@ -2142,7 +2137,7 @@ async function uploadSignatureForUser(email,file){
     if(error) return renderApp('사인 업로드 실패: '+error.message,'err');
 
     await logActivity('upload_signature','user',email,{size:file.size});
-    currentTab='adminPanel';
+    currentTab='daily';
     await loadAll('사인 이미지가 등록되었습니다.','ok');
   };
   reader.readAsDataURL(file);
