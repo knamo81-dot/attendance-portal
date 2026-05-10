@@ -80,11 +80,13 @@ async function loadAllData() {
     AppState.profiles = profilesResult.data || [];
     AppState.divisions = divisionsResult.data || [];
     AppState.teams = teamsResult.data || [];
-    AppState.merged = mergeEmployeeProfiles(
-      AppState.employees,
-      AppState.profiles,
-      AppState.divisions,
-      AppState.teams
+    AppState.merged = sortStaffRows(
+      mergeEmployeeProfiles(
+        AppState.employees,
+        AppState.profiles,
+        AppState.divisions,
+        AppState.teams
+      )
     );
 
     setConnectionStatus("서버 연결 완료", "success");
@@ -142,6 +144,7 @@ function mergeEmployeeProfiles(employees, profiles, divisions = [], teams = []) 
 
       division_code: employee.division_code || "",
       team_code: employee.team_code || "",
+      sort_order: Number(employee.sort_order || 999999),
       hire_date: hireDate,
       resignation_date: getEmployeeResignationDate(employee),
 
@@ -156,6 +159,22 @@ function mergeEmployeeProfiles(employees, profiles, divisions = [], teams = []) 
       degree: profile.degree || "",
       remarks: profile.remarks || ""
     };
+  });
+}
+
+function sortStaffRows(rows) {
+  return [...rows].sort((a, b) => {
+    const divisionCompare = String(a.division_code || a.department || "").localeCompare(String(b.division_code || b.department || ""), "ko");
+    if (divisionCompare !== 0) return divisionCompare;
+
+    const teamCompare = String(a.team_code || a.team || "").localeCompare(String(b.team_code || b.team || ""), "ko");
+    if (teamCompare !== 0) return teamCompare;
+
+    const aOrder = Number.isFinite(Number(a.sort_order)) ? Number(a.sort_order) : 999999;
+    const bOrder = Number.isFinite(Number(b.sort_order)) ? Number(b.sort_order) : 999999;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+
+    return String(a.employee_no || "").localeCompare(String(b.employee_no || ""), "ko");
   });
 }
 
