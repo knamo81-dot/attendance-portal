@@ -6,21 +6,6 @@ const AppState = {
   isAdmin: true
 };
 
-const PAGE_META = {
-  dashboard: {
-    title: "메인 대시보드",
-    subtitle: "연구개발 인력구조를 한눈에 확인합니다."
-  },
-  analysis: {
-    title: "현황분석",
-    subtitle: "조직별·학위별·연령별 인력구성을 비교합니다."
-  },
-  admin: {
-    title: "관리자기능",
-    subtitle: "연구개발 인력 정보를 입력하고 수정합니다."
-  }
-};
-
 document.addEventListener("DOMContentLoaded", async () => {
   bindNavigation();
   bindCommonEvents();
@@ -28,7 +13,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function bindNavigation() {
-  document.querySelectorAll(".nav-btn").forEach(btn => {
+  document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const view = btn.dataset.view;
       setView(view);
@@ -43,17 +28,13 @@ function bindCommonEvents() {
 function setView(view) {
   AppState.currentView = view;
 
-  document.querySelectorAll(".nav-btn").forEach(btn => {
+  document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.view === view);
   });
 
   document.querySelectorAll(".view").forEach(section => {
     section.classList.toggle("active", section.id === `view-${view}`);
   });
-
-  const meta = PAGE_META[view] || PAGE_META.dashboard;
-  document.getElementById("pageTitle").textContent = meta.title;
-  document.getElementById("pageSubtitle").textContent = meta.subtitle;
 }
 
 async function loadAllData() {
