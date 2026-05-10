@@ -16,8 +16,7 @@ function renderAdmin() {
     ].some(value => String(value || "").toLowerCase().includes(keyword));
   });
 
-  const pageSize = document.getElementById("adminPageSize")?.value || "20";
-  const rows = pageSize === "all" ? filteredRows : filteredRows.slice(0, Number(pageSize));
+  const rows = sortStaffRows(filteredRows);
 
   tbody.innerHTML = rows.map(row => renderAdminRow(row)).join("");
 
@@ -26,7 +25,6 @@ function renderAdmin() {
 
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("adminSearch")?.addEventListener("input", renderAdmin);
-  document.getElementById("adminPageSize")?.addEventListener("change", renderAdmin);
   document.getElementById("saveAllBtn")?.addEventListener("click", saveAllProfiles);
 });
 
