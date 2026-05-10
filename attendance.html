@@ -34,6 +34,7 @@
 <!-- general user hard lock applied: only attendance tab, self records, no manual edit; non-admin/operator/auto-authority defaults to general -->
 <!-- general user attendance chart label fixed: division/team label replaced with user name -->
 <!-- effective access object added: admin/operator/director/manager/teamLeader/general unified with scope -->
+<!-- effective access menu binding added: admin only admin tab; director/manager/teamLeader/operator analysis tabs; general attendance tab only -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -266,6 +267,8 @@ svg text{fill:var(--muted);font-size:14px}
 .mainTabs .spacer{flex:1 1 auto}
 .mainTab[data-main="admin"][data-admin-hidden="Y"]{display:none !important}
 #main-admin[data-admin-hidden="Y"]{display:none !important}
+.mainTab[data-access-hidden="Y"]{display:none !important}
+.mainPanel[data-access-hidden="Y"]{display:none !important}
 .mainTab.active{background:var(--text);color:#fff}
 .mainPanel{display:none}
 .mainPanel.active{display:block}
@@ -5071,6 +5074,7 @@ function applyAttendanceGeneralUserVisibility(){
   const isGeneral = isCurrentAttendanceGeneralUser();
   if(!isGeneral){
     unlockAttendanceGeneralUserFilters();
+    if(typeof applyAttendanceMainMenuAccess === 'function') applyAttendanceMainMenuAccess();
     return;
   }
   lockAttendanceGeneralUserFilters();
@@ -5544,6 +5548,67 @@ window.buildEffectiveAccess = buildEffectiveAccess;
 window.resolveAttendanceEffectiveAccess = resolveAttendanceEffectiveAccess;
 window.getAttendanceEffectiveAccess = getAttendanceEffectiveAccess;
 
+
+/* effective access menu binding: 메뉴 접근은 currentAccess 하나만 기준으로 판단 */
+const ATTENDANCE_ANALYSIS_MAIN_TABS = ['dashboard','deep-analysis','trend-analysis','attendance-missing'];
+function normalizeAttendanceMainTabName(tabName){
+  return String(tabName || '').trim();
+}
+function canAccessAttendanceMainTab(tabName){
+  const targetName = normalizeAttendanceMainTabName(tabName);
+  if(!targetName) return false;
+  if(targetName === 'attendance') return true;
+  const access = (typeof getAttendanceEffectiveAccess === 'function') ? getAttendanceEffectiveAccess() : (window.currentAccess || {});
+  const isAdmin = !!(access.isAdmin || (typeof isCurrentAttendanceAdmin === 'function' && isCurrentAttendanceAdmin()));
+  const isOperator = !!(access.isOperator || (typeof isCurrentAttendanceOperator === 'function' && isCurrentAttendanceOperator()));
+  const isDirector = !!access.isDirector;
+  const isManager = !!access.isManager;
+  const isTeamLeader = !!(access.isTeamLeader || access.isLeader);
+  const isGeneral = !!(access.isGeneral || (typeof isCurrentAttendanceGeneralUser === 'function' && isCurrentAttendanceGeneralUser()));
+  if(targetName === 'admin') return isAdmin;
+  if(isGeneral) return false;
+  if(ATTENDANCE_ANALYSIS_MAIN_TABS.includes(targetName)){
+    return isAdmin || isOperator || isDirector || isManager || isTeamLeader || !!access.canViewAll || !!access.canViewDivision || !!access.canViewManagedTeams || !!access.canViewTeam;
+  }
+  return isAdmin || isOperator || isDirector || isManager || isTeamLeader;
+}
+function getAttendanceMainTabDenyMessage(tabName){
+  const targetName = normalizeAttendanceMainTabName(tabName);
+  if(targetName === 'admin') return '관리자만 접근할 수 있습니다.';
+  if(typeof isCurrentAttendanceGeneralUser === 'function' && isCurrentAttendanceGeneralUser()) return '일반사용자는 근태관리 탭에서 본인 데이터만 조회할 수 있습니다.';
+  return '현재 권한으로 접근할 수 없는 메뉴입니다.';
+}
+function applyAttendanceMainMenuAccess(){
+  const tabs = Array.from(document.querySelectorAll('.mainTab'));
+  const panels = Array.from(document.querySelectorAll('.mainPanel'));
+  let activeAllowed = true;
+  tabs.forEach(btn => {
+    const mainName = normalizeAttendanceMainTabName(btn?.dataset?.main);
+    const allowed = canAccessAttendanceMainTab(mainName);
+    btn.dataset.accessHidden = allowed ? 'N' : 'Y';
+    btn.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+    btn.disabled = !allowed;
+    btn.style.setProperty('display', allowed ? '' : 'none', allowed ? '' : 'important');
+    if(btn.classList.contains('active') && !allowed) activeAllowed = false;
+  });
+  panels.forEach(panel => {
+    const mainName = normalizeAttendanceMainTabName(String(panel?.id || '').replace(/^main-/, ''));
+    const allowed = canAccessAttendanceMainTab(mainName);
+    panel.dataset.accessHidden = allowed ? 'N' : 'Y';
+    panel.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+    panel.style.setProperty('display', allowed ? '' : 'none', allowed ? '' : 'important');
+    if(panel.classList.contains('active') && !allowed) activeAllowed = false;
+  });
+  const savedTab = readAttendanceMainTab ? readAttendanceMainTab() : '';
+  if(!activeAllowed || (savedTab && !canAccessAttendanceMainTab(savedTab))){
+    activateMainTabWithoutRender('attendance');
+    saveAttendanceMainTab('attendance');
+  }
+  if(typeof trendUpdatePeriodControlVisibility === 'function') trendUpdatePeriodControlVisibility();
+}
+window.canAccessAttendanceMainTab = canAccessAttendanceMainTab;
+window.applyAttendanceMainMenuAccess = applyAttendanceMainMenuAccess;
+
 function saveAttendanceMainTab(tabName){
   try{
     const value = String(tabName || '').trim();
@@ -5564,13 +5629,12 @@ function restoreSavedAttendancePeriod(){
 function activateMainTabWithoutRender(tabName){
   const targetName = String(tabName || '').trim();
   if(!targetName) return false;
-  if(typeof isCurrentAttendanceGeneralUser === 'function' && isCurrentAttendanceGeneralUser() && targetName !== 'attendance') return false;
-  if(targetName === 'admin' && !isCurrentAttendanceAdmin()) return false;
+  if(typeof canAccessAttendanceMainTab === 'function' && !canAccessAttendanceMainTab(targetName)) return false;
   const btn = document.querySelector(`.mainTab[data-main="${targetName}"]`);
   const panel = document.querySelector(`#main-${targetName}`);
   if(!btn || !panel) return false;
-  $$('.mainTab').forEach(x => x.classList.remove('active'));
-  $$('.mainPanel').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.mainTab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.mainPanel').forEach(x => x.classList.remove('active'));
   btn.classList.add('active');
   panel.classList.add('active');
   ATTENDANCE_CURRENT_MAIN_TAB = targetName;
@@ -5606,6 +5670,7 @@ resolveAttendanceAdminAccess(false).then(function(isAdmin){
   return resolveAttendanceEffectiveAccess(true);
 }).then(function(){
   applyAttendanceGeneralUserVisibility();
+  if(typeof applyAttendanceMainMenuAccess === 'function') applyAttendanceMainMenuAccess();
   if(typeof render === 'function') render();
 }).catch(function(e){
   console.warn('[ATTENDANCE ACCESS INIT] 권한 초기화 실패:', e);
@@ -11929,16 +11994,9 @@ function bindMainTabs(){
   $$('.mainTab').forEach(btn => {
     btn.onclick = () => {
       const mainName = String(btn.dataset.main || '').trim();
-      if(isCurrentAttendanceGeneralUser() && mainName !== 'attendance'){
-        alert('일반사용자는 근태관리 탭에서 본인 데이터만 조회할 수 있습니다.');
-        applyAttendanceGeneralUserVisibility();
-        activateMainTabWithoutRender('attendance');
-        saveAttendanceMainTab('attendance');
-        return;
-      }
-      if(mainName === 'admin' && !isCurrentAttendanceAdmin()){
-        alert('관리자만 접근할 수 있습니다.');
-        applyAttendanceAdminVisibility(false);
+      if(typeof canAccessAttendanceMainTab === 'function' && !canAccessAttendanceMainTab(mainName)){
+        alert(getAttendanceMainTabDenyMessage(mainName));
+        if(typeof applyAttendanceMainMenuAccess === 'function') applyAttendanceMainMenuAccess();
         activateMainTabWithoutRender('attendance');
         saveAttendanceMainTab('attendance');
         return;
@@ -11961,6 +12019,7 @@ function bindMainTabs(){
       }
     };
   });
+  if(typeof applyAttendanceMainMenuAccess === 'function') applyAttendanceMainMenuAccess();
 }
 
 function renderTabs(){
