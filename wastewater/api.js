@@ -138,6 +138,25 @@ async function loadWastewaterRoleRows(){
   return { data: rows, error: null };
 }
 
+function loadCoreData(){
+  return Promise.all([
+    sb.from(DAILY_VIEW).select('*').order('date',{ascending:false}).order('created_at',{ascending:false}),
+    sb.from(PICKUP_TABLE).select('*').order('pickup_date',{ascending:false}).order('created_at',{ascending:false}),
+    sb.from(APPROVAL_TABLE).select('*').order('month_key',{ascending:false})
+  ]);
+}
+
+function loadAdminData(){
+  return Promise.all([
+    loadWastewaterRoleRows(),
+    sb.from(LOG_TABLE).select('*').order('created_at',{ascending:false}).limit(200)
+  ]);
+}
+
+function loadReferenceData(){
+  return sb.from(REFERENCE_TABLE).select('*').order('doc_key',{ascending:true});
+}
+
 function loadAllData(includeAdmin){
   return Promise.all([
     sb.from(DAILY_VIEW).select('*').order('date',{ascending:false}).order('created_at',{ascending:false}),
@@ -395,5 +414,5 @@ async function logApprovalAction(actorEmail,monthKey,action,reason=''){
 window.WastewaterApi={
   SUPABASE_URL,SUPABASE_KEY,
   DAILY_TABLE,DAILY_VIEW,PICKUP_TABLE,USERS_TABLE,EMPLOYEES_TABLE,WASTEWATER_ROLE_VIEW,WASTEWATER_OPERATORS_TABLE,WASTEWATER_APPROVERS_TABLE,USER_APP_ROLES_TABLE,LOG_TABLE,APPROVAL_TABLE,APPROVAL_LOG_TABLE,REFERENCE_TABLE,RELATED_DOC_BUCKET,CM_LIMIT,TON_TO_CM,MAX_TON_M3,
-  getMyRoles,loadAllData,saveReferenceDoc,deleteReferenceDocById,saveRelatedDocument,deleteRelatedDocumentById,uploadRelatedDocFile,getRelatedDocPublicUrl,deleteRelatedDocFile,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,getUserSignature,searchEmployees,loadWastewaterManagers,addWastewaterOperator,removeWastewaterOperator,addWastewaterApprover,removeWastewaterApprover,logActivity,logApprovalAction
+  getMyRoles,loadCoreData,loadAdminData,loadReferenceData,loadAllData,saveReferenceDoc,deleteReferenceDocById,saveRelatedDocument,deleteRelatedDocumentById,uploadRelatedDocFile,getRelatedDocPublicUrl,deleteRelatedDocFile,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,getUserSignature,searchEmployees,loadWastewaterManagers,addWastewaterOperator,removeWastewaterOperator,addWastewaterApprover,removeWastewaterApprover,logActivity,logApprovalAction
 };
