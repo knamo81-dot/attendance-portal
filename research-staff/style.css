@@ -571,3 +571,72 @@ th:first-child {
     min-height: 420px;
   }
 }
+
+
+/* 기준년월 필터 */
+.reference-filter {
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 13px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.reference-filter input[type="month"] {
+  height: 30px;
+  min-width: 128px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0 0 0 8px;
+  font-weight: 800;
+  background: transparent;
+}
+
+/* 집계 체크박스 제거 후 관리자 테이블 정렬 */
+.admin-table th:nth-child(1),
+.admin-table td:nth-child(1) {
+  width: 82px;
+  min-width: 82px;
+}
+
+.admin-table th:nth-child(2),
+.admin-table td:nth-child(2) {
+  width: 78px;
+  min-width: 78px;
+}
+
+.admin-table th:nth-child(3),
+.admin-table td:nth-child(3),
+.admin-table th:nth-child(4),
+.admin-table td:nth-child(4),
+.admin-table th:nth-child(5),
+.admin-table td:nth-child(5),
+.admin-table th:nth-child(6),
+.admin-table td:nth-child(6) {
+  width: 88px;
+  min-width: 88px;
+}
+
+.admin-table th.col-collect,
+.admin-table td.col-collect {
+  display: none !important;
+}
+
+@media (max-width: 720px) {
+  .reference-filter {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .reference-filter input[type="month"] {
+    flex: 1;
+  }
+}
