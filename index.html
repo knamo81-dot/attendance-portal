@@ -197,251 +197,33 @@
     return String(src || '').includes('reagent/index.html');
   }
 
-  async function getPortalAccessProfile(user) {
-    const base = {
-      email: user?.email || '',
-      employee_no: '',
-      name: '',
-      user_role: '',
-      is_global_admin: false,
-      is_reagent_operator: false,
-      reagent_role: ''
-    };
+  function saveReagentUserHint(user) {
+    if (!user) return;
 
-    if (!base.email) return base;
-
-    try {
-      const { data: userRow, error: userError } = await supabaseClient
-        .from('users')
-        .select('email,name,role')
-        .eq('email', base.email)
-        .maybeSingle();
-
-      if (userError) {
-        console.warn('users 권한 조회 실패:', userError);
-      }
-
-      if (userRow) {
-        base.name = userRow.name || base.name || '';
-        base.user_role = userRow.role || '';
-        base.is_global_admin = String(userRow.role || '').trim() === 'admin';
-      }
-
-      const { data: empRow, error: empError } = await supabaseClient
-        .from('employees')
-        .select('*')
-        .eq('email', base.email)
-        .maybeSingle();
-
-      if (empError) {
-        console.warn('employees 사원 조회 실패:', empError);
-      }
-
-      if (empRow) {
-        base.employee_no = empRow.employee_no || '';
-        base.name = empRow.name || base.name || '';
-        base.division_code = empRow.division_code || '';
-        base.team_code = empRow.team_code || '';
-        base.position = empRow.position || '';
-        base.authority = empRow.authority || '';
-        base.status = empRow.status || '';
-      }
-
-      if (base.is_global_admin) {
-        base.is_reagent_operator = true;
-        base.reagent_role = '관리자';
-      } else if (base.employee_no) {
-        const { data: opRow, error: opError } = await supabaseClient
-          .from('reagent_operators')
-          .select('employee_no,role,is_active')
-          .eq('employee_no', base.employee_no)
-          .eq('is_active', true)
-          .maybeSingle();
-
-        if (opError) {
-          console.warn('시약초자 운영자 조회 실패:', opError);
-        }
-
-        if (opRow) {
-          base.is_reagent_operator = true;
-          base.reagent_role = opRow.role || '운영자';
-        }
-      }
-    } catch (error) {
-      console.warn('권한 프로필 조회 중 오류:', error);
-    }
-
-    return base;
-  }
-
-  function saveReagentUserHint(access) {
-    if (!access) return;
-
+    // 시약초자 권한은 포탈 settings(user_app_roles)를 앱 내부에서 직접 조회합니다.
+    // 포탈은 폐수 앱처럼 로그인 사용자 식별 정보만 전달합니다.
     try {
       localStorage.setItem('reagent_current_user', JSON.stringify({
-        email: access.email || '',
-        employee_no: access.employee_no || '',
-        name: access.name || '',
-        user_role: access.user_role || '',
-        role: access.reagent_role || '',
-        is_global_admin: access.is_global_admin === true,
-        is_reagent_operator: access.is_reagent_operator === true,
-        reagent_role: access.reagent_role || '',
-        division_code: access.division_code || '',
-        team_code: access.team_code || '',
-        position: access.position || '',
-        authority: access.authority || '',
-        status: access.status || ''
+        email: user.email || '',
+        user_role: '',
+        role: '',
+        is_global_admin: false,
+        is_reagent_operator: false,
+        reagent_role: ''
       }));
     } catch (_) {}
   }
 
-  function canReagentAccess(access, level) {
-    if (level === 'all') return true;
-    if (level === 'admin') return access?.is_global_admin === true;
-    if (level === 'operator') return access?.is_global_admin === true || access?.is_reagent_operator === true;
-    return false;
-  }
 
-  function getReagentButtonLevel(btn) {
-    const tab = String(btn?.dataset?.tab || '');
-    const label = String(btn?.textContent || '').replace(/\s+/g, '').trim();
-
-    if (tab === 'admin-management' || label === '관리자기능') return 'admin';
-    if (
-      tab === 'collect' ||
-      tab === 'prepare' ||
-      tab === 'product-management' ||
-      label === '제품취합' ||
-      label === '취합정리' ||
-      label === '제품관리'
-    ) return 'operator';
-
-    if (tab === 'request' || label === '제품신청') return 'all';
-
-    return 'operator';
-  }
-
-  function switchReagentToRequest(doc) {
-    if (!doc) return;
-
-    const requestBtn = Array.from(doc.querySelectorAll('.tab-btn, button[data-tab]'))
-      .find((btn) => String(btn.dataset?.tab || '') === 'request' || String(btn.textContent || '').replace(/\s+/g, '').trim() === '제품신청');
-    const requestPage = doc.getElementById('page-request');
-
-    doc.querySelectorAll('.tab-btn, button[data-tab]').forEach((btn) => btn.classList.remove('active'));
-    doc.querySelectorAll('.page').forEach((page) => page.classList.remove('active'));
-
-    requestBtn?.classList.add('active');
-    requestPage?.classList.add('active');
-  }
-
-  function enforceReagentFramePermissions(access) {
-    if (!frame || !isReagentSrc(frame.getAttribute('src'))) return;
-
-    let doc;
-    try {
-      doc = frame.contentDocument || frame.contentWindow?.document;
-    } catch (error) {
-      console.warn('시약초자 iframe 접근 실패:', error);
-      return;
-    }
-
-    if (!doc) return;
-
-    const buttons = Array.from(doc.querySelectorAll('.tab-btn, button[data-tab]'));
-    buttons.forEach((btn) => {
-      const level = getReagentButtonLevel(btn);
-      const allowed = canReagentAccess(access, level);
-
-      if (!allowed) {
-        btn.style.setProperty('display', 'none', 'important');
-        btn.style.setProperty('visibility', 'hidden', 'important');
-        btn.disabled = true;
-        btn.setAttribute('aria-hidden', 'true');
-
-        if (!btn.dataset.portalPermissionBound) {
-          btn.dataset.portalPermissionBound = '1';
-          btn.addEventListener('click', function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-            event.stopImmediatePropagation();
-            switchReagentToRequest(doc);
-          }, true);
-        }
-      } else {
-        btn.style.removeProperty('display');
-        btn.style.removeProperty('visibility');
-        btn.disabled = false;
-        btn.setAttribute('aria-hidden', 'false');
-      }
-    });
-
-    const adminButton = doc.getElementById('openReagentAdmin') ||
-      Array.from(doc.querySelectorAll('button')).find((btn) => String(btn.textContent || '').replace(/\s+/g, '').trim() === '관리자기능');
-
-    if (adminButton) {
-      const allowed = canReagentAccess(access, 'admin');
-      if (!allowed) {
-        adminButton.style.setProperty('display', 'none', 'important');
-        adminButton.disabled = true;
-        adminButton.setAttribute('aria-hidden', 'true');
-      } else {
-        adminButton.style.removeProperty('display');
-        adminButton.disabled = false;
-        adminButton.setAttribute('aria-hidden', 'false');
-      }
-    }
-
-    const activeBtn = Array.from(doc.querySelectorAll('.tab-btn.active, button[data-tab].active'))[0];
-    if (activeBtn && !canReagentAccess(access, getReagentButtonLevel(activeBtn))) {
-      switchReagentToRequest(doc);
-    }
-
-    if (!frame.__reagentPermissionObserver) {
-      try {
-        frame.__reagentPermissionObserver = new frame.contentWindow.MutationObserver(function () {
-          enforceReagentFramePermissions(access);
-        });
-        frame.__reagentPermissionObserver.observe(doc.body, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ['class', 'style']
-        });
-      } catch (error) {
-        console.warn('시약초자 권한 감시 설정 실패:', error);
-      }
-    }
-  }
-
-  function bindReagentFramePermission(access) {
-    if (!access || !isReagentSrc(frame?.getAttribute('src'))) return;
-
-    saveReagentUserHint(access);
-
-    let count = 0;
-    const timer = setInterval(function () {
-      enforceReagentFramePermissions(access);
-      count += 1;
-      if (count > 40) clearInterval(timer);
-    }, 100);
-  }
-
-
-  function buildSrcWithUser(src, user, access) {
+  function buildSrcWithUser(src, user) {
     if (!src || !user) return src;
 
     const params = [];
-    const email = user.email || access?.email || '';
+    const email = user.email || '';
 
     if (email) params.push('email=' + encodeURIComponent(email));
 
-    if (isReagentSrc(src) && access) {
-      if (access.employee_no) params.push('employee_no=' + encodeURIComponent(access.employee_no));
-      if (access.name) params.push('name=' + encodeURIComponent(access.name));
-      if (access.user_role) params.push('user_role=' + encodeURIComponent(access.user_role));
-      if (access.reagent_role) params.push('reagent_role=' + encodeURIComponent(access.reagent_role));
+    if (isReagentSrc(src)) {
       params.push('portal_auth=1');
       params.push('v=' + Date.now());
     }
@@ -470,10 +252,9 @@
     if (!ok) return;
 
     const user = await getCurrentUser();
-    const access = isReagentSrc(src) ? await getPortalAccessProfile(user) : null;
 
     if (isReagentSrc(src)) {
-      saveReagentUserHint(access);
+      saveReagentUserHint(user);
     }
 
     // 사용자가 선택한 앱만 마지막 페이지로 저장합니다.
@@ -483,12 +264,9 @@
 
     frame.onload = function () {
       postAuthToFrame(user);
-      if (isReagentSrc(src)) {
-        bindReagentFramePermission(access);
-      }
     };
 
-    const finalSrc = buildSrcWithUser(src, user, access);
+    const finalSrc = buildSrcWithUser(src, user);
     frame.src = finalSrc;
     setActiveNav(btn);
   }
@@ -522,20 +300,16 @@
     }
 
     const user = await getCurrentUser();
-    const access = isReagentSrc(savedSrc) ? await getPortalAccessProfile(user) : null;
 
     if (isReagentSrc(savedSrc)) {
-      saveReagentUserHint(access);
+      saveReagentUserHint(user);
     }
 
     frame.onload = function () {
       postAuthToFrame(user);
-      if (isReagentSrc(savedSrc)) {
-        bindReagentFramePermission(access);
-      }
     };
 
-    const finalSrc = buildSrcWithUser(savedSrc, user, access);
+    const finalSrc = buildSrcWithUser(savedSrc, user);
     frame.src = finalSrc;
     setActiveNav(targetBtn);
   }
