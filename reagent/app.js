@@ -105,6 +105,24 @@ window.ReagentApp.hasReagentAdminAccess = function () {
   return window.ReagentApp.isGlobalAdmin?.() === true;
 };
 
+
+// index.html 초기 권한 숨김 클래스 보정
+// 권한 조회 후 실제 권한에 맞게 html 클래스를 갱신합니다.
+window.ReagentApp.syncRoleClass = function () {
+  const root = document.documentElement;
+  if (!root) return;
+
+  root.classList.remove("reagent-role-general", "reagent-role-operator", "reagent-role-admin");
+
+  if (window.ReagentApp.hasReagentAdminAccess?.() === true) {
+    root.classList.add("reagent-role-admin");
+  } else if (window.ReagentApp.hasReagentOperatorAccess?.() === true) {
+    root.classList.add("reagent-role-operator");
+  } else {
+    root.classList.add("reagent-role-general");
+  }
+};
+
 window.ReagentApp.getTabAccessLevel = function (target) {
   const tab = typeof target === "string" ? target : String(target?.dataset?.tab || "");
   const label = typeof target === "string" ? "" : window.ReagentApp.getCleanLabel(target);
@@ -179,6 +197,7 @@ window.ReagentApp.enforcePermissionDom = function () {
 };
 
 window.ReagentApp.applyPermissionUI = function () {
+  window.ReagentApp.syncRoleClass?.();
   window.ReagentApp.enforcePermissionDom?.();
 
   if (!window.ReagentApp._permissionObserver) {
@@ -345,6 +364,9 @@ window.ReagentApp.loadReagentPermission = async function () {
   try {
     localStorage.setItem("reagent_current_user", JSON.stringify(user));
   } catch (_) {}
+
+  window.ReagentApp.syncRoleClass?.();
+  window.ReagentApp.applyRequestAdminUI?.();
 
   return user;
 };
@@ -670,6 +692,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   await window.ReagentApp.loadCurrentUser?.();
   await window.ReagentApp.loadReagentPermission?.();
+  window.ReagentApp.syncRoleClass?.();
   window.ReagentApp.applyRequestAdminUI?.();
 
   window.ReagentApp.bindTabs();
