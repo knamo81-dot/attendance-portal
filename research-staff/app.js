@@ -81,6 +81,34 @@ function mergeEmployeeProfiles(employees, profiles) {
 
     return {
       ...employee,
+
+      department:
+        employee.department ||
+        employee.department_name ||
+        employee.dept ||
+        employee.division ||
+        employee.org ||
+        employee.organization ||
+        employee.bonbu ||
+        employee.headquarters ||
+        "",
+
+      team:
+        employee.team ||
+        employee.team_name ||
+        employee.part ||
+        employee.group ||
+        employee.unit ||
+        "",
+
+      position:
+        employee.position ||
+        employee.position_name ||
+        employee.job_title ||
+        employee.rank ||
+        employee.duty ||
+        "",
+
       employee_no: employeeNo,
       profile_id: profile.id || null,
       is_research_staff: Boolean(profile.is_research_staff),
