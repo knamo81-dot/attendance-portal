@@ -35,6 +35,7 @@ const api = window.WastewaterApi;
 let user=null,currentRole='user',currentRoles=[],currentTab='daily',ledgerMonthFilter='',pickupYearFilter='',pickupTypeFilter='전체',yearlyReportFilter='',refTab='facilities',refSearch='',relatedDocCategoryFilter='삼천당제약 사업자등록증',relatedDocWriteMode=false,relatedDocViewId=null,relatedDocEditId=null;
 let approvalAlertDismissed=false;
 let dailyRows=[],pickupRows=[],userRows=[],logRows=[],approvalRows=[],referenceDocs=[];
+let lazyReferenceLoaded=false,lazyAdminLoaded=false;
 let wastewaterAdminState={admins:[],operators:[],approvers:[],searchResults:[]};
 
 function escapeHtml(str){return String(str??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
@@ -248,21 +249,58 @@ async function loadMyRole(){await loadMyRoles();}
 
 async function logActivity(action,targetType,targetId,details){try{await api.logActivity(user?.email||'unknown',action,targetType,targetId,details);}catch(e){console.warn('activity log skipped',e);}}
 async function logApprovalAction(monthKey,action,reason=''){try{await api.logApprovalAction(user?.email||'unknown',monthKey,action,reason);}catch(e){console.warn('approval log skipped',e);}}
-async function loadAll(message='',cls='muted'){const [dailyRes,pickupRes,usersRes,logsRes,approvalsRes,referenceRes]=await api.loadAllData(canAdmin());
-dailyRows=dailyRes.data||[]; pickupRows=pickupRes.data||[]; userRows=usersRes.data||[]; logRows=logsRes.data||[]; approvalRows=approvalsRes.data||[]; referenceDocs=referenceRes.data||[];
-if(canAdmin() && api.loadWastewaterManagers){
+async function ensureReferenceDocsLoaded(force=false){
+  if(!api.loadReferenceData) return;
+  if(lazyReferenceLoaded && !force) return;
   try{
-    const managerRes=await api.loadWastewaterManagers();
-    wastewaterAdminState={...wastewaterAdminState,...(managerRes.data||{})};
-    Object.values(managerRes.errors||{}).filter(Boolean).forEach(err=>console.warn('폐수 권한관리 조회 오류:',err));
+    const referenceRes = await api.loadReferenceData();
+    referenceDocs = referenceRes.data || [];
+    lazyReferenceLoaded = true;
   }catch(err){
-    console.warn('폐수 권한관리 조회 실패:',err);
+    console.warn('운영 관련자료 지연 조회 실패:', err);
   }
 }
-if(!ledgerMonthFilter) ledgerMonthFilter=getDefaultLedgerMonth();
-if(!pickupYearFilter) pickupYearFilter=getDefaultPickupYear();
-if(!yearlyReportFilter) yearlyReportFilter=getDefaultYearlyReportYear();
-renderApp(message,cls);
+
+async function ensureAdminDataLoaded(force=false){
+  if(!canAdmin()) return;
+  if(lazyAdminLoaded && !force) return;
+  try{
+    if(api.loadAdminData){
+      const [usersRes,logsRes] = await api.loadAdminData();
+      userRows = usersRes.data || [];
+      logRows = logsRes.data || [];
+    }
+    if(api.loadWastewaterManagers){
+      const managerRes=await api.loadWastewaterManagers();
+      wastewaterAdminState={...wastewaterAdminState,...(managerRes.data||{})};
+      Object.values(managerRes.errors||{}).filter(Boolean).forEach(err=>console.warn('폐수 권한관리 조회 오류:',err));
+    }
+    lazyAdminLoaded = true;
+  }catch(err){
+    console.warn('폐수 관리자 데이터 지연 조회 실패:',err);
+  }
+}
+
+async function loadAll(message='',cls='muted'){
+  if(api.loadCoreData){
+    const [dailyRes,pickupRes,approvalsRes]=await api.loadCoreData();
+    dailyRows=dailyRes.data||[];
+    pickupRows=pickupRes.data||[];
+    approvalRows=approvalsRes.data||[];
+
+    if(currentTab==='reference' || currentTab==='relatedDocs') await ensureReferenceDocsLoaded(false);
+    if(currentTab==='adminPanel') await ensureAdminDataLoaded(false);
+  }else{
+    const [dailyRes,pickupRes,usersRes,logsRes,approvalsRes,referenceRes]=await api.loadAllData(canAdmin());
+    dailyRows=dailyRes.data||[]; pickupRows=pickupRes.data||[]; userRows=usersRes.data||[]; logRows=logsRes.data||[]; approvalRows=approvalsRes.data||[]; referenceDocs=referenceRes.data||[];
+    lazyReferenceLoaded=true;
+    lazyAdminLoaded=canAdmin();
+  }
+
+  if(!ledgerMonthFilter) ledgerMonthFilter=getDefaultLedgerMonth();
+  if(!pickupYearFilter) pickupYearFilter=getDefaultPickupYear();
+  if(!yearlyReportFilter) yearlyReportFilter=getDefaultYearlyReportYear();
+  renderApp(message,cls);
 }
 
 function buildMonthDateRange(monthKey){
@@ -1979,7 +2017,7 @@ ${renderRelatedDocsPanel()}
 </div>`;
 updateDailyPreview(); togglePickupType(); showMessage('daily-msg',currentTab==='daily'?message:'',cls); showMessage('pickup-msg',currentTab==='pickup'?message:'',cls);
 }
-function switchTab(tab){if(tab==='adminPanel'&&!canAdmin()) tab='daily'; currentTab=tab; syncUrlState(); renderApp();}
+async function switchTab(tab){if(tab==='adminPanel'&&!canAdmin()) tab='daily'; currentTab=tab; syncUrlState(); if(tab==='reference'||tab==='relatedDocs') await ensureReferenceDocsLoaded(false); if(tab==='adminPanel') await ensureAdminDataLoaded(false); renderApp();}
 function changeLedgerMonth(v){ledgerMonthFilter=v; syncUrlState(); renderApp();}
 function changePickupYear(v){pickupYearFilter=v; renderApp();}
 function changePickupTypeFilter(v){pickupTypeFilter=v; renderApp();}
