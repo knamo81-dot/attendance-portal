@@ -187,7 +187,7 @@ function requestPortalUserFromParent(){
   }catch(e){}
 }
 
-function waitForPortalUserMessage(timeout=1200){
+function waitForPortalUserMessage(timeout=300){
   return new Promise((resolve)=>{
     let done=false;
     const finish=(user)=>{ if(done) return; done=true; window.removeEventListener('message', onMessage); clearTimeout(timer); resolve(user||null); };
