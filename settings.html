@@ -2875,6 +2875,26 @@ create table if not exists user_app_roles (
   function fillPermissionEdit(id){const r=(dataState.userAppRoles||[]).find(x=>String(x.id)===String(id)); if(!r)return; dataState.permissionEditingId=r.id; if($('permissionEmployeeSelect'))$('permissionEmployeeSelect').value=r.employee_no||r.email||''; if($('permissionAppSelect'))$('permissionAppSelect').value=r.app_key||'attendance'; fillPermissionRoleSelect(); if($('permissionRoleSelect'))$('permissionRoleSelect').value=r.role_key||'operator'; if($('permissionMemoInput'))$('permissionMemoInput').value=r.memo||''; if($('permissionSaveBtn'))$('permissionSaveBtn').textContent='수정 저장'; dataState.permissionView='manual'; renderPermissionAdmin(); setFeedback('permissionFeedback',(r.name||r.email||r.employee_no)+' 권한 수정 모드입니다.',true);}
   async function savePermissionRole(){const empKey=$('permissionEmployeeSelect')?.value||''; const emp=(dataState.employees||[]).find(e=>String(e.employee_no||e.email||'')===empKey); if(!emp){setFeedback('permissionFeedback','사원을 선택해 주세요.',false);return;} const payload={employee_no:emp.employee_no||'',email:emp.email||'',name:emp.name||'',app_key:$('permissionAppSelect')?.value||'attendance',role_key:$('permissionRoleSelect')?.value||'operator',memo:$('permissionMemoInput')?.value||'',updated_at:new Date().toISOString()}; setFeedback('permissionFeedback','저장 중입니다...','loading'); const res=dataState.permissionEditingId?await sb.from('user_app_roles').update(payload).eq('id',dataState.permissionEditingId):await sb.from('user_app_roles').insert([payload]); if(res.error){setFeedback('permissionFeedback','저장 실패: '+res.error.message,false);return;} resetPermissionForm(); await loadPermissionRoles(); dataState.permissionView='manual'; renderPermissionAdmin(); setFeedback('permissionFeedback','권한을 저장했습니다.',true);}
   async function togglePermissionRole(id){const r=(dataState.userAppRoles||[]).find(x=>String(x.id)===String(id)); if(!r)return; const next=r.is_active===false; const res=await sb.from('user_app_roles').update({is_active:next,updated_at:new Date().toISOString()}).eq('id',r.id); if(res.error){setFeedback('permissionFeedback','상태 변경 실패: '+res.error.message,false);return;} await loadPermissionRoles(); renderPermissionAdmin(); setFeedback('permissionFeedback',next?'권한을 사용 상태로 변경했습니다.':'권한을 미사용 처리했습니다.',true);}
+  async function deletePermissionRole(id){
+    const r=(dataState.userAppRoles||[]).find(x=>String(x.id)===String(id));
+    if(!r){setFeedback('permissionFeedback','삭제할 권한 정보를 찾지 못했습니다. 목록을 새로고침해 주세요.',false);return;}
+    const label=(r.name||r.email||r.employee_no||'선택한 사용자')+' / '+appLabel(r.app_key)+' / '+roleLabel(r.app_key,r.role_key);
+    if(!confirm(label+' 권한을 삭제할까요?')) return;
+    setFeedback('permissionFeedback','삭제 중입니다...','loading');
+    let query=sb.from('user_app_roles').delete();
+    if(r.id!==undefined && r.id!==null && String(r.id)!==''){
+      query=query.eq('id',r.id);
+    }else{
+      query=query.eq('employee_no',r.employee_no||'').eq('app_key',r.app_key||'').eq('role_key',r.role_key||'');
+    }
+    const res=await query;
+    if(res.error){setFeedback('permissionFeedback','삭제 실패: '+res.error.message,false);return;}
+    dataState.userAppRoles=(dataState.userAppRoles||[]).filter(x=>String(x.id)!==String(id));
+    await loadPermissionRoles();
+    dataState.permissionView='manual';
+    renderPermissionAdmin();
+    setFeedback('permissionFeedback','권한을 삭제했습니다.',true);
+  }
 
   function bindStaticEvents(){
     $('realOrgDivisionFilter')?.addEventListener('change', ()=>{ fillTeamSelect('realOrgTeamFilter', $('realOrgDivisionFilter').value, true); renderOrganizations(); });
@@ -2969,6 +2989,7 @@ create table if not exists user_app_roles (
       if(resSave) return saveReservationResourceRow(resSave.dataset.resSave);
       const permissionEdit = e.target.closest('[data-permission-edit]'); if(permissionEdit) return fillPermissionEdit(permissionEdit.dataset.permissionEdit);
       const permissionToggle = e.target.closest('[data-permission-toggle]'); if(permissionToggle) return togglePermissionRole(permissionToggle.dataset.permissionToggle);
+      const permissionDelete = e.target.closest('[data-permission-delete]'); if(permissionDelete) return deletePermissionRole(permissionDelete.dataset.permissionDelete);
     });
 
     document.addEventListener('change', (e)=>{
