@@ -242,53 +242,76 @@ window.ReagentApp.loadReagentPermission = async function () {
   const storedHint = window.ReagentApp.getStoredUserHint?.() || {};
 
   user.user_role = urlHint.user_role || user.user_role || storedHint.user_role || "";
-  user.reagent_role = urlHint.reagent_role || user.reagent_role || storedHint.reagent_role || "";
-  user.is_global_admin = user.user_role === "admin" || user.is_global_admin === true || storedHint.is_global_admin === true;
-  user.is_reagent_operator = user.is_global_admin === true || user.is_reagent_operator === true || storedHint.is_reagent_operator === true || user.reagent_role === "관리자" || user.reagent_role === "운영자";
+  user.reagent_role = "";
+  user.is_global_admin = false;
+  user.is_reagent_operator = false;
 
   if (!sb) {
+    // Supabase 연결이 없으면 권한은 최소 권한으로 둡니다.
+    // 제품 신청만 가능하고, 취합/정리/제품관리/관리자기능은 숨김 처리됩니다.
     window.ReagentApp.currentUser = user;
     return user;
   }
 
   try {
-    if (user.email) {
+    const targetEmail = String(user.email || "").trim();
+    const targetEmployeeNo = String(user.employee_no || user.employeeNo || "").trim();
+    const targetEmailLower = targetEmail.toLowerCase();
+
+    // 1) 공통 관리자 권한: users.role = admin
+    if (targetEmail) {
       const { data: userRoleRow, error: userRoleError } = await sb
         .from("users")
         .select("email, role")
-        .eq("email", user.email)
+        .ilike("email", targetEmail)
         .maybeSingle();
 
       if (userRoleError) {
-        console.warn("공통 권한 조회 실패:", userRoleError);
+        console.warn("공통 관리자 권한 조회 실패:", userRoleError);
       } else if (userRoleRow) {
-        user.user_role = userRoleRow.role || "";
-        user.is_global_admin = String(userRoleRow.role || "").trim() === "admin";
+        user.user_role = String(userRoleRow.role || "").trim();
+        user.is_global_admin = user.user_role === "admin";
       }
     }
 
-    if (!user.is_global_admin && user.employee_no) {
-      const { data: operatorRow, error: operatorError } = await sb
-        .from("reagent_operators")
-        .select("employee_no, is_active, role")
-        .eq("employee_no", user.employee_no)
-        .eq("is_active", true)
-        .maybeSingle();
+    // 2) 포탈 settings 권한관리 기준: user_app_roles
+    //    app_key='reagent', role_key='operator'이면 시약초자 운영자 권한입니다.
+    if (!user.is_global_admin) {
+      const { data: appRoles, error: appRoleError } = await sb
+        .from("user_app_roles")
+        .select("employee_no,email,app_key,role_key")
+        .eq("app_key", "reagent");
 
-      if (operatorError) {
-        console.warn("시약초자 운영자 권한 조회 실패:", operatorError);
-      } else if (operatorRow) {
-        user.is_reagent_operator = true;
-        user.reagent_role = operatorRow.role || "운영자";
+      if (appRoleError) {
+        console.warn("시약초자 중앙 권한 조회 실패:", appRoleError);
+      } else {
+        const matchedRole = (Array.isArray(appRoles) ? appRoles : []).find((row) => {
+          const rowEmployeeNo = String(row.employee_no || "").trim();
+          const rowEmail = String(row.email || "").trim().toLowerCase();
+          const roleKey = String(row.role_key || "").trim();
+
+          const sameEmployee = targetEmployeeNo && rowEmployeeNo === targetEmployeeNo;
+          const sameEmail = targetEmailLower && rowEmail === targetEmailLower;
+
+          return roleKey === "operator" && (sameEmployee || sameEmail);
+        });
+
+        if (matchedRole) {
+          user.is_reagent_operator = true;
+          user.reagent_role = "운영자";
+        }
       }
     }
 
+    // 3) 관리자는 시약초자 전체 운영권한도 자동 보유
     if (user.is_global_admin) {
       user.is_reagent_operator = true;
       user.reagent_role = "관리자";
     }
   } catch (err) {
     console.warn("시약초자 권한 조회 중 오류:", err);
+    user.is_reagent_operator = user.is_global_admin === true;
+    if (user.is_global_admin) user.reagent_role = "관리자";
   }
 
   window.ReagentApp.currentUser = user;
