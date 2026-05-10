@@ -33,8 +33,7 @@
 <!-- manual check server sync applied: absence_decision + approved_overtime_override saved to Supabase -->
 <!-- general user hard lock applied: only attendance tab, self records, no manual edit; non-admin/operator/auto-authority defaults to general -->
 <!-- general user attendance chart label fixed: division/team label replaced with user name -->
-<!-- scoped authority visibility fixed: director/manager/team leader tabs restored outside general mode -->
-<!-- scoped authority access applied: director/division, manager/managed teams, team leader/team, general/self -->
+<!-- effective access object added: admin/operator/director/manager/teamLeader/general unified with scope -->
 <style>
 :root {
   --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
@@ -4973,7 +4972,7 @@ function getAttendanceEmailFromIdentity(obj){
 
 
 /* general user scope: 일반사용자는 근태관리 탭 + 본인 데이터만 조회 */
-const ATTENDANCE_GENERAL_USER_ACCESS_STATE = { resolved:false, loading:false, isGeneral:false, name:'', email:'', employeeNo:'', reason:'', scopeType:'all', authority:'', division:'', divisionCode:'', team:'', teamCode:'', managedTeams:[], managedTeamNames:[] };
+const ATTENDANCE_GENERAL_USER_ACCESS_STATE = { resolved:false, loading:false, isGeneral:false, name:'', email:'', employeeNo:'', reason:'' };
 function normalizeAttendanceGeneralRole(value){
   const s = String(value || '').trim().toLowerCase().replace(/\s+/g,'');
   if(!s) return '';
@@ -5026,16 +5025,13 @@ function lockAttendanceGeneralUserFilters(){
   });
 }
 function unlockAttendanceGeneralUserFilters(){
-  if(isCurrentAttendanceScopedUser && isCurrentAttendanceScopedUser()) return;
+  if(isCurrentAttendanceGeneralUser()) return;
   ['division','team'].forEach(id => {
     const el = document.getElementById(id);
-    if(!el) return;
-    if(el.dataset.generalLocked === 'Y' || el.dataset.scopeLocked === 'Y'){
-      el.disabled = false;
-      el.title = '';
-      delete el.dataset.generalLocked;
-      delete el.dataset.scopeLocked;
-    }
+    if(!el || el.dataset.generalLocked !== 'Y') return;
+    el.disabled = false;
+    el.title = '';
+    delete el.dataset.generalLocked;
   });
 }
 function findAttendanceEmployeeForCurrentUser(summary){
@@ -5055,172 +5051,6 @@ function findAttendanceEmployeeForCurrentUser(summary){
 function isCurrentAttendanceGeneralUser(){
   return ATTENDANCE_GENERAL_USER_ACCESS_STATE.isGeneral === true;
 }
-function getCurrentAttendanceScopeType(){
-  return String(ATTENDANCE_GENERAL_USER_ACCESS_STATE.scopeType || 'all').trim() || 'all';
-}
-function isCurrentAttendanceScopedUser(){
-  const scope = getCurrentAttendanceScopeType();
-  return scope && scope !== 'all';
-}
-function normalizeAttendanceScopeCode(value){
-  return String(value || '').trim().toUpperCase();
-}
-function normalizeAttendanceScopeName(value){
-  return String(value || '').trim();
-}
-function getAttendanceEmpDivisionCode(emp){
-  return normalizeAttendanceScopeCode(emp?.divisionCode || emp?.division_code || emp?.department_code || '');
-}
-function getAttendanceEmpTeamCode(emp){
-  return normalizeAttendanceScopeCode(emp?.teamCode || emp?.team_code || emp?.org_team_code || '');
-}
-function getAttendanceEmpDivisionName(emp){
-  return normalizeAttendanceScopeName(emp?.division || emp?.divisionName || emp?.division_name || emp?.department || '');
-}
-function getAttendanceEmpTeamName(emp){
-  return normalizeAttendanceScopeName(emp?.team || emp?.teamName || emp?.team_name || '');
-}
-function normalizeAttendanceManagedTeams(value, fallbackTeamCode=''){
-  let arr = [];
-  if(Array.isArray(value)) arr = value;
-  else if(value && typeof value === 'string') arr = value.split(/[|,\n\s]+/);
-  else if(value && typeof value === 'object') arr = Object.values(value);
-  arr = arr.map(v => normalizeAttendanceScopeCode(v)).filter(Boolean);
-  const fallback = normalizeAttendanceScopeCode(fallbackTeamCode);
-  if(!arr.length && fallback) arr.push(fallback);
-  return Array.from(new Set(arr));
-}
-function getAttendanceManagedTeamCodesFromEmp(emp){
-  return normalizeAttendanceManagedTeams(
-    emp?.managedTeams || emp?.managed_teams || emp?.managedTeamCodes || emp?.managed_team_codes || emp?.manageTeamCode || emp?.manage_team_code || emp?.managementTeamCode || emp?.management_team_code,
-    getAttendanceEmpTeamCode(emp)
-  );
-}
-function getAttendanceTeamNameByCodeSafe(teamCode){
-  const code = normalizeAttendanceScopeCode(teamCode);
-  if(!code) return '';
-  try{
-    const divCode = code.includes('-') ? code.split('-')[0] : '';
-    if(typeof getTeamNameByCode === 'function' && divCode){
-      const name = getTeamNameByCode(divCode, code);
-      if(name && name !== code && name !== '-') return String(name).trim();
-    }
-    const divs = Array.isArray(orgMaster) ? orgMaster : [];
-    for(const div of divs){
-      const team = (div.teams || []).find(t => normalizeAttendanceScopeCode(t.teamCode || t.code) === code);
-      if(team) return String(team.teamName || team.name || '').trim();
-    }
-    const emps = Array.isArray(empMaster) ? empMaster : [];
-    const emp = emps.find(e => getAttendanceEmpTeamCode(e) === code);
-    return emp ? getAttendanceEmpTeamName(emp) : '';
-  }catch(e){ return ''; }
-}
-function getAttendanceRowDivisionCode(row){
-  const direct = normalizeAttendanceScopeCode(row?.divisionCode || row?.division_code || row?.department_code || '');
-  if(direct) return direct;
-  const name = normalizeAttendanceScopeName(row?.division || row?.divisionName || row?.division_name || '');
-  if(!name) return '';
-  const div = (Array.isArray(orgMaster) ? orgMaster : []).find(d => String(d.divisionName || d.name || '').trim() === name);
-  return normalizeAttendanceScopeCode(div?.divisionCode || div?.code || '');
-}
-function getAttendanceRowTeamCode(row){
-  const direct = normalizeAttendanceScopeCode(row?.teamCode || row?.team_code || row?.org_team_code || '');
-  if(direct) return direct;
-  const teamName = normalizeAttendanceScopeName(row?.team || row?.teamName || row?.team_name || '');
-  if(!teamName) return '';
-  const divCode = getAttendanceRowDivisionCode(row);
-  const divs = Array.isArray(orgMaster) ? orgMaster : [];
-  for(const div of divs){
-    if(divCode && normalizeAttendanceScopeCode(div.divisionCode || div.code) !== divCode) continue;
-    const team = (div.teams || []).find(t => String(t.teamName || t.name || '').trim() === teamName);
-    if(team) return normalizeAttendanceScopeCode(team.teamCode || team.code || '');
-  }
-  const emp = (Array.isArray(empMaster) ? empMaster : []).find(e => getAttendanceEmpTeamName(e) === teamName);
-  return getAttendanceEmpTeamCode(emp);
-}
-function rowMatchesCurrentAttendanceScope(row){
-  const scope = getCurrentAttendanceScopeType();
-  if(scope === 'all') return true;
-  if(scope === 'self') return rowMatchesCurrentGeneralUser(row);
-
-  const state = ATTENDANCE_GENERAL_USER_ACCESS_STATE;
-  const rowDivCode = getAttendanceRowDivisionCode(row);
-  const rowTeamCode = getAttendanceRowTeamCode(row);
-  const rowDivName = normalizeAttendanceScopeName(row?.division || row?.divisionName || row?.division_name || '');
-  const rowTeamName = normalizeAttendanceScopeName(row?.team || row?.teamName || row?.team_name || '');
-
-  if(scope === 'division'){
-    const divCode = normalizeAttendanceScopeCode(state.divisionCode);
-    const divName = normalizeAttendanceScopeName(state.division);
-    return (!!divCode && rowDivCode === divCode) || (!!divName && rowDivName === divName);
-  }
-  if(scope === 'team'){
-    const teamCode = normalizeAttendanceScopeCode(state.teamCode);
-    const teamName = normalizeAttendanceScopeName(state.team);
-    return (!!teamCode && rowTeamCode === teamCode) || (!!teamName && rowTeamName === teamName);
-  }
-  if(scope === 'managedTeams'){
-    const codes = new Set((state.managedTeams || []).map(normalizeAttendanceScopeCode).filter(Boolean));
-    const names = new Set((state.managedTeamNames || []).map(normalizeAttendanceScopeName).filter(Boolean));
-    return (!!rowTeamCode && codes.has(rowTeamCode)) || (!!rowTeamName && names.has(rowTeamName));
-  }
-  return true;
-}
-function applyAttendanceScopeFilterDefaults(){
-  const scope = getCurrentAttendanceScopeType();
-  const state = ATTENDANCE_GENERAL_USER_ACCESS_STATE;
-  if(scope === 'self'){
-    STATE.division = '전체';
-    STATE.team = '전체';
-  }else if(scope === 'division'){
-    if(state.division) STATE.division = state.division;
-    STATE.team = '전체';
-  }else if(scope === 'team'){
-    if(state.division) STATE.division = state.division;
-    if(state.team) STATE.team = state.team;
-  }else if(scope === 'managedTeams'){
-    if(state.division) STATE.division = state.division;
-    if((state.managedTeamNames || []).length === 1) STATE.team = state.managedTeamNames[0];
-    else STATE.team = '전체';
-  }
-}
-function lockAttendanceScopeFilters(){
-  const scope = getCurrentAttendanceScopeType();
-  const divEl = document.getElementById('division');
-  const teamEl = document.getElementById('team');
-  [divEl, teamEl].forEach(el => {
-    if(!el) return;
-    if(el.dataset.scopeLocked === 'Y'){
-      el.disabled = false;
-      el.title = '';
-      delete el.dataset.scopeLocked;
-    }
-  });
-  if(scope === 'all') return;
-  const msg = scope === 'self'
-    ? '일반사용자는 본인 데이터만 조회합니다.'
-    : '현재 권한 범위 내 데이터만 조회합니다.';
-  if(scope === 'self'){
-    if(divEl){ divEl.value = ''; divEl.disabled = true; divEl.title = msg; divEl.dataset.scopeLocked = 'Y'; divEl.dataset.generalLocked = 'Y'; }
-    if(teamEl){ teamEl.value = ''; teamEl.disabled = true; teamEl.title = msg; teamEl.dataset.scopeLocked = 'Y'; teamEl.dataset.generalLocked = 'Y'; }
-    return;
-  }
-  if(scope === 'division'){
-    if(divEl){ divEl.disabled = true; divEl.title = msg; divEl.dataset.scopeLocked = 'Y'; }
-    return;
-  }
-  if(scope === 'team'){
-    if(divEl){ divEl.disabled = true; divEl.title = msg; divEl.dataset.scopeLocked = 'Y'; }
-    if(teamEl){ teamEl.disabled = true; teamEl.title = msg; teamEl.dataset.scopeLocked = 'Y'; }
-    return;
-  }
-  if(scope === 'managedTeams'){
-    if(divEl){ divEl.disabled = true; divEl.title = msg; divEl.dataset.scopeLocked = 'Y'; }
-    if(teamEl && (ATTENDANCE_GENERAL_USER_ACCESS_STATE.managedTeamNames || []).length <= 1){
-      teamEl.disabled = true; teamEl.title = msg; teamEl.dataset.scopeLocked = 'Y';
-    }
-  }
-}
 function rowMatchesCurrentGeneralUser(row){
   if(!isCurrentAttendanceGeneralUser()) return true;
   const state = ATTENDANCE_GENERAL_USER_ACCESS_STATE;
@@ -5235,50 +5065,15 @@ function rowMatchesCurrentGeneralUser(row){
 }
 function scopeAttendanceRowsForGeneralUser(rows){
   const list = Array.isArray(rows) ? rows : [];
-  return list.filter(rowMatchesCurrentAttendanceScope);
-}
-function restoreAttendanceAuthorityUserVisibility(){
-  // 일반사용자가 아닌 권한자(소장/본부장/담당/팀장/운영자)는
-  // 일반사용자 모드에서 숨겨진 분석 탭을 다시 복구합니다.
-  document.querySelectorAll('.mainTab').forEach(btn => {
-    const main = btn?.dataset?.main || '';
-    const isAdminTab = main === 'admin';
-    const adminAllowed = (typeof isCurrentAttendanceAdmin === 'function' && isCurrentAttendanceAdmin());
-    const allowed = !isAdminTab || adminAllowed;
-    if(btn.dataset.generalHidden === 'Y' || btn.dataset.generalHidden === 'N'){
-      delete btn.dataset.generalHidden;
-    }
-    btn.style.removeProperty('display');
-    btn.disabled = !allowed;
-    btn.setAttribute('aria-hidden', allowed ? 'false' : 'true');
-    if(isAdminTab && !adminAllowed){
-      btn.dataset.adminHidden = 'Y';
-    }
-  });
-  document.querySelectorAll('.mainPanel').forEach(panel => {
-    const isAdminPanel = panel?.id === 'main-admin';
-    const adminAllowed = (typeof isCurrentAttendanceAdmin === 'function' && isCurrentAttendanceAdmin());
-    if(panel.dataset.generalHidden === 'Y' || panel.dataset.generalHidden === 'N'){
-      delete panel.dataset.generalHidden;
-    }
-    panel.style.removeProperty('display');
-    panel.setAttribute('aria-hidden', (isAdminPanel && !adminAllowed) ? 'true' : 'false');
-    if(isAdminPanel && !adminAllowed){
-      panel.dataset.adminHidden = 'Y';
-      panel.classList.remove('active');
-    }
-  });
+  return isCurrentAttendanceGeneralUser() ? list.filter(rowMatchesCurrentGeneralUser) : list;
 }
 function applyAttendanceGeneralUserVisibility(){
   const isGeneral = isCurrentAttendanceGeneralUser();
   if(!isGeneral){
-    restoreAttendanceAuthorityUserVisibility();
-    if(typeof lockAttendanceScopeFilters === 'function') lockAttendanceScopeFilters();
-    else unlockAttendanceGeneralUserFilters();
+    unlockAttendanceGeneralUserFilters();
     return;
   }
-  if(typeof lockAttendanceScopeFilters === 'function') lockAttendanceScopeFilters();
-  if(typeof lockAttendanceScopeFilters === 'function') lockAttendanceScopeFilters();
+  lockAttendanceGeneralUserFilters();
   document.querySelectorAll('.mainTab').forEach(btn => {
     const allowed = btn?.dataset?.main === 'attendance';
     btn.dataset.generalHidden = allowed ? 'N' : 'Y';
@@ -5306,15 +5101,9 @@ async function resolveAttendanceGeneralUserAccess(force){
   ATTENDANCE_GENERAL_USER_ACCESS_STATE.loading = true;
   try{
     if(isCurrentAttendanceAdmin() || (typeof isCurrentAttendanceOperator === 'function' && isCurrentAttendanceOperator())){
-      Object.assign(ATTENDANCE_GENERAL_USER_ACCESS_STATE, { resolved:true, isGeneral:false, scopeType:'all', reason:'admin/operator' });
+      Object.assign(ATTENDANCE_GENERAL_USER_ACCESS_STATE, { resolved:true, isGeneral:false, reason:'admin/operator' });
       return false;
     }
-    try{
-      if((!Array.isArray(empMaster) || !empMaster.length) && typeof loadOrgMaster === 'function' && typeof loadEmpMaster === 'function'){
-        loadOrgMaster();
-        loadEmpMaster();
-      }
-    }catch(_e){}
     const summary = getAttendanceCurrentIdentitySummary();
     const client = window.__attendanceSupabaseClient || (window.supabase && typeof SUPABASE_URL !== 'undefined' && typeof SUPABASE_KEY !== 'undefined' ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null);
     if(client && client.auth && typeof client.auth.getSession === 'function'){
@@ -5340,61 +5129,25 @@ async function resolveAttendanceGeneralUserAccess(force){
       summary.employeeNo = summary.employeeNo || String(emp.employee_no || emp.employeeNo || emp.id || '').trim();
       summary.role = summary.role || getAttendanceEmployeeAuthority(emp) || String(emp.role || '').trim();
     }
-    const rawAuthority = String(getAttendanceEmployeeAuthority(emp) || summary.role || '').trim();
     const normalizedRole = normalizeAttendanceGeneralRole(summary.role);
-    const normalizedAuthority = normalizeAttendanceGeneralRole(rawAuthority);
+    const normalizedAuthority = normalizeAttendanceGeneralRole(getAttendanceEmployeeAuthority(emp));
     const privileged = normalizedRole === 'admin' || normalizedRole === 'operator' || normalizedRole === 'privileged' || normalizedAuthority === 'admin' || normalizedAuthority === 'operator' || normalizedAuthority === 'privileged';
     // 일반사용자 기준 고정:
     // 관리자(users.role=admin), 운영자(attendance_operators), 자동권한자(소장/본부장/담당/팀장)가 아니면 모두 일반사용자입니다.
-    // 자동권한자는 조회범위만 제한하고, 결근확인/OT확인 수정권한은 부여하지 않습니다.
+    // 따라서 사원 마스터의 '팀원' 또는 권한 공란/일반 role은 본인조회 전용으로 잠급니다.
     const hasIdentity = !!(summary.email || summary.employeeNo || summary.name || emp);
-    const authorityText = rawAuthority || (normalizedRole === 'privileged' ? String(summary.role || '').trim() : '');
-    let scopeType = 'all';
-    let managedTeams = [];
-    let managedTeamNames = [];
-    if(['소장','본부장'].includes(authorityText)){
-      scopeType = 'division';
-    }else if(authorityText === '담당'){
-      scopeType = 'managedTeams';
-      managedTeams = getAttendanceManagedTeamCodesFromEmp(emp);
-      managedTeamNames = managedTeams.map(getAttendanceTeamNameByCodeSafe).filter(Boolean);
-    }else if(authorityText === '팀장'){
-      scopeType = 'team';
-    }else if(privileged && emp){
-      // 영문/대체 role로 들어온 경우의 보수적 처리
-      if(normalizedAuthority === 'privileged' || normalizedRole === 'privileged'){
-        const a = String(getAttendanceEmployeeAuthority(emp) || '').trim();
-        if(['소장','본부장'].includes(a)) scopeType = 'division';
-        else if(a === '담당'){
-          scopeType = 'managedTeams';
-          managedTeams = getAttendanceManagedTeamCodesFromEmp(emp);
-          managedTeamNames = managedTeams.map(getAttendanceTeamNameByCodeSafe).filter(Boolean);
-        }else if(a === '팀장') scopeType = 'team';
-      }
-    }
     const isGeneral = hasIdentity && !privileged;
-    if(isGeneral) scopeType = 'self';
     ATTENDANCE_GENERAL_USER_ACCESS_STATE.isGeneral = isGeneral;
     ATTENDANCE_GENERAL_USER_ACCESS_STATE.name = summary.name || '';
     ATTENDANCE_GENERAL_USER_ACCESS_STATE.email = summary.email || '';
     ATTENDANCE_GENERAL_USER_ACCESS_STATE.employeeNo = summary.employeeNo || '';
-    ATTENDANCE_GENERAL_USER_ACCESS_STATE.authority = authorityText || '';
-    ATTENDANCE_GENERAL_USER_ACCESS_STATE.scopeType = scopeType;
-    ATTENDANCE_GENERAL_USER_ACCESS_STATE.division = getAttendanceEmpDivisionName(emp);
-    ATTENDANCE_GENERAL_USER_ACCESS_STATE.divisionCode = getAttendanceEmpDivisionCode(emp);
-    ATTENDANCE_GENERAL_USER_ACCESS_STATE.team = getAttendanceEmpTeamName(emp);
-    ATTENDANCE_GENERAL_USER_ACCESS_STATE.teamCode = getAttendanceEmpTeamCode(emp);
-    ATTENDANCE_GENERAL_USER_ACCESS_STATE.managedTeams = managedTeams;
-    ATTENDANCE_GENERAL_USER_ACCESS_STATE.managedTeamNames = managedTeamNames;
-    ATTENDANCE_GENERAL_USER_ACCESS_STATE.reason = isGeneral ? 'general user scoped' : (scopeType !== 'all' ? 'auto authority scoped' : 'not scoped');
+    ATTENDANCE_GENERAL_USER_ACCESS_STATE.reason = isGeneral ? 'general user scoped' : 'not general user';
     ATTENDANCE_GENERAL_USER_ACCESS_STATE.resolved = true;
-    if(typeof applyAttendanceScopeFilterDefaults === 'function') applyAttendanceScopeFilterDefaults();
     applyAttendanceGeneralUserVisibility();
     return isGeneral;
   }catch(e){
     console.warn('[GENERAL USER ACCESS] 일반사용자 권한 확인 실패:', e);
     ATTENDANCE_GENERAL_USER_ACCESS_STATE.isGeneral = false;
-    ATTENDANCE_GENERAL_USER_ACCESS_STATE.scopeType = 'all';
     ATTENDANCE_GENERAL_USER_ACCESS_STATE.reason = 'check exception';
     ATTENDANCE_GENERAL_USER_ACCESS_STATE.resolved = true;
     return false;
@@ -5403,9 +5156,6 @@ async function resolveAttendanceGeneralUserAccess(force){
   }
 }
 window.isCurrentAttendanceGeneralUser = isCurrentAttendanceGeneralUser;
-window.getCurrentAttendanceScopeType = getCurrentAttendanceScopeType;
-window.isCurrentAttendanceScopedUser = isCurrentAttendanceScopedUser;
-window.rowMatchesCurrentAttendanceScope = rowMatchesCurrentAttendanceScope;
 window.scopeAttendanceRowsForGeneralUser = scopeAttendanceRowsForGeneralUser;
 window.resolveAttendanceGeneralUserAccess = resolveAttendanceGeneralUserAccess;
 function isCurrentAttendanceAdmin(){
@@ -5598,6 +5348,202 @@ window.canEditAttendanceManualChecks = canEditAttendanceManualChecks;
 window.resolveAttendanceManualEditAccess = resolveAttendanceManualEditAccess;
 window.applyAttendanceManualEditControls = applyAttendanceManualEditControls;
 
+
+/* effectiveAccess: 로그인 사용자 권한/조회범위 통합 객체 */
+const ATTENDANCE_EFFECTIVE_ACCESS_STATE = { resolved:false, loading:false, access:null, reason:'' };
+function attendanceUniqueArray(values){
+  const out = [];
+  (Array.isArray(values) ? values : [values]).forEach(v => {
+    if(Array.isArray(v)){
+      v.forEach(x => { const s = String(x || '').trim(); if(s && !out.includes(s)) out.push(s); });
+      return;
+    }
+    const s = String(v || '').trim();
+    if(s && !out.includes(s)) out.push(s);
+  });
+  return out;
+}
+function getAttendanceEmployeeNo(emp){
+  if(!emp || typeof emp !== 'object') return '';
+  return String(emp.employee_no || emp.employeeNo || emp.id || emp.emp_no || emp.empNo || '').trim();
+}
+function getAttendanceEmployeeEmail(emp){
+  if(!emp || typeof emp !== 'object') return '';
+  return String(emp.email || emp.mail || emp.user_email || emp.userEmail || '').trim().toLowerCase();
+}
+function getAttendanceEmployeeName(emp){
+  if(!emp || typeof emp !== 'object') return '';
+  return String(emp.name || emp.employee_name || emp.employeeName || '').trim();
+}
+function getAttendanceEmployeeDivisionCode(emp){
+  if(!emp || typeof emp !== 'object') return '';
+  return String(emp.divisionCode || emp.division_code || emp.division || emp.divisionName || '').trim();
+}
+function getAttendanceEmployeeTeamCode(emp){
+  if(!emp || typeof emp !== 'object') return '';
+  return String(emp.teamCode || emp.team_code || emp.team || emp.teamName || '').trim();
+}
+function getAttendanceEmployeeManagedTeamCodes(emp){
+  if(!emp || typeof emp !== 'object') return [];
+  const fallback = getAttendanceEmployeeAuthority(emp) === '담당' ? getAttendanceEmployeeTeamCode(emp) : '';
+  if(typeof normalizeManagedTeams === 'function') return normalizeManagedTeams(emp.managedTeams || emp.managed_teams || emp.managedTeamCodes || emp.managed_team_codes || emp.manageTeamCode || emp.manage_team_code || '', fallback);
+  const raw = emp.managedTeams || emp.managed_teams || emp.managedTeamCodes || emp.managed_team_codes || emp.manageTeamCode || emp.manage_team_code || '';
+  const list = Array.isArray(raw) ? raw : String(raw || '').split(',');
+  const normalized = attendanceUniqueArray(list.map(v => String(v || '').trim()).filter(Boolean));
+  return normalized.length ? normalized : (fallback ? [fallback] : []);
+}
+function buildEffectiveAccess(options){
+  options = options || {};
+  const summary = options.summary || getAttendanceCurrentIdentitySummary();
+  const emp = options.employee || findAttendanceEmployeeForCurrentUser(summary) || null;
+  const authority = String(getAttendanceEmployeeAuthority(emp) || summary.role || '').trim();
+  const normalizedRole = normalizeAttendanceGeneralRole(summary.role);
+  const isAdmin = options.isAdmin === true || isCurrentAttendanceAdmin() || normalizedRole === 'admin';
+  const isOperator = !isAdmin && (options.isOperator === true || (typeof isCurrentAttendanceOperator === 'function' && isCurrentAttendanceOperator()) || normalizedRole === 'operator');
+  const isDirector = !isAdmin && !isOperator && ['소장','본부장'].includes(authority);
+  const isManager = !isAdmin && !isOperator && authority === '담당';
+  const isTeamLeader = !isAdmin && !isOperator && authority === '팀장';
+  const hasIdentity = !!(summary.email || summary.employeeNo || summary.name || emp);
+  const isGeneral = hasIdentity && !isAdmin && !isOperator && !isDirector && !isManager && !isTeamLeader;
+  const employeeNo = String(summary.employeeNo || getAttendanceEmployeeNo(emp) || '').trim();
+  const email = String(summary.email || getAttendanceEmployeeEmail(emp) || '').trim().toLowerCase();
+  const name = String(summary.name || getAttendanceEmployeeName(emp) || '').trim();
+  const divisionCode = getAttendanceEmployeeDivisionCode(emp);
+  const teamCode = getAttendanceEmployeeTeamCode(emp);
+  const managedTeamCodes = isManager ? getAttendanceEmployeeManagedTeamCodes(emp) : [];
+  let scopeLevel = 'none';
+  let scopeLabel = '미확인';
+  let divisionCodes = [];
+  let teamCodes = [];
+  let employeeNos = [];
+  if(isAdmin){
+    scopeLevel = 'all';
+    scopeLabel = '전체 조회';
+  }else if(isOperator){
+    scopeLevel = 'all';
+    scopeLabel = '운영자 전체 조회';
+  }else if(isDirector){
+    scopeLevel = 'division';
+    divisionCodes = attendanceUniqueArray([divisionCode]);
+    scopeLabel = divisionCode ? `${divisionCode} 하위 전체` : '소속 본부/연구소 전체';
+  }else if(isManager){
+    scopeLevel = 'managedTeams';
+    divisionCodes = attendanceUniqueArray([divisionCode]);
+    teamCodes = attendanceUniqueArray(managedTeamCodes);
+    scopeLabel = teamCodes.length ? `관리팀 ${teamCodes.join(', ')}` : '관리팀 미지정';
+  }else if(isTeamLeader){
+    scopeLevel = 'team';
+    divisionCodes = attendanceUniqueArray([divisionCode]);
+    teamCodes = attendanceUniqueArray([teamCode]);
+    scopeLabel = teamCode ? `${teamCode} 팀` : '소속 팀';
+  }else if(isGeneral){
+    scopeLevel = 'self';
+    divisionCodes = attendanceUniqueArray([divisionCode]);
+    teamCodes = attendanceUniqueArray([teamCode]);
+    employeeNos = attendanceUniqueArray([employeeNo]);
+    scopeLabel = '본인 데이터';
+  }
+  const primaryRole = isAdmin ? 'admin' : isOperator ? 'operator' : isDirector ? 'director' : isManager ? 'manager' : isTeamLeader ? 'teamLeader' : isGeneral ? 'general' : 'unknown';
+  const primaryRoleLabel = isAdmin ? '관리자' : isOperator ? '운영자' : isDirector ? '소장/본부장' : isManager ? '담당' : isTeamLeader ? '팀장' : isGeneral ? '일반사용자' : '미확인';
+  return {
+    resolvedAt: new Date().toISOString(),
+    primaryRole,
+    primaryRoleLabel,
+    role: primaryRole,
+    roleLabel: primaryRoleLabel,
+    authority,
+    isAdmin,
+    isOperator,
+    isDirector,
+    isManager,
+    isTeamLeader,
+    isLeader: isTeamLeader,
+    isGeneral,
+    canAccessAdmin: isAdmin,
+    canEditManualChecks: isAdmin || isOperator,
+    canViewAll: isAdmin || isOperator,
+    canViewDivision: isDirector,
+    canViewManagedTeams: isManager,
+    canViewTeam: isTeamLeader,
+    canViewSelfOnly: isGeneral,
+    user: { employeeNo, email, name, divisionCode, teamCode },
+    employee: emp || null,
+    scope: {
+      level: scopeLevel,
+      label: scopeLabel,
+      divisionCodes,
+      teamCodes,
+      managedTeamCodes,
+      employeeNos,
+      email: isGeneral ? email : ''
+    },
+    debug: {
+      adminReason: ATTENDANCE_ADMIN_ACCESS_STATE.reason || '',
+      operatorReason: ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.reason || '',
+      matchedEmployee: !!emp
+    }
+  };
+}
+async function resolveAttendanceEffectiveAccess(force){
+  if(ATTENDANCE_EFFECTIVE_ACCESS_STATE.loading && !force) return ATTENDANCE_EFFECTIVE_ACCESS_STATE.access;
+  if(ATTENDANCE_EFFECTIVE_ACCESS_STATE.resolved && !force) return ATTENDANCE_EFFECTIVE_ACCESS_STATE.access;
+  ATTENDANCE_EFFECTIVE_ACCESS_STATE.loading = true;
+  try{
+    await resolveAttendanceAdminAccess(force);
+    await resolveAttendanceManualEditAccess(force);
+    const summary = getAttendanceCurrentIdentitySummary();
+    const client = window.__attendanceSupabaseClient || (window.supabase && typeof SUPABASE_URL !== 'undefined' && typeof SUPABASE_KEY !== 'undefined' ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null);
+    if(client && client.auth && typeof client.auth.getSession === 'function'){
+      try{
+        const sessionRes = await client.auth.getSession();
+        const sessionEmail = String(sessionRes?.data?.session?.user?.email || '').trim().toLowerCase();
+        if(sessionEmail && !summary.email) summary.email = sessionEmail;
+      }catch(e){}
+    }
+    if(client && summary.email){
+      try{
+        const res = await client.from('users').select('email,name,role,employee_no,is_active').eq('email', summary.email).maybeSingle();
+        if(!res?.error && res?.data && res.data.is_active !== false){
+          summary.role = summary.role || res.data.role || '';
+          summary.name = summary.name || res.data.name || '';
+          summary.employeeNo = summary.employeeNo || res.data.employee_no || '';
+        }
+      }catch(e){}
+    }
+    const emp = findAttendanceEmployeeForCurrentUser(summary);
+    if(emp){
+      summary.name = summary.name || getAttendanceEmployeeName(emp);
+      summary.employeeNo = summary.employeeNo || getAttendanceEmployeeNo(emp);
+      summary.role = summary.role || getAttendanceEmployeeAuthority(emp) || String(emp.role || '').trim();
+    }
+    const access = buildEffectiveAccess({ summary, employee: emp, isAdmin:isCurrentAttendanceAdmin(), isOperator:isCurrentAttendanceOperator() });
+    ATTENDANCE_EFFECTIVE_ACCESS_STATE.access = access;
+    ATTENDANCE_EFFECTIVE_ACCESS_STATE.resolved = true;
+    ATTENDANCE_EFFECTIVE_ACCESS_STATE.reason = 'resolved';
+    window.currentAccess = access;
+    window.ATTENDANCE_EFFECTIVE_ACCESS = access;
+    try{ console.info('[ATTENDANCE EFFECTIVE ACCESS]', access); }catch(e){}
+    return access;
+  }catch(e){
+    console.warn('[ATTENDANCE EFFECTIVE ACCESS] 권한 객체 생성 실패:', e);
+    const access = buildEffectiveAccess({});
+    ATTENDANCE_EFFECTIVE_ACCESS_STATE.access = access;
+    ATTENDANCE_EFFECTIVE_ACCESS_STATE.resolved = true;
+    ATTENDANCE_EFFECTIVE_ACCESS_STATE.reason = 'fallback';
+    window.currentAccess = access;
+    window.ATTENDANCE_EFFECTIVE_ACCESS = access;
+    return access;
+  }finally{
+    ATTENDANCE_EFFECTIVE_ACCESS_STATE.loading = false;
+  }
+}
+function getAttendanceEffectiveAccess(){
+  return ATTENDANCE_EFFECTIVE_ACCESS_STATE.access || window.currentAccess || buildEffectiveAccess({});
+}
+window.buildEffectiveAccess = buildEffectiveAccess;
+window.resolveAttendanceEffectiveAccess = resolveAttendanceEffectiveAccess;
+window.getAttendanceEffectiveAccess = getAttendanceEffectiveAccess;
+
 function saveAttendanceMainTab(tabName){
   try{
     const value = String(tabName || '').trim();
@@ -5653,7 +5599,11 @@ resolveAttendanceAdminAccess(false).then(function(isAdmin){
   if(!isAdmin && readAttendanceMainTab() === 'admin') saveAttendanceMainTab('attendance');
   return resolveAttendanceManualEditAccess(false);
 }).then(function(){
+  return resolveAttendanceEffectiveAccess(false);
+}).then(function(){
   return resolveAttendanceGeneralUserAccess(false);
+}).then(function(){
+  return resolveAttendanceEffectiveAccess(true);
 }).then(function(){
   applyAttendanceGeneralUserVisibility();
   if(typeof render === 'function') render();
@@ -6370,8 +6320,9 @@ function renderFilters(){
     STATE.period = fallbackPeriod;
   }
   STATE.leaveCauseFocus = '';
-  if(typeof applyAttendanceScopeFilterDefaults === 'function'){
-    applyAttendanceScopeFilterDefaults();
+  if(isCurrentAttendanceGeneralUser()){
+    STATE.division = '전체';
+    STATE.team = '전체';
   }
   $('#period').innerHTML = periodOptions.length
     ? periodOptions.map(item => `<option value="${item.value}">${item.label}</option>`).join('')
@@ -6439,7 +6390,7 @@ function renderFilters(){
     .concat(teams.map(v=>`<option value="${String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}">${v}</option>`))
     .join('');
   $('#team').value = STATE.team === '전체' ? '' : STATE.team;
-  if(typeof lockAttendanceScopeFilters === 'function') lockAttendanceScopeFilters();
+  lockAttendanceGeneralUserFilters();
   if($('#team').value !== (STATE.team === '전체' ? '' : STATE.team)){
     STATE.team = '전체';
     $('#team').value = '';
