@@ -4,7 +4,8 @@ function renderAdmin() {
 
   const keyword = (document.getElementById("adminSearch")?.value || "").trim().toLowerCase();
 
-  const rows = AppState.merged.filter(row => {
+  const baseRows = typeof getAdminRows === "function" ? getAdminRows() : AppState.merged;
+  const filteredRows = baseRows.filter(row => {
     if (!keyword) return true;
     return [
       row.name,
@@ -15,6 +16,9 @@ function renderAdmin() {
     ].some(value => String(value || "").toLowerCase().includes(keyword));
   });
 
+  const pageSize = document.getElementById("adminPageSize")?.value || "20";
+  const rows = pageSize === "all" ? filteredRows : filteredRows.slice(0, Number(pageSize));
+
   tbody.innerHTML = rows.map(row => renderAdminRow(row)).join("");
 
   bindAdminInputs();
@@ -22,6 +26,7 @@ function renderAdmin() {
 
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("adminSearch")?.addEventListener("input", renderAdmin);
+  document.getElementById("adminPageSize")?.addEventListener("change", renderAdmin);
   document.getElementById("saveAllBtn")?.addEventListener("click", saveAllProfiles);
 });
 
@@ -30,7 +35,6 @@ function renderAdminRow(row) {
 
   return `
     <tr data-employee-no="${employeeNo}">
-      <td><input type="checkbox" data-field="is_research_staff" ${row.is_research_staff ? "checked" : ""}></td>
       <td>${employeeNo}</td>
       <td>${escapeHtml(row.name || "")}</td>
       <td>${escapeHtml(row.department || "")}</td>
@@ -102,6 +106,7 @@ async function saveAllProfiles() {
       payload[field] = input.type === "checkbox" ? input.checked : input.value || null;
     });
 
+    payload.is_research_staff = true;
     payload.updated_at = new Date().toISOString();
     return payload;
   });
