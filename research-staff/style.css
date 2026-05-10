@@ -399,7 +399,6 @@ th:first-child {
 }
 
 .admin-table-wrap {
-  max-height: 620px;
   border-radius: 14px;
 }
 
@@ -479,5 +478,96 @@ th:first-child {
 
   .bar-row {
     grid-template-columns: 90px 1fr 42px;
+  }
+}
+
+/* 관리자기능 테이블 개선 */
+#view-admin .panel {
+  min-height: calc(100vh - 235px);
+  display: flex;
+  flex-direction: column;
+}
+
+#view-admin .notice {
+  margin-bottom: 12px;
+}
+
+.admin-table-wrap {
+  height: calc(100vh - 385px);
+  min-height: 520px;
+  max-height: none;
+  border-radius: 14px;
+  flex: 1;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 7px 8px;
+  height: 42px;
+}
+
+.admin-table th.col-collect,
+.admin-table td.col-collect {
+  width: 58px;
+  min-width: 58px;
+  max-width: 58px;
+  text-align: center !important;
+}
+
+.admin-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.admin-table input,
+.admin-table select {
+  height: 32px;
+  min-width: 92px;
+  border-radius: 9px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+
+.admin-table input[type="text"] {
+  min-width: 130px;
+}
+
+.admin-table th:nth-child(2),
+.admin-table td:nth-child(2) {
+  width: 82px;
+  min-width: 82px;
+}
+
+.admin-table th:nth-child(3),
+.admin-table td:nth-child(3) {
+  width: 78px;
+  min-width: 78px;
+}
+
+.admin-table th:nth-child(4),
+.admin-table td:nth-child(4),
+.admin-table th:nth-child(5),
+.admin-table td:nth-child(5),
+.admin-table th:nth-child(6),
+.admin-table td:nth-child(6),
+.admin-table th:nth-child(7),
+.admin-table td:nth-child(7) {
+  width: 82px;
+  min-width: 82px;
+}
+
+#adminPageSize {
+  width: 92px;
+  min-width: 92px;
+}
+
+@media (max-width: 720px) {
+  #view-admin .panel {
+    min-height: auto;
+  }
+
+  .admin-table-wrap {
+    height: calc(100vh - 360px);
+    min-height: 420px;
   }
 }
