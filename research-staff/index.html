@@ -26,9 +26,10 @@
         <button class="tab-btn" data-view="admin">관리자기능</button>
       </div>
       <div class="top-actions">
-        <select id="scopeFilter" title="조회 범위">
-          <option value="all">전체</option>
-        </select>
+        <div class="reference-filter" title="기준년월">
+          <span>기준년월</span>
+          <input id="referenceMonth" type="month" />
+        </div>
         <button id="refreshBtn" class="btn secondary">새로고침</button>
       </div>
     </section>
@@ -210,14 +211,13 @@
         </div>
 
         <div class="notice">
-          입력 항목은 최소화했습니다. 연구개발인력 여부, 구분, 성별, 생년월일, 연구소 발령일, 최종학위만 관리합니다.
+          입력 항목은 최소화했습니다. 구분, 성별, 생년월일, 연구소 발령일, 최종학위만 관리합니다. 연구소 발령일은 비어 있으면 입사일을 기본값으로 사용합니다.
         </div>
 
         <div class="table-wrap admin-table-wrap">
           <table class="admin-table">
             <thead>
               <tr>
-                <th class="col-collect">집계</th>
                 <th>사번</th>
                 <th>성명</th>
                 <th>부서</th>
