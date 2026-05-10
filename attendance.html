@@ -35,6 +35,7 @@
 <!-- general user attendance chart label fixed: division/team label replaced with user name -->
 <!-- effective access object added: admin/operator/director/manager/teamLeader/general unified with scope -->
 <!-- effective access menu binding added: admin only admin tab; director/manager/teamLeader/operator analysis tabs; general attendance tab only -->
+<!-- effective access filter lock refined: director fixed division with team all; manager/teamLeader fixed division and no team all -->
 <!-- effective access filter scope added: top division/team filters and displayed rows are limited to current access scope -->
 <style>
 :root {
@@ -5175,6 +5176,44 @@ function scopeRowsByEffectiveAccess(rows){
 function getAttendanceEmployeesWithinEffectiveScope(source){
   return scopeRowsByEffectiveAccess(Array.isArray(source) ? source : []);
 }
+
+function getAttendanceFilterAccessMode(){
+  const access = (typeof getAttendanceEffectiveAccess === 'function') ? getAttendanceEffectiveAccess() : (window.currentAccess || {});
+  const role = String(access?.role || access?.primaryRole || '').trim();
+  const isAll = isAttendanceAllAccess(access);
+  const isDirector = !!(access?.isDirector || access?.canViewDivision || role === 'director');
+  const isManager = !!(access?.isManager || access?.canViewManagedTeams || role === 'manager');
+  const isTeamLeader = !!(access?.isTeamLeader || access?.isLeader || access?.canViewTeam || role === 'teamLeader' || role === 'teamleader' || role === 'leader');
+  return {
+    access,
+    role,
+    isAll,
+    isDirector,
+    isManager,
+    isTeamLeader,
+    lockDivision: !isAll && (isDirector || isManager || isTeamLeader),
+    allowDivisionAll: isAll || !(isDirector || isManager || isTeamLeader),
+    allowTeamAll: isAll || isDirector || (!isManager && !isTeamLeader),
+    requireSpecificTeam: !isAll && (isManager || isTeamLeader),
+    lockSingleTeam: !isAll && isTeamLeader
+  };
+}
+function attendanceOptionEscape(value){
+  return String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function setAttendanceFilterLockState(id, locked, title){
+  const el = document.getElementById(id);
+  if(!el) return;
+  if(locked){
+    el.disabled = true;
+    el.dataset.accessLocked = 'Y';
+    el.title = title || '현재 권한 범위로 고정되었습니다.';
+  }else if(el.dataset.accessLocked === 'Y'){
+    el.disabled = false;
+    el.title = '';
+    delete el.dataset.accessLocked;
+  }
+}
 function applyAttendanceGeneralUserVisibility(){
   const isGeneral = isCurrentAttendanceGeneralUser();
   if(!isGeneral){
@@ -6519,6 +6558,7 @@ function renderFilters(){
     Promise.resolve(updateAttendanceViewsAfterDataChange({ refreshFilters: false, keepMainTab: keepTab })).finally(() => restoreSavedMainTab(keepTab));
   };
 
+  const filterMode = getAttendanceFilterAccessMode();
   const optionEmployees = getAttendanceEmployeesWithinEffectiveScope(EMPLOYEES);
   const divisionMetaByName = new Map(orgMaster.map(div => [div.divisionName, div]));
   const employeeDivisionNames = [...new Set(optionEmployees.map(e => e.division).filter(Boolean))];
@@ -6527,29 +6567,54 @@ function renderFilters(){
     const codeB = String(divisionMetaByName.get(b)?.divisionCode || 'ZZZ');
     return codeA.localeCompare(codeB, 'ko') || String(a).localeCompare(String(b), 'ko');
   });
-  if(STATE.division !== '전체' && !divisions.includes(STATE.division)){
+
+  if(filterMode.lockDivision && divisions.length){
+    if(STATE.division === '전체' || !divisions.includes(STATE.division)){
+      STATE.division = divisions[0];
+      STATE.team = '전체';
+    }
+  }else if(STATE.division !== '전체' && !divisions.includes(STATE.division)){
     STATE.division = '전체';
     STATE.team = '전체';
   }
+
   const divisionControlValue = STATE.division === '전체'
     ? (STATE.team !== '전체' ? '__ALL_WITH_TEAM_FILTER__' : '')
     : STATE.division;
-  $('#division').innerHTML = ['<option value="">전체</option>']
-    .concat(STATE.division === '전체' && STATE.team !== '전체' ? ['<option value="__ALL_WITH_TEAM_FILTER__">전체</option>'] : [])
-    .concat(divisions.map(v=>`<option value="${String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}">${v}</option>`))
-    .join('');
-  $('#division').value = divisionControlValue;
-  if($('#division').value !== divisionControlValue){
-    STATE.division = '전체';
-    STATE.team = '전체';
-    $('#division').value = '';
+  const divisionOptions = [];
+  if(filterMode.allowDivisionAll){
+    divisionOptions.push('<option value="">전체</option>');
+    if(STATE.division === '전체' && STATE.team !== '전체') divisionOptions.push('<option value="__ALL_WITH_TEAM_FILTER__">전체</option>');
+  }
+  divisionOptions.push(...divisions.map(v=>`<option value="${attendanceOptionEscape(v)}">${attendanceOptionEscape(v)}</option>`));
+  $('#division').innerHTML = divisionOptions.join('') || '<option value="">-</option>';
+  $('#division').value = filterMode.lockDivision ? (STATE.division === '전체' ? (divisions[0] || '') : STATE.division) : divisionControlValue;
+  if($('#division').value !== (filterMode.lockDivision ? (STATE.division === '전체' ? (divisions[0] || '') : STATE.division) : divisionControlValue)){
+    if(filterMode.lockDivision && divisions.length){
+      STATE.division = divisions[0];
+      STATE.team = '전체';
+      $('#division').value = STATE.division;
+    }else{
+      STATE.division = '전체';
+      STATE.team = '전체';
+      $('#division').value = '';
+    }
+  }
+  setAttendanceFilterLockState('division', filterMode.lockDivision && divisions.length <= 1, '현재 권한의 본부로 고정되었습니다.');
+  if(filterMode.lockDivision && divisions.length > 1){
+    // 예외적으로 여러 본부가 허용되는 자동권한이면 드롭다운 선택은 허용하되 전체는 제외합니다.
+    setAttendanceFilterLockState('division', false);
   }
   $('#division').onchange = e => {
     if(e?.preventDefault) e.preventDefault();
     const keepTab = getActiveAttendanceMainTab('attendance');
     saveAttendanceMainTab(keepTab);
+    saveAttendanceMainTab(keepTab);
     const nextDivision = (e.target.value || '').trim();
-    if(!nextDivision){
+    if(filterMode.lockDivision){
+      STATE.division = divisions.includes(nextDivision) ? nextDivision : (divisions[0] || STATE.division || '전체');
+      STATE.team = '전체';
+    }else if(!nextDivision){
       STATE.division = '전체';
       STATE.team = '전체';
     }else if(nextDivision === '__ALL_WITH_TEAM_FILTER__'){
@@ -6572,21 +6637,38 @@ function renderFilters(){
     return String(metaA.teamCode || 'ZZZ').localeCompare(String(metaB.teamCode || 'ZZZ'), 'ko')
       || String(a).localeCompare(String(b), 'ko');
   });
-  if(STATE.team !== '전체' && !teams.includes(STATE.team)) STATE.team = '전체';
-  $('#team').innerHTML = ['<option value="">전체</option>']
-    .concat(teams.map(v=>`<option value="${String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}">${v}</option>`))
-    .join('');
+  if(filterMode.requireSpecificTeam && teams.length){
+    if(STATE.team === '전체' || !teams.includes(STATE.team)) STATE.team = teams[0];
+  }else if(STATE.team !== '전체' && !teams.includes(STATE.team)){
+    STATE.team = '전체';
+  }
+  const teamOptions = [];
+  if(filterMode.allowTeamAll) teamOptions.push('<option value="">전체</option>');
+  teamOptions.push(...teams.map(v=>`<option value="${attendanceOptionEscape(v)}">${attendanceOptionEscape(v)}</option>`));
+  $('#team').innerHTML = teamOptions.join('') || '<option value="">-</option>';
   $('#team').value = STATE.team === '전체' ? '' : STATE.team;
   lockAttendanceGeneralUserFilters();
   if($('#team').value !== (STATE.team === '전체' ? '' : STATE.team)){
-    STATE.team = '전체';
-    $('#team').value = '';
+    if(filterMode.requireSpecificTeam && teams.length){
+      STATE.team = teams[0];
+      $('#team').value = STATE.team;
+    }else{
+      STATE.team = '전체';
+      $('#team').value = '';
+    }
   }
+  setAttendanceFilterLockState('team', filterMode.lockSingleTeam && teams.length <= 1, '현재 권한의 팀으로 고정되었습니다.');
+  if(!filterMode.lockSingleTeam) setAttendanceFilterLockState('team', false);
   $('#team').onchange = e => {
     if(e?.preventDefault) e.preventDefault();
     const keepTab = getActiveAttendanceMainTab('attendance');
     saveAttendanceMainTab(keepTab);
-    STATE.team = (e.target.value || '').trim() || '전체';
+    const nextTeam = (e.target.value || '').trim();
+    if(filterMode.requireSpecificTeam){
+      STATE.team = teams.includes(nextTeam) ? nextTeam : (teams[0] || STATE.team || '전체');
+    }else{
+      STATE.team = nextTeam || '전체';
+    }
     Promise.resolve(updateAttendanceViewsAfterDataChange({ refreshFilters: true, keepMainTab: keepTab })).finally(() => restoreSavedMainTab(keepTab));
   };
 }
