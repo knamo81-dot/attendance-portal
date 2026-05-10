@@ -238,24 +238,45 @@ window.ReagentApp.showTab = function (tab) {
 window.ReagentApp.loadReagentPermission = async function () {
   const sb = window.ReagentApp.sb;
   const user = window.ReagentApp.currentUser || {};
-  const urlHint = window.ReagentApp.getUrlUserHint?.() || {};
-  const storedHint = window.ReagentApp.getStoredUserHint?.() || {};
 
-  user.user_role = urlHint.user_role || user.user_role || storedHint.user_role || "";
+  user.user_role = "";
   user.reagent_role = "";
   user.is_global_admin = false;
   user.is_reagent_operator = false;
 
   if (!sb) {
-    // Supabase 연결이 없으면 권한은 최소 권한으로 둡니다.
-    // 제품 신청만 가능하고, 취합/정리/제품관리/관리자기능은 숨김 처리됩니다.
     window.ReagentApp.currentUser = user;
     return user;
   }
 
   try {
-    const targetEmail = String(user.email || "").trim();
-    const targetEmployeeNo = String(user.employee_no || user.employeeNo || "").trim();
+    let targetEmail = String(user.email || user.user_email || user.userEmail || "").trim();
+    let targetEmployeeNo = String(user.employee_no || user.employeeNo || "").trim();
+    const targetName = String(user.name || user.user_name || user.userName || "").trim();
+
+    // 사번이 비어 있는 경우 email/name으로 employees를 한 번 더 확인합니다.
+    // settings 권한관리(user_app_roles)가 employee_no 중심으로 저장된 경우를 보정하기 위함입니다.
+    if (!targetEmployeeNo && (targetEmail || targetName)) {
+      try {
+        let empQuery = sb.from("employees").select("*").limit(1);
+        if (targetEmail) empQuery = empQuery.ilike("email", targetEmail);
+        else if (targetName) empQuery = empQuery.eq("name", targetName);
+
+        const { data: empRow, error: empLookupError } = await empQuery.maybeSingle();
+        if (empLookupError) {
+          console.warn("시약초자 권한용 사원정보 보정 조회 실패:", empLookupError);
+        } else if (empRow) {
+          targetEmployeeNo = String(empRow.employee_no || empRow.employeeNo || "").trim();
+          targetEmail = String(empRow.email || targetEmail || "").trim();
+          user.employee_no = targetEmployeeNo || user.employee_no || "";
+          user.email = targetEmail || user.email || "";
+          user.name = empRow.name || user.name || "";
+        }
+      } catch (empLookupCatch) {
+        console.warn("시약초자 권한용 사원정보 보정 조회 건너뜀:", empLookupCatch);
+      }
+    }
+
     const targetEmailLower = targetEmail.toLowerCase();
 
     // 1) 공통 관리자 권한: users.role = admin
@@ -275,12 +296,16 @@ window.ReagentApp.loadReagentPermission = async function () {
     }
 
     // 2) 포탈 settings 권한관리 기준: user_app_roles
-    //    app_key='reagent', role_key='operator'이면 시약초자 운영자 권한입니다.
+    //    app_key는 reagent를 기본으로 보되, 기존 명칭이 섞여 있어도 동작하도록 폭넓게 허용합니다.
+    //    role_key도 operator/운영자를 모두 허용합니다.
     if (!user.is_global_admin) {
+      const appKeys = ["reagent", "reagents", "supplies", "glassware", "reagent_glassware", "reagent-glassware"];
+      const operatorRoleKeys = ["operator", "운영자"];
+
       const { data: appRoles, error: appRoleError } = await sb
         .from("user_app_roles")
-        .select("employee_no,email,app_key,role_key")
-        .eq("app_key", "reagent");
+        .select("employee_no,email,name,app_key,role_key")
+        .in("app_key", appKeys);
 
       if (appRoleError) {
         console.warn("시약초자 중앙 권한 조회 실패:", appRoleError);
@@ -288,12 +313,14 @@ window.ReagentApp.loadReagentPermission = async function () {
         const matchedRole = (Array.isArray(appRoles) ? appRoles : []).find((row) => {
           const rowEmployeeNo = String(row.employee_no || "").trim();
           const rowEmail = String(row.email || "").trim().toLowerCase();
+          const rowName = String(row.name || "").trim();
           const roleKey = String(row.role_key || "").trim();
 
-          const sameEmployee = targetEmployeeNo && rowEmployeeNo === targetEmployeeNo;
-          const sameEmail = targetEmailLower && rowEmail === targetEmailLower;
+          const sameEmployee = !!targetEmployeeNo && !!rowEmployeeNo && rowEmployeeNo === targetEmployeeNo;
+          const sameEmail = !!targetEmailLower && !!rowEmail && rowEmail === targetEmailLower;
+          const sameName = !targetEmployeeNo && !targetEmailLower && !!targetName && !!rowName && rowName === targetName;
 
-          return roleKey === "operator" && (sameEmployee || sameEmail);
+          return operatorRoleKeys.includes(roleKey) && (sameEmployee || sameEmail || sameName);
         });
 
         if (matchedRole) {
@@ -557,10 +584,10 @@ window.ReagentApp.loadCurrentUser = async function () {
     team_name: storedHint.team_name || storedHint.team || "",
     position: storedHint.position || "",
     role: storedHint.role || storedHint.authority || "",
-    user_role: urlHint.user_role || storedHint.user_role || "",
-    reagent_role: urlHint.reagent_role || storedHint.reagent_role || "",
-    is_global_admin: storedHint.is_global_admin === true || urlHint.user_role === "admin",
-    is_reagent_operator: storedHint.is_reagent_operator === true || urlHint.reagent_role === "관리자" || urlHint.reagent_role === "운영자"
+    user_role: "",
+    reagent_role: "",
+    is_global_admin: false,
+    is_reagent_operator: false
   };
 
   if (!sb) {
@@ -571,13 +598,13 @@ window.ReagentApp.loadCurrentUser = async function () {
   try {
     let query = sb
       .from("employees")
-      .select("employee_no,name,division_code,team_code,position,authority,email,status")
+      .select("*")
       .limit(1);
 
     if (employeeNo) {
       query = query.eq("employee_no", employeeNo);
     } else if (email) {
-      query = query.eq("email", email);
+      query = query.ilike("email", email);
     } else if (userName) {
       query = query.eq("name", userName);
     } else {
@@ -594,39 +621,16 @@ window.ReagentApp.loadCurrentUser = async function () {
     }
 
     if (data) {
-      let divisionName = "";
-      let teamName = "";
-
-      const divisionCode = data.division_code || "";
-      const teamCode = data.team_code || "";
-
-      if (divisionCode || teamCode) {
-        const codes = [divisionCode, teamCode].filter(Boolean);
-
-        const { data: orgRows, error: orgError } = await sb
-          .from("teams")
-          .select("team_code,division_code,team_name")
-          .in("team_code", codes);
-
-        if (orgError) {
-          console.warn("조직명 조회 실패:", orgError);
-        } else if (Array.isArray(orgRows)) {
-          const divisionRow = orgRows.find((row) => row.team_code === divisionCode);
-          const teamRow = orgRows.find((row) => row.team_code === teamCode);
-
-          divisionName = divisionRow?.team_name || "";
-          teamName = teamRow?.team_name || "";
-        }
-      }
-
-      // team_code가 본부 코드와 동일한 경우에는 본부명만 있고 팀명은 비어 있을 수 있습니다.
-      // 이때 화면 표시용 team은 divisionName으로 대체합니다.
+      const divisionCode = data.division_code || data.department_code || data.division || "";
+      const teamCode = data.team_code || data.team || "";
+      const divisionName = data.division_name || data.department || data.division || "";
+      const teamName = data.team_name || data.team || "";
       const displayTeam = teamName || divisionName || "";
 
       window.ReagentApp.currentUser = {
         email: data.email || email || "",
-        employee_no: data.employee_no || "",
-        name: data.name || "",
+        employee_no: data.employee_no || data.employeeNo || employeeNo || "",
+        name: data.name || userName || "",
         division_code: divisionCode,
         team_code: teamCode,
         department: divisionName,
@@ -634,11 +638,11 @@ window.ReagentApp.loadCurrentUser = async function () {
         team: displayTeam,
         team_name: teamName,
         position: data.position || "",
-        role: data.authority || "",
-        user_role: urlHint.user_role || storedHint.user_role || "",
-        reagent_role: urlHint.reagent_role || storedHint.reagent_role || "",
-        is_global_admin: storedHint.is_global_admin === true || urlHint.user_role === "admin",
-        is_reagent_operator: storedHint.is_reagent_operator === true || urlHint.reagent_role === "관리자" || urlHint.reagent_role === "운영자"
+        role: data.authority || data.role || "",
+        user_role: "",
+        reagent_role: "",
+        is_global_admin: false,
+        is_reagent_operator: false
       };
 
       try {
