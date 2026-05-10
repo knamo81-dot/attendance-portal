@@ -70,4 +70,3 @@ function renderAnalysisComment(rows) {
     <p>석사 이상 인력은 <strong>${masterPlus}명</strong>으로 전체의 <strong>${pct(masterPlus, total)}</strong>입니다.</p>
   `;
 }
-
