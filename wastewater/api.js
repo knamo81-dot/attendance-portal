@@ -10,6 +10,7 @@ const EMPLOYEES_TABLE='employees';
 const WASTEWATER_ROLE_VIEW='wastewater_role_view';
 const WASTEWATER_OPERATORS_TABLE='wastewater_operators';
 const WASTEWATER_APPROVERS_TABLE='wastewater_approvers';
+const USER_APP_ROLES_TABLE='user_app_roles';
 const LOG_TABLE='activity_logs';
 const APPROVAL_TABLE='monthly_approvals';
 const APPROVAL_LOG_TABLE='approval_logs';
@@ -22,33 +23,67 @@ const MAX_TON_M3=7;
 async function getMyRoles(email){
   const roles = [];
   const targetEmail = String(email || '').trim();
+  const targetEmailLower = targetEmail.toLowerCase();
   if(!targetEmail) return roles;
 
   const pushRole = (role) => {
     if(role && !roles.includes(role)) roles.push(role);
   };
 
-  try{
-    const { data, error } = await sb.from(WASTEWATER_ROLE_VIEW).select('role_name').ilike('email', targetEmail);
-    if(error){
-      console.warn('role view load failed:', error);
-    }else{
-      (data||[]).forEach(r => pushRole(r.role_name));
-    }
-  }catch(error){
-    console.warn('role view load skipped:', error);
-  }
+  let employeeNo = '';
 
   try{
-    const { data: commonUser } = await sb.from(USERS_TABLE).select('email,role').ilike('email', targetEmail).maybeSingle();
+    const { data: commonUser } = await sb
+      .from(USERS_TABLE)
+      .select('email,role')
+      .ilike('email', targetEmail)
+      .maybeSingle();
     if(String(commonUser?.role || '').trim() === 'admin') pushRole('wastewater_admin');
   }catch(error){
     console.warn('common admin role load skipped:', error);
   }
 
   try{
-    const { data: employee } = await sb.from(EMPLOYEES_TABLE).select('employee_no,email').ilike('email', targetEmail).maybeSingle();
-    const employeeNo = employee?.employee_no;
+    const { data: employee } = await sb
+      .from(EMPLOYEES_TABLE)
+      .select('employee_no,email')
+      .ilike('email', targetEmail)
+      .maybeSingle();
+    employeeNo = String(employee?.employee_no || '').trim();
+  }catch(error){
+    console.warn('employee role key load skipped:', error);
+  }
+
+  // 중앙 권한관리(settings > user_app_roles) 기준 권한입니다.
+  // app_key='wastewater', role_key='operator|approver'만 폐수 앱에 반영합니다.
+  try{
+    let roleQuery = sb
+      .from(USER_APP_ROLES_TABLE)
+      .select('employee_no,email,app_key,role_key')
+      .eq('app_key', 'wastewater');
+
+    if(employeeNo){
+      roleQuery = roleQuery.or(`employee_no.eq.${employeeNo},email.ilike.${targetEmailLower}`);
+    }else{
+      roleQuery = roleQuery.ilike('email', targetEmail);
+    }
+
+    const { data, error } = await roleQuery;
+    if(error){
+      console.warn('central wastewater role load failed:', error);
+    }else{
+      (data || []).forEach(row => {
+        const roleKey = String(row.role_key || '').trim();
+        if(roleKey === 'operator') pushRole('wastewater_operator');
+        if(roleKey === 'approver') pushRole('wastewater_approver');
+      });
+    }
+  }catch(error){
+    console.warn('central wastewater role load skipped:', error);
+  }
+
+  // 과거 폐수 전용 권한 테이블이 남아있는 경우를 대비한 fallback입니다.
+  try{
     if(employeeNo){
       const { data: op } = await sb.from(WASTEWATER_OPERATORS_TABLE).select('employee_no,is_active').eq('employee_no', employeeNo).eq('is_active', true).maybeSingle();
       if(op) pushRole('wastewater_operator');
@@ -56,17 +91,58 @@ async function getMyRoles(email){
       if(ap) pushRole('wastewater_approver');
     }
   }catch(error){
-    console.warn('wastewater dedicated role load skipped:', error);
+    console.warn('legacy wastewater dedicated role load skipped:', error);
   }
 
   return roles;
+}
+
+async function loadWastewaterRoleRows(){
+  const rows = [];
+
+  try{
+    const { data: adminUsers, error: adminError } = await sb
+      .from(USERS_TABLE)
+      .select('email,name,role')
+      .eq('role','admin');
+    if(adminError) console.warn('admin role rows load failed:', adminError);
+    (Array.isArray(adminUsers) ? adminUsers : []).forEach(row => {
+      const email = String(row.email || '').trim();
+      if(email) rows.push({ email, role_name:'wastewater_admin' });
+    });
+  }catch(error){
+    console.warn('admin role rows load skipped:', error);
+  }
+
+  try{
+    const { data, error } = await sb
+      .from(USER_APP_ROLES_TABLE)
+      .select('email,employee_no,app_key,role_key')
+      .eq('app_key','wastewater')
+      .order('email',{ascending:true});
+    if(error){
+      console.warn('central wastewater role rows load failed:', error);
+    }else{
+      (Array.isArray(data) ? data : []).forEach(row => {
+        const roleKey = String(row.role_key || '').trim();
+        const email = String(row.email || '').trim();
+        if(!email) return;
+        if(roleKey === 'operator') rows.push({ email, role_name:'wastewater_operator' });
+        if(roleKey === 'approver') rows.push({ email, role_name:'wastewater_approver' });
+      });
+    }
+  }catch(error){
+    console.warn('central wastewater role rows load skipped:', error);
+  }
+
+  return { data: rows, error: null };
 }
 
 function loadAllData(includeAdmin){
   return Promise.all([
     sb.from(DAILY_VIEW).select('*').order('date',{ascending:false}).order('created_at',{ascending:false}),
     sb.from(PICKUP_TABLE).select('*').order('pickup_date',{ascending:false}).order('created_at',{ascending:false}),
-    includeAdmin?sb.from(WASTEWATER_ROLE_VIEW).select('email,role_name').order('email',{ascending:true}):Promise.resolve({data:[]}),
+    includeAdmin?loadWastewaterRoleRows():Promise.resolve({data:[]}),
     includeAdmin?sb.from(LOG_TABLE).select('*').order('created_at',{ascending:false}).limit(200):Promise.resolve({data:[]}),
     sb.from(APPROVAL_TABLE).select('*').order('month_key',{ascending:false}),
     sb.from(REFERENCE_TABLE).select('*').order('doc_key',{ascending:true})
@@ -134,31 +210,37 @@ async function searchEmployees(keyword){
 }
 
 async function loadWastewaterManagers(){
-  const [adminRes, operatorRes, approverRes] = await Promise.all([
+  const [adminRes, roleRes] = await Promise.all([
     sb.from(USERS_TABLE).select('*').eq('role','admin'),
-    sb.from(WASTEWATER_OPERATORS_TABLE).select('*').eq('is_active', true).order('created_at',{ascending:false}),
-    sb.from(WASTEWATER_APPROVERS_TABLE).select('*').eq('is_active', true).order('created_at',{ascending:false})
+    sb.from(USER_APP_ROLES_TABLE).select('*').eq('app_key','wastewater').order('created_at',{ascending:false})
   ]);
 
-  let adminEmployees = [];
   const adminUsers = Array.isArray(adminRes.data) ? adminRes.data : [];
-  const adminEmails = adminUsers.map(row => String(row.email || row.user_email || '').trim()).filter(Boolean);
+  const roleRows = Array.isArray(roleRes.data) ? roleRes.data : [];
 
-  if(adminEmails.length){
-    const { data: employeeRows, error: employeeError } = await sb.from(EMPLOYEES_TABLE).select('*').in('email', adminEmails);
-    if(employeeError) console.warn('관리자 사원정보 매칭 실패:', employeeError);
-    adminEmployees = Array.isArray(employeeRows) ? employeeRows : [];
+  const emails = [
+    ...adminUsers.map(row => String(row.email || row.user_email || '').trim()),
+    ...roleRows.map(row => String(row.email || '').trim())
+  ].filter(Boolean);
+  const employeeNos = roleRows.map(row => String(row.employee_no || '').trim()).filter(Boolean);
+
+  let employeeRows = [];
+  if(emails.length || employeeNos.length){
+    const filters = [];
+    if(emails.length) filters.push(`email.in.(${[...new Set(emails)].join(',')})`);
+    if(employeeNos.length) filters.push(`employee_no.in.(${[...new Set(employeeNos)].join(',')})`);
+    try{
+      const { data, error } = await sb.from(EMPLOYEES_TABLE).select('*').or(filters.join(','));
+      if(error) console.warn('권한 사원정보 매칭 실패:', error);
+      employeeRows = Array.isArray(data) ? data : [];
+    }catch(error){
+      console.warn('권한 사원정보 매칭 건너뜀:', error);
+    }
   }
 
-  const signatureEmails = [
-    ...adminUsers.map(row => String(row.email || row.user_email || '').trim()),
-    ...(Array.isArray(operatorRes.data) ? operatorRes.data : []).map(row => String(row.email || '').trim()),
-    ...(Array.isArray(approverRes.data) ? approverRes.data : []).map(row => String(row.email || '').trim())
-  ].filter(Boolean);
-
   let signatureMap = new Map();
-  if(signatureEmails.length){
-    const uniqueEmails = [...new Set(signatureEmails)];
+  if(emails.length){
+    const uniqueEmails = [...new Set(emails)];
     const { data: signatureUsers, error: signatureError } = await sb
       .from(USERS_TABLE)
       .select('email,signature_url')
@@ -169,9 +251,18 @@ async function loadWastewaterManagers(){
     });
   }
 
+  const findEmployee = (row) => {
+    const email = String(row.email || row.user_email || '').trim();
+    const employeeNo = String(row.employee_no || row.employeeNo || '').trim();
+    return employeeRows.find(emp =>
+      (email && String(emp.email || '').trim() === email) ||
+      (employeeNo && String(emp.employee_no || '').trim() === employeeNo)
+    ) || {};
+  };
+
   const admins = adminUsers.map((userRow) => {
     const email = String(userRow.email || userRow.user_email || '').trim();
-    const employee = adminEmployees.find(emp => String(emp.email || '').trim() === email) || {};
+    const employee = findEmployee(userRow);
     return {
       employee_no: getEmployeeNo(employee) || userRow.employee_no || userRow.employeeNo || '',
       name: employee.name || userRow.name || userRow.user_name || email || '',
@@ -181,87 +272,94 @@ async function loadWastewaterManagers(){
       email,
       signature_url: signatureMap.get(email) || userRow.signature_url || '',
       role: '관리자',
-      created_by: '사원정보',
+      created_by: 'users.role=admin',
       created_at: userRow.updated_at || userRow.created_at || employee.updated_at || employee.created_at || '',
       is_admin: true,
       is_active: true
     };
   });
 
-  const operators = (Array.isArray(operatorRes.data) ? operatorRes.data : []).map(row => ({
-    ...row,
-    signature_url: signatureMap.get(String(row.email || '').trim()) || row.signature_url || ''
-  }));
+  const toManagerRow = (row, roleLabel) => {
+    const email = String(row.email || '').trim();
+    const employee = findEmployee(row);
+    return {
+      id: row.id,
+      employee_no: String(row.employee_no || getEmployeeNo(employee) || '').trim(),
+      name: row.name || employee.name || email || '',
+      department: getEmployeeDepartment(employee),
+      team: getEmployeeTeam(employee),
+      position: employee.position || '',
+      email,
+      signature_url: signatureMap.get(email) || '',
+      role: roleLabel,
+      memo: row.memo || '',
+      created_by: '권한관리',
+      created_at: row.updated_at || row.created_at || '',
+      is_admin: false,
+      is_active: true
+    };
+  };
 
-  const approvers = (Array.isArray(approverRes.data) ? approverRes.data : []).map(row => ({
-    ...row,
-    signature_url: signatureMap.get(String(row.email || '').trim()) || row.signature_url || ''
-  }));
+  const operators = roleRows
+    .filter(row => String(row.role_key || '').trim() === 'operator')
+    .map(row => toManagerRow(row, '운영자'));
+
+  const approvers = roleRows
+    .filter(row => String(row.role_key || '').trim() === 'approver')
+    .map(row => toManagerRow(row, '결재자'));
 
   return {
-    data: {
-      admins,
-      operators,
-      approvers
-    },
-    errors: {
-      admins: adminRes.error || null,
-      operators: operatorRes.error || null,
-      approvers: approverRes.error || null
-    }
+    data: { admins, operators, approvers },
+    errors: { admins: adminRes.error || null, operators: roleRes.error || null, approvers: roleRes.error || null }
   };
 }
 
-function buildWastewaterRolePayload(employee, roleLabel, actorName){
+function buildWastewaterRolePayload(employee, roleKey, memo){
   return {
     employee_no: getEmployeeNo(employee),
-    name: employee.name || '',
-    department: getEmployeeDepartment(employee),
-    team: getEmployeeTeam(employee),
-    position: employee.position || '',
     email: getEmployeeEmail(employee),
-    role: roleLabel,
-    is_active: true,
-    created_by: actorName || '',
-    updated_by: actorName || '',
+    name: employee.name || '',
+    app_key: 'wastewater',
+    role_key: roleKey,
+    memo: memo || '',
     updated_at: new Date().toISOString()
   };
 }
 
 function addWastewaterOperator(employee, actorName){
-  const payload = buildWastewaterRolePayload(employee, '운영자', actorName);
+  const payload = buildWastewaterRolePayload(employee, 'operator', actorName ? `폐수 운영자 / ${actorName}` : '폐수 운영자');
   return sb
-    .from(WASTEWATER_OPERATORS_TABLE)
-    .upsert(payload, { onConflict: 'employee_no' })
+    .from(USER_APP_ROLES_TABLE)
+    .upsert(payload, { onConflict: 'employee_no,app_key,role_key' })
     .select('*')
     .maybeSingle();
 }
 
 function removeWastewaterOperator(employeeNo, actorName){
   return sb
-    .from(WASTEWATER_OPERATORS_TABLE)
-    .update({ is_active:false, updated_by:actorName || '', updated_at:new Date().toISOString() })
+    .from(USER_APP_ROLES_TABLE)
+    .delete()
     .eq('employee_no', employeeNo)
-    .select('*')
-    .maybeSingle();
+    .eq('app_key', 'wastewater')
+    .eq('role_key', 'operator');
 }
 
 function addWastewaterApprover(employee, actorName){
-  const payload = buildWastewaterRolePayload(employee, '결재자', actorName);
+  const payload = buildWastewaterRolePayload(employee, 'approver', actorName ? `폐수 결재자 / ${actorName}` : '폐수 결재자');
   return sb
-    .from(WASTEWATER_APPROVERS_TABLE)
-    .upsert(payload, { onConflict: 'employee_no' })
+    .from(USER_APP_ROLES_TABLE)
+    .upsert(payload, { onConflict: 'employee_no,app_key,role_key' })
     .select('*')
     .maybeSingle();
 }
 
 function removeWastewaterApprover(employeeNo, actorName){
   return sb
-    .from(WASTEWATER_APPROVERS_TABLE)
-    .update({ is_active:false, updated_by:actorName || '', updated_at:new Date().toISOString() })
+    .from(USER_APP_ROLES_TABLE)
+    .delete()
     .eq('employee_no', employeeNo)
-    .select('*')
-    .maybeSingle();
+    .eq('app_key', 'wastewater')
+    .eq('role_key', 'approver');
 }
 
 
@@ -296,6 +394,6 @@ async function logApprovalAction(actorEmail,monthKey,action,reason=''){
 
 window.WastewaterApi={
   SUPABASE_URL,SUPABASE_KEY,
-  DAILY_TABLE,DAILY_VIEW,PICKUP_TABLE,USERS_TABLE,EMPLOYEES_TABLE,WASTEWATER_ROLE_VIEW,WASTEWATER_OPERATORS_TABLE,WASTEWATER_APPROVERS_TABLE,LOG_TABLE,APPROVAL_TABLE,APPROVAL_LOG_TABLE,REFERENCE_TABLE,RELATED_DOC_BUCKET,CM_LIMIT,TON_TO_CM,MAX_TON_M3,
+  DAILY_TABLE,DAILY_VIEW,PICKUP_TABLE,USERS_TABLE,EMPLOYEES_TABLE,WASTEWATER_ROLE_VIEW,WASTEWATER_OPERATORS_TABLE,WASTEWATER_APPROVERS_TABLE,USER_APP_ROLES_TABLE,LOG_TABLE,APPROVAL_TABLE,APPROVAL_LOG_TABLE,REFERENCE_TABLE,RELATED_DOC_BUCKET,CM_LIMIT,TON_TO_CM,MAX_TON_M3,
   getMyRoles,loadAllData,saveReferenceDoc,deleteReferenceDocById,saveRelatedDocument,deleteRelatedDocumentById,uploadRelatedDocFile,getRelatedDocPublicUrl,deleteRelatedDocFile,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,getUserSignature,searchEmployees,loadWastewaterManagers,addWastewaterOperator,removeWastewaterOperator,addWastewaterApprover,removeWastewaterApprover,logActivity,logApprovalAction
 };
