@@ -8,224 +8,232 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-icon">人</div>
-        <div>
-          <h1>인력운영현황</h1>
-          <p>Research Staff</p>
-        </div>
+  <main class="app">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Research Lab Integrated Portal</p>
+        <h1>인력운영현황</h1>
+        <p class="hero-desc">연구개발 인력구조를 한눈에 확인하고, 최소 입력 정보로 현황을 자동 집계합니다.</p>
       </div>
-
-      <nav class="nav">
-        <button class="nav-btn active" data-view="dashboard">메인 대시보드</button>
-        <button class="nav-btn" data-view="analysis">현황분석</button>
-        <button class="nav-btn admin-only" data-view="admin">관리자기능</button>
-      </nav>
-
-      <div class="sidebar-footer">
+      <div class="hero-right">
         <span id="connectionStatus" class="status-pill muted">서버 연결 대기</span>
       </div>
-    </aside>
+    </section>
 
-    <main class="main">
-      <header class="topbar">
-        <div>
-          <h2 id="pageTitle">메인 대시보드</h2>
-          <p id="pageSubtitle">연구개발 인력구조를 한눈에 확인합니다.</p>
-        </div>
-        <div class="top-actions">
-          <select id="scopeFilter" title="조회 범위">
-            <option value="all">전체</option>
-          </select>
-          <button id="refreshBtn" class="btn secondary">새로고침</button>
-        </div>
-      </header>
+    <section class="tabs-row">
+      <div class="tabs">
+        <button class="tab-btn active" data-view="dashboard">메인 대시보드</button>
+        <button class="tab-btn" data-view="analysis">현황분석</button>
+        <button class="tab-btn" data-view="admin">관리자기능</button>
+      </div>
+      <div class="top-actions">
+        <select id="scopeFilter" title="조회 범위">
+          <option value="all">전체</option>
+        </select>
+        <button id="refreshBtn" class="btn secondary">새로고침</button>
+      </div>
+    </section>
 
-      <section id="view-dashboard" class="view active">
-        <section class="summary-grid">
-          <article class="summary-card">
-            <span>총 연구개발인력</span>
-            <strong id="cardTotal">0</strong>
-            <em>재직 기준</em>
-          </article>
-          <article class="summary-card">
-            <span>전담요원</span>
-            <strong id="cardDedicated">0</strong>
-            <em id="cardDedicatedSub">-</em>
-          </article>
-          <article class="summary-card">
-            <span>보조원</span>
-            <strong id="cardAssistant">0</strong>
-            <em id="cardAssistantSub">-</em>
-          </article>
-          <article class="summary-card">
-            <span>관리직원</span>
-            <strong id="cardManager">0</strong>
-            <em id="cardManagerSub">-</em>
-          </article>
-          <article class="summary-card">
-            <span>여성 연구인력</span>
-            <strong id="cardFemale">0</strong>
-            <em id="cardFemaleRate">0%</em>
-          </article>
-          <article class="summary-card">
-            <span>석사 이상</span>
-            <strong id="cardMasterPlus">0</strong>
-            <em id="cardMasterPlusRate">0%</em>
-          </article>
-        </section>
+    <section id="view-dashboard" class="view active">
+      <section class="summary-grid">
+        <article class="summary-card">
+          <span>총 연구개발인력</span>
+          <strong id="cardTotal">0</strong>
+          <em>재직 기준</em>
+        </article>
+        <article class="summary-card">
+          <span>전담요원</span>
+          <strong id="cardDedicated">0</strong>
+          <em id="cardDedicatedSub">-</em>
+        </article>
+        <article class="summary-card">
+          <span>보조원</span>
+          <strong id="cardAssistant">0</strong>
+          <em id="cardAssistantSub">-</em>
+        </article>
+        <article class="summary-card">
+          <span>관리직원</span>
+          <strong id="cardManager">0</strong>
+          <em id="cardManagerSub">-</em>
+        </article>
+        <article class="summary-card">
+          <span>여성 연구인력</span>
+          <strong id="cardFemale">0</strong>
+          <em id="cardFemaleRate">0%</em>
+        </article>
+        <article class="summary-card">
+          <span>석사 이상</span>
+          <strong id="cardMasterPlus">0</strong>
+          <em id="cardMasterPlusRate">0%</em>
+        </article>
+      </section>
 
-        <section class="panel">
-          <div class="panel-head">
+      <section class="panel">
+        <div class="panel-head">
+          <div>
             <h3>연구개발인력현황</h3>
             <p>구분별 전체/남/여 현황</p>
+          </div>
+          <span class="mini-note">구분별 전체/남/여 현황</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>구분</th>
+                <th>전체</th>
+                <th>남</th>
+                <th>여</th>
+                <th>여성비율</th>
+              </tr>
+            </thead>
+            <tbody id="researchTypeTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>학위별 현황</h3>
+              <p>각 칸은 남/여 기준입니다.</p>
+            </div>
+            <span class="mini-note">남 / 여</span>
           </div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
                   <th>구분</th>
-                  <th>전체</th>
-                  <th>남</th>
-                  <th>여</th>
-                  <th>여성비율</th>
+                  <th>박사</th>
+                  <th>석사</th>
+                  <th>학사</th>
+                  <th>전문학사</th>
+                  <th>기타</th>
+                  <th>합계</th>
                 </tr>
               </thead>
-              <tbody id="researchTypeTable"></tbody>
+              <tbody id="degreeTable"></tbody>
             </table>
           </div>
-        </section>
+        </article>
 
-        <section class="dashboard-grid">
-          <article class="panel">
-            <div class="panel-head">
-              <h3>학위별 현황</h3>
-              <p>각 칸은 남/여 기준입니다.</p>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>구분</th>
-                    <th>박사</th>
-                    <th>석사</th>
-                    <th>학사</th>
-                    <th>전문학사</th>
-                    <th>기타</th>
-                    <th>합계</th>
-                  </tr>
-                </thead>
-                <tbody id="degreeTable"></tbody>
-              </table>
-            </div>
-          </article>
-
-          <article class="panel">
-            <div class="panel-head">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
               <h3>연령별 현황</h3>
               <p>생년월일 기준 자동 계산</p>
             </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>구분</th>
-                    <th>20대</th>
-                    <th>30대</th>
-                    <th>40대</th>
-                    <th>50대+</th>
-                    <th>합계</th>
-                  </tr>
-                </thead>
-                <tbody id="ageTable"></tbody>
-              </table>
-            </div>
-          </article>
-        </section>
+            <span class="mini-note">기준일 현재</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>구분</th>
+                  <th>20대</th>
+                  <th>30대</th>
+                  <th>40대</th>
+                  <th>50대+</th>
+                  <th>합계</th>
+                </tr>
+              </thead>
+              <tbody id="ageTable"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
 
-        <section class="panel">
-          <div class="panel-head">
+      <section class="panel">
+        <div class="panel-head">
+          <div>
             <h3>연령·성별 인력구조 피라미드</h3>
             <p>남성 ← 연령대 → 여성</p>
           </div>
-          <div id="pyramidChart" class="pyramid"></div>
-          <div id="shapeInsight" class="insight-box">데이터 입력 후 인력구조 해석이 표시됩니다.</div>
-        </section>
+          <span class="mini-note">피라미드 / 항아리형 참고</span>
+        </div>
+        <div id="pyramidChart" class="pyramid"></div>
+        <div id="shapeInsight" class="insight-box">데이터 입력 후 인력구조 해석이 표시됩니다.</div>
       </section>
+    </section>
 
-      <section id="view-analysis" class="view">
-        <section class="dashboard-grid">
-          <article class="panel">
-            <div class="panel-head">
+    <section id="view-analysis" class="view">
+      <section class="content-grid">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
               <h3>부서/팀별 인력현황</h3>
               <p>사원정보의 부서/팀 기준</p>
             </div>
-            <div id="teamBars" class="bar-list"></div>
-          </article>
+          </div>
+          <div id="teamBars" class="bar-list"></div>
+        </article>
 
-          <article class="panel">
-            <div class="panel-head">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
               <h3>학위 구성비</h3>
               <p>최종학위 기준</p>
             </div>
-            <div id="degreeBars" class="bar-list"></div>
-          </article>
-        </section>
+          </div>
+          <div id="degreeBars" class="bar-list"></div>
+        </article>
+      </section>
 
-        <section class="panel">
-          <div class="panel-head">
+      <section class="panel">
+        <div class="panel-head">
+          <div>
             <h3>분석 코멘트</h3>
             <p>현재 입력된 연구인력 정보를 기준으로 자동 요약합니다.</p>
           </div>
-          <div id="analysisComment" class="comment-box">데이터 입력 후 분석 코멘트가 표시됩니다.</div>
-        </section>
+        </div>
+        <div id="analysisComment" class="comment-box">데이터 입력 후 분석 코멘트가 표시됩니다.</div>
       </section>
+    </section>
 
-      <section id="view-admin" class="view">
-        <section class="panel">
-          <div class="panel-head admin-head">
-            <div>
-              <h3>연구인력 관리</h3>
-              <p>사원정보에서 불러온 직원에 연구개발 인력 정보를 보완합니다.</p>
-            </div>
-            <div class="admin-actions">
-              <input id="adminSearch" type="search" placeholder="성명, 부서, 팀 검색" />
-              <button id="saveAllBtn" class="btn">변경사항 저장</button>
-            </div>
+    <section id="view-admin" class="view">
+      <section class="panel">
+        <div class="panel-head admin-head">
+          <div>
+            <h3>연구인력 관리</h3>
+            <p>사원정보에서 불러온 직원에 연구개발 인력 정보를 보완합니다.</p>
           </div>
+          <div class="admin-actions">
+            <input id="adminSearch" type="search" placeholder="성명, 부서, 팀 검색" />
+            <button id="saveAllBtn" class="btn">변경사항 저장</button>
+          </div>
+        </div>
 
-          <div class="notice">
-            입력 항목은 최소화했습니다. 연구개발인력 여부, 구분, 성별, 생년월일, 연구소 발령일, 최종학위만 관리합니다.
-          </div>
+        <div class="notice">
+          입력 항목은 최소화했습니다. 연구개발인력 여부, 구분, 성별, 생년월일, 연구소 발령일, 최종학위만 관리합니다.
+        </div>
 
-          <div class="table-wrap admin-table-wrap">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th>연구인력</th>
-                  <th>사번</th>
-                  <th>성명</th>
-                  <th>부서</th>
-                  <th>팀</th>
-                  <th>직위</th>
-                  <th>재직상태</th>
-                  <th>구분</th>
-                  <th>성별</th>
-                  <th>생년월일</th>
-                  <th>연구소 발령일</th>
-                  <th>최종학위</th>
-                  <th>비고</th>
-                </tr>
-              </thead>
-              <tbody id="adminTableBody"></tbody>
-            </table>
-          </div>
-        </section>
+        <div class="table-wrap admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>연구인력</th>
+                <th>사번</th>
+                <th>성명</th>
+                <th>부서</th>
+                <th>팀</th>
+                <th>직위</th>
+                <th>재직상태</th>
+                <th>구분</th>
+                <th>성별</th>
+                <th>생년월일</th>
+                <th>연구소 발령일</th>
+                <th>최종학위</th>
+                <th>비고</th>
+              </tr>
+            </thead>
+            <tbody id="adminTableBody"></tbody>
+          </table>
+        </div>
       </section>
-    </main>
-  </div>
+    </section>
+  </main>
 
   <script src="./supabase.js"></script>
   <script src="./app.js"></script>
