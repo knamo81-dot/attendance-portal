@@ -95,7 +95,16 @@
             </table>
           </div>
         </article>
-        <div class="dashboard-empty-slot" aria-hidden="true"></div>
+        <article class="panel dashboard-card dashboard-degree-bars-panel">
+          <div class="panel-head">
+            <div>
+              <h3>학위 구성비</h3>
+              <p>최종학위 기준 인력 구성</p>
+            </div>
+            <span class="mini-note">학위별 인원</span>
+          </div>
+          <div id="dashboardDegreeBars" class="bar-list dashboard-degree-bars"></div>
+        </article>
       </section>
 
       <section class="content-grid dashboard-visual-grid">
@@ -178,7 +187,7 @@
     </section>
 
     <section id="view-analysis" class="view">
-      <section class="content-grid">
+      <section class="content-grid analysis-main-grid">
         <article class="panel">
           <div class="panel-head">
             <div>
@@ -187,16 +196,6 @@
             </div>
           </div>
           <div id="teamBars" class="bar-list"></div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-head">
-            <div>
-              <h3>학위 구성비</h3>
-              <p>최종학위 기준</p>
-            </div>
-          </div>
-          <div id="degreeBars" class="bar-list"></div>
         </article>
       </section>
 
