@@ -30,7 +30,10 @@
           <span>기준년월</span>
           <input id="referenceMonth" type="month" />
         </div>
-        <button id="refreshBtn" class="btn secondary">새로고침</button>
+        <div class="leave-toggle" title="휴직자 포함 여부">
+          <button class="leave-toggle-btn active" data-leave-mode="exclude" type="button">휴직 제외</button>
+          <button class="leave-toggle-btn" data-leave-mode="include" type="button">휴직 포함</button>
+        </div>
       </div>
     </section>
 
@@ -39,7 +42,7 @@
         <article class="summary-card">
           <span>총 연구개발인력</span>
           <strong id="cardTotal">0</strong>
-          <em>재직 기준</em>
+          <em id="cardTotalSub">휴직 제외 기준</em>
         </article>
         <article class="summary-card">
           <span>전담요원</span>
