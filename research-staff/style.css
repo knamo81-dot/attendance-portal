@@ -1202,3 +1202,59 @@ th:first-child {
     text-align: left;
   }
 }
+
+/* 운영인력 리스트: 관리자 외 조회 전용 */
+.readonly-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+#view-admin.admin-readonly .notice::after {
+  content: " 관리자 권한이 없는 사용자는 조회만 가능합니다.";
+  color: #4c1d95;
+  font-weight: 900;
+}
+
+#view-admin.admin-readonly .admin-table input:disabled,
+#view-admin.admin-readonly .admin-table select:disabled {
+  color: #334155;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  opacity: 1;
+  cursor: default;
+}
+
+#view-admin.admin-readonly .admin-table select:disabled {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: none;
+}
+
+#view-admin.admin-readonly .admin-table input:disabled::placeholder {
+  color: #94a3b8;
+}
+
+#view-admin.admin-readonly .admin-table tr.edited td {
+  background: inherit;
+}
+
+#view-admin.admin-readonly .admin-table tr.leave-row td {
+  background: #f5f3ff !important;
+}
+
+@media (max-width: 720px) {
+  .readonly-badge {
+    width: 100%;
+    justify-content: center;
+  }
+}
