@@ -7,6 +7,7 @@ function renderDashboard() {
 
   renderSummaryCards(rows);
   renderResearchTypeTable(rows);
+  renderDashboardDegreeBars(rows);
   renderDegreeTable(rows);
   renderAgeTable(rows);
   renderDegreePyramid(rows);
@@ -33,6 +34,9 @@ function renderSummaryCards(rows) {
   setText("cardManagerSub", pct(manager, total));
   setText("cardFemaleRate", pct(female, total));
   setText("cardMasterPlusRate", pct(masterPlus, total));
+
+  const leaveLabel = AppState.leaveMode === "include" ? "휴직 포함 기준" : "휴직 제외 기준";
+  setText("cardTotalSub", leaveLabel);
 }
 
 function renderResearchTypeTable(rows) {
@@ -69,6 +73,28 @@ function renderResearchTypeTable(rows) {
   `);
 
   tbody.innerHTML = lines.join("");
+}
+
+function renderDashboardDegreeBars(rows) {
+  const container = document.getElementById("dashboardDegreeBars");
+  if (!container) return;
+
+  const entries = DEGREES.map(degree => [degree, rows.filter(row => row.degree === degree).length]);
+  const max = Math.max(1, ...entries.map(([, count]) => count));
+  const total = rows.length;
+
+  if (!total) {
+    container.innerHTML = `<div class="empty">표시할 데이터가 없습니다.</div>`;
+    return;
+  }
+
+  container.innerHTML = entries.map(([name, count]) => `
+    <div class="bar-row dashboard-degree-bar-row">
+      <span>${name}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${(count / max) * 100}%"></div></div>
+      <strong>${count}명 <em>${pct(count, total)}</em></strong>
+    </div>
+  `).join("");
 }
 
 function renderDegreeTable(rows) {
