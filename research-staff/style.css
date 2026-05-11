@@ -1011,3 +1011,72 @@ th:first-child {
     justify-items: start;
   }
 }
+
+
+/* 현황분석: 조직 구조 분석 레이아웃 */
+#view-analysis .analysis-main-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  align-items: stretch;
+}
+
+#view-analysis .analysis-card {
+  height: 100%;
+}
+
+.analysis-bars {
+  gap: 11px;
+}
+
+.analysis-bar-row {
+  grid-template-columns: 120px 1fr 96px;
+  gap: 10px;
+}
+
+.analysis-bar-row > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-bar-row strong {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.analysis-bar-row strong em {
+  display: inline-block;
+  margin-left: 4px;
+  color: #64748b;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.analysis-comment-panel {
+  margin-top: 0;
+}
+
+.analysis-comment-box p {
+  margin: 0 0 8px;
+}
+
+.analysis-comment-box p:last-child {
+  margin-bottom: 0;
+}
+
+.analysis-comment-box strong {
+  color: #111827;
+  font-weight: 900;
+}
+
+@media (max-width: 1300px) {
+  #view-analysis .analysis-main-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .analysis-bar-row {
+    grid-template-columns: 92px 1fr 86px;
+  }
+}
