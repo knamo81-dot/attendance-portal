@@ -19,6 +19,7 @@ function renderAdmin() {
   });
 
   const rows = sortStaffRows(filteredRows);
+  const canEdit = canEditAdminList();
 
   const countEl = document.getElementById("adminListCount");
   if (countEl) {
@@ -29,9 +30,10 @@ function renderAdmin() {
       : `전체 ${totalCount.toLocaleString()}명`;
   }
 
-  tbody.innerHTML = rows.map((row, index) => renderAdminRow(row, index)).join("");
+  tbody.innerHTML = rows.map((row, index) => renderAdminRow(row, index, canEdit)).join("");
 
-  bindAdminInputs();
+  updateAdminEditMode(canEdit);
+  bindAdminInputs(canEdit);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -39,11 +41,46 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("saveAllBtn")?.addEventListener("click", saveAllProfiles);
 });
 
-function renderAdminRow(row, index) {
+function canEditAdminList() {
+  if (typeof canEditOperatingStaffList === "function") return canEditOperatingStaffList();
+  return Boolean(AppState?.isAdmin);
+}
+
+function updateAdminEditMode(canEdit) {
+  const view = document.getElementById("view-admin");
+  const saveBtn = document.getElementById("saveAllBtn");
+  const tableBody = document.getElementById("adminTableBody");
+
+  view?.classList.toggle("admin-readonly", !canEdit);
+  tableBody?.classList.toggle("admin-readonly-body", !canEdit);
+
+  if (saveBtn) {
+    saveBtn.hidden = !canEdit;
+    saveBtn.disabled = !canEdit;
+  }
+
+  let badge = document.getElementById("adminReadonlyBadge");
+  const actions = document.querySelector("#view-admin .admin-actions");
+
+  if (!badge && actions) {
+    badge = document.createElement("span");
+    badge.id = "adminReadonlyBadge";
+    badge.className = "readonly-badge";
+    actions.prepend(badge);
+  }
+
+  if (badge) {
+    badge.textContent = canEdit ? "관리자 수정 가능" : "조회 전용";
+    badge.hidden = canEdit;
+  }
+}
+
+function renderAdminRow(row, index, canEdit = true) {
   const employeeNo = escapeHtml(row.employee_no || "");
   const displayStatus = typeof getAdminDisplayStatus === "function" ? getAdminDisplayStatus(row) : (row.status || "");
   const isLeaveRow = typeof isAdminLeaveRow === "function" ? isAdminLeaveRow(row) : false;
   const rowClass = isLeaveRow ? "leave-row" : "";
+  const disabledAttr = canEdit ? "" : " disabled";
 
   return `
     <tr class="${rowClass}" data-employee-no="${employeeNo}">
@@ -55,7 +92,7 @@ function renderAdminRow(row, index) {
       <td>${escapeHtml(row.position || "")}</td>
       <td class="status-cell">${formatAdminStatus(displayStatus)}</td>
       <td>
-        <select data-field="research_type">
+        <select data-field="research_type"${disabledAttr}>
           ${option("", "선택", row.research_type)}
           ${option("전담요원", "전담요원", row.research_type)}
           ${option("보조원", "보조원", row.research_type)}
@@ -63,16 +100,16 @@ function renderAdminRow(row, index) {
         </select>
       </td>
       <td>
-        <select data-field="gender">
+        <select data-field="gender"${disabledAttr}>
           ${option("", "선택", row.gender)}
           ${option("남", "남", row.gender)}
           ${option("여", "여", row.gender)}
         </select>
       </td>
-      <td><input type="date" data-field="birth_date" value="${row.birth_date || ""}"></td>
-      <td><input type="date" data-field="lab_assign_date" value="${row.lab_assign_date || ""}"></td>
+      <td><input type="date" data-field="birth_date" value="${row.birth_date || ""}"${disabledAttr}></td>
+      <td><input type="date" data-field="lab_assign_date" value="${row.lab_assign_date || ""}"${disabledAttr}></td>
       <td>
-        <select data-field="degree">
+        <select data-field="degree"${disabledAttr}>
           ${option("", "선택", row.degree)}
           ${option("박사", "박사", row.degree)}
           ${option("석사", "석사", row.degree)}
@@ -81,12 +118,14 @@ function renderAdminRow(row, index) {
           ${option("기타", "기타", row.degree)}
         </select>
       </td>
-      <td><input type="text" data-field="remarks" value="${escapeHtml(row.remarks || "")}" placeholder="비고"></td>
+      <td><input type="text" data-field="remarks" value="${escapeHtml(row.remarks || "")}" placeholder="비고"${disabledAttr}></td>
     </tr>
   `;
 }
 
-function bindAdminInputs() {
+function bindAdminInputs(canEdit = true) {
+  if (!canEdit) return;
+
   document.querySelectorAll("#adminTableBody input, #adminTableBody select").forEach(input => {
     input.addEventListener("change", event => {
       const tr = event.target.closest("tr");
@@ -96,6 +135,11 @@ function bindAdminInputs() {
 }
 
 async function saveAllProfiles() {
+  if (!canEditAdminList()) {
+    alert("관리자만 수정할 수 있습니다.");
+    return;
+  }
+
   const client = getSupabase();
 
   if (!client) {
