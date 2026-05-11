@@ -71,7 +71,8 @@
         </article>
       </section>
 
-      <section class="panel">
+      <section class="content-grid dashboard-main-grid">
+        <article class="panel dashboard-research-panel">
         <div class="panel-head">
           <div>
             <h3>연구개발인력현황</h3>
@@ -93,6 +94,21 @@
             <tbody id="researchTypeTable"></tbody>
           </table>
         </div>
+        </article>
+
+        <article class="panel dashboard-pyramid-panel">
+        <div class="panel-head">
+          <div>
+            <h3>연령·성별 인력구조 피라미드</h3>
+            <p>남성 ← 연령대 → 여성</p>
+          </div>
+          <span class="mini-note">피라미드 / 항아리형 참고</span>
+        </div>
+        <div id="pyramidChart" class="pyramid"></div>
+        <div id="shapeInsight" class="insight-box">데이터 입력 후 인력구조 해석이 표시됩니다.</div>
+      </section>
+    </section>
+
       </section>
 
       <section class="content-grid">
@@ -147,19 +163,6 @@
           </div>
         </article>
       </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <h3>연령·성별 인력구조 피라미드</h3>
-            <p>남성 ← 연령대 → 여성</p>
-          </div>
-          <span class="mini-note">피라미드 / 항아리형 참고</span>
-        </div>
-        <div id="pyramidChart" class="pyramid"></div>
-        <div id="shapeInsight" class="insight-box">데이터 입력 후 인력구조 해석이 표시됩니다.</div>
-      </section>
-    </section>
 
     <section id="view-analysis" class="view">
       <section class="content-grid">
