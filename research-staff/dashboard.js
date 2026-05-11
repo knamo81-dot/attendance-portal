@@ -9,6 +9,7 @@ function renderDashboard() {
   renderResearchTypeTable(rows);
   renderDegreeTable(rows);
   renderAgeTable(rows);
+  renderDegreePyramid(rows);
   renderPyramid(rows);
 }
 
@@ -128,6 +129,37 @@ function renderAgeTable(rows) {
   `);
 
   tbody.innerHTML = lines.join("");
+}
+
+
+function renderDegreePyramid(rows) {
+  const container = document.getElementById("degreePyramidChart");
+  if (!container) return;
+
+  const groups = DEGREES;
+  const max = Math.max(
+    1,
+    ...groups.map(group => rows.filter(row => row.degree === group && row.gender === "남").length),
+    ...groups.map(group => rows.filter(row => row.degree === group && row.gender === "여").length)
+  );
+
+  container.innerHTML = `
+    <div class="pyramid-col">
+      ${groups.map(group => {
+        const count = rows.filter(row => row.degree === group && row.gender === "남").length;
+        return `<div class="pyramid-row left"><span>${count}명</span><div class="pyramid-bar male" style="width:${(count / max) * 100}%"></div></div>`;
+      }).join("")}
+    </div>
+    <div class="pyramid-age">
+      ${groups.map(group => `<div>${group}</div>`).join("")}
+    </div>
+    <div class="pyramid-col">
+      ${groups.map(group => {
+        const count = rows.filter(row => row.degree === group && row.gender === "여").length;
+        return `<div class="pyramid-row right"><div class="pyramid-bar female" style="width:${(count / max) * 100}%"></div><span>${count}명</span></div>`;
+      }).join("")}
+    </div>
+  `;
 }
 
 function renderPyramid(rows) {
