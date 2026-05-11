@@ -756,3 +756,52 @@ th:first-child {
 .admin-table tr.leave-row.edited td {
   background: #fff7ed !important;
 }
+
+/* 메인 대시보드 상단: 연구개발인력현황 + 피라미드 2분할 배치 */
+.dashboard-main-grid {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  align-items: stretch;
+  margin-bottom: 0;
+}
+
+.dashboard-main-grid .panel {
+  height: 100%;
+}
+
+.dashboard-pyramid-panel .pyramid {
+  grid-template-columns: 1fr 62px 1fr;
+  gap: 8px;
+  padding: 6px 4px 4px;
+}
+
+.dashboard-pyramid-panel .pyramid-col,
+.dashboard-pyramid-panel .pyramid-age {
+  gap: 9px;
+}
+
+.dashboard-pyramid-panel .pyramid-row {
+  height: 26px;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.dashboard-pyramid-panel .pyramid-bar {
+  height: 18px;
+}
+
+.dashboard-pyramid-panel .insight-box {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+@media (max-width: 1300px) {
+  .dashboard-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-pyramid-panel .pyramid {
+    grid-template-columns: 1fr 58px 1fr;
+    gap: 6px;
+  }
+}
