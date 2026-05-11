@@ -1,8 +1,21 @@
 const POSITION_ORDER = ["사원", "주임", "대리", "과장", "차장", "부장", "이사부장", "이사", "전무"];
 const LOWER_TENURE_GROUPS = ["3~5년", "1~3년", "1년 미만"];
 
+function getLatestAnalysisRows() {
+  const source = Array.isArray(AppState?.merged) ? AppState.merged : [];
+  return source
+    .filter(row => typeof isResearchStaffRow === "function" ? isResearchStaffRow(row) : true)
+    .filter(row => {
+      const status = String(row.status || row.employment_status || "").trim();
+      if (status === "퇴사") return false;
+      if (row.resignation_date) return false;
+      return true;
+    });
+}
+
+
 function renderAnalysis() {
-  const rows = getReferenceFilteredRows(AppState.merged).filter(row => isResearchStaffRow(row));
+  const rows = getLatestAnalysisRows();
 
   renderTenureBars(rows);
   renderPositionBars(rows);
@@ -15,7 +28,7 @@ function renderTenureBars(rows) {
   const tenureGroups = getDynamicTenureGroups(rows);
   const entries = tenureGroups.map(group => [
     group,
-    rows.filter(row => getTenureGroup(row.lab_assign_date || row.hire_date, tenureGroups) === group).length
+    rows.filter(row => getTenureGroup(row.hire_date, tenureGroups) === group).length
   ]);
 
   renderAnalysisBars("tenureBars", entries, rows.length, { includeZero: true });
@@ -169,16 +182,15 @@ function renderAnalysisComment(rows) {
     return;
   }
 
-  const female = countGender(rows, "여");
-  const masterPlus = rows.filter(row => row.degree === "석사" || row.degree === "박사").length;
   const dedicated = countBy(rows, "research_type", "전담요원");
+  const masterPlus = rows.filter(row => row.degree === "석사" || row.degree === "박사").length;
 
   const tenureGroups = getDynamicTenureGroups(rows);
-  const tenureCounts = tenureGroups.map(group => ({
-    group,
-    count: rows.filter(row => getTenureGroup(row.lab_assign_date || row.hire_date, tenureGroups) === group).length
-  }));
-  const topTenure = tenureCounts
+  const topTenure = tenureGroups
+    .map(group => ({
+      group,
+      count: rows.filter(row => getTenureGroup(row.hire_date, tenureGroups) === group).length
+    }))
     .filter(item => item.count > 0 && item.group !== "미입력")
     .sort((a, b) => b.count - a.count)[0];
 
@@ -204,36 +216,36 @@ function renderAnalysisComment(rows) {
   });
   const latestYear = [...yearMap.keys()].sort((a, b) => Number(b) - Number(a))[0];
 
-  const comments = [];
-  comments.push(`현재 연구개발인력은 총 <strong>${total}명</strong>이며, 전담요원은 <strong>${dedicated}명</strong>으로 전체의 <strong>${pct(dedicated, total)}</strong>입니다.`);
-  comments.push(`여성 연구인력은 <strong>${female}명</strong>이며, 여성 비율은 <strong>${pct(female, total)}</strong>입니다. 석사 이상 인력은 <strong>${masterPlus}명</strong>으로 전체의 <strong>${pct(masterPlus, total)}</strong>입니다.`);
+  const insights = [];
+  insights.push(`전담요원 비중은 <strong>${pct(dedicated, total)}</strong>로 연구 중심 조직 구조를 보여줍니다.`);
+  insights.push(`석사 이상 인력은 <strong>${masterPlus}명</strong>으로 전체의 <strong>${pct(masterPlus, total)}</strong>입니다.`);
 
-  if (topTenure && topTenure.count > 0) {
-    comments.push(`근속연수는 <strong>${topTenure.group}</strong> 구간이 가장 많아, 해당 구간이 현재 연구소 인력 구조의 중심층으로 보입니다.`);
+  if (topTenure) {
+    insights.push(`입사일 기준 근속연수는 <strong>${topTenure.group}</strong> 구간이 가장 큰 비중을 차지합니다.`);
   }
 
   if (coreCount > 0) {
-    comments.push(`대리~차장 구간의 실무 허리층은 <strong>${coreCount}명</strong>으로 전체의 <strong>${pct(coreCount, total)}</strong>입니다. 이 비율은 과제 운영 안정성과 직접 연결됩니다.`);
+    insights.push(`대리~차장 실무 허리층은 <strong>${coreCount}명</strong>으로 전체의 <strong>${pct(coreCount, total)}</strong>입니다.`);
   }
 
   if (seniorCount > 0) {
-    comments.push(`부장 이상 리더/상위 직급 인력은 <strong>${seniorCount}명</strong>으로, 연구 방향성 관리와 후배 인력 육성의 핵심 축입니다.`);
+    insights.push(`부장 이상 리더/상위 직급은 <strong>${seniorCount}명</strong>으로 조직 운영의 핵심 축입니다.`);
   }
 
   if (topTeam) {
-    comments.push(`팀별로는 <strong>${escapeAnalysisHtml(topTeam[0])}</strong> 인원이 <strong>${topTeam[1]}명</strong>으로 가장 많습니다.`);
+    insights.push(`가장 큰 조직 단위는 <strong>${escapeAnalysisHtml(topTeam[0])}</strong>이며 <strong>${topTeam[1]}명</strong>입니다.`);
   }
 
   if (latestYear) {
-    comments.push(`가장 최근 발령연도는 <strong>${latestYear}년</strong>이며, 최신 유입 인력부터 과거 발령 인력까지 연도별 흐름을 확인할 수 있습니다.`);
+    insights.push(`최근 연구소 발령연도는 <strong>${latestYear}년</strong>이며, 최신 유입 흐름을 우선 확인할 수 있습니다.`);
   }
 
-  el.innerHTML = comments.map(text => `<p>${text}</p>`).join("");
+  el.innerHTML = `<ul class="analysis-insight-list">${insights.map(text => `<li>${text}</li>`).join("")}</ul>`;
 }
 
 function getDynamicTenureGroups(rows) {
   const yearsList = rows
-    .map(row => getTenureYears(row.lab_assign_date || row.hire_date))
+    .map(row => getTenureYears(row.hire_date))
     .filter(years => Number.isFinite(years) && years >= 0);
 
   const maxYears = Math.max(0, ...yearsList);
@@ -271,7 +283,7 @@ function getTenureYears(dateValue) {
   const startDate = parseDateOnly(dateValue);
   if (!startDate) return NaN;
 
-  const referenceDate = getReferenceDate();
+  const referenceDate = getAnalysisReferenceDate();
   let months = (referenceDate.getFullYear() - startDate.getFullYear()) * 12;
   months += referenceDate.getMonth() - startDate.getMonth();
   if (referenceDate.getDate() < startDate.getDate()) months -= 1;
@@ -328,6 +340,11 @@ function compareSortValues(a, b) {
   if (!av) return 1;
   if (!bv) return -1;
   return av.localeCompare(bv, "ko", { numeric: true, sensitivity: "base" });
+}
+
+function getAnalysisReferenceDate() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + 1, 0);
 }
 
 function escapeAnalysisHtml(value) {
