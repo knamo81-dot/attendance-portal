@@ -1,7 +1,6 @@
 function renderAnalysis() {
-  const rows = getResearchRows();
+  const rows = getReferenceFilteredRows(AppState.merged).filter(row => isResearchStaffRow(row));
   renderTeamBars(rows);
-  renderDegreeBars(rows);
   renderAnalysisComment(rows);
 }
 
@@ -23,22 +22,6 @@ function renderTeamBars(rows) {
     container.innerHTML = `<div class="empty">표시할 데이터가 없습니다.</div>`;
     return;
   }
-
-  container.innerHTML = entries.map(([name, count]) => `
-    <div class="bar-row">
-      <span>${name}</span>
-      <div class="bar-track"><div class="bar-fill" style="width:${(count / max) * 100}%"></div></div>
-      <strong>${count}명</strong>
-    </div>
-  `).join("");
-}
-
-function renderDegreeBars(rows) {
-  const container = document.getElementById("degreeBars");
-  if (!container) return;
-
-  const entries = DEGREES.map(degree => [degree, rows.filter(row => row.degree === degree).length]);
-  const max = Math.max(1, ...entries.map(([, count]) => count));
 
   container.innerHTML = entries.map(([name, count]) => `
     <div class="bar-row">
