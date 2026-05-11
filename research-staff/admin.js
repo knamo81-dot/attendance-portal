@@ -18,7 +18,16 @@ function renderAdmin() {
 
   const rows = sortStaffRows(filteredRows);
 
-  tbody.innerHTML = rows.map(row => renderAdminRow(row)).join("");
+  const countEl = document.getElementById("adminListCount");
+  if (countEl) {
+    const totalCount = baseRows.length;
+    const filteredCount = rows.length;
+    countEl.innerHTML = keyword
+      ? `검색 ${filteredCount.toLocaleString()}명 <span>/ 전체 ${totalCount.toLocaleString()}명</span>`
+      : `전체 ${totalCount.toLocaleString()}명`;
+  }
+
+  tbody.innerHTML = rows.map((row, index) => renderAdminRow(row, index)).join("");
 
   bindAdminInputs();
 }
@@ -28,12 +37,13 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("saveAllBtn")?.addEventListener("click", saveAllProfiles);
 });
 
-function renderAdminRow(row) {
+function renderAdminRow(row, index) {
   const employeeNo = escapeHtml(row.employee_no || "");
 
   return `
     <tr data-employee-no="${employeeNo}">
-      <td>${employeeNo}</td>
+      <td class="admin-row-no">${index + 1}</td>
+      <td class="admin-employee-no">${employeeNo}</td>
       <td>${escapeHtml(row.name || "")}</td>
       <td>${escapeHtml(row.department || "")}</td>
       <td>${escapeHtml(row.team || "")}</td>
