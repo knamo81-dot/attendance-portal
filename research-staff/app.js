@@ -3,6 +3,7 @@ const AppState = {
   profiles: [],
   divisions: [],
   teams: [],
+  specialNotes: [],
   merged: [],
   currentView: "dashboard",
   referenceMonth: "",
@@ -76,11 +77,12 @@ async function loadAllData() {
   }
 
   try {
-    const [employeesResult, profilesResult, divisionsResult, teamsResult] = await Promise.all([
+    const [employeesResult, profilesResult, divisionsResult, teamsResult, specialNotesResult] = await Promise.all([
       client.from("employees").select("*").order("name", { ascending: true }),
       client.from("research_staff_profiles").select("*"),
       client.from("divisions").select("*"),
-      client.from("teams").select("*")
+      client.from("teams").select("*"),
+      client.from("employee_special_notes").select("*")
     ]);
 
     if (employeesResult.error) throw employeesResult.error;
@@ -88,10 +90,15 @@ async function loadAllData() {
     if (divisionsResult.error) throw divisionsResult.error;
     if (teamsResult.error) throw teamsResult.error;
 
+    if (specialNotesResult.error) {
+      console.warn("특이사항 조회 실패:", specialNotesResult.error);
+    }
+
     AppState.employees = employeesResult.data || [];
     AppState.profiles = profilesResult.data || [];
     AppState.divisions = divisionsResult.data || [];
     AppState.teams = teamsResult.data || [];
+    AppState.specialNotes = specialNotesResult.error ? [] : (specialNotesResult.data || []);
     AppState.merged = sortStaffRows(
       mergeEmployeeProfiles(
         AppState.employees,
@@ -208,7 +215,13 @@ function getResearchRows() {
 }
 
 function getAdminRows() {
-  return getReferenceFilteredRows(AppState.merged);
+  const rows = getReferenceFilteredRows(AppState.merged);
+
+  if (AppState.leaveMode === "include") {
+    return rows;
+  }
+
+  return rows.filter(row => !isAdminLeaveRow(row));
 }
 
 function isResearchStaffRow(row) {
@@ -237,10 +250,6 @@ function getReferenceFilteredRows(rows) {
       return false;
     }
 
-    if (AppState.leaveMode !== "include" && isLeaveStatus(row)) {
-      return false;
-    }
-
     return true;
   });
 }
@@ -249,6 +258,61 @@ function isLeaveStatus(row) {
   const statusText = String(row.status || row.employment_status || "");
   const leaveTypeText = String(row.leave_type || "");
   return statusText.includes("휴직") || Boolean(leaveTypeText);
+}
+
+const ADMIN_LEAVE_SPECIAL_TYPES = [
+  "파견",
+  "병가",
+  "육아휴직",
+  "출산휴가",
+  "일반휴직",
+  "가족돌봄휴직"
+];
+
+function isAdminLeaveRow(row) {
+  return Boolean(getAdminReferenceSpecialStatus(row)) || isLeaveStatus(row);
+}
+
+function getAdminDisplayStatus(row) {
+  const specialStatus = getAdminReferenceSpecialStatus(row);
+  if (specialStatus) return specialStatus;
+
+  const leaveType = String(row.leave_type || "").trim();
+  if (leaveType) return leaveType;
+
+  return String(row.status || row.employment_status || "").trim();
+}
+
+function getAdminReferenceSpecialStatus(row) {
+  const employeeNo = String(row.employee_no || row.employee_id || row.id || "").trim();
+  if (!employeeNo) return "";
+
+  const referenceDate = getReferenceDate();
+
+  const matches = (AppState.specialNotes || [])
+    .filter(note => String(note.employee_no || note.employee_id || "").trim() === employeeNo)
+    .filter(note => ADMIN_LEAVE_SPECIAL_TYPES.includes(String(note.issue_type || note.special_type || note.type || "").trim()))
+    .filter(note => isSpecialNoteActiveOnDate(note, referenceDate))
+    .sort((a, b) => {
+      const aDate = parseDateOnly(a.start_date) || new Date(0);
+      const bDate = parseDateOnly(b.start_date) || new Date(0);
+      return bDate - aDate;
+    });
+
+  if (!matches.length) return "";
+
+  return String(matches[0].issue_type || matches[0].special_type || matches[0].type || "").trim();
+}
+
+function isSpecialNoteActiveOnDate(note, date) {
+  const startDate = parseDateOnly(note.start_date || note.from_date || note.begin_date);
+  const endDate = parseDateOnly(note.end_date || note.to_date || note.finish_date);
+
+  if (!startDate) return false;
+  if (startDate > date) return false;
+  if (endDate && endDate < date) return false;
+
+  return true;
 }
 
 function getReferenceDate() {
@@ -346,6 +410,8 @@ function useSampleData() {
     { employee_no: "E005", name: "이하나", department: "중앙연구소", team: "분석팀", position: "연구원", status: "재직" },
     { employee_no: "E006", name: "박민수", department: "중앙연구소", team: "제제연구팀", position: "연구원", status: "재직" }
   ];
+
+  AppState.specialNotes = [];
 
   AppState.profiles = [
     { employee_no: "E001", is_research_staff: true, research_type: "전담요원", gender: "남", birth_date: "1991-03-12", lab_assign_date: "2020-05-18", degree: "석사", remarks: "" },
