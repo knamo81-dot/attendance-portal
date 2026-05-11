@@ -38,75 +38,112 @@ function renderSummaryCards(rows) {
   const leaveLabel = AppState.leaveMode === "include" ? "휴직 포함 기준" : "휴직 제외 기준";
   setText("cardTotalSub", leaveLabel);
 
-  renderSummaryLeaveNotes(rows);
+  renderKpiLeaveSummaries(rows);
 }
 
 
-function renderSummaryLeaveNotes(rows) {
-  ["cardTotal", "cardFemale"].forEach(id => {
-    const card = document.getElementById(id)?.closest(".summary-card");
+function renderKpiLeaveSummaries(rows) {
+  const leaveEnabled = AppState.leaveMode === "include";
+
+  const targets = [
+    { id: "cardTotal", label: "휴직", rows },
+    { id: "cardDedicated", label: "휴직", rows: rows.filter(row => row.research_type === "전담요원") },
+    { id: "cardAssistant", label: "휴직", rows: rows.filter(row => row.research_type === "보조원") },
+    { id: "cardManager", label: "휴직", rows: rows.filter(row => row.research_type === "관리직원") },
+    { id: "cardFemale", label: "여성 휴직", rows: rows.filter(row => row.gender === "여") },
+    { id: "cardMasterPlus", label: "휴직", rows: rows.filter(row => row.degree === "석사" || row.degree === "박사") }
+  ];
+
+  targets.forEach(target => {
+    const card = document.getElementById(target.id)?.closest(".summary-card");
     if (!card) return;
-    card.classList.remove("has-leave-note");
-    card.querySelector(".summary-leave-note")?.remove();
+
+    let box = card.querySelector(".kpi-leave-summary");
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "kpi-leave-summary";
+      card.appendChild(box);
+    }
+
+    if (!leaveEnabled) {
+      box.innerHTML = "";
+      box.classList.remove("show");
+      return;
+    }
+
+    const counts = getLeaveReasonCounts(target.rows);
+    const total = counts.reduce((sum, item) => sum + item.count, 0);
+
+    if (!total) {
+      box.innerHTML = "";
+      box.classList.remove("show");
+      return;
+    }
+
+    box.classList.add("show");
+    box.innerHTML = `
+      <div class="kpi-leave-total">${target.label} <strong>${total}명</strong></div>
+      <div class="kpi-leave-items">
+        ${counts.map(item => `<span>${escapeDashboardHtml(formatLeaveReasonLabel(item.type))} <b>${item.count}</b></span>`).join("")}
+      </div>
+    `;
   });
-
-  if (AppState.leaveMode !== "include") return;
-
-  renderLeaveNoteForCard("cardTotal", rows, "휴직");
-  renderLeaveNoteForCard("cardFemale", rows.filter(row => row.gender === "여"), "여성 휴직");
 }
 
-function renderLeaveNoteForCard(cardValueId, rows, title) {
-  const card = document.getElementById(cardValueId)?.closest(".summary-card");
-  if (!card) return;
-
-  const entries = getLeaveSummaryEntries(rows);
-  if (!entries.length) return;
-
-  const total = entries.reduce((sum, [, count]) => sum + count, 0);
-  const note = document.createElement("div");
-  note.className = "summary-leave-note";
-  note.innerHTML = `
-    <div class="summary-leave-title">${title} ${total}명</div>
-    <div class="summary-leave-list">
-      ${entries.map(([type, count]) => `<span>${type} <b>${count}</b></span>`).join("")}
-    </div>
-  `;
-
-  card.classList.add("has-leave-note");
-  card.appendChild(note);
-}
-
-function getLeaveSummaryEntries(rows) {
-  const order = typeof ADMIN_LEAVE_SPECIAL_TYPES !== "undefined"
-    ? ADMIN_LEAVE_SPECIAL_TYPES
-    : ["파견", "병가", "육아휴직", "출산휴가", "일반휴직", "가족돌봄휴직"];
-
+function getLeaveReasonCounts(rows) {
+  const order = getLeaveReasonOrder();
   const map = new Map(order.map(type => [type, 0]));
 
   rows.forEach(row => {
-    const type = getDashboardLeaveStatus(row);
-    if (!type) return;
-    if (!map.has(type)) map.set(type, 0);
+    const type = getDashboardLeaveType(row);
+    if (!type || !map.has(type)) return;
     map.set(type, map.get(type) + 1);
   });
 
-  return [...map.entries()].filter(([, count]) => count > 0);
+  return [...map.entries()]
+    .filter(([, count]) => count > 0)
+    .map(([type, count]) => ({ type, count }));
 }
 
-function getDashboardLeaveStatus(row) {
-  if (typeof getAdminReferenceSpecialStatus === "function") {
-    const specialStatus = getAdminReferenceSpecialStatus(row);
-    if (specialStatus) return specialStatus;
+function getLeaveReasonOrder() {
+  if (typeof ADMIN_LEAVE_SPECIAL_TYPES !== "undefined" && Array.isArray(ADMIN_LEAVE_SPECIAL_TYPES)) {
+    return ADMIN_LEAVE_SPECIAL_TYPES;
   }
 
+  return ["파견", "병가", "육아휴직", "출산휴가", "일반휴직", "가족돌봄휴직"];
+}
+
+function getDashboardLeaveType(row) {
+  let specialStatus = "";
+
+  if (typeof getAdminReferenceSpecialStatus === "function") {
+    specialStatus = getAdminReferenceSpecialStatus(row);
+  }
+
+  const order = getLeaveReasonOrder();
+  if (order.includes(specialStatus)) return specialStatus;
+
   const leaveType = String(row.leave_type || "").trim();
-  if (leaveType) return leaveType;
+  if (order.includes(leaveType)) return leaveType;
 
   const statusText = String(row.status || row.employment_status || "").trim();
-  if (statusText.includes("휴직")) return statusText || "휴직";
+  if (order.includes(statusText)) return statusText;
+  if (statusText.includes("휴직")) return "일반휴직";
 
   return "";
+}
+
+function formatLeaveReasonLabel(type) {
+  return type === "가족돌봄휴직" ? "가족돌봄" : type;
+}
+
+function escapeDashboardHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function renderResearchTypeTable(rows) {
