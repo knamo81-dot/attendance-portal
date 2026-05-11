@@ -986,7 +986,7 @@ html.embed-mode .auth-overlay[hidden]{
               </div>
 
               <div id="adminSectionIssue" class="admin-section-panel" hidden>
-                <div class="admin-header-desc" style="margin-bottom:12px;">단축근무, 파견처럼 세금 출퇴근 기록 분석에 영향을 줄 수 있는 특이사항을 별도로 기록합니다.</div>
+                <div class="admin-header-desc" style="margin-bottom:12px;">재택근무, 단축근무, 파견, 휴직/휴가 등 근태 분석에 영향을 줄 수 있는 특이사항을 별도로 기록합니다.</div>
                 <div class="real-admin-top-note">입력 순서는 본부, 팀, 담당자 선택 후 사번 자동표시 방식이며, 아래에서 적용 시작일과 종료일을 함께 저장하도록 구성했습니다.</div>
                 <div class="real-card">
                   <div class="real-box-title">특이사항 등록</div>
@@ -997,9 +997,9 @@ html.embed-mode .auth-overlay[hidden]{
                     <div class="real-field"><label>사번</label><input id="realIssueEmployeeNo" class="real-input" placeholder="담당자 선택 시 자동 표시" readonly></div>
                     <div class="real-field"><label>적용 시작일</label><input id="realIssueStartDate" class="real-input" type="date"></div>
                     <div class="real-field"><label>적용 종료일</label><input id="realIssueEndDate" class="real-input" type="date"></div>
-                    <div class="real-field"><label>특이사항</label><select id="realIssueType" class="real-select"><option value="">선택</option><option value="단축근무">단축근무</option><option value="파견">파견</option><option value="재택근무">재택근무</option></select></div>
+                    <div class="real-field"><label>특이사항</label><select id="realIssueType" class="real-select"><option value="">선택</option><option value="재택근무">재택근무</option><option value="단축근무">단축근무</option><option value="파견">파견</option><option value="병가">병가</option><option value="육아휴직">육아휴직</option><option value="출산휴가">출산휴가</option><option value="일반휴직">일반휴직</option><option value="가족돌봄휴직">가족돌봄휴직</option></select></div>
                     <div class="real-field"><label>총 근무시간</label><input id="realIssueWorkHours" class="real-input" placeholder="단축근무 선택 시 입력"></div>
-                    <div class="real-field full"><label>비고</label><input id="realIssueNote" class="real-input" placeholder="예: 임신초기 단축근무 / 본사 파견"></div>
+                    <div class="real-field full"><label>비고</label><input id="realIssueNote" class="real-input" placeholder="예: 임신초기 단축근무 / 본사 파견 / 육아휴직"></div>
                   </div>
                   <div class="real-actions left" style="margin-top:14px;">
                     <button id="realIssueSaveBtn" class="real-btn">특이사항 저장</button>
