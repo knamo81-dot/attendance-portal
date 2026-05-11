@@ -7,12 +7,14 @@ function renderAdmin() {
   const baseRows = typeof getAdminRows === "function" ? getAdminRows() : AppState.merged;
   const filteredRows = baseRows.filter(row => {
     if (!keyword) return true;
+    const displayStatus = typeof getAdminDisplayStatus === "function" ? getAdminDisplayStatus(row) : row.status;
     return [
       row.name,
       row.department,
       row.team,
       row.position,
-      row.employee_no
+      row.employee_no,
+      displayStatus
     ].some(value => String(value || "").toLowerCase().includes(keyword));
   });
 
@@ -39,16 +41,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function renderAdminRow(row, index) {
   const employeeNo = escapeHtml(row.employee_no || "");
+  const displayStatus = typeof getAdminDisplayStatus === "function" ? getAdminDisplayStatus(row) : (row.status || "");
+  const isLeaveRow = typeof isAdminLeaveRow === "function" ? isAdminLeaveRow(row) : false;
+  const rowClass = isLeaveRow ? "leave-row" : "";
 
   return `
-    <tr data-employee-no="${employeeNo}">
+    <tr class="${rowClass}" data-employee-no="${employeeNo}">
       <td class="admin-row-no">${index + 1}</td>
       <td class="admin-employee-no">${employeeNo}</td>
       <td>${escapeHtml(row.name || "")}</td>
       <td>${escapeHtml(row.department || "")}</td>
       <td>${escapeHtml(row.team || "")}</td>
       <td>${escapeHtml(row.position || "")}</td>
-      <td>${escapeHtml(row.status || "")}</td>
+      <td class="status-cell">${formatAdminStatus(displayStatus)}</td>
       <td>
         <select data-field="research_type">
           ${option("", "선택", row.research_type)}
@@ -145,4 +150,15 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+
+function formatAdminStatus(value) {
+  const status = String(value || "").trim();
+
+  if (status === "가족돌봄휴직") {
+    return '<span class="status-text">가족돌봄<br>휴직</span>';
+  }
+
+  return `<span class="status-text">${escapeHtml(status)}</span>`;
 }
