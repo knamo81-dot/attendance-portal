@@ -211,7 +211,13 @@ function setConnectionStatus(text, type = "muted") {
 }
 
 function getResearchRows() {
-  return getReferenceFilteredRows(AppState.merged).filter(row => isResearchStaffRow(row));
+  const rows = getReferenceFilteredRows(AppState.merged).filter(row => isResearchStaffRow(row));
+
+  if (AppState.leaveMode === "include") {
+    return rows;
+  }
+
+  return rows.filter(row => !isReferenceLeaveRow(row));
 }
 
 function getAdminRows() {
@@ -269,8 +275,12 @@ const ADMIN_LEAVE_SPECIAL_TYPES = [
   "가족돌봄휴직"
 ];
 
-function isAdminLeaveRow(row) {
+function isReferenceLeaveRow(row) {
   return Boolean(getAdminReferenceSpecialStatus(row)) || isLeaveStatus(row);
+}
+
+function isAdminLeaveRow(row) {
+  return isReferenceLeaveRow(row);
 }
 
 function getAdminDisplayStatus(row) {
