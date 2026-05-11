@@ -8,10 +8,13 @@ const AppState = {
   currentView: "dashboard",
   referenceMonth: "",
   leaveMode: "exclude",
-  isAdmin: true
+  currentUser: null,
+  currentRole: "",
+  isAdmin: false
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
+  hydrateAuthState();
   bindNavigation();
   bindCommonEvents();
   await loadAllData();
@@ -24,6 +27,140 @@ function bindNavigation() {
       setView(view);
     });
   });
+}
+
+
+function hydrateAuthState() {
+  const roleFromUrl = getRoleFromUrl();
+  const storedUser = getStoredUserInfo();
+  const storedRole = roleFromUrl || getStoredRoleValue() || extractRoleFromUser(storedUser);
+
+  AppState.currentUser = storedUser;
+  AppState.currentRole = storedRole || "";
+  AppState.isAdmin = isAdminRole(storedRole);
+}
+
+function getRoleFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const role = params.get("role") || params.get("user_role") || params.get("auth_role");
+    if (role) return role;
+
+    const adminParam = params.get("admin") || params.get("is_admin");
+    if (["1", "true", "yes", "y"].includes(String(adminParam || "").toLowerCase())) return "관리자";
+  } catch (error) {
+    console.warn("권한 URL 파라미터 확인 실패:", error);
+  }
+
+  return "";
+}
+
+function getStoredRoleValue() {
+  const keys = [
+    "currentRole", "role", "userRole", "user_role", "authRole", "auth_role",
+    "portalRole", "portal_role", "labPortalRole", "employeeRole"
+  ];
+
+  for (const key of keys) {
+    const value = getStorageValue(key);
+    if (value) return value;
+  }
+
+  return "";
+}
+
+function getStoredUserInfo() {
+  const keys = [
+    "currentUser", "portalUser", "labPortalUser", "loggedInUser", "loginUser",
+    "authUser", "employee", "employeeProfile", "userProfile", "user", "USER"
+  ];
+
+  for (const key of keys) {
+    const value = getStorageValue(key);
+    const parsed = parseMaybeJson(value);
+    if (parsed && typeof parsed === "object") return parsed;
+  }
+
+  const scanned = scanStorageForUserInfo();
+  return scanned || null;
+}
+
+function scanStorageForUserInfo() {
+  const storages = [window.localStorage, window.sessionStorage].filter(Boolean);
+
+  for (const storage of storages) {
+    try {
+      for (let i = 0; i < storage.length; i += 1) {
+        const key = storage.key(i) || "";
+        if (!/(user|profile|employee|auth|login|portal)/i.test(key)) continue;
+
+        const parsed = parseMaybeJson(storage.getItem(key));
+        const role = extractRoleFromUser(parsed);
+        if (role) return parsed;
+      }
+    } catch (error) {
+      console.warn("저장된 사용자 정보 확인 실패:", error);
+    }
+  }
+
+  return null;
+}
+
+function getStorageValue(key) {
+  try {
+    return window.localStorage?.getItem(key) || window.sessionStorage?.getItem(key) || "";
+  } catch (error) {
+    console.warn("저장소 접근 실패:", error);
+    return "";
+  }
+}
+
+function parseMaybeJson(value) {
+  if (!value) return null;
+  if (typeof value !== "string") return value;
+
+  try {
+    return JSON.parse(value);
+  } catch (_) {
+    return value;
+  }
+}
+
+function extractRoleFromUser(user) {
+  if (!user || typeof user !== "object") return "";
+
+  const fields = [
+    "role", "user_role", "auth_role", "permission", "authority", "grade_role",
+    "access_role", "account_role", "employee_role", "position_role"
+  ];
+
+  for (const field of fields) {
+    const value = user[field];
+    if (value !== undefined && value !== null && String(value).trim() !== "") return String(value).trim();
+  }
+
+  if (user.profile) return extractRoleFromUser(user.profile);
+  if (user.user) return extractRoleFromUser(user.user);
+  if (user.employee) return extractRoleFromUser(user.employee);
+  if (user.app_metadata) return extractRoleFromUser(user.app_metadata);
+  if (user.user_metadata) return extractRoleFromUser(user.user_metadata);
+
+  return "";
+}
+
+function isAdminRole(role) {
+  const text = String(role || "").trim();
+  if (!text) return false;
+
+  const normalized = text.toLowerCase().replace(/[\s_-]/g, "");
+  return (
+    text.includes("관리자") ||
+    ["admin", "administrator", "superadmin", "systemadmin", "owner"].includes(normalized)
+  );
+}
+
+function canEditOperatingStaffList() {
+  return Boolean(AppState.isAdmin);
 }
 
 function bindCommonEvents() {
