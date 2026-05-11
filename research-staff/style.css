@@ -569,6 +569,40 @@ th:first-child {
 }
 
 
+
+
+/* 휴직 포함/제외 토글 */
+.leave-toggle {
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04);
+  white-space: nowrap;
+}
+
+.leave-toggle-btn {
+  height: 30px;
+  border: 0;
+  border-radius: 9px;
+  padding: 0 12px;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.leave-toggle-btn.active {
+  background: #111827;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.16);
+}
+
 /* 기준년월 필터 */
 .reference-filter {
   height: 40px;
@@ -627,9 +661,14 @@ th:first-child {
 }
 
 @media (max-width: 720px) {
-  .reference-filter {
+  .reference-filter,
+  .leave-toggle {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .leave-toggle-btn {
+    flex: 1;
   }
 
   .reference-filter input[type="month"] {
