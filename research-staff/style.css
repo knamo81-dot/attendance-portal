@@ -727,3 +727,32 @@ th:first-child {
   width: 88px;
   min-width: 88px;
 }
+
+
+/* 관리자기능 휴직 포함/제외 시각화 */
+.admin-table tr.leave-row td {
+  background: #f5f3ff !important;
+}
+
+.admin-table td.status-cell,
+.admin-table th:nth-child(7) {
+  text-align: center !important;
+  vertical-align: middle;
+}
+
+.admin-table td.status-cell {
+  white-space: normal !important;
+  line-height: 1.15;
+  font-weight: 900;
+  color: #312e81;
+}
+
+.admin-table td.status-cell .status-text {
+  display: inline-block;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.admin-table tr.leave-row.edited td {
+  background: #fff7ed !important;
+}
