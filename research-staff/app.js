@@ -6,6 +6,7 @@ const AppState = {
   merged: [],
   currentView: "dashboard",
   referenceMonth: "",
+  leaveMode: "exclude",
   isAdmin: true
 };
 
@@ -25,8 +26,6 @@ function bindNavigation() {
 }
 
 function bindCommonEvents() {
-  document.getElementById("refreshBtn")?.addEventListener("click", loadAllData);
-
   const referenceMonthInput = document.getElementById("referenceMonth");
   if (referenceMonthInput) {
     referenceMonthInput.value = getCurrentMonthValue();
@@ -37,6 +36,19 @@ function bindCommonEvents() {
       renderAll();
     });
   }
+
+  document.querySelectorAll(".leave-toggle-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.leaveMode || "exclude";
+      AppState.leaveMode = mode;
+
+      document.querySelectorAll(".leave-toggle-btn").forEach(item => {
+        item.classList.toggle("active", item.dataset.leaveMode === mode);
+      });
+
+      renderAll();
+    });
+  });
 }
 
 function setView(view) {
@@ -225,8 +237,23 @@ function getReferenceFilteredRows(rows) {
       return false;
     }
 
+    if (AppState.leaveMode !== "include" && isLeaveStatus(row)) {
+      return false;
+    }
+
     return true;
   });
+}
+
+function isLeaveStatus(row) {
+  const statusText = String(row.status || row.employment_status || "");
+  const leaveTypeText = String(row.leave_type || "");
+  return statusText.includes("휴직") || Boolean(leaveTypeText);
+}
+
+function getReferenceDate() {
+  const { end } = getMonthRange(AppState.referenceMonth || getCurrentMonthValue());
+  return end;
 }
 
 function getCurrentMonthValue() {
@@ -277,11 +304,11 @@ function calculateAge(birthDate) {
   const date = new Date(birthDate);
   if (Number.isNaN(date.getTime())) return null;
 
-  const today = new Date();
-  let age = today.getFullYear() - date.getFullYear();
-  const monthDiff = today.getMonth() - date.getMonth();
+  const referenceDate = getReferenceDate();
+  let age = referenceDate.getFullYear() - date.getFullYear();
+  const monthDiff = referenceDate.getMonth() - date.getMonth();
 
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < date.getDate())) {
+  if (monthDiff < 0 || (monthDiff === 0 && referenceDate.getDate() < date.getDate())) {
     age -= 1;
   }
 
