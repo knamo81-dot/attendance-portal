@@ -1132,3 +1132,73 @@ th:first-child {
 .analysis-bar-row.zero-row .bar-fill {
   width: 0 !important;
 }
+/* 현황분석: 기준 안내 카드 */
+.analysis-standard-card {
+  margin-bottom: 14px;
+  padding: 11px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #f8fafc;
+  box-shadow: var(--shadow);
+}
+
+.analysis-standard-card > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.analysis-standard-card strong {
+  flex: 0 0 auto;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.analysis-standard-card span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.analysis-insight-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.analysis-insight-list li {
+  position: relative;
+  padding-left: 15px;
+  color: #475569;
+  line-height: 1.55;
+}
+
+.analysis-insight-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.72em;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #111827;
+}
+
+@media (max-width: 720px) {
+  .analysis-standard-card > div {
+    display: block;
+  }
+
+  .analysis-standard-card span {
+    display: block;
+    margin-top: 4px;
+    text-align: left;
+  }
+}
