@@ -913,79 +913,84 @@ th:first-child {
   }
 }
 
-/* 메인 KPI 카드: 휴직 포함 시 휴직 사유 요약 */
+/* 메인 KPI 카드: 휴직 포함 시 카드별 휴직 요약 */
 .summary-card {
   position: relative;
+  overflow: hidden;
 }
 
-.summary-card.has-leave-note {
-  min-height: 118px;
-  padding-right: 128px;
+.kpi-leave-summary {
+  display: none;
 }
 
-.summary-leave-note {
+.kpi-leave-summary.show {
   position: absolute;
-  top: 16px;
+  top: 18px;
   right: 16px;
-  width: 104px;
+  width: min(46%, 150px);
+  display: grid;
+  gap: 5px;
+  padding-left: 10px;
+  border-left: 1px solid #e2e8f0;
   text-align: right;
-  color: #475569;
+  color: #64748b;
   font-size: 11px;
-  line-height: 1.35;
+  line-height: 1.25;
 }
 
-.summary-leave-title {
-  margin-bottom: 5px;
+.kpi-leave-total {
   color: #4c1d95;
-  font-size: 12px;
   font-weight: 900;
   white-space: nowrap;
 }
 
-.summary-leave-list {
-  display: grid;
-  gap: 3px;
-  justify-items: end;
+.kpi-leave-total strong {
+  display: inline;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #4c1d95;
 }
 
-.summary-leave-list span {
+.kpi-leave-items {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px 6px;
+  flex-wrap: wrap;
+}
+
+.kpi-leave-items span {
   display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  max-width: 100%;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: #f5f3ff;
-  color: #4c1d95;
-  font-weight: 800;
+  gap: 3px;
   white-space: nowrap;
 }
 
-.summary-leave-list b {
-  font-size: 12px;
+.kpi-leave-items b {
+  color: #334155;
   font-weight: 900;
 }
 
 @media (max-width: 1300px) {
-  .summary-card.has-leave-note {
-    padding-right: 118px;
+  .kpi-leave-summary.show {
+    width: min(44%, 140px);
   }
 }
 
 @media (max-width: 720px) {
-  .summary-card.has-leave-note {
-    padding-right: 18px;
-  }
-
-  .summary-leave-note {
+  .kpi-leave-summary.show {
     position: static;
-    width: auto;
+    width: 100%;
     margin-top: 10px;
+    padding-left: 0;
+    padding-top: 8px;
+    border-left: 0;
+    border-top: 1px solid #e2e8f0;
     text-align: left;
   }
 
-  .summary-leave-list {
-    justify-items: start;
+  .kpi-leave-items {
+    justify-content: flex-start;
   }
 }
