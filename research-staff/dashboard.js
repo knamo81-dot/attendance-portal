@@ -83,7 +83,7 @@ function renderKpiLeaveSummaries(rows) {
     box.classList.add("show");
     box.innerHTML = `
       <div class="kpi-leave-total">${target.label} <strong>${total}명</strong></div>
-      <div class="kpi-leave-items">
+      <div class="kpi-leave-items ${counts.length > 4 ? "two-columns" : "one-column"}">
         ${counts.map(item => `<span>${escapeDashboardHtml(formatLeaveReasonLabel(item.type))} <b>${item.count}</b></span>`).join("")}
       </div>
     `;
