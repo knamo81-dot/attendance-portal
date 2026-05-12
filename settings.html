@@ -1082,7 +1082,7 @@ html.embed-mode .auth-overlay[hidden]{
                 </div>
               </div>
               <div id="adminSectionPermission" class="admin-section-panel" hidden>
-                <div class="real-admin-top-note">아직 각 프로그램과 직접 연동하지 않는 검증용 화면입니다. 근태 자동 특수권한(소장/본부장·담당·팀장)만 확인하고, 프로그램별 운영자와 폐수 결재자 권한만 수동으로 저장합니다. 권한설정 테이블에 없는 사람은 각 프로그램에서 기본 일반사용자로 처리하는 구조입니다.</div>
+                <div class="real-admin-top-note">아직 각 프로그램과 직접 연동하지 않는 검증용 화면입니다. 근태 자동 특수권한(소장/본부장·담당·팀장)만 확인하고, 프로그램별 운영자와 폐수 결재자 권한을 수동으로 저장합니다. 권한설정 테이블에 없는 사람은 각 프로그램에서 기본 일반사용자로 처리하는 구조입니다.</div>
                 <div class="permission-summary-grid">
                   <div class="permission-stat-card"><div class="permission-stat-label">근태 자동특수권한</div><div id="permissionAutoCount" class="permission-stat-value">0</div></div>
                   <div class="permission-stat-card"><div class="permission-stat-label">수동 권한</div><div id="permissionManualCount" class="permission-stat-value">0</div></div>
@@ -1112,7 +1112,7 @@ html.embed-mode .auth-overlay[hidden]{
                       <div class="permission-form-grid" style="margin-top:12px;">
                         <div class="real-field full"><label>사원 선택</label><select id="permissionEmployeeSelect" class="real-select"><option value="">사원 선택</option></select><div class="permission-help">사원정보에 등록된 재직자를 선택합니다. 권한을 등록하지 않은 사람은 자동으로 일반사용자로 처리됩니다.</div></div>
                         <div class="real-field"><label>프로그램</label><select id="permissionAppSelect" class="real-select"></select></div>
-                        <div class="real-field"><label>권한</label><select id="permissionRoleSelect" class="real-select"></select><div class="permission-help">현재 단계에서는 프로그램별 운영자와 폐수 결재자만 수동 지정합니다.</div></div>
+                        <div class="real-field"><label>권한</label><select id="permissionRoleSelect" class="real-select"></select><div class="permission-help">현재 단계에서는 프로그램별 운영자와 폐수 결재자를 수동 지정합니다.</div></div>
                         <div class="real-field full"><label>메모</label><input id="permissionMemoInput" class="real-input" placeholder="예: 폐수 운영자 / 근태 운영자"></div>
                       </div>
                       <div class="real-actions left"><button id="permissionSaveBtn" type="button" class="real-btn">저장</button><button id="permissionResetBtn" type="button" class="real-btn ghost">입력 초기화</button></div>
@@ -2831,8 +2831,8 @@ create table if not exists user_app_roles (
     window.loadReservationResourcesAdminPage = loadReservationResourcesAdmin;
   }
 
-  const PERMISSION_APPS=[{key:'attendance',label:'근태'},{key:'wastewater',label:'폐수'},{key:'reagent',label:'시약초자'}];
-  const PERMISSION_ROLES={attendance:[['operator','운영자']],wastewater:[['operator','운영자'],['approver','결재자']],reagent:[['operator','운영자']]};
+  const PERMISSION_APPS=[{key:'attendance',label:'근태'},{key:'wastewater',label:'폐수'},{key:'reagent',label:'시약초자'},{key:'research_staff',label:'인력'}];
+  const PERMISSION_ROLES={attendance:[['operator','운영자']],wastewater:[['operator','운영자'],['approver','결재자']],reagent:[['operator','운영자']],research_staff:[['operator','운영자']]};
   const ATTENDANCE_AUTO_ROLES=[['director','소장/본부장'],['manager','담당'],['team_leader','팀장']];
   const SCOPE_LABELS={self:'본인',team:'팀',hq:'본부',all:'전체',custom:'직접입력'};
   const appLabel=k=>PERMISSION_APPS.find(a=>a.key===k)?.label||k||'-';
