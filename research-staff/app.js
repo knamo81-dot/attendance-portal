@@ -315,39 +315,35 @@ function buildDivisionOptions() {
 
 function buildTeamOptions(divisionValue = "") {
   const map = new Map();
-  const teamsSource = Array.isArray(AppState?.teams) && AppState.teams.length
-    ? AppState.teams
-    : [];
+  const teams = Array.isArray(AppState.teams) ? AppState.teams : [];
 
-  if (teamsSource.length) {
-    teamsSource
-      .filter(team => !isVirtualTeam(team))
+  if (teams.length) {
+    teams
+      .filter(team => !isVirtualTeamOption(team))
       .filter(team => {
         if (!divisionValue) return true;
-        const teamDivision = String(
-          team.division_code ||
-          team.divisionCode ||
-          team.department_code ||
-          team.dept_code ||
-          team.division ||
-          team.department ||
-          ""
-        ).trim();
-        return teamDivision === divisionValue;
+        const teamDivision = getTeamDivisionValue(team);
+        if (teamDivision && teamDivision === divisionValue) return true;
+
+        const divisionLabel = getDivisionLabelByValue(divisionValue);
+        const teamDivisionLabel = String(team.division_name || team.department || team.division || team.parent_name || "").trim();
+        return Boolean(divisionLabel && teamDivisionLabel && teamDivisionLabel === divisionLabel);
       })
       .forEach(team => {
-        const value = String(team.team_code || team.teamCode || team.code || team.id || "").trim();
-        const label = String(team.team_name || team.name || team.team || team.team_code || "미지정 팀").trim() || "미지정 팀";
-        if (!value) return;
+        const value = getTeamOptionValue(team);
+        const label = getTeamOptionLabel(team);
+        if (!value || !label) return;
         if (!map.has(value)) {
-          map.set(value, { value, label, sort: String(team.sort_order ?? team.team_order ?? team.team_code ?? label) });
+          map.set(value, {
+            value,
+            label,
+            sort: getTeamSortKey(team, label)
+          });
         }
       });
   }
 
   if (!map.size) {
-    const virtualTeamCodes = buildVirtualTeamCodeSet();
-
     (AppState.merged || [])
       .filter(row => {
         if (!divisionValue) return true;
@@ -357,8 +353,7 @@ function buildTeamOptions(divisionValue = "") {
       .forEach(row => {
         const value = String(row.team_code || row.team || "").trim();
         const label = String(row.team || row.team_name || row.team_code || "미지정 팀").trim() || "미지정 팀";
-        if (!value) return;
-        if (virtualTeamCodes.has(value) || isVirtualTeam(row)) return;
+        if (!value || isVirtualTeamName(label)) return;
         if (!map.has(value)) {
           map.set(value, { value, label, sort: String(row.team_code || label) });
         }
@@ -368,42 +363,113 @@ function buildTeamOptions(divisionValue = "") {
   return [...map.values()].sort((a, b) => String(a.sort).localeCompare(String(b.sort), "ko", { numeric: true, sensitivity: "base" }));
 }
 
-function buildVirtualTeamCodeSet() {
-  const set = new Set();
-
-  (AppState.teams || []).forEach(team => {
-    if (!isVirtualTeam(team)) return;
-    const code = String(team.team_code || team.teamCode || team.code || team.id || "").trim();
-    if (code) set.add(code);
-  });
-
-  return set;
+function getTeamOptionValue(team) {
+  return String(
+    team.team_code ||
+    team.code ||
+    team.id ||
+    team.team_id ||
+    team.value ||
+    team.team_name ||
+    team.name ||
+    ""
+  ).trim();
 }
 
-function isVirtualTeam(item) {
-  if (!item) return false;
-
-  const booleanValue =
-    item.is_virtual ??
-    item.isVirtual ??
-    item.virtual ??
-    item.virtual_team ??
-    item.is_virtual_team;
-
-  if (booleanValue === true) return true;
-  if (String(booleanValue).toLowerCase() === "true") return true;
-  if (String(booleanValue) === "1") return true;
-
-  const text = String(
-    item.team_type ||
-    item.type ||
-    item.category ||
-    item.note ||
-    item.memo ||
+function getTeamOptionLabel(team) {
+  return String(
+    team.team_name ||
+    team.name ||
+    team.label ||
+    team.team_code ||
+    team.code ||
     ""
-  );
+  ).trim();
+}
 
-  return text.includes("가상");
+function getTeamDivisionValue(team) {
+  return String(
+    team.division_code ||
+    team.department_code ||
+    team.parent_division_code ||
+    team.parent_code ||
+    team.division_id ||
+    team.department_id ||
+    ""
+  ).trim();
+}
+
+function getTeamSortKey(team, fallback = "") {
+  return String(
+    team.sort_order ||
+    team.display_order ||
+    team.order_no ||
+    team.team_code ||
+    team.code ||
+    fallback ||
+    ""
+  ).trim();
+}
+
+function getDivisionLabelByValue(value) {
+  const target = String(value || "").trim();
+  if (!target) return "";
+
+  const division = (AppState.divisions || []).find(item => String(
+    item.division_code ||
+    item.code ||
+    item.id ||
+    item.value ||
+    item.division_name ||
+    item.name ||
+    ""
+  ).trim() === target);
+
+  if (division) {
+    return String(division.division_name || division.name || division.label || division.division_code || division.code || "").trim();
+  }
+
+  const row = (AppState.merged || []).find(item => String(item.division_code || item.department || "").trim() === target);
+  return String(row?.department || row?.division_name || row?.division || "").trim();
+}
+
+function getDivisionNameSet() {
+  const names = new Set();
+
+  (AppState.divisions || []).forEach(division => {
+    const name = String(division.division_name || division.name || division.label || division.department || "").trim();
+    if (name) names.add(name);
+  });
+
+  (AppState.merged || []).forEach(row => {
+    const name = String(row.department || row.division_name || row.division || "").trim();
+    if (name) names.add(name);
+  });
+
+  return names;
+}
+
+function isVirtualTeamOption(team) {
+  const truthyKeys = ["is_virtual", "isVirtual", "virtual", "virtual_team", "is_virtual_team", "isVirtualTeam"];
+  if (truthyKeys.some(key => isTruthyValue(team?.[key]))) return true;
+
+  const textKeys = ["team_type", "type", "category", "note", "memo", "description", "remarks"];
+  if (textKeys.some(key => String(team?.[key] || "").includes("가상"))) return true;
+
+  return isVirtualTeamName(getTeamOptionLabel(team));
+}
+
+function isVirtualTeamName(teamName) {
+  const name = String(teamName || "").trim();
+  if (!name) return false;
+  if (name.includes("가상")) return true;
+  return getDivisionNameSet().has(name);
+}
+
+function isTruthyValue(value) {
+  if (value === true) return true;
+  const text = String(value ?? "").trim().toLowerCase();
+  return ["true", "1", "y", "yes", "사용", "가상", "virtual"].includes(text);
 }
 
 function updateOrgFilterHint() {
