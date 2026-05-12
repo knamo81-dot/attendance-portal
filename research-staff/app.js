@@ -10,6 +10,8 @@ const AppState = {
   leaveMode: "exclude",
   filterDivision: "",
   filterTeam: "",
+  currentEmployee: null,
+  orgAccess: { scope: "all", division: "", team: "", reason: "" },
   currentUser: null,
   currentRoles: [],
   currentRole: "",
@@ -260,8 +262,10 @@ function bindOrgFilterEvents() {
 }
 
 function populateOrgFilters() {
+  applyOrgAccessDefaults();
   populateDivisionFilterOptions();
   populateTeamFilterOptions();
+  updateOrgFilterControls();
   updateOrgFilterHint();
 }
 
@@ -269,15 +273,24 @@ function populateDivisionFilterOptions() {
   const select = document.getElementById("filterDivision");
   if (!select) return;
 
+  const access = getOrgAccess();
   const current = AppState.filterDivision || "";
-  const divisions = buildDivisionOptions();
+  const divisions = buildDivisionOptions().filter(item => {
+    if (access.scope === "all") return true;
+    return sameOrgValue(item.value, access.division);
+  });
 
   select.innerHTML = [
-    `<option value="">전체 본부</option>`,
+    ...(access.scope === "all" ? [`<option value="">전체 본부</option>`] : []),
     ...divisions.map(item => `<option value="${escapeAttr(item.value)}">${escapeHtmlText(item.label)}</option>`)
   ].join("");
 
-  select.value = divisions.some(item => item.value === current) ? current : "";
+  if (access.scope !== "all" && access.division) {
+    select.value = access.division;
+  } else {
+    select.value = divisions.some(item => item.value === current) ? current : "";
+  }
+
   AppState.filterDivision = select.value;
 }
 
@@ -285,16 +298,26 @@ function populateTeamFilterOptions() {
   const select = document.getElementById("filterTeam");
   if (!select) return;
 
+  const access = getOrgAccess();
   const current = AppState.filterTeam || "";
-  const teams = buildTeamOptions(AppState.filterDivision);
+  const teams = buildTeamOptions(AppState.filterDivision).filter(item => {
+    if (access.scope !== "team") return true;
+    return sameOrgValue(item.value, access.team);
+  });
 
   select.innerHTML = [
-    `<option value="">전체 팀</option>`,
+    ...(access.scope !== "team" ? [`<option value="">전체 팀</option>`] : []),
     ...teams.map(item => `<option value="${escapeAttr(item.value)}">${escapeHtmlText(item.label)}</option>`)
   ].join("");
 
-  select.value = teams.some(item => item.value === current) ? current : "";
+  if (access.scope === "team" && access.team) {
+    select.value = access.team;
+  } else {
+    select.value = teams.some(item => item.value === current) ? current : "";
+  }
+
   AppState.filterTeam = select.value;
+  updateOrgFilterControls();
   updateOrgFilterHint();
 }
 
@@ -472,6 +495,128 @@ function isTruthyValue(value) {
   return ["true", "1", "y", "yes", "사용", "가상", "virtual"].includes(text);
 }
 
+function resolveCurrentEmployeeRow() {
+  const email = String(AppState.currentUser?.email || "").trim().toLowerCase();
+  if (!email) return null;
+
+  return (AppState.merged || []).find(row => {
+    const candidates = [
+      row.email,
+      row.work_email,
+      row.company_email,
+      row.user_email,
+      row.portal_email
+    ].map(value => String(value || "").trim().toLowerCase());
+
+    return candidates.includes(email);
+  }) || null;
+}
+
+function applyOrgAccessDefaults() {
+  AppState.currentEmployee = AppState.currentEmployee || resolveCurrentEmployeeRow();
+  AppState.orgAccess = buildOrgAccess();
+
+  const access = getOrgAccess();
+  if (access.scope === "division" || access.scope === "team") {
+    AppState.filterDivision = access.division || "";
+  }
+  if (access.scope === "team") {
+    AppState.filterTeam = access.team || "";
+  }
+}
+
+function buildOrgAccess() {
+  if (AppState.isAdmin || AppState.currentRole === "admin" || AppState.currentRole === "operator") {
+    return { scope: "all", division: "", team: "", reason: "관리자/운영자" };
+  }
+
+  const employee = resolveCurrentEmployeeRow();
+  const division = getRowDivisionValue(employee);
+  const team = getRowTeamValue(employee);
+
+  if (!employee) {
+    return { scope: "team", division: "", team: "", reason: "로그인 사용자 조직정보 없음" };
+  }
+
+  if (isDivisionLevelUser(employee)) {
+    return { scope: "division", division, team: "", reason: "소장/본부장" };
+  }
+
+  return { scope: "team", division, team, reason: "팀 단위 조회" };
+}
+
+function getOrgAccess() {
+  return AppState.orgAccess || { scope: "all", division: "", team: "", reason: "" };
+}
+
+function isDivisionLevelUser(row) {
+  if (!row) return false;
+  const text = [
+    row.duty,
+    row.role,
+    row.job_role,
+    row.job_title,
+    row.position,
+    row.title,
+    row.rank,
+    row.employee_role
+  ].map(value => String(value || "").trim()).join(" ");
+
+  return /소장|본부장|부문장|센터장/.test(text);
+}
+
+function updateOrgFilterControls() {
+  const access = getOrgAccess();
+  const divisionSelect = document.getElementById("filterDivision");
+  const teamSelect = document.getElementById("filterTeam");
+
+  if (divisionSelect) {
+    divisionSelect.disabled = access.scope === "division" || access.scope === "team";
+    divisionSelect.title = divisionSelect.disabled ? `${access.reason} 권한으로 본부가 고정됩니다.` : "본부 선택";
+  }
+
+  if (teamSelect) {
+    teamSelect.disabled = access.scope === "team";
+    teamSelect.title = teamSelect.disabled ? `${access.reason} 권한으로 팀이 고정됩니다.` : "팀 선택";
+  }
+}
+
+function getOrgScopedRows(rows) {
+  const access = getOrgAccess();
+  const source = Array.isArray(rows) ? rows : [];
+
+  return source.filter(row => {
+    const rowDivision = getRowDivisionValue(row);
+    const rowTeam = getRowTeamValue(row);
+
+    if (access.scope === "division" && access.division && !sameOrgValue(rowDivision, access.division)) return false;
+    if (access.scope === "team") {
+      if (access.division && !sameOrgValue(rowDivision, access.division)) return false;
+      if (access.team && !sameOrgValue(rowTeam, access.team)) return false;
+      if (!access.team) return false;
+    }
+
+    if (AppState.filterDivision && !sameOrgValue(rowDivision, AppState.filterDivision)) return false;
+    if (AppState.filterTeam && !sameOrgValue(rowTeam, AppState.filterTeam)) return false;
+
+    return true;
+  });
+}
+
+function getRowDivisionValue(row) {
+  if (!row) return "";
+  return String(row.division_code || row.department_code || row.dept_code || row.department || row.division_name || row.division || "").trim();
+}
+
+function getRowTeamValue(row) {
+  if (!row) return "";
+  return String(row.team_code || row.team_id || row.team || row.team_name || "").trim();
+}
+
+function sameOrgValue(a, b) {
+  return String(a || "").trim() === String(b || "").trim();
+}
+
 function updateOrgFilterHint() {
   const hint = document.getElementById("orgFilterHint");
   if (!hint) return;
@@ -546,6 +691,7 @@ async function loadAllData() {
         AppState.teams
       )
     );
+    AppState.currentEmployee = resolveCurrentEmployeeRow();
 
     populateOrgFilters();
 
@@ -686,7 +832,7 @@ function getReferenceFilteredRows(rows) {
   const month = AppState.referenceMonth || getCurrentMonthValue();
   const { start, end } = getMonthRange(month);
 
-  return rows.filter(row => {
+  const referenceRows = rows.filter(row => {
     const labAssignDate = parseDateOnly(row.lab_assign_date || row.hire_date);
     const resignationDate = parseDateOnly(row.resignation_date);
 
@@ -699,6 +845,8 @@ function getReferenceFilteredRows(rows) {
 
     return true;
   });
+
+  return getOrgScopedRows(referenceRows);
 }
 
 function isLeaveStatus(row) {
@@ -874,5 +1022,6 @@ function useSampleData() {
   ];
 
   AppState.merged = mergeEmployeeProfiles(AppState.employees, AppState.profiles);
+  AppState.currentEmployee = resolveCurrentEmployeeRow();
   populateOrgFilters();
 }
