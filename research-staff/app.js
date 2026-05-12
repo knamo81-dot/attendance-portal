@@ -9,14 +9,15 @@ const AppState = {
   referenceMonth: "",
   leaveMode: "exclude",
   currentUser: null,
+  currentRoles: [],
   currentRole: "",
   isAdmin: false
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
-  hydrateAuthState();
   bindNavigation();
   bindCommonEvents();
+  await initializeAuthState();
   await loadAllData();
 });
 
@@ -30,89 +31,122 @@ function bindNavigation() {
 }
 
 
-function hydrateAuthState() {
-  const roleFromUrl = getRoleFromUrl();
-  const storedUser = getStoredUserInfo();
-  const storedRole = roleFromUrl || getStoredRoleValue() || extractRoleFromUser(storedUser);
 
-  AppState.currentUser = storedUser;
-  AppState.currentRole = storedRole || "";
-  AppState.isAdmin = isAdminRole(storedRole);
+async function initializeAuthState() {
+  AppState.currentUser = await resolvePortalUser();
+  await loadMyResearchStaffRoles();
 }
 
-function getRoleFromUrl() {
+async function loadMyResearchStaffRoles() {
+  const email = String(AppState.currentUser?.email || "").trim();
+
+  AppState.currentRoles = [];
+  AppState.currentRole = "viewer";
+  AppState.isAdmin = false;
+
+  if (!email) {
+    console.warn("포탈 로그인 이메일을 확인하지 못해 운영인력 리스트는 조회 전용으로 동작합니다.");
+    return;
+  }
+
+  try {
+    const roles = typeof getResearchStaffRoles === "function"
+      ? await getResearchStaffRoles(email)
+      : [];
+
+    AppState.currentRoles = Array.isArray(roles) ? roles : [];
+    AppState.isAdmin = AppState.currentRoles.includes("research_staff_admin");
+    AppState.currentRole = AppState.isAdmin ? "admin" : "viewer";
+  } catch (error) {
+    console.warn("인력운영현황 권한 조회 실패:", error);
+    AppState.currentRoles = [];
+    AppState.currentRole = "viewer";
+    AppState.isAdmin = false;
+  }
+}
+
+function canEditOperatingStaffList() {
+  return Boolean(AppState.isAdmin);
+}
+
+async function resolvePortalUser() {
+  const queryUser = readPortalUserFromQuery();
+  if (queryUser?.email) return queryUser;
+
+  const storageUser = readPortalUserFromStorage();
+  if (storageUser?.email) return storageUser;
+
+  const supabaseUser = await readSupabaseAuthUser();
+  if (supabaseUser?.email) return supabaseUser;
+
+  if (window.__PORTAL_USER__?.email) return window.__PORTAL_USER__;
+
+  const messageUser = await waitForPortalUserMessage(450);
+  if (messageUser?.email) return messageUser;
+
+  return null;
+}
+
+function readPortalUserFromQuery() {
   try {
     const params = new URLSearchParams(window.location.search);
-    const role = params.get("role") || params.get("user_role") || params.get("auth_role");
-    if (role) return role;
-
-    const adminParam = params.get("admin") || params.get("is_admin");
-    if (["1", "true", "yes", "y"].includes(String(adminParam || "").toLowerCase())) return "관리자";
+    const email = params.get("portalEmail") || params.get("portal_email") || params.get("userEmail") || params.get("email") || "";
+    const name = params.get("portalName") || params.get("name") || "";
+    if (email) return { email, name };
   } catch (error) {
-    console.warn("권한 URL 파라미터 확인 실패:", error);
+    console.warn("포탈 사용자 URL 확인 실패:", error);
   }
-
-  return "";
+  return null;
 }
 
-function getStoredRoleValue() {
+function readPortalUserFromStorage() {
   const keys = [
-    "currentRole", "role", "userRole", "user_role", "authRole", "auth_role",
-    "portalRole", "portal_role", "labPortalRole", "employeeRole"
+    "portal_auth_user",
+    "portalUser",
+    "labPortalUser",
+    "attendance_portal_user",
+    "reagent_current_user",
+    "currentUser",
+    "loggedInUser",
+    "authUser"
   ];
 
   for (const key of keys) {
-    const value = getStorageValue(key);
-    if (value) return value;
-  }
-
-  return "";
-}
-
-function getStoredUserInfo() {
-  const keys = [
-    "currentUser", "portalUser", "labPortalUser", "loggedInUser", "loginUser",
-    "authUser", "employee", "employeeProfile", "userProfile", "user", "USER"
-  ];
-
-  for (const key of keys) {
-    const value = getStorageValue(key);
-    const parsed = parseMaybeJson(value);
-    if (parsed && typeof parsed === "object") return parsed;
-  }
-
-  const scanned = scanStorageForUserInfo();
-  return scanned || null;
-}
-
-function scanStorageForUserInfo() {
-  const storages = [window.localStorage, window.sessionStorage].filter(Boolean);
-
-  for (const storage of storages) {
     try {
-      for (let i = 0; i < storage.length; i += 1) {
-        const key = storage.key(i) || "";
-        if (!/(user|profile|employee|auth|login|portal)/i.test(key)) continue;
+      const raw = window.sessionStorage?.getItem(key) || window.localStorage?.getItem(key);
+      if (!raw) continue;
 
-        const parsed = parseMaybeJson(storage.getItem(key));
-        const role = extractRoleFromUser(parsed);
-        if (role) return parsed;
+      const parsed = parseMaybeJson(raw);
+      const email = extractEmailFromUser(parsed);
+      if (email) {
+        return {
+          email,
+          name: parsed?.name || parsed?.user?.name || parsed?.employee?.name || ""
+        };
       }
     } catch (error) {
-      console.warn("저장된 사용자 정보 확인 실패:", error);
+      console.warn("포탈 사용자 저장 정보 확인 실패:", error);
     }
   }
 
   return null;
 }
 
-function getStorageValue(key) {
-  try {
-    return window.localStorage?.getItem(key) || window.sessionStorage?.getItem(key) || "";
-  } catch (error) {
-    console.warn("저장소 접근 실패:", error);
-    return "";
+function extractEmailFromUser(value) {
+  if (!value) return "";
+  if (typeof value === "string") {
+    return value.includes("@") ? value.trim() : "";
   }
+
+  return String(
+    value.email ||
+    value.user_email ||
+    value.portalEmail ||
+    value.user?.email ||
+    value.profile?.email ||
+    value.employee?.email ||
+    ""
+  ).trim();
 }
 
 function parseMaybeJson(value) {
@@ -126,41 +160,51 @@ function parseMaybeJson(value) {
   }
 }
 
-function extractRoleFromUser(user) {
-  if (!user || typeof user !== "object") return "";
+async function readSupabaseAuthUser() {
+  try {
+    const client = getSupabase();
+    if (!client?.auth?.getUser) return null;
 
-  const fields = [
-    "role", "user_role", "auth_role", "permission", "authority", "grade_role",
-    "access_role", "account_role", "employee_role", "position_role"
-  ];
-
-  for (const field of fields) {
-    const value = user[field];
-    if (value !== undefined && value !== null && String(value).trim() !== "") return String(value).trim();
+    const { data } = await client.auth.getUser();
+    const user = data?.user;
+    if (user?.email) return { email: user.email, name: user.user_metadata?.name || "" };
+  } catch (error) {
+    console.warn("Supabase 로그인 사용자 확인 실패:", error);
   }
 
-  if (user.profile) return extractRoleFromUser(user.profile);
-  if (user.user) return extractRoleFromUser(user.user);
-  if (user.employee) return extractRoleFromUser(user.employee);
-  if (user.app_metadata) return extractRoleFromUser(user.app_metadata);
-  if (user.user_metadata) return extractRoleFromUser(user.user_metadata);
-
-  return "";
+  return null;
 }
 
-function isAdminRole(role) {
-  const text = String(role || "").trim();
-  if (!text) return false;
+function waitForPortalUserMessage(timeout = 450) {
+  return new Promise((resolve) => {
+    let done = false;
 
-  const normalized = text.toLowerCase().replace(/[\s_-]/g, "");
-  return (
-    text.includes("관리자") ||
-    ["admin", "administrator", "superadmin", "systemadmin", "owner"].includes(normalized)
-  );
-}
+    const finish = (user) => {
+      if (done) return;
+      done = true;
+      window.removeEventListener("message", onMessage);
+      clearTimeout(timer);
+      resolve(user || null);
+    };
 
-function canEditOperatingStaffList() {
-  return Boolean(AppState.isAdmin);
+    const onMessage = (event) => {
+      const data = event.data || {};
+      if (data?.type !== "portal-auth" && data?.type !== "PORTAL_AUTH_USER") return;
+
+      const payload = data.user || data.payload || data;
+      const email = String(payload?.email || "").trim();
+      if (email) finish({ email, name: payload?.name || "" });
+    };
+
+    const timer = setTimeout(() => finish(null), timeout);
+    window.addEventListener("message", onMessage);
+
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: "portal-auth-request", app: "research-staff" }, "*");
+      }
+    } catch (_) {}
+  });
 }
 
 function bindCommonEvents() {
