@@ -1521,10 +1521,7 @@ th:first-child {
 }
 
 .org-filter-hint {
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
+  display: none !important;
 }
 
 @media (max-width: 900px) {
@@ -1540,10 +1537,6 @@ th:first-child {
 
   .org-filter-group select {
     flex: 1;
-    width: 100%;
-  }
-
-  .org-filter-hint {
     width: 100%;
   }
 }
