@@ -1512,75 +1512,14 @@ html.embed-mode .header-card{
     })();
     </script>
 
-<script id="portal-home-shell-auth-bridge">
-window.__PORTAL_AUTH_USER__ = window.__PORTAL_AUTH_USER__ || null;
-
+<script id="portal-home-url-email-helper">
 function getPortalInjectedEmail(){
   try{
-    if(window.__PORTAL_AUTH_USER__ && window.__PORTAL_AUTH_USER__.email){
-      return String(window.__PORTAL_AUTH_USER__.email || '').trim().toLowerCase();
-    }
-
     const params = new URLSearchParams(location.search);
     const qEmail = params.get('email');
     if(qEmail) return String(qEmail || '').trim().toLowerCase();
-
-    const stored = localStorage.getItem('portal_current_user') || localStorage.getItem('current_user') || '';
-    if(stored){
-      try{
-        const parsed = JSON.parse(stored);
-        if(parsed && parsed.email) return String(parsed.email || '').trim().toLowerCase();
-      }catch(e){
-        if(String(stored).includes('@')) return String(stored).trim().toLowerCase();
-      }
-    }
   }catch(e){}
   return '';
-}
-
-function notifyPortalAuthReceived(user){
-  try{
-    if(user && user.email){
-      window.__PORTAL_AUTH_USER__ = user;
-      window.dispatchEvent(new CustomEvent('portal-auth-received', { detail: user }));
-    }
-  }catch(e){}
-}
-
-window.addEventListener('message', function(event){
-  try{
-    const data = event.data || {};
-    if(data.type === 'portal-auth' && data.user && data.user.email){
-      notifyPortalAuthReceived(data.user);
-    }
-  }catch(e){
-    console.error('portal-auth receive error', e);
-  }
-});
-
-(function requestAuthFromShell(){
-  try{
-    const embed = window.self !== window.top;
-    if(!embed || !window.parent) return;
-
-    setTimeout(function(){ window.parent.postMessage({ type:'portal-auth-request', source:'portal-home' }, '*'); }, 50);
-    setTimeout(function(){ window.parent.postMessage({ type:'portal-auth-request', source:'portal-home' }, '*'); }, 300);
-    setTimeout(function(){ window.parent.postMessage({ type:'portal-auth-request', source:'portal-home' }, '*'); }, 900);
-  }catch(e){}
-})();
-</script>
-
-
-<script id="portal-home-auth-parent-notify">
-function notifyShellHomeAuthenticated(user){
-  try{
-    if(!user || !user.email) return;
-    const payloadUser = { email: String(user.email || '').trim().toLowerCase() };
-    localStorage.setItem('portal_current_user', JSON.stringify(payloadUser));
-    if(window.parent && window.parent !== window){
-      window.parent.postMessage({ type:'portal-home-authenticated', user: payloadUser }, '*');
-    }
-  }catch(e){}
 }
 </script>
 
@@ -2186,11 +2125,10 @@ function notifyShellHomeAuthenticated(user){
 
     function portalAuth() {
       const ctx = typeof window.getPortalAuthContext === 'function' ? window.getPortalAuthContext() : {};
-      const sb = ctx.supabase || window.portalSupabase || window.__portalHomeSupabase || null;
+      const sb = ctx.supabase || window.portalSupabase;
       const injectedEmail = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
-      const directUserEmail = (typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : '';
-      const email = String(ctx.user?.email || directUserEmail || injectedEmail || '').trim().toLowerCase();
-      const profile = ctx.profile || window.__portalHomeProfile || (typeof currentProfile !== 'undefined' ? currentProfile : null) || null;
+      const email = String(ctx.user?.email || injectedEmail || '').trim().toLowerCase();
+      const profile = ctx.profile || null;
       const name = String(profile?.name || profile?.employee_name || profile?.username || '').trim()
         || (email ? email.split('@')[0] : '사용자');
       return { sb, email, name, user: ctx.user || (email ? { email } : null), profile };
@@ -2408,10 +2346,7 @@ function notifyShellHomeAuthenticated(user){
     }
 
     async function createMemoOnServer(payload) {
-      const auth = portalAuth();
-      const sb = auth.sb;
-      const email = auth.email || (typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '');
-      const name = auth.name || (email ? email.split('@')[0] : '사용자');
+      const { sb, email, name } = portalAuth();
       if (!sb || !email) throw new Error('로그인이 필요합니다.');
       const insertRow = payload.created_by_email != null ? payload : memoStateToDbPayload(payload, email, name);
       const { data, error } = await sb.from('portal_memos').insert([insertRow]).select('*').single();
@@ -4783,9 +4718,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           renderScheduleTab();
           return;
         }
-        const auth = portalAuth();
-        const email = auth.email || (typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '');
-        const name = auth.name || (email ? email.split('@')[0] : '사용자');
+        const { email, name } = portalAuth();
         if (!email) {
           setPortalPlannerFeedback('로그인이 필요합니다.', 'error');
           renderScheduleTab();
@@ -5072,10 +5005,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY";
 
   function initAuth() {
-    const portalHomeEmbed = (function(){
-      try { return window.self !== window.top; } catch(e) { return true; }
-    })();
-
     const fallbackOverlay = document.getElementById('authOverlay');
     const fallbackLoginCard = document.getElementById('loginCard');
     const fallbackLoginError = document.getElementById('loginError');
@@ -5095,11 +5024,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     if (!supabaseClient) {
       supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       window.portalSupabase = supabaseClient;
-      window.__portalHomeSupabase = supabaseClient;
     }
-
-    window.__portalHomeSupabase = supabaseClient;
-    window.portalSupabase = supabaseClient;
 
     window.getPortalAuthContext = function getPortalAuthContext() {
       return {
@@ -5150,15 +5075,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     }
 
     function showLogin(message = '') {
-      if (portalHomeEmbed) {
-        document.body.classList.remove('auth-loading');
-        if (els.overlay) els.overlay.hidden = true;
-        if (els.loginCard) els.loginCard.hidden = true;
-        if (els.passwordCard) els.passwordCard.hidden = true;
-        if (els.topUserBar) els.topUserBar.hidden = true;
-        return;
-      }
-
       document.body.classList.add('auth-loading');
       if (els.overlay) els.overlay.hidden = false;
       if (els.loginCard) els.loginCard.hidden = false;
@@ -5183,9 +5099,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       if (els.overlay) els.overlay.hidden = true;
       if (els.loginCard) els.loginCard.hidden = true;
       if (els.passwordCard) els.passwordCard.hidden = true;
-      if (typeof notifyShellHomeAuthenticated === 'function' && currentUser && currentUser.email) {
-        notifyShellHomeAuthenticated(currentUser);
-      }
     }
 
     function applyRoleUI(profile) {
@@ -5215,13 +5128,16 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
 
       if (!user) {
         const injectedEmail = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
-        if (portalHomeEmbed && injectedEmail) {
-          await handlePortalInjectedUser({ email: injectedEmail });
-          return;
-        }
-
-        if (portalHomeEmbed) {
+        if (injectedEmail) {
+          currentUser = { email: injectedEmail };
           showPortal();
+          try {
+            if (typeof window.loadPortalServerData === 'function') {
+              await window.loadPortalServerData();
+            }
+          } catch (loadErr) {
+            console.error('loadPortalServerData with injected email', loadErr);
+          }
           return;
         }
 
@@ -5232,26 +5148,17 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       try {
         const profile = await fetchProfile(user.email);
         if (!profile) {
-          if (portalHomeEmbed) {
-            showPortal();
-            return;
-          }
           await supabaseClient.auth.signOut();
           showLogin('users 테이블에 등록되지 않은 이메일입니다. 관리자에게 계정 등록을 요청해 주세요.');
           return;
         }
         if (profile.is_active === false) {
-          if (portalHomeEmbed) {
-            showPortal();
-            return;
-          }
           await supabaseClient.auth.signOut();
           showLogin('비활성화된 계정입니다. 관리자에게 문의해 주세요.');
           return;
         }
 
         currentProfile = profile;
-        window.__portalHomeProfile = profile;
         applyRoleUI(profile);
 
         if (profile.must_change_password) {
@@ -5272,47 +5179,6 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         await supabaseClient.auth.signOut();
         showLogin('사용자 권한 정보를 확인하지 못했습니다. users 테이블의 이메일과 권한 정보를 확인해 주세요.');
       }
-    }
-
-    async function handlePortalInjectedUser(portalUser) {
-      const injectedEmail = String(portalUser?.email || getPortalInjectedEmail() || '').trim().toLowerCase();
-      if (!injectedEmail) return;
-
-      try {
-        currentUser = { email: injectedEmail };
-        const profile = await fetchProfile(injectedEmail);
-
-        if (profile && profile.is_active !== false) {
-          currentProfile = profile;
-          window.__portalHomeProfile = profile;
-          applyRoleUI(profile);
-        } else {
-          currentProfile = null;
-        }
-
-        showPortal();
-
-        try {
-          if (typeof window.loadPortalServerData === 'function') {
-            await window.loadPortalServerData();
-          }
-        } catch (loadErr) {
-          console.error('loadPortalServerData after portal-auth', loadErr);
-        }
-      } catch (error) {
-        console.error('handlePortalInjectedUser error:', error);
-        showPortal();
-      }
-    }
-
-    window.addEventListener('portal-auth-received', function(e){
-      handlePortalInjectedUser(e.detail || window.__PORTAL_AUTH_USER__).catch(console.error);
-    });
-
-    if (window.__PORTAL_AUTH_USER__ && window.__PORTAL_AUTH_USER__.email) {
-      setTimeout(function(){
-        handlePortalInjectedUser(window.__PORTAL_AUTH_USER__).catch(console.error);
-      }, 0);
     }
 
     async function login() {
@@ -5411,35 +5277,13 @@ window.portalLogout = logout;
     els.logoutNavBtn?.addEventListener('click', logout);
 
     supabaseClient.auth.onAuthStateChange((_event, session) => {
-      const sessionUser = session?.user || null;
-      if (!sessionUser && portalHomeEmbed) {
-        const injectedEmail = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
-        if (injectedEmail) {
-          handlePortalInjectedUser({ email: injectedEmail }).catch(console.error);
-          return;
-        }
-      }
-      handleSession(sessionUser);
+      handleSession(session?.user || null);
     });
 
     supabaseClient.auth.getSession()
-      .then(({ data }) => {
-        const sessionUser = data?.session?.user || null;
-        const injectedEmail = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
-
-        if (!sessionUser && portalHomeEmbed && injectedEmail) {
-          return handlePortalInjectedUser({ email: injectedEmail });
-        }
-
-        return handleSession(sessionUser);
-      })
+      .then(({ data }) => handleSession(data?.session?.user || null))
       .catch((error) => {
         console.error('getSession error:', error);
-        const injectedEmail = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
-        if (portalHomeEmbed && injectedEmail) {
-          handlePortalInjectedUser({ email: injectedEmail }).catch(console.error);
-          return;
-        }
         showLogin('인증 세션을 확인하지 못했습니다.');
       });
 
@@ -6678,56 +6522,6 @@ window.portalLogout = logout;
 })();
 </script>
 
-
-
-<script id="portal-home-embedded-auth-finalizer">
-(function(){
-  function isEmbedded(){
-    try { return window.self !== window.top; } catch(e){ return true; }
-  }
-
-  function requestAgain(){
-    if(!isEmbedded()) return;
-    try {
-      if(window.parent){
-        window.parent.postMessage({ type:'portal-auth-request', source:'portal-home-finalizer' }, '*');
-      }
-    } catch(e){}
-  }
-
-  document.addEventListener('DOMContentLoaded', function(){
-    requestAgain();
-    setTimeout(requestAgain, 500);
-    setTimeout(requestAgain, 1500);
-  });
-})();
-</script>
-
-
-<script id="portal-home-url-email-finalizer">
-(function(){
-  function activate(){
-    try{
-      var email = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
-      if(!email) return;
-      document.body.classList.remove('auth-loading');
-      var overlay = document.getElementById('authOverlay');
-      if(overlay){
-        overlay.hidden = true;
-        overlay.style.display = 'none';
-      }
-      if(typeof notifyShellHomeAuthenticated === 'function'){
-        notifyShellHomeAuthenticated({ email: email });
-      }
-    }catch(e){}
-  }
-  document.addEventListener('DOMContentLoaded', function(){
-    activate();
-    setTimeout(activate, 300);
-    setTimeout(activate, 1000);
-  });
-})();
-</script>
 
 </body>
 </html>
