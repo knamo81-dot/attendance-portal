@@ -438,8 +438,8 @@ function isUnavailableOnDate(row, date) {
 
 function buildDedicatedTrendSvg(data) {
   const width = 920;
-  const height = 300;
-  const padding = { top: 26, right: 24, bottom: 46, left: 44 };
+  const height = 210;
+  const padding = { top: 30, right: 24, bottom: 34, left: 40 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
   const maxValue = Math.max(1, ...data.flatMap(item => [item.totalDedicated, item.actualDedicated]));
@@ -472,7 +472,9 @@ function buildDedicatedTrendSvg(data) {
           <line x1="${x(index)}" y1="${padding.top}" x2="${x(index)}" y2="${padding.top + chartHeight}" class="trend-month-guide"></line>
           <circle cx="${x(index)}" cy="${y(item.totalDedicated)}" r="4.5" class="trend-point total"></circle>
           <circle cx="${x(index)}" cy="${y(item.actualDedicated)}" r="4.5" class="trend-point actual"></circle>
-          <text x="${x(index)}" y="${height - 17}" text-anchor="middle" class="trend-month-label">${escapeAnalysisHtml(item.shortLabel)}</text>
+          <text x="${x(index)}" y="${Math.max(padding.top + 10, y(item.totalDedicated) - 10)}" text-anchor="middle" class="trend-value-label total">${item.totalDedicated}</text>
+          <text x="${x(index)}" y="${Math.min(padding.top + chartHeight - 8, y(item.actualDedicated) + 18)}" text-anchor="middle" class="trend-value-label actual">${item.actualDedicated}</text>
+          <text x="${x(index)}" y="${height - 12}" text-anchor="middle" class="trend-month-label">${escapeAnalysisHtml(item.shortLabel)}</text>
         </g>
       `).join("")}
     </svg>
