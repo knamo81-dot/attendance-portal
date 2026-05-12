@@ -157,7 +157,7 @@
   }
 
   function postAuthToFrame(user) {
-    if (!frame || !frame.contentWindow || !user) return;
+    if (!frame || !frame.contentWindow || !user || !user.email) return;
 
     frame.contentWindow.postMessage(
       {
@@ -168,6 +168,15 @@
       },
       '*'
     );
+  }
+
+  function postAuthToFrameWithRetry(user) {
+    if (!user || !user.email) return;
+
+    postAuthToFrame(user);
+    setTimeout(function () { postAuthToFrame(user); }, 120);
+    setTimeout(function () { postAuthToFrame(user); }, 450);
+    setTimeout(function () { postAuthToFrame(user); }, 1000);
   }
 
   async function getCurrentUser() {
@@ -224,6 +233,11 @@
 
     if (email) params.push('email=' + encodeURIComponent(email));
 
+    if (src === HOME_SRC) {
+      params.push('portal_auth=1');
+      params.push('embed=1');
+    }
+
     if (isReagentSrc(src)) {
       params.push('portal_auth=1');
       params.push('v=' + Date.now());
@@ -241,11 +255,18 @@
     var src = btn.getAttribute('data-portal-src');
     if (!src || !frame) return;
 
-    // 홈은 로그인 전에도 열 수 있게 둡니다.
+    // 홈은 로그인 전에도 열 수 있게 두되, 로그인 세션이 있으면 홈에도 사용자 정보를 전달합니다.
     if (src === HOME_SRC) {
-      frame.src = HOME_SRC;
       localStorage.removeItem(LAST_PAGE_KEY);
+
+      const user = await getCurrentUser();
+      frame.onload = function () {
+        if (user) postAuthToFrameWithRetry(user);
+      };
+      frame.src = user ? buildSrcWithUser(HOME_SRC, user) : HOME_SRC;
       setActiveNav(btn);
+
+      if (user) postAuthToFrameWithRetry(user);
       return;
     }
 
@@ -264,7 +285,7 @@
     }
 
     frame.onload = function () {
-      postAuthToFrame(user);
+      postAuthToFrameWithRetry(user);
     };
 
     const finalSrc = buildSrcWithUser(src, user);
@@ -307,13 +328,25 @@
     }
 
     frame.onload = function () {
-      postAuthToFrame(user);
+      postAuthToFrameWithRetry(user);
     };
 
     const finalSrc = buildSrcWithUser(savedSrc, user);
     frame.src = finalSrc;
     setActiveNav(targetBtn);
   }
+
+  window.addEventListener('message', async function (event) {
+    try {
+      const data = event.data || {};
+      if (data.type !== 'portal-auth-request') return;
+
+      const user = await getCurrentUser();
+      if (user) postAuthToFrameWithRetry(user);
+    } catch (e) {
+      console.error('portal-auth-request failed:', e);
+    }
+  });
 
   navButtons.forEach(function (btn) {
     btn.addEventListener('click', async function () {
@@ -351,12 +384,22 @@
   if (navType === 'reload') {
     restoreLastPage();
   } else {
-    if (frame) {
-      frame.src = HOME_SRC;
-    }
-    if (homeBtn) {
-      setActiveNav(homeBtn);
-    }
+    (async function openHomeOnFirstVisit() {
+      const user = await getCurrentUser();
+
+      if (frame) {
+        frame.onload = function () {
+          if (user) postAuthToFrameWithRetry(user);
+        };
+        frame.src = user ? buildSrcWithUser(HOME_SRC, user) : HOME_SRC;
+      }
+
+      if (homeBtn) {
+        setActiveNav(homeBtn);
+      }
+
+      if (user) postAuthToFrameWithRetry(user);
+    })();
   }
 })();
 </script>
