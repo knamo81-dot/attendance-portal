@@ -1394,3 +1394,80 @@ th:first-child {
     gap: 6px;
   }
 }
+/* 현황분석 상단: 월별 추이 + 조직 분석 코멘트 2분할 */
+#view-analysis .analysis-top-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  align-items: stretch;
+  margin-bottom: 0;
+}
+
+#view-analysis .analysis-top-grid .panel {
+  height: 100%;
+}
+
+.analysis-comment-side-panel .analysis-comment-box {
+  min-height: 214px;
+}
+
+.analysis-comment-side-panel .analysis-insight-list {
+  gap: 7px;
+}
+
+.analysis-comment-side-panel .analysis-insight-list li {
+  line-height: 1.48;
+}
+
+/* 현황분석: 월별 운영 가능 전담인력 추이 - 절반 카드용 compact */
+.analysis-trend-panel {
+  margin-bottom: 18px;
+}
+
+.dedicated-trend-chart {
+  min-height: 228px;
+  padding: 12px 12px 6px;
+}
+
+.dedicated-trend-svg {
+  min-width: 660px;
+  height: 210px;
+}
+
+.trend-value-label {
+  font-size: 11px;
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.trend-value-label.total {
+  fill: #111827;
+}
+
+.trend-value-label.actual {
+  fill: #4c1d95;
+}
+
+.dedicated-trend-summary {
+  padding: 10px 12px;
+  margin-top: 8px;
+  font-size: 11px;
+  gap: 6px 10px;
+}
+
+@media (max-width: 1300px) {
+  #view-analysis .analysis-top-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .analysis-comment-side-panel .analysis-comment-box {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .dedicated-trend-svg {
+    min-width: 620px;
+  }
+}
