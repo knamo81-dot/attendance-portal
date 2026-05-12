@@ -1471,3 +1471,79 @@ th:first-child {
     min-width: 620px;
   }
 }
+/* 상단 조직 필터: 본부 / 팀 얇은 2줄 바 */
+.org-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: -8px 0 16px;
+  min-height: 36px;
+}
+
+.org-filter-group {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 11px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.035);
+  white-space: nowrap;
+}
+
+.org-filter-group label {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.org-filter-group select {
+  width: 150px;
+  min-width: 120px;
+  height: 28px;
+  padding: 0 26px 0 8px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  background-color: transparent;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.org-filter-group select:disabled {
+  color: #64748b;
+  cursor: default;
+  opacity: 1;
+}
+
+.org-filter-hint {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .org-filter-row {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    margin-top: -4px;
+  }
+
+  .org-filter-group {
+    flex: 1 1 180px;
+  }
+
+  .org-filter-group select {
+    flex: 1;
+    width: 100%;
+  }
+
+  .org-filter-hint {
+    width: 100%;
+  }
+}
