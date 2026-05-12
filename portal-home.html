@@ -1513,78 +1513,31 @@ html.embed-mode .header-card{
     </script>
 
 <script>
-window.__PORTAL_AUTH_USER__ = null;
+window.__PORTAL_AUTH_USER__ = window.__PORTAL_AUTH_USER__ || null;
 
-window.addEventListener('message', function(event){
-  try{
-    const data = event.data || {};
-    if(data.type === 'portal-auth' && data.user){
-      window.__PORTAL_AUTH_USER__ = data.user || null;
-
-      if(window.portalAuth && typeof window.portalAuth === 'function'){
-        try{
-          const ctx = window.portalAuth();
-          if(ctx){
-            ctx.email = data.user.email || '';
-          }
-        }catch(e){}
-      }
-
-      document.body.classList.remove('auth-loading');
-
-      const overlay = document.getElementById('authOverlay');
-      if(overlay){
-        overlay.hidden = true;
-        overlay.style.display = 'none';
-      }
-    }
-  }catch(e){
-    console.error('portal-auth bridge error', e);
-  }
-});
-</script>
-
-
-    <script>
-      (function(){
-        function hidePortalLoginForEmbedded(){
-          var embed = false;
-          try { embed = window.self !== window.top; } catch(e){ embed = true; }
-
-          if(!embed) return;
-
-          document.addEventListener('DOMContentLoaded', function(){
-            document.body.classList.remove('auth-loading');
-
-            var overlay = document.getElementById('authOverlay');
-            if(overlay){
-              overlay.hidden = true;
-              overlay.style.display = 'none';
-            }
-          });
-        }
-
-        hidePortalLoginForEmbedded();
-      })();
-    </script>
-
-
-<script>
 function getPortalInjectedEmail(){
   try{
     if(window.__PORTAL_AUTH_USER__ && window.__PORTAL_AUTH_USER__.email){
       return String(window.__PORTAL_AUTH_USER__.email || '').trim().toLowerCase();
     }
-
     const params = new URLSearchParams(location.search);
     const qEmail = params.get('email');
-    if(qEmail){
-      return String(qEmail || '').trim().toLowerCase();
-    }
+    if(qEmail) return String(qEmail || '').trim().toLowerCase();
   }catch(e){}
-
   return '';
 }
+
+window.addEventListener('message', function(event){
+  try{
+    const data = event.data || {};
+    if(data.type === 'portal-auth' && data.user && data.user.email){
+      window.__PORTAL_AUTH_USER__ = data.user;
+      window.dispatchEvent(new CustomEvent('portal-auth-received', { detail: data.user }));
+    }
+  }catch(e){
+    console.error('portal-auth receive error', e);
+  }
+});
 </script>
 
 </head>
@@ -2041,8 +1994,6 @@ function getPortalInjectedEmail(){
     async function loadPortalUserEmployee() {
       try {
         const { sb, email } = portalAuth();
-        const injectedEmail = getPortalInjectedEmail();
-        const finalEmail = injectedEmail || email;
         if (!sb || !email) {
           state.portalUserEmployee = null;
           return;
@@ -2074,13 +2025,13 @@ function getPortalInjectedEmail(){
         let data = null;
         let result = await sb.from('employees')
           .select(employeeSelect)
-          .eq('email', finalEmail)
+          .eq('email', email)
           .maybeSingle();
 
         if (result.error && String(result.error.message || '').includes('column')) {
           result = await sb.from('employees')
             .select('email,team,department,employee_no,name,role')
-            .eq('email', finalEmail)
+            .eq('email', email)
             .maybeSingle();
         }
 
@@ -2090,13 +2041,13 @@ function getPortalInjectedEmail(){
         if (!data) {
           let alt = await sb.from('employees')
             .select(employeeSelect)
-            .ilike('email', finalEmail)
+            .ilike('email', email)
             .maybeSingle();
 
           if (alt.error && String(alt.error.message || '').includes('column')) {
             alt = await sb.from('employees')
               .select('email,team,department,employee_no,name,role')
-              .ilike('email', finalEmail)
+              .ilike('email', email)
               .maybeSingle();
           }
 
@@ -2155,8 +2106,6 @@ function getPortalInjectedEmail(){
       state.reservationLoading = true;
       try {
         const { sb, email } = portalAuth();
-        const injectedEmail = getPortalInjectedEmail();
-        const finalEmail = injectedEmail || email;
         if (!sb || !email) {
           state.reservationsAll = [];
           applyReservationFilter();
@@ -2194,11 +2143,12 @@ function getPortalInjectedEmail(){
     function portalAuth() {
       const ctx = typeof window.getPortalAuthContext === 'function' ? window.getPortalAuthContext() : {};
       const sb = ctx.supabase || window.portalSupabase;
-      const email = String(ctx.user?.email || '').trim().toLowerCase();
+      const injectedEmail = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
+      const email = String(ctx.user?.email || injectedEmail || '').trim().toLowerCase();
       const profile = ctx.profile || null;
       const name = String(profile?.name || profile?.employee_name || profile?.username || '').trim()
         || (email ? email.split('@')[0] : '사용자');
-      return { sb, email, name, user: ctx.user, profile };
+      return { sb, email, name, user: ctx.user || (email ? { email } : null), profile };
     }
 
     function getCurrentUserDisplayName() {
@@ -2369,8 +2319,6 @@ function getPortalInjectedEmail(){
       state.memoLoading = true;
       try {
         const { sb, email } = portalAuth();
-        const injectedEmail = getPortalInjectedEmail();
-        const finalEmail = injectedEmail || email;
         if (!sb || !email) {
           state.notes = [];
           return;
@@ -2396,8 +2344,6 @@ function getPortalInjectedEmail(){
     async function loadTrashMemosFromServer() {
       try {
         const { sb, email } = portalAuth();
-        const injectedEmail = getPortalInjectedEmail();
-        const finalEmail = injectedEmail || email;
         if (!sb || !email) {
           state.trash = [];
           return;
@@ -2459,8 +2405,6 @@ function getPortalInjectedEmail(){
 
     async function patchMemoOnServer(id, patch) {
       const { sb, email } = portalAuth();
-        const injectedEmail = getPortalInjectedEmail();
-        const finalEmail = injectedEmail || email;
       if (!sb || !email) throw new Error('로그인이 필요합니다.');
       const { data, error } = await sb.from('portal_memos').update(patch).eq('id', id).eq('created_by_email', email).select('*').single();
       if (error) throw error;
@@ -2487,8 +2431,6 @@ function getPortalInjectedEmail(){
 
     async function permanentDeleteMemoOnServer(id) {
       const { sb, email } = portalAuth();
-        const injectedEmail = getPortalInjectedEmail();
-        const finalEmail = injectedEmail || email;
       if (!sb || !email) throw new Error('로그인이 필요합니다.');
       const { error } = await sb.from('portal_memos').delete().eq('id', id).eq('created_by_email', email);
       if (error) throw error;
@@ -2620,8 +2562,6 @@ function getPortalInjectedEmail(){
       state.scheduleLoading = true;
       try {
         const { sb, email } = portalAuth();
-        const injectedEmail = getPortalInjectedEmail();
-        const finalEmail = injectedEmail || email;
         if (!sb || !email) {
           state.schedules = [];
           return;
@@ -2653,8 +2593,6 @@ function getPortalInjectedEmail(){
 
     async function updateScheduleOnServer(id, patch) {
       const { sb, email } = portalAuth();
-        const injectedEmail = getPortalInjectedEmail();
-        const finalEmail = injectedEmail || email;
       if (!sb) throw new Error('로그인이 필요합니다.');
       const isAdmin = isPortalAdminRole();
       let q = sb.from('portal_schedules').update(patch).eq('id', id);
@@ -2666,8 +2604,6 @@ function getPortalInjectedEmail(){
 
     async function deleteScheduleOnServer(id) {
       const { sb, email } = portalAuth();
-        const injectedEmail = getPortalInjectedEmail();
-        const finalEmail = injectedEmail || email;
       if (!sb) throw new Error('로그인이 필요합니다.');
       const isAdmin = isPortalAdminRole();
       let q = sb.from('portal_schedules').delete().eq('id', id);
@@ -2739,8 +2675,6 @@ function getPortalInjectedEmail(){
 
     async function updateReservationOnServer(id, patch) {
       const { sb, email } = portalAuth();
-        const injectedEmail = getPortalInjectedEmail();
-        const finalEmail = injectedEmail || email;
       const isAdmin = isPortalAdminRole();
       let q = sb.from('portal_reservations').update(patch).eq('id', id);
       if (!isAdmin) q = q.eq('created_by_email', email);
@@ -2751,8 +2685,6 @@ function getPortalInjectedEmail(){
 
     async function deleteReservationOnServer(id) {
       const { sb, email } = portalAuth();
-        const injectedEmail = getPortalInjectedEmail();
-        const finalEmail = injectedEmail || email;
       const isAdmin = isPortalAdminRole();
       let q = sb.from('portal_reservations').delete().eq('id', id);
       if (!isAdmin) q = q.eq('created_by_email', email);
@@ -5090,6 +5022,10 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY";
 
   function initAuth() {
+    const portalHomeEmbed = (function(){
+      try { return window.self !== window.top; } catch(e) { return true; }
+    })();
+
     const fallbackOverlay = document.getElementById('authOverlay');
     const fallbackLoginCard = document.getElementById('loginCard');
     const fallbackLoginError = document.getElementById('loginError');
@@ -5160,6 +5096,15 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     }
 
     function showLogin(message = '') {
+      if (portalHomeEmbed) {
+        document.body.classList.remove('auth-loading');
+        if (els.overlay) els.overlay.hidden = true;
+        if (els.loginCard) els.loginCard.hidden = true;
+        if (els.passwordCard) els.passwordCard.hidden = true;
+        if (els.topUserBar) els.topUserBar.hidden = true;
+        return;
+      }
+
       document.body.classList.add('auth-loading');
       if (els.overlay) els.overlay.hidden = false;
       if (els.loginCard) els.loginCard.hidden = false;
@@ -5201,7 +5146,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       const { data, error } = await supabaseClient
         .from('users')
         .select('email,name,role,is_active,must_change_password')
-        .eq('email', finalEmail)
+        .eq('email', email)
         .maybeSingle();
       if (error) throw error;
       return data;
@@ -5250,6 +5195,47 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         await supabaseClient.auth.signOut();
         showLogin('사용자 권한 정보를 확인하지 못했습니다. users 테이블의 이메일과 권한 정보를 확인해 주세요.');
       }
+    }
+
+    async function handlePortalInjectedUser(portalUser) {
+      const injectedEmail = String(portalUser?.email || '').trim().toLowerCase();
+      if (!injectedEmail) return;
+
+      try {
+        currentUser = { email: injectedEmail };
+        const profile = await fetchProfile(injectedEmail);
+
+        if (!profile || profile.is_active === false) {
+          currentProfile = null;
+          showPortal();
+          return;
+        }
+
+        currentProfile = profile;
+        applyRoleUI(profile);
+        showPortal();
+
+        try {
+          if (typeof window.loadPortalServerData === 'function') {
+            await window.loadPortalServerData();
+          }
+        } catch (loadErr) {
+          console.error('loadPortalServerData after portal-auth', loadErr);
+        }
+      } catch (error) {
+        console.error('handlePortalInjectedUser error:', error);
+        showPortal();
+      }
+    }
+
+    window.addEventListener('portal-auth-received', function(e){
+      handlePortalInjectedUser(e.detail || window.__PORTAL_AUTH_USER__).catch(console.error);
+    });
+
+    if (window.__PORTAL_AUTH_USER__ && window.__PORTAL_AUTH_USER__.email) {
+      setTimeout(function(){
+        handlePortalInjectedUser(window.__PORTAL_AUTH_USER__).catch(console.error);
+      }, 0);
     }
 
     async function login() {
