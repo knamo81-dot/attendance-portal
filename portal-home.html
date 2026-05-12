@@ -1512,7 +1512,7 @@ html.embed-mode .header-card{
     })();
     </script>
 
-<script>
+<script id="portal-home-shell-auth-bridge">
 window.__PORTAL_AUTH_USER__ = window.__PORTAL_AUTH_USER__ || null;
 
 function getPortalInjectedEmail(){
@@ -1520,24 +1520,54 @@ function getPortalInjectedEmail(){
     if(window.__PORTAL_AUTH_USER__ && window.__PORTAL_AUTH_USER__.email){
       return String(window.__PORTAL_AUTH_USER__.email || '').trim().toLowerCase();
     }
+
     const params = new URLSearchParams(location.search);
     const qEmail = params.get('email');
     if(qEmail) return String(qEmail || '').trim().toLowerCase();
+
+    const stored = localStorage.getItem('portal_current_user') || localStorage.getItem('current_user') || '';
+    if(stored){
+      try{
+        const parsed = JSON.parse(stored);
+        if(parsed && parsed.email) return String(parsed.email || '').trim().toLowerCase();
+      }catch(e){
+        if(String(stored).includes('@')) return String(stored).trim().toLowerCase();
+      }
+    }
   }catch(e){}
   return '';
+}
+
+function notifyPortalAuthReceived(user){
+  try{
+    if(user && user.email){
+      window.__PORTAL_AUTH_USER__ = user;
+      window.dispatchEvent(new CustomEvent('portal-auth-received', { detail: user }));
+    }
+  }catch(e){}
 }
 
 window.addEventListener('message', function(event){
   try{
     const data = event.data || {};
     if(data.type === 'portal-auth' && data.user && data.user.email){
-      window.__PORTAL_AUTH_USER__ = data.user;
-      window.dispatchEvent(new CustomEvent('portal-auth-received', { detail: data.user }));
+      notifyPortalAuthReceived(data.user);
     }
   }catch(e){
     console.error('portal-auth receive error', e);
   }
 });
+
+(function requestAuthFromShell(){
+  try{
+    const embed = window.self !== window.top;
+    if(!embed || !window.parent) return;
+
+    setTimeout(function(){ window.parent.postMessage({ type:'portal-auth-request', source:'portal-home' }, '*'); }, 50);
+    setTimeout(function(){ window.parent.postMessage({ type:'portal-auth-request', source:'portal-home' }, '*'); }, 300);
+    setTimeout(function(){ window.parent.postMessage({ type:'portal-auth-request', source:'portal-home' }, '*'); }, 900);
+  }catch(e){}
+})();
 </script>
 
 </head>
@@ -2142,10 +2172,10 @@ window.addEventListener('message', function(event){
 
     function portalAuth() {
       const ctx = typeof window.getPortalAuthContext === 'function' ? window.getPortalAuthContext() : {};
-      const sb = ctx.supabase || window.portalSupabase;
+      const sb = ctx.supabase || window.portalSupabase || window.__portalHomeSupabase || null;
       const injectedEmail = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
       const email = String(ctx.user?.email || injectedEmail || '').trim().toLowerCase();
-      const profile = ctx.profile || null;
+      const profile = ctx.profile || window.__portalHomeProfile || null;
       const name = String(profile?.name || profile?.employee_name || profile?.username || '').trim()
         || (email ? email.split('@')[0] : '사용자');
       return { sb, email, name, user: ctx.user || (email ? { email } : null), profile };
@@ -5045,6 +5075,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     if (!supabaseClient) {
       supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       window.portalSupabase = supabaseClient;
+      window.__portalHomeSupabase = supabaseClient;
     }
 
     window.getPortalAuthContext = function getPortalAuthContext() {
@@ -5157,6 +5188,17 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       currentProfile = null;
 
       if (!user) {
+        const injectedEmail = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
+        if (portalHomeEmbed && injectedEmail) {
+          await handlePortalInjectedUser({ email: injectedEmail });
+          return;
+        }
+
+        if (portalHomeEmbed) {
+          showPortal();
+          return;
+        }
+
         showLogin('');
         return;
       }
@@ -5175,6 +5217,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         }
 
         currentProfile = profile;
+        window.__portalHomeProfile = profile;
         applyRoleUI(profile);
 
         if (profile.must_change_password) {
@@ -5198,21 +5241,21 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
     }
 
     async function handlePortalInjectedUser(portalUser) {
-      const injectedEmail = String(portalUser?.email || '').trim().toLowerCase();
+      const injectedEmail = String(portalUser?.email || getPortalInjectedEmail() || '').trim().toLowerCase();
       if (!injectedEmail) return;
 
       try {
         currentUser = { email: injectedEmail };
         const profile = await fetchProfile(injectedEmail);
 
-        if (!profile || profile.is_active === false) {
+        if (profile && profile.is_active !== false) {
+          currentProfile = profile;
+          window.__portalHomeProfile = profile;
+          applyRoleUI(profile);
+        } else {
           currentProfile = null;
-          showPortal();
-          return;
         }
 
-        currentProfile = profile;
-        applyRoleUI(profile);
         showPortal();
 
         try {
@@ -5338,9 +5381,23 @@ window.portalLogout = logout;
     });
 
     supabaseClient.auth.getSession()
-      .then(({ data }) => handleSession(data?.session?.user || null))
+      .then(({ data }) => {
+        const sessionUser = data?.session?.user || null;
+        const injectedEmail = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
+
+        if (!sessionUser && portalHomeEmbed && injectedEmail) {
+          return handlePortalInjectedUser({ email: injectedEmail });
+        }
+
+        return handleSession(sessionUser);
+      })
       .catch((error) => {
         console.error('getSession error:', error);
+        const injectedEmail = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
+        if (portalHomeEmbed && injectedEmail) {
+          handlePortalInjectedUser({ email: injectedEmail }).catch(console.error);
+          return;
+        }
         showLogin('인증 세션을 확인하지 못했습니다.');
       });
 
@@ -6579,6 +6636,30 @@ window.portalLogout = logout;
 })();
 </script>
 
+
+
+<script id="portal-home-embedded-auth-finalizer">
+(function(){
+  function isEmbedded(){
+    try { return window.self !== window.top; } catch(e){ return true; }
+  }
+
+  function requestAgain(){
+    if(!isEmbedded()) return;
+    try {
+      if(window.parent){
+        window.parent.postMessage({ type:'portal-auth-request', source:'portal-home-finalizer' }, '*');
+      }
+    } catch(e){}
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    requestAgain();
+    setTimeout(requestAgain, 500);
+    setTimeout(requestAgain, 1500);
+  });
+})();
+</script>
 
 </body>
 </html>
