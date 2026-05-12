@@ -1570,6 +1570,20 @@ window.addEventListener('message', function(event){
 })();
 </script>
 
+
+<script id="portal-home-auth-parent-notify">
+function notifyShellHomeAuthenticated(user){
+  try{
+    if(!user || !user.email) return;
+    const payloadUser = { email: String(user.email || '').trim().toLowerCase() };
+    localStorage.setItem('portal_current_user', JSON.stringify(payloadUser));
+    if(window.parent && window.parent !== window){
+      window.parent.postMessage({ type:'portal-home-authenticated', user: payloadUser }, '*');
+    }
+  }catch(e){}
+}
+</script>
+
 </head>
 <body class="auth-loading">
 
@@ -2174,8 +2188,9 @@ window.addEventListener('message', function(event){
       const ctx = typeof window.getPortalAuthContext === 'function' ? window.getPortalAuthContext() : {};
       const sb = ctx.supabase || window.portalSupabase || window.__portalHomeSupabase || null;
       const injectedEmail = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
-      const email = String(ctx.user?.email || injectedEmail || '').trim().toLowerCase();
-      const profile = ctx.profile || window.__portalHomeProfile || null;
+      const directUserEmail = (typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : '';
+      const email = String(ctx.user?.email || directUserEmail || injectedEmail || '').trim().toLowerCase();
+      const profile = ctx.profile || window.__portalHomeProfile || (typeof currentProfile !== 'undefined' ? currentProfile : null) || null;
       const name = String(profile?.name || profile?.employee_name || profile?.username || '').trim()
         || (email ? email.split('@')[0] : '사용자');
       return { sb, email, name, user: ctx.user || (email ? { email } : null), profile };
@@ -2393,7 +2408,10 @@ window.addEventListener('message', function(event){
     }
 
     async function createMemoOnServer(payload) {
-      const { sb, email, name } = portalAuth();
+      const auth = portalAuth();
+      const sb = auth.sb;
+      const email = auth.email || (typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '');
+      const name = auth.name || (email ? email.split('@')[0] : '사용자');
       if (!sb || !email) throw new Error('로그인이 필요합니다.');
       const insertRow = payload.created_by_email != null ? payload : memoStateToDbPayload(payload, email, name);
       const { data, error } = await sb.from('portal_memos').insert([insertRow]).select('*').single();
@@ -4765,7 +4783,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           renderScheduleTab();
           return;
         }
-        const { email, name } = portalAuth();
+        const auth = portalAuth();
+        const email = auth.email || (typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '');
+        const name = auth.name || (email ? email.split('@')[0] : '사용자');
         if (!email) {
           setPortalPlannerFeedback('로그인이 필요합니다.', 'error');
           renderScheduleTab();
@@ -5078,6 +5098,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       window.__portalHomeSupabase = supabaseClient;
     }
 
+    window.__portalHomeSupabase = supabaseClient;
+    window.portalSupabase = supabaseClient;
+
     window.getPortalAuthContext = function getPortalAuthContext() {
       return {
         user: currentUser,
@@ -5160,6 +5183,9 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       if (els.overlay) els.overlay.hidden = true;
       if (els.loginCard) els.loginCard.hidden = true;
       if (els.passwordCard) els.passwordCard.hidden = true;
+      if (typeof notifyShellHomeAuthenticated === 'function' && currentUser && currentUser.email) {
+        notifyShellHomeAuthenticated(currentUser);
+      }
     }
 
     function applyRoleUI(profile) {
@@ -5206,11 +5232,19 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       try {
         const profile = await fetchProfile(user.email);
         if (!profile) {
+          if (portalHomeEmbed) {
+            showPortal();
+            return;
+          }
           await supabaseClient.auth.signOut();
           showLogin('users 테이블에 등록되지 않은 이메일입니다. 관리자에게 계정 등록을 요청해 주세요.');
           return;
         }
         if (profile.is_active === false) {
+          if (portalHomeEmbed) {
+            showPortal();
+            return;
+          }
           await supabaseClient.auth.signOut();
           showLogin('비활성화된 계정입니다. 관리자에게 문의해 주세요.');
           return;
@@ -5377,7 +5411,15 @@ window.portalLogout = logout;
     els.logoutNavBtn?.addEventListener('click', logout);
 
     supabaseClient.auth.onAuthStateChange((_event, session) => {
-      handleSession(session?.user || null);
+      const sessionUser = session?.user || null;
+      if (!sessionUser && portalHomeEmbed) {
+        const injectedEmail = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
+        if (injectedEmail) {
+          handlePortalInjectedUser({ email: injectedEmail }).catch(console.error);
+          return;
+        }
+      }
+      handleSession(sessionUser);
     });
 
     supabaseClient.auth.getSession()
@@ -6657,6 +6699,32 @@ window.portalLogout = logout;
     requestAgain();
     setTimeout(requestAgain, 500);
     setTimeout(requestAgain, 1500);
+  });
+})();
+</script>
+
+
+<script id="portal-home-url-email-finalizer">
+(function(){
+  function activate(){
+    try{
+      var email = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
+      if(!email) return;
+      document.body.classList.remove('auth-loading');
+      var overlay = document.getElementById('authOverlay');
+      if(overlay){
+        overlay.hidden = true;
+        overlay.style.display = 'none';
+      }
+      if(typeof notifyShellHomeAuthenticated === 'function'){
+        notifyShellHomeAuthenticated({ email: email });
+      }
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    activate();
+    setTimeout(activate, 300);
+    setTimeout(activate, 1000);
   });
 })();
 </script>
