@@ -15,7 +15,8 @@ const AppState = {
   currentUser: null,
   currentRoles: [],
   currentRole: "",
-  isAdmin: false
+  isAdmin: false,
+  isOperator: false
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -47,6 +48,7 @@ async function loadMyResearchStaffRoles() {
   AppState.currentRoles = [];
   AppState.currentRole = "viewer";
   AppState.isAdmin = false;
+  AppState.isOperator = false;
 
   if (!email) {
     console.warn("포탈 로그인 이메일을 확인하지 못해 운영인력 리스트는 조회 전용으로 동작합니다.");
@@ -59,17 +61,17 @@ async function loadMyResearchStaffRoles() {
       : [];
 
     AppState.currentRoles = Array.isArray(roles) ? roles : [];
-    AppState.isAdmin =
-      AppState.currentRoles.includes("research_staff_admin") ||
-      AppState.currentRoles.includes("research_staff_operator");
-    AppState.currentRole = AppState.currentRoles.includes("research_staff_admin")
+    AppState.isAdmin = AppState.currentRoles.includes("research_staff_admin");
+    AppState.isOperator = AppState.currentRoles.includes("research_staff_operator");
+    AppState.currentRole = AppState.isAdmin
       ? "admin"
-      : (AppState.currentRoles.includes("research_staff_operator") ? "operator" : "viewer");
+      : (AppState.isOperator ? "operator" : "viewer");
   } catch (error) {
     console.warn("인력운영현황 권한 조회 실패:", error);
     AppState.currentRoles = [];
     AppState.currentRole = "viewer";
     AppState.isAdmin = false;
+    AppState.isOperator = false;
   }
 }
 
