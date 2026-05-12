@@ -316,6 +316,10 @@ function populateTeamFilterOptions() {
     select.value = teams.some(item => item.value === current) ? current : "";
   }
 
+  if (access.scope === "division" && select.value && isVirtualTeamName(select.selectedOptions?.[0]?.textContent || "")) {
+    select.value = "";
+  }
+
   AppState.filterTeam = select.value;
   updateOrgFilterControls();
   updateOrgFilterHint();
@@ -506,6 +510,11 @@ function applyOrgAccessDefaults() {
   if (access.scope === "division" || access.scope === "team") {
     AppState.filterDivision = access.division || "";
   }
+
+  if (access.scope === "division") {
+    AppState.filterTeam = "";
+  }
+
   if (access.scope === "team") {
     AppState.filterTeam = access.team || "";
   }
@@ -517,14 +526,15 @@ function buildOrgAccess() {
   }
 
   const employee = resolveCurrentEmployeeRow();
-  const division = getRowDivisionValue(employee);
-  const team = getRowTeamValue(employee);
 
   if (!employee) {
     return { scope: "team", division: "", team: "", reason: "로그인 사용자 조직정보 없음" };
   }
 
-  if (isDivisionLevelUser(employee)) {
+  const division = getEmployeeDivisionScopeValue(employee);
+  const team = getRowTeamValue(employee);
+
+  if (isDivisionLevelUser(employee) || isVirtualTeamRow(employee)) {
     return { scope: "division", division, team: "", reason: "소장/본부장" };
   }
 
@@ -549,6 +559,43 @@ function isDivisionLevelUser(row) {
   ].map(value => String(value || "").trim()).join(" ");
 
   return /소장|본부장|부문장|센터장/.test(text);
+}
+
+function getEmployeeDivisionScopeValue(row) {
+  if (!row) return "";
+
+  const directDivision = getRowDivisionValue(row);
+  const teamValue = getRowTeamValue(row);
+  const matchedTeam = findTeamByValue(teamValue);
+
+  if (matchedTeam && isVirtualTeamOption(matchedTeam)) {
+    return (
+      getTeamDivisionValue(matchedTeam) ||
+      matchedTeam.division_code ||
+      matchedTeam.parent_division_code ||
+      matchedTeam.parent_code ||
+      directDivision ||
+      getTeamOptionValue(matchedTeam) ||
+      getTeamOptionLabel(matchedTeam) ||
+      ""
+    );
+  }
+
+  return directDivision;
+}
+
+function isVirtualTeamRow(row) {
+  if (!row) return false;
+
+  const teamValue = getRowTeamValue(row);
+  const matchedTeam = findTeamByValue(teamValue);
+  if (matchedTeam && isVirtualTeamOption(matchedTeam)) return true;
+
+  const teamName = String(row.team || row.team_name || "").trim();
+  if (teamName && isVirtualTeamName(teamName)) return true;
+
+  const divisionName = String(row.department || row.division_name || row.division || "").trim();
+  return Boolean(teamName && divisionName && normalizeOrgValue(teamName) === normalizeOrgValue(divisionName));
 }
 
 function updateOrgFilterControls() {
