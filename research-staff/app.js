@@ -55,8 +55,12 @@ async function loadMyResearchStaffRoles() {
       : [];
 
     AppState.currentRoles = Array.isArray(roles) ? roles : [];
-    AppState.isAdmin = AppState.currentRoles.includes("research_staff_admin");
-    AppState.currentRole = AppState.isAdmin ? "admin" : "viewer";
+    AppState.isAdmin =
+      AppState.currentRoles.includes("research_staff_admin") ||
+      AppState.currentRoles.includes("research_staff_operator");
+    AppState.currentRole = AppState.currentRoles.includes("research_staff_admin")
+      ? "admin"
+      : (AppState.currentRoles.includes("research_staff_operator") ? "operator" : "viewer");
   } catch (error) {
     console.warn("인력운영현황 권한 조회 실패:", error);
     AppState.currentRoles = [];
