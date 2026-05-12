@@ -125,7 +125,7 @@
         </div>
       </div>
       <div class="portal-main">
-        <iframe id="portalFrame" title="포털 본문" src="portal-home.html"></iframe>
+        <iframe id="portalFrame" title="포털 본문" src="portal-home.html?embed=1"></iframe>
       </div>
     </div>
   </div>
@@ -143,6 +143,31 @@
   const homeBtn = document.getElementById('homeNavBtn');
 
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let portalCurrentUser = null;
+
+  function rememberPortalUser(user) {
+    if (!user || !user.email) return;
+    portalCurrentUser = { email: String(user.email || '').trim().toLowerCase() };
+    try {
+      localStorage.setItem('portal_current_user', JSON.stringify(portalCurrentUser));
+    } catch (_) {}
+  }
+
+  function getRememberedPortalUser() {
+    if (portalCurrentUser && portalCurrentUser.email) return portalCurrentUser;
+    try {
+      const raw = localStorage.getItem('portal_current_user') || '';
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.email) {
+          portalCurrentUser = { email: String(parsed.email || '').trim().toLowerCase() };
+          return portalCurrentUser;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
 
   function setActiveNav(activeBtn) {
     navButtons.forEach(function (b) {
@@ -180,15 +205,35 @@
   }
 
   async function getCurrentUser() {
-    const { data } = await supabaseClient.auth.getUser();
-    return data?.user || null;
+    const remembered = getRememberedPortalUser();
+    if (remembered && remembered.email) return remembered;
+
+    try {
+      const { data: sessionData } = await supabaseClient.auth.getSession();
+      if (sessionData?.session?.user?.email) {
+        rememberPortalUser(sessionData.session.user);
+        return sessionData.session.user;
+      }
+    } catch (_) {}
+
+    try {
+      const { data } = await supabaseClient.auth.getUser();
+      if (data?.user?.email) {
+        rememberPortalUser(data.user);
+        return data.user;
+      }
+    } catch (_) {}
+
+    return null;
   }
 
   async function ensureAuthenticated() {
-    const { data } = await supabaseClient.auth.getSession();
+    const user = await getCurrentUser();
 
-    if (!data.session) {
+    if (!user || !user.email) {
       localStorage.removeItem(LAST_PAGE_KEY);
+      localStorage.removeItem('portal_current_user');
+      portalCurrentUser = null;
 
       if (frame) {
         frame.src = HOME_SRC;
@@ -335,20 +380,7 @@
     frame.src = finalSrc;
     setActiveNav(targetBtn);
   }
-
-  window.addEventListener('message', async function (event) {
-    try {
-      const data = event.data || {};
-      if (data.type !== 'portal-auth-request') return;
-
-      const user = await getCurrentUser();
-      if (user) postAuthToFrameWithRetry(user);
-    } catch (e) {
-      console.error('portal-auth-request failed:', e);
-    }
-  });
-
-  navButtons.forEach(function (btn) {
+navButtons.forEach(function (btn) {
     btn.addEventListener('click', async function () {
       await navigate(btn);
     });
