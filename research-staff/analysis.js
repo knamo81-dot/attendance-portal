@@ -3,7 +3,9 @@ const LOWER_TENURE_GROUPS = ["3~5년", "1~3년", "1년 미만"];
 
 function getLatestAnalysisRows() {
   const source = Array.isArray(AppState?.merged) ? AppState.merged : [];
-  return source
+  const scoped = typeof getOrgScopedRows === "function" ? getOrgScopedRows(source) : source;
+
+  return scoped
     .filter(row => typeof isResearchStaffRow === "function" ? isResearchStaffRow(row) : true)
     .filter(row => {
       const status = String(row.status || row.employment_status || "").trim();
@@ -365,7 +367,8 @@ function renderDedicatedTrendChart() {
 
 function getDedicatedTrendSourceRows() {
   const source = Array.isArray(AppState?.merged) ? AppState.merged : [];
-  return source.filter(row => typeof isResearchStaffRow === "function" ? isResearchStaffRow(row) : true);
+  const scoped = typeof getOrgScopedRows === "function" ? getOrgScopedRows(source) : source;
+  return scoped.filter(row => typeof isResearchStaffRow === "function" ? isResearchStaffRow(row) : true);
 }
 
 function getLatestTwelveMonths() {
