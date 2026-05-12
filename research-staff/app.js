@@ -315,38 +315,101 @@ function buildDivisionOptions() {
 
 function buildTeamOptions(divisionValue = "") {
   const map = new Map();
+  const teamsSource = Array.isArray(AppState?.teams) && AppState.teams.length
+    ? AppState.teams
+    : [];
 
-  (AppState.merged || [])
-    .filter(row => {
-      if (!divisionValue) return true;
-      const rowDivision = String(row.division_code || row.department || "").trim();
-      return rowDivision === divisionValue;
-    })
-    .forEach(row => {
-      const value = String(row.team_code || row.team || "").trim();
-      const label = String(row.team || row.team_name || row.team_code || "미지정 팀").trim() || "미지정 팀";
-      if (!value) return;
-      if (!map.has(value)) {
-        map.set(value, { value, label, sort: String(row.team_code || label) });
-      }
-    });
+  if (teamsSource.length) {
+    teamsSource
+      .filter(team => !isVirtualTeam(team))
+      .filter(team => {
+        if (!divisionValue) return true;
+        const teamDivision = String(
+          team.division_code ||
+          team.divisionCode ||
+          team.department_code ||
+          team.dept_code ||
+          team.division ||
+          team.department ||
+          ""
+        ).trim();
+        return teamDivision === divisionValue;
+      })
+      .forEach(team => {
+        const value = String(team.team_code || team.teamCode || team.code || team.id || "").trim();
+        const label = String(team.team_name || team.name || team.team || team.team_code || "미지정 팀").trim() || "미지정 팀";
+        if (!value) return;
+        if (!map.has(value)) {
+          map.set(value, { value, label, sort: String(team.sort_order ?? team.team_order ?? team.team_code ?? label) });
+        }
+      });
+  }
+
+  if (!map.size) {
+    const virtualTeamCodes = buildVirtualTeamCodeSet();
+
+    (AppState.merged || [])
+      .filter(row => {
+        if (!divisionValue) return true;
+        const rowDivision = String(row.division_code || row.department || "").trim();
+        return rowDivision === divisionValue;
+      })
+      .forEach(row => {
+        const value = String(row.team_code || row.team || "").trim();
+        const label = String(row.team || row.team_name || row.team_code || "미지정 팀").trim() || "미지정 팀";
+        if (!value) return;
+        if (virtualTeamCodes.has(value) || isVirtualTeam(row)) return;
+        if (!map.has(value)) {
+          map.set(value, { value, label, sort: String(row.team_code || label) });
+        }
+      });
+  }
 
   return [...map.values()].sort((a, b) => String(a.sort).localeCompare(String(b.sort), "ko", { numeric: true, sensitivity: "base" }));
+}
+
+function buildVirtualTeamCodeSet() {
+  const set = new Set();
+
+  (AppState.teams || []).forEach(team => {
+    if (!isVirtualTeam(team)) return;
+    const code = String(team.team_code || team.teamCode || team.code || team.id || "").trim();
+    if (code) set.add(code);
+  });
+
+  return set;
+}
+
+function isVirtualTeam(item) {
+  if (!item) return false;
+
+  const booleanValue =
+    item.is_virtual ??
+    item.isVirtual ??
+    item.virtual ??
+    item.virtual_team ??
+    item.is_virtual_team;
+
+  if (booleanValue === true) return true;
+  if (String(booleanValue).toLowerCase() === "true") return true;
+  if (String(booleanValue) === "1") return true;
+
+  const text = String(
+    item.team_type ||
+    item.type ||
+    item.category ||
+    item.note ||
+    item.memo ||
+    ""
+  );
+
+  return text.includes("가상");
 }
 
 function updateOrgFilterHint() {
   const hint = document.getElementById("orgFilterHint");
   if (!hint) return;
-
-  const divisionText = document.getElementById("filterDivision")?.selectedOptions?.[0]?.textContent || "전체 본부";
-  const teamText = document.getElementById("filterTeam")?.selectedOptions?.[0]?.textContent || "전체 팀";
-
-  if (!AppState.filterDivision && !AppState.filterTeam) {
-    hint.textContent = "조직 필터는 선택 즉시 반영됩니다.";
-    return;
-  }
-
-  hint.textContent = `현재 조회범위: ${divisionText} / ${teamText}`;
+  hint.textContent = "";
 }
 
 function escapeHtmlText(value) {
