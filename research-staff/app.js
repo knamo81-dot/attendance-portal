@@ -343,15 +343,7 @@ function buildTeamOptions(divisionValue = "") {
   if (teams.length) {
     teams
       .filter(team => !isVirtualTeamOption(team))
-      .filter(team => {
-        if (!divisionValue) return true;
-        const teamDivision = getTeamDivisionValue(team);
-        if (teamDivision && teamDivision === divisionValue) return true;
-
-        const divisionLabel = getDivisionLabelByValue(divisionValue);
-        const teamDivisionLabel = String(team.division_name || team.department || team.division || team.parent_name || "").trim();
-        return Boolean(divisionLabel && teamDivisionLabel && teamDivisionLabel === divisionLabel);
-      })
+      .filter(team => teamBelongsToDivision(team, divisionValue))
       .forEach(team => {
         const value = getTeamOptionValue(team);
         const label = getTeamOptionLabel(team);
@@ -366,22 +358,16 @@ function buildTeamOptions(divisionValue = "") {
       });
   }
 
-  if (!map.size) {
-    (AppState.merged || [])
-      .filter(row => {
-        if (!divisionValue) return true;
-        const rowDivision = String(row.division_code || row.department || "").trim();
-        return rowDivision === divisionValue;
-      })
-      .forEach(row => {
-        const value = String(row.team_code || row.team || "").trim();
-        const label = String(row.team || row.team_name || row.team_code || "미지정 팀").trim() || "미지정 팀";
-        if (!value || isVirtualTeamName(label)) return;
-        if (!map.has(value)) {
-          map.set(value, { value, label, sort: String(row.team_code || label) });
-        }
-      });
-  }
+  (AppState.merged || [])
+    .filter(row => rowBelongsToDivision(row, divisionValue))
+    .forEach(row => {
+      const value = String(row.team_code || row.team || "").trim();
+      const label = String(row.team || row.team_name || row.team_code || "미지정 팀").trim() || "미지정 팀";
+      if (!value || isVirtualTeamName(label)) return;
+      if (!map.has(value)) {
+        map.set(value, { value, label, sort: String(row.team_code || label) });
+      }
+    });
 
   return [...map.values()].sort((a, b) => String(a.sort).localeCompare(String(b.sort), "ko", { numeric: true, sensitivity: "base" }));
 }
@@ -586,17 +572,16 @@ function getOrgScopedRows(rows) {
   const source = Array.isArray(rows) ? rows : [];
 
   return source.filter(row => {
-    const rowDivision = getRowDivisionValue(row);
     const rowTeam = getRowTeamValue(row);
 
-    if (access.scope === "division" && access.division && !sameOrgValue(rowDivision, access.division)) return false;
+    if (access.scope === "division" && access.division && !rowBelongsToDivision(row, access.division)) return false;
     if (access.scope === "team") {
-      if (access.division && !sameOrgValue(rowDivision, access.division)) return false;
+      if (access.division && !rowBelongsToDivision(row, access.division)) return false;
       if (access.team && !sameOrgValue(rowTeam, access.team)) return false;
       if (!access.team) return false;
     }
 
-    if (AppState.filterDivision && !sameOrgValue(rowDivision, AppState.filterDivision)) return false;
+    if (AppState.filterDivision && !rowBelongsToDivision(row, AppState.filterDivision)) return false;
     if (AppState.filterTeam && !sameOrgValue(rowTeam, AppState.filterTeam)) return false;
 
     return true;
@@ -614,7 +599,164 @@ function getRowTeamValue(row) {
 }
 
 function sameOrgValue(a, b) {
-  return String(a || "").trim() === String(b || "").trim();
+  const av = normalizeOrgValue(a);
+  const bv = normalizeOrgValue(b);
+  return Boolean(av && bv && av === bv);
+}
+
+function normalizeOrgValue(value) {
+  return String(value || "").trim().replace(/\s+/g, "").toLowerCase();
+}
+
+function teamBelongsToDivision(team, divisionValue = "") {
+  if (!divisionValue) return true;
+
+  const related = getDivisionRelatedValueSet(divisionValue);
+  const teamValue = getTeamOptionValue(team);
+  const teamLabel = getTeamOptionLabel(team);
+  const teamDivision = getTeamDivisionValue(team);
+  const parentValues = [
+    team.parent_code,
+    team.parent_team_code,
+    team.parent_id,
+    team.parent_name,
+    team.division_name,
+    team.department,
+    team.division
+  ];
+
+  if (valueInOrgSet(teamDivision, related)) return true;
+  if (parentValues.some(value => valueInOrgSet(value, related))) return true;
+  if (valueInOrgSet(teamLabel, related) && isVirtualTeamOption(team)) return true;
+
+  const virtualCodes = getVirtualTeamCodesForDivision(divisionValue);
+  return virtualCodes.some(code => {
+    const normalizedCode = normalizeOrgValue(code);
+    const normalizedTeam = normalizeOrgValue(teamValue);
+    return Boolean(normalizedCode && normalizedTeam && normalizedTeam.startsWith(`${normalizedCode}-`));
+  });
+}
+
+function rowBelongsToDivision(row, divisionValue = "") {
+  if (!divisionValue) return true;
+  if (!row) return false;
+
+  const related = getDivisionRelatedValueSet(divisionValue);
+  const rowDivisionValues = [
+    row.division_code,
+    row.department_code,
+    row.dept_code,
+    row.department,
+    row.division_name,
+    row.division
+  ];
+
+  if (rowDivisionValues.some(value => valueInOrgSet(value, related))) return true;
+
+  const rowTeam = getRowTeamValue(row);
+  const matchedTeam = findTeamByValue(rowTeam);
+  if (matchedTeam && teamBelongsToDivision(matchedTeam, divisionValue)) return true;
+
+  const virtualCodes = getVirtualTeamCodesForDivision(divisionValue);
+  return virtualCodes.some(code => {
+    const normalizedCode = normalizeOrgValue(code);
+    const normalizedTeam = normalizeOrgValue(rowTeam);
+    return Boolean(normalizedCode && normalizedTeam && (normalizedTeam === normalizedCode || normalizedTeam.startsWith(`${normalizedCode}-`)));
+  });
+}
+
+function getDivisionRelatedValueSet(divisionValue = "") {
+  const set = new Set();
+  const add = value => {
+    const normalized = normalizeOrgValue(value);
+    if (normalized) set.add(normalized);
+  };
+
+  add(divisionValue);
+  const divisionLabel = getDivisionLabelByValue(divisionValue);
+  add(divisionLabel);
+
+  (AppState.divisions || []).forEach(division => {
+    const values = [
+      division.division_code,
+      division.code,
+      division.id,
+      division.value,
+      division.division_name,
+      division.name,
+      division.label,
+      division.department
+    ];
+    if (values.some(value => sameOrgValue(value, divisionValue) || sameOrgValue(value, divisionLabel))) {
+      values.forEach(add);
+    }
+  });
+
+  (AppState.teams || []).forEach(team => {
+    if (!isVirtualTeamOption(team)) return;
+    const teamValues = [
+      getTeamOptionValue(team),
+      getTeamOptionLabel(team),
+      getTeamDivisionValue(team),
+      team.parent_code,
+      team.parent_team_code,
+      team.parent_name,
+      team.division_name,
+      team.department,
+      team.division
+    ];
+    if (teamValues.some(value => valueInOrgSet(value, set))) {
+      teamValues.forEach(add);
+    }
+  });
+
+  return set;
+}
+
+function valueInOrgSet(value, set) {
+  const normalized = normalizeOrgValue(value);
+  return Boolean(normalized && set?.has(normalized));
+}
+
+function getVirtualTeamCodesForDivision(divisionValue = "") {
+  const related = getDivisionRelatedValueSet(divisionValue);
+  return (AppState.teams || [])
+    .filter(team => isVirtualTeamOption(team))
+    .filter(team => {
+      const values = [
+        getTeamOptionValue(team),
+        getTeamOptionLabel(team),
+        getTeamDivisionValue(team),
+        team.parent_code,
+        team.parent_team_code,
+        team.parent_name,
+        team.division_name,
+        team.department,
+        team.division
+      ];
+      return values.some(value => valueInOrgSet(value, related));
+    })
+    .map(team => getTeamOptionValue(team))
+    .filter(Boolean);
+}
+
+function findTeamByValue(value) {
+  const target = normalizeOrgValue(value);
+  if (!target) return null;
+
+  return (AppState.teams || []).find(team => {
+    const values = [
+      getTeamOptionValue(team),
+      getTeamOptionLabel(team),
+      team.team_id,
+      team.id,
+      team.code,
+      team.team_code,
+      team.team_name,
+      team.name
+    ];
+    return values.some(item => normalizeOrgValue(item) === target);
+  }) || null;
 }
 
 function updateOrgFilterHint() {
