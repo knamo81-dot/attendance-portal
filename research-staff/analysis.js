@@ -17,6 +17,7 @@ function getLatestAnalysisRows() {
 function renderAnalysis() {
   const rows = getLatestAnalysisRows();
 
+  renderDedicatedTrendChart();
   renderTenureBars(rows);
   renderPositionBars(rows);
   renderTeamBars(rows);
@@ -340,6 +341,168 @@ function compareSortValues(a, b) {
   if (!av) return 1;
   if (!bv) return -1;
   return av.localeCompare(bv, "ko", { numeric: true, sensitivity: "base" });
+}
+
+
+function renderDedicatedTrendChart() {
+  const container = document.getElementById("dedicatedTrendChart");
+  const summaryEl = document.getElementById("dedicatedTrendSummary");
+  if (!container) return;
+
+  const months = getLatestTwelveMonths();
+  const sourceRows = getDedicatedTrendSourceRows();
+  const data = months.map(month => buildDedicatedTrendPoint(month, sourceRows));
+
+  if (!data.length) {
+    container.innerHTML = `<div class="empty">표시할 데이터가 없습니다.</div>`;
+    if (summaryEl) summaryEl.textContent = "최근 12개월 전담인력 데이터가 입력되면 운영 가능 인력 추이가 표시됩니다.";
+    return;
+  }
+
+  container.innerHTML = buildDedicatedTrendSvg(data);
+  renderDedicatedTrendSummary(summaryEl, data);
+}
+
+function getDedicatedTrendSourceRows() {
+  const source = Array.isArray(AppState?.merged) ? AppState.merged : [];
+  return source.filter(row => typeof isResearchStaffRow === "function" ? isResearchStaffRow(row) : true);
+}
+
+function getLatestTwelveMonths() {
+  const now = new Date();
+  const latest = new Date(now.getFullYear(), now.getMonth(), 1);
+  const months = [];
+
+  for (let i = 11; i >= 0; i -= 1) {
+    const date = new Date(latest.getFullYear(), latest.getMonth() - i, 1);
+    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    months.push({
+      value,
+      label: `${String(date.getMonth() + 1).padStart(2, "0")}월`,
+      shortLabel: `${date.getMonth() + 1}월`,
+      start: new Date(date.getFullYear(), date.getMonth(), 1),
+      end: new Date(date.getFullYear(), date.getMonth() + 1, 0)
+    });
+  }
+
+  return months;
+}
+
+function buildDedicatedTrendPoint(month, sourceRows) {
+  const activeRows = sourceRows.filter(row => isActiveOnMonthEnd(row, month.end));
+  const dedicatedRows = activeRows.filter(row => row.research_type === "전담요원");
+  const actualRows = dedicatedRows.filter(row => !isUnavailableOnDate(row, month.end));
+
+  return {
+    month: month.value,
+    label: month.label,
+    shortLabel: month.shortLabel,
+    totalDedicated: dedicatedRows.length,
+    actualDedicated: actualRows.length,
+    gap: dedicatedRows.length - actualRows.length
+  };
+}
+
+function isActiveOnMonthEnd(row, monthEnd) {
+  const startDate = parseDateOnly(row.hire_date || row.lab_assign_date);
+  const resignationDate = parseDateOnly(row.resignation_date);
+  const status = String(row.status || row.employment_status || "").trim();
+
+  if (!startDate || startDate > monthEnd) return false;
+  if (resignationDate && resignationDate <= monthEnd) return false;
+  if (!resignationDate && status.includes("퇴사")) return false;
+
+  return true;
+}
+
+function isUnavailableOnDate(row, date) {
+  if (typeof getAdminReferenceSpecialStatusOnDate === "function") {
+    return Boolean(getAdminReferenceSpecialStatusOnDate(row, date)) || isLeaveStatus(row);
+  }
+
+  const employeeNo = String(row.employee_no || row.employee_id || row.id || "").trim();
+  const specialTypes = typeof ADMIN_LEAVE_SPECIAL_TYPES !== "undefined"
+    ? ADMIN_LEAVE_SPECIAL_TYPES
+    : ["파견", "병가", "육아휴직", "출산휴가", "일반휴직", "가족돌봄휴직"];
+
+  const hasSpecialStatus = Boolean(employeeNo) && (AppState.specialNotes || []).some(note => {
+    const noteEmployeeNo = String(note.employee_no || note.employee_id || "").trim();
+    const type = String(note.issue_type || note.special_type || note.type || "").trim();
+    if (noteEmployeeNo !== employeeNo) return false;
+    if (!specialTypes.includes(type)) return false;
+    return isSpecialNoteActiveOnDate(note, date);
+  });
+
+  return hasSpecialStatus || isLeaveStatus(row);
+}
+
+function buildDedicatedTrendSvg(data) {
+  const width = 920;
+  const height = 300;
+  const padding = { top: 26, right: 24, bottom: 46, left: 44 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  const maxValue = Math.max(1, ...data.flatMap(item => [item.totalDedicated, item.actualDedicated]));
+  const yMax = Math.max(5, Math.ceil(maxValue / 5) * 5);
+
+  const x = index => padding.left + (data.length === 1 ? chartWidth / 2 : (chartWidth / (data.length - 1)) * index);
+  const y = value => padding.top + chartHeight - (value / yMax) * chartHeight;
+  const pointsTotal = data.map((item, index) => `${x(index)},${y(item.totalDedicated)}`).join(" ");
+  const pointsActual = data.map((item, index) => `${x(index)},${y(item.actualDedicated)}`).join(" ");
+  const yTicks = [0, Math.round(yMax / 2), yMax];
+
+  return `
+    <div class="dedicated-trend-legend">
+      <span><i class="total"></i>총전담</span>
+      <span><i class="actual"></i>실전담</span>
+      <span class="trend-gap-note">두 선의 차이 = 휴직/파견 등 운영공백</span>
+    </div>
+    <svg class="dedicated-trend-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="월별 운영 가능 전담인력 추이">
+      ${yTicks.map(value => `
+        <g>
+          <line x1="${padding.left}" y1="${y(value)}" x2="${width - padding.right}" y2="${y(value)}" class="trend-grid-line"></line>
+          <text x="${padding.left - 10}" y="${y(value) + 4}" text-anchor="end" class="trend-axis-label">${value}</text>
+        </g>
+      `).join("")}
+      <polyline points="${pointsTotal}" class="trend-line total"></polyline>
+      <polyline points="${pointsActual}" class="trend-line actual"></polyline>
+      ${data.map((item, index) => `
+        <g class="trend-point-group">
+          <title>${item.month} / 총전담 ${item.totalDedicated}명 / 실전담 ${item.actualDedicated}명 / 차이 ${item.gap}명</title>
+          <line x1="${x(index)}" y1="${padding.top}" x2="${x(index)}" y2="${padding.top + chartHeight}" class="trend-month-guide"></line>
+          <circle cx="${x(index)}" cy="${y(item.totalDedicated)}" r="4.5" class="trend-point total"></circle>
+          <circle cx="${x(index)}" cy="${y(item.actualDedicated)}" r="4.5" class="trend-point actual"></circle>
+          <text x="${x(index)}" y="${height - 17}" text-anchor="middle" class="trend-month-label">${escapeAnalysisHtml(item.shortLabel)}</text>
+        </g>
+      `).join("")}
+    </svg>
+  `;
+}
+
+function renderDedicatedTrendSummary(summaryEl, data) {
+  if (!summaryEl) return;
+
+  const latest = data[data.length - 1];
+  const previous = data[data.length - 2] || latest;
+  const totalDelta = latest.totalDedicated - previous.totalDedicated;
+  const actualDelta = latest.actualDedicated - previous.actualDedicated;
+  const gapText = latest.gap > 0
+    ? `현재 총전담과 실전담 차이는 ${latest.gap}명입니다.`
+    : "현재 총전담과 실전담 차이는 없습니다.";
+
+  summaryEl.innerHTML = `
+    <span>최근월 총전담 <strong>${latest.totalDedicated}명</strong></span>
+    <span>실전담 <strong>${latest.actualDedicated}명</strong></span>
+    <span>전월 대비 총전담 <strong>${formatSignedCount(totalDelta)}</strong>, 실전담 <strong>${formatSignedCount(actualDelta)}</strong></span>
+    <span>${gapText}</span>
+  `;
+}
+
+function formatSignedCount(value) {
+  const number = Number(value || 0);
+  if (number > 0) return `+${number}명`;
+  if (number < 0) return `${number}명`;
+  return "변동 없음";
 }
 
 function getAnalysisReferenceDate() {
