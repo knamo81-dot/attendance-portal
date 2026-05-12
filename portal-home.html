@@ -1679,6 +1679,8 @@ html.embed-mode .header-card{
       scheduleLoading: false,
       reservationLoading: false,
       portalUserEmployee: null,
+      portalOrgTeams: [],
+      portalOrgDivisions: [],
       reservationsAll: [],
       reservationResourcesList: [],
       selectedReservationResourceName: '',
@@ -1747,6 +1749,149 @@ html.embed-mode .header-card{
       return '개인';
     }
 
+
+    function normalizePortalOrgValue(value) {
+      return String(value || '').trim().replace(/\s+/g, '').toLowerCase();
+    }
+
+    function addPortalOrgValue(set, value) {
+      const normalized = normalizePortalOrgValue(value);
+      if (normalized) set.add(normalized);
+    }
+
+    function getPortalTeamValues(value) {
+      const set = new Set();
+      addPortalOrgValue(set, value);
+      const target = normalizePortalOrgValue(value);
+      if (!target) return set;
+
+      (state.portalOrgTeams || []).forEach(team => {
+        const candidates = [
+          team.team_code,
+          team.code,
+          team.id,
+          team.team_id,
+          team.team_name,
+          team.name,
+          team.label
+        ];
+        if (candidates.some(item => normalizePortalOrgValue(item) === target)) {
+          candidates.forEach(item => addPortalOrgValue(set, item));
+        }
+      });
+
+      return set;
+    }
+
+    function getPortalDivisionValues(value) {
+      const set = new Set();
+      addPortalOrgValue(set, value);
+      const target = normalizePortalOrgValue(value);
+      if (!target) return set;
+
+      (state.portalOrgDivisions || []).forEach(division => {
+        const candidates = [
+          division.division_code,
+          division.code,
+          division.id,
+          division.value,
+          division.division_name,
+          division.name,
+          division.label,
+          division.department
+        ];
+        if (candidates.some(item => normalizePortalOrgValue(item) === target)) {
+          candidates.forEach(item => addPortalOrgValue(set, item));
+        }
+      });
+
+      (state.portalOrgTeams || []).forEach(team => {
+        const teamCandidates = [
+          team.team_code,
+          team.code,
+          team.id,
+          team.team_id,
+          team.team_name,
+          team.name,
+          team.label
+        ];
+        if (teamCandidates.some(item => normalizePortalOrgValue(item) === target)) {
+          [team.division_code, team.department_code, team.parent_division_code, team.division_name, team.department, team.division]
+            .forEach(item => addPortalOrgValue(set, item));
+        }
+      });
+
+      return set;
+    }
+
+    function portalSetsIntersect(aSet, bSet) {
+      for (const value of aSet) {
+        if (bSet.has(value)) return true;
+      }
+      return false;
+    }
+
+    function samePortalTeamValue(a, b) {
+      const av = getPortalTeamValues(a);
+      const bv = getPortalTeamValues(b);
+      return av.size > 0 && bv.size > 0 && portalSetsIntersect(av, bv);
+    }
+
+    function samePortalDivisionValue(a, b) {
+      const av = getPortalDivisionValues(a);
+      const bv = getPortalDivisionValues(b);
+      return av.size > 0 && bv.size > 0 && portalSetsIntersect(av, bv);
+    }
+
+    function findPortalTeamByValue(value) {
+      const target = normalizePortalOrgValue(value);
+      if (!target) return null;
+      return (state.portalOrgTeams || []).find(team => [
+        team.team_code,
+        team.code,
+        team.id,
+        team.team_id,
+        team.team_name,
+        team.name,
+        team.label
+      ].some(item => normalizePortalOrgValue(item) === target)) || null;
+    }
+
+    function resolvePortalTeamDivisionValue(teamValue) {
+      const team = findPortalTeamByValue(teamValue);
+      if (!team) return '';
+      return String(team.division_code || team.department_code || team.parent_division_code || team.division_name || team.department || team.division || '').trim();
+    }
+
+    function getPortalTeamCodeFromEmployee(employee) {
+      if (!employee) return '';
+      const direct = String(employee.team_code || employee.team_id || '').trim();
+      if (direct) return direct;
+      const teamName = String(employee.team || employee.team_name || '').trim();
+      const team = findPortalTeamByValue(teamName);
+      return String(team?.team_code || team?.code || teamName || '').trim();
+    }
+
+    function getPortalDivisionCodeFromEmployee(employee, teamCode) {
+      if (!employee) return '';
+      const direct = String(employee.division_code || employee.department_code || employee.dept_code || '').trim();
+      if (direct) return direct;
+      const teamDivision = resolvePortalTeamDivisionValue(teamCode || employee.team || employee.team_name);
+      if (teamDivision) return teamDivision;
+      const divisionName = String(employee.department || employee.division_name || employee.division || '').trim();
+      const matchedDivision = (state.portalOrgDivisions || []).find(division => [
+        division.division_code,
+        division.code,
+        division.id,
+        division.value,
+        division.division_name,
+        division.name,
+        division.label,
+        division.department
+      ].some(item => normalizePortalOrgValue(item) === normalizePortalOrgValue(divisionName)));
+      return String(matchedDivision?.division_code || matchedDivision?.code || divisionName || '').trim();
+    }
+
     function isPortalAdminRole() {
       const p = portalAuth().profile;
       return String(p?.role || '') === 'admin';
@@ -1759,20 +1904,25 @@ html.embed-mode .header-card{
       const authorEmail = String(row.created_by_email || '').trim().toLowerCase();
       const { meta } = unpackScheduleDescription(row.description || '');
       const authTeam = String(meta.author_team_code || '').trim();
-      const authDiv = String(meta.author_division_code || '').trim();
+      const authDiv = String(meta.author_division_code || '').trim() || resolvePortalTeamDivisionValue(authTeam);
+
       if (scope === 'personal') return authorEmail === email;
       if (scope === 'all') return true;
+
       const me = state.portalUserEmployee;
       const myTeam = String(me?.team_code || '').trim();
-      const myDiv = String(me?.division_code || '').trim();
+      const myDiv = String(me?.division_code || '').trim() || resolvePortalTeamDivisionValue(myTeam);
+
       if (scope === 'team') {
         if (!authTeam) return authorEmail === email;
-        return myTeam !== '' && myTeam === authTeam;
+        return Boolean(myTeam && samePortalTeamValue(myTeam, authTeam));
       }
+
       if (scope === 'lab') {
         if (!authDiv) return authorEmail === email;
-        return myDiv !== '' && myDiv === authDiv;
+        return Boolean(myDiv && samePortalDivisionValue(myDiv, authDiv));
       }
+
       return false;
     }
 
@@ -1799,32 +1949,66 @@ html.embed-mode .header-card{
           state.portalUserEmployee = null;
           return;
         }
-let { data, error } = await sb.from('employees')
-  .select('email,team,department,employee_no,name,role')
-  .eq('email', email)
-  .maybeSingle();
 
-if (error) throw error;
+        const [teamsResult, divisionsResult] = await Promise.all([
+          sb.from('teams').select('team_code,team_name,division_code,is_active,is_virtual,sort_order'),
+          sb.from('divisions').select('division_code,division_name,name,is_active,sort_order')
+        ]);
 
-if (!data) {
-  const alt = await sb.from('employees')
-    .select('email,team,department,employee_no,name,role')
-    .ilike('email', email)
-    .maybeSingle();
+        if (!teamsResult.error) state.portalOrgTeams = teamsResult.data || [];
+        else {
+          console.warn('teams 조직정보 조회 실패:', teamsResult.error);
+          state.portalOrgTeams = [];
+        }
 
-  if (alt.error) throw alt.error;
-  data = alt.data;
-}
-state.portalUserEmployee = data ? {
-  ...data,
-  team_code: data.team || '',
-  division_code: data.department || '',
-  team_name: data.team || '',
-  division_name: data.department || ''
-} : null;
+        if (!divisionsResult.error) state.portalOrgDivisions = divisionsResult.data || [];
+        else {
+          console.warn('divisions 조직정보 조회 실패:', divisionsResult.error);
+          state.portalOrgDivisions = [];
+        }
+
+        let { data, error } = await sb.from('employees')
+          .select('email,team,department,employee_no,name,role')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!data) {
+          const alt = await sb.from('employees')
+            .select('email,team,department,employee_no,name,role')
+            .ilike('email', email)
+            .maybeSingle();
+
+          if (alt.error) throw alt.error;
+          data = alt.data;
+        }
+
+        if (!data) {
+          state.portalUserEmployee = null;
+          return;
+        }
+
+        const resolvedTeamCode = getPortalTeamCodeFromEmployee(data);
+        const resolvedDivisionCode = getPortalDivisionCodeFromEmployee(data, resolvedTeamCode);
+        const matchedTeam = findPortalTeamByValue(resolvedTeamCode || data.team);
+        const matchedDivision = (state.portalOrgDivisions || []).find(division => samePortalDivisionValue(
+          division.division_code || division.division_name || division.name,
+          resolvedDivisionCode
+        ));
+
+        state.portalUserEmployee = {
+          ...data,
+          team_code: resolvedTeamCode || data.team || '',
+          division_code: resolvedDivisionCode || data.department || '',
+          team_name: String(matchedTeam?.team_name || matchedTeam?.name || data.team || '').trim(),
+          division_name: String(matchedDivision?.division_name || matchedDivision?.name || data.department || '').trim()
+        };
       } catch (e) {
         console.error('loadPortalUserEmployee', e);
         state.portalUserEmployee = null;
+        state.portalOrgTeams = [];
+        state.portalOrgDivisions = [];
       }
     }
 
