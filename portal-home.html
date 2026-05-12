@@ -1511,6 +1511,82 @@ html.embed-mode .header-card{
       if (embed) document.documentElement.classList.add('embed-mode');
     })();
     </script>
+
+<script>
+window.__PORTAL_AUTH_USER__ = null;
+
+window.addEventListener('message', function(event){
+  try{
+    const data = event.data || {};
+    if(data.type === 'portal-auth' && data.user){
+      window.__PORTAL_AUTH_USER__ = data.user || null;
+
+      if(window.portalAuth && typeof window.portalAuth === 'function'){
+        try{
+          const ctx = window.portalAuth();
+          if(ctx){
+            ctx.email = data.user.email || '';
+          }
+        }catch(e){}
+      }
+
+      document.body.classList.remove('auth-loading');
+
+      const overlay = document.getElementById('authOverlay');
+      if(overlay){
+        overlay.hidden = true;
+        overlay.style.display = 'none';
+      }
+    }
+  }catch(e){
+    console.error('portal-auth bridge error', e);
+  }
+});
+</script>
+
+
+    <script>
+      (function(){
+        function hidePortalLoginForEmbedded(){
+          var embed = false;
+          try { embed = window.self !== window.top; } catch(e){ embed = true; }
+
+          if(!embed) return;
+
+          document.addEventListener('DOMContentLoaded', function(){
+            document.body.classList.remove('auth-loading');
+
+            var overlay = document.getElementById('authOverlay');
+            if(overlay){
+              overlay.hidden = true;
+              overlay.style.display = 'none';
+            }
+          });
+        }
+
+        hidePortalLoginForEmbedded();
+      })();
+    </script>
+
+
+<script>
+function getPortalInjectedEmail(){
+  try{
+    if(window.__PORTAL_AUTH_USER__ && window.__PORTAL_AUTH_USER__.email){
+      return String(window.__PORTAL_AUTH_USER__.email || '').trim().toLowerCase();
+    }
+
+    const params = new URLSearchParams(location.search);
+    const qEmail = params.get('email');
+    if(qEmail){
+      return String(qEmail || '').trim().toLowerCase();
+    }
+  }catch(e){}
+
+  return '';
+}
+</script>
+
 </head>
 <body class="auth-loading">
 
@@ -1965,6 +2041,8 @@ html.embed-mode .header-card{
     async function loadPortalUserEmployee() {
       try {
         const { sb, email } = portalAuth();
+        const injectedEmail = getPortalInjectedEmail();
+        const finalEmail = injectedEmail || email;
         if (!sb || !email) {
           state.portalUserEmployee = null;
           return;
@@ -1996,13 +2074,13 @@ html.embed-mode .header-card{
         let data = null;
         let result = await sb.from('employees')
           .select(employeeSelect)
-          .eq('email', email)
+          .eq('email', finalEmail)
           .maybeSingle();
 
         if (result.error && String(result.error.message || '').includes('column')) {
           result = await sb.from('employees')
             .select('email,team,department,employee_no,name,role')
-            .eq('email', email)
+            .eq('email', finalEmail)
             .maybeSingle();
         }
 
@@ -2012,13 +2090,13 @@ html.embed-mode .header-card{
         if (!data) {
           let alt = await sb.from('employees')
             .select(employeeSelect)
-            .ilike('email', email)
+            .ilike('email', finalEmail)
             .maybeSingle();
 
           if (alt.error && String(alt.error.message || '').includes('column')) {
             alt = await sb.from('employees')
               .select('email,team,department,employee_no,name,role')
-              .ilike('email', email)
+              .ilike('email', finalEmail)
               .maybeSingle();
           }
 
@@ -2077,6 +2155,8 @@ html.embed-mode .header-card{
       state.reservationLoading = true;
       try {
         const { sb, email } = portalAuth();
+        const injectedEmail = getPortalInjectedEmail();
+        const finalEmail = injectedEmail || email;
         if (!sb || !email) {
           state.reservationsAll = [];
           applyReservationFilter();
@@ -2289,6 +2369,8 @@ html.embed-mode .header-card{
       state.memoLoading = true;
       try {
         const { sb, email } = portalAuth();
+        const injectedEmail = getPortalInjectedEmail();
+        const finalEmail = injectedEmail || email;
         if (!sb || !email) {
           state.notes = [];
           return;
@@ -2314,6 +2396,8 @@ html.embed-mode .header-card{
     async function loadTrashMemosFromServer() {
       try {
         const { sb, email } = portalAuth();
+        const injectedEmail = getPortalInjectedEmail();
+        const finalEmail = injectedEmail || email;
         if (!sb || !email) {
           state.trash = [];
           return;
@@ -2375,6 +2459,8 @@ html.embed-mode .header-card{
 
     async function patchMemoOnServer(id, patch) {
       const { sb, email } = portalAuth();
+        const injectedEmail = getPortalInjectedEmail();
+        const finalEmail = injectedEmail || email;
       if (!sb || !email) throw new Error('로그인이 필요합니다.');
       const { data, error } = await sb.from('portal_memos').update(patch).eq('id', id).eq('created_by_email', email).select('*').single();
       if (error) throw error;
@@ -2401,6 +2487,8 @@ html.embed-mode .header-card{
 
     async function permanentDeleteMemoOnServer(id) {
       const { sb, email } = portalAuth();
+        const injectedEmail = getPortalInjectedEmail();
+        const finalEmail = injectedEmail || email;
       if (!sb || !email) throw new Error('로그인이 필요합니다.');
       const { error } = await sb.from('portal_memos').delete().eq('id', id).eq('created_by_email', email);
       if (error) throw error;
@@ -2532,6 +2620,8 @@ html.embed-mode .header-card{
       state.scheduleLoading = true;
       try {
         const { sb, email } = portalAuth();
+        const injectedEmail = getPortalInjectedEmail();
+        const finalEmail = injectedEmail || email;
         if (!sb || !email) {
           state.schedules = [];
           return;
@@ -2563,6 +2653,8 @@ html.embed-mode .header-card{
 
     async function updateScheduleOnServer(id, patch) {
       const { sb, email } = portalAuth();
+        const injectedEmail = getPortalInjectedEmail();
+        const finalEmail = injectedEmail || email;
       if (!sb) throw new Error('로그인이 필요합니다.');
       const isAdmin = isPortalAdminRole();
       let q = sb.from('portal_schedules').update(patch).eq('id', id);
@@ -2574,6 +2666,8 @@ html.embed-mode .header-card{
 
     async function deleteScheduleOnServer(id) {
       const { sb, email } = portalAuth();
+        const injectedEmail = getPortalInjectedEmail();
+        const finalEmail = injectedEmail || email;
       if (!sb) throw new Error('로그인이 필요합니다.');
       const isAdmin = isPortalAdminRole();
       let q = sb.from('portal_schedules').delete().eq('id', id);
@@ -2645,6 +2739,8 @@ html.embed-mode .header-card{
 
     async function updateReservationOnServer(id, patch) {
       const { sb, email } = portalAuth();
+        const injectedEmail = getPortalInjectedEmail();
+        const finalEmail = injectedEmail || email;
       const isAdmin = isPortalAdminRole();
       let q = sb.from('portal_reservations').update(patch).eq('id', id);
       if (!isAdmin) q = q.eq('created_by_email', email);
@@ -2655,6 +2751,8 @@ html.embed-mode .header-card{
 
     async function deleteReservationOnServer(id) {
       const { sb, email } = portalAuth();
+        const injectedEmail = getPortalInjectedEmail();
+        const finalEmail = injectedEmail || email;
       const isAdmin = isPortalAdminRole();
       let q = sb.from('portal_reservations').delete().eq('id', id);
       if (!isAdmin) q = q.eq('created_by_email', email);
@@ -5103,7 +5201,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
       const { data, error } = await supabaseClient
         .from('users')
         .select('email,name,role,is_active,must_change_password')
-        .eq('email', email)
+        .eq('email', finalEmail)
         .maybeSingle();
       if (error) throw error;
       return data;
