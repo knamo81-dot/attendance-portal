@@ -8,6 +8,8 @@ const AppState = {
   currentView: "dashboard",
   referenceMonth: "",
   leaveMode: "exclude",
+  filterDivision: "",
+  filterTeam: "",
   currentUser: null,
   currentRoles: [],
   currentRole: "",
@@ -235,6 +237,129 @@ function bindCommonEvents() {
       renderAll();
     });
   });
+
+  bindOrgFilterEvents();
+}
+
+
+function bindOrgFilterEvents() {
+  const divisionSelect = document.getElementById("filterDivision");
+  const teamSelect = document.getElementById("filterTeam");
+
+  divisionSelect?.addEventListener("change", () => {
+    AppState.filterDivision = divisionSelect.value || "";
+    AppState.filterTeam = "";
+    populateTeamFilterOptions();
+    renderAll();
+  });
+
+  teamSelect?.addEventListener("change", () => {
+    AppState.filterTeam = teamSelect.value || "";
+    renderAll();
+  });
+}
+
+function populateOrgFilters() {
+  populateDivisionFilterOptions();
+  populateTeamFilterOptions();
+  updateOrgFilterHint();
+}
+
+function populateDivisionFilterOptions() {
+  const select = document.getElementById("filterDivision");
+  if (!select) return;
+
+  const current = AppState.filterDivision || "";
+  const divisions = buildDivisionOptions();
+
+  select.innerHTML = [
+    `<option value="">전체 본부</option>`,
+    ...divisions.map(item => `<option value="${escapeAttr(item.value)}">${escapeHtmlText(item.label)}</option>`)
+  ].join("");
+
+  select.value = divisions.some(item => item.value === current) ? current : "";
+  AppState.filterDivision = select.value;
+}
+
+function populateTeamFilterOptions() {
+  const select = document.getElementById("filterTeam");
+  if (!select) return;
+
+  const current = AppState.filterTeam || "";
+  const teams = buildTeamOptions(AppState.filterDivision);
+
+  select.innerHTML = [
+    `<option value="">전체 팀</option>`,
+    ...teams.map(item => `<option value="${escapeAttr(item.value)}">${escapeHtmlText(item.label)}</option>`)
+  ].join("");
+
+  select.value = teams.some(item => item.value === current) ? current : "";
+  AppState.filterTeam = select.value;
+  updateOrgFilterHint();
+}
+
+function buildDivisionOptions() {
+  const map = new Map();
+
+  (AppState.merged || []).forEach(row => {
+    const value = String(row.division_code || row.department || "").trim();
+    const label = String(row.department || row.division_name || row.division || row.division_code || "미지정 본부").trim() || "미지정 본부";
+    if (!value) return;
+    if (!map.has(value)) {
+      map.set(value, { value, label, sort: String(row.division_code || label) });
+    }
+  });
+
+  return [...map.values()].sort((a, b) => String(a.sort).localeCompare(String(b.sort), "ko", { numeric: true, sensitivity: "base" }));
+}
+
+function buildTeamOptions(divisionValue = "") {
+  const map = new Map();
+
+  (AppState.merged || [])
+    .filter(row => {
+      if (!divisionValue) return true;
+      const rowDivision = String(row.division_code || row.department || "").trim();
+      return rowDivision === divisionValue;
+    })
+    .forEach(row => {
+      const value = String(row.team_code || row.team || "").trim();
+      const label = String(row.team || row.team_name || row.team_code || "미지정 팀").trim() || "미지정 팀";
+      if (!value) return;
+      if (!map.has(value)) {
+        map.set(value, { value, label, sort: String(row.team_code || label) });
+      }
+    });
+
+  return [...map.values()].sort((a, b) => String(a.sort).localeCompare(String(b.sort), "ko", { numeric: true, sensitivity: "base" }));
+}
+
+function updateOrgFilterHint() {
+  const hint = document.getElementById("orgFilterHint");
+  if (!hint) return;
+
+  const divisionText = document.getElementById("filterDivision")?.selectedOptions?.[0]?.textContent || "전체 본부";
+  const teamText = document.getElementById("filterTeam")?.selectedOptions?.[0]?.textContent || "전체 팀";
+
+  if (!AppState.filterDivision && !AppState.filterTeam) {
+    hint.textContent = "조직 필터는 선택 즉시 반영됩니다.";
+    return;
+  }
+
+  hint.textContent = `현재 조회범위: ${divisionText} / ${teamText}`;
+}
+
+function escapeHtmlText(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function escapeAttr(value) {
+  return escapeHtmlText(value);
 }
 
 function setView(view) {
@@ -292,6 +417,8 @@ async function loadAllData() {
         AppState.teams
       )
     );
+
+    populateOrgFilters();
 
     setConnectionStatus("서버 연결 완료", "success");
     renderAll();
@@ -618,4 +745,5 @@ function useSampleData() {
   ];
 
   AppState.merged = mergeEmployeeProfiles(AppState.employees, AppState.profiles);
+  populateOrgFilters();
 }
