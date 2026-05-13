@@ -1907,11 +1907,13 @@ function getPortalInjectedEmail(){
 
     function getPortalDivisionCodeFromEmployee(employee, teamCode) {
       if (!employee) return '';
-      const direct = String(employee.division_code || employee.department_code || employee.dept_code || '').trim();
+      const direct = String(employee.division_code || '').trim();
       if (direct) return direct;
-      const teamDivision = resolvePortalTeamDivisionValue(teamCode || employee.team || employee.team_name);
+
+      const teamDivision = resolvePortalTeamDivisionValue(teamCode || employee.team_code || employee.team || employee.team_name);
       if (teamDivision) return teamDivision;
-      const divisionName = String(employee.department || employee.division_name || employee.division || '').trim();
+
+      const divisionName = String(employee.division_name || employee.division || '').trim();
       const matchedDivision = (state.portalOrgDivisions || []).find(division => [
         division.division_code,
         division.code,
@@ -1919,15 +1921,16 @@ function getPortalInjectedEmail(){
         division.value,
         division.division_name,
         division.name,
-        division.label,
-        division.department
+        division.label
       ].some(item => normalizePortalOrgValue(item) === normalizePortalOrgValue(divisionName)));
+
       return String(matchedDivision?.division_code || matchedDivision?.code || divisionName || '').trim();
     }
 
     function isPortalAdminRole() {
       const p = portalAuth().profile;
-      return String(p?.role || '') === 'admin';
+      const roleValue = String(p?.role || p?.authority || '').trim().toLowerCase();
+      return roleValue === 'admin' || roleValue === '관리자';
     }
 
     function getPortalEmployeeByEmail(email) {
@@ -1954,10 +1957,11 @@ function getPortalInjectedEmail(){
 
       return {
         ...employee,
+        role: employee.role || employee.authority || '',
         team_code: String(teamCode || employee.team_code || employee.team || '').trim(),
-        division_code: String(divisionCode || employee.division_code || employee.department_code || employee.department || '').trim(),
+        division_code: String(divisionCode || employee.division_code || '').trim(),
         team_name: String(matchedTeam?.team_name || matchedTeam?.name || employee.team || employee.team_code || '').trim(),
-        division_name: String(matchedDivision?.division_name || matchedDivision?.name || employee.department || employee.division_code || '').trim()
+        division_name: String(matchedDivision?.division_name || matchedDivision?.name || employee.division_code || '').trim()
       };
     }
 
@@ -1975,7 +1979,7 @@ function getPortalInjectedEmail(){
         team_code: teamCode,
         division_code: divisionCode,
         team_name: String(me.team_name || state.portalUserEmployee?.team || state.portalUserEmployee?.team_name || '').trim(),
-        division_name: String(me.division_name || state.portalUserEmployee?.department || state.portalUserEmployee?.division_name || '').trim()
+        division_name: String(me.division_name || state.portalUserEmployee?.division_name || state.portalUserEmployee?.division_code || '').trim()
       };
     }
 
@@ -2009,8 +2013,6 @@ function getPortalInjectedEmail(){
         metaDiv ||
         normalizedAuthor?.division_code ||
         resolvePortalTeamDivisionValue(authorTeam) ||
-        normalizedAuthor?.department_code ||
-        normalizedAuthor?.department ||
         normalizedAuthor?.division_name ||
         ''
       ).trim();
@@ -2020,7 +2022,7 @@ function getPortalInjectedEmail(){
         team: authorTeam,
         division: authorDiv,
         teamName: columnTeamName || normalizedAuthor?.team_name || normalizedAuthor?.team || '',
-        divisionName: columnDivName || normalizedAuthor?.division_name || normalizedAuthor?.department || '',
+        divisionName: columnDivName || normalizedAuthor?.division_name || normalizedAuthor?.division_code || '',
         employee: normalizedAuthor
       };
     }
@@ -2040,7 +2042,7 @@ function getPortalInjectedEmail(){
 
       const me = normalizePortalEmployeeOrg(state.portalUserEmployee);
       const myTeam = String(me?.team_code || me?.team || '').trim();
-      const myDiv = String(me?.division_code || resolvePortalTeamDivisionValue(myTeam) || me?.department || '').trim();
+      const myDiv = String(me?.division_code || resolvePortalTeamDivisionValue(myTeam) || '').trim();
 
       if (scope === 'team') {
         if (!author.team) return Boolean(email && author.email === email);
@@ -2048,7 +2050,17 @@ function getPortalInjectedEmail(){
         // 새 컬럼 저장값은 정규화 문자열 직접 비교가 가장 안정적입니다.
         if (normalizePortalOrgValue(myTeam) && normalizePortalOrgValue(myTeam) === normalizePortalOrgValue(author.team)) return true;
 
-        return Boolean(myTeam && samePortalTeamValue(myTeam, author.team));
+        const visible = Boolean(myTeam && samePortalTeamValue(myTeam, author.team));
+        if (!visible) {
+          console.log('[portal-home] team scope hidden:', {
+            title: row.title,
+            myTeam,
+            authorTeam: author.team,
+            myEmail: email,
+            authorEmail: author.email
+          });
+        }
+        return visible;
       }
 
       if (scope === 'lab') {
@@ -2057,7 +2069,17 @@ function getPortalInjectedEmail(){
         // 새 컬럼 저장값은 정규화 문자열 직접 비교가 가장 안정적입니다.
         if (normalizePortalOrgValue(myDiv) && normalizePortalOrgValue(myDiv) === normalizePortalOrgValue(author.division)) return true;
 
-        return Boolean(myDiv && samePortalDivisionValue(myDiv, author.division));
+        const visible = Boolean(myDiv && samePortalDivisionValue(myDiv, author.division));
+        if (!visible) {
+          console.log('[portal-home] lab scope hidden:', {
+            title: row.title,
+            myDiv,
+            authorDiv: author.division,
+            myEmail: email,
+            authorEmail: author.email
+          });
+        }
+        return visible;
       }
 
       return false;
@@ -2109,7 +2131,7 @@ function getPortalInjectedEmail(){
           state.portalOrgDivisions = [];
         }
 
-        const employeeSelect = 'email,team,department,employee_no,name,role,team_code,division_code,department_code';
+        const employeeSelect = 'email,team,employee_no,name,authority,team_code,division_code';
 
         try {
           let allEmployeesResult = await sb.from('employees')
@@ -2117,7 +2139,7 @@ function getPortalInjectedEmail(){
 
           if (allEmployeesResult.error && String(allEmployeesResult.error.message || '').includes('column')) {
             allEmployeesResult = await sb.from('employees')
-              .select('email,team,department,employee_no,name,role');
+              .select('email,team,employee_no,name,authority');
           }
 
           if (!allEmployeesResult.error) {
@@ -2141,7 +2163,7 @@ function getPortalInjectedEmail(){
 
         if (result.error && String(result.error.message || '').includes('column')) {
           result = await sb.from('employees')
-            .select('email,team,department,employee_no,name,role')
+            .select('email,team,employee_no,name,authority')
             .eq('email', email)
             .maybeSingle();
         }
@@ -2157,7 +2179,7 @@ function getPortalInjectedEmail(){
 
           if (alt.error && String(alt.error.message || '').includes('column')) {
             alt = await sb.from('employees')
-              .select('email,team,department,employee_no,name,role')
+              .select('email,team,employee_no,name,authority')
               .ilike('email', email)
               .maybeSingle();
           }
@@ -2172,6 +2194,13 @@ function getPortalInjectedEmail(){
         }
 
         state.portalUserEmployee = normalizePortalEmployeeOrg(data);
+        console.log('[portal-home] current employee org:', {
+          email,
+          team_code: state.portalUserEmployee?.team_code,
+          division_code: state.portalUserEmployee?.division_code,
+          team_name: state.portalUserEmployee?.team_name,
+          division_name: state.portalUserEmployee?.division_name
+        });
 
         if (state.portalUserEmployee && !getPortalEmployeeByEmail(state.portalUserEmployee.email)) {
           state.portalOrgEmployees = [
