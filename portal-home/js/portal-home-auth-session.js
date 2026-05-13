@@ -1166,6 +1166,20 @@
   }
 
   async function initRealAdmin(){
+    // portal-home.html 홈 화면에는 조직/사원 관리 DOM이 없을 수 있습니다.
+    // 이 경우 관리자 초기화 로직을 실행하지 않아 null.innerHTML 오류를 방지합니다.
+    const hasAdminDom = Boolean(
+      document.getElementById('realOrgTree') ||
+      document.getElementById('realEmployeeTbody') ||
+      document.getElementById('realTeamHistory') ||
+      document.getElementById('realIssueTbody') ||
+      document.getElementById('realResResourceTbody')
+    );
+
+    if (!hasAdminDom) {
+      return;
+    }
+
     bindStaticEvents();
     await loadOrgData();
     await loadEmployees();
