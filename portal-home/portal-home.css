@@ -1494,3 +1494,4 @@ body.auth-loading .app{visibility:visible; opacity:.35; pointer-events:none}
     .user-chip .role{display:inline-flex;padding:4px 8px;border-radius:999px;background:#0f172a;color:#fff;font-size:11px}
     .top-user-bar{display:flex;justify-content:flex-end;margin-bottom:12px}
     .nav-btn[hidden], .pill[hidden], .top-user-bar[hidden]{display:none !important}
+
