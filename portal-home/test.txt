@@ -1,1 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab Portal Home (split stub)</title>
+  
+ <link rel="icon" href="/favicon.ico">
+ <link rel="apple-touch-icon" href="/icon-192.png">
+ <link rel="manifest" href="/manifest.json"> 
+  
+  <link rel="stylesheet" href="./css/portal-home.css" />
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <script src="./js/portal-home-embed.js"></script>
+
+<script src="./js/portal-home-url-email-helper.js"></script>
+
+</head>
+<body class="auth-loading">
+
+ <div id="authOverlay" class="auth-overlay" hidden>
+    <div id="loginCard" class="auth-card">
+      <h1 class="auth-title">연구소 포털 로그인</h1>
+      <p class="auth-subtitle">사내에서 등록된 이메일과 비밀번호로 로그인하세요. 초기 비밀번호는 관리자 지정값(예: 사번 또는 임시 비밀번호)이며, 최초 로그인 사용자는 비밀번호를 바로 변경하게 됩니다.</p>
+      <div class="auth-field">
+        <label class="auth-label" for="loginEmail">이메일</label>
+        <input id="loginEmail" class="auth-input" type="email" autocomplete="username" placeholder="example@scd.co.kr" />
+      </div>
+      <div class="auth-field">
+        <label class="auth-label" for="loginPassword">비밀번호</label>
+        <input id="loginPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="비밀번호 입력" />
+      </div>
+      <div class="auth-actions">
+        <button id="loginButton" class="auth-btn primary" type="button">로그인</button>
+      </div>
+      <div id="loginError" class="auth-error"></div>
+      <div class="auth-helper">회원가입 버튼은 제공하지 않습니다. 등록된 계정만 로그인할 수 있습니다.</div>
+    </div>
+
+    <div id="passwordCard" class="auth-card" hidden>
+      <h1 class="auth-title">비밀번호 변경</h1>
+      <p class="auth-subtitle">최초 로그인으로 확인되었습니다. 계속하려면 새 비밀번호로 변경해 주세요.</p>
+      <div class="auth-field">
+        <label class="auth-label" for="newPassword">새 비밀번호</label>
+        <input id="newPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="새 비밀번호 입력" />
+      </div>
+      <div class="auth-field">
+        <label class="auth-label" for="confirmPassword">새 비밀번호 확인</label>
+        <input id="confirmPassword" class="auth-input" type="password" autocomplete="new-password" placeholder="한 번 더 입력" />
+      </div>
+      <div class="auth-actions">
+        <button id="changePasswordButton" class="auth-btn primary" type="button">비밀번호 변경</button>
+      </div>
+      <div id="passwordError" class="auth-error"></div>
+      <div id="passwordSuccess" class="auth-success"></div>
+      <div class="auth-helper">영문, 숫자, 특수문자를 조합해 8자 이상을 권장합니다.</div>
+    </div>
+  </div>
+  <div class="app">
+    <div class="layout">
+      <div>
+        <div id="home-page" class="home-root">
+        <div id="topUserBar" class="top-user-bar" hidden><div id="userChip" class="user-chip"></div></div>
+        <div class="card header-card">
+          <div class="header-top">Research Lab Integrated Portal</div>
+          <div class="title">연구소 운영 통합 메인</div>
+          <div class="tabs">
+            <button class="pill active" data-tab="memo">개인 메모</button>
+            <button class="pill" data-tab="schedule">스케줄</button>
+            <button class="pill" data-tab="ops">연구소 운영 통합 정보</button>
+          </div>
+        </div>
+
+        <div id="tab-content" class="content"></div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="./js/portal-home-main.js"></script>
+
+
+<script src="./js/portal-home-iframe-fit.js"></script>
+
+
+<script src="./js/portal-home-auth.js"></script>
+
+
+<script src="./js/portal-home-auth-session.js"></script>
+
+
+<script src="./js/portal-home-employee-modal.js"></script>
+
+
+</body>
+</html>
