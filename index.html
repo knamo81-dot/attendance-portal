@@ -32,6 +32,7 @@
     }
     .sidenav {
       width: 72px;
+      z-index: 20;
       background: #0f172a;
       color: #fff;
       border-radius: 24px;
@@ -125,7 +126,7 @@
         </div>
       </div>
       <div class="portal-main">
-        <iframe id="portalFrame" title="포털 본문" src="portal-home.html?embed=1"></iframe>
+        <iframe id="portalFrame" title="포털 본문" src="portal-home.html"></iframe>
       </div>
     </div>
   </div>
@@ -144,31 +145,6 @@
 
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  let portalCurrentUser = null;
-
-  function rememberPortalUser(user) {
-    if (!user || !user.email) return;
-    portalCurrentUser = { email: String(user.email || '').trim().toLowerCase() };
-    try {
-      localStorage.setItem('portal_current_user', JSON.stringify(portalCurrentUser));
-    } catch (_) {}
-  }
-
-  function getRememberedPortalUser() {
-    if (portalCurrentUser && portalCurrentUser.email) return portalCurrentUser;
-    try {
-      const raw = localStorage.getItem('portal_current_user') || '';
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.email) {
-          portalCurrentUser = { email: String(parsed.email || '').trim().toLowerCase() };
-          return portalCurrentUser;
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-
   function setActiveNav(activeBtn) {
     navButtons.forEach(function (b) {
       b.classList.toggle('active', b === activeBtn);
@@ -182,7 +158,7 @@
   }
 
   function postAuthToFrame(user) {
-    if (!frame || !frame.contentWindow || !user || !user.email) return;
+    if (!frame || !frame.contentWindow || !user) return;
 
     frame.contentWindow.postMessage(
       {
@@ -195,45 +171,16 @@
     );
   }
 
-  function postAuthToFrameWithRetry(user) {
-    if (!user || !user.email) return;
-
-    postAuthToFrame(user);
-    setTimeout(function () { postAuthToFrame(user); }, 120);
-    setTimeout(function () { postAuthToFrame(user); }, 450);
-    setTimeout(function () { postAuthToFrame(user); }, 1000);
-  }
-
   async function getCurrentUser() {
-    const remembered = getRememberedPortalUser();
-    if (remembered && remembered.email) return remembered;
-
-    try {
-      const { data: sessionData } = await supabaseClient.auth.getSession();
-      if (sessionData?.session?.user?.email) {
-        rememberPortalUser(sessionData.session.user);
-        return sessionData.session.user;
-      }
-    } catch (_) {}
-
-    try {
-      const { data } = await supabaseClient.auth.getUser();
-      if (data?.user?.email) {
-        rememberPortalUser(data.user);
-        return data.user;
-      }
-    } catch (_) {}
-
-    return null;
+    const { data } = await supabaseClient.auth.getUser();
+    return data?.user || null;
   }
 
   async function ensureAuthenticated() {
-    const user = await getCurrentUser();
+    const { data } = await supabaseClient.auth.getSession();
 
-    if (!user || !user.email) {
+    if (!data.session) {
       localStorage.removeItem(LAST_PAGE_KEY);
-      localStorage.removeItem('portal_current_user');
-      portalCurrentUser = null;
 
       if (frame) {
         frame.src = HOME_SRC;
@@ -300,18 +247,15 @@
     var src = btn.getAttribute('data-portal-src');
     if (!src || !frame) return;
 
-    // 홈은 로그인 전에도 열 수 있게 두되, 로그인 세션이 있으면 홈에도 사용자 정보를 전달합니다.
+    // 홈은 로그인 전에도 열 수 있게 두되, 로그인 세션이 있으면 다른 앱처럼 email을 URL로 전달합니다.
     if (src === HOME_SRC) {
-      localStorage.removeItem(LAST_PAGE_KEY);
-
       const user = await getCurrentUser();
       frame.onload = function () {
-        if (user) postAuthToFrameWithRetry(user);
+        if (user) postAuthToFrame(user);
       };
       frame.src = user ? buildSrcWithUser(HOME_SRC, user) : HOME_SRC;
+      localStorage.removeItem(LAST_PAGE_KEY);
       setActiveNav(btn);
-
-      if (user) postAuthToFrameWithRetry(user);
       return;
     }
 
@@ -330,7 +274,7 @@
     }
 
     frame.onload = function () {
-      postAuthToFrameWithRetry(user);
+      postAuthToFrame(user);
     };
 
     const finalSrc = buildSrcWithUser(src, user);
@@ -373,14 +317,15 @@
     }
 
     frame.onload = function () {
-      postAuthToFrameWithRetry(user);
+      postAuthToFrame(user);
     };
 
     const finalSrc = buildSrcWithUser(savedSrc, user);
     frame.src = finalSrc;
     setActiveNav(targetBtn);
   }
-navButtons.forEach(function (btn) {
+
+  navButtons.forEach(function (btn) {
     btn.addEventListener('click', async function () {
       await navigate(btn);
     });
@@ -421,7 +366,7 @@ navButtons.forEach(function (btn) {
 
       if (frame) {
         frame.onload = function () {
-          if (user) postAuthToFrameWithRetry(user);
+          if (user) postAuthToFrame(user);
         };
         frame.src = user ? buildSrcWithUser(HOME_SRC, user) : HOME_SRC;
       }
@@ -429,8 +374,6 @@ navButtons.forEach(function (btn) {
       if (homeBtn) {
         setActiveNav(homeBtn);
       }
-
-      if (user) postAuthToFrameWithRetry(user);
     })();
   }
 })();
