@@ -2089,8 +2089,9 @@ function getPortalInjectedEmail(){
       if (!row) return false;
       const email = String(portalAuth().email || '').trim().toLowerCase();
       const authorEmail = String(row.created_by_email || '').trim().toLowerCase();
-      if (authorEmail === email) return true;
-      return isPortalAdminRole();
+
+      // 스케줄은 관리자 권한과 무관하게 작성자 본인만 수정/삭제/완료 처리 가능합니다.
+      return Boolean(email && authorEmail === email);
     }
 
     function canMutateReservationRow(row) {
@@ -4363,7 +4364,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
                       <div class="schedule-item scope-${getScopeClass(item.scopeCode || 'lab')} ${item.completed ? 'completed' : ''}">
                         <button class="schedule-head" data-schedule-expand="${escapeAttr(panelKey)}">
                           <div onclick="event.stopPropagation()" style="display:flex;align-items:flex-start;padding-top:2px;">
-                            <input type="checkbox" data-schedule-complete="${escapeAttr(panelKey)}" ${item.completed ? 'checked' : ''} style="margin-top:2px;" ${item.canMutate ? '' : 'disabled title="작성자만 완료 처리할 수 있습니다."'} />
+                            <input type="checkbox" data-schedule-complete="${escapeAttr(panelKey)}" ${item.completed ? 'checked' : ''} style="margin-top:2px;" ${item.canMutate ? '' : 'disabled title="작성자만 완료 처리 가능합니다."'} />
                           </div>
                           <div class="schedule-time">
                             <strong>${escapeHtml(getScheduleTimeLabel(item))}</strong>
@@ -4393,7 +4394,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
                               ${item.canMutate ? `
                               <button class="small-btn" data-schedule-edit="${escapeAttr(panelKey)}">수정</button>
                               <button class="small-btn" data-schedule-delete="${escapeAttr(panelKey)}" style="color:#b91c1c;border-color:#fecaca;background:#fff5f5;">삭제</button>
-                              ` : `<span style="font-size:12px;color:#94a3b8;">작성자만 수정·삭제할 수 있습니다.</span>`}
+                              ` : `<span style="font-size:12px;color:#94a3b8;">작성자만 수정 삭제 가능합니다.</span>`}
                             </div>
                           </div>
                         ` : ``}
@@ -4726,7 +4727,7 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
           if (!row) return;
           if (!canMutateScheduleRow(row)) {
             chk.checked = !!row.is_completed;
-            setPortalPlannerFeedback('작성자만 완료 처리할 수 있습니다.', 'error');
+            setPortalPlannerFeedback('작성자만 완료 처리 가능합니다.', 'error');
             renderScheduleTab();
             return;
           }
