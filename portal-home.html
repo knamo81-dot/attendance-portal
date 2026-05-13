@@ -1693,6 +1693,7 @@ function getPortalInjectedEmail(){
       portalUserEmployee: null,
       portalOrgTeams: [],
       portalOrgDivisions: [],
+      portalOrgEmployees: [],
       reservationsAll: [],
       reservationResourcesList: [],
       selectedReservationResourceName: '',
@@ -1929,30 +1930,100 @@ function getPortalInjectedEmail(){
       return String(p?.role || '') === 'admin';
     }
 
-    function scheduleRowVisibleToCurrentUser(row) {
-      if (!row) return false;
-      const scope = normalizeScopeCode(row.scope);
-      const email = String(portalAuth().email || '').trim().toLowerCase();
-      const authorEmail = String(row.created_by_email || '').trim().toLowerCase();
-      const { meta } = unpackScheduleDescription(row.description || '');
-      const authTeam = String(meta.author_team_code || '').trim();
-      const authDiv = String(meta.author_division_code || '').trim() || resolvePortalTeamDivisionValue(authTeam);
+    function getPortalEmployeeByEmail(email) {
+      const target = normalizePortalEmail(email);
+      if (!target) return null;
 
-      if (scope === 'personal') return authorEmail === email;
-      if (scope === 'all') return true;
-
-      const me = state.portalUserEmployee;
-      const myTeam = String(me?.team_code || '').trim();
-      const myDiv = String(me?.division_code || '').trim() || resolvePortalTeamDivisionValue(myTeam);
-
-      if (scope === 'team') {
-        if (!authTeam) return authorEmail === email;
-        return Boolean(myTeam && samePortalTeamValue(myTeam, authTeam));
+      if (state.portalUserEmployee && normalizePortalEmail(state.portalUserEmployee.email) === target) {
+        return state.portalUserEmployee;
       }
 
+      return (state.portalOrgEmployees || []).find(emp => normalizePortalEmail(emp.email) === target) || null;
+    }
+
+    function normalizePortalEmployeeOrg(employee) {
+      if (!employee) return null;
+
+      const teamCode = getPortalTeamCodeFromEmployee(employee);
+      const divisionCode = getPortalDivisionCodeFromEmployee(employee, teamCode);
+      const matchedTeam = findPortalTeamByValue(teamCode || employee.team || employee.team_code);
+      const matchedDivision = (state.portalOrgDivisions || []).find(division => samePortalDivisionValue(
+        division.division_code || division.division_name || division.name,
+        divisionCode
+      ));
+
+      return {
+        ...employee,
+        team_code: String(teamCode || employee.team_code || employee.team || '').trim(),
+        division_code: String(divisionCode || employee.division_code || employee.department_code || employee.department || '').trim(),
+        team_name: String(matchedTeam?.team_name || matchedTeam?.name || employee.team || employee.team_code || '').trim(),
+        division_name: String(matchedDivision?.division_name || matchedDivision?.name || employee.department || employee.division_code || '').trim()
+      };
+    }
+
+    function getScheduleAuthorOrg(row) {
+      const authorEmail = normalizePortalEmail(row?.created_by_email);
+      const { meta } = unpackScheduleDescription(row?.description || '');
+
+      const metaTeam = String(meta.author_team_code || '').trim();
+      const metaDiv = String(meta.author_division_code || '').trim();
+
+      const authorEmployee = getPortalEmployeeByEmail(authorEmail);
+      const normalizedAuthor = normalizePortalEmployeeOrg(authorEmployee);
+
+      const authorTeam = String(
+        metaTeam ||
+        normalizedAuthor?.team_code ||
+        normalizedAuthor?.team ||
+        normalizedAuthor?.team_name ||
+        ''
+      ).trim();
+
+      const authorDiv = String(
+        metaDiv ||
+        normalizedAuthor?.division_code ||
+        resolvePortalTeamDivisionValue(authorTeam) ||
+        normalizedAuthor?.department_code ||
+        normalizedAuthor?.department ||
+        normalizedAuthor?.division_name ||
+        ''
+      ).trim();
+
+      return {
+        email: authorEmail,
+        team: authorTeam,
+        division: authorDiv,
+        employee: normalizedAuthor
+      };
+    }
+
+    function scheduleRowVisibleToCurrentUser(row) {
+      if (!row) return false;
+
+      const scope = normalizeScopeCode(row.scope);
+      const email = normalizePortalEmail(portalAuth().email);
+      const author = getScheduleAuthorOrg(row);
+
+      // 전체 공개는 작성자 조직정보가 없어도 모든 사용자에게 표시
+      if (scope === 'all') return true;
+
+      // 개인 공개는 작성자 본인에게만 표시
+      if (scope === 'personal') return Boolean(email && author.email === email);
+
+      const me = normalizePortalEmployeeOrg(state.portalUserEmployee);
+      const myTeam = String(me?.team_code || me?.team || '').trim();
+      const myDiv = String(me?.division_code || resolvePortalTeamDivisionValue(myTeam) || me?.department || '').trim();
+
+      // 팀 공개: 메타가 없는 과거 일정은 작성자 이메일 → employees → team_code로 보정
+      if (scope === 'team') {
+        if (!author.team) return Boolean(email && author.email === email);
+        return Boolean(myTeam && samePortalTeamValue(myTeam, author.team));
+      }
+
+      // 연구소 공개: 메타가 없는 과거 일정은 작성자 이메일 → employees/team → division_code로 보정
       if (scope === 'lab') {
-        if (!authDiv) return authorEmail === email;
-        return Boolean(myDiv && samePortalDivisionValue(myDiv, authDiv));
+        if (!author.division) return Boolean(email && author.email === email);
+        return Boolean(myDiv && samePortalDivisionValue(myDiv, author.division));
       }
 
       return false;
@@ -2005,6 +2076,29 @@ function getPortalInjectedEmail(){
         }
 
         const employeeSelect = 'email,team,department,employee_no,name,role,team_code,division_code,department_code';
+
+        try {
+          let allEmployeesResult = await sb.from('employees')
+            .select(employeeSelect);
+
+          if (allEmployeesResult.error && String(allEmployeesResult.error.message || '').includes('column')) {
+            allEmployeesResult = await sb.from('employees')
+              .select('email,team,department,employee_no,name,role');
+          }
+
+          if (!allEmployeesResult.error) {
+            state.portalOrgEmployees = (allEmployeesResult.data || [])
+              .filter(emp => emp && emp.email)
+              .map(emp => normalizePortalEmployeeOrg(emp));
+          } else {
+            console.warn('employees 전체 조직정보 조회 실패:', allEmployeesResult.error);
+            state.portalOrgEmployees = [];
+          }
+        } catch (employeesError) {
+          console.warn('employees 전체 조직정보 조회 실패:', employeesError);
+          state.portalOrgEmployees = [];
+        }
+
         let data = null;
         let result = await sb.from('employees')
           .select(employeeSelect)
@@ -2043,26 +2137,20 @@ function getPortalInjectedEmail(){
           return;
         }
 
-        const resolvedTeamCode = getPortalTeamCodeFromEmployee(data);
-        const resolvedDivisionCode = getPortalDivisionCodeFromEmployee(data, resolvedTeamCode);
-        const matchedTeam = findPortalTeamByValue(resolvedTeamCode || data.team || data.team_code);
-        const matchedDivision = (state.portalOrgDivisions || []).find(division => samePortalDivisionValue(
-          division.division_code || division.division_name || division.name,
-          resolvedDivisionCode
-        ));
+        state.portalUserEmployee = normalizePortalEmployeeOrg(data);
 
-        state.portalUserEmployee = {
-          ...data,
-          team_code: resolvedTeamCode || data.team_code || data.team || '',
-          division_code: resolvedDivisionCode || data.division_code || data.department_code || data.department || '',
-          team_name: String(matchedTeam?.team_name || matchedTeam?.name || data.team || data.team_code || '').trim(),
-          division_name: String(matchedDivision?.division_name || matchedDivision?.name || data.department || data.division_code || '').trim()
-        };
+        if (state.portalUserEmployee && !getPortalEmployeeByEmail(state.portalUserEmployee.email)) {
+          state.portalOrgEmployees = [
+            ...(state.portalOrgEmployees || []),
+            state.portalUserEmployee
+          ];
+        }
       } catch (e) {
         console.error('loadPortalUserEmployee', e);
         state.portalUserEmployee = null;
         state.portalOrgTeams = [];
         state.portalOrgDivisions = [];
+        state.portalOrgEmployees = [];
       }
     }
 
@@ -2485,6 +2573,7 @@ function getPortalInjectedEmail(){
       const { clean, meta } = unpackScheduleDescription(row.description || '');
       const displayMode = inferDisplayModeFromTimes(row.start_time, row.end_time, meta.displayMode);
       const scopeCode = normalizeScopeCode(row.scope);
+      const authorOrg = getScheduleAuthorOrg(row);
       return {
         id: row.id,
         panelDate: row.schedule_date,
@@ -2499,8 +2588,8 @@ function getPortalInjectedEmail(){
         text: row.title || '',
         description: clean,
         author: row.created_by_name || row.created_by_email || '',
-        teamName: String(meta.author_team_code || '').trim() || '-',
-        lab: String(meta.author_division_code || '').trim() || '-',
+        teamName: String(authorOrg.employee?.team_name || authorOrg.team || meta.author_team_code || '').trim() || '-',
+        lab: String(authorOrg.employee?.division_name || authorOrg.division || meta.author_division_code || '').trim() || '-',
         canMutate: canMutateScheduleRow(row)
       };
     }
@@ -2551,6 +2640,8 @@ function getPortalInjectedEmail(){
         }
         const { data, error } = await sb.from('portal_schedules')
           .select('*')
+          // 공개범위 필터는 scheduleRowVisibleToCurrentUser()에서 처리합니다.
+          // 여기서는 월/작성자 제한 없이 전체를 가져와야 전체/연구소/팀 공개가 정상 동작합니다.
           .order('schedule_date', { ascending: true })
           .order('start_time', { ascending: true })
           .order('id', { ascending: true });
