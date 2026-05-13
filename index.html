@@ -138,7 +138,7 @@
   const HOME_SRC = 'portal-home.html';
   const LAST_PAGE_KEY = 'portalLastPage';
 
-  const frame = document.getElementById('portalFrame');
+  let frame = document.getElementById('portalFrame');
   const navButtons = Array.prototype.slice.call(document.querySelectorAll('.nav-btn[data-portal-src]'));
   const logoutBtn = document.getElementById('logoutNavBtn');
   const homeBtn = document.getElementById('homeNavBtn');
@@ -171,6 +171,33 @@
     );
   }
 
+  function replacePortalFrame(src, user) {
+    const main = document.querySelector('.portal-main');
+    if (!main || !src) return;
+
+    if (frame) {
+      try {
+        frame.onload = null;
+        frame.src = 'about:blank';
+      } catch (_) {}
+      frame.remove();
+    }
+
+    const nextFrame = document.createElement('iframe');
+    nextFrame.id = 'portalFrame';
+    nextFrame.title = '포털 본문';
+    nextFrame.setAttribute('loading', 'eager');
+    nextFrame.setAttribute('referrerpolicy', 'no-referrer-when-downgrade');
+
+    nextFrame.onload = function () {
+      if (user) postAuthToFrame(user);
+    };
+
+    main.appendChild(nextFrame);
+    frame = nextFrame;
+    nextFrame.src = src;
+  }
+
   async function getCurrentUser() {
     const { data } = await supabaseClient.auth.getUser();
     return data?.user || null;
@@ -182,9 +209,7 @@
     if (!data.session) {
       localStorage.removeItem(LAST_PAGE_KEY);
 
-      if (frame) {
-        frame.src = HOME_SRC;
-      }
+      replacePortalFrame(HOME_SRC, null);
       if (homeBtn) {
         setActiveNav(homeBtn);
       }
@@ -250,10 +275,8 @@
     // 홈은 로그인 전에도 열 수 있게 두되, 로그인 세션이 있으면 다른 앱처럼 email을 URL로 전달합니다.
     if (src === HOME_SRC) {
       const user = await getCurrentUser();
-      frame.onload = function () {
-        if (user) postAuthToFrame(user);
-      };
-      frame.src = user ? buildSrcWithUser(HOME_SRC, user) : HOME_SRC;
+      const finalHomeSrc = user ? buildSrcWithUser(HOME_SRC, user) : HOME_SRC;
+      replacePortalFrame(finalHomeSrc, user);
       localStorage.removeItem(LAST_PAGE_KEY);
       setActiveNav(btn);
       return;
@@ -273,12 +296,8 @@
       localStorage.setItem(LAST_PAGE_KEY, src);
     }
 
-    frame.onload = function () {
-      postAuthToFrame(user);
-    };
-
     const finalSrc = buildSrcWithUser(src, user);
-    frame.src = finalSrc;
+    replacePortalFrame(finalSrc, user);
     setActiveNav(btn);
   }
 
@@ -291,13 +310,13 @@
 
     if (!hasSession) {
       localStorage.removeItem(LAST_PAGE_KEY);
-      frame.src = HOME_SRC;
+      replacePortalFrame(HOME_SRC, null);
       if (homeBtn) setActiveNav(homeBtn);
       return;
     }
 
     if (!savedSrc || savedSrc === HOME_SRC) {
-      frame.src = HOME_SRC;
+      replacePortalFrame(HOME_SRC, null);
       if (homeBtn) setActiveNav(homeBtn);
       return;
     }
@@ -305,7 +324,7 @@
     const targetBtn = findNavBySrc(savedSrc);
     if (!targetBtn) {
       localStorage.removeItem(LAST_PAGE_KEY);
-      frame.src = HOME_SRC;
+      replacePortalFrame(HOME_SRC, null);
       if (homeBtn) setActiveNav(homeBtn);
       return;
     }
@@ -316,12 +335,8 @@
       saveReagentUserHint(user);
     }
 
-    frame.onload = function () {
-      postAuthToFrame(user);
-    };
-
     const finalSrc = buildSrcWithUser(savedSrc, user);
-    frame.src = finalSrc;
+    replacePortalFrame(finalSrc, user);
     setActiveNav(targetBtn);
   }
 
@@ -336,9 +351,7 @@
       await supabaseClient.auth.signOut();
       localStorage.removeItem(LAST_PAGE_KEY);
 
-      if (frame) {
-        frame.src = HOME_SRC;
-      }
+      replacePortalFrame(HOME_SRC, null);
 
       if (homeBtn) {
         setActiveNav(homeBtn);
@@ -364,12 +377,7 @@
     (async function openHomeOnFirstVisit() {
       const user = await getCurrentUser();
 
-      if (frame) {
-        frame.onload = function () {
-          if (user) postAuthToFrame(user);
-        };
-        frame.src = user ? buildSrcWithUser(HOME_SRC, user) : HOME_SRC;
-      }
+      replacePortalFrame(user ? buildSrcWithUser(HOME_SRC, user) : HOME_SRC, user);
 
       if (homeBtn) {
         setActiveNav(homeBtn);
