@@ -1961,9 +1961,33 @@ function getPortalInjectedEmail(){
       };
     }
 
+    function getCurrentPortalAuthorOrg() {
+      const me = normalizePortalEmployeeOrg(state.portalUserEmployee) || {};
+      const teamCode = String(me.team_code || getPortalTeamCodeFromEmployee(state.portalUserEmployee) || '').trim();
+      const divisionCode = String(
+        me.division_code ||
+        getPortalDivisionCodeFromEmployee(state.portalUserEmployee, teamCode) ||
+        resolvePortalTeamDivisionValue(teamCode) ||
+        ''
+      ).trim();
+
+      return {
+        team_code: teamCode,
+        division_code: divisionCode,
+        team_name: String(me.team_name || state.portalUserEmployee?.team || state.portalUserEmployee?.team_name || '').trim(),
+        division_name: String(me.division_name || state.portalUserEmployee?.department || state.portalUserEmployee?.division_name || '').trim()
+      };
+    }
+
     function getScheduleAuthorOrg(row) {
       const authorEmail = normalizePortalEmail(row?.created_by_email);
       const { meta } = unpackScheduleDescription(row?.description || '');
+
+      // 새 DB 컬럼을 1순위로 사용하고, 기존 description 메타/직원조회는 fallback으로만 사용합니다.
+      const columnTeam = String(row?.author_team_code || '').trim();
+      const columnDiv = String(row?.author_division_code || '').trim();
+      const columnTeamName = String(row?.author_team_name || '').trim();
+      const columnDivName = String(row?.author_division_name || '').trim();
 
       const metaTeam = String(meta.author_team_code || '').trim();
       const metaDiv = String(meta.author_division_code || '').trim();
@@ -1972,6 +1996,7 @@ function getPortalInjectedEmail(){
       const normalizedAuthor = normalizePortalEmployeeOrg(authorEmployee);
 
       const authorTeam = String(
+        columnTeam ||
         metaTeam ||
         normalizedAuthor?.team_code ||
         normalizedAuthor?.team ||
@@ -1980,6 +2005,7 @@ function getPortalInjectedEmail(){
       ).trim();
 
       const authorDiv = String(
+        columnDiv ||
         metaDiv ||
         normalizedAuthor?.division_code ||
         resolvePortalTeamDivisionValue(authorTeam) ||
@@ -1993,6 +2019,8 @@ function getPortalInjectedEmail(){
         email: authorEmail,
         team: authorTeam,
         division: authorDiv,
+        teamName: columnTeamName || normalizedAuthor?.team_name || normalizedAuthor?.team || '',
+        divisionName: columnDivName || normalizedAuthor?.division_name || normalizedAuthor?.department || '',
         employee: normalizedAuthor
       };
     }
@@ -2014,15 +2042,21 @@ function getPortalInjectedEmail(){
       const myTeam = String(me?.team_code || me?.team || '').trim();
       const myDiv = String(me?.division_code || resolvePortalTeamDivisionValue(myTeam) || me?.department || '').trim();
 
-      // 팀 공개: 메타가 없는 과거 일정은 작성자 이메일 → employees → team_code로 보정
       if (scope === 'team') {
         if (!author.team) return Boolean(email && author.email === email);
+
+        // 새 컬럼 저장값은 정규화 문자열 직접 비교가 가장 안정적입니다.
+        if (normalizePortalOrgValue(myTeam) && normalizePortalOrgValue(myTeam) === normalizePortalOrgValue(author.team)) return true;
+
         return Boolean(myTeam && samePortalTeamValue(myTeam, author.team));
       }
 
-      // 연구소 공개: 메타가 없는 과거 일정은 작성자 이메일 → employees/team → division_code로 보정
       if (scope === 'lab') {
         if (!author.division) return Boolean(email && author.email === email);
+
+        // 새 컬럼 저장값은 정규화 문자열 직접 비교가 가장 안정적입니다.
+        if (normalizePortalOrgValue(myDiv) && normalizePortalOrgValue(myDiv) === normalizePortalOrgValue(author.division)) return true;
+
         return Boolean(myDiv && samePortalDivisionValue(myDiv, author.division));
       }
 
@@ -2588,8 +2622,8 @@ function getPortalInjectedEmail(){
         text: row.title || '',
         description: clean,
         author: row.created_by_name || row.created_by_email || '',
-        teamName: String(authorOrg.employee?.team_name || authorOrg.team || meta.author_team_code || '').trim() || '-',
-        lab: String(authorOrg.employee?.division_name || authorOrg.division || meta.author_division_code || '').trim() || '-',
+        teamName: String(row.author_team_name || authorOrg.teamName || authorOrg.employee?.team_name || authorOrg.team || meta.author_team_code || '').trim() || '-',
+        lab: String(row.author_division_name || authorOrg.divisionName || authorOrg.employee?.division_name || authorOrg.division || meta.author_division_code || '').trim() || '-',
         canMutate: canMutateScheduleRow(row)
       };
     }
@@ -2605,11 +2639,14 @@ function getPortalInjectedEmail(){
       const dm = f.displayMode;
       const startTime = dm === 'allDay' ? '' : (f.startTime || '');
       const endTime = dm === 'range' ? (f.endTime || '') : '';
+      const authorOrg = getCurrentPortalAuthorOrg();
+
       let status = 'planned';
       if (state.scheduleEditingId != null) {
         const ex = state.schedules.find(s => Number(s.id) === Number(state.scheduleEditingId));
         if (ex && ex.status) status = ex.status;
       }
+
       return {
         created_by_email: email,
         created_by_name: name,
@@ -2619,14 +2656,21 @@ function getPortalInjectedEmail(){
           type: f.type,
           app: f.app,
           displayMode: dm,
-          author_team_code: String(getPortalTeamCodeFromEmployee(state.portalUserEmployee) || state.portalUserEmployee?.team_code || '').trim(),
-          author_division_code: String(getPortalDivisionCodeFromEmployee(state.portalUserEmployee, getPortalTeamCodeFromEmployee(state.portalUserEmployee)) || state.portalUserEmployee?.division_code || '').trim()
+          // 기존 description 메타도 유지해 과거 코드/데이터와 호환합니다.
+          author_team_code: authorOrg.team_code,
+          author_division_code: authorOrg.division_code
         }),
         start_time: startTime,
         end_time: endTime,
         scope: normalizeScopeCode(f.scope || 'lab'),
         is_completed: !!isCompleted,
-        status
+        status,
+
+        // 신규 DB 컬럼: 공개범위 판단의 1순위 기준값
+        author_team_code: authorOrg.team_code,
+        author_division_code: authorOrg.division_code,
+        author_team_name: authorOrg.team_name,
+        author_division_name: authorOrg.division_name
       };
     }
 
@@ -2656,24 +2700,63 @@ function getPortalInjectedEmail(){
       }
     }
 
+    function stripScheduleAuthorColumns(row) {
+      if (!row) return row;
+      const {
+        author_team_code,
+        author_division_code,
+        author_team_name,
+        author_division_name,
+        ...rest
+      } = row;
+      return rest;
+    }
+
+    function isScheduleAuthorColumnError(error) {
+      const msg = String(error?.message || error?.details || '').toLowerCase();
+      return msg.includes('author_team_code') ||
+        msg.includes('author_division_code') ||
+        msg.includes('author_team_name') ||
+        msg.includes('author_division_name') ||
+        (msg.includes('column') && msg.includes('portal_schedules'));
+    }
+
     async function createScheduleOnServer(payload) {
       const { sb } = portalAuth();
       if (!sb) throw new Error('로그인이 필요합니다.');
       const row = payload || buildSchedulePayloadFromForm(false);
-      const { data, error } = await sb.from('portal_schedules').insert([row]).select('*').single();
-      if (error) throw error;
-      return data;
+
+      let result = await sb.from('portal_schedules').insert([row]).select('*').single();
+
+      // Supabase 스키마 캐시가 갱신되기 전일 때만 임시 fallback
+      if (result.error && isScheduleAuthorColumnError(result.error)) {
+        console.warn('신규 작성자 조직 컬럼 insert 실패, 기존 컬럼으로 임시 저장:', result.error);
+        result = await sb.from('portal_schedules').insert([stripScheduleAuthorColumns(row)]).select('*').single();
+      }
+
+      if (result.error) throw result.error;
+      return result.data;
     }
 
     async function updateScheduleOnServer(id, patch) {
       const { sb, email } = portalAuth();
       if (!sb) throw new Error('로그인이 필요합니다.');
       const isAdmin = isPortalAdminRole();
+
       let q = sb.from('portal_schedules').update(patch).eq('id', id);
       if (!isAdmin) q = q.eq('created_by_email', email);
-      const { data, error } = await q.select('*').single();
-      if (error) throw error;
-      return data;
+      let result = await q.select('*').single();
+
+      // Supabase 스키마 캐시가 갱신되기 전일 때만 임시 fallback
+      if (result.error && isScheduleAuthorColumnError(result.error)) {
+        console.warn('신규 작성자 조직 컬럼 update 실패, 기존 컬럼으로 임시 저장:', result.error);
+        let q2 = sb.from('portal_schedules').update(stripScheduleAuthorColumns(patch)).eq('id', id);
+        if (!isAdmin) q2 = q2.eq('created_by_email', email);
+        result = await q2.select('*').single();
+      }
+
+      if (result.error) throw result.error;
+      return result.data;
     }
 
     async function deleteScheduleOnServer(id) {
