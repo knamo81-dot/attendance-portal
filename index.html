@@ -110,7 +110,7 @@
     <div class="layout">
       <div class="sidenav">
         <div>
-          <button type="button" id="homeNavBtn" class="nav-btn home active" data-portal-src="portal-home.html" title="홈">홈</button>
+          <button type="button" id="homeNavBtn" class="nav-btn home active" data-portal-src="portal-home/portal-home.html" title="홈">홈</button>
           <div class="nav-group">
             <button type="button" id="wastewaterNavBtn" class="nav-btn" data-portal-src="wastewater/index.html" title="폐수">폐수</button>
             <button type="button" id="attendanceNavBtn" class="nav-btn" data-portal-src="attendance.html" title="근태">근태</button>
@@ -126,7 +126,7 @@
         </div>
       </div>
       <div class="portal-main">
-        <iframe id="portalFrame" title="포털 본문" src="portal-home.html"></iframe>
+        <iframe id="portalFrame" title="포털 본문" src="portal-home/portal-home.html"></iframe>
       </div>
     </div>
   </div>
@@ -135,7 +135,7 @@
   const SUPABASE_URL = 'https://mbqpsovlwvedwrtbbauj.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
 
-  const HOME_SRC = 'portal-home.html';
+  const HOME_SRC = 'portal-home/portal-home.html';
   const LAST_PAGE_KEY = 'portalLastPage';
 
   let frame = document.getElementById('portalFrame');
@@ -366,7 +366,7 @@
   });
 
   // 새 접속은 항상 홈에서 시작하고, 브라우저 새로고침일 때만 마지막 프로그램을 복원합니다.
-  // - 일반 접속/새 탭/주소 직접 입력: portal-home.html
+  // - 일반 접속/새 탭/주소 직접 입력: portal-home/portal-home.html
   // - F5 또는 브라우저 새로고침: localStorage의 마지막 프로그램 유지
   const navEntry = performance.getEntriesByType('navigation')[0];
   const navType = navEntry && navEntry.type ? navEntry.type : '';
