@@ -170,6 +170,165 @@
       display: block;
     }
 
+
+    body.auth-loading .layout {
+      filter: blur(1px);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .auth-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(15, 23, 42, 0.72);
+      backdrop-filter: blur(6px);
+    }
+
+    .auth-overlay[hidden] {
+      display: none !important;
+    }
+
+    .auth-card {
+      width: min(420px, 100%);
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 30px;
+      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.35);
+    }
+
+    .auth-card[hidden] {
+      display: none !important;
+    }
+
+    .auth-card h1 {
+      margin: 0 0 8px;
+      font-size: 26px;
+      letter-spacing: -0.04em;
+      color: #0f172a;
+    }
+
+    .auth-card p {
+      margin: 0 0 22px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #64748b;
+    }
+
+    .auth-field {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      margin-bottom: 14px;
+    }
+
+    .auth-field label {
+      font-size: 12px;
+      font-weight: 800;
+      color: #334155;
+    }
+
+    .auth-field input {
+      width: 100%;
+      height: 44px;
+      border-radius: 14px;
+      border: 1px solid #cbd5e1;
+      padding: 0 14px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .auth-field input:focus {
+      border-color: #c8102e;
+      box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.12);
+    }
+
+    .auth-button {
+      width: 100%;
+      height: 46px;
+      border: none;
+      border-radius: 15px;
+      background: linear-gradient(135deg, #c8102e 0%, #e11d2e 100%);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+
+    .auth-button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .auth-message {
+      display: none;
+      margin-top: 14px;
+      padding: 11px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .auth-message.show {
+      display: block;
+    }
+
+    .auth-message.error {
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+
+    .auth-message.success {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+    }
+
+    .top-user-bar {
+      position: fixed;
+      top: 22px;
+      right: 28px;
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .top-user-bar[hidden] {
+      display: none !important;
+    }
+
+    .user-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 360px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.22);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+      backdrop-filter: blur(6px);
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .user-chip .role {
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.18);
+      font-size: 10px;
+    }
+
     @media (max-width: 820px) {
       .portal-common-header {
         flex-direction: column;
@@ -224,25 +383,88 @@
       </div>
     </div>
   </div>
+
+  <div id="topUserBar" class="top-user-bar" hidden>
+    <div id="userChip" class="user-chip"></div>
+  </div>
+
+  <div id="authOverlay" class="auth-overlay" hidden>
+    <div id="loginCard" class="auth-card">
+      <h1>포탈 로그인</h1>
+      <p>연구소 통합 운영 포탈에 접속하려면 계정으로 로그인해 주세요.</p>
+      <div class="auth-field">
+        <label for="loginEmail">이메일</label>
+        <input id="loginEmail" type="email" autocomplete="username" placeholder="email@example.com" />
+      </div>
+      <div class="auth-field">
+        <label for="loginPassword">비밀번호</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="비밀번호" />
+      </div>
+      <button id="loginButton" type="button" class="auth-button">로그인</button>
+      <div id="loginError" class="auth-message error"></div>
+    </div>
+
+    <div id="passwordCard" class="auth-card" hidden>
+      <h1>비밀번호 변경</h1>
+      <p>최초 로그인 또는 관리자 요청으로 비밀번호 변경이 필요합니다.</p>
+      <div class="auth-field">
+        <label for="newPassword">새 비밀번호</label>
+        <input id="newPassword" type="password" autocomplete="new-password" placeholder="6자 이상" />
+      </div>
+      <div class="auth-field">
+        <label for="confirmPassword">새 비밀번호 확인</label>
+        <input id="confirmPassword" type="password" autocomplete="new-password" placeholder="다시 입력" />
+      </div>
+      <button id="changePasswordButton" type="button" class="auth-button">비밀번호 변경</button>
+      <div id="passwordError" class="auth-message error"></div>
+      <div id="passwordSuccess" class="auth-message success"></div>
+    </div>
+  </div>
+
 <script>
 (function () {
   'use strict';
 
-  // Version: company-context-safe-navigation-2026-05-14
-
   const SUPABASE_URL = 'https://mbqpsovlwvedwrtbbauj.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXJhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
 
   const HOME_SRC = 'portal-main/portal-main.html';
   const LAST_PAGE_KEY = 'portalLastPage';
 
-  let frame = document.getElementById('portalFrame');
+  const frame = document.getElementById('portalFrame');
   const navButtons = Array.from(document.querySelectorAll('.nav-btn[data-portal-src]'));
   const logoutBtn = document.getElementById('logoutNavBtn');
   const homeBtn = document.getElementById('homeNavBtn');
 
+  const els = {
+    overlay: document.getElementById('authOverlay'),
+    loginCard: document.getElementById('loginCard'),
+    passwordCard: document.getElementById('passwordCard'),
+    loginEmail: document.getElementById('loginEmail'),
+    loginPassword: document.getElementById('loginPassword'),
+    loginButton: document.getElementById('loginButton'),
+    loginError: document.getElementById('loginError'),
+    newPassword: document.getElementById('newPassword'),
+    confirmPassword: document.getElementById('confirmPassword'),
+    changePasswordButton: document.getElementById('changePasswordButton'),
+    passwordError: document.getElementById('passwordError'),
+    passwordSuccess: document.getElementById('passwordSuccess'),
+    topUserBar: document.getElementById('topUserBar'),
+    userChip: document.getElementById('userChip')
+  };
+
+  if (!window.supabase || !window.supabase.createClient) {
+    showLogin('Supabase 라이브러리를 불러오지 못했습니다. 인터넷 연결 또는 브라우저 보안 설정을 확인해 주세요.');
+    return;
+  }
+
   const supabaseClient = window.portalSupabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   window.portalSupabase = supabaseClient;
+
+  let currentUser = null;
+  let currentProfile = null;
+  let currentCompany = null;
+  let authBusy = false;
 
   const portalHeaderMeta = {
     'portal-main/portal-main.html': {
@@ -308,133 +530,222 @@
   }
 
   function setActiveNav(activeBtn) {
-    navButtons.forEach(function (btn) {
-      btn.classList.toggle('active', btn === activeBtn);
-    });
+    navButtons.forEach((btn) => btn.classList.toggle('active', btn === activeBtn));
   }
 
   function findNavBySrc(src) {
-    return navButtons.find(function (btn) {
-      return btn.getAttribute('data-portal-src') === src;
-    });
+    return navButtons.find((btn) => btn.getAttribute('data-portal-src') === src);
   }
 
-  async function getSessionUser() {
-    try {
-      const { data } = await supabaseClient.auth.getSession();
-      return data?.session?.user || null;
-    } catch (error) {
-      console.warn('getSessionUser failed:', error);
-      return null;
-    }
+  function setBoxMessage(target, message) {
+    if (!target) return;
+    target.textContent = message || '';
+    target.classList.toggle('show', !!message);
   }
 
-  async function getCurrentUser() {
-    try {
-      const { data, error } = await supabaseClient.auth.getUser();
-      if (error) throw error;
-      return data?.user || null;
-    } catch (error) {
-      return await getSessionUser();
-    }
+  function roleLabel(role) {
+    if (role === 'admin') return '관리자';
+    if (role === 'operator') return '운영자';
+    if (role === 'supervisor') return '책임자';
+    return '일반사용자';
   }
 
-  async function getCompanyContext(user) {
-    const empty = {
-      company_id: '',
-      company_code: '',
-      company_name: ''
+  function buildPortalSession() {
+    const companyId = currentProfile?.company_id || currentCompany?.id || '';
+    const companyCode = currentCompany?.company_code || '';
+    const companyName = currentCompany?.company_name || '';
+    const role = currentProfile?.role || 'viewer';
+
+    return {
+      user: currentUser,
+      profile: currentProfile,
+      company: currentCompany,
+      email: currentUser?.email || '',
+      companyId,
+      company_id: companyId,
+      companyCode,
+      company_code: companyCode,
+      companyName,
+      company_name: companyName,
+      role,
+      supabase: supabaseClient
     };
+  }
 
-    if (!user?.email) {
-      window.portalCompanyContext = empty;
-      return empty;
+  function publishPortalSession() {
+    const session = buildPortalSession();
+    window.portalSession = session;
+    window.currentPortalSession = session;
+    window.currentCompanyId = session.companyId;
+    window.currentCompanyCode = session.companyCode;
+    window.currentCompanyName = session.companyName;
+    window.currentUserRole = session.role;
+    window.dispatchEvent(new CustomEvent('portal-session-ready', { detail: session }));
+    return session;
+  }
+
+  function clearPortalSession() {
+    currentUser = null;
+    currentProfile = null;
+    currentCompany = null;
+    window.portalSession = null;
+    window.currentPortalSession = null;
+    window.currentCompanyId = null;
+    window.currentCompanyCode = null;
+    window.currentCompanyName = null;
+    window.currentUserRole = null;
+  }
+
+  window.getPortalSession = function () {
+    return buildPortalSession();
+  };
+
+  window.getPortalAuthContext = function () {
+    return buildPortalSession();
+  };
+
+  window.getCompanyAppUrl = function (appUrl) {
+    const session = buildPortalSession();
+    if (!appUrl || !session.companyId) return appUrl;
+    return appUrl + (String(appUrl).includes('?') ? '&' : '?') + 'company_id=' + encodeURIComponent(session.companyId);
+  };
+
+  function showLogin(message = '') {
+    document.body.classList.add('auth-loading');
+    if (els.overlay) els.overlay.hidden = false;
+    if (els.loginCard) els.loginCard.hidden = false;
+    if (els.passwordCard) els.passwordCard.hidden = true;
+    if (els.topUserBar) els.topUserBar.hidden = true;
+    setBoxMessage(els.loginError, message);
+    setBoxMessage(els.passwordError, '');
+    setBoxMessage(els.passwordSuccess, '');
+  }
+
+  function showPasswordChange(message = '') {
+    document.body.classList.add('auth-loading');
+    if (els.overlay) els.overlay.hidden = false;
+    if (els.loginCard) els.loginCard.hidden = true;
+    if (els.passwordCard) els.passwordCard.hidden = false;
+    setBoxMessage(els.passwordError, message);
+    setBoxMessage(els.passwordSuccess, '');
+  }
+
+  function showPortal() {
+    document.body.classList.remove('auth-loading');
+    if (els.overlay) els.overlay.hidden = true;
+    if (els.loginCard) els.loginCard.hidden = true;
+    if (els.passwordCard) els.passwordCard.hidden = true;
+    if (els.topUserBar) els.topUserBar.hidden = false;
+  }
+
+  function applyRoleUI() {
+    if (!els.userChip) return;
+    const session = buildPortalSession();
+    const name = currentProfile?.name || currentUser?.email || '사용자';
+    const company = session.companyName ? `<span class="role">${session.companyName}</span>` : '';
+    els.userChip.innerHTML = `<span>${name}</span>${company}<span class="role">${roleLabel(session.role)}</span>`;
+  }
+
+  async function fetchProfile(email) {
+    const { data, error } = await supabaseClient
+      .from('users')
+      .select('email,name,role,is_active,must_change_password,company_id')
+      .eq('email', email)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
+  async function fetchCompany(companyId) {
+    if (!companyId) return null;
+    const { data, error } = await supabaseClient
+      .from('companies')
+      .select('id,company_name,company_code,is_active')
+      .eq('id', companyId)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
+  async function loadUserContext(user) {
+    if (!user?.email) return false;
+
+    const profile = await fetchProfile(user.email);
+    if (!profile) {
+      await supabaseClient.auth.signOut();
+      clearPortalSession();
+      showLogin('users 테이블에 등록되지 않은 이메일입니다. 관리자에게 계정 등록을 요청해 주세요.');
+      return false;
     }
 
-    try {
-      const { data: profile, error: profileError } = await supabaseClient
-        .from('users')
-        .select('email,company_id')
-        .eq('email', user.email)
-        .maybeSingle();
-
-      if (profileError || !profile?.company_id) {
-        if (profileError) console.warn('company profile lookup failed:', profileError);
-        window.portalCompanyContext = empty;
-        return empty;
-      }
-
-      const { data: company, error: companyError } = await supabaseClient
-        .from('companies')
-        .select('id,company_name,company_code,is_active')
-        .eq('id', profile.company_id)
-        .maybeSingle();
-
-      if (companyError) console.warn('company lookup failed:', companyError);
-
-      const context = {
-        company_id: profile.company_id || '',
-        company_code: company?.company_code || '',
-        company_name: company?.company_name || ''
-      };
-
-      window.portalCompanyContext = context;
-      window.currentCompanyId = context.company_id;
-      window.currentCompanyCode = context.company_code;
-      window.currentCompanyName = context.company_name;
-      window.portalSession = {
-        user: user,
-        email: user.email || '',
-        companyId: context.company_id,
-        company_id: context.company_id,
-        companyCode: context.company_code,
-        company_code: context.company_code,
-        companyName: context.company_name,
-        company_name: context.company_name
-      };
-
-      return context;
-    } catch (error) {
-      console.warn('getCompanyContext failed:', error);
-      window.portalCompanyContext = empty;
-      return empty;
+    if (profile.is_active === false) {
+      await supabaseClient.auth.signOut();
+      clearPortalSession();
+      showLogin('비활성화된 계정입니다. 관리자에게 문의해 주세요.');
+      return false;
     }
+
+    if (!profile.company_id) {
+      await supabaseClient.auth.signOut();
+      clearPortalSession();
+      showLogin('회사 정보가 연결되지 않은 계정입니다. users.company_id를 확인해 주세요.');
+      return false;
+    }
+
+    const company = await fetchCompany(profile.company_id);
+    if (!company) {
+      await supabaseClient.auth.signOut();
+      clearPortalSession();
+      showLogin('회사 정보를 찾지 못했습니다. companies 테이블과 users.company_id 연결을 확인해 주세요.');
+      return false;
+    }
+
+    if (company.is_active === false) {
+      await supabaseClient.auth.signOut();
+      clearPortalSession();
+      showLogin('비활성화된 회사입니다. 관리자에게 문의해 주세요.');
+      return false;
+    }
+
+    currentUser = user;
+    currentProfile = profile;
+    currentCompany = company;
+    publishPortalSession();
+    applyRoleUI();
+    return true;
   }
 
   function isReagentSrc(src) {
     return String(src || '').includes('reagent/index.html');
   }
 
-  function saveReagentUserHint(user, companyContext) {
-    if (!user) return;
-    const ctx = companyContext || window.portalCompanyContext || {};
-
+  function saveReagentUserHint() {
+    const session = buildPortalSession();
+    if (!session.email) return;
     try {
       localStorage.setItem('reagent_current_user', JSON.stringify({
-        email: user.email || '',
-        company_id: ctx.company_id || '',
-        company_code: ctx.company_code || '',
-        company_name: ctx.company_name || '',
-        user_role: '',
-        role: '',
-        is_global_admin: false,
+        email: session.email,
+        company_id: session.companyId || '',
+        company_code: session.companyCode || '',
+        company_name: session.companyName || '',
+        user_role: session.role || '',
+        role: session.role || '',
+        is_global_admin: session.role === 'admin',
         is_reagent_operator: false,
         reagent_role: ''
       }));
     } catch (_) {}
   }
 
-  function buildSrcWithUser(src, user, companyContext) {
+  function buildSrcWithSession(src) {
     if (!src) return src;
-
-    const ctx = companyContext || window.portalCompanyContext || {};
+    const session = buildPortalSession();
     const params = [];
-    const email = user?.email || '';
 
-    if (email) params.push('email=' + encodeURIComponent(email));
-    if (ctx.company_id) params.push('company_id=' + encodeURIComponent(ctx.company_id));
-    if (ctx.company_code) params.push('company_code=' + encodeURIComponent(ctx.company_code));
-    if (ctx.company_name) params.push('company_name=' + encodeURIComponent(ctx.company_name));
+    if (session.email) params.push('email=' + encodeURIComponent(session.email));
+    if (session.companyId) params.push('company_id=' + encodeURIComponent(session.companyId));
+    if (session.companyCode) params.push('company_code=' + encodeURIComponent(session.companyCode));
+    if (session.companyName) params.push('company_name=' + encodeURIComponent(session.companyName));
 
     if (src === HOME_SRC) {
       params.push('portal_auth=1');
@@ -450,102 +761,69 @@
     return src + (src.includes('?') ? '&' : '?') + params.join('&');
   }
 
-  function postAuthToFrame(user, companyContext) {
-    if (!frame || !frame.contentWindow || !user) return;
-    const ctx = companyContext || window.portalCompanyContext || {};
+  function postAuthToFrame() {
+    if (!frame || !frame.contentWindow || !currentUser) return;
+    const session = buildPortalSession();
 
     frame.contentWindow.postMessage({
       type: 'portal-auth',
       user: {
-        email: user.email || '',
-        company_id: ctx.company_id || '',
-        companyId: ctx.company_id || '',
-        company_code: ctx.company_code || '',
-        companyCode: ctx.company_code || '',
-        company_name: ctx.company_name || '',
-        companyName: ctx.company_name || ''
+        email: session.email,
+        company_id: session.companyId,
+        companyId: session.companyId,
+        company_code: session.companyCode,
+        companyCode: session.companyCode,
+        company_name: session.companyName,
+        companyName: session.companyName,
+        role: session.role
       },
       company: {
-        id: ctx.company_id || '',
-        company_id: ctx.company_id || '',
-        code: ctx.company_code || '',
-        company_code: ctx.company_code || '',
-        name: ctx.company_name || '',
-        company_name: ctx.company_name || ''
+        id: session.companyId,
+        company_id: session.companyId,
+        code: session.companyCode,
+        company_code: session.companyCode,
+        name: session.companyName,
+        company_name: session.companyName
       }
     }, '*');
   }
 
-  function getFrame() {
-    frame = document.getElementById('portalFrame');
-    return frame;
-  }
-
-  function replacePortalFrame(src, user, companyContext) {
+  function replacePortalFrame(src) {
+    if (!frame || !src) return;
     updatePortalHeader(src);
-    const currentFrame = getFrame();
-    if (!currentFrame || !src) return;
-
-    currentFrame.onload = function () {
-      if (user) postAuthToFrame(user, companyContext);
-    };
-    currentFrame.src = src;
+    frame.onload = postAuthToFrame;
+    frame.src = src;
   }
 
-  async function ensureAuthenticated() {
-    const user = await getCurrentUser();
-    if (!user) {
-      localStorage.removeItem(LAST_PAGE_KEY);
-      replacePortalFrame(HOME_SRC, null, {});
-      if (homeBtn) setActiveNav(homeBtn);
-      return false;
-    }
-    return true;
-  }
-
-  async function navigateBySrc(src, btn, options) {
-    options = options || {};
+  async function navigateBySrc(src, btn, options = {}) {
     if (!src) return;
 
-    // 중요: 부모 index.html에서 세션이 없다고 iframe 이동을 막지 않습니다.
-    // 기존 포탈 구조처럼 먼저 이동은 정상 동작시키고,
-    // 로그인 세션/회사 정보가 확인되는 경우에만 URL과 postMessage에 company 정보를 붙입니다.
-    let user = null;
-    let companyContext = {};
-
-    try {
-      user = await getCurrentUser();
-      companyContext = user ? await getCompanyContext(user) : {};
-    } catch (error) {
-      console.warn('navigation auth context skipped:', error);
-      user = null;
-      companyContext = {};
+    const isHome = src === HOME_SRC;
+    if (!currentUser && !isHome) {
+      showLogin('로그인 후 이용할 수 있습니다.');
+      return;
     }
 
-    if (isReagentSrc(src)) saveReagentUserHint(user, companyContext);
+    if (isReagentSrc(src)) saveReagentUserHint();
 
-    if (src === HOME_SRC) {
+    if (isHome) {
       localStorage.removeItem(LAST_PAGE_KEY);
     } else if (!options.skipSave) {
       localStorage.setItem(LAST_PAGE_KEY, src);
     }
 
-    const finalSrc = buildSrcWithUser(src, user, companyContext);
-    replacePortalFrame(finalSrc, user, companyContext);
+    replacePortalFrame(buildSrcWithSession(src));
     if (btn) setActiveNav(btn);
   }
 
   async function navigate(btn, options) {
     if (!btn) return;
-    const src = btn.getAttribute('data-portal-src');
-    await navigateBySrc(src, btn, options);
+    await navigateBySrc(btn.getAttribute('data-portal-src'), btn, options);
   }
 
   async function restoreLastPage() {
     const savedSrc = localStorage.getItem(LAST_PAGE_KEY);
-    const user = await getCurrentUser();
-
-    if (!user || !savedSrc || savedSrc === HOME_SRC) {
+    if (!currentUser || !savedSrc || savedSrc === HOME_SRC) {
       await navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
       return;
     }
@@ -560,60 +838,181 @@
     await navigate(targetBtn, { skipSave: true });
   }
 
-  navButtons.forEach(function (btn) {
-    btn.addEventListener('click', function (event) {
-      event.preventDefault();
-      navigate(btn).catch(function (error) {
-        console.error('portal navigation failed:', error);
-        alert('화면 이동 중 오류가 발생했습니다. 콘솔 오류를 확인해 주세요.');
-      });
-    });
-  });
+  async function login() {
+    if (authBusy) return;
+    const email = (els.loginEmail?.value || '').trim();
+    const password = els.loginPassword?.value || '';
 
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', async function (event) {
-      event.preventDefault();
-      try {
-        await supabaseClient.auth.signOut();
-      } catch (error) {
-        console.warn('logout signOut skipped/failed:', error);
-      } finally {
-        localStorage.removeItem(LAST_PAGE_KEY);
-        try { localStorage.removeItem('reagent_current_user'); } catch (_) {}
-        window.portalSession = null;
-        window.portalCompanyContext = null;
-        await navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
-        window.location.reload();
+    if (!email || !password) {
+      setBoxMessage(els.loginError, '이메일과 비밀번호를 입력해 주세요.');
+      return;
+    }
+
+    authBusy = true;
+    if (els.loginButton) els.loginButton.disabled = true;
+    setBoxMessage(els.loginError, '');
+
+    try {
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+
+      const ok = await loadUserContext(data?.user || null);
+      if (!ok) return;
+
+      if (currentProfile?.must_change_password) {
+        showPasswordChange('');
+        return;
       }
-    });
+
+      showPortal();
+      await restoreLastPage();
+    } catch (error) {
+      console.error('login error:', error);
+      let msg = error?.message || '로그인에 실패했습니다.';
+      if (msg === 'Invalid login credentials') {
+        msg = '로그인 정보가 맞지 않습니다. 이메일과 비밀번호를 다시 확인해 주세요.';
+      }
+      setBoxMessage(els.loginError, msg);
+    } finally {
+      authBusy = false;
+      if (els.loginButton) els.loginButton.disabled = false;
+    }
   }
 
+  async function changePassword() {
+    const newPassword = els.newPassword?.value || '';
+    const confirmPassword = els.confirmPassword?.value || '';
+
+    if (newPassword.length < 6) {
+      setBoxMessage(els.passwordError, '비밀번호는 6자 이상으로 입력해 주세요.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setBoxMessage(els.passwordError, '새 비밀번호와 확인 값이 서로 다릅니다.');
+      return;
+    }
+
+    if (els.changePasswordButton) els.changePasswordButton.disabled = true;
+    setBoxMessage(els.passwordError, '');
+    setBoxMessage(els.passwordSuccess, '');
+
+    try {
+      const { error: pwError } = await supabaseClient.auth.updateUser({ password: newPassword });
+      if (pwError) throw pwError;
+
+      if (currentUser?.email) {
+        const { error: profileError } = await supabaseClient
+          .from('users')
+          .update({ must_change_password: false })
+          .eq('email', currentUser.email);
+        if (profileError) throw profileError;
+      }
+
+      currentProfile = { ...(currentProfile || {}), must_change_password: false };
+      publishPortalSession();
+      setBoxMessage(els.passwordSuccess, '비밀번호가 변경되었습니다. 포털로 이동합니다.');
+      setTimeout(async () => {
+        showPortal();
+        await restoreLastPage();
+      }, 650);
+    } catch (error) {
+      console.error('changePassword error:', error);
+      setBoxMessage(els.passwordError, error?.message || '비밀번호 변경 중 오류가 발생했습니다.');
+    } finally {
+      if (els.changePasswordButton) els.changePasswordButton.disabled = false;
+    }
+  }
+
+  async function logout() {
+    try {
+      await supabaseClient.auth.signOut();
+    } catch (error) {
+      console.warn('signOut warning:', error);
+    }
+    localStorage.removeItem(LAST_PAGE_KEY);
+    try { localStorage.removeItem('reagent_current_user'); } catch (_) {}
+    clearPortalSession();
+    replacePortalFrame(HOME_SRC);
+    if (homeBtn) setActiveNav(homeBtn);
+    showLogin('로그아웃되었습니다.');
+  }
+
+  function bindEvents() {
+    navButtons.forEach(function (btn) {
+      btn.addEventListener('click', function (event) {
+        event.preventDefault();
+        navigate(btn).catch(function (error) {
+          console.error('portal navigation failed:', error);
+          alert('화면 이동 중 오류가 발생했습니다. 콘솔 오류를 확인해 주세요.');
+        });
+      });
+    });
+
+    logoutBtn?.addEventListener('click', function (event) {
+      event.preventDefault();
+      logout();
+    });
+
+    els.loginButton?.addEventListener('click', login);
+    els.loginEmail?.addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+    els.loginPassword?.addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+    els.changePasswordButton?.addEventListener('click', changePassword);
+    els.confirmPassword?.addEventListener('keydown', (e) => { if (e.key === 'Enter') changePassword(); });
+  }
+
+  async function boot() {
+    bindEvents();
+    updatePortalHeader(HOME_SRC);
+
+    const { data } = await supabaseClient.auth.getSession();
+    const sessionUser = data?.session?.user || null;
+
+    if (!sessionUser) {
+      clearPortalSession();
+      replacePortalFrame(HOME_SRC);
+      if (homeBtn) setActiveNav(homeBtn);
+      showLogin('');
+      return;
+    }
+
+    try {
+      const ok = await loadUserContext(sessionUser);
+      if (!ok) return;
+
+      if (currentProfile?.must_change_password) {
+        showPasswordChange('');
+        return;
+      }
+
+      showPortal();
+      const navEntry = performance.getEntriesByType('navigation')[0];
+      const navType = navEntry && navEntry.type ? navEntry.type : '';
+
+      if (navType === 'reload') {
+        await restoreLastPage();
+      } else {
+        await navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
+      }
+    } catch (error) {
+      console.error('boot failed:', error);
+      await supabaseClient.auth.signOut();
+      clearPortalSession();
+      showLogin('사용자 권한 정보를 확인하지 못했습니다. users와 companies 정보를 확인해 주세요.');
+    }
+  }
+
+  window.portalLogout = logout;
   window.portalNavigate = navigateBySrc;
   window.portalDebug = function () {
     return {
       frameSrc: document.getElementById('portalFrame')?.src || '',
       navButtonCount: navButtons.length,
       portalSession: window.portalSession || null,
-      portalCompanyContext: window.portalCompanyContext || null,
       lastPage: localStorage.getItem(LAST_PAGE_KEY)
     };
   };
 
-  updatePortalHeader(HOME_SRC);
-
-  const navEntry = performance.getEntriesByType('navigation')[0];
-  const navType = navEntry && navEntry.type ? navEntry.type : '';
-
-  if (navType === 'reload') {
-    restoreLastPage().catch(function (error) {
-      console.error('restoreLastPage failed:', error);
-      navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
-    });
-  } else {
-    navigateBySrc(HOME_SRC, homeBtn, { skipSave: true }).catch(function (error) {
-      console.error('openHomeOnFirstVisit failed:', error);
-    });
-  }
+  boot();
 })();
 </script>
 </body>
