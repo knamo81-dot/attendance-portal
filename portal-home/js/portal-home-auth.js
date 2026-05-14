@@ -1,5 +1,8 @@
-/* portal-home-auth.js | Phase 1 split from original portal-home.html
-   원본 inline script #5를 실행 순서 그대로 외부 파일로 분리했습니다. */
+/* portal-home-auth.js | company session ready
+   - users.company_id 조회
+   - companies.company_code/company_name 조회
+   - window.portalSession / window.currentCompanyId 전역 세션 제공
+   - iframe 앱 전달용 querystring 생성 헬퍼 제공 */
 
 (function(){
   const SUPABASE_URL = "https://mbqpsovlwvedwrtbbauj.supabase.co";
@@ -27,13 +30,6 @@
       window.portalSupabase = supabaseClient;
     }
 
-    window.getPortalAuthContext = function getPortalAuthContext() {
-      return {
-        user: currentUser,
-        profile: currentProfile,
-        supabase: supabaseClient
-      };
-    };
     const els = {
       overlay: document.getElementById('authOverlay'),
       loginCard: document.getElementById('loginCard'),
@@ -61,7 +57,56 @@
 
     let currentProfile = null;
     let currentUser = null;
+    let currentCompany = null;
     let authBusy = false;
+
+    function buildPortalSession() {
+      const companyId = currentProfile?.company_id || currentCompany?.id || null;
+      const companyCode = currentCompany?.company_code || currentProfile?.company_code || null;
+      const companyName = currentCompany?.company_name || currentProfile?.company_name || null;
+      const role = currentProfile?.role || 'viewer';
+
+      return {
+        user: currentUser,
+        profile: currentProfile,
+        company: currentCompany,
+        companyId,
+        company_id: companyId,
+        companyCode,
+        company_code: companyCode,
+        companyName,
+        company_name: companyName,
+        role,
+        supabase: supabaseClient
+      };
+    }
+
+    function publishPortalSession() {
+      const session = buildPortalSession();
+      window.portalSession = session;
+      window.currentPortalSession = session;
+      window.currentCompanyId = session.companyId;
+      window.currentCompanyCode = session.companyCode;
+      window.currentCompanyName = session.companyName;
+      window.currentUserRole = session.role;
+      window.dispatchEvent(new CustomEvent('portal-session-ready', { detail: session }));
+      return session;
+    }
+
+    window.getPortalAuthContext = function getPortalAuthContext() {
+      return buildPortalSession();
+    };
+
+    window.getPortalSession = function getPortalSession() {
+      return buildPortalSession();
+    };
+
+    window.getCompanyAppUrl = function getCompanyAppUrl(appUrl) {
+      const session = buildPortalSession();
+      if (!appUrl || !session.companyId) return appUrl;
+      const separator = String(appUrl).includes('?') ? '&' : '?';
+      return `${appUrl}${separator}company_id=${encodeURIComponent(session.companyId)}`;
+    };
 
     function setBoxMessage(target, message) {
       if (!target) return;
@@ -72,7 +117,20 @@
     function roleLabel(role) {
       if (role === 'admin') return '관리자';
       if (role === 'operator') return '운영자';
+      if (role === 'supervisor') return '책임자';
+      if (role === 'viewer') return '일반사용자';
       return '일반사용자';
+    }
+
+    function clearPortalSession() {
+      currentProfile = null;
+      currentCompany = null;
+      window.portalSession = null;
+      window.currentPortalSession = null;
+      window.currentCompanyId = null;
+      window.currentCompanyCode = null;
+      window.currentCompanyName = null;
+      window.currentUserRole = null;
     }
 
     function showLogin(message = '') {
@@ -109,14 +167,26 @@
       if (els.topUserBar && els.userChip) {
         els.topUserBar.hidden = false;
         const displayName = profile?.name || currentUser?.email || '사용자';
-        els.userChip.innerHTML = `<span>${displayName}</span><span class="role">${roleLabel(role)}</span>`;
+        const companyLabel = currentCompany?.company_name ? `<span class="role">${currentCompany.company_name}</span>` : '';
+        els.userChip.innerHTML = `<span>${displayName}</span>${companyLabel}<span class="role">${roleLabel(role)}</span>`;
       }
+    }
+
+    async function fetchCompany(companyId) {
+      if (!companyId) return null;
+      const { data, error } = await supabaseClient
+        .from('companies')
+        .select('id,company_name,company_code,is_active')
+        .eq('id', companyId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
     }
 
     async function fetchProfile(email) {
       const { data, error } = await supabaseClient
         .from('users')
-        .select('email,name,role,is_active,must_change_password')
+        .select('email,name,role,is_active,must_change_password,company_id')
         .eq('email', email)
         .maybeSingle();
       if (error) throw error;
@@ -126,22 +196,35 @@
     async function handleSession(user) {
       currentUser = user || null;
       currentProfile = null;
+      currentCompany = null;
 
       if (!user) {
         const injectedEmail = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
         if (injectedEmail) {
           currentUser = { email: injectedEmail };
-          showPortal();
           try {
+            const injectedProfile = await fetchProfile(injectedEmail);
+            if (injectedProfile) {
+              currentProfile = injectedProfile;
+              currentCompany = await fetchCompany(injectedProfile.company_id);
+              publishPortalSession();
+              applyRoleUI(injectedProfile);
+            } else {
+              publishPortalSession();
+            }
+            showPortal();
             if (typeof window.loadPortalServerData === 'function') {
               await window.loadPortalServerData();
             }
           } catch (loadErr) {
             console.error('loadPortalServerData with injected email', loadErr);
+            publishPortalSession();
+            showPortal();
           }
           return;
         }
 
+        clearPortalSession();
         showLogin('');
         return;
       }
@@ -159,7 +242,27 @@
           return;
         }
 
+        if (!profile.company_id) {
+          await supabaseClient.auth.signOut();
+          showLogin('회사 정보가 연결되지 않은 계정입니다. users.company_id를 확인해 주세요.');
+          return;
+        }
+
+        const company = await fetchCompany(profile.company_id);
+        if (!company) {
+          await supabaseClient.auth.signOut();
+          showLogin('회사 정보를 찾지 못했습니다. companies 테이블과 users.company_id 연결을 확인해 주세요.');
+          return;
+        }
+        if (company.is_active === false) {
+          await supabaseClient.auth.signOut();
+          showLogin('비활성화된 회사입니다. 관리자에게 문의해 주세요.');
+          return;
+        }
+
         currentProfile = profile;
+        currentCompany = company;
+        publishPortalSession();
         applyRoleUI(profile);
 
         if (profile.must_change_password) {
@@ -178,7 +281,8 @@
       } catch (error) {
         console.error('handleSession error:', error);
         await supabaseClient.auth.signOut();
-        showLogin('사용자 권한 정보를 확인하지 못했습니다. users 테이블의 이메일과 권한 정보를 확인해 주세요.');
+        clearPortalSession();
+        showLogin('사용자 권한 정보를 확인하지 못했습니다. users 테이블의 이메일, 권한, 회사 정보를 확인해 주세요.');
       }
     }
 
@@ -244,6 +348,7 @@
         }
 
         currentProfile = { ...(currentProfile || {}), must_change_password: false };
+        publishPortalSession();
         applyRoleUI(currentProfile);
         setBoxMessage(els.passwordSuccess, '비밀번호가 변경되었습니다. 포털로 이동합니다.');
         setTimeout(() => {
@@ -263,7 +368,7 @@
 async function logout() {
   await supabaseClient.auth.signOut();
   currentUser = null;
-  currentProfile = null;
+  clearPortalSession();
   if (els.topUserBar) els.topUserBar.hidden = true;
   showLogin('로그아웃되었습니다.');
 }
