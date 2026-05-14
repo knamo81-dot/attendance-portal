@@ -11,6 +11,11 @@
   
   <style>
     * { box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
     body {
       margin: 0;
       font-family: Arial, sans-serif;
@@ -18,17 +23,19 @@
       color: #0f172a;
     }
     .app {
-      min-height: 100vh;
+      height: 100vh;
       padding: 16px;
+      overflow: hidden;
     }
     .layout {
       width: 100%;
+      height: calc(100vh - 32px);
       margin: 0;
-      min-height: calc(100vh - 32px);
       display: grid;
       grid-template-columns: 72px minmax(0, 1fr);
       gap: 16px;
-      align-items: start;
+      align-items: stretch;
+      overflow: hidden;
     }
     .sidenav {
       width: 72px;
@@ -88,7 +95,7 @@
     .nav-group { display: flex; flex-direction: column; gap: 8px; }
     .portal-main {
       min-width: 0;
-      height: auto;
+      height: calc(100vh - 32px);
       overflow: hidden;
       display: grid;
       grid-template-rows: auto minmax(0, 1fr);
@@ -98,6 +105,9 @@
     .portal-common-header {
       width: 100%;
       min-height: 112px;
+      flex: 0 0 auto;
+      position: relative;
+      z-index: 30;
       border-radius: 26px;
       padding: 22px 30px;
       color: #fff;
@@ -161,13 +171,14 @@
 
     #portalFrame {
       width: 100%;
-      min-height: calc(100vh - 160px);
-      height: auto;
+      height: 100%;
+      min-height: 0;
       border: none;
       border-radius: 22px;
       background: #fff;
       box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
       display: block;
+      overflow: hidden;
     }
 
 
