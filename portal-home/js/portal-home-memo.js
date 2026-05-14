@@ -1,4 +1,28 @@
-/* portal-home-memo.js | 메모 데이터/렌더링 로직 분리 */
+/* portal-home-memo.js | 메모 데이터/렌더링 로직 분리 | company_id 적용 */
+
+function getPortalWorkspaceCompanyId() {
+  try {
+    const auth = (typeof portalAuth === 'function') ? portalAuth() : {};
+    const v = auth.companyId || auth.company_id || auth.company?.id || auth.profile?.company_id ||
+      window.currentCompanyId || window.portalCompanyContext?.company_id || window.portalSession?.companyId || window.portalSession?.company_id ||
+      new URLSearchParams(window.location.search).get('company_id') || '';
+    return String(v || '').trim();
+  } catch (_) {
+    try { return String(new URLSearchParams(window.location.search).get('company_id') || '').trim(); } catch (__) { return ''; }
+  }
+}
+
+function requirePortalWorkspaceCompanyId() {
+  const companyId = getPortalWorkspaceCompanyId();
+  if (!companyId) throw new Error('회사 정보(company_id)를 확인하지 못했습니다. 포탈에서 다시 로그인해 주세요.');
+  return companyId;
+}
+
+function applyCompanyFilterToQuery(query) {
+  const companyId = getPortalWorkspaceCompanyId();
+  return companyId ? query.eq('company_id', companyId) : query;
+}
+
 
 function memoBoardHeightStorageKey() {
       try {
@@ -110,6 +134,7 @@ function memoBoardHeightStorageKey() {
         is_image_only: !!note.imageOnly,
         image_url: note.image ? String(note.image) : null,
         board_type: note.boardType || 'personal',
+        company_id: requirePortalWorkspaceCompanyId(),
         is_deleted: note.is_deleted === true,
         deleted_at: null,
         deleted_by: null
@@ -135,10 +160,10 @@ function memoBoardHeightStorageKey() {
           state.notes = [];
           return;
         }
-        const { data, error } = await sb.from('portal_memos')
+        const { data, error } = await applyCompanyFilterToQuery(sb.from('portal_memos')
           .select('*')
           .eq('created_by_email', email)
-          .eq('is_deleted', false)
+          .eq('is_deleted', false))
           .order('pinned', { ascending: false })
           .order('z_index', { ascending: false })
           .order('created_at', { ascending: true });
@@ -160,10 +185,10 @@ function memoBoardHeightStorageKey() {
           state.trash = [];
           return;
         }
-        const { data, error } = await sb.from('portal_memos')
+        const { data, error } = await applyCompanyFilterToQuery(sb.from('portal_memos')
           .select('*')
           .eq('created_by_email', email)
-          .eq('is_deleted', true)
+          .eq('is_deleted', true))
           .order('updated_at', { ascending: false });
         if (error) throw error;
         state.trash = (data || []).map(mapMemoRowToState);
@@ -177,7 +202,7 @@ function memoBoardHeightStorageKey() {
     async function createMemoOnServer(payload) {
       const { sb, email, name } = portalAuth();
       if (!sb || !email) throw new Error('로그인이 필요합니다.');
-      const insertRow = payload.created_by_email != null ? payload : memoStateToDbPayload(payload, email, name);
+      const insertRow = payload.created_by_email != null ? { ...payload, company_id: payload.company_id || requirePortalWorkspaceCompanyId() } : memoStateToDbPayload(payload, email, name);
       const { data, error } = await sb.from('portal_memos').insert([insertRow]).select('*').single();
       if (error) throw error;
       return data;
@@ -210,7 +235,9 @@ function memoBoardHeightStorageKey() {
       delete payload.created_by_name;
       delete payload.deleted_at;
       delete payload.deleted_by;
-      const { data, error } = await sb.from('portal_memos').update(payload).eq('id', id).eq('created_by_email', email).select('*').single();
+      let q = sb.from('portal_memos').update(payload).eq('id', id).eq('created_by_email', email);
+      q = applyCompanyFilterToQuery(q);
+      const { data, error } = await q.select('*').single();
       if (error) throw error;
       return data;
     }
@@ -218,7 +245,9 @@ function memoBoardHeightStorageKey() {
     async function patchMemoOnServer(id, patch) {
       const { sb, email } = portalAuth();
       if (!sb || !email) throw new Error('로그인이 필요합니다.');
-      const { data, error } = await sb.from('portal_memos').update(patch).eq('id', id).eq('created_by_email', email).select('*').single();
+      let q = sb.from('portal_memos').update(patch).eq('id', id).eq('created_by_email', email);
+      q = applyCompanyFilterToQuery(q);
+      const { data, error } = await q.select('*').single();
       if (error) throw error;
       return data;
     }
@@ -244,7 +273,9 @@ function memoBoardHeightStorageKey() {
     async function permanentDeleteMemoOnServer(id) {
       const { sb, email } = portalAuth();
       if (!sb || !email) throw new Error('로그인이 필요합니다.');
-      const { error } = await sb.from('portal_memos').delete().eq('id', id).eq('created_by_email', email);
+      let q = sb.from('portal_memos').delete().eq('id', id).eq('created_by_email', email);
+      q = applyCompanyFilterToQuery(q);
+      const { error } = await q;
       if (error) throw error;
     }
 
@@ -1018,4 +1049,3 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         state.editMemo.pinned = e.target.checked;
       });
     }
-
