@@ -262,13 +262,13 @@
       top: 'Workforce Analytics',
       title: '근태관리',
       desc: '출퇴근, 연장근무, 누락 데이터를 분석합니다.',
-      gradient: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)'
+      gradient: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)', textColor:'#14532d', subColor:'rgba(20,83,45,.72)', descColor:'rgba(20,83,45,.88)'
     },
     'research-staff/index.html': {
       top: 'Organization Management',
       title: '인력운영현황',
       desc: '조직과 인력 운영 현황을 확인합니다.',
-      gradient: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)'
+      gradient: 'linear-gradient(135deg, #111827 0%, #1f2937 55%, #374151 100%)'
     },
     'reagent/index.html': {
       top: 'Resource Management',
@@ -297,9 +297,21 @@
     const desc = document.getElementById('portalHeaderDesc');
 
     if (header && meta.gradient) header.style.background = meta.gradient;
-    if (top) top.textContent = meta.top || '';
-    if (title) title.textContent = meta.title || '';
-    if (desc) desc.textContent = meta.desc || '';
+
+    if (top) {
+      top.textContent = meta.top || '';
+      top.style.color = meta.subColor || 'rgba(255,255,255,.76)';
+    }
+
+    if (title) {
+      title.textContent = meta.title || '';
+      title.style.color = meta.textColor || '#ffffff';
+    }
+
+    if (desc) {
+      desc.textContent = meta.desc || '';
+      desc.style.color = meta.descColor || 'rgba(255,255,255,.88)';
+    }
   }
 
   function setActiveNav(activeBtn) {
