@@ -391,6 +391,12 @@
   display:block;
 }
 
+
+body:not(.service-admin-enabled) .service-admin-btn{
+  cursor:default !important;
+}
+
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -633,8 +639,13 @@
   function updateServiceAdminButtonVisibility() {
     if (!els.serviceAdminBtn) return;
 
+    if (isServiceAdminRole()) {
+      document.body.classList.add('service-admin-enabled');
+    } else {
+      document.body.classList.remove('service-admin-enabled');
+    }
+
     // EL 심볼은 모든 사용자에게 브랜드 심볼처럼 항상 표시합니다.
-    // 실제 서비스관리자 페이지 접근은 클릭 시 navigateBySrc()에서 권한 확인합니다.
     els.serviceAdminBtn.hidden = false;
     els.serviceAdminBtn.classList.remove('disabled');
     els.serviceAdminBtn.setAttribute('title', 'ExeloLab');
