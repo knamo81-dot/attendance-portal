@@ -369,6 +369,10 @@
       }
     }
   
+body:not(.service-admin-enabled) .service-admin-btn{
+  cursor:default !important;
+}
+
 .service-admin-btn{
   width:52px;
   height:52px;
@@ -630,7 +634,12 @@
   }
 
   function updateServiceAdminButtonVisibility() {
-    if (!els.serviceAdminBtn) return;
+    if (isServiceAdminRole()) {
+      document.body.classList.add('service-admin-enabled');
+    } else {
+      document.body.classList.remove('service-admin-enabled');
+    }
+if (!els.serviceAdminBtn) return;
 
     // EL 심볼은 모든 사용자에게 브랜드 심볼처럼 항상 표시합니다.
     // 실제 서비스관리자 페이지 접근은 클릭 시 navigateBySrc()에서 권한 확인합니다.
@@ -931,7 +940,6 @@
     }
 
     if (isServiceAdminSrc(src) && !isServiceAdminRole()) {
-      alert('서비스 관리자 전용 메뉴입니다.');
       return;
     }
 
