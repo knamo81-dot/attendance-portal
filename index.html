@@ -226,14 +226,16 @@
   </div>
 <script>
 (function () {
+  'use strict';
+
   const SUPABASE_URL = 'https://mbqpsovlwvedwrtbbauj.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXJhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
 
   const HOME_SRC = 'portal-main/portal-main.html';
   const LAST_PAGE_KEY = 'portalLastPage';
 
   let frame = document.getElementById('portalFrame');
-  const navButtons = Array.prototype.slice.call(document.querySelectorAll('.nav-btn[data-portal-src]'));
+  const navButtons = Array.from(document.querySelectorAll('.nav-btn[data-portal-src]'));
   const logoutBtn = document.getElementById('logoutNavBtn');
   const homeBtn = document.getElementById('homeNavBtn');
 
@@ -304,8 +306,8 @@
   }
 
   function setActiveNav(activeBtn) {
-    navButtons.forEach(function (b) {
-      b.classList.toggle('active', b === activeBtn);
+    navButtons.forEach(function (btn) {
+      btn.classList.toggle('active', btn === activeBtn);
     });
   }
 
@@ -315,68 +317,24 @@
     });
   }
 
-  function postAuthToFrame(user, companyContext) {
-    if (!frame || !frame.contentWindow || !user) return;
-
-    const ctx = companyContext || window.portalCompanyContext || {};
-
-    frame.contentWindow.postMessage(
-      {
-        type: 'portal-auth',
-        user: {
-          email: user.email || '',
-          company_id: ctx.company_id || '',
-          companyId: ctx.company_id || '',
-          company_code: ctx.company_code || '',
-          companyCode: ctx.company_code || '',
-          company_name: ctx.company_name || '',
-          companyName: ctx.company_name || ''
-        },
-        company: {
-          id: ctx.company_id || '',
-          company_id: ctx.company_id || '',
-          code: ctx.company_code || '',
-          company_code: ctx.company_code || '',
-          name: ctx.company_name || '',
-          company_name: ctx.company_name || ''
-        }
-      },
-      '*'
-    );
-  }
-
-  function replacePortalFrame(src, user, companyContext) {
-    const main = document.querySelector('.portal-main');
-    if (!main || !src) return;
-
-    updatePortalHeader(src);
-
-    if (frame) {
-      try {
-        frame.onload = null;
-        frame.src = 'about:blank';
-      } catch (_) {}
-      frame.remove();
+  async function getSessionUser() {
+    try {
+      const { data } = await supabaseClient.auth.getSession();
+      return data?.session?.user || null;
+    } catch (error) {
+      console.warn('getSessionUser failed:', error);
+      return null;
     }
-
-    const nextFrame = document.createElement('iframe');
-    nextFrame.id = 'portalFrame';
-    nextFrame.title = '포털 본문';
-    nextFrame.setAttribute('loading', 'eager');
-    nextFrame.setAttribute('referrerpolicy', 'no-referrer-when-downgrade');
-
-    nextFrame.onload = function () {
-      if (user) postAuthToFrame(user, companyContext);
-    };
-
-    main.appendChild(nextFrame);
-    frame = nextFrame;
-    nextFrame.src = src;
   }
 
   async function getCurrentUser() {
-    const { data } = await supabaseClient.auth.getUser();
-    return data?.user || null;
+    try {
+      const { data, error } = await supabaseClient.auth.getUser();
+      if (error) throw error;
+      return data?.user || null;
+    } catch (error) {
+      return await getSessionUser();
+    }
   }
 
   async function getCompanyContext(user) {
@@ -386,7 +344,10 @@
       company_name: ''
     };
 
-    if (!user?.email) return empty;
+    if (!user?.email) {
+      window.portalCompanyContext = empty;
+      return empty;
+    }
 
     try {
       const { data: profile, error: profileError } = await supabaseClient
@@ -407,9 +368,7 @@
         .eq('id', profile.company_id)
         .maybeSingle();
 
-      if (companyError) {
-        console.warn('company lookup failed:', companyError);
-      }
+      if (companyError) console.warn('company lookup failed:', companyError);
 
       const context = {
         company_id: profile.company_id || '',
@@ -440,23 +399,6 @@
     }
   }
 
-  async function ensureAuthenticated() {
-    const { data } = await supabaseClient.auth.getSession();
-
-    if (!data.session) {
-      localStorage.removeItem(LAST_PAGE_KEY);
-
-      replacePortalFrame(HOME_SRC, null);
-      if (homeBtn) {
-        setActiveNav(homeBtn);
-      }
-      return false;
-    }
-
-    return true;
-  }
-
-
   function isReagentSrc(src) {
     return String(src || '').includes('reagent/index.html');
   }
@@ -465,8 +407,6 @@
     if (!user) return;
     const ctx = companyContext || window.portalCompanyContext || {};
 
-    // 시약초자 권한은 포탈 settings(user_app_roles)를 앱 내부에서 직접 조회합니다.
-    // 포탈은 폐수 앱처럼 로그인 사용자 식별 정보만 전달합니다.
     try {
       localStorage.setItem('reagent_current_user', JSON.stringify({
         email: user.email || '',
@@ -482,13 +422,12 @@
     } catch (_) {}
   }
 
-
   function buildSrcWithUser(src, user, companyContext) {
-    if (!src || !user) return src;
+    if (!src) return src;
 
     const ctx = companyContext || window.portalCompanyContext || {};
     const params = [];
-    const email = user.email || '';
+    const email = user?.email || '';
 
     if (email) params.push('email=' + encodeURIComponent(email));
     if (ctx.company_id) params.push('company_id=' + encodeURIComponent(ctx.company_id));
@@ -506,137 +445,165 @@
     }
 
     if (!params.length) return src;
-
-    const separator = src.includes('?') ? '&' : '?';
-    return src + separator + params.join('&');
+    return src + (src.includes('?') ? '&' : '?') + params.join('&');
   }
 
-  async function navigate(btn, options) {
-    options = options || {};
+  function postAuthToFrame(user, companyContext) {
+    if (!frame || !frame.contentWindow || !user) return;
+    const ctx = companyContext || window.portalCompanyContext || {};
 
-    var src = btn.getAttribute('data-portal-src');
-    if (!src || !frame) return;
+    frame.contentWindow.postMessage({
+      type: 'portal-auth',
+      user: {
+        email: user.email || '',
+        company_id: ctx.company_id || '',
+        companyId: ctx.company_id || '',
+        company_code: ctx.company_code || '',
+        companyCode: ctx.company_code || '',
+        company_name: ctx.company_name || '',
+        companyName: ctx.company_name || ''
+      },
+      company: {
+        id: ctx.company_id || '',
+        company_id: ctx.company_id || '',
+        code: ctx.company_code || '',
+        company_code: ctx.company_code || '',
+        name: ctx.company_name || '',
+        company_name: ctx.company_name || ''
+      }
+    }, '*');
+  }
 
-    // 홈은 로그인 전에도 열 수 있게 두되, 로그인 세션이 있으면 다른 앱처럼 email을 URL로 전달합니다.
-    if (src === HOME_SRC) {
-      const user = await getCurrentUser();
-      const companyContext = user ? await getCompanyContext(user) : {};
-      const finalHomeSrc = user ? buildSrcWithUser(HOME_SRC, user, companyContext) : HOME_SRC;
-      replacePortalFrame(finalHomeSrc, user, companyContext);
+  function getFrame() {
+    frame = document.getElementById('portalFrame');
+    return frame;
+  }
+
+  function replacePortalFrame(src, user, companyContext) {
+    updatePortalHeader(src);
+    const currentFrame = getFrame();
+    if (!currentFrame || !src) return;
+
+    currentFrame.onload = function () {
+      if (user) postAuthToFrame(user, companyContext);
+    };
+    currentFrame.src = src;
+  }
+
+  async function ensureAuthenticated() {
+    const user = await getCurrentUser();
+    if (!user) {
       localStorage.removeItem(LAST_PAGE_KEY);
-      setActiveNav(btn);
-      return;
+      replacePortalFrame(HOME_SRC, null, {});
+      if (homeBtn) setActiveNav(homeBtn);
+      return false;
     }
+    return true;
+  }
 
-    const ok = await ensureAuthenticated();
-    if (!ok) return;
+  async function navigateBySrc(src, btn, options) {
+    options = options || {};
+    if (!src) return;
 
     const user = await getCurrentUser();
+    const companyContext = user ? await getCompanyContext(user) : {};
 
-    const companyContext = await getCompanyContext(user);
-
-    if (isReagentSrc(src)) {
-      saveReagentUserHint(user, companyContext);
+    if (src !== HOME_SRC) {
+      const ok = await ensureAuthenticated();
+      if (!ok) return;
     }
 
-    // 사용자가 선택한 앱만 마지막 페이지로 저장합니다.
-    if (!options.skipSave) {
+    if (isReagentSrc(src)) saveReagentUserHint(user, companyContext);
+
+    if (src === HOME_SRC) {
+      localStorage.removeItem(LAST_PAGE_KEY);
+    } else if (!options.skipSave) {
       localStorage.setItem(LAST_PAGE_KEY, src);
     }
 
     const finalSrc = buildSrcWithUser(src, user, companyContext);
     replacePortalFrame(finalSrc, user, companyContext);
-    setActiveNav(btn);
+    if (btn) setActiveNav(btn);
+  }
+
+  async function navigate(btn, options) {
+    if (!btn) return;
+    const src = btn.getAttribute('data-portal-src');
+    await navigateBySrc(src, btn, options);
   }
 
   async function restoreLastPage() {
-    if (!frame) return;
-
-    const { data } = await supabaseClient.auth.getSession();
-    const hasSession = !!data.session;
     const savedSrc = localStorage.getItem(LAST_PAGE_KEY);
+    const user = await getCurrentUser();
 
-    if (!hasSession) {
-      localStorage.removeItem(LAST_PAGE_KEY);
-      replacePortalFrame(HOME_SRC, null);
-      if (homeBtn) setActiveNav(homeBtn);
-      return;
-    }
-
-    if (!savedSrc || savedSrc === HOME_SRC) {
-      replacePortalFrame(HOME_SRC, null);
-      if (homeBtn) setActiveNav(homeBtn);
+    if (!user || !savedSrc || savedSrc === HOME_SRC) {
+      await navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
       return;
     }
 
     const targetBtn = findNavBySrc(savedSrc);
     if (!targetBtn) {
       localStorage.removeItem(LAST_PAGE_KEY);
-      replacePortalFrame(HOME_SRC, null);
-      if (homeBtn) setActiveNav(homeBtn);
+      await navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
       return;
     }
 
-    const user = await getCurrentUser();
-
-    const companyContext = await getCompanyContext(user);
-
-    if (isReagentSrc(savedSrc)) {
-      saveReagentUserHint(user, companyContext);
-    }
-
-    const finalSrc = buildSrcWithUser(savedSrc, user, companyContext);
-    replacePortalFrame(finalSrc, user, companyContext);
-    setActiveNav(targetBtn);
+    await navigate(targetBtn, { skipSave: true });
   }
 
   navButtons.forEach(function (btn) {
-    btn.addEventListener('click', async function () {
-      await navigate(btn);
+    btn.addEventListener('click', function (event) {
+      event.preventDefault();
+      navigate(btn).catch(function (error) {
+        console.error('portal navigation failed:', error);
+        alert('화면 이동 중 오류가 발생했습니다. 콘솔 오류를 확인해 주세요.');
+      });
     });
   });
 
-  logoutBtn.addEventListener('click', async function () {
-    try {
-      await supabaseClient.auth.signOut();
-      localStorage.removeItem(LAST_PAGE_KEY);
-
-      replacePortalFrame(HOME_SRC, null);
-
-      if (homeBtn) {
-        setActiveNav(homeBtn);
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async function (event) {
+      event.preventDefault();
+      try {
+        await supabaseClient.auth.signOut();
+        localStorage.removeItem(LAST_PAGE_KEY);
+        try { localStorage.removeItem('reagent_current_user'); } catch (_) {}
+        window.portalSession = null;
+        window.portalCompanyContext = null;
+        await navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
+        window.location.reload();
+      } catch (error) {
+        console.error('logout failed:', error);
+        alert('로그아웃 중 오류가 발생했습니다.');
       }
+    });
+  }
 
-      window.location.reload();
-
-    } catch (e) {
-      console.error('logout failed:', e);
-      alert('로그아웃 중 오류가 발생했습니다.');
-    }
-  });
-
-  // 새 접속은 항상 홈에서 시작하고, 브라우저 새로고침일 때만 마지막 프로그램을 복원합니다.
-  // - 일반 접속/새 탭/주소 직접 입력: portal-main/portal-main.html
-  // - F5 또는 브라우저 새로고침: localStorage의 마지막 프로그램 유지
-  const navEntry = performance.getEntriesByType('navigation')[0];
-  const navType = navEntry && navEntry.type ? navEntry.type : '';
+  window.portalNavigate = navigateBySrc;
+  window.portalDebug = function () {
+    return {
+      frameSrc: document.getElementById('portalFrame')?.src || '',
+      navButtonCount: navButtons.length,
+      portalSession: window.portalSession || null,
+      portalCompanyContext: window.portalCompanyContext || null,
+      lastPage: localStorage.getItem(LAST_PAGE_KEY)
+    };
+  };
 
   updatePortalHeader(HOME_SRC);
 
+  const navEntry = performance.getEntriesByType('navigation')[0];
+  const navType = navEntry && navEntry.type ? navEntry.type : '';
+
   if (navType === 'reload') {
-    restoreLastPage();
+    restoreLastPage().catch(function (error) {
+      console.error('restoreLastPage failed:', error);
+      navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
+    });
   } else {
-    (async function openHomeOnFirstVisit() {
-      const user = await getCurrentUser();
-
-      const companyContext = user ? await getCompanyContext(user) : {};
-
-      replacePortalFrame(user ? buildSrcWithUser(HOME_SRC, user, companyContext) : HOME_SRC, user, companyContext);
-
-      if (homeBtn) {
-        setActiveNav(homeBtn);
-      }
-    })();
+    navigateBySrc(HOME_SRC, homeBtn, { skipSave: true }).catch(function (error) {
+      console.error('openHomeOnFirstVisit failed:', error);
+    });
   }
 })();
 </script>
