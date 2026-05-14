@@ -114,6 +114,26 @@
       target.classList.toggle('show', !!message);
     }
 
+
+    function clearLoginInputs(options = {}) {
+      const keepEmail = options.keepEmail === true;
+      const clearEmail = !keepEmail;
+      const fields = [els.loginPassword, els.newPassword, els.confirmPassword];
+
+      if (clearEmail && els.loginEmail) {
+        els.loginEmail.value = '';
+        els.loginEmail.defaultValue = '';
+        els.loginEmail.setAttribute('autocomplete', 'off');
+      }
+
+      fields.forEach((field) => {
+        if (!field) return;
+        field.value = '';
+        field.defaultValue = '';
+        field.setAttribute('autocomplete', 'new-password');
+      });
+    }
+
     function roleLabel(role) {
       if (role === 'admin') return '관리자';
       if (role === 'operator') return '운영자';
@@ -133,31 +153,11 @@
       window.currentUserRole = null;
     }
 
-    function clearAuthInputs(options = {}) {
-      const keepEmail = options.keepEmail === true;
-      if (!keepEmail && els.loginEmail) els.loginEmail.value = '';
-      if (els.loginPassword) els.loginPassword.value = '';
-      if (els.newPassword) els.newPassword.value = '';
-      if (els.confirmPassword) els.confirmPassword.value = '';
-    }
-
-    function clearPortalStorage() {
-      try {
-        localStorage.removeItem('portalLastPage');
-        localStorage.removeItem('reagent_current_user');
-        localStorage.removeItem('portalCompanyContext');
-        localStorage.removeItem('portalSession');
-      } catch (_) {}
-      try {
-        sessionStorage.removeItem('portalLastPage');
-        sessionStorage.removeItem('reagent_current_user');
-        sessionStorage.removeItem('portalCompanyContext');
-        sessionStorage.removeItem('portalSession');
-      } catch (_) {}
-    }
-
     function showLogin(message = '') {
       document.body.classList.add('auth-loading');
+      clearLoginInputs();
+      setTimeout(() => clearLoginInputs(), 80);
+      setTimeout(() => clearLoginInputs(), 350);
       if (els.overlay) els.overlay.hidden = false;
       if (els.loginCard) els.loginCard.hidden = false;
       if (els.passwordCard) els.passwordCard.hidden = true;
@@ -327,7 +327,7 @@
       try {
         const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        if (els.loginPassword) els.loginPassword.value = '';
+        clearLoginInputs();
         await handleSession(data?.user || null);
       } catch (error) {
         console.error('login error:', error);
@@ -390,19 +390,18 @@
     }
 
 async function logout() {
-  try {
-    await supabaseClient.auth.signOut();
-  } catch (error) {
-    console.warn('logout signOut failed:', error);
-  }
-
+  await supabaseClient.auth.signOut();
   currentUser = null;
   clearPortalSession();
-  clearPortalStorage();
-  clearAuthInputs({ keepEmail: false });
-
+  clearLoginInputs();
+  try {
+    localStorage.removeItem('portalLastPage');
+    localStorage.removeItem('reagent_current_user');
+  } catch (_) {}
   if (els.topUserBar) els.topUserBar.hidden = true;
   showLogin('로그아웃되었습니다.');
+  setTimeout(() => clearLoginInputs(), 80);
+  setTimeout(() => clearLoginInputs(), 350);
 }
 
 window.portalLogout = logout;
