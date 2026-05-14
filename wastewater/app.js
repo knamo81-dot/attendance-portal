@@ -1879,7 +1879,7 @@ async function removeWastewaterApprover(employeeNo){
 function renderApp(message='',cls='muted'){const stats=getDerivedStats(); const latestDaily=stats.latest; const filteredLedgerRows=stats.enrichedDaily.filter(r=>!ledgerMonthFilter||monthKeyFromDate(r.date)===ledgerMonthFilter); const latestMeter=latestDaily?Number(latestDaily.usage||0):0; const pickupYears=getPickupYears(); if(!pickupYears.includes(pickupYearFilter)) pickupYearFilter=pickupYears[0]||String(new Date().getFullYear()); const availableYears=getAvailableYears(); if(!availableYears.includes(yearlyReportFilter)) yearlyReportFilter=availableYears[0]||String(new Date().getFullYear()); const filteredPickupRows=pickupRows.filter(row=>{const rowYear=yearKeyFromDate(row.pickup_date); const rowType=row.pickup_type||'폐수'; return (!pickupYearFilter||rowYear===pickupYearFilter)&&(pickupTypeFilter==='전체'||rowType===pickupTypeFilter);}); const approvalStatus=getApprovalStatus(ledgerMonthFilter);
 document.getElementById('app').innerHTML=`<div class="app-shell">
 <div class="portal-header">
-  <div class="portal-eyebrow">Research Lab Integrated Portal</div>
+  <div class="portal-eyebrow">Integrated Operations Platform</div>
   <h1 class="portal-title">폐수/폐기물 운영일지</h1>
 </div>
 <div class="stats">
