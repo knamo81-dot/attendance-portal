@@ -1,4 +1,28 @@
-/* portal-home-reservation.js | 예약 데이터/타임테이블 로직 분리 */
+/* portal-home-reservation.js | 예약 데이터/타임테이블 로직 분리 | company_id 적용 */
+
+function getPortalWorkspaceCompanyId() {
+  try {
+    const auth = (typeof portalAuth === 'function') ? portalAuth() : {};
+    const v = auth.companyId || auth.company_id || auth.company?.id || auth.profile?.company_id ||
+      window.currentCompanyId || window.portalCompanyContext?.company_id || window.portalSession?.companyId || window.portalSession?.company_id ||
+      new URLSearchParams(window.location.search).get('company_id') || '';
+    return String(v || '').trim();
+  } catch (_) {
+    try { return String(new URLSearchParams(window.location.search).get('company_id') || '').trim(); } catch (__) { return ''; }
+  }
+}
+
+function requirePortalWorkspaceCompanyId() {
+  const companyId = getPortalWorkspaceCompanyId();
+  if (!companyId) throw new Error('회사 정보(company_id)를 확인하지 못했습니다. 포탈에서 다시 로그인해 주세요.');
+  return companyId;
+}
+
+function applyCompanyFilterToQuery(query) {
+  const companyId = getPortalWorkspaceCompanyId();
+  return companyId ? query.eq('company_id', companyId) : query;
+}
+
 
 function getMonthReservationRange(monthKey) {
       const prefix = String(monthKey || '').slice(0, 7);
@@ -29,13 +53,13 @@ function getMonthReservationRange(monthKey) {
           return;
         }
         const { first, last } = getMonthReservationRange(monthKey);
-        const { data, error } = await sb.from('portal_reservations')
+        const { data, error } = await applyCompanyFilterToQuery(sb.from('portal_reservations')
           .select('*')
           .gte('reserve_date', first)
           .lte('reserve_date', last)
           .order('reserve_date', { ascending: true })
           .order('start_time', { ascending: true })
-          .order('id', { ascending: true });
+          .order('id', { ascending: true }));
         if (error) throw error;
         state.reservationsAll = data || [];
         applyReservationFilter();
@@ -115,7 +139,9 @@ function mapReservationRowToState(row) {
 
     async function createReservationOnServer(payload) {
       const { sb } = portalAuth();
-      const { data, error } = await sb.from('portal_reservations').insert([payload]).select('*').single();
+      if (!sb) throw new Error('로그인이 필요합니다.');
+      const row = { ...(payload || {}), company_id: (payload && payload.company_id) || requirePortalWorkspaceCompanyId() };
+      const { data, error } = await sb.from('portal_reservations').insert([row]).select('*').single();
       if (error) throw error;
       return data;
     }
@@ -124,6 +150,7 @@ function mapReservationRowToState(row) {
       const { sb, email } = portalAuth();
       const isAdmin = isPortalAdminRole();
       let q = sb.from('portal_reservations').update(patch).eq('id', id);
+      q = applyCompanyFilterToQuery(q);
       if (!isAdmin) q = q.eq('created_by_email', email);
       const { data, error } = await q.select('*').single();
       if (error) throw error;
@@ -134,6 +161,7 @@ function mapReservationRowToState(row) {
       const { sb, email } = portalAuth();
       const isAdmin = isPortalAdminRole();
       let q = sb.from('portal_reservations').delete().eq('id', id);
+      q = applyCompanyFilterToQuery(q);
       if (!isAdmin) q = q.eq('created_by_email', email);
       const { error } = await q;
       if (error) throw error;
