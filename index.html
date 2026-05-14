@@ -78,6 +78,24 @@
       font-weight: 800;
       box-shadow: 0 6px 18px rgba(15,23,42,0.18);
     }
+
+    .nav-btn.service-admin-btn {
+      background: #ffffff;
+      color: #0f172a;
+      border: 1px solid rgba(255,255,255,0.28);
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      box-shadow: 0 8px 22px rgba(15,23,42,0.22);
+      margin-top: 2px;
+    }
+    .nav-btn.service-admin-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 26px rgba(15,23,42,0.26);
+    }
+    .nav-btn.service-admin-btn[hidden] {
+      display: none !important;
+    }
     .nav-btn.nav-btn--soon {
       cursor: not-allowed;
       opacity: 0.38;
@@ -353,7 +371,30 @@
         align-self: flex-start;
       }
     }
-  </style>
+  
+.service-admin-btn{
+  width:52px;
+  height:52px;
+  border-radius:16px;
+  border:none;
+  background:#ffffff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  padding:0;
+  overflow:hidden;
+  box-shadow:0 6px 18px rgba(0,0,0,.18);
+}
+
+.service-admin-logo{
+  width:38px;
+  height:38px;
+  object-fit:contain;
+  display:block;
+}
+
+</style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -376,6 +417,7 @@
         <div class="nav-group">
           <button type="button" id="settingsNavBtn" class="nav-btn" data-portal-src="settings.html" title="설정">설정</button>
           <button type="button" id="logoutNavBtn" class="nav-btn" title="로그아웃 안내">종료</button>
+          <button type="button" id="serviceAdminBtn" class="nav-btn service-admin-btn" data-portal-src="service-admin.html" title="서비스 관리자" hidden><img src="assets/el-symbol.png" alt="EL" class="service-admin-logo"></button>
         </div>
       </div>
       <div class="portal-main">
@@ -461,7 +503,8 @@
     passwordError: document.getElementById('passwordError'),
     passwordSuccess: document.getElementById('passwordSuccess'),
     topUserBar: document.getElementById('topUserBar'),
-    userChip: document.getElementById('userChip')
+    userChip: document.getElementById('userChip'),
+    serviceAdminBtn: document.getElementById('serviceAdminBtn')
   };
 
   if (!window.supabase || !window.supabase.createClient) {
@@ -519,7 +562,13 @@
       title: '설정',
       desc: '사용자, 권한, 포탈 설정을 관리합니다.',
       gradient: 'linear-gradient(135deg, #475569 0%, #0f172a 100%)'
-    }
+    },
+    'service-admin.html': {
+      top: 'ExeloLab Service Admin',
+      title: '서비스 관리자',
+      desc: '회사 등록과 서비스 운영 설정을 관리합니다.',
+      gradient: 'linear-gradient(135deg, #061f44 0%, #0f172a 55%, #158154 100%)'
+    },
   };
 
   function normalizePortalSrc(src) {
@@ -555,6 +604,21 @@
   }
 
 
+  function isServiceAdminRole() {
+    const role = String(currentProfile?.role || window.portalSession?.role || '').trim();
+    return role === 'service_admin';
+  }
+
+  function updateServiceAdminButtonVisibility() {
+    if (!els.serviceAdminBtn) return;
+    els.serviceAdminBtn.hidden = !isServiceAdminRole();
+  }
+
+  function isServiceAdminSrc(src) {
+    return normalizePortalSrc(src) === 'service-admin.html';
+  }
+
+
   function clearLoginInputs(options = {}) {
     const keepEmail = options.keepEmail === true;
 
@@ -576,6 +640,7 @@
     if (role === 'admin') return '관리자';
     if (role === 'operator') return '운영자';
     if (role === 'supervisor') return '책임자';
+    if (role === 'service_admin') return '서비스관리자';
     return '일반사용자';
   }
 
@@ -623,6 +688,7 @@
     window.currentCompanyCode = null;
     window.currentCompanyName = null;
     window.currentUserRole = null;
+    updateServiceAdminButtonVisibility();
   }
 
   window.getPortalSession = function () {
@@ -677,6 +743,7 @@
     const name = currentProfile?.name || currentUser?.email || '사용자';
     const company = session.companyName ? `<span class="role">${session.companyName}</span>` : '';
     els.userChip.innerHTML = `<span>${name}</span>${company}<span class="role">${roleLabel(session.role)}</span>`;
+    updateServiceAdminButtonVisibility();
   }
 
   async function fetchProfile(email) {
@@ -834,6 +901,11 @@
     const isHome = src === HOME_SRC;
     if (!currentUser && !isHome) {
       showLogin('로그인 후 이용할 수 있습니다.');
+      return;
+    }
+
+    if (isServiceAdminSrc(src) && !isServiceAdminRole()) {
+      alert('서비스 관리자만 접근할 수 있습니다.');
       return;
     }
 
