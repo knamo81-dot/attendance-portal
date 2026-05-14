@@ -127,18 +127,32 @@
       justify-content: flex-end;
       flex-wrap: wrap;
     }
-    .company-edit-row {
-      margin-top: 10px;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto auto;
-      gap: 8px;
-      align-items: center;
-    }
     .company-name {
       font-size: 15px;
       font-weight: 900;
       color: #0f172a;
       word-break: keep-all;
+    }
+    .company-title-row {
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+    }
+    .company-title-input {
+      width: min(420px, 100%);
+      height: 40px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 0 12px;
+      font-size: 14px;
+      font-weight: 800;
+      color: #0f172a;
+      background: #fff;
+      outline: none;
+    }
+    .company-title-input:focus {
+      border-color: #0f172a;
+      box-shadow: 0 0 0 3px rgba(15,23,42,.08);
     }
     .company-meta {
       margin-top: 4px;
@@ -469,22 +483,27 @@
     els.companyList.innerHTML = companies.map(company => {
       const active = company.is_active !== false;
       return `
-        <div class="company-item" data-company-row="${escapeHtml(company.id)}">
+        <div class="company-item" data-company-row="${escapeHtml(company.id)}" data-editing="false">
           <div>
-            <div class="company-name">${escapeHtml(company.company_name || '-')}</div>
+            <div class="company-title-row">
+              <div class="company-name" data-company-name-text="${escapeHtml(company.id)}">${escapeHtml(company.company_name || '-')}</div>
+              <input
+                class="company-title-input"
+                data-edit-company-name="${escapeHtml(company.id)}"
+                value="${escapeHtml(company.company_name || '')}"
+                hidden
+              >
+            </div>
             <div class="company-meta">
               <span>code: ${escapeHtml(company.company_code || '-')}</span>
               <span>id: ${escapeHtml(company.id || '-')}</span>
               <span class="badge ${active ? 'active' : 'inactive'}">${active ? '활성' : '비활성'}</span>
             </div>
-            <div class="company-edit-row" hidden data-edit-row="${escapeHtml(company.id)}">
-              <input class="input" data-edit-company-name="${escapeHtml(company.id)}" value="${escapeHtml(company.company_name || '')}">
-              <button type="button" class="btn primary" data-save-company="${escapeHtml(company.id)}">저장</button>
-              <button type="button" class="btn" data-cancel-company-edit="${escapeHtml(company.id)}">취소</button>
-            </div>
           </div>
           <div class="company-actions">
             <button type="button" class="btn" data-edit-company="${escapeHtml(company.id)}">수정</button>
+            <button type="button" class="btn primary" data-save-company="${escapeHtml(company.id)}" hidden>저장</button>
+            <button type="button" class="btn" data-cancel-company-edit="${escapeHtml(company.id)}" hidden>취소</button>
             <button
               type="button"
               class="btn ${active ? 'danger' : 'primary'}"
@@ -620,8 +639,36 @@
   }
 
   function showCompanyEdit(companyId, show) {
-    const row = document.querySelector(`[data-edit-row="${CSS.escape(companyId)}"]`);
-    if (row) row.hidden = !show;
+    const row = document.querySelector(`[data-company-row="${CSS.escape(companyId)}"]`);
+    if (!row) return;
+
+    const nameText = row.querySelector(`[data-company-name-text="${CSS.escape(companyId)}"]`);
+    const input = row.querySelector(`[data-edit-company-name="${CSS.escape(companyId)}"]`);
+    const editBtn = row.querySelector(`[data-edit-company="${CSS.escape(companyId)}"]`);
+    const saveBtn = row.querySelector(`[data-save-company="${CSS.escape(companyId)}"]`);
+    const cancelBtn = row.querySelector(`[data-cancel-company-edit="${CSS.escape(companyId)}"]`);
+    const toggleBtn = row.querySelector('[data-toggle-company]');
+    const deleteBtn = row.querySelector('[data-delete-company]');
+
+    row.dataset.editing = show ? 'true' : 'false';
+
+    if (nameText) nameText.hidden = show;
+    if (input) {
+      input.hidden = !show;
+      if (show) {
+        input.value = nameText ? nameText.textContent : input.value;
+        setTimeout(() => {
+          input.focus();
+          input.select();
+        }, 0);
+      }
+    }
+
+    if (editBtn) editBtn.hidden = show;
+    if (saveBtn) saveBtn.hidden = !show;
+    if (cancelBtn) cancelBtn.hidden = !show;
+    if (toggleBtn) toggleBtn.hidden = show;
+    if (deleteBtn) deleteBtn.hidden = show;
   }
 
   async function loadCompanyApps(companyId) {
@@ -702,6 +749,28 @@
       } catch (error) {
         console.error(error);
         setFeedback(error.message || '앱 설정을 불러오지 못했습니다.', 'error');
+      }
+    });
+
+    document.addEventListener('keydown', async (event) => {
+      const input = event.target.closest('[data-edit-company-name]');
+      if (!input) return;
+
+      const id = input.getAttribute('data-edit-company-name');
+
+      if (event.key === 'Escape') {
+        showCompanyEdit(id, false);
+        return;
+      }
+
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        try {
+          await updateCompanyName(id, input.value || '');
+        } catch (error) {
+          console.error(error);
+          setFeedback(error.message || '회사명 수정 중 오류가 발생했습니다.', 'error');
+        }
       }
     });
 
