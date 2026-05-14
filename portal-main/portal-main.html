@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal Main</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#f1f5f9;
+  color:#0f172a;
+}
+.app{
+  padding:16px;
+}
+.card{
+  background:#fff;
+  border-radius:24px;
+  padding:28px;
+  box-shadow:0 4px 18px rgba(15,23,42,.06);
+}
+.hero{
+  background:linear-gradient(135deg,#c8102e 0%,#e11d2e 100%);
+  color:#fff;
+}
+.hero-top{
+  font-size:13px;
+  opacity:.8;
+  margin-bottom:8px;
+}
+.hero-title{
+  font-size:34px;
+  font-weight:800;
+}
+.hero-sub{
+  margin-top:10px;
+  font-size:14px;
+  opacity:.9;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:16px;
+  margin-top:18px;
+}
+.quick{
+  border:1px solid #e2e8f0;
+}
+.quick-title{
+  font-size:18px;
+  font-weight:800;
+  margin-bottom:8px;
+}
+.quick-desc{
+  font-size:13px;
+  line-height:1.6;
+  color:#64748b;
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="card hero">
+    <div class="hero-top">Lab Operations Portal</div>
+    <div class="hero-title">홈</div>
+    <div class="hero-sub">연구소 운영 포털 메인 화면입니다.</div>
+  </div>
+
+  <div class="grid">
+    <div class="card quick">
+      <div class="quick-title">워크스페이스</div>
+      <div class="quick-desc">메모와 일정·예약을 통합 관리합니다.</div>
+    </div>
+
+    <div class="card quick">
+      <div class="quick-title">연구소 운영</div>
+      <div class="quick-desc">근태, 폐수, 시약 등 운영 시스템으로 이동합니다.</div>
+    </div>
+
+    <div class="card quick">
+      <div class="quick-title">통합 포털</div>
+      <div class="quick-desc">연구소 운영 데이터를 한 곳에서 관리합니다.</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
+
