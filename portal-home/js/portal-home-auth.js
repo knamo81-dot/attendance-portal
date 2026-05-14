@@ -133,6 +133,29 @@
       window.currentUserRole = null;
     }
 
+    function clearAuthInputs(options = {}) {
+      const keepEmail = options.keepEmail === true;
+      if (!keepEmail && els.loginEmail) els.loginEmail.value = '';
+      if (els.loginPassword) els.loginPassword.value = '';
+      if (els.newPassword) els.newPassword.value = '';
+      if (els.confirmPassword) els.confirmPassword.value = '';
+    }
+
+    function clearPortalStorage() {
+      try {
+        localStorage.removeItem('portalLastPage');
+        localStorage.removeItem('reagent_current_user');
+        localStorage.removeItem('portalCompanyContext');
+        localStorage.removeItem('portalSession');
+      } catch (_) {}
+      try {
+        sessionStorage.removeItem('portalLastPage');
+        sessionStorage.removeItem('reagent_current_user');
+        sessionStorage.removeItem('portalCompanyContext');
+        sessionStorage.removeItem('portalSession');
+      } catch (_) {}
+    }
+
     function showLogin(message = '') {
       document.body.classList.add('auth-loading');
       if (els.overlay) els.overlay.hidden = false;
@@ -304,6 +327,7 @@
       try {
         const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        if (els.loginPassword) els.loginPassword.value = '';
         await handleSession(data?.user || null);
       } catch (error) {
         console.error('login error:', error);
@@ -366,9 +390,17 @@
     }
 
 async function logout() {
-  await supabaseClient.auth.signOut();
+  try {
+    await supabaseClient.auth.signOut();
+  } catch (error) {
+    console.warn('logout signOut failed:', error);
+  }
+
   currentUser = null;
   clearPortalSession();
+  clearPortalStorage();
+  clearAuthInputs({ keepEmail: false });
+
   if (els.topUserBar) els.topUserBar.hidden = true;
   showLogin('로그아웃되었습니다.');
 }
