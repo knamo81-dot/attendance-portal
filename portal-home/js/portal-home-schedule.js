@@ -1,4 +1,28 @@
-/* portal-home-schedule.js | 일정 데이터/캘린더/이벤트 로직 분리 */
+/* portal-home-schedule.js | 일정 데이터/캘린더/이벤트 로직 분리 | company_id 적용 */
+
+function getPortalWorkspaceCompanyId() {
+  try {
+    const auth = (typeof portalAuth === 'function') ? portalAuth() : {};
+    const v = auth.companyId || auth.company_id || auth.company?.id || auth.profile?.company_id ||
+      window.currentCompanyId || window.portalCompanyContext?.company_id || window.portalSession?.companyId || window.portalSession?.company_id ||
+      new URLSearchParams(window.location.search).get('company_id') || '';
+    return String(v || '').trim();
+  } catch (_) {
+    try { return String(new URLSearchParams(window.location.search).get('company_id') || '').trim(); } catch (__) { return ''; }
+  }
+}
+
+function requirePortalWorkspaceCompanyId() {
+  const companyId = getPortalWorkspaceCompanyId();
+  if (!companyId) throw new Error('회사 정보(company_id)를 확인하지 못했습니다. 포탈에서 다시 로그인해 주세요.');
+  return companyId;
+}
+
+function applyCompanyFilterToQuery(query) {
+  const companyId = getPortalWorkspaceCompanyId();
+  return companyId ? query.eq('company_id', companyId) : query;
+}
+
 
 function packScheduleDescription(userText, meta) {
       const tail = SCHEDULE_META_MARK + encodeURIComponent(JSON.stringify({
@@ -79,6 +103,7 @@ function packScheduleDescription(userText, meta) {
       return {
         created_by_email: email,
         created_by_name: name,
+        company_id: requirePortalWorkspaceCompanyId(),
         schedule_date: state.selectedDate,
         title: (f.text || '').trim(),
         description: packScheduleDescription((f.description || '').trim(), {
@@ -111,13 +136,13 @@ function packScheduleDescription(userText, meta) {
           state.schedules = [];
           return;
         }
-        const { data, error } = await sb.from('portal_schedules')
+        const { data, error } = await applyCompanyFilterToQuery(sb.from('portal_schedules')
           .select('*')
           // 공개범위 필터는 scheduleRowVisibleToCurrentUser()에서 처리합니다.
           // 여기서는 월/작성자 제한 없이 전체를 가져와야 전체/연구소/팀 공개가 정상 동작합니다.
           .order('schedule_date', { ascending: true })
           .order('start_time', { ascending: true })
-          .order('id', { ascending: true });
+          .order('id', { ascending: true }));
         if (error) throw error;
         state.schedules = data || [];
       } catch (e) {
@@ -153,7 +178,8 @@ function packScheduleDescription(userText, meta) {
     async function createScheduleOnServer(payload) {
       const { sb } = portalAuth();
       if (!sb) throw new Error('로그인이 필요합니다.');
-      const row = payload || buildSchedulePayloadFromForm(false);
+      const row = { ...(payload || buildSchedulePayloadFromForm(false)) };
+      row.company_id = row.company_id || requirePortalWorkspaceCompanyId();
 
       let result = await sb.from('portal_schedules').insert([row]).select('*').single();
 
@@ -173,6 +199,7 @@ function packScheduleDescription(userText, meta) {
       const isAdmin = isPortalAdminRole();
 
       let q = sb.from('portal_schedules').update(patch).eq('id', id);
+      q = applyCompanyFilterToQuery(q);
       if (!isAdmin) q = q.eq('created_by_email', email);
       let result = await q.select('*').single();
 
@@ -180,6 +207,7 @@ function packScheduleDescription(userText, meta) {
       if (result.error && isScheduleAuthorColumnError(result.error)) {
         console.warn('신규 작성자 조직 컬럼 update 실패, 기존 컬럼으로 임시 저장:', result.error);
         let q2 = sb.from('portal_schedules').update(stripScheduleAuthorColumns(patch)).eq('id', id);
+        q2 = applyCompanyFilterToQuery(q2);
         if (!isAdmin) q2 = q2.eq('created_by_email', email);
         result = await q2.select('*').single();
       }
@@ -193,6 +221,7 @@ function packScheduleDescription(userText, meta) {
       if (!sb) throw new Error('로그인이 필요합니다.');
       const isAdmin = isPortalAdminRole();
       let q = sb.from('portal_schedules').delete().eq('id', id);
+      q = applyCompanyFilterToQuery(q);
       if (!isAdmin) q = q.eq('created_by_email', email);
       const { error } = await q;
       if (error) throw error;
@@ -1095,4 +1124,3 @@ function bindScheduleEvents() {
       populateReservationTimeSelects();
       bindReservationSlotPointer();
     }
-
