@@ -1,1 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ExeloLab Service Admin</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, "Noto Sans KR", sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .page {
+      min-height: 100vh;
+      padding: 28px;
+    }
+    .hero {
+      border-radius: 24px;
+      padding: 28px;
+      background: linear-gradient(135deg, #061f44 0%, #0f172a 58%, #158154 100%);
+      color: #fff;
+      box-shadow: 0 16px 38px rgba(15, 23, 42, 0.14);
+      margin-bottom: 20px;
+    }
+    .eyebrow {
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      color: rgba(255,255,255,.72);
+      margin-bottom: 8px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: -0.04em;
+    }
+    .hero p {
+      margin: 10px 0 0;
+      color: rgba(255,255,255,.82);
+      line-height: 1.65;
+      font-size: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 22px;
+      padding: 22px;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+      min-height: 180px;
+    }
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+    }
+    .card p {
+      margin: 0;
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.6;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+    .btn {
+      height: 38px;
+      border-radius: 12px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #0f172a;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: not-allowed;
+      opacity: .55;
+    }
+    .btn.primary {
+      background: #0f172a;
+      color: #fff;
+      border-color: #0f172a;
+    }
+    .notice {
+      margin-top: 18px;
+      border: 1px dashed #cbd5e1;
+      border-radius: 18px;
+      padding: 16px;
+      color: #64748b;
+      background: #fff;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      .page { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="eyebrow">EXELOLAB SERVICE ADMIN</div>
+      <h1>서비스 관리자</h1>
+      <p>회사 등록, 회사별 관리자 계정, 사용 앱 설정을 관리하기 위한 전용 공간입니다. 현재는 2단계 기본 화면이며, 다음 단계에서 Supabase 연동 기능을 붙입니다.</p>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>회사 관리</h2>
+        <p>회사 등록, 회사명 변경, company_code 확인, 활성/비활성 상태를 관리합니다.</p>
+        <div class="actions">
+          <button class="btn primary" type="button" disabled>회사 등록 준비중</button>
+          <button class="btn" type="button" disabled>회사 목록 준비중</button>
+        </div>
+      </article>
+      <article class="card">
+        <h2>회사별 관리자</h2>
+        <p>각 회사의 최초 관리자 계정 생성과 company_id 연결을 관리합니다.</p>
+        <div class="actions">
+          <button class="btn primary" type="button" disabled>관리자 생성 준비중</button>
+        </div>
+      </article>
+      <article class="card">
+        <h2>앱 사용 설정</h2>
+        <p>근태, 폐수, 시약·초자, 인력운영 등 회사별 사용 앱을 켜고 끄는 영역입니다.</p>
+        <div class="actions">
+          <button class="btn primary" type="button" disabled>앱 설정 준비중</button>
+        </div>
+      </article>
+    </section>
+
+    <div class="notice">
+      다음 단계에서는 <strong>companies</strong>, <strong>users</strong>, 회사별 앱 설정 테이블을 연결해 실제 등록·수정 기능을 추가합니다.
+    </div>
+  </main>
+</body>
+</html>
 
