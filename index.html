@@ -394,11 +394,11 @@
       <p>연구소 통합 운영 포탈에 접속하려면 계정으로 로그인해 주세요.</p>
       <div class="auth-field">
         <label for="loginEmail">이메일</label>
-        <input id="loginEmail" type="email" autocomplete="username" placeholder="email@example.com" />
+        <input id="loginEmail" type="email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="email@example.com" />
       </div>
       <div class="auth-field">
         <label for="loginPassword">비밀번호</label>
-        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="비밀번호" />
+        <input id="loginPassword" type="password" autocomplete="new-password" placeholder="비밀번호" />
       </div>
       <button id="loginButton" type="button" class="auth-button">로그인</button>
       <div id="loginError" class="auth-message error"></div>
@@ -543,6 +543,24 @@
     target.classList.toggle('show', !!message);
   }
 
+
+  function clearLoginInputs(options = {}) {
+    const keepEmail = options.keepEmail === true;
+
+    if (!keepEmail && els.loginEmail) {
+      els.loginEmail.value = '';
+      els.loginEmail.defaultValue = '';
+      els.loginEmail.setAttribute('autocomplete', 'off');
+    }
+
+    [els.loginPassword, els.newPassword, els.confirmPassword].forEach(function (field) {
+      if (!field) return;
+      field.value = '';
+      field.defaultValue = '';
+      field.setAttribute('autocomplete', 'new-password');
+    });
+  }
+
   function roleLabel(role) {
     if (role === 'admin') return '관리자';
     if (role === 'operator') return '운영자';
@@ -612,6 +630,10 @@
 
   function showLogin(message = '') {
     document.body.classList.add('auth-loading');
+    clearLoginInputs();
+    setTimeout(() => clearLoginInputs(), 80);
+    setTimeout(() => clearLoginInputs(), 350);
+    setTimeout(() => clearLoginInputs(), 800);
     if (els.overlay) els.overlay.hidden = false;
     if (els.loginCard) els.loginCard.hidden = false;
     if (els.passwordCard) els.passwordCard.hidden = true;
@@ -858,6 +880,7 @@
 
       const ok = await loadUserContext(data?.user || null);
       if (!ok) return;
+      clearLoginInputs();
 
       if (currentProfile?.must_change_password) {
         showPasswordChange('');
@@ -932,9 +955,13 @@
     localStorage.removeItem(LAST_PAGE_KEY);
     try { localStorage.removeItem('reagent_current_user'); } catch (_) {}
     clearPortalSession();
+    clearLoginInputs();
     replacePortalFrame(HOME_SRC);
     if (homeBtn) setActiveNav(homeBtn);
     showLogin('로그아웃되었습니다.');
+    setTimeout(() => clearLoginInputs(), 80);
+    setTimeout(() => clearLoginInputs(), 350);
+    setTimeout(() => clearLoginInputs(), 800);
   }
 
   function bindEvents() {
