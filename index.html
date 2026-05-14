@@ -93,8 +93,14 @@
       transform: translateY(-1px);
       box-shadow: 0 12px 26px rgba(15,23,42,0.26);
     }
-    .nav-btn.service-admin-btn[hidden] {
-      display: none !important;
+    .nav-btn.service-admin-btn.disabled {
+      opacity: 0.62;
+      cursor: default;
+      box-shadow: 0 4px 14px rgba(15,23,42,0.16);
+    }
+    .nav-btn.service-admin-btn.disabled:hover {
+      transform: none;
+      box-shadow: 0 4px 14px rgba(15,23,42,0.16);
     }
     .nav-btn.nav-btn--soon {
       cursor: not-allowed;
@@ -416,7 +422,7 @@
         <div class="nav-group">
           <button type="button" id="settingsNavBtn" class="nav-btn" data-portal-src="settings.html" title="설정">설정</button>
           <button type="button" id="logoutNavBtn" class="nav-btn" title="로그아웃 안내">종료</button>
-          <button type="button" id="serviceAdminBtn" class="nav-btn service-admin-btn" data-portal-src="service-admin.html" title="서비스 관리자" hidden>
+          <button type="button" id="serviceAdminBtn" class="nav-btn service-admin-btn" data-portal-src="service-admin.html" title="서비스 관리자">
 <svg
   class="service-admin-svg"
   viewBox="0 0 120 120"
@@ -634,7 +640,19 @@
 
   function updateServiceAdminButtonVisibility() {
     if (!els.serviceAdminBtn) return;
-    els.serviceAdminBtn.hidden = !isServiceAdminRole();
+    const allowed = isServiceAdminRole();
+
+    // EL 심볼은 항상 표시하되, service_admin만 실제 서비스관리자 페이지 접근 가능
+    els.serviceAdminBtn.hidden = false;
+    els.serviceAdminBtn.classList.toggle('disabled', !allowed);
+    els.serviceAdminBtn.setAttribute(
+      'title',
+      allowed ? '서비스 관리자' : '서비스 관리자 전용 메뉴'
+    );
+    els.serviceAdminBtn.setAttribute(
+      'aria-disabled',
+      allowed ? 'false' : 'true'
+    );
   }
 
   function isServiceAdminSrc(src) {
@@ -928,7 +946,7 @@
     }
 
     if (isServiceAdminSrc(src) && !isServiceAdminRole()) {
-      alert('서비스 관리자만 접근할 수 있습니다.');
+      alert('서비스 관리자 전용 메뉴입니다.');
       return;
     }
 
