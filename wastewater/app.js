@@ -171,7 +171,19 @@ function readPortalUserFromQuery(){
     const params=new URLSearchParams(location.search);
     const email=params.get('portalEmail')||params.get('portal_email')||params.get('userEmail')||params.get('email')||'';
     const name=params.get('portalName')||params.get('name')||'';
-    if(email) return {email,name};
+    const companyId=params.get('company_id')||params.get('companyId')||'';
+    const companyCode=params.get('company_code')||params.get('companyCode')||'';
+    const companyName=params.get('company_name')||params.get('companyName')||'';
+    if(email){
+      window.portalSession = {
+        ...(window.portalSession || {}),
+        email,name,
+        companyId, company_id:companyId,
+        companyCode, company_code:companyCode,
+        companyName, company_name:companyName
+      };
+      return {email,name,company_id:companyId};
+    }
   }catch(e){}
   return null;
 }
@@ -196,8 +208,22 @@ function waitForPortalUserMessage(timeout=300){
       const data=event.data||{};
       if(data?.type==='portal-auth' || data?.type==='PORTAL_AUTH_USER'){
         const payload=data.user||data.payload||data;
+        const companyPayload=data.company||payload.company||{};
         const email=payload?.email||'';
-        if(email) finish({email, name: payload?.name||''});
+        if(email){
+          window.portalSession = {
+            ...(window.portalSession || {}),
+            user: payload,
+            email,
+            name: payload?.name || '',
+            role: payload?.role || window.portalSession?.role || '',
+            companyId: payload?.company_id || payload?.companyId || companyPayload?.id || companyPayload?.company_id || '',
+            company_id: payload?.company_id || payload?.companyId || companyPayload?.id || companyPayload?.company_id || '',
+            companyCode: payload?.company_code || payload?.companyCode || companyPayload?.company_code || companyPayload?.code || '',
+            companyName: payload?.company_name || payload?.companyName || companyPayload?.company_name || companyPayload?.name || ''
+          };
+          finish({email, name: payload?.name||'', company_id: window.portalSession.companyId});
+        }
       }
     };
     const timer=setTimeout(()=>finish(null), timeout);
@@ -221,6 +247,21 @@ async function init(){
   applyUrlState();
   user = await resolvePortalUser();
   if(!user?.email) return renderPortalAccessRequired();
+
+  try{
+    if(window.parent && typeof window.parent.getPortalSession === 'function'){
+      const parentSession = window.parent.getPortalSession();
+      if(parentSession){
+        window.portalSession = {
+          ...(window.portalSession || {}),
+          ...parentSession,
+          companyId: parentSession.companyId || parentSession.company_id || parentSession.company?.id || '',
+          company_id: parentSession.companyId || parentSession.company_id || parentSession.company?.id || ''
+        };
+      }
+    }
+  }catch(e){}
+
   await loadMyRoles();
   // 권한이 없어도 폐수 프로그램은 조회 전용으로 접근 허용합니다.
   // 관리자 기능만 숨기고, 저장/삭제/결재 버튼은 역할별로 제어합니다.
