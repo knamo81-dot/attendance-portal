@@ -18,8 +18,9 @@
     }
     .grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: 1.05fr .95fr;
       gap: 16px;
+      align-items: start;
     }
     .card {
       background: #fff;
@@ -27,7 +28,6 @@
       border-radius: 22px;
       padding: 22px;
       box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
-      min-height: 180px;
     }
     .card h2 {
       margin: 0 0 8px;
@@ -41,14 +41,38 @@
       color: #64748b;
       line-height: 1.6;
     }
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 18px;
+    .form {
+      display: grid;
+      grid-template-columns: 1fr 180px auto;
+      gap: 10px;
+      margin-top: 16px;
+      align-items: end;
+    }
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+    .field label {
+      font-size: 12px;
+      font-weight: 800;
+      color: #475569;
+    }
+    .input, .select {
+      height: 40px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 0 12px;
+      font-size: 13px;
+      color: #0f172a;
+      background: #fff;
+      outline: none;
+    }
+    .input:focus, .select:focus {
+      border-color: #0f172a;
+      box-shadow: 0 0 0 3px rgba(15,23,42,.08);
     }
     .btn {
-      height: 38px;
+      height: 40px;
       border-radius: 12px;
       border: 1px solid #cbd5e1;
       background: #fff;
@@ -56,26 +80,171 @@
       padding: 0 14px;
       font-size: 13px;
       font-weight: 800;
-      cursor: not-allowed;
-      opacity: .55;
+      cursor: pointer;
+      white-space: nowrap;
     }
     .btn.primary {
       background: #0f172a;
       color: #fff;
       border-color: #0f172a;
     }
-    .notice {
-      margin-top: 18px;
-      border: 1px dashed #cbd5e1;
-      border-radius: 18px;
-      padding: 16px;
-      color: #64748b;
+    .btn.danger {
+      color: #dc2626;
+      border-color: #fecaca;
       background: #fff;
+    }
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: .5;
+    }
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin: 16px 0 10px;
+      flex-wrap: wrap;
+    }
+    .company-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .company-item {
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 14px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      background: #fff;
+    }
+    .company-name {
+      font-size: 15px;
+      font-weight: 900;
+      color: #0f172a;
+      word-break: keep-all;
+    }
+    .company-meta {
+      margin-top: 4px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: #64748b;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      height: 24px;
+      padding: 0 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #475569;
+    }
+    .badge.active {
+      background: #dcfce7;
+      border-color: #bbf7d0;
+      color: #15803d;
+    }
+    .badge.inactive {
+      background: #f1f5f9;
+      color: #64748b;
+    }
+    .apps {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .app-row {
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 13px 14px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      background: #fff;
+    }
+    .app-name {
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .toggle {
+      position: relative;
+      width: 50px;
+      height: 28px;
+      border-radius: 999px;
+      border: none;
+      background: #cbd5e1;
+      cursor: pointer;
+      transition: .15s ease;
+      flex: 0 0 auto;
+    }
+    .toggle::after {
+      content: "";
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      background: #fff;
+      transition: .15s ease;
+      box-shadow: 0 2px 6px rgba(0,0,0,.18);
+    }
+    .toggle.on {
+      background: #0f172a;
+    }
+    .toggle.on::after {
+      left: 26px;
+    }
+    .notice, .feedback {
+      margin-top: 16px;
+      border-radius: 16px;
+      padding: 14px 16px;
       font-size: 13px;
       line-height: 1.65;
     }
-    @media (max-width: 900px) {
+    .notice {
+      border: 1px dashed #cbd5e1;
+      color: #64748b;
+      background: #fff;
+    }
+    .feedback {
+      display: none;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #475569;
+      font-weight: 700;
+    }
+    .feedback.show { display: block; }
+    .feedback.ok {
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+      color: #15803d;
+    }
+    .feedback.error {
+      border-color: #fecaca;
+      background: #fef2f2;
+      color: #b91c1c;
+    }
+    .empty {
+      padding: 24px;
+      text-align: center;
+      color: #94a3b8;
+      border: 1px dashed #cbd5e1;
+      border-radius: 16px;
+      background: #fff;
+      font-size: 13px;
+    }
+    @media (max-width: 1100px) {
       .grid { grid-template-columns: 1fr; }
+      .form { grid-template-columns: 1fr; }
       .page { padding: 18px; }
     }
   </style>
@@ -86,30 +255,425 @@
       <article class="card">
         <h2>회사 관리</h2>
         <p>회사 등록, 회사명 변경, company_code 확인, 활성/비활성 상태를 관리합니다.</p>
-        <div class="actions">
-          <button class="btn primary" type="button" disabled>회사 등록 준비중</button>
-          <button class="btn" type="button" disabled>회사 목록 준비중</button>
+
+        <div class="form">
+          <div class="field">
+            <label for="companyNameInput">회사명</label>
+            <input id="companyNameInput" class="input" placeholder="예: 삼천당제약" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="companyCodeInput">회사코드</label>
+            <input id="companyCodeInput" class="input" placeholder="예: SCD-01" autocomplete="off">
+          </div>
+          <button id="createCompanyBtn" class="btn primary" type="button">회사 등록</button>
+        </div>
+
+        <div class="toolbar">
+          <div class="badge" id="companyCountBadge">회사 0개</div>
+          <button id="refreshCompaniesBtn" class="btn" type="button">새로고침</button>
+        </div>
+
+        <div id="companyList" class="company-list">
+          <div class="empty">회사 목록을 불러오는 중입니다.</div>
         </div>
       </article>
-      <article class="card">
-        <h2>회사별 관리자</h2>
-        <p>각 회사의 최초 관리자 계정 생성과 company_id 연결을 관리합니다.</p>
-        <div class="actions">
-          <button class="btn primary" type="button" disabled>관리자 생성 준비중</button>
-        </div>
-      </article>
+
       <article class="card">
         <h2>앱 사용 설정</h2>
-        <p>근태, 폐수, 시약·초자, 인력운영 등 회사별 사용 앱을 켜고 끄는 영역입니다.</p>
-        <div class="actions">
-          <button class="btn primary" type="button" disabled>앱 설정 준비중</button>
+        <p>선택한 회사에서 사용할 앱을 켜고 끕니다. 저장 즉시 company_apps 테이블에 반영됩니다.</p>
+
+        <div class="field" style="margin-top:16px;">
+          <label for="selectedCompanySelect">회사 선택</label>
+          <select id="selectedCompanySelect" class="select">
+            <option value="">회사 선택</option>
+          </select>
+        </div>
+
+        <div id="appsWrap" class="apps">
+          <div class="empty">회사를 선택하면 앱 설정이 표시됩니다.</div>
+        </div>
+
+        <div class="notice">
+          현재 1차 활성화 범위는 <strong>회사 등록</strong>, <strong>회사 목록 조회</strong>, <strong>회사 활성/비활성</strong>, <strong>앱 ON/OFF</strong>입니다.
         </div>
       </article>
     </section>
 
-    <div class="notice">
-      다음 단계에서는 <strong>companies</strong>, <strong>users</strong>, 회사별 앱 설정 테이블을 연결해 실제 등록·수정 기능을 추가합니다.
-    </div>
+    <section class="card" style="margin-top:16px;">
+      <h2>회사별 관리자</h2>
+      <p>각 회사의 최초 관리자 계정 생성과 company_id 연결은 다음 단계에서 Auth 생성 방식 확정 후 연결합니다.</p>
+      <div class="notice">
+        Supabase Auth 유저 생성은 보안상 보통 서버/API 또는 Supabase 관리자 화면에서 처리하는 것이 안전합니다. 다음 단계에서 “Auth는 수동 생성 + users 테이블 연결” 방식으로 먼저 붙이는 것을 추천합니다.
+      </div>
+    </section>
+
+    <div id="feedback" class="feedback"></div>
   </main>
+
+<script>
+(function () {
+  'use strict';
+
+  const DEFAULT_APPS = [
+    { app_key: 'portal-home', app_name: '워크스페이스' },
+    { app_key: 'attendance', app_name: '근태' },
+    { app_key: 'wastewater', app_name: '폐수' },
+    { app_key: 'reagent', app_name: '시약·초자' },
+    { app_key: 'research-staff', app_name: '인력운영' }
+  ];
+
+  const els = {
+    companyNameInput: document.getElementById('companyNameInput'),
+    companyCodeInput: document.getElementById('companyCodeInput'),
+    createCompanyBtn: document.getElementById('createCompanyBtn'),
+    refreshCompaniesBtn: document.getElementById('refreshCompaniesBtn'),
+    companyList: document.getElementById('companyList'),
+    companyCountBadge: document.getElementById('companyCountBadge'),
+    selectedCompanySelect: document.getElementById('selectedCompanySelect'),
+    appsWrap: document.getElementById('appsWrap'),
+    feedback: document.getElementById('feedback')
+  };
+
+  let companies = [];
+  let selectedCompanyId = '';
+
+  function getParentSession() {
+    try {
+      if (window.parent && typeof window.parent.getPortalSession === 'function') {
+        return window.parent.getPortalSession();
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function getSupabaseClient() {
+    const session = getParentSession();
+    if (session && session.supabase) return session.supabase;
+
+    try {
+      if (window.parent && window.parent.portalSupabase) return window.parent.portalSupabase;
+    } catch (_) {}
+
+    return window.portalSupabase || null;
+  }
+
+  function isServiceAdmin() {
+    const session = getParentSession();
+    const role = String(session?.role || session?.profile?.role || '').trim();
+    return role === 'service_admin';
+  }
+
+  function sb() {
+    const client = getSupabaseClient();
+    if (!client) throw new Error('Supabase 연결을 찾지 못했습니다. 포탈 안에서 다시 열어주세요.');
+    return client;
+  }
+
+  function setFeedback(message, type = '') {
+    if (!els.feedback) return;
+    els.feedback.textContent = message || '';
+    els.feedback.className = 'feedback' + (message ? ' show' : '') + (type ? ' ' + type : '');
+  }
+
+  function normalizeCode(value) {
+    return String(value || '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^A-Za-z0-9_-]/g, '')
+      .toUpperCase();
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (m) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+    }[m]));
+  }
+
+  function assertServiceAdmin() {
+    if (!isServiceAdmin()) {
+      throw new Error('서비스 관리자 권한이 필요합니다.');
+    }
+  }
+
+  async function ensureCompanyApps(companyId) {
+    const rows = DEFAULT_APPS.map(app => ({
+      company_id: companyId,
+      app_key: app.app_key,
+      app_name: app.app_name,
+      is_enabled: true
+    }));
+
+    const { error } = await sb()
+      .from('company_apps')
+      .upsert(rows, { onConflict: 'company_id,app_key' });
+
+    if (error) throw error;
+  }
+
+  async function loadCompanies() {
+    assertServiceAdmin();
+    setFeedback('회사 목록을 불러오는 중입니다.', '');
+
+    const { data, error } = await sb()
+      .from('companies')
+      .select('id, company_name, company_code, is_active, created_at')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    companies = data || [];
+    renderCompanies();
+    renderCompanySelect();
+
+    if (selectedCompanyId) {
+      await loadCompanyApps(selectedCompanyId);
+    }
+
+    setFeedback('회사 목록을 불러왔습니다.', 'ok');
+  }
+
+  function renderCompanies() {
+    els.companyCountBadge.textContent = '회사 ' + companies.length + '개';
+
+    if (!companies.length) {
+      els.companyList.innerHTML = '<div class="empty">등록된 회사가 없습니다.</div>';
+      return;
+    }
+
+    els.companyList.innerHTML = companies.map(company => {
+      const active = company.is_active !== false;
+      return `
+        <div class="company-item">
+          <div>
+            <div class="company-name">${escapeHtml(company.company_name || '-')}</div>
+            <div class="company-meta">
+              <span>code: ${escapeHtml(company.company_code || '-')}</span>
+              <span>id: ${escapeHtml(company.id || '-')}</span>
+              <span class="badge ${active ? 'active' : 'inactive'}">${active ? '활성' : '비활성'}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="btn ${active ? 'danger' : 'primary'}"
+            data-toggle-company="${escapeHtml(company.id)}"
+            data-next-active="${active ? 'false' : 'true'}"
+          >
+            ${active ? '비활성화' : '활성화'}
+          </button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderCompanySelect() {
+    els.selectedCompanySelect.innerHTML =
+      '<option value="">회사 선택</option>' +
+      companies.map(company => `
+        <option value="${escapeHtml(company.id)}" ${company.id === selectedCompanyId ? 'selected' : ''}>
+          ${escapeHtml(company.company_name || '-')} (${escapeHtml(company.company_code || '-')})
+        </option>
+      `).join('');
+  }
+
+  async function createCompany() {
+    assertServiceAdmin();
+
+    const name = String(els.companyNameInput.value || '').trim();
+    const code = normalizeCode(els.companyCodeInput.value || '');
+
+    if (!name) {
+      setFeedback('회사명을 입력해 주세요.', 'error');
+      return;
+    }
+
+    if (!code) {
+      setFeedback('회사코드를 입력해 주세요. 예: SCD-01', 'error');
+      return;
+    }
+
+    els.createCompanyBtn.disabled = true;
+    setFeedback('회사를 등록하는 중입니다.', '');
+
+    try {
+      const { data, error } = await sb()
+        .from('companies')
+        .insert({
+          company_name: name,
+          company_code: code,
+          is_active: true
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+
+      await ensureCompanyApps(data.id);
+
+      els.companyNameInput.value = '';
+      els.companyCodeInput.value = '';
+      selectedCompanyId = data.id;
+
+      await loadCompanies();
+      await loadCompanyApps(selectedCompanyId);
+
+      setFeedback('회사 등록이 완료되었습니다.', 'ok');
+    } catch (error) {
+      console.error(error);
+      setFeedback(error.message || '회사 등록 중 오류가 발생했습니다.', 'error');
+    } finally {
+      els.createCompanyBtn.disabled = false;
+    }
+  }
+
+  async function toggleCompanyActive(companyId, nextActive) {
+    assertServiceAdmin();
+    setFeedback('회사 상태를 변경하는 중입니다.', '');
+
+    const { error } = await sb()
+      .from('companies')
+      .update({ is_active: nextActive })
+      .eq('id', companyId);
+
+    if (error) throw error;
+
+    await loadCompanies();
+    setFeedback('회사 상태를 변경했습니다.', 'ok');
+  }
+
+  async function loadCompanyApps(companyId) {
+    assertServiceAdmin();
+
+    if (!companyId) {
+      els.appsWrap.innerHTML = '<div class="empty">회사를 선택하면 앱 설정이 표시됩니다.</div>';
+      return;
+    }
+
+    await ensureCompanyApps(companyId);
+
+    const { data, error } = await sb()
+      .from('company_apps')
+      .select('id, company_id, app_key, app_name, is_enabled')
+      .eq('company_id', companyId)
+      .order('app_key', { ascending: true });
+
+    if (error) throw error;
+
+    renderApps(data || []);
+  }
+
+  function renderApps(apps) {
+    if (!apps.length) {
+      els.appsWrap.innerHTML = '<div class="empty">앱 설정이 없습니다.</div>';
+      return;
+    }
+
+    const order = DEFAULT_APPS.map(a => a.app_key);
+    apps.sort((a, b) => order.indexOf(a.app_key) - order.indexOf(b.app_key));
+
+    els.appsWrap.innerHTML = apps.map(app => `
+      <div class="app-row">
+        <div>
+          <div class="app-name">${escapeHtml(app.app_name || app.app_key)}</div>
+          <div class="company-meta">key: ${escapeHtml(app.app_key)}</div>
+        </div>
+        <button
+          type="button"
+          class="toggle ${app.is_enabled ? 'on' : ''}"
+          data-toggle-app="${escapeHtml(app.id)}"
+          data-next-enabled="${app.is_enabled ? 'false' : 'true'}"
+          aria-label="${escapeHtml(app.app_name || app.app_key)} 사용 설정"
+        ></button>
+      </div>
+    `).join('');
+  }
+
+  async function toggleAppEnabled(appId, nextEnabled) {
+    assertServiceAdmin();
+    setFeedback('앱 사용 설정을 저장하는 중입니다.', '');
+
+    const { error } = await sb()
+      .from('company_apps')
+      .update({ is_enabled: nextEnabled, updated_at: new Date().toISOString() })
+      .eq('id', appId);
+
+    if (error) throw error;
+
+    await loadCompanyApps(selectedCompanyId);
+    setFeedback('앱 사용 설정을 저장했습니다.', 'ok');
+  }
+
+  function bindEvents() {
+    els.createCompanyBtn.addEventListener('click', () => createCompany());
+    els.refreshCompaniesBtn.addEventListener('click', () => {
+      loadCompanies().catch(error => {
+        console.error(error);
+        setFeedback(error.message || '새로고침 중 오류가 발생했습니다.', 'error');
+      });
+    });
+
+    els.companyCodeInput.addEventListener('input', () => {
+      const pos = els.companyCodeInput.selectionStart;
+      els.companyCodeInput.value = normalizeCode(els.companyCodeInput.value);
+      try { els.companyCodeInput.setSelectionRange(pos, pos); } catch (_) {}
+    });
+
+    els.selectedCompanySelect.addEventListener('change', async () => {
+      selectedCompanyId = els.selectedCompanySelect.value || '';
+      try {
+        await loadCompanyApps(selectedCompanyId);
+      } catch (error) {
+        console.error(error);
+        setFeedback(error.message || '앱 설정을 불러오지 못했습니다.', 'error');
+      }
+    });
+
+    document.addEventListener('click', async (event) => {
+      const companyBtn = event.target.closest('[data-toggle-company]');
+      if (companyBtn) {
+        const id = companyBtn.getAttribute('data-toggle-company');
+        const next = companyBtn.getAttribute('data-next-active') === 'true';
+        try {
+          await toggleCompanyActive(id, next);
+        } catch (error) {
+          console.error(error);
+          setFeedback(error.message || '회사 상태 변경 중 오류가 발생했습니다.', 'error');
+        }
+        return;
+      }
+
+      const appBtn = event.target.closest('[data-toggle-app]');
+      if (appBtn) {
+        const id = appBtn.getAttribute('data-toggle-app');
+        const next = appBtn.getAttribute('data-next-enabled') === 'true';
+        try {
+          await toggleAppEnabled(id, next);
+        } catch (error) {
+          console.error(error);
+          setFeedback(error.message || '앱 설정 저장 중 오류가 발생했습니다.', 'error');
+        }
+      }
+    });
+  }
+
+  async function boot() {
+    bindEvents();
+
+    if (!isServiceAdmin()) {
+      document.body.innerHTML = '<main class="page"><div class="empty">서비스 관리자 권한이 필요합니다.</div></main>';
+      return;
+    }
+
+    try {
+      await loadCompanies();
+    } catch (error) {
+      console.error(error);
+      setFeedback(error.message || '서비스 관리자 정보를 불러오지 못했습니다.', 'error');
+      els.companyList.innerHTML = '<div class="empty">회사 목록을 불러오지 못했습니다.</div>';
+    }
+  }
+
+  boot();
+})();
+</script>
 </body>
 </html>
