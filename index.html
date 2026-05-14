@@ -420,7 +420,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
         <div class="nav-group">
           <button type="button" id="settingsNavBtn" class="nav-btn" data-portal-src="settings.html" title="설정">설정</button>
           <button type="button" id="logoutNavBtn" class="nav-btn" title="로그아웃 안내">종료</button>
-          <button type="button" id="serviceAdminBtn" class="nav-btn service-admin-btn" data-portal-src="service-admin.html" title="ExeloLab" aria-label="ExeloLab">
+          <button type="button" id="serviceAdminBtn" class="nav-btn service-admin-btn" data-portal-src="service-admin/service-admin.html" title="ExeloLab" aria-label="ExeloLab">
 <svg
   class="service-admin-svg"
   viewBox="0 0 120 120"
@@ -590,7 +590,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
       desc: '사용자, 권한, 포탈 설정을 관리합니다.',
       gradient: 'linear-gradient(135deg, #475569 0%, #0f172a 100%)'
     },
-    'service-admin.html': {
+    'service-admin/service-admin.html': {
       top: 'ExeloLab Service Admin',
       title: '서비스 관리자',
       desc: '회사 등록과 서비스 운영 설정을 관리합니다.',
@@ -653,7 +653,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
   }
 
   function isServiceAdminSrc(src) {
-    return normalizePortalSrc(src) === 'service-admin.html';
+    return normalizePortalSrc(src) === 'service-admin/service-admin.html';
   }
 
 
