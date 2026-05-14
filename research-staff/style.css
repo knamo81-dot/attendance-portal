@@ -1540,3 +1540,90 @@ th:first-child {
     width: 100%;
   }
 }
+
+
+/* ===== Portal shell compact top controls ===== */
+.tabs-row {
+  margin: 0 0 12px;
+  align-items: center;
+  gap: 10px;
+}
+
+.tabs {
+  gap: 6px;
+}
+
+.tab-btn {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 13px;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.top-actions .org-filter-row {
+  margin: 0;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.top-actions .org-filter-group {
+  height: 40px;
+  border-radius: 11px;
+}
+
+.top-actions .org-filter-group select {
+  height: 30px;
+}
+
+.org-filter-row {
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  .tabs-row {
+    align-items: flex-start;
+  }
+
+  .top-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .tabs-row {
+    display: block;
+  }
+
+  .top-actions {
+    margin-top: 10px;
+  }
+
+  .top-actions .org-filter-row {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .top-actions .org-filter-group {
+    flex: 1 1 180px;
+  }
+
+  .top-actions .org-filter-group select {
+    width: 100%;
+  }
+}
