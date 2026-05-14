@@ -28,25 +28,26 @@
           <span>기준년월</span>
           <input id="referenceMonth" type="month" />
         </div>
+
+        <div class="org-filter-row" aria-label="조직 조회 필터">
+          <div class="org-filter-group">
+            <label for="filterDivision">본부</label>
+            <select id="filterDivision">
+              <option value="">전체 본부</option>
+            </select>
+          </div>
+          <div class="org-filter-group">
+            <label for="filterTeam">팀</label>
+            <select id="filterTeam">
+              <option value="">전체 팀</option>
+            </select>
+          </div>
+        </div>
+
         <div class="leave-toggle" title="휴직자 포함 여부">
           <button class="leave-toggle-btn active" data-leave-mode="exclude" type="button">휴직 제외</button>
           <button class="leave-toggle-btn" data-leave-mode="include" type="button">휴직 포함</button>
         </div>
-      </div>
-    </section>
-
-    <section class="org-filter-row" aria-label="조직 조회 필터">
-      <div class="org-filter-group">
-        <label for="filterDivision">본부</label>
-        <select id="filterDivision">
-          <option value="">전체 본부</option>
-        </select>
-      </div>
-      <div class="org-filter-group">
-        <label for="filterTeam">팀</label>
-        <select id="filterTeam">
-          <option value="">전체 팀</option>
-        </select>
       </div>
     </section>
 
