@@ -6,18 +6,16 @@
   <title>인력운영현황</title>
   <link rel="stylesheet" href="./style.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    #connectionStatus[hidden] {
+      display: none !important;
+    }
+  </style>
 </head>
 <body>
   <main class="app">
-    <section class="hero">
-      <div>
-        <p class="eyebrow">Integrated Operations Platform</p>
-        <h1>인력운영현황</h1>
-      </div>
-      <div class="hero-right">
-        <span id="connectionStatus" class="status-pill muted">서버 연결 대기</span>
-      </div>
-    </section>
+    <span id="connectionStatus" class="status-pill muted" hidden>서버 연결 대기</span>
 
     <section class="tabs-row">
       <div class="tabs">
