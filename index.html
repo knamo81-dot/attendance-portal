@@ -90,17 +90,99 @@
       min-width: 0;
       height: auto;
       overflow: hidden;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 16px;
     }
+
+    .portal-common-header {
+      width: 100%;
+      min-height: 112px;
+      border-radius: 26px;
+      padding: 22px 30px;
+      color: #fff;
+      box-shadow: 0 10px 28px rgba(15,23,42,.14);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      background: linear-gradient(135deg, #c8102e 0%, #e11d2e 100%);
+      transition: background .25s ease;
+    }
+
+    .portal-common-header .header-left {
+      min-width: 0;
+    }
+
+    .portal-common-header .header-top {
+      font-size: 13px;
+      font-weight: 700;
+      color: rgba(255,255,255,.76);
+      margin-bottom: 6px;
+      letter-spacing: .02em;
+    }
+
+    .portal-common-header .header-title {
+      font-size: 32px;
+      line-height: 1.15;
+      font-weight: 800;
+      letter-spacing: -.04em;
+      margin-bottom: 6px;
+    }
+
+    .portal-common-header .header-desc {
+      font-size: 13px;
+      line-height: 1.6;
+      color: rgba(255,255,255,.88);
+    }
+
+    .portal-common-header .header-right {
+      text-align: right;
+      align-self: flex-end;
+      padding-bottom: 2px;
+      flex: 0 0 auto;
+    }
+
+    .portal-common-header .header-slogan {
+      font-size: 13px;
+      font-weight: 700;
+      color: rgba(255,255,255,.9);
+      line-height: 1.6;
+      white-space: nowrap;
+    }
+
+    .portal-common-header .header-powered {
+      margin-top: 4px;
+      font-size: 11px;
+      letter-spacing: .04em;
+      color: rgba(255,255,255,.72);
+      white-space: nowrap;
+    }
+
     #portalFrame {
-  width: 100%;
-  min-height: calc(100vh - 32px);
-  height: auto;   /* ← 이걸로 변경 */
-  border: none;
-  border-radius: 22px;
-  background: #fff;
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
-  display: block;
-}
+      width: 100%;
+      min-height: calc(100vh - 160px);
+      height: auto;
+      border: none;
+      border-radius: 22px;
+      background: #fff;
+      box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+      display: block;
+    }
+
+    @media (max-width: 820px) {
+      .portal-common-header {
+        flex-direction: column;
+        justify-content: flex-start;
+        min-height: 132px;
+      }
+
+      .portal-common-header .header-right {
+        width: 100%;
+        text-align: left;
+        align-self: flex-start;
+      }
+    }
   </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -127,6 +209,17 @@
         </div>
       </div>
       <div class="portal-main">
+        <div id="portalCommonHeader" class="portal-common-header">
+          <div class="header-left">
+            <div id="portalHeaderTop" class="header-top">Integrated Operations Platform</div>
+            <div id="portalHeaderTitle" class="header-title">통합 운영 플랫폼</div>
+            <div id="portalHeaderDesc" class="header-desc">운영 시스템과 업무 환경을 하나의 포탈에서 통합 관리합니다.</div>
+          </div>
+          <div class="header-right">
+            <div class="header-slogan">Work smarter. Think deeper.</div>
+            <div class="header-powered">powered by ExeloLab</div>
+          </div>
+        </div>
         <iframe id="portalFrame" title="포털 본문" src="portal-main/portal-main.html"></iframe>
       </div>
     </div>
@@ -145,6 +238,69 @@
   const homeBtn = document.getElementById('homeNavBtn');
 
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const portalHeaderMeta = {
+    'portal-main/portal-main.html': {
+      top: 'Integrated Operations Platform',
+      title: '통합 운영 플랫폼',
+      desc: '운영 시스템과 업무 환경을 하나의 포탈에서 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #c8102e 0%, #e11d2e 100%)'
+    },
+    'portal-home/portal-home.html': {
+      top: 'Integrated Operations Platform',
+      title: '워크스페이스',
+      desc: '메모와 일정·예약을 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)'
+    },
+    'wastewater/index.html': {
+      top: 'Operations Management',
+      title: '폐수 운영일지',
+      desc: '폐수 배출시설 운영 기록과 수거 내역을 관리합니다.',
+      gradient: 'linear-gradient(135deg, #047857 0%, #14b8a6 100%)'
+    },
+    'attendance.html': {
+      top: 'Workforce Analytics',
+      title: '근태관리',
+      desc: '출퇴근, 연장근무, 누락 데이터를 분석합니다.',
+      gradient: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)'
+    },
+    'research-staff/index.html': {
+      top: 'Organization Management',
+      title: '인력운영현황',
+      desc: '조직과 인력 운영 현황을 확인합니다.',
+      gradient: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)'
+    },
+    'reagent/index.html': {
+      top: 'Resource Management',
+      title: '시약·초자',
+      desc: '제품 신청, 취합, 정리 업무를 관리합니다.',
+      gradient: 'linear-gradient(135deg, #173a7a 0%, #2251a3 100%)'
+    },
+    'settings.html': {
+      top: 'Portal Settings',
+      title: '설정',
+      desc: '사용자, 권한, 포탈 설정을 관리합니다.',
+      gradient: 'linear-gradient(135deg, #475569 0%, #0f172a 100%)'
+    }
+  };
+
+  function normalizePortalSrc(src) {
+    return String(src || '').split('?')[0];
+  }
+
+  function updatePortalHeader(src) {
+    const key = normalizePortalSrc(src);
+    const meta = portalHeaderMeta[key] || portalHeaderMeta[HOME_SRC];
+    const header = document.getElementById('portalCommonHeader');
+    const top = document.getElementById('portalHeaderTop');
+    const title = document.getElementById('portalHeaderTitle');
+    const desc = document.getElementById('portalHeaderDesc');
+
+    if (header && meta.gradient) header.style.background = meta.gradient;
+    if (top) top.textContent = meta.top || '';
+    if (title) title.textContent = meta.title || '';
+    if (desc) desc.textContent = meta.desc || '';
+  }
 
   function setActiveNav(activeBtn) {
     navButtons.forEach(function (b) {
@@ -175,6 +331,8 @@
   function replacePortalFrame(src, user) {
     const main = document.querySelector('.portal-main');
     if (!main || !src) return;
+
+    updatePortalHeader(src);
 
     if (frame) {
       try {
@@ -371,6 +529,8 @@
   // - F5 또는 브라우저 새로고침: localStorage의 마지막 프로그램 유지
   const navEntry = performance.getEntriesByType('navigation')[0];
   const navType = navEntry && navEntry.type ? navEntry.type : '';
+
+  updatePortalHeader(HOME_SRC);
 
   if (navType === 'reload') {
     restoreLastPage();
