@@ -43,7 +43,7 @@
     }
     .form {
       display: grid;
-      grid-template-columns: 1fr 180px auto;
+      grid-template-columns: 1fr auto;
       gap: 10px;
       margin-top: 16px;
       align-items: end;
@@ -119,6 +119,20 @@
       gap: 10px;
       align-items: center;
       background: #fff;
+    }
+    .company-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+    .company-edit-row {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 8px;
+      align-items: center;
     }
     .company-name {
       font-size: 15px;
@@ -254,16 +268,12 @@
     <section class="grid">
       <article class="card">
         <h2>회사 관리</h2>
-        <p>회사 등록, 회사명 변경, company_code 확인, 활성/비활성 상태를 관리합니다.</p>
+        <p>회사명만 입력하면 company_code는 자동 생성됩니다. 회사명 수정, 활성/비활성, 삭제를 관리합니다.</p>
 
         <div class="form">
           <div class="field">
             <label for="companyNameInput">회사명</label>
             <input id="companyNameInput" class="input" placeholder="예: 삼천당제약" autocomplete="off">
-          </div>
-          <div class="field">
-            <label for="companyCodeInput">회사코드</label>
-            <input id="companyCodeInput" class="input" placeholder="예: SCD-01" autocomplete="off">
           </div>
           <button id="createCompanyBtn" class="btn primary" type="button">회사 등록</button>
         </div>
@@ -324,7 +334,6 @@
 
   const els = {
     companyNameInput: document.getElementById('companyNameInput'),
-    companyCodeInput: document.getElementById('companyCodeInput'),
     createCompanyBtn: document.getElementById('createCompanyBtn'),
     refreshCompaniesBtn: document.getElementById('refreshCompaniesBtn'),
     companyList: document.getElementById('companyList'),
@@ -375,12 +384,29 @@
     els.feedback.className = 'feedback' + (message ? ' show' : '') + (type ? ' ' + type : '');
   }
 
-  function normalizeCode(value) {
-    return String(value || '')
-      .trim()
-      .replace(/\s+/g, '-')
-      .replace(/[^A-Za-z0-9_-]/g, '')
-      .toUpperCase();
+  function generateCompanyCode() {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const random = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return `COMP-${yyyy}${mm}${dd}-${random}`;
+  }
+
+  async function generateUniqueCompanyCode() {
+    for (let i = 0; i < 8; i += 1) {
+      const code = generateCompanyCode();
+      const { data, error } = await sb()
+        .from('companies')
+        .select('id')
+        .eq('company_code', code)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) return code;
+    }
+
+    throw new Error('회사코드 자동 생성에 실패했습니다. 다시 시도해 주세요.');
   }
 
   function escapeHtml(value) {
@@ -443,7 +469,7 @@
     els.companyList.innerHTML = companies.map(company => {
       const active = company.is_active !== false;
       return `
-        <div class="company-item">
+        <div class="company-item" data-company-row="${escapeHtml(company.id)}">
           <div>
             <div class="company-name">${escapeHtml(company.company_name || '-')}</div>
             <div class="company-meta">
@@ -451,15 +477,24 @@
               <span>id: ${escapeHtml(company.id || '-')}</span>
               <span class="badge ${active ? 'active' : 'inactive'}">${active ? '활성' : '비활성'}</span>
             </div>
+            <div class="company-edit-row" hidden data-edit-row="${escapeHtml(company.id)}">
+              <input class="input" data-edit-company-name="${escapeHtml(company.id)}" value="${escapeHtml(company.company_name || '')}">
+              <button type="button" class="btn primary" data-save-company="${escapeHtml(company.id)}">저장</button>
+              <button type="button" class="btn" data-cancel-company-edit="${escapeHtml(company.id)}">취소</button>
+            </div>
           </div>
-          <button
-            type="button"
-            class="btn ${active ? 'danger' : 'primary'}"
-            data-toggle-company="${escapeHtml(company.id)}"
-            data-next-active="${active ? 'false' : 'true'}"
-          >
-            ${active ? '비활성화' : '활성화'}
-          </button>
+          <div class="company-actions">
+            <button type="button" class="btn" data-edit-company="${escapeHtml(company.id)}">수정</button>
+            <button
+              type="button"
+              class="btn ${active ? 'danger' : 'primary'}"
+              data-toggle-company="${escapeHtml(company.id)}"
+              data-next-active="${active ? 'false' : 'true'}"
+            >
+              ${active ? '비활성화' : '활성화'}
+            </button>
+            <button type="button" class="btn danger" data-delete-company="${escapeHtml(company.id)}">삭제</button>
+          </div>
         </div>
       `;
     }).join('');
@@ -479,22 +514,18 @@
     assertServiceAdmin();
 
     const name = String(els.companyNameInput.value || '').trim();
-    const code = normalizeCode(els.companyCodeInput.value || '');
 
     if (!name) {
       setFeedback('회사명을 입력해 주세요.', 'error');
       return;
     }
 
-    if (!code) {
-      setFeedback('회사코드를 입력해 주세요. 예: SCD-01', 'error');
-      return;
-    }
-
     els.createCompanyBtn.disabled = true;
-    setFeedback('회사를 등록하는 중입니다.', '');
+    setFeedback('회사코드를 자동 생성하고 회사를 등록하는 중입니다.', '');
 
     try {
+      const code = await generateUniqueCompanyCode();
+
       const { data, error } = await sb()
         .from('companies')
         .insert({
@@ -510,13 +541,12 @@
       await ensureCompanyApps(data.id);
 
       els.companyNameInput.value = '';
-      els.companyCodeInput.value = '';
       selectedCompanyId = data.id;
 
       await loadCompanies();
       await loadCompanyApps(selectedCompanyId);
 
-      setFeedback('회사 등록이 완료되었습니다.', 'ok');
+      setFeedback(`회사 등록이 완료되었습니다. 자동 생성 코드: ${code}`, 'ok');
     } catch (error) {
       console.error(error);
       setFeedback(error.message || '회사 등록 중 오류가 발생했습니다.', 'error');
@@ -538,6 +568,60 @@
 
     await loadCompanies();
     setFeedback('회사 상태를 변경했습니다.', 'ok');
+  }
+
+  async function updateCompanyName(companyId, nextName) {
+    assertServiceAdmin();
+
+    const name = String(nextName || '').trim();
+    if (!name) {
+      setFeedback('수정할 회사명을 입력해 주세요.', 'error');
+      return;
+    }
+
+    setFeedback('회사명을 수정하는 중입니다.', '');
+
+    const { error } = await sb()
+      .from('companies')
+      .update({ company_name: name })
+      .eq('id', companyId);
+
+    if (error) throw error;
+
+    await loadCompanies();
+    setFeedback('회사명을 수정했습니다.', 'ok');
+  }
+
+  async function deleteCompany(companyId) {
+    assertServiceAdmin();
+
+    const company = companies.find(item => item.id === companyId);
+    const name = company?.company_name || '선택한 회사';
+
+    const ok = confirm(`${name} 회사를 삭제하시겠습니까?\n\ncompany_apps도 함께 삭제됩니다. 이미 연결된 사용자나 업무 데이터가 있으면 삭제가 실패할 수 있습니다.`);
+    if (!ok) return;
+
+    setFeedback('회사를 삭제하는 중입니다.', '');
+
+    const { error } = await sb()
+      .from('companies')
+      .delete()
+      .eq('id', companyId);
+
+    if (error) throw error;
+
+    if (selectedCompanyId === companyId) {
+      selectedCompanyId = '';
+      els.appsWrap.innerHTML = '<div class="empty">회사를 선택하면 앱 설정이 표시됩니다.</div>';
+    }
+
+    await loadCompanies();
+    setFeedback('회사를 삭제했습니다.', 'ok');
+  }
+
+  function showCompanyEdit(companyId, show) {
+    const row = document.querySelector(`[data-edit-row="${CSS.escape(companyId)}"]`);
+    if (row) row.hidden = !show;
   }
 
   async function loadCompanyApps(companyId) {
@@ -611,12 +695,6 @@
       });
     });
 
-    els.companyCodeInput.addEventListener('input', () => {
-      const pos = els.companyCodeInput.selectionStart;
-      els.companyCodeInput.value = normalizeCode(els.companyCodeInput.value);
-      try { els.companyCodeInput.setSelectionRange(pos, pos); } catch (_) {}
-    });
-
     els.selectedCompanySelect.addEventListener('change', async () => {
       selectedCompanyId = els.selectedCompanySelect.value || '';
       try {
@@ -628,6 +706,43 @@
     });
 
     document.addEventListener('click', async (event) => {
+      const editBtn = event.target.closest('[data-edit-company]');
+      if (editBtn) {
+        showCompanyEdit(editBtn.getAttribute('data-edit-company'), true);
+        return;
+      }
+
+      const cancelEditBtn = event.target.closest('[data-cancel-company-edit]');
+      if (cancelEditBtn) {
+        showCompanyEdit(cancelEditBtn.getAttribute('data-cancel-company-edit'), false);
+        return;
+      }
+
+      const saveCompanyBtn = event.target.closest('[data-save-company]');
+      if (saveCompanyBtn) {
+        const id = saveCompanyBtn.getAttribute('data-save-company');
+        const input = document.querySelector(`[data-edit-company-name="${CSS.escape(id)}"]`);
+        try {
+          await updateCompanyName(id, input?.value || '');
+        } catch (error) {
+          console.error(error);
+          setFeedback(error.message || '회사명 수정 중 오류가 발생했습니다.', 'error');
+        }
+        return;
+      }
+
+      const deleteCompanyBtn = event.target.closest('[data-delete-company]');
+      if (deleteCompanyBtn) {
+        const id = deleteCompanyBtn.getAttribute('data-delete-company');
+        try {
+          await deleteCompany(id);
+        } catch (error) {
+          console.error(error);
+          setFeedback(error.message || '회사 삭제 중 오류가 발생했습니다.', 'error');
+        }
+        return;
+      }
+
       const companyBtn = event.target.closest('[data-toggle-company]');
       if (companyBtn) {
         const id = companyBtn.getAttribute('data-toggle-company');
