@@ -228,8 +228,10 @@
 (function () {
   'use strict';
 
+  // Version: company-context-safe-navigation-2026-05-14
+
   const SUPABASE_URL = 'https://mbqpsovlwvedwrtbbauj.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXJhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
 
   const HOME_SRC = 'portal-main/portal-main.html';
   const LAST_PAGE_KEY = 'portalLastPage';
@@ -505,12 +507,19 @@
     options = options || {};
     if (!src) return;
 
-    const user = await getCurrentUser();
-    const companyContext = user ? await getCompanyContext(user) : {};
+    // 중요: 부모 index.html에서 세션이 없다고 iframe 이동을 막지 않습니다.
+    // 기존 포탈 구조처럼 먼저 이동은 정상 동작시키고,
+    // 로그인 세션/회사 정보가 확인되는 경우에만 URL과 postMessage에 company 정보를 붙입니다.
+    let user = null;
+    let companyContext = {};
 
-    if (src !== HOME_SRC) {
-      const ok = await ensureAuthenticated();
-      if (!ok) return;
+    try {
+      user = await getCurrentUser();
+      companyContext = user ? await getCompanyContext(user) : {};
+    } catch (error) {
+      console.warn('navigation auth context skipped:', error);
+      user = null;
+      companyContext = {};
     }
 
     if (isReagentSrc(src)) saveReagentUserHint(user, companyContext);
@@ -566,15 +575,15 @@
       event.preventDefault();
       try {
         await supabaseClient.auth.signOut();
+      } catch (error) {
+        console.warn('logout signOut skipped/failed:', error);
+      } finally {
         localStorage.removeItem(LAST_PAGE_KEY);
         try { localStorage.removeItem('reagent_current_user'); } catch (_) {}
         window.portalSession = null;
         window.portalCompanyContext = null;
         await navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
         window.location.reload();
-      } catch (error) {
-        console.error('logout failed:', error);
-        alert('로그아웃 중 오류가 발생했습니다.');
       }
     });
   }
