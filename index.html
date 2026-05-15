@@ -658,6 +658,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
   --portal-brand-color: #c8102e;
   --portal-brand-color-2: #e11d2e;
   --portal-brand-rgb: 200, 16, 46;
+  --current-header-accent: #c8102e;
 }
 
 .portal-common-header {
@@ -665,11 +666,11 @@ body:not(.service-admin-enabled) .service-admin-btn{
 }
 
 .nav-btn.home {
-  border-color: rgba(var(--portal-brand-rgb), 0.9) !important;
+  border-color: var(--current-header-accent) !important;
 }
 
 .nav-btn.home.active {
-  color: var(--portal-brand-color) !important;
+  color: var(--current-header-accent) !important;
   border-color: rgba(var(--portal-brand-rgb), 0.98) !important;
   box-shadow:
     0 5px 14px rgba(var(--portal-brand-rgb), 0.22),
@@ -681,7 +682,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
 }
 
 .nav-btn.home.active:hover {
-  color: var(--portal-brand-color) !important;
+  color: var(--current-header-accent) !important;
 }
 
 .auth-field input:focus {
@@ -998,6 +999,18 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
     const headerGradient = key === HOME_SRC ? getPortalBrandGradient() : meta.gradient;
     if (header && headerGradient) header.style.background = headerGradient;
+
+    let accentColor = '#c8102e';
+
+    if (key === HOME_SRC) {
+      accentColor = portalBrandColor;
+    } else if (meta.gradient) {
+      const match = meta.gradient.match(/#([0-9a-fA-F]{6})/);
+      if (match) accentColor = '#' + match[1];
+    }
+
+    document.documentElement.style.setProperty('--current-header-accent', accentColor);
+
     if (top) top.textContent = meta.top || '';
     if (title) title.textContent = meta.title || '';
     if (desc) desc.textContent = meta.desc || '';
