@@ -710,6 +710,389 @@ table td {
   margin-top:0 !important;
 }
 
+
+/* ===== ExeloLab Common Compact UI 적용: wastewater ===== */
+/* 기능/JS 변경 없이 화면 밀도만 0.5단계 축소 */
+
+:root {
+  --ww-page-gap: 12px;
+  --ww-card-padding: 18px;
+  --ww-card-radius: 16px;
+  --ww-control-height: 34px;
+  --ww-control-radius: 11px;
+  --ww-font-base: 13px;
+  --ww-font-small: 11.5px;
+  --ww-font-title: 16px;
+  --ww-shadow: 0 5px 14px rgba(15,23,42,.05);
+}
+
+/* 전체 */
+body {
+  font-size: var(--ww-font-base);
+}
+
+.app-shell {
+  padding: 0 !important;
+}
+
+.card {
+  border-radius: var(--ww-card-radius);
+  box-shadow: var(--ww-shadow);
+}
+
+/* 숨겨진 내부 헤더 유지, 혹시 단독 실행 시에도 compact */
+.portal-header {
+  border-radius: 20px;
+  padding: 24px 28px;
+  margin-bottom: var(--ww-page-gap);
+}
+
+.portal-eyebrow {
+  font-size: var(--ww-font-small);
+  margin-bottom: 7px;
+}
+
+.portal-title {
+  font-size: 26px;
+}
+
+/* 상단 KPI */
+.stats {
+  gap: var(--ww-page-gap);
+  margin-bottom: var(--ww-page-gap);
+}
+
+.stat-box {
+  padding: 16px;
+  min-height: 84px;
+}
+
+.stat-label {
+  font-size: var(--ww-font-base);
+  margin-bottom: 7px;
+}
+
+.stat-value {
+  font-size: 20px;
+}
+
+/* 탭 */
+.tabs,
+.tabs-main,
+.tabs-wrap {
+  gap: 8px;
+  margin-bottom: var(--ww-page-gap);
+}
+
+.tab-btn {
+  border-radius: 12px;
+  padding: 10px 8px;
+  font-size: var(--ww-font-base);
+}
+
+.admin-mini-btn {
+  height: var(--ww-control-height);
+  padding: 0 10px;
+  font-size: var(--ww-font-small);
+  border-radius: var(--ww-control-radius);
+}
+
+/* 카드/그리드 */
+.main-grid {
+  grid-template-columns: 430px 1fr;
+  gap: var(--ww-page-gap);
+}
+
+.form-card,
+.preview-card,
+.ledger-card,
+.admin-card,
+.log-card,
+.ref-card,
+.related-doc-form,
+.related-doc-item {
+  padding: var(--ww-card-padding);
+}
+
+.section-title {
+  gap: 7px;
+  font-size: var(--ww-font-title);
+  margin-bottom: 12px;
+}
+
+.field {
+  margin-bottom: 11px;
+}
+
+.field label {
+  margin-bottom: 5px;
+  font-size: var(--ww-font-base);
+}
+
+/* 입력/버튼 */
+.input,
+.textarea,
+.select {
+  min-height: var(--ww-control-height);
+  border-radius: var(--ww-control-radius);
+  padding: 9px 11px;
+  font-size: var(--ww-font-base);
+}
+
+.textarea {
+  min-height: 76px;
+}
+
+.checkbox-row {
+  gap: 7px;
+  border-radius: var(--ww-control-radius);
+  padding: 10px 11px;
+  margin-bottom: 10px;
+}
+
+.btn {
+  min-height: var(--ww-control-height);
+  border-radius: 999px;
+  padding: 0 13px;
+  font-size: var(--ww-font-base);
+}
+
+.btn.block {
+  border-radius: var(--ww-control-radius);
+}
+
+.small-btn {
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: var(--ww-font-small);
+}
+
+/* 미리보기 */
+.preview-grid {
+  gap: var(--ww-page-gap);
+  margin-bottom: var(--ww-page-gap);
+}
+
+.mini-card {
+  border-radius: 14px;
+  padding: 13px;
+  min-height: 72px;
+}
+
+.mini-label {
+  font-size: var(--ww-font-small);
+  margin-bottom: 6px;
+}
+
+.mini-value {
+  font-size: 16px;
+}
+
+.hint-box,
+.type-box,
+.ref-paragraph,
+.doc-container,
+.doc-editor,
+.rich-editor {
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.type-chip {
+  border-radius: var(--ww-control-radius);
+  padding: 9px 10px;
+  font-size: var(--ww-font-base);
+}
+
+.form-chip-row {
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* 표 */
+.table-wrap {
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 9px 10px;
+  font-size: var(--ww-font-base);
+}
+
+table {
+  min-width: 980px;
+}
+
+/* 관리자/툴바 */
+.toolbar-row,
+.related-doc-toolbar,
+.ledger-top {
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.toolbar-right,
+.related-doc-actions,
+.rich-toolbar,
+.rich-toolbar-group {
+  gap: 7px;
+}
+
+.admin-card .preview-grid,
+.admin-card .three-col,
+.admin-summary-grid {
+  gap: 8px !important;
+}
+
+/* 운영 관련자료 */
+.ref-layout {
+  grid-template-columns: 240px 1fr;
+  gap: var(--ww-page-gap);
+}
+
+.ref-menu {
+  gap: 7px;
+}
+
+.ref-btn {
+  padding: 10px 12px;
+  border-radius: var(--ww-control-radius);
+  font-size: var(--ww-font-base);
+}
+
+.doc-title {
+  font-size: 20px;
+}
+
+.doc-body {
+  font-size: var(--ww-font-base);
+}
+
+.doc-meta,
+.doc-meta-top,
+.doc-meta,
+.related-doc-meta,
+.mail-help {
+  font-size: var(--ww-font-small);
+}
+
+.doc-section {
+  margin-top: 18px;
+  margin-bottom: 7px;
+}
+
+.doc-question {
+  margin-top: 15px;
+  margin-bottom: 7px;
+}
+
+.related-doc-layout {
+  grid-template-columns: 260px 1fr;
+  gap: var(--ww-page-gap);
+}
+
+.related-doc-list {
+  gap: 10px;
+}
+
+.related-doc-title {
+  font-size: var(--ww-font-title);
+}
+
+.related-doc-body {
+  line-height: 1.6;
+}
+
+/* 결재/서명 */
+.sign-row {
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.sign-box {
+  border-radius: 10px;
+  padding: 10px;
+  min-height: 104px;
+}
+
+.sign-title {
+  font-size: var(--ww-font-small);
+}
+
+.sign-image-wrap {
+  height: 66px;
+}
+
+.sign-image {
+  max-width: 150px;
+  max-height: 62px;
+}
+
+/* 로그인/접근 */
+.login-card,
+.portal-access-card {
+  padding: 22px;
+  border-radius: 18px;
+}
+
+.login-card h2,
+.portal-access-card h2 {
+  font-size: 24px;
+}
+
+.portal-access-help {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  font-size: var(--ww-font-base);
+}
+
+/* 모달 */
+.approval-alert-modal {
+  border-radius: 18px;
+}
+
+.approval-alert-head {
+  padding: 16px 18px;
+}
+
+.approval-alert-title {
+  font-size: 21px;
+}
+
+.approval-alert-body {
+  padding: 16px 18px 10px;
+}
+
+.approval-alert-foot {
+  padding: 0 18px 16px;
+}
+
+/* 반응형 기존 유지 */
+@media (max-width:1100px){
+  .main-grid,
+  .ref-layout,
+  .related-doc-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width:720px){
+  .form-card,
+  .preview-card,
+  .ledger-card,
+  .admin-card,
+  .log-card,
+  .ref-card {
+    padding: 14px;
+  }
+
+  .portal-title {
+    font-size: 23px;
+  }
+}
+
 </style>
 </head>
 <body>
