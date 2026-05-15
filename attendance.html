@@ -2449,6 +2449,77 @@ svg text{
 }
 </style>
 
+
+<style id="trend-summary-card-actual-fix">
+/* ===== 트렌드분석 실제 KPI 카드 4개 compact 적용 ===== */
+/* 대상: #trendSummaryCards > .trendSummaryCard */
+/* 기능/JS 변경 없음 */
+
+#trendSummaryCards.trendSummaryGrid,
+#main-trend-analysis #trendSummaryCards{
+  grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+  gap:12px !important;
+  margin-top:12px !important;
+}
+
+#trendSummaryCards .trendSummaryCard{
+  min-height:92px !important;
+  height:92px !important;
+  padding:12px 14px !important;
+  border-radius:16px !important;
+  display:flex !important;
+  flex-direction:column !important;
+  justify-content:center !important;
+}
+
+#trendSummaryCards .trendSummaryCard .k{
+  font-size:11px !important;
+  line-height:1.2 !important;
+  margin-bottom:5px !important;
+  color:#64748b !important;
+}
+
+#trendSummaryCards .trendSummaryCard .v{
+  font-size:22px !important;
+  line-height:1.08 !important;
+  margin:0 0 5px !important;
+  font-weight:900 !important;
+}
+
+#trendSummaryCards .trendSummaryCard .s{
+  font-size:10.5px !important;
+  line-height:1.25 !important;
+  color:#64748b !important;
+}
+
+/* 혹시 기존 style이 더 강하게 잡혀 있을 경우 대비 */
+#main-trend-analysis .trendSummaryCard{
+  min-height:92px !important;
+  height:92px !important;
+  padding-top:12px !important;
+  padding-bottom:12px !important;
+}
+
+@media (max-width:1100px){
+  #trendSummaryCards.trendSummaryGrid,
+  #main-trend-analysis #trendSummaryCards{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+}
+
+@media (max-width:700px){
+  #trendSummaryCards.trendSummaryGrid,
+  #main-trend-analysis #trendSummaryCards{
+    grid-template-columns:1fr !important;
+  }
+
+  #trendSummaryCards .trendSummaryCard{
+    height:auto !important;
+    min-height:84px !important;
+  }
+}
+</style>
+
 </head>
 <body>
 <script>
@@ -15995,4 +16066,3 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
 </script>
 </body>
 </html>
-
