@@ -542,49 +542,114 @@ body:not(.service-admin-enabled) .service-admin-btn{
 }
 
 
-/* ===== Big Home Symbol Button ===== */
-.nav-btn.home{
+/* ===== Home Nav Button Accent Final ===== */
+/* 홈 버튼만 헤더 카드 색상에 맞춰 아이콘 + 테두리 강조 */
+.nav-btn.home {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  width: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border: 1px solid rgba(200, 16, 46, 0.85) !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.07)),
+    rgba(255,255,255,0.08) !important;
+  color: #ffffff !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06) !important;
+}
+
+.nav-btn.home .home-nav-icon {
+  width: 13px;
+  height: 13px;
+  display: block;
+  color: inherit;
+  flex: 0 0 auto;
+}
+
+.nav-btn.home .home-nav-text {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.nav-btn.home.active {
+  background: #ffffff !important;
+  color: #c8102e !important;
+  border-color: rgba(200, 16, 46, 0.95) !important;
+  box-shadow:
+    0 5px 14px rgba(200, 16, 46, 0.22),
+    inset 0 0 0 1px rgba(200, 16, 46, 0.06) !important;
+}
+
+.nav-btn.home:hover {
+  border-color: rgba(225, 29, 46, 1) !important;
+}
+
+.nav-btn.home.active:hover {
+  color: #b30e27 !important;
+}
+
+
+/* ===== Home Nav Button Big House v2 ===== */
+/* 선 두께는 유지하고 집 아이콘 크기만 확대, 홈 글자는 집 내부에 배치 */
+.nav-btn.home {
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
   width:36px !important;
   height:36px !important;
   padding:0 !important;
   border-radius:11px !important;
-  border:1px solid rgba(200,16,46,.85) !important;
+  border:1px solid rgba(200, 16, 46, 0.9) !important;
   background:
-    linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.06)),
-    rgba(255,255,255,.08) !important;
+    linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.07)),
+    rgba(255,255,255,0.08) !important;
   color:#ffffff !important;
-  display:flex !important;
-  align-items:center !important;
-  justify-content:center !important;
   overflow:hidden !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06) !important;
 }
 
-.nav-btn.home .home-big-icon{
-  width:28px !important;
-  height:28px !important;
+.nav-btn.home .home-nav-icon {
+  width:31px !important;
+  height:31px !important;
   display:block !important;
   color:inherit !important;
+  flex:0 0 auto !important;
 }
 
-.nav-btn.home .home-icon-text{
-  fill:currentColor;
-  font-size:10px;
-  font-weight:900;
-  letter-spacing:-0.04em;
-  font-family:Arial, sans-serif;
+.nav-btn.home .home-nav-text,
+.nav-btn.home span.home-nav-text {
+  display:none !important;
 }
 
-.nav-btn.home.active{
+.nav-btn.home .home-nav-text-svg {
+  fill:currentColor !important;
+  font-family:Arial, sans-serif !important;
+  font-size:11px !important;
+  font-weight:900 !important;
+  letter-spacing:-0.06em !important;
+}
+
+.nav-btn.home.active {
   background:#ffffff !important;
   color:#c8102e !important;
-  border-color:#c8102e !important;
+  border-color:rgba(200, 16, 46, 0.98) !important;
   box-shadow:
-    0 5px 14px rgba(200,16,46,.20),
-    inset 0 0 0 1px rgba(200,16,46,.05) !important;
+    0 5px 14px rgba(200, 16, 46, 0.22),
+    inset 0 0 0 1px rgba(200, 16, 46, 0.06) !important;
 }
 
-.nav-btn.home:hover{
-  border-color:#e11d2e !important;
+.nav-btn.home:hover {
+  border-color:rgba(225, 29, 46, 1) !important;
+}
+
+.nav-btn.home.active:hover {
+  color:#b30e27 !important;
 }
 
 </style>
@@ -597,12 +662,12 @@ body:not(.service-admin-enabled) .service-admin-btn{
       <div class="sidenav">
         <div>
           <button type="button" id="homeNavBtn" class="nav-btn home active" data-portal-src="portal-main/portal-main.html" title="홈" aria-label="홈">
-  <svg class="home-big-icon" viewBox="0 0 48 48" aria-hidden="true">
-    <path d="M10 22 L24 10 L38 22" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M14 20 V36 H34 V20" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="24" y="31" text-anchor="middle" class="home-icon-text">홈</text>
-  </svg>
-</button>
+            <svg class="home-nav-icon" viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M8.5 22 L24 8.5 L39.5 22" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M13 20 V38 H35 V20" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <text x="24" y="30.5" text-anchor="middle" class="home-nav-text-svg">홈</text>
+            </svg>
+          </button>
           <div class="nav-group">
             <button type="button" id="workspaceNavBtn" class="nav-btn" data-portal-src="portal-home/portal-home.html" title="업무">업무</button>
             <button type="button" id="wastewaterNavBtn" class="nav-btn" data-portal-src="wastewater/index.html" title="폐수">폐수</button>
