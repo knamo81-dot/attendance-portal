@@ -9,6 +9,41 @@ window.ReagentApp.request = {
   myRegistrationRequests: [],
   activeRequestPanel: "list",
 
+  getCompanyId() {
+    if (typeof window.ReagentApp.getCompanyId === "function") {
+      return window.ReagentApp.getCompanyId() || "";
+    }
+
+    try {
+      const session = window.parent?.portalSession || window.portalSession || {};
+      return String(session.companyId || session.company_id || session.company?.id || session.company?.company_id || "").trim();
+    } catch (_) {
+      return "";
+    }
+  },
+
+  withCompanyPayload(row = {}) {
+    if (typeof window.ReagentApp.withCompanyPayload === "function") {
+      return window.ReagentApp.withCompanyPayload(row);
+    }
+
+    const companyId = this.getCompanyId();
+    return companyId ? { ...row, company_id: companyId } : { ...row };
+  },
+
+  withCompanyRows(rows = []) {
+    return (Array.isArray(rows) ? rows : []).map((row) => this.withCompanyPayload(row));
+  },
+
+  scopedCompanyQuery(query) {
+    if (typeof window.ReagentApp.scopedCompanyQuery === "function") {
+      return window.ReagentApp.scopedCompanyQuery(query);
+    }
+
+    const companyId = this.getCompanyId();
+    return companyId ? query.eq("company_id", companyId) : query;
+  },
+
   saveRequestRows() {
     try {
       localStorage.setItem("reagent_request_rows", JSON.stringify(this.requestRows || []));
@@ -507,7 +542,7 @@ window.ReagentApp.request = {
 
     const { error } = await sb
       .from("product_registration_requests")
-      .insert(payload);
+      .insert(this.withCompanyPayload(payload));
 
     if (error) {
       console.error("제품 등록 요청 실패:", error);
@@ -684,6 +719,8 @@ window.ReagentApp.request = {
       .from("product_registration_requests")
       .select("*")
       .order("created_at", { ascending: false });
+
+    query = this.scopedCompanyQuery(query);
 
     if (requester && requester !== "미지정") {
       query = query.eq("requester", requester);
@@ -916,10 +953,14 @@ window.ReagentApp.request = {
 
     if (!canSaveRequestEdit) return;
 
-    const { data, error } = await sb
+    let updateRequestQuery = sb
       .from("product_registration_requests")
       .update(row)
-      .eq("id", id)
+      .eq("id", id);
+
+    updateRequestQuery = this.scopedCompanyQuery(updateRequestQuery);
+
+    const { data, error } = await updateRequestQuery
       .select()
       .single();
 
@@ -960,10 +1001,14 @@ window.ReagentApp.request = {
       return;
     }
 
-    const { error } = await sb
+    let deleteRequestQuery = sb
       .from("product_registration_requests")
       .delete()
       .eq("id", id);
+
+    deleteRequestQuery = this.scopedCompanyQuery(deleteRequestQuery);
+
+    const { error } = await deleteRequestQuery;
 
     if (error) {
       console.error("제품 등록 요청 삭제 실패:", error);
@@ -1029,7 +1074,7 @@ window.ReagentApp.request = {
 
     const { data, error } = await sb
       .from("product_registration_requests")
-      .insert(payload)
+      .insert(this.withCompanyPayload(payload))
       .select()
       .single();
 
@@ -1039,10 +1084,14 @@ window.ReagentApp.request = {
       return;
     }
 
-    const { error: markError } = await sb
+    let markRetryQuery = sb
       .from("product_registration_requests")
       .update({ retry_created: true })
       .eq("id", id);
+
+    markRetryQuery = this.scopedCompanyQuery(markRetryQuery);
+
+    const { error: markError } = await markRetryQuery;
 
     if (markError) {
       console.error("기존 반려건 재요청 표시 업데이트 실패:", markError);
@@ -1174,7 +1223,7 @@ window.ReagentApp.request = {
 
     const { data, error } = await sb
       .from("reagent_requests")
-      .insert(row)
+      .insert(this.withCompanyPayload(row))
       .select()
       .single();
 
@@ -1205,10 +1254,14 @@ window.ReagentApp.request = {
     const sb = window.ReagentApp.sb;
 
     if (sb) {
-      const { error: collectDeleteError } = await sb
+      let collectDeleteQuery = sb
         .from("reagent_collect_items")
         .delete()
         .neq("id", 0);
+
+      collectDeleteQuery = this.scopedCompanyQuery(collectDeleteQuery);
+
+      const { error: collectDeleteError } = await collectDeleteQuery;
 
       if (collectDeleteError) {
         console.error("취합 데이터 전체 삭제 실패:", collectDeleteError);
@@ -1216,10 +1269,14 @@ window.ReagentApp.request = {
         return;
       }
 
-      const { error } = await sb
+      let requestDeleteQuery = sb
         .from("reagent_requests")
         .delete()
         .neq("id", 0);
+
+      requestDeleteQuery = this.scopedCompanyQuery(requestDeleteQuery);
+
+      const { error } = await requestDeleteQuery;
 
       if (error) {
         console.error("전체 삭제 실패:", error);
@@ -1292,10 +1349,14 @@ window.ReagentApp.request = {
     const sb = window.ReagentApp.sb;
 
     if (sb && deleteIds.length) {
-      const { error } = await sb
+      let deleteQuery = sb
         .from("reagent_requests")
         .delete()
         .in("id", deleteIds);
+
+      deleteQuery = this.scopedCompanyQuery(deleteQuery);
+
+      const { error } = await deleteQuery;
 
       if (error) {
         console.error("미취합/추가신청 삭제 실패:", error);
@@ -1400,7 +1461,7 @@ window.ReagentApp.request = {
 
     const { data, error } = await sb
       .from("reagent_requests")
-      .insert(sampleRows)
+      .insert(this.withCompanyRows(sampleRows))
       .select();
 
     if (error) {
@@ -1428,10 +1489,14 @@ window.ReagentApp.request = {
       this.requestRows = [];
       this.collectedMeta = {};
     } else {
-      const { data, error } = await sb
+      let requestQuery = sb
         .from("reagent_requests")
         .select("*")
         .order("created_at", { ascending: false });
+
+      requestQuery = this.scopedCompanyQuery(requestQuery);
+
+      const { data, error } = await requestQuery;
 
       if (error) {
         console.error("신청 목록 조회 실패:", error);
@@ -1441,9 +1506,13 @@ window.ReagentApp.request = {
         this.requestRows = data || [];
       }
 
-      const { data: collectData, error: collectError } = await sb
+      let collectQuery = sb
         .from("reagent_collect_items")
         .select("*");
+
+      collectQuery = this.scopedCompanyQuery(collectQuery);
+
+      const { data: collectData, error: collectError } = await collectQuery;
 
       if (collectError) {
         console.error("취합 목록 조회 실패:", collectError);
@@ -1579,10 +1648,14 @@ window.ReagentApp.request = {
     const sb = window.ReagentApp.sb;
 
     if (sb) {
-      const { data, error } = await sb
+      let updateQuery = sb
         .from("reagent_requests")
         .update({ qty: nextQty, usage: nextUsage })
-        .eq("id", id)
+        .eq("id", id);
+
+      updateQuery = this.scopedCompanyQuery(updateQuery);
+
+      const { data, error } = await updateQuery
         .select()
         .single();
 
@@ -1610,10 +1683,14 @@ window.ReagentApp.request = {
     const sb = window.ReagentApp.sb;
 
     if (sb) {
-      const { error } = await sb
+      let deleteQuery = sb
         .from("reagent_requests")
         .delete()
         .eq("id", id);
+
+      deleteQuery = this.scopedCompanyQuery(deleteQuery);
+
+      const { error } = await deleteQuery;
 
       if (error) {
         console.error("삭제 실패:", error);
