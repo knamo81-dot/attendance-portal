@@ -2402,74 +2402,49 @@ svg text{
 </style>
 
 
-<style id="attendance-risk-card-height-hard-fix">
-/* ===== 위험지수 상위 담당자 흰색 박스 끊김 최종 보정 ===== */
-/* 기능/JS 변경 없음: 해당 리스트 영역만 높이 제한 해제 */
-
-/* 심층분석 하위 탭 전체 높이 제한 제거 */
-#main-deep-analysis,
-#main-deep-analysis .panel,
-#main-deep-analysis .mainPanel,
-#main-deep-analysis .card,
-#main-deep-analysis .scrollBox {
-  height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
+<style id="trend-kpi-compact-fix">
+/* ===== 트렌드분석 상단 KPI 카드 4개 compact ===== */
+#main-trend-analysis .kpis,
+#trend-analysis-panel .kpis{
+  gap:12px !important;
 }
 
-/* 위험지수 상위 담당자 리스트 카드가 내용 끝까지 감싸도록 강제 */
-#main-deep-analysis .card:has(.riskItem),
-#main-deep-analysis .card:has(.riskInlineMetrics),
-#main-deep-analysis .card:has(.riskScoreWrap) {
-  display: block !important;
-  height: auto !important;
-  min-height: fit-content !important;
-  max-height: none !important;
-  overflow: visible !important;
-  padding-bottom: 16px !important;
-  background: #fff !important;
+#main-trend-analysis .kpis .card,
+#trend-analysis-panel .kpis .card{
+  min-height:112px !important;
+  padding:14px 16px !important;
+  border-radius:18px !important;
 }
 
-/* 리스트 내부 스크롤 제한 제거 */
-#main-deep-analysis .card:has(.riskItem) .scrollBox,
-#main-deep-analysis .card:has(.riskInlineMetrics) .scrollBox,
-#main-deep-analysis .card:has(.riskScoreWrap) .scrollBox {
-  height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
-  padding-right: 0 !important;
+#main-trend-analysis .kpis .label,
+#trend-analysis-panel .kpis .label{
+  font-size:12px !important;
+  margin-bottom:6px !important;
 }
 
-/* 담당자 행 compact는 유지하되 카드 밖으로 삐져나오지 않게 */
-#main-deep-analysis .riskItem {
-  height: auto !important;
-  min-height: 56px !important;
-  max-height: none !important;
-  overflow: visible !important;
-  margin-bottom: 9px !important;
-  padding: 10px 12px !important;
-  border-radius: 13px !important;
-  background: #fff !important;
+#main-trend-analysis .kpis .value,
+#trend-analysis-panel .kpis .value{
+  font-size:24px !important;
+  line-height:1.05 !important;
+  margin:4px 0 2px !important;
 }
 
-#main-deep-analysis .riskItem:last-child {
-  margin-bottom: 0 !important;
+#main-trend-analysis .kpis .sub,
+#trend-analysis-panel .kpis .sub{
+  font-size:11px !important;
+  line-height:1.25 !important;
 }
 
-/* 혹시 부모 컨테이너가 clipping하는 경우 방지 */
-#main-deep-analysis .deepTopGrid,
-#main-deep-analysis .deepLeftStack,
-#main-deep-analysis .radarCenterCard,
-#main-deep-analysis .criteriaCard,
-#main-deep-analysis .leaveCauseGrid,
-#main-deep-analysis .leaveCauseSummary {
-  overflow: visible !important;
-}
+@media (min-width:1200px){
+  #main-trend-analysis .kpis .card,
+  #trend-analysis-panel .kpis .card{
+    min-height:98px !important;
+    padding:12px 14px !important;
+  }
 
-/* 데스크톱에서는 위험지수 리스트가 카드 안에서 자연스럽게 이어지도록 */
-@media (min-width: 901px) {
-  #main-deep-analysis .card:has(.riskItem) {
-    min-height: auto !important;
+  #main-trend-analysis .kpis .value,
+  #trend-analysis-panel .kpis .value{
+    font-size:20px !important;
   }
 }
 </style>
