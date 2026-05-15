@@ -424,6 +424,32 @@
     }
     .company-code-hidden { display: none; }
 
+    .admin-layout {
+      display: grid;
+      grid-template-columns: auto minmax(360px, 520px);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .apps-side-panel {
+      display: none;
+    }
+
+    .apps-side-panel.active {
+      display: block;
+    }
+
+    @media (max-width: 1200px) {
+      .admin-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .apps-side-panel {
+        display: none !important;
+      }
+    }
+
+
     @media (max-width: 1100px) {
       .page { padding: 18px; }
       .card { width: 100%; }
@@ -472,8 +498,9 @@
 </head>
 <body>
   <main class="page">
-    <section id="companiesView" class="view active">
-      <article class="card">
+    <div class="admin-layout">
+      <section id="companiesView" class="view active">
+        <article class="card">
         <h2>회사 관리</h2>
         <p>회사명과 서브도메인을 등록합니다. company_code는 내부 식별값으로 자동 생성됩니다.</p>
 
@@ -507,11 +534,12 @@
         <div id="companyList" class="company-list">
           <div class="empty">회사 목록을 불러오는 중입니다.</div>
         </div>
-      </article>
-    </section>
+        </article>
+      </section>
 
-    <section id="appsView" class="view">
-      <article class="card">
+      <aside id="appsSidePanel" class="apps-side-panel">
+        <section id="appsView" class="view active">
+          <article class="card">
         <div class="detail-header">
           <div class="detail-title">
             <strong id="appsViewTitle">앱 사용 설정</strong>
@@ -530,10 +558,12 @@
         <div class="notice">
           앱 ON/OFF 변경 후 <strong>저장</strong>을 누르면 반영되고 회사 목록으로 돌아갑니다.
         </div>
-      </article>
-    </section>
+          </article>
+        </section>
+      </aside>
 
-    <div id="feedback" class="feedback"></div>
+      <div id="feedback" class="feedback"></div>
+    </div>
   </main>
 
 <script>
@@ -551,6 +581,7 @@
   const els = {
     companiesView: document.getElementById('companiesView'),
     appsView: document.getElementById('appsView'),
+    appsSidePanel: document.getElementById('appsSidePanel'),
     companyNameInput: document.getElementById('companyNameInput'),
     companySubdomainInput: document.getElementById('companySubdomainInput'),
     companyDomainPreview: document.getElementById('companyDomainPreview'),
@@ -611,8 +642,22 @@
   }
 
   function showView(viewName) {
-    els.companiesView?.classList.toggle('active', viewName === 'companies');
-    els.appsView?.classList.toggle('active', viewName === 'apps');
+    const mobile = window.innerWidth <= 1200;
+
+    if (mobile) {
+      els.companiesView?.classList.toggle('active', viewName === 'companies');
+      els.appsView?.classList.toggle('active', viewName === 'apps');
+      if (els.appsSidePanel) {
+        els.appsSidePanel.classList.toggle('active', viewName === 'apps');
+      }
+    } else {
+      els.companiesView?.classList.add('active');
+      els.appsView?.classList.add('active');
+
+      if (els.appsSidePanel) {
+        els.appsSidePanel.classList.toggle('active', viewName === 'apps');
+      }
+    }
   }
 
   function generateCompanyCode() {
@@ -1022,6 +1067,9 @@
 
   function returnToCompaniesView(message, type = 'ok') {
     showView('companies');
+    if (els.appsSidePanel) {
+      els.appsSidePanel.classList.remove('active');
+    }
     if (message) setFeedback(message, type);
   }
 
