@@ -295,7 +295,66 @@ window.ReagentApp.collect = {
       .filter(Boolean);
   },
 
+  getSelectableCollectCheckboxes() {
+    return Array.from(document.querySelectorAll(".collect-check"))
+      .filter((checkbox) => !checkbox.disabled && checkbox.dataset.key);
+  },
+
+  syncCollectAllToggle() {
+    const toggle = document.getElementById("collectAllToggle");
+    if (!toggle) return;
+
+    const checkboxes = this.getSelectableCollectCheckboxes();
+    const checkedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
+
+    toggle.disabled = checkboxes.length === 0;
+    toggle.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
+    toggle.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+  },
+
+  resetCollectAllToggle() {
+    const toggle = document.getElementById("collectAllToggle");
+    if (!toggle) return;
+
+    toggle.checked = false;
+    toggle.indeterminate = false;
+  },
+
+  ensureCollectAllToggleHeader() {
+    const list = window.ReagentApp.els?.collectList || document.getElementById("collectList");
+    const table = list?.closest?.("table");
+    const firstHeader = table?.querySelector?.("thead th:first-child");
+    if (!firstHeader || firstHeader.dataset.collectAllReady === "1") return;
+
+    firstHeader.dataset.collectAllReady = "1";
+    firstHeader.innerHTML = `
+      <span style="display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap;">
+        <span>선택</span>
+        <input type="checkbox" id="collectAllToggle" title="현재 화면의 미확정 항목 전체 선택/해제" style="margin:0; transform:translateY(1px);">
+      </span>
+    `;
+  },
+
   bindCollectEvents() {
+    const collectAllToggle = document.getElementById("collectAllToggle");
+    if (collectAllToggle) {
+      collectAllToggle.onchange = (e) => {
+        const shouldCheck = e.target.checked;
+        const checkboxes = this.getSelectableCollectCheckboxes();
+
+        checkboxes.forEach((checkbox) => {
+          checkbox.checked = shouldCheck;
+        });
+
+        this.selectedKeys = shouldCheck
+          ? checkboxes.map((checkbox) => checkbox.dataset.key).filter(Boolean)
+          : [];
+
+        this.saveSelectedKeys();
+        this.syncCollectAllToggle();
+      };
+    }
+
     document.querySelectorAll(".collect-check").forEach((chk) => {
       chk.addEventListener("change", (e) => {
         const key = e.target.dataset.key;
@@ -307,6 +366,7 @@ window.ReagentApp.collect = {
         }
 
         this.saveSelectedKeys();
+        this.syncCollectAllToggle();
       });
     });
 
@@ -540,6 +600,7 @@ window.ReagentApp.collect = {
 
     this.selectedKeys = [];
     this.saveSelectedKeys();
+    this.resetCollectAllToggle();
     this.saveCollectMeta();
     request.renderRequest();
     this.renderCollect();
@@ -1589,6 +1650,7 @@ if (els.count) els.count.textContent = String(rows.length);
     const { els, escapeHtml } = window.ReagentApp;
     const request = window.ReagentApp.request;
     this.hydrateDefaultVendorInfoOnce();
+    this.ensureCollectAllToggleHeader();
 
     let groups = request.groupItems(request.getRowsForCurrentOrderMonth ? request.getRowsForCurrentOrderMonth() : request.requestRows)
       .filter((g) => Number(request.collectedMeta[g.key] || 0) > 0);
@@ -1693,6 +1755,10 @@ if (els.count) els.count.textContent = String(rows.length);
       if (els.collectCount) els.collectCount.textContent = "0";
       if (els.collectQty) els.collectQty.textContent = "0";
       if (els.collectMix) els.collectMix.textContent = "0 / 0 / 0";
+      this.selectedKeys = [];
+      this.saveSelectedKeys();
+      this.resetCollectAllToggle();
+      this.syncCollectAllToggle();
       return;
     }
 
@@ -1860,6 +1926,7 @@ if (els.count) els.count.textContent = String(rows.length);
 
     this.saveCollectMeta();
     this.bindCollectEvents();
+    this.syncCollectAllToggle();
 
     if (els.collectCount) els.collectCount.textContent = String(groups.length);
     if (els.collectQty) els.collectQty.textContent = String(groups.reduce((sum, g) => sum + Number(g.collectedQty || g.totalQty || 0), 0));
