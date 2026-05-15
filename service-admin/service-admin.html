@@ -121,18 +121,22 @@
       background: #fff;
     }
     .company-summary {
-      display: grid;
-      grid-template-columns: auto minmax(140px, 220px) auto minmax(210px, 340px);
+      display: flex;
       align-items: center;
       gap: 10px;
       min-width: 0;
+      flex-wrap: nowrap;
+      width: fit-content;
+      max-width: 100%;
     }
     .company-edit-line {
-      display: grid;
-      grid-template-columns: auto minmax(140px, 220px) auto minmax(240px, 360px);
+      display: flex;
       align-items: center;
       gap: 10px;
       min-width: 0;
+      flex-wrap: nowrap;
+      width: fit-content;
+      max-width: 100%;
     }
     .company-summary[hidden],
     .company-edit-line[hidden],
@@ -141,7 +145,7 @@
     }
     .company-actions {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       align-items: center;
       justify-content: flex-end;
       flex-wrap: wrap;
@@ -162,13 +166,29 @@
       font-weight: 900;
       font-size: 14px;
     }
+    .company-name-text {
+      width: var(--company-name-col, auto);
+      max-width: 260px;
+    }
+    .company-domain-text {
+      width: var(--company-domain-col, auto);
+      max-width: 360px;
+    }
+    .company-separator {
+      color: #cbd5e1;
+      font-weight: 900;
+    }
+    .company-edit-line .domain-input-wrap {
+      width: var(--company-domain-input-col, 300px);
+      flex: 0 0 auto;
+    }
     .company-domain-text a {
       color: #0f766e;
       text-decoration: none;
     }
     .company-domain-text a:hover { text-decoration: underline; }
     .company-title-input {
-      width: 100%;
+      width: var(--company-name-input-col, 190px);
       height: 40px;
       border: 1px solid #cbd5e1;
       border-radius: 12px;
@@ -388,12 +408,19 @@
     @media (max-width: 760px) {
       .company-summary,
       .company-edit-line {
-        grid-template-columns: 1fr;
+        flex-wrap: wrap;
+        width: 100%;
         gap: 7px;
       }
-      .company-summary .badge,
-      .company-edit-line .badge {
-        justify-self: flex-start;
+      .company-name-text,
+      .company-domain-text,
+      .company-title-input,
+      .company-edit-line .domain-input-wrap {
+        width: 100% !important;
+        max-width: 100%;
+      }
+      .company-separator {
+        display: none;
       }
     }
   </style>
@@ -647,6 +674,13 @@
   function renderCompanies() {
     els.companyCountBadge.textContent = '회사 ' + companies.length + '개';
 
+    const maxNameLen = Math.max(8, ...companies.map(company => String(company.company_name || '-').length));
+    const maxDomainLen = Math.max(18, ...companies.map(company => getCompanyDisplayDomain(company.subdomain || '').length || 0));
+    const nameColWidth = Math.min(Math.max(maxNameLen * 14 + 18, 120), 260);
+    const domainColWidth = Math.min(Math.max(maxDomainLen * 8 + 24, 190), 360);
+    const nameInputWidth = Math.min(Math.max(maxNameLen * 14 + 42, 170), 300);
+    const domainInputWidth = Math.min(Math.max(maxDomainLen * 8 + 86, 260), 430);
+
     if (!companies.length) {
       els.companyList.innerHTML = '<div class="empty">등록된 회사가 없습니다.</div>';
       return;
@@ -659,11 +693,12 @@
       const displayDomain = getCompanyDisplayDomain(subdomain);
 
       return `
-        <div class="company-item" data-company-row="${escapeHtml(company.id)}" data-editing="false">
+        <div class="company-item" data-company-row="${escapeHtml(company.id)}" data-editing="false" style="--company-name-col:${nameColWidth}px; --company-domain-col:${domainColWidth}px; --company-name-input-col:${nameInputWidth}px; --company-domain-input-col:${domainInputWidth}px;">
           <div class="company-summary" data-company-view="${escapeHtml(company.id)}">
             <span class="badge ${active ? 'active' : 'inactive'}">${active ? '활성' : '비활성'}</span>
             <span class="label">회사:</span>
             <span class="company-name-text" title="${escapeHtml(company.company_name || '-')}">${escapeHtml(company.company_name || '-')}</span>
+            <span class="company-separator">│</span>
             <span class="label">주소:</span>
             <span class="company-domain-text" title="${escapeHtml(displayDomain || '주소 미설정')}">
               ${
@@ -683,6 +718,7 @@
               data-edit-company-name="${escapeHtml(company.id)}"
               value="${escapeHtml(company.company_name || '')}"
             >
+            <span class="company-separator">│</span>
             <span class="label">주소:</span>
             <div class="domain-input-wrap">
               <span class="domain-prefix">https://</span>
