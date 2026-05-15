@@ -20,6 +20,27 @@ const CM_LIMIT=154;
 const TON_TO_CM=22;
 const MAX_TON_M3=7;
 
+function getWastewaterPortalSession(){
+  try{ if(window.parent && typeof window.parent.getPortalSession === 'function') return window.parent.getPortalSession(); }catch(e){}
+  try{ if(window.parent && window.parent.portalSession) return window.parent.portalSession; }catch(e){}
+  return window.portalSession || window.currentPortalSession || null;
+}
+function getWastewaterCompanyId(){
+  const session=getWastewaterPortalSession();
+  const fromSession=session?.companyId||session?.company_id||session?.company?.id||session?.company?.company_id||window.currentCompanyId||'';
+  if(fromSession) return String(fromSession);
+  try{ const params=new URLSearchParams(location.search); return params.get('company_id')||params.get('companyId')||''; }catch(e){ return ''; }
+}
+function withCompanyPayload(payload){
+  const companyId=getWastewaterCompanyId();
+  return companyId ? {...payload, company_id:companyId} : {...payload};
+}
+function scopedCompanyQuery(query){
+  const companyId=getWastewaterCompanyId();
+  return companyId ? query.eq('company_id', companyId) : query;
+}
+
+
 async function getMyRoles(email){
   const roles = [];
   const targetEmail = String(email || '').trim();
@@ -140,16 +161,16 @@ async function loadWastewaterRoleRows(){
 
 function loadCoreData(){
   return Promise.all([
-    sb.from(DAILY_VIEW).select('*').order('date',{ascending:false}).order('created_at',{ascending:false}),
-    sb.from(PICKUP_TABLE).select('*').order('pickup_date',{ascending:false}).order('created_at',{ascending:false}),
-    sb.from(APPROVAL_TABLE).select('*').order('month_key',{ascending:false})
+    scopedCompanyQuery(sb.from(DAILY_VIEW).select('*')).order('date',{ascending:false}).order('created_at',{ascending:false}),
+    scopedCompanyQuery(sb.from(PICKUP_TABLE).select('*')).order('pickup_date',{ascending:false}).order('created_at',{ascending:false}),
+    scopedCompanyQuery(sb.from(APPROVAL_TABLE).select('*')).order('month_key',{ascending:false})
   ]);
 }
 
 function loadAdminData(){
   return Promise.all([
     loadWastewaterRoleRows(),
-    sb.from(LOG_TABLE).select('*').order('created_at',{ascending:false}).limit(200)
+    scopedCompanyQuery(sb.from(LOG_TABLE).select('*')).order('created_at',{ascending:false}).limit(200)
   ]);
 }
 
@@ -159,11 +180,11 @@ function loadReferenceData(){
 
 function loadAllData(includeAdmin){
   return Promise.all([
-    sb.from(DAILY_VIEW).select('*').order('date',{ascending:false}).order('created_at',{ascending:false}),
-    sb.from(PICKUP_TABLE).select('*').order('pickup_date',{ascending:false}).order('created_at',{ascending:false}),
+    scopedCompanyQuery(sb.from(DAILY_VIEW).select('*')).order('date',{ascending:false}).order('created_at',{ascending:false}),
+    scopedCompanyQuery(sb.from(PICKUP_TABLE).select('*')).order('pickup_date',{ascending:false}).order('created_at',{ascending:false}),
     includeAdmin?loadWastewaterRoleRows():Promise.resolve({data:[]}),
-    includeAdmin?sb.from(LOG_TABLE).select('*').order('created_at',{ascending:false}).limit(200):Promise.resolve({data:[]}),
-    sb.from(APPROVAL_TABLE).select('*').order('month_key',{ascending:false}),
+    includeAdmin?scopedCompanyQuery(sb.from(LOG_TABLE).select('*')).order('created_at',{ascending:false}).limit(200):Promise.resolve({data:[]}),
+    scopedCompanyQuery(sb.from(APPROVAL_TABLE).select('*')).order('month_key',{ascending:false}),
     sb.from(REFERENCE_TABLE).select('*').order('doc_key',{ascending:true})
   ]);
 }
@@ -178,23 +199,23 @@ function deleteReferenceDocById(id){
 }
 
 function insertDailyRow(payload){
-  return sb.from(DAILY_TABLE).insert([payload]).select().single();
+  return sb.from(DAILY_TABLE).insert([withCompanyPayload(payload)]).select().single();
 }
 
 function insertPickupRow(payload){
-  return sb.from(PICKUP_TABLE).insert([payload]).select().single();
+  return sb.from(PICKUP_TABLE).insert([withCompanyPayload(payload)]).select().single();
 }
 
-function deleteDailyRowById(id){ return sb.from(DAILY_TABLE).delete().eq('id',id); }
-function deletePickupRowById(id){ return sb.from(PICKUP_TABLE).delete().eq('id',id); }
+function deleteDailyRowById(id){ return scopedCompanyQuery(sb.from(DAILY_TABLE).delete().eq('id',id)); }
+function deletePickupRowById(id){ return scopedCompanyQuery(sb.from(PICKUP_TABLE).delete().eq('id',id)); }
 
 function upsertWriterApproval(monthKey,payload,rowExists){
-  if(rowExists) return sb.from(APPROVAL_TABLE).update(payload).eq('month_key', monthKey);
-  return sb.from(APPROVAL_TABLE).insert([payload]);
+  if(rowExists) return scopedCompanyQuery(sb.from(APPROVAL_TABLE).update(payload).eq('month_key', monthKey));
+  return sb.from(APPROVAL_TABLE).insert([withCompanyPayload(payload)]);
 }
 
 function updateApprovalByMonth(monthKey,payload){
-  return sb.from(APPROVAL_TABLE).update(payload).eq('month_key',monthKey);
+  return scopedCompanyQuery(sb.from(APPROVAL_TABLE).update(payload).eq('month_key',monthKey));
 }
 
 function updateUserRole(email,newRole){ return sb.from(USERS_TABLE).update({role:newRole}).eq('email',email); }
@@ -412,6 +433,8 @@ async function logApprovalAction(actorEmail,monthKey,action,reason=''){
 }
 
 window.WastewaterApi={
+  getCompanyId:getWastewaterCompanyId,
+  getPortalSession:getWastewaterPortalSession,
   SUPABASE_URL,SUPABASE_KEY,
   DAILY_TABLE,DAILY_VIEW,PICKUP_TABLE,USERS_TABLE,EMPLOYEES_TABLE,WASTEWATER_ROLE_VIEW,WASTEWATER_OPERATORS_TABLE,WASTEWATER_APPROVERS_TABLE,USER_APP_ROLES_TABLE,LOG_TABLE,APPROVAL_TABLE,APPROVAL_LOG_TABLE,REFERENCE_TABLE,RELATED_DOC_BUCKET,CM_LIMIT,TON_TO_CM,MAX_TON_M3,
   getMyRoles,loadCoreData,loadAdminData,loadReferenceData,loadAllData,saveReferenceDoc,deleteReferenceDocById,saveRelatedDocument,deleteRelatedDocumentById,uploadRelatedDocFile,getRelatedDocPublicUrl,deleteRelatedDocFile,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,getUserSignature,searchEmployees,loadWastewaterManagers,addWastewaterOperator,removeWastewaterOperator,addWastewaterApprover,removeWastewaterApprover,logActivity,logApprovalAction
