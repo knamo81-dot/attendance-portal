@@ -2520,6 +2520,148 @@ svg text{
 }
 </style>
 
+
+<style id="attendance-deep-risk-radar-final-fix">
+/* ===== 심층분석 최종 보정 ===== */
+/* 1) 위험지수 상위 담당자 흰색 박스 끊김 수정 */
+/* 2) 조직 건강도 레이더 컨트롤 정렬 수정 */
+/* 기능/JS 변경 없음 */
+
+/* 1. 위험지수 상위 담당자 카드 높이 제한 해제 */
+#main-deep-analysis .card:has(.riskItem),
+#main-deep-analysis .card:has(.riskInlineMetrics),
+#main-deep-analysis .card:has(.riskScoreWrap) {
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  display: block !important;
+  padding-bottom: 16px !important;
+  background: #fff !important;
+}
+
+#main-deep-analysis .card:has(.riskItem) .scrollBox,
+#main-deep-analysis .card:has(.riskInlineMetrics) .scrollBox,
+#main-deep-analysis .card:has(.riskScoreWrap) .scrollBox {
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding-right: 0 !important;
+}
+
+#main-deep-analysis .scrollBox:has(.riskItem) {
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding-right: 0 !important;
+}
+
+#main-deep-analysis .riskItem {
+  height: auto !important;
+  min-height: 56px !important;
+  max-height: none !important;
+  overflow: visible !important;
+  margin-bottom: 9px !important;
+  padding: 10px 12px !important;
+  border-radius: 13px !important;
+  background: #fff !important;
+}
+
+#main-deep-analysis .riskItem:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* 부모 clipping 방지 */
+#main-deep-analysis,
+#main-deep-analysis .mainPanel,
+#main-deep-analysis .panel,
+#main-deep-analysis .deepTopGrid,
+#main-deep-analysis .deepLeftStack,
+#main-deep-analysis .criteriaCard,
+#main-deep-analysis .radarCenterCard {
+  overflow: visible !important;
+}
+
+/* 2. 조직 건강도 레이더 컨트롤 정렬 */
+#main-deep-analysis .radarModeWrap {
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  margin: 8px 0 0 0 !important;
+  gap: 0 !important;
+}
+
+#main-deep-analysis .radarModeLabel {
+  display: block !important;
+  text-align: left !important;
+  margin: 0 0 8px 0 !important;
+  padding: 0 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  color: #475569 !important;
+  line-height: 1.2 !important;
+}
+
+#main-deep-analysis .radarModeTabs {
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 7px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#main-deep-analysis .radarModeBtn {
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+}
+
+/* 버튼 아래 범례 간격 확보 */
+#main-deep-analysis .radarCenterCard .legend {
+  justify-content: flex-start !important;
+  align-items: center !important;
+  margin-top: 10px !important;
+  margin-bottom: 8px !important;
+  gap: 8px !important;
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+}
+
+#main-deep-analysis .radarCenterCard .legend .dot {
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 3px !important;
+  margin-right: 2px !important;
+}
+
+/* 레이더 헤더 내부 정렬 안정화 */
+#main-deep-analysis .radarHead {
+  align-items: flex-start !important;
+  gap: 10px !important;
+}
+
+#main-deep-analysis .radarHead > div {
+  min-width: 0 !important;
+}
+
+/* 반응형 */
+@media (max-width: 900px) {
+  #main-deep-analysis .radarModeWrap {
+    width: 100% !important;
+  }
+
+  #main-deep-analysis .radarModeTabs {
+    flex-wrap: wrap !important;
+  }
+}
+</style>
+
 </head>
 <body>
 <script>
