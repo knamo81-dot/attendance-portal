@@ -674,6 +674,98 @@ window.ReagentApp.collect = {
     };
   },
 
+
+  ensurePrepareColumnLayoutStyle() {
+    if (document.getElementById("reagent-prepare-column-layout-style")) return;
+
+    const style = document.createElement("style");
+    style.id = "reagent-prepare-column-layout-style";
+    style.textContent = `
+      /* 취합정리 비교견적표 컬럼 폭 보정
+         - 품명 컬럼을 넓히고, 제조사~용도 구간을 압축해 긴 품명이 덜 줄바꿈되도록 조정합니다. */
+      .prepare-quote-table.prepare-fixed-table,
+      .prepare-quote-table {
+        table-layout: fixed !important;
+        min-width: 1760px !important;
+        width: 100% !important;
+      }
+
+      .prepare-quote-table th,
+      .prepare-quote-table td {
+        vertical-align: middle !important;
+      }
+
+      .prepare-quote-table th:nth-child(1),
+      .prepare-quote-table td:nth-child(1) { width: 58px !important; }
+
+      .prepare-quote-table th:nth-child(2),
+      .prepare-quote-table td:nth-child(2) {
+        width: 330px !important;
+        min-width: 330px !important;
+        white-space: normal !important;
+        word-break: keep-all !important;
+        overflow-wrap: anywhere !important;
+        line-height: 1.35 !important;
+      }
+
+      .prepare-quote-table th:nth-child(3),
+      .prepare-quote-table td:nth-child(3) { width: 105px !important; }
+      .prepare-quote-table th:nth-child(4),
+      .prepare-quote-table td:nth-child(4) { width: 62px !important; }
+      .prepare-quote-table th:nth-child(5),
+      .prepare-quote-table td:nth-child(5) { width: 92px !important; }
+      .prepare-quote-table th:nth-child(6),
+      .prepare-quote-table td:nth-child(6) { width: 78px !important; }
+      .prepare-quote-table th:nth-child(7),
+      .prepare-quote-table td:nth-child(7) { width: 92px !important; }
+      .prepare-quote-table th:nth-child(8),
+      .prepare-quote-table td:nth-child(8) { width: 56px !important; }
+
+      .prepare-quote-table th:nth-child(9),
+      .prepare-quote-table td:nth-child(9) {
+        width: 180px !important;
+        min-width: 180px !important;
+        white-space: normal !important;
+        word-break: keep-all !important;
+        overflow-wrap: anywhere !important;
+        line-height: 1.35 !important;
+      }
+
+      .prepare-quote-table th:nth-child(10),
+      .prepare-quote-table td:nth-child(10) { width: 88px !important; }
+      .prepare-quote-table th:nth-child(11),
+      .prepare-quote-table td:nth-child(11) { width: 105px !important; }
+      .prepare-quote-table th:nth-child(12),
+      .prepare-quote-table td:nth-child(12) { width: 120px !important; }
+      .prepare-quote-table th:nth-child(13),
+      .prepare-quote-table td:nth-child(13) { width: 88px !important; }
+      .prepare-quote-table th:nth-child(14),
+      .prepare-quote-table td:nth-child(14) { width: 105px !important; }
+      .prepare-quote-table th:nth-child(15),
+      .prepare-quote-table td:nth-child(15) { width: 120px !important; }
+      .prepare-quote-table th:nth-child(16),
+      .prepare-quote-table td:nth-child(16) { width: 132px !important; }
+
+      .prepare-summary-table.prepare-fixed-table,
+      .prepare-summary-table {
+        table-layout: fixed !important;
+        min-width: 980px !important;
+      }
+
+      .prepare-summary-table th:nth-child(2),
+      .prepare-summary-table td:nth-child(2) {
+        width: 320px !important;
+        min-width: 320px !important;
+        white-space: normal !important;
+        word-break: keep-all !important;
+        overflow-wrap: anywhere !important;
+        line-height: 1.35 !important;
+      }
+    `;
+
+    document.head.appendChild(style);
+  },
+
   initPrepareMonthControl() {
     const request = window.ReagentApp.request;
     const els = this.getPrepareEls();
@@ -1294,6 +1386,7 @@ window.ReagentApp.collect = {
     const els = this.getPrepareEls();
     if (!request || !els.summaryList || !els.quoteList) return;
 
+    this.ensurePrepareColumnLayoutStyle?.();
     this.initPrepareMonthControl();
 
     const view = this.getPrepareActiveView();
