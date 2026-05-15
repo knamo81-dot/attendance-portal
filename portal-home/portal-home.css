@@ -1522,13 +1522,13 @@ body.auth-loading .app{visibility:visible; opacity:.35; pointer-events:none}
 
 /* 메모 */
 .memo-top {
-  padding: 14px 14px 0 14px;
+  padding: 8px 14px 0 14px;
 }
 
 .memo-board {
-  margin: 14px;
+  margin: 8px 14px 14px 14px;
   border-radius: 16px;
-  min-height: max(760px, calc(100vh - 220px));
+  min-height: 640px;
 }
 
 .memo-note {
@@ -1871,7 +1871,12 @@ body.auth-loading .app{visibility:visible; opacity:.35; pointer-events:none}
   }
 }
 
-/* ===== 개인 메모 보드 세로 비율 보정 ===== */
-.memo-board {
-  min-height: max(760px, calc(100vh - 220px));
+/* ===== 개인 메모 시작 위치 보정 ===== */
+.memo-top {
+  padding-top: 8px;
 }
+
+.memo-board {
+  margin-top: 8px;
+}
+
