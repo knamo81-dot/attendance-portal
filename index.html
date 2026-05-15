@@ -652,6 +652,47 @@ body:not(.service-admin-enabled) .service-admin-btn{
   color:#b30e27 !important;
 }
 
+
+/* ===== Portal Brand Color from system_settings ===== */
+:root {
+  --portal-brand-color: #c8102e;
+  --portal-brand-color-2: #e11d2e;
+  --portal-brand-rgb: 200, 16, 46;
+}
+
+.portal-common-header {
+  background: linear-gradient(135deg, var(--portal-brand-color) 0%, var(--portal-brand-color-2) 100%);
+}
+
+.nav-btn.home {
+  border-color: rgba(var(--portal-brand-rgb), 0.9) !important;
+}
+
+.nav-btn.home.active {
+  color: var(--portal-brand-color) !important;
+  border-color: rgba(var(--portal-brand-rgb), 0.98) !important;
+  box-shadow:
+    0 5px 14px rgba(var(--portal-brand-rgb), 0.22),
+    inset 0 0 0 1px rgba(var(--portal-brand-rgb), 0.06) !important;
+}
+
+.nav-btn.home:hover {
+  border-color: var(--portal-brand-color-2) !important;
+}
+
+.nav-btn.home.active:hover {
+  color: var(--portal-brand-color) !important;
+}
+
+.auth-field input:focus {
+  border-color: var(--portal-brand-color);
+  box-shadow: 0 0 0 3px rgba(var(--portal-brand-rgb), 0.12);
+}
+
+.auth-button {
+  background: linear-gradient(135deg, var(--portal-brand-color) 0%, var(--portal-brand-color-2) 100%);
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -808,6 +849,90 @@ body:not(.service-admin-enabled) .service-admin-btn{
   let currentCompany = null;
   let authBusy = false;
 
+  let portalBrandColor = '#c8102e';
+  let portalBrandColor2 = '#e11d2e';
+
+  function isValidHexColor(value) {
+    return /^#[0-9a-fA-F]{6}$/.test(String(value || '').trim());
+  }
+
+  function hexToRgb(hex) {
+    const clean = String(hex || '').replace('#', '');
+    if (clean.length !== 6) return { r: 200, g: 16, b: 46 };
+    return {
+      r: parseInt(clean.slice(0, 2), 16),
+      g: parseInt(clean.slice(2, 4), 16),
+      b: parseInt(clean.slice(4, 6), 16)
+    };
+  }
+
+  function rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(function (n) {
+      const v = Math.max(0, Math.min(255, Math.round(n)));
+      return v.toString(16).padStart(2, '0');
+    }).join('');
+  }
+
+  function adjustHexColor(hex, amount) {
+    const rgb = hexToRgb(hex);
+    return rgbToHex(rgb.r + amount, rgb.g + amount, rgb.b + amount);
+  }
+
+  function applyPortalBrandColor(color) {
+    const safeColor = isValidHexColor(color) ? String(color).trim() : '#c8102e';
+    const accentColor = adjustHexColor(safeColor, 22);
+    const rgb = hexToRgb(safeColor);
+
+    portalBrandColor = safeColor;
+    portalBrandColor2 = accentColor;
+
+    document.documentElement.style.setProperty('--portal-brand-color', safeColor);
+    document.documentElement.style.setProperty('--portal-brand-color-2', accentColor);
+    document.documentElement.style.setProperty('--portal-brand-rgb', `${rgb.r}, ${rgb.g}, ${rgb.b}`);
+
+    let themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (!themeMeta) {
+      themeMeta = document.createElement('meta');
+      themeMeta.setAttribute('name', 'theme-color');
+      document.head.appendChild(themeMeta);
+    }
+    themeMeta.setAttribute('content', safeColor);
+  }
+
+  function getPortalBrandGradient() {
+    return `linear-gradient(135deg, ${portalBrandColor} 0%, ${portalBrandColor2} 100%)`;
+  }
+
+  async function loadPortalBrandSettings() {
+    const companyId = currentProfile?.company_id || currentCompany?.id || window.currentCompanyId || '';
+    if (!companyId) {
+      applyPortalBrandColor('#c8102e');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabaseClient
+        .from('system_settings')
+        .select('setting_value')
+        .eq('company_id', companyId)
+        .eq('setting_key', 'portal_brand')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      const savedColor =
+        data?.setting_value?.brandColor ||
+        data?.setting_value?.brand_color ||
+        data?.setting_value?.color ||
+        '#c8102e';
+
+      applyPortalBrandColor(savedColor);
+    } catch (error) {
+      console.warn('portal brand setting load failed:', error);
+      applyPortalBrandColor('#c8102e');
+    }
+  }
+
   const portalHeaderMeta = {
     'portal-main/portal-main.html': {
       top: 'Integrated Operations Platform',
@@ -871,7 +996,8 @@ body:not(.service-admin-enabled) .service-admin-btn{
     const title = document.getElementById('portalHeaderTitle');
     const desc = document.getElementById('portalHeaderDesc');
 
-    if (header && meta.gradient) header.style.background = meta.gradient;
+    const headerGradient = key === HOME_SRC ? getPortalBrandGradient() : meta.gradient;
+    if (header && headerGradient) header.style.background = headerGradient;
     if (top) top.textContent = meta.top || '';
     if (title) title.textContent = meta.title || '';
     if (desc) desc.textContent = meta.desc || '';
@@ -1007,6 +1133,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
     currentUser = null;
     currentProfile = null;
     currentCompany = null;
+    applyPortalBrandColor('#c8102e');
     window.portalSession = null;
     window.currentPortalSession = null;
     window.currentCompanyId = null;
@@ -1135,6 +1262,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
     currentUser = user;
     currentProfile = profile;
     currentCompany = company;
+    await loadPortalBrandSettings();
     publishPortalSession();
     applyRoleUI();
     return true;
@@ -1236,6 +1364,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
     if (isReagentSrc(src)) saveReagentUserHint();
 
     if (isHome) {
+      await loadPortalBrandSettings();
       localStorage.removeItem(LAST_PAGE_KEY);
     } else if (!options.skipSave) {
       localStorage.setItem(LAST_PAGE_KEY, src);
@@ -1430,6 +1559,16 @@ body:not(.service-admin-enabled) .service-admin-btn{
     els.loginPassword?.addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
     els.changePasswordButton?.addEventListener('click', changePassword);
     els.confirmPassword?.addEventListener('keydown', (e) => { if (e.key === 'Enter') changePassword(); });
+
+    window.addEventListener('message', function (event) {
+      const payload = event?.data || {};
+      if (payload.type !== 'portal-brand-updated') return;
+      const nextColor = payload.brandColor || payload.brand_color || payload.color;
+      if (!isValidHexColor(nextColor)) return;
+      applyPortalBrandColor(nextColor);
+      const currentSrc = normalizePortalSrc(frame?.getAttribute('src') || frame?.src || HOME_SRC);
+      updatePortalHeader(currentSrc);
+    });
   }
 
   async function boot() {
