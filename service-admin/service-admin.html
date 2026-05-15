@@ -22,6 +22,8 @@
       border-radius: 22px;
       padding: 22px;
       box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+      width: fit-content;
+      max-width: 100%;
     }
     .card h2 {
       margin: 0 0 8px;
@@ -301,6 +303,8 @@
       display: grid;
       gap: 10px;
       margin-top: 16px;
+      width: var(--admin-content-width, 650px);
+      max-width: 100%;
     }
     .app-row {
       border: 1px solid #e2e8f0;
@@ -357,6 +361,8 @@
       padding: 14px 16px;
       font-size: 13px;
       line-height: 1.65;
+      width: var(--admin-content-width, 650px);
+      max-width: 100%;
     }
     .notice {
       border: 1px dashed #cbd5e1;
@@ -422,6 +428,7 @@
 
     @media (max-width: 1100px) {
       .page { padding: 18px; }
+      .card { width: 100%; }
       .form {
         grid-template-columns: 1fr;
         width: 100%;
