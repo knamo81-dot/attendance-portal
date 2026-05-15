@@ -424,32 +424,6 @@
     }
     .company-code-hidden { display: none; }
 
-    .admin-layout {
-      display: grid;
-      grid-template-columns: auto minmax(360px, 520px);
-      gap: 18px;
-      align-items: start;
-    }
-
-    .apps-side-panel {
-      display: none;
-    }
-
-    .apps-side-panel.active {
-      display: block;
-    }
-
-    @media (max-width: 1200px) {
-      .admin-layout {
-        grid-template-columns: 1fr;
-      }
-
-      .apps-side-panel {
-        display: none !important;
-      }
-    }
-
-
     @media (max-width: 1100px) {
       .page { padding: 18px; }
       .card { width: 100%; }
@@ -495,12 +469,12 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="./assets/css/common-ui.css">
 </head>
 <body>
-  <main class="page">
-    <div class="admin-layout">
-      <section id="companiesView" class="view active">
-        <article class="card">
+  <main class="page el-page">
+    <section id="companiesView" class="view active">
+      <article class="card el-card">
         <h2>회사 관리</h2>
         <p>회사명과 서브도메인을 등록합니다. company_code는 내부 식별값으로 자동 생성됩니다.</p>
 
@@ -508,11 +482,11 @@
           <div class="form-fields">
             <div class="field">
               <label for="companyNameInput">회사명</label>
-              <input id="companyNameInput" class="input" placeholder="예: 삼천당제약" autocomplete="off">
+              <input id="companyNameInput" class="input el-input" placeholder="예: 삼천당제약" autocomplete="off">
             </div>
             <div class="domain-field">
               <label for="companySubdomainInput">접속주소</label>
-              <div class="domain-input-wrap">
+              <div class="domain-input-wrap el-domain-wrap">
                 <span class="domain-prefix">https://</span>
                 <input id="companySubdomainInput" class="domain-input" placeholder="" autocomplete="off" spellcheck="false">
                 <span class="domain-suffix">.ops.exelolab.com</span>
@@ -521,33 +495,32 @@
             </div>
           </div>
           <div class="form-actions">
-            <button id="createCompanyBtn" class="btn primary" type="button">등록</button>
-            <button id="cancelCompanyInputBtn" class="btn" type="button">취소</button>
-            <button id="refreshCompaniesBtn" class="btn" type="button">새로고침</button>
+            <button id="createCompanyBtn" class="btn el-btn el-btn-primary primary" type="button">등록</button>
+            <button id="cancelCompanyInputBtn" class="btn el-btn" type="button">취소</button>
+            <button id="refreshCompaniesBtn" class="btn el-btn" type="button">새로고침</button>
           </div>
         </div>
 
         <div class="toolbar">
-          <div class="badge" id="companyCountBadge">회사 0개</div>
+          <div class="badge el-badge" id="companyCountBadge">회사 0개</div>
         </div>
 
         <div id="companyList" class="company-list">
           <div class="empty">회사 목록을 불러오는 중입니다.</div>
         </div>
-        </article>
-      </section>
+      </article>
+    </section>
 
-      <aside id="appsSidePanel" class="apps-side-panel">
-        <section id="appsView" class="view active">
-          <article class="card">
+    <section id="appsView" class="view">
+      <article class="card el-card">
         <div class="detail-header">
           <div class="detail-title">
             <strong id="appsViewTitle">앱 사용 설정</strong>
             <span id="appsViewDesc">선택한 회사에서 사용할 앱을 켜고 끕니다.</span>
           </div>
           <div class="detail-actions">
-            <button id="cancelAppsBtn" class="btn" type="button">목록으로</button>
-            <button id="saveAppsBtn" class="btn primary" type="button">저장</button>
+            <button id="cancelAppsBtn" class="btn el-btn" type="button">목록으로</button>
+            <button id="saveAppsBtn" class="btn el-btn el-btn-primary primary" type="button">저장</button>
           </div>
         </div>
 
@@ -555,15 +528,13 @@
           <div class="empty">앱 설정을 불러오는 중입니다.</div>
         </div>
 
-        <div class="notice">
+        <div class="notice el-notice">
           앱 ON/OFF 변경 후 <strong>저장</strong>을 누르면 반영되고 회사 목록으로 돌아갑니다.
         </div>
-          </article>
-        </section>
-      </aside>
+      </article>
+    </section>
 
-      <div id="feedback" class="feedback"></div>
-    </div>
+    <div id="feedback" class="feedback el-feedback"></div>
   </main>
 
 <script>
@@ -581,7 +552,6 @@
   const els = {
     companiesView: document.getElementById('companiesView'),
     appsView: document.getElementById('appsView'),
-    appsSidePanel: document.getElementById('appsSidePanel'),
     companyNameInput: document.getElementById('companyNameInput'),
     companySubdomainInput: document.getElementById('companySubdomainInput'),
     companyDomainPreview: document.getElementById('companyDomainPreview'),
@@ -642,22 +612,8 @@
   }
 
   function showView(viewName) {
-    const mobile = window.innerWidth <= 1200;
-
-    if (mobile) {
-      els.companiesView?.classList.toggle('active', viewName === 'companies');
-      els.appsView?.classList.toggle('active', viewName === 'apps');
-      if (els.appsSidePanel) {
-        els.appsSidePanel.classList.toggle('active', viewName === 'apps');
-      }
-    } else {
-      els.companiesView?.classList.add('active');
-      els.appsView?.classList.add('active');
-
-      if (els.appsSidePanel) {
-        els.appsSidePanel.classList.toggle('active', viewName === 'apps');
-      }
-    }
+    els.companiesView?.classList.toggle('active', viewName === 'companies');
+    els.appsView?.classList.toggle('active', viewName === 'apps');
   }
 
   function generateCompanyCode() {
@@ -807,7 +763,7 @@
       const displayDomain = getCompanyDisplayDomain(subdomain);
 
       return `
-        <div class="company-item" data-company-row="${escapeHtml(company.id)}" data-editing="false" style="--company-name-col:${nameColWidth}px; --company-domain-col:${domainColWidth}px; --company-name-input-col:${nameInputWidth}px; --company-domain-input-col:${domainInputWidth}px;">
+        <div class="company-item el-company-item" data-company-row="${escapeHtml(company.id)}" data-editing="false" style="--company-name-col:${nameColWidth}px; --company-domain-col:${domainColWidth}px; --company-name-input-col:${nameInputWidth}px; --company-domain-input-col:${domainInputWidth}px;">
           <div class="company-summary" data-company-view="${escapeHtml(company.id)}">
             <span class="badge ${active ? 'active' : 'inactive'}">${active ? '활성' : '비활성'}</span>
             <span class="label">회사:</span>
@@ -834,7 +790,7 @@
             >
             <span class="company-separator">│</span>
             <span class="label">주소:</span>
-            <div class="domain-input-wrap">
+            <div class="domain-input-wrap el-domain-wrap">
               <span class="domain-prefix">https://</span>
               <input
                 class="domain-input"
@@ -849,10 +805,10 @@
           </div>
 
           <div class="company-actions">
-            <button type="button" class="btn" data-open-apps="${escapeHtml(company.id)}">앱설정</button>
-            <button type="button" class="btn" data-edit-company="${escapeHtml(company.id)}">수정</button>
-            <button type="button" class="btn primary" data-save-company="${escapeHtml(company.id)}" hidden>저장</button>
-            <button type="button" class="btn" data-cancel-company-edit="${escapeHtml(company.id)}" hidden>취소</button>
+            <button type="button" class="btn el-btn" data-open-apps="${escapeHtml(company.id)}">앱설정</button>
+            <button type="button" class="btn el-btn" data-edit-company="${escapeHtml(company.id)}">수정</button>
+            <button type="button" class="btn el-btn el-btn-primary primary" data-save-company="${escapeHtml(company.id)}" hidden>저장</button>
+            <button type="button" class="btn el-btn" data-cancel-company-edit="${escapeHtml(company.id)}" hidden>취소</button>
             <button
               type="button"
               class="btn ${active ? 'danger' : 'primary'}"
@@ -861,7 +817,7 @@
             >
               ${active ? '비활성' : '활성'}
             </button>
-            <button type="button" class="btn danger" data-delete-company="${escapeHtml(company.id)}">삭제</button>
+            <button type="button" class="btn el-btn el-btn-danger danger" data-delete-company="${escapeHtml(company.id)}">삭제</button>
           </div>
         </div>
       `;
@@ -1067,9 +1023,6 @@
 
   function returnToCompaniesView(message, type = 'ok') {
     showView('companies');
-    if (els.appsSidePanel) {
-      els.appsSidePanel.classList.remove('active');
-    }
     if (message) setFeedback(message, type);
   }
 
@@ -1108,14 +1061,14 @@
     els.appsWrap.innerHTML = apps.map(app => {
       const enabled = appDraft.get(app.id) !== false;
       return `
-        <div class="app-row">
+        <div class="app-row el-app-row">
           <div>
             <div class="app-name">${escapeHtml(app.app_name || app.app_key)}</div>
             <div class="app-key">key: ${escapeHtml(app.app_key)}</div>
           </div>
           <button
             type="button"
-            class="toggle ${enabled ? 'on' : ''}"
+            class="toggle el-toggle ${enabled ? 'on' : ''}"
             data-draft-toggle-app="${escapeHtml(app.id)}"
             aria-label="${escapeHtml(app.app_name || app.app_key)} 사용 설정"
           ></button>
@@ -1309,7 +1262,7 @@
     updateDomainPreview();
 
     if (!isServiceAdmin()) {
-      document.body.innerHTML = '<main class="page"><div class="empty">서비스 관리자 권한이 필요합니다.</div></main>';
+      document.body.innerHTML = '<main class="page el-page"><div class="empty">서비스 관리자 권한이 필요합니다.</div></main>';
       return;
     }
 
