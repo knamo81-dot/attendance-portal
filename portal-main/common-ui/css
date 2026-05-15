@@ -1,0 +1,86 @@
+:root {
+  --page-padding: 14px;
+
+  --card-padding: 12px;
+  --card-radius: 14px;
+  --card-gap: 8px;
+
+  --control-height: 28px;
+  --control-radius: 8px;
+
+  --font-title: 13px;
+  --font-base: 11px;
+  --font-small: 10px;
+
+  --gap-xs: 3px;
+  --gap-sm: 5px;
+  --gap-md: 8px;
+
+  --shadow-card: 0 5px 14px rgba(15, 23, 42, 0.045);
+}
+
+/* ExeloLab Common Compact UI - prefix only */
+.page.el-page {
+  padding: var(--page-padding) var(--page-padding) var(--page-padding) 0;
+}
+
+.card.el-card {
+  padding: var(--card-padding);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-card);
+}
+
+.card.el-card h2,
+.el-title {
+  font-size: var(--font-title);
+  margin-bottom: 6px;
+}
+
+.card.el-card p,
+.el-text {
+  font-size: var(--font-base);
+  line-height: 1.45;
+}
+
+.input.el-input,
+.select.el-select {
+  height: var(--control-height);
+  border-radius: var(--control-radius);
+  font-size: var(--font-base);
+  padding: 0 8px;
+}
+
+.btn.el-btn,
+.btn.el-btn.primary,
+.btn.el-btn.danger,
+.btn.el-btn.soft {
+  height: var(--control-height);
+  min-height: var(--control-height);
+  border-radius: var(--control-radius);
+  padding: 0 8px;
+  font-size: var(--font-base);
+  font-weight: 700;
+}
+
+.btn.el-btn-primary {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+}
+
+.btn.el-btn-danger {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fff;
+}
+
+.btn.el-btn-soft {
+  background: #f8fafc;
+  color: #334155;
+}
+
+.badge.el-badge {
+  height: 18px;
+  padding: 0 6px;
+  font-size: var(--font-small);
+}
