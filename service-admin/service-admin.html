@@ -14,36 +14,36 @@
     }
     .page {
       min-height: 100vh;
-      padding: 24px 24px 24px 0;
+      padding: var(--page-padding, 14px) var(--page-padding, 14px) var(--page-padding, 14px) 0;
     }
     .card {
       background: #fff;
       border: 1px solid #e2e8f0;
-      border-radius: 22px;
-      padding: 22px;
-      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+      border-radius: var(--card-radius, 14px);
+      padding: var(--card-padding, 12px);
+      box-shadow: var(--shadow-card, 0 5px 14px rgba(15, 23, 42, 0.045));
       width: fit-content;
       max-width: 100%;
     }
     .card h2 {
-      margin: 0 0 8px;
-      font-size: 18px;
+      margin: 0 0 6px;
+      font-size: var(--font-title, 13px);
       color: #0f172a;
       letter-spacing: -0.02em;
     }
     .card p {
       margin: 0;
-      font-size: 13px;
+      font-size: var(--font-base, 11px);
       color: #64748b;
-      line-height: 1.6;
+      line-height: 1.45;
     }
     .view { display: none; }
     .view.active { display: block; }
     .form {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
-      gap: 10px;
-      margin-top: 16px;
+      gap: 7px;
+      margin-top: 8px;
       align-items: end;
       width: var(--admin-content-width, 650px);
       max-width: 100%;
@@ -63,16 +63,16 @@
       gap: 6px;
     }
     .field label {
-      font-size: 12px;
-      font-weight: 800;
+      font-size: var(--font-small, 10px);
+      font-weight: 700;
       color: #475569;
     }
     .input, .select {
-      height: 40px;
+      height: var(--control-height, 28px);
       border: 1px solid #cbd5e1;
-      border-radius: 12px;
-      padding: 0 12px;
-      font-size: 13px;
+      border-radius: var(--control-radius, 8px);
+      padding: 0 8px;
+      font-size: var(--font-base, 11px);
       color: #0f172a;
       background: #fff;
       outline: none;
@@ -82,14 +82,14 @@
       box-shadow: 0 0 0 3px rgba(15,23,42,.08);
     }
     .btn {
-      height: 40px;
-      border-radius: 12px;
+      height: var(--control-height, 28px);
+      border-radius: var(--control-radius, 8px);
       border: 1px solid #cbd5e1;
       background: #fff;
       color: #0f172a;
-      padding: 0 14px;
-      font-size: 13px;
-      font-weight: 800;
+      padding: 0 8px;
+      font-size: var(--font-base, 11px);
+      font-weight: 700;
       cursor: pointer;
       white-space: nowrap;
     }
@@ -114,7 +114,7 @@
     .toolbar {
       display: flex;
       justify-content: space-between;
-      gap: 10px;
+      gap: 7px;
       align-items: center;
       margin: 16px 0 10px;
       flex-wrap: wrap;
@@ -123,19 +123,19 @@
     }
     .company-list {
       display: grid;
-      gap: 10px;
-      margin-top: 12px;
+      gap: 7px;
+      margin-top: 8px;
       justify-items: start;
       width: var(--admin-content-width, 650px);
       max-width: 100%;
     }
     .company-item {
       border: 1px solid #e2e8f0;
-      border-radius: 16px;
-      padding: 13px 14px;
+      border-radius: 11px;
+      padding: 7px 8px;
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
-      gap: 14px;
+      gap: 8px;
       align-items: center;
       background: #fff;
       width: 100%;
@@ -145,7 +145,7 @@
     .company-summary {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 7px;
       min-width: 0;
       flex-wrap: nowrap;
       width: fit-content;
@@ -154,7 +154,7 @@
     .company-edit-line {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 7px;
       min-width: 0;
       flex-wrap: nowrap;
       width: fit-content;
@@ -174,9 +174,9 @@
       margin-left: 4px;
     }
     .label {
-      font-size: 13px;
+      font-size: var(--font-base, 11px);
       color: #64748b;
-      font-weight: 800;
+      font-weight: 700;
       white-space: nowrap;
     }
     .company-name-text,
@@ -186,8 +186,8 @@
       text-overflow: ellipsis;
       white-space: nowrap;
       color: #0f172a;
-      font-weight: 900;
-      font-size: 14px;
+      font-weight: 800;
+      font-size: var(--font-base, 11px);
     }
     .company-name-text {
       width: var(--company-name-col, auto);
@@ -199,7 +199,7 @@
     }
     .company-separator {
       color: #cbd5e1;
-      font-weight: 900;
+      font-weight: 800;
     }
     .company-edit-line .domain-input-wrap {
       width: var(--company-domain-input-col, 300px);
@@ -212,12 +212,12 @@
     .company-domain-text a:hover { text-decoration: underline; }
     .company-title-input {
       width: var(--company-name-input-col, 190px);
-      height: 40px;
+      height: var(--control-height, 28px);
       border: 1px solid #cbd5e1;
-      border-radius: 12px;
-      padding: 0 12px;
-      font-size: 14px;
-      font-weight: 800;
+      border-radius: var(--control-radius, 8px);
+      padding: 0 8px;
+      font-size: var(--font-base, 11px);
+      font-weight: 700;
       color: #0f172a;
       background: #fff;
       outline: none;
@@ -233,8 +233,8 @@
       height: 24px;
       padding: 0 9px;
       border-radius: 999px;
-      font-size: 12px;
-      font-weight: 800;
+      font-size: var(--font-small, 10px);
+      font-weight: 700;
       border: 1px solid #e2e8f0;
       background: #f8fafc;
       color: #475569;
@@ -252,12 +252,12 @@
     .domain-field {
       display: grid;
       gap: 6px;
-      margin-top: 10px;
+      margin-top: 7px;
     }
     .domain-input-wrap {
-      min-height: 40px;
+      min-height: var(--control-height, 28px);
       border: 1px solid #cbd5e1;
-      border-radius: 12px;
+      border-radius: var(--control-radius, 8px);
       background: #fff;
       display: grid;
       grid-template-columns: auto minmax(120px, 1fr) auto;
@@ -270,9 +270,9 @@
       height: 100%;
       display: inline-flex;
       align-items: center;
-      padding: 0 10px;
-      font-size: 13px;
-      font-weight: 800;
+      padding: 0 7px;
+      font-size: var(--font-base, 11px);
+      font-weight: 700;
       color: #64748b;
       background: #f8fafc;
       white-space: nowrap;
@@ -280,12 +280,12 @@
     .domain-prefix { border-right: 1px solid #e2e8f0; }
     .domain-suffix { border-left: 1px solid #e2e8f0; }
     .domain-input {
-      height: 38px;
+      height: calc(var(--control-height, 28px) - 2px);
       border: 0;
       outline: none;
-      padding: 0 10px;
-      font-size: 13px;
-      font-weight: 900;
+      padding: 0 7px;
+      font-size: var(--font-base, 11px);
+      font-weight: 800;
       color: #0f172a;
       min-width: 0;
       background: #fff;
@@ -295,32 +295,32 @@
       box-shadow: 0 0 0 3px rgba(15,23,42,.08);
     }
     .domain-preview {
-      font-size: 12px;
+      font-size: var(--font-small, 10px);
       color: #64748b;
       line-height: 1.5;
     }
     .apps {
       display: grid;
-      gap: 10px;
-      margin-top: 16px;
+      gap: 7px;
+      margin-top: 8px;
     }
     .app-row {
       border: 1px solid #e2e8f0;
-      border-radius: 16px;
-      padding: 13px 14px;
+      border-radius: 11px;
+      padding: 7px 8px;
       display: flex;
       justify-content: space-between;
-      gap: 12px;
+      gap: 8px;
       align-items: center;
       background: #fff;
     }
     .app-name {
-      font-size: 14px;
-      font-weight: 900;
+      font-size: var(--font-base, 11px);
+      font-weight: 800;
     }
     .app-key {
       margin-top: 4px;
-      font-size: 12px;
+      font-size: var(--font-small, 10px);
       color: #64748b;
       font-weight: 700;
     }
@@ -354,11 +354,11 @@
       left: 26px;
     }
     .notice, .feedback {
-      margin-top: 16px;
-      border-radius: 16px;
+      margin-top: 8px;
+      border-radius: 11px;
       padding: 14px 16px;
-      font-size: 13px;
-      line-height: 1.65;
+      font-size: var(--font-base, 11px);
+      line-height: 1.45;
     }
     .notice {
       border: 1px dashed #cbd5e1;
@@ -390,15 +390,15 @@
       text-align: center;
       color: #94a3b8;
       border: 1px dashed #cbd5e1;
-      border-radius: 16px;
+      border-radius: 11px;
       background: #fff;
-      font-size: 13px;
+      font-size: var(--font-base, 11px);
     }
     .detail-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 12px;
+      gap: 8px;
       margin-bottom: 14px;
       flex-wrap: wrap;
     }
@@ -407,12 +407,12 @@
       gap: 4px;
     }
     .detail-title strong {
-      font-size: 18px;
+      font-size: var(--font-title, 13px);
       color: #0f172a;
       letter-spacing: -0.02em;
     }
     .detail-title span {
-      font-size: 12px;
+      font-size: var(--font-small, 10px);
       color: #64748b;
       font-weight: 700;
     }
@@ -811,7 +811,7 @@
             <button type="button" class="btn el-btn" data-cancel-company-edit="${escapeHtml(company.id)}" hidden>취소</button>
             <button
               type="button"
-              class="btn el-btn ${active ? 'danger' : 'primary'}"
+              class="btn el-btn ${active ? 'el-btn-danger danger' : 'el-btn-primary primary'}"
               data-toggle-company="${escapeHtml(company.id)}"
               data-next-active="${active ? 'false' : 'true'}"
             >
