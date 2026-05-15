@@ -495,7 +495,7 @@
             </div>
           </div>
           <div class="form-actions">
-            <button id="createCompanyBtn" class="btn el-btn el-btn-primary primary" type="button">등록</button>
+            <button id="createCompanyBtn" class="btn el-btn-primary primary" type="button">등록</button>
             <button id="cancelCompanyInputBtn" class="btn el-btn" type="button">취소</button>
             <button id="refreshCompaniesBtn" class="btn el-btn" type="button">새로고침</button>
           </div>
@@ -520,7 +520,7 @@
           </div>
           <div class="detail-actions">
             <button id="cancelAppsBtn" class="btn el-btn" type="button">목록으로</button>
-            <button id="saveAppsBtn" class="btn el-btn el-btn-primary primary" type="button">저장</button>
+            <button id="saveAppsBtn" class="btn el-btn-primary primary" type="button">저장</button>
           </div>
         </div>
 
@@ -729,14 +729,14 @@
   }
 
   function setAdminContentWidth(width) {
-    const safeWidth = Math.min(Math.max(Number(width) || 650, 620), 860);
+    const safeWidth = Math.min(Math.max(Number(width) || 560, 520), 720);
     document.documentElement.style.setProperty('--admin-content-width', safeWidth + 'px');
   }
 
   function calculateCompanyShellWidth(nameColWidth, domainColWidth) {
-    const summaryBase = 52 + 34 + 10 + 34 + 50;
-    const actionBase = 64 + 50 + 62 + 50 + 18;
-    const cardPaddingAndGap = 28 + 14;
+    const summaryBase = 44 + 28 + 8 + 28 + 36;
+    const actionBase = 52 + 42 + 52 + 42 + 14;
+    const cardPaddingAndGap = 20 + 10;
     return summaryBase + nameColWidth + domainColWidth + actionBase + cardPaddingAndGap;
   }
 
@@ -745,10 +745,10 @@
 
     const maxNameLen = Math.max(8, ...companies.map(company => String(company.company_name || '-').length));
     const maxDomainLen = Math.max(18, ...companies.map(company => getCompanyDisplayDomain(company.subdomain || '').length || 0));
-    const nameColWidth = Math.min(Math.max(maxNameLen * 14 + 18, 120), 260);
-    const domainColWidth = Math.min(Math.max(maxDomainLen * 8 + 24, 190), 360);
-    const nameInputWidth = Math.min(Math.max(maxNameLen * 14 + 42, 170), 300);
-    const domainInputWidth = Math.min(Math.max(maxDomainLen * 8 + 86, 260), 430);
+    const nameColWidth = Math.min(Math.max(maxNameLen * 11 + 14, 95), 210);
+    const domainColWidth = Math.min(Math.max(maxDomainLen * 7 + 18, 160), 300);
+    const nameInputWidth = Math.min(Math.max(maxNameLen * 11 + 34, 140), 240);
+    const domainInputWidth = Math.min(Math.max(maxDomainLen * 7 + 68, 220), 360);
     setAdminContentWidth(calculateCompanyShellWidth(nameColWidth, domainColWidth));
 
     if (!companies.length) {
@@ -765,7 +765,7 @@
       return `
         <div class="company-item el-company-item" data-company-row="${escapeHtml(company.id)}" data-editing="false" style="--company-name-col:${nameColWidth}px; --company-domain-col:${domainColWidth}px; --company-name-input-col:${nameInputWidth}px; --company-domain-input-col:${domainInputWidth}px;">
           <div class="company-summary" data-company-view="${escapeHtml(company.id)}">
-            <span class="badge ${active ? 'active' : 'inactive'}">${active ? '활성' : '비활성'}</span>
+            <span class="badge el-badge ${active ? 'active' : 'inactive'}">${active ? '활성' : '비활성'}</span>
             <span class="label">회사:</span>
             <span class="company-name-text" title="${escapeHtml(company.company_name || '-')}">${escapeHtml(company.company_name || '-')}</span>
             <span class="company-separator">│</span>
@@ -781,10 +781,10 @@
           </div>
 
           <div class="company-edit-line" data-company-edit-grid="${escapeHtml(company.id)}" hidden>
-            <span class="badge ${active ? 'active' : 'inactive'}">${active ? '활성' : '비활성'}</span>
+            <span class="badge el-badge ${active ? 'active' : 'inactive'}">${active ? '활성' : '비활성'}</span>
             <span class="label">회사:</span>
             <input
-              class="company-title-input"
+              class="company-title-input el-input"
               data-edit-company-name="${escapeHtml(company.id)}"
               value="${escapeHtml(company.company_name || '')}"
             >
@@ -807,17 +807,17 @@
           <div class="company-actions">
             <button type="button" class="btn el-btn" data-open-apps="${escapeHtml(company.id)}">앱설정</button>
             <button type="button" class="btn el-btn" data-edit-company="${escapeHtml(company.id)}">수정</button>
-            <button type="button" class="btn el-btn el-btn-primary primary" data-save-company="${escapeHtml(company.id)}" hidden>저장</button>
+            <button type="button" class="btn el-btn-primary primary" data-save-company="${escapeHtml(company.id)}" hidden>저장</button>
             <button type="button" class="btn el-btn" data-cancel-company-edit="${escapeHtml(company.id)}" hidden>취소</button>
             <button
               type="button"
-              class="btn ${active ? 'danger' : 'primary'}"
+              class="btn el-btn ${active ? 'danger' : 'primary'}"
               data-toggle-company="${escapeHtml(company.id)}"
               data-next-active="${active ? 'false' : 'true'}"
             >
               ${active ? '비활성' : '활성'}
             </button>
-            <button type="button" class="btn el-btn el-btn-danger danger" data-delete-company="${escapeHtml(company.id)}">삭제</button>
+            <button type="button" class="btn el-btn-danger danger" data-delete-company="${escapeHtml(company.id)}">삭제</button>
           </div>
         </div>
       `;
