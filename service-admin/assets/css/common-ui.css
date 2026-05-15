@@ -5,12 +5,12 @@
   --card-radius: 14px;
   --card-gap: 8px;
 
-  --control-height: 30px;
+  --control-height: 28px;
   --control-radius: 8px;
 
-  --font-title: 14px;
-  --font-base: 11.5px;
-  --font-small: 10.5px;
+  --font-title: 13px;
+  --font-base: 11px;
+  --font-small: 10px;
 
   --gap-xs: 3px;
   --gap-sm: 5px;
@@ -47,13 +47,13 @@
   height: var(--control-height);
   border-radius: var(--control-radius);
   font-size: var(--font-base);
-  padding: 0 9px;
+  padding: 0 8px;
 }
 
 .btn.el-btn {
   height: var(--control-height);
   border-radius: var(--control-radius);
-  padding: 0 9px;
+  padding: 0 8px;
   font-size: var(--font-base);
 }
 
@@ -98,7 +98,7 @@
 
 .company-item.el-company-item,
 .app-row.el-app-row {
-  padding: 8px 9px;
+  padding: 7px 8px;
   border-radius: 11px;
 }
 
