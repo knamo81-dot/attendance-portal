@@ -769,9 +769,9 @@ window.ReagentApp.collect = {
     const categoryOrder = { "시약": 1, "초자": 2, "초자/소모품": 2, "안전용품": 3 };
     const sortedRows = Array.isArray(rows) ? [...rows] : [];
 
-    // 제품취합 화면의 정렬 흐름과 맞추되, 비고(온라인/대리점/제조원/취급처 구매)는
-    // 행 위치를 바꾸는 기준으로 사용하지 않습니다.
-    // 정렬 기준: 구분 → 대표 기본거래처 → 일반 비교견적 → 기타 기본거래처 → 거래처 → 용도 → 품명 → 비고
+    // 제품취합 화면의 정렬 흐름과 맞춥니다.
+    // 구분값 안에서는 온라인 구매를 항상 가장 아래로 보냅니다.
+    // 정렬 기준: 구분 → 대표 기본거래처 → 일반 비교견적 → 기타 기본거래처 → 온라인 구매 → 거래처 → 용도 → 품명 → 비고
     // 엑셀 병합은 정렬 후 서로 붙어 있는 같은 비고만 묶습니다.
     const getPrepareSortInfo = (row = {}) => {
       const category = String(row.category || "");
@@ -783,14 +783,15 @@ window.ReagentApp.collect = {
         categoryOrder: categoryOrder[category] || 99,
         remark,
         vendor,
-        isGeneral: !vendor
+        isOnline: remark === "온라인 구매",
+        isGeneral: !vendor && remark !== "온라인 구매"
       };
     };
 
     const firstVendorByBucket = {};
     sortedRows.forEach((row) => {
       const info = getPrepareSortInfo(row);
-      if (info.isGeneral || !info.vendor) return;
+      if (info.isOnline || info.isGeneral || !info.vendor) return;
 
       const bucketKey = String(info.category || "");
       if (!firstVendorByBucket[bucketKey]) {
@@ -800,6 +801,7 @@ window.ReagentApp.collect = {
 
     const getPrepareBlockOrder = (row = {}) => {
       const info = getPrepareSortInfo(row);
+      if (info.isOnline) return 9;
       if (info.isGeneral) return 2;
 
       const firstVendor = firstVendorByBucket[String(info.category || "")] || "";
@@ -1605,7 +1607,7 @@ if (els.count) els.count.textContent = String(rows.length);
     }
 
     // 제품취합 정렬: 미확정 우선 → 시약/초자/안전용품 → 기본거래처/일반/온라인 구매 순
-    // ※ 취합정리/엑셀 정렬은 건드리지 않고, 제품취합 화면 표시 순서만 조정합니다.
+    // 구분값 안에서는 온라인 구매를 항상 가장 아래로 보냅니다.
     const categoryOrder = {
       "시약": 1,
       "초자": 2,
@@ -1635,7 +1637,7 @@ if (els.count) els.count.textContent = String(rows.length);
     const firstVendorByBucket = {};
     groups.forEach((group) => {
       const info = getCollectSortInfo(group);
-      if (info.isGeneral || !info.vendor) return;
+      if (info.isOnline || info.isGeneral || !info.vendor) return;
 
       const bucketKey = `${info.confirmedOrder}||${info.category}`;
       if (!firstVendorByBucket[bucketKey]) {
@@ -1645,6 +1647,7 @@ if (els.count) els.count.textContent = String(rows.length);
 
     const getCollectBlockOrder = (group) => {
       const info = getCollectSortInfo(group);
+      if (info.isOnline) return 9;
       if (info.isGeneral) return 2;
 
       const bucketKey = `${info.confirmedOrder}||${info.category}`;
