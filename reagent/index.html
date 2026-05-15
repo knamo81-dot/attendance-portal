@@ -391,4 +391,57 @@
     });
   });
 </script>
+
+<script id="reagent-tab-emergency-fallback">
+(function () {
+  function activateReagentTab(tab) {
+    tab = tab || "request";
+    var tabButtons = document.querySelectorAll(".tab-btn, button[data-tab]");
+    var pages = document.querySelectorAll(".page");
+    var targetBtn = document.querySelector('.tab-btn[data-tab="' + tab + '"], button[data-tab="' + tab + '"]');
+    var targetPage = document.getElementById("page-" + tab) || document.querySelector('.page[data-tab="' + tab + '"], [data-page="' + tab + '"]');
+
+    tabButtons.forEach(function (btn) {
+      var on = btn === targetBtn;
+      btn.classList.toggle("active", on);
+      btn.disabled = false;
+      btn.style.removeProperty("pointer-events");
+      btn.style.removeProperty("visibility");
+      btn.style.removeProperty("display");
+      btn.setAttribute("aria-hidden", "false");
+    });
+
+    pages.forEach(function (page) {
+      var on = page === targetPage;
+      page.classList.toggle("active", on);
+      page.hidden = false;
+      page.style.display = on ? "" : "none";
+    });
+
+    if (tab === "prepare") {
+      try { window.ReagentApp?.collect?.initPrepareMonthControl?.(); } catch (_) {}
+      try { window.ReagentApp?.collect?.renderPrepare?.(); } catch (_) {}
+    }
+    if (tab === "product-management") {
+      try { window.ReagentApp?.productManagement?.init?.(); } catch (_) {}
+    }
+  }
+
+  window.__reagentActivateTab = activateReagentTab;
+
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".tab-btn, button[data-tab]").forEach(function (btn) {
+      btn.disabled = false;
+      btn.style.removeProperty("pointer-events");
+      btn.onclick = function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        activateReagentTab(btn.getAttribute("data-tab") || "request");
+        return false;
+      };
+    });
+  });
+})();
+</script>
+
 </body></html>
