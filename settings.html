@@ -722,6 +722,411 @@ html.embed-mode .auth-overlay[hidden]{
 @media (max-width:1250px){#settings-page .permission-layout,#settings-page .permission-summary-grid{grid-template-columns:1fr !important}#settings-page .permission-form-grid{grid-template-columns:1fr}}
 </style>
 
+
+<style id="settings-common-compact-final">
+/* ===== ExeloLab Common Compact UI 적용: settings ===== */
+/* 기능/JS 변경 없이 설정 화면 밀도만 조정 */
+
+:root{
+  --st-page-gap:10px;
+  --st-card-padding:14px;
+  --st-card-radius:15px;
+  --st-control-height:34px;
+  --st-control-radius:10px;
+  --st-font-title:16px;
+  --st-font-base:12.5px;
+  --st-font-small:11px;
+  --st-shadow:0 5px 14px rgba(15,23,42,.045);
+}
+
+/* 기본 레이아웃 */
+.app{
+  padding:12px;
+}
+
+.layout{
+  gap:var(--st-page-gap);
+}
+
+.settings-session-hint{
+  margin:0 0 var(--st-page-gap);
+  padding:10px 12px;
+  border-radius:13px;
+  font-size:var(--st-font-base);
+}
+
+/* 설정 메인 카드 */
+#settings-page .admin-main-card.real-admin-main,
+.admin-main-card.real-admin-main{
+  border-radius:var(--st-card-radius) !important;
+  padding:14px !important;
+  box-shadow:var(--st-shadow) !important;
+}
+
+/* 상단 탭 */
+#settings-page .adminSubTabs,
+.adminSubTabs{
+  gap:7px !important;
+  margin:0 0 12px 0 !important;
+}
+
+#settings-page .adminSubTabs .admin-subnav-btn,
+.adminSubTabs .admin-subnav-btn{
+  min-width:118px !important;
+  min-height:var(--st-control-height) !important;
+  height:var(--st-control-height) !important;
+  padding:0 12px !important;
+  border-radius:var(--st-control-radius) !important;
+  font-size:var(--st-font-base) !important;
+}
+
+/* 제목/설명 */
+#settings-page .admin-header-title,
+#adminSectionTitle{
+  font-size:18px !important;
+  margin-bottom:5px !important;
+}
+
+#settings-page .admin-header-desc,
+#adminSectionDesc{
+  font-size:var(--st-font-base) !important;
+  line-height:1.5 !important;
+  margin-bottom:10px !important;
+}
+
+/* 알림 박스 */
+#settings-page .real-admin-top-note,
+#settings-page .real-warning-box,
+.real-admin-top-note,
+.real-warning-box{
+  padding:10px 12px !important;
+  border-radius:13px !important;
+  font-size:var(--st-font-base) !important;
+  line-height:1.5 !important;
+  margin-bottom:12px !important;
+}
+
+/* 카드/박스 */
+#settings-page .real-card,
+#settings-page .real-form-card,
+.real-card,
+.real-form-card{
+  border-radius:var(--st-card-radius) !important;
+  padding:var(--st-card-padding) !important;
+  box-shadow:var(--st-shadow) !important;
+}
+
+.real-two-col,
+#settings-page .real-two-col{
+  gap:var(--st-page-gap) !important;
+  margin-top:10px !important;
+}
+
+.real-box-head{
+  gap:8px !important;
+  margin-bottom:10px !important;
+}
+
+.real-box-title,
+#settings-page .real-box-title,
+#settings-page .real-division-name{
+  font-size:var(--st-font-title) !important;
+}
+
+.real-box-sub,
+.real-division-sub,
+.real-helper-text,
+#settings-page .real-box-sub{
+  font-size:var(--st-font-small) !important;
+  line-height:1.45 !important;
+}
+
+/* 입력/셀렉트 */
+.real-input,
+.real-select,
+.admin-input,
+.admin-select,
+.auth-input,
+#settings-page .real-input,
+#settings-page .real-select{
+  min-height:var(--st-control-height) !important;
+  height:var(--st-control-height) !important;
+  border-radius:var(--st-control-radius) !important;
+  padding:0 10px !important;
+  font-size:var(--st-font-base) !important;
+}
+
+.real-field{
+  gap:4px !important;
+}
+
+.real-field label,
+.admin-field label,
+.auth-label{
+  font-size:var(--st-font-small) !important;
+}
+
+/* 버튼 */
+.real-btn,
+.admin-btn,
+.auth-btn,
+#settings-page .real-btn{
+  min-height:var(--st-control-height) !important;
+  height:var(--st-control-height) !important;
+  padding:0 12px !important;
+  border-radius:var(--st-control-radius) !important;
+  font-size:var(--st-font-base) !important;
+  font-weight:700 !important;
+}
+
+.real-actions,
+.admin-actions{
+  gap:7px !important;
+  margin-top:10px !important;
+}
+
+.real-actions.left{
+  gap:7px !important;
+}
+
+/* 그리드 */
+.real-inline-grid,
+.admin-form-grid,
+.permission-form-grid{
+  gap:9px !important;
+}
+
+.real-inline-grid.two{
+  grid-template-columns:1fr 1fr !important;
+}
+
+.real-inline-grid.three{
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+}
+
+.real-inline-grid.four{
+  grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+}
+
+/* 조직 카드 */
+.real-tree-wrap{
+  gap:8px !important;
+}
+
+.real-division-card,
+#settings-page .real-division-card{
+  border-radius:13px !important;
+  padding:10px !important;
+}
+
+.real-division-head,
+#settings-page .real-division-head{
+  gap:8px !important;
+}
+
+.real-team-grid,
+#settings-page .real-team-grid{
+  gap:7px !important;
+  margin-top:8px !important;
+}
+
+.real-team-card,
+#settings-page .real-team-card{
+  border-radius:13px !important;
+  padding:8px 10px !important;
+}
+
+#settings-page .real-team-main strong,
+.real-team-main strong{
+  font-size:var(--st-font-base) !important;
+}
+
+.real-status-chip,
+#settings-page .real-team-card .real-status-chip{
+  padding:4px 7px !important;
+  font-size:10.5px !important;
+}
+
+/* 툴바 */
+.real-toolbar{
+  gap:8px !important;
+  margin-bottom:10px !important;
+}
+
+.real-toolbar-left,
+.real-filter-row,
+#settings-page .real-toolbar-left,
+#settings-page .real-filter-row{
+  gap:6px !important;
+}
+
+.real-toolbar-left .real-search{
+  min-width:160px !important;
+  width:160px !important;
+}
+
+.real-toolbar-stats,
+#settings-page .real-toolbar-stats{
+  gap:6px !important;
+}
+
+.real-chip-outline,
+.real-count-badge{
+  min-height:var(--st-control-height) !important;
+  padding:0 10px !important;
+  border-radius:13px !important;
+  font-size:var(--st-font-base) !important;
+}
+
+/* 테이블 */
+.real-table-wrap{
+  border-radius:var(--st-card-radius) !important;
+}
+
+.real-table{
+  font-size:var(--st-font-base) !important;
+}
+
+.real-table th,
+.real-table td{
+  padding:8px 8px !important;
+  font-size:var(--st-font-base) !important;
+}
+
+.real-table th{
+  font-size:var(--st-font-small) !important;
+}
+
+.real-empty,
+.real-empty-row{
+  padding:18px !important;
+  font-size:var(--st-font-base) !important;
+}
+
+/* 모달 */
+.real-modal-card{
+  border-radius:18px !important;
+  padding:14px !important;
+}
+
+.real-modal-head{
+  margin-bottom:10px !important;
+}
+
+.real-modal-title{
+  font-size:16px !important;
+}
+
+.real-modal-close{
+  width:34px !important;
+  height:34px !important;
+  border-radius:10px !important;
+}
+
+/* 권한관리 */
+#settings-page .permission-summary-grid{
+  gap:8px !important;
+  margin-bottom:12px !important;
+}
+
+#settings-page .permission-stat-card{
+  border-radius:14px !important;
+  padding:11px !important;
+}
+
+#settings-page .permission-stat-label{
+  font-size:var(--st-font-small) !important;
+  margin-bottom:5px !important;
+}
+
+#settings-page .permission-stat-value{
+  font-size:20px !important;
+}
+
+#settings-page .permission-layout{
+  gap:var(--st-page-gap) !important;
+}
+
+#settings-page .permission-mini-tabs{
+  gap:6px !important;
+  margin-bottom:10px !important;
+}
+
+#settings-page .permission-mini-tab{
+  padding:7px 10px !important;
+  font-size:var(--st-font-small) !important;
+}
+
+#settings-page .permission-badge{
+  padding:4px 7px !important;
+  font-size:var(--st-font-small) !important;
+}
+
+#settings-page .permission-help,
+#settings-page .permission-sql-box{
+  font-size:var(--st-font-small) !important;
+}
+
+/* iframe embed */
+html.embed-mode .app{
+  padding:0 !important;
+}
+
+html.embed-mode #settings-page .adminSubTabs{
+  gap:7px !important;
+  margin:0 0 10px !important;
+  padding-bottom:8px !important;
+}
+
+html.embed-mode #settings-page .admin-main-card.real-admin-main{
+  padding:0 !important;
+  box-shadow:none !important;
+}
+
+html.embed-mode #settings-page .real-card,
+html.embed-mode #settings-page .real-form-card{
+  box-shadow:var(--st-shadow) !important;
+}
+
+/* 반응형 */
+@media (max-width:1250px){
+  #settings-page .real-two-col,
+  .real-two-col,
+  #settings-page .permission-layout,
+  #settings-page .permission-summary-grid{
+    grid-template-columns:1fr !important;
+  }
+}
+
+@media (max-width:900px){
+  #settings-page .adminSubTabs .admin-subnav-btn,
+  .adminSubTabs .admin-subnav-btn{
+    min-width:108px !important;
+    font-size:var(--st-font-small) !important;
+  }
+}
+
+@media (max-width:760px){
+  .app{
+    padding:8px;
+  }
+
+  .real-inline-grid.two,
+  .real-inline-grid.three,
+  .real-inline-grid.four,
+  .admin-form-grid,
+  .permission-form-grid{
+    grid-template-columns:1fr !important;
+  }
+
+  #settings-page .adminSubTabs .admin-subnav-btn,
+  .adminSubTabs .admin-subnav-btn{
+    flex:1 1 calc(50% - 4px) !important;
+    min-width:0 !important;
+  }
+}
+</style>
+
 </head>
 <body class="settings-embed-body">
 <script>
