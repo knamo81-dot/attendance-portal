@@ -50,11 +50,16 @@
   padding: 0 8px;
 }
 
-.btn.el-btn {
+.btn.el-btn,
+.btn.el-btn.primary,
+.btn.el-btn.danger,
+.btn.el-btn.soft {
   height: var(--control-height);
+  min-height: var(--control-height);
   border-radius: var(--control-radius);
   padding: 0 8px;
   font-size: var(--font-base);
+  font-weight: 700;
 }
 
 .btn.el-btn-primary {
@@ -123,72 +128,4 @@
 
 .toggle.el-toggle.on::after {
   left: 19px;
-}
-
-.field {
-  gap: 4px;
-}
-
-.field label,
-.domain-field label {
-  font-size: var(--font-small);
-}
-
-.domain-field {
-  gap: 4px;
-  margin-top: 7px;
-}
-
-.form {
-  gap: 7px;
-  margin-top: 12px;
-}
-
-.form-actions,
-.company-actions,
-.detail-actions {
-  gap: 5px;
-}
-
-.toolbar {
-  margin: 12px 0 8px;
-}
-
-.company-list {
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.label,
-.company-name-text,
-.company-domain-text,
-.app-name {
-  font-size: var(--font-base);
-}
-
-.app-key,
-.domain-preview,
-.detail-title span {
-  font-size: var(--font-small);
-}
-
-.detail-title strong {
-  font-size: var(--font-title);
-}
-
-.apps {
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.btn.el-btn,
-.btn.el-btn.primary,
-.btn.el-btn.danger,
-.btn.el-btn.soft {
-  height: var(--control-height);
-  min-height: var(--control-height);
-  padding: 0 8px;
-  font-size: var(--font-base);
-  font-weight: 700;
-  border-radius: var(--control-radius);
 }
