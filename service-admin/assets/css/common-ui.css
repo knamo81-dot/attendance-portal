@@ -180,3 +180,15 @@
   gap: 8px;
   margin-top: 12px;
 }
+
+.btn.el-btn,
+.btn.el-btn.primary,
+.btn.el-btn.danger,
+.btn.el-btn.soft {
+  height: var(--control-height);
+  min-height: var(--control-height);
+  padding: 0 8px;
+  font-size: var(--font-base);
+  font-weight: 700;
+  border-radius: var(--control-radius);
+}
