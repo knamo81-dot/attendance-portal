@@ -83,25 +83,12 @@ window.ReagentApp.escapeHtml = function (value) {
 
 window.ReagentApp.getPortalSession = function () {
   try {
-    if (window.parent && window.parent !== window && typeof window.parent.getPortalSession === "function") {
-      const session = window.parent.getPortalSession();
-      if (session) return session;
-    }
-  } catch (_) {}
-
-  try {
     if (window.parent && window.parent !== window && window.parent.portalSession) {
       return window.parent.portalSession || {};
     }
   } catch (_) {}
 
-  try {
-    if (window.parent && window.parent !== window && window.parent.currentPortalSession) {
-      return window.parent.currentPortalSession || {};
-    }
-  } catch (_) {}
-
-  return window.portalSession || window.currentPortalSession || {};
+  return window.portalSession || {};
 };
 
 window.ReagentApp.getCompanyId = function () {
@@ -169,24 +156,12 @@ window.ReagentApp.getCleanLabel = function (el) {
 window.ReagentApp.isGlobalAdmin = function () {
   const user = window.ReagentApp.currentUser || {};
   const role = String(user.user_role || user.role || "").trim().toLowerCase();
-  const root = document.documentElement;
-  return (
-    role === "admin" ||
-    role === "관리자" ||
-    user.is_global_admin === true ||
-    window.ReagentApp.isPortalAdminSession?.() === true ||
-    root?.classList?.contains("reagent-role-admin") === true
-  );
+  return role === "admin" || role === "관리자" || user.is_global_admin === true || window.ReagentApp.isPortalAdminSession?.() === true;
 };
 
 window.ReagentApp.isReagentOperator = function () {
   const user = window.ReagentApp.currentUser || {};
-  const root = document.documentElement;
-  return (
-    window.ReagentApp.isGlobalAdmin?.() === true ||
-    user.is_reagent_operator === true ||
-    root?.classList?.contains("reagent-role-operator") === true
-  );
+  return window.ReagentApp.isGlobalAdmin?.() === true || user.is_reagent_operator === true;
 };
 
 window.ReagentApp.hasReagentOperatorAccess = function () {
@@ -306,60 +281,14 @@ window.ReagentApp.normalizeRemovedTab = function (tab) {
 
 window.ReagentApp.showTab = function (tab) {
   tab = window.ReagentApp.normalizeRemovedTab?.(tab) || tab || "request";
-
   const targetTab = document.querySelector(`.tab-btn[data-tab="${tab}"], button[data-tab="${tab}"]`);
+
   if (targetTab && window.ReagentApp.canAccessTab?.(targetTab) === false) {
     window.ReagentApp.toast?.("접근 권한이 없는 기능입니다.", "warn");
     tab = "request";
   }
 
-  const finalTab = document.querySelector(`.tab-btn[data-tab="${tab}"], button[data-tab="${tab}"]`);
-  const finalPage =
-    document.getElementById(`page-${tab}`) ||
-    document.querySelector(`.page[data-tab="${tab}"], [data-page="${tab}"], section[data-tab="${tab}"]`);
-
-  document.querySelectorAll(".tab-btn, button[data-tab]").forEach((b) => {
-    b.classList.remove("active");
-    b.setAttribute("aria-selected", "false");
-  });
-
-  document.querySelectorAll(".page").forEach((p) => {
-    p.classList.remove("active");
-    p.setAttribute("aria-hidden", "true");
-    p.hidden = true;
-    p.style.display = "none";
-  });
-
-  if (finalTab) {
-    finalTab.classList.add("active");
-    finalTab.setAttribute("aria-selected", "true");
-    finalTab.disabled = false;
-    finalTab.style.removeProperty("pointer-events");
-  }
-
-  if (finalPage) {
-    finalPage.classList.add("active");
-    finalPage.setAttribute("aria-hidden", "false");
-    finalPage.hidden = false;
-    finalPage.style.display = "";
-  } else {
-    console.warn("시약초자 탭 페이지를 찾지 못했습니다:", tab);
-  }
-
-  window.ReagentApp.enforcePermissionDom?.();
-
-  if (tab === "prepare") {
-    window.ReagentApp.collect?.initPrepareMonthControl?.();
-    window.ReagentApp.collect?.renderPrepare?.();
-  }
-
-  if (tab === "collect") {
-    window.ReagentApp.collect?.renderCollect?.();
-  }
-
-  if (tab === "product-management") {
-    window.ReagentApp.productManagement?.init?.();
-  }
+  window.ReagentApp.forceShowTab?.(tab);
 };
 
 window.ReagentApp.loadReagentPermission = async function () {
@@ -503,18 +432,14 @@ window.ReagentApp.handleTabButtonClick = function (btn, event) {
     event.stopPropagation();
   }
 
-  // 클릭 시점에 버튼이 과거 상태로 disabled 처리되어 있어도 현재 권한 기준으로 다시 살립니다.
-  btn.disabled = false;
-  btn.style.removeProperty("pointer-events");
-
   if (window.ReagentApp.canAccessTab?.(btn) === false) {
     window.ReagentApp.toast?.("접근 권한이 없는 기능입니다.", "warn");
-    window.ReagentApp.showTab?.("request");
+    window.ReagentApp.forceShowTab?.("request");
     return false;
   }
 
   const tab = btn.dataset?.tab || "request";
-  window.ReagentApp.showTab?.(tab);
+  window.ReagentApp.forceShowTab?.(tab);
   return true;
 };
 
@@ -522,8 +447,6 @@ window.ReagentApp.installTabClickGuard = function () {
   if (window.ReagentApp._tabClickGuardInstalled) return;
   window.ReagentApp._tabClickGuardInstalled = true;
 
-  // capture 단계에서 stopImmediatePropagation을 쓰면 실제 탭 전환이 브라우저/다른 스크립트와 충돌할 수 있어
-  // bubble 단계의 보조 핸들러로만 사용합니다.
   document.addEventListener("click", function (e) {
     const btn = window.ReagentApp.getTabButtonFromEvent?.(e);
     if (!btn) return;
@@ -842,9 +765,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   window.ReagentApp.bindTabs();
   window.ReagentApp.applyPermissionUI?.();
-  // 초기 화면도 명시적으로 보정합니다.
-  const activeTab = document.querySelector(".tab-btn.active, button[data-tab].active")?.dataset?.tab || "request";
-  window.ReagentApp.showTab?.(activeTab);
   window.ReagentApp.request.populateMakerOptions();
   window.ReagentApp.bindEvents();
   window.ReagentApp.request.bindRegistrationStatusPanel?.();
