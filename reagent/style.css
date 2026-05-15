@@ -1780,3 +1780,347 @@ tr:not(.collect-row-confirmed) .vendor-group-td{
     grid-template-columns:1fr 1fr;
   }
 }
+
+
+/* ===== ExeloLab Common Compact UI 적용: reagent ===== */
+/* 기능/JS 변경 없이 시약·초자 화면 밀도만 조정 */
+
+:root{
+  --rg-page-gap:10px;
+  --rg-card-padding:14px;
+  --rg-card-radius:14px;
+  --rg-control-height:34px;
+  --rg-control-radius:10px;
+  --rg-font-title:16px;
+  --rg-font-base:12px;
+  --rg-font-small:11px;
+  --rg-shadow:0 5px 14px rgba(15,23,42,.045);
+}
+
+body{
+  font-size:var(--rg-font-base);
+}
+
+.shell{
+  gap:var(--rg-page-gap) !important;
+}
+
+/* 카드 */
+.card{
+  border-radius:var(--rg-card-radius);
+  box-shadow:var(--rg-shadow);
+}
+
+.card-head{
+  padding:13px 16px;
+  gap:8px;
+}
+
+.card-head h2,
+.card-head h3{
+  font-size:var(--rg-font-title);
+}
+
+.card-head p{
+  margin-top:4px;
+  font-size:var(--rg-font-small);
+}
+
+.card-body{
+  padding:14px 16px 16px;
+}
+
+/* 상단 헤더 카드 */
+.reagent-header-card,
+html.embed-mode .reagent-header-card{
+  padding:22px 24px !important;
+  min-height:98px !important;
+  border-radius:18px !important;
+}
+
+.reagent-header-card .sub-title{
+  font-size:var(--rg-font-small) !important;
+  margin-bottom:5px !important;
+}
+
+.reagent-header-card h2{
+  font-size:26px !important;
+  line-height:1.2 !important;
+}
+
+/* 탭/버튼 */
+.tabs{
+  gap:6px;
+}
+
+.tab-btn,
+.btn{
+  height:var(--rg-control-height) !important;
+  min-height:var(--rg-control-height) !important;
+  padding:0 12px !important;
+  border-radius:var(--rg-control-radius) !important;
+  font-size:var(--rg-font-base) !important;
+}
+
+.ghost-btn{
+  padding:6px 8px;
+  border-radius:8px;
+  font-size:var(--rg-font-small);
+}
+
+.actions{
+  gap:7px;
+  margin-top:10px;
+}
+
+/* 입력 */
+.field{
+  gap:5px;
+}
+
+.field label{
+  font-size:var(--rg-font-small);
+}
+
+.field input,
+.field select,
+.field button{
+  height:var(--rg-control-height);
+  border-radius:var(--rg-control-radius);
+  padding:0 10px;
+  font-size:var(--rg-font-base);
+}
+
+.form-grid{
+  gap:8px;
+}
+
+/* 배지/요약 */
+.badge{
+  min-height:28px;
+  padding:0 9px;
+  font-size:var(--rg-font-small);
+}
+
+.summary{
+  gap:var(--rg-page-gap);
+}
+
+.tile{
+  border-radius:12px;
+  padding:11px;
+}
+
+.tile .k{
+  font-size:var(--rg-font-small);
+  margin-bottom:5px;
+}
+
+.tile .v{
+  font-size:20px;
+}
+
+/* 표 */
+.table-wrap{
+  border-radius:13px;
+}
+
+table{
+  min-width:1080px;
+}
+
+th,
+td{
+  padding:8px 8px;
+  font-size:var(--rg-font-base);
+}
+
+th{
+  font-size:var(--rg-font-small);
+}
+
+/* 신청/취합 필터 */
+.collect-filters{
+  gap:8px;
+}
+
+/* 모달 */
+.modal{
+  border-radius:18px;
+}
+
+.modal-head{
+  padding:14px 16px;
+}
+
+.modal-search{
+  padding:12px 16px;
+  gap:8px;
+}
+
+.result-item{
+  padding:11px 16px;
+}
+
+.result-title{
+  margin-bottom:6px;
+}
+
+.modal-foot{
+  padding:12px 16px;
+}
+
+.meta{
+  gap:6px;
+}
+
+.meta span{
+  font-size:var(--rg-font-small);
+  padding:4px 7px;
+}
+
+.small,
+.search-hint,
+.order-month-wrap .small,
+.prepare-control-label{
+  font-size:var(--rg-font-small);
+}
+
+/* 주문월/컨트롤 */
+.title-row{
+  gap:8px;
+}
+
+.order-month-wrap{
+  gap:6px;
+}
+
+.order-month-wrap .label{
+  font-size:var(--rg-font-small);
+}
+
+.order-month-wrap select,
+.prepare-remark-select{
+  height:32px;
+  border-radius:8px;
+  font-size:var(--rg-font-small);
+}
+
+.prepare-control-wrap{
+  gap:10px;
+}
+
+.prepare-control-group{
+  gap:6px;
+  padding:5px;
+  border-radius:11px;
+}
+
+.request-list-toggle .btn,
+.prepare-control-group .btn,
+.prepare-finalize-group .prepare-finalize-btn{
+  height:32px !important;
+  padding:0 11px !important;
+  border-radius:8px !important;
+  font-size:var(--rg-font-small) !important;
+}
+
+#openSearch,
+#addItem,
+#clearForm,
+#requestNew,
+#addToCollect,
+#confirmSelectedCollect,
+#sendToPrepare,
+#downloadExcel{
+  height:34px !important;
+  padding:0 13px !important;
+}
+
+/* 제품취합 테이블 compact */
+.table-wrap table:has(#collectList){
+  min-width:1560px;
+}
+
+.table-wrap table:has(#collectList) th,
+.table-wrap table:has(#collectList) td{
+  padding:6px 5px !important;
+}
+
+.table-wrap table:has(#collectList) input.collect-input{
+  height:28px !important;
+  padding:3px 5px !important;
+  font-size:11.5px !important;
+  border-radius:7px !important;
+}
+
+.table-wrap table:has(#collectList) .ghost-btn{
+  padding:5px 7px !important;
+  font-size:11px !important;
+  border-radius:8px !important;
+}
+
+.table-wrap table:has(#collectList) th:nth-child(2),
+.table-wrap table:has(#collectList) td:nth-child(2){
+  width:300px;
+}
+
+.vendor-quote-box{
+  min-height:30px !important;
+  padding:3px 6px !important;
+  border-radius:11px !important;
+  gap:5px !important;
+}
+
+.vendor-quote-box input.collect-input{
+  height:24px !important;
+  min-height:24px !important;
+  font-size:11.5px !important;
+}
+
+/* 토스트 */
+.toast-wrap{
+  right:12px;
+  bottom:12px;
+  gap:8px;
+}
+
+.toast{
+  min-width:230px;
+  border-radius:12px;
+  padding:11px 13px;
+  font-size:var(--rg-font-base);
+}
+
+/* iframe */
+html.embed-mode .shell{
+  gap:var(--rg-page-gap) !important;
+}
+
+@media (max-width:1200px){
+  .form-grid,
+  .collect-filters{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media (max-width:760px){
+  body{
+    padding:0 !important;
+  }
+
+  .card-head,
+  .card-body{
+    padding:12px;
+  }
+
+  .reagent-header-card,
+  html.embed-mode .reagent-header-card{
+    padding:18px 16px !important;
+    min-height:88px !important;
+  }
+
+  .reagent-header-card h2{
+    font-size:23px !important;
+  }
+}
