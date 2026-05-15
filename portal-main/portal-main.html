@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Portal Main</title>
+<link rel="stylesheet" href="../assets/css/common-ui.css">
 <style>
 :root{
   --bg:#f1f5f9;
@@ -11,8 +12,8 @@
   --line:#d9e2ec;
   --text:#1f2937;
   --muted:#64748b;
-  --shadow:0 10px 28px rgba(15,23,42,.08);
-  --radius:22px;
+  --shadow:var(--shadow-card, 0 5px 14px rgba(15,23,42,.045));
+  --radius:var(--card-radius, 14px);
 }
 
 *{box-sizing:border-box}
@@ -44,7 +45,7 @@ body{
   max-width:none;
   margin:0;
   display:grid;
-  gap:12px;
+  gap:var(--gap-md, 8px);
 }
 
 .card{
@@ -60,12 +61,12 @@ body{
 .grid{
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:12px;
+  gap:var(--gap-md, 8px);
 }
 
 .quick{
-  padding:24px 24px;
-  min-height:104px;
+  padding:var(--card-padding, 12px);
+  min-height:78px;
   display:flex;
   flex-direction:column;
   justify-content:center;
@@ -73,21 +74,21 @@ body{
 }
 
 .quick:hover{
-  transform:translateY(-2px);
-  box-shadow:0 14px 32px rgba(15,23,42,.10);
+  transform:translateY(-1px);
+  box-shadow:0 8px 18px rgba(15,23,42,.08);
 }
 
 .quick-title{
-  font-size:18px;
+  font-size:var(--font-title, 13px);
   font-weight:800;
   letter-spacing:-.03em;
-  margin-bottom:8px;
+  margin-bottom:5px;
   color:#0f172a;
 }
 
 .quick-desc{
-  font-size:13px;
-  line-height:1.6;
+  font-size:var(--font-base, 11px);
+  line-height:1.45;
   color:var(--muted);
 }
 
@@ -99,7 +100,7 @@ body{
 
 @media (max-width:760px){
   .quick{
-    padding:20px;
+    padding:14px;
   }
 }
 </style>
@@ -108,22 +109,23 @@ body{
 <div class="app">
   <main class="shell">
     <section class="grid">
-      <article class="card quick">
-        <div class="quick-title">워크스페이스</div>
-        <div class="quick-desc">메모와 일정·예약을 통합 관리합니다.</div>
+      <article class="card el-card quick">
+        <div class="quick-title el-title">워크스페이스</div>
+        <div class="quick-desc el-text">메모와 일정·예약을 통합 관리합니다.</div>
       </article>
 
-      <article class="card quick">
-        <div class="quick-title">연구소 운영</div>
-        <div class="quick-desc">근태, 폐수, 시약 등 운영 시스템으로 이동합니다.</div>
+      <article class="card el-card quick">
+        <div class="quick-title el-title">연구소 운영</div>
+        <div class="quick-desc el-text">근태, 폐수, 시약 등 운영 시스템으로 이동합니다.</div>
       </article>
 
-      <article class="card quick">
-        <div class="quick-title">통합 포털</div>
-        <div class="quick-desc">연구소 운영 데이터를 한 곳에서 관리합니다.</div>
+      <article class="card el-card quick">
+        <div class="quick-title el-title">통합 포털</div>
+        <div class="quick-desc el-text">연구소 운영 데이터를 한 곳에서 관리합니다.</div>
       </article>
     </section>
   </main>
 </div>
 </body>
 </html>
+
