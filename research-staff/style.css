@@ -1627,3 +1627,366 @@ th:first-child {
     width: 100%;
   }
 }
+
+
+/* ===== ExeloLab Common Compact UI 적용: research-staff ===== */
+/* 기능/JS 변경 없이 인력운영현황 화면 밀도만 조정 */
+
+:root {
+  --rs-page-gap: 12px;
+  --rs-card-padding: 18px;
+  --rs-card-radius: 15px;
+  --rs-control-height: 34px;
+  --rs-control-radius: 10px;
+  --rs-font-title: 16px;
+  --rs-font-base: 12.5px;
+  --rs-font-small: 11px;
+  --rs-shadow: 0 5px 14px rgba(15, 23, 42, 0.045);
+}
+
+/* 기본 */
+body {
+  font-size: var(--rs-font-base);
+}
+
+.app {
+  padding: 0;
+}
+
+/* 포탈 공통 헤더 안에서는 내부 hero가 있다면 compact */
+.hero {
+  border-radius: 20px;
+  padding: 22px 26px;
+  margin-bottom: var(--rs-page-gap);
+  gap: 12px;
+  box-shadow: 0 8px 20px rgba(31,41,55,.13);
+}
+
+.eyebrow {
+  font-size: var(--rs-font-small);
+  margin-bottom: 7px;
+}
+
+.hero h1 {
+  font-size: 26px;
+}
+
+.hero-desc {
+  margin-top: 5px;
+  font-size: var(--rs-font-base);
+}
+
+.status-pill {
+  padding: 5px 8px;
+  font-size: var(--rs-font-small);
+}
+
+/* 탭/상단 컨트롤 */
+.tabs-row {
+  margin: 0 0 var(--rs-page-gap);
+  gap: 8px;
+}
+
+.tabs {
+  gap: 6px;
+}
+
+.tab-btn {
+  height: var(--rs-control-height);
+  min-height: var(--rs-control-height);
+  padding: 0 12px;
+  border-radius: var(--rs-control-radius);
+  font-size: var(--rs-font-base);
+  box-shadow: 0 2px 8px rgba(15,23,42,.035);
+}
+
+.btn {
+  min-height: var(--rs-control-height);
+  border-radius: var(--rs-control-radius);
+  padding: 0 12px;
+  font-size: var(--rs-font-base);
+  box-shadow: 0 3px 9px rgba(15,23,42,.11);
+}
+
+.btn.secondary {
+  box-shadow: none;
+}
+
+select,
+input {
+  height: var(--rs-control-height);
+  border-radius: var(--rs-control-radius);
+  padding: 0 10px;
+  font-size: var(--rs-font-base);
+}
+
+/* KPI */
+.summary-grid {
+  gap: var(--rs-page-gap);
+  margin-bottom: var(--rs-page-gap);
+}
+
+.summary-card,
+.panel {
+  border-radius: var(--rs-card-radius);
+  box-shadow: var(--rs-shadow);
+}
+
+.summary-card {
+  padding: 14px;
+  min-height: 78px;
+}
+
+.summary-card span {
+  font-size: var(--rs-font-small);
+}
+
+.summary-card strong {
+  margin-top: 6px;
+  font-size: 24px;
+}
+
+.summary-card em {
+  margin-top: 5px;
+  font-size: var(--rs-font-small);
+}
+
+/* 패널 */
+.panel {
+  padding: var(--rs-card-padding);
+  margin-bottom: var(--rs-page-gap);
+}
+
+.panel-head {
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.panel-head h3 {
+  font-size: var(--rs-font-title);
+}
+
+.panel-head p {
+  margin-top: 4px;
+  font-size: var(--rs-font-small);
+}
+
+.mini-note {
+  font-size: var(--rs-font-small);
+}
+
+.content-grid,
+.dashboard-half-grid,
+.dashboard-visual-grid,
+.dashboard-table-grid,
+#view-dashboard .content-grid,
+#view-analysis .analysis-main-grid,
+#view-analysis .analysis-top-grid {
+  gap: var(--rs-page-gap);
+}
+
+/* 표 */
+table {
+  font-size: var(--rs-font-base);
+}
+
+th,
+td {
+  padding: 8px 8px;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 6px 7px;
+  height: 36px;
+}
+
+.admin-table-wrap {
+  border-radius: var(--rs-card-radius);
+}
+
+.admin-table input,
+.admin-table select {
+  height: 30px;
+  border-radius: 8px;
+  padding: 0 8px;
+  font-size: var(--rs-font-small);
+}
+
+.admin-list-count {
+  padding: 6px 10px;
+  font-size: var(--rs-font-small);
+  margin-bottom: 8px;
+}
+
+/* 차트/시각화 */
+.pyramid {
+  gap: 8px;
+  padding: 10px 6px 4px;
+}
+
+.pyramid-col,
+.pyramid-age {
+  gap: 9px;
+}
+
+.pyramid-row {
+  height: 26px;
+  gap: 6px;
+  font-size: var(--rs-font-small);
+}
+
+.pyramid-bar {
+  height: 18px;
+}
+
+.dashboard-degree-pyramid-panel .pyramid-row,
+.dashboard-pyramid-panel .pyramid-row {
+  height: 24px;
+  font-size: 10.5px;
+}
+
+.dashboard-degree-pyramid-panel .pyramid-bar,
+.dashboard-pyramid-panel .pyramid-bar {
+  height: 16px;
+}
+
+.bar-list,
+.analysis-bars,
+.dashboard-degree-bars {
+  gap: 9px;
+}
+
+.bar-row,
+.analysis-bar-row,
+.dashboard-degree-bar-row {
+  gap: 8px;
+  font-size: var(--rs-font-base);
+}
+
+.bar-track {
+  height: 14px;
+}
+
+/* 안내/코멘트 */
+.insight-box,
+.comment-box,
+.notice,
+.analysis-standard-card {
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: var(--rs-font-base);
+  line-height: 1.5;
+}
+
+.analysis-standard-card {
+  margin-bottom: 10px;
+}
+
+.analysis-standard-card strong,
+.analysis-standard-card span {
+  font-size: var(--rs-font-small);
+}
+
+/* 필터 */
+.leave-toggle,
+.reference-filter,
+.org-filter-group {
+  height: var(--rs-control-height);
+  border-radius: var(--rs-control-radius);
+}
+
+.leave-toggle-btn {
+  height: 26px;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: var(--rs-font-small);
+}
+
+.reference-filter,
+.org-filter-group label {
+  font-size: var(--rs-font-small);
+}
+
+.reference-filter input[type="month"],
+.org-filter-group select {
+  height: 26px;
+  font-size: var(--rs-font-small);
+}
+
+.org-filter-row {
+  min-height: var(--rs-control-height);
+  gap: 6px;
+}
+
+.top-actions .org-filter-row {
+  min-height: var(--rs-control-height);
+}
+
+.top-actions .org-filter-group {
+  height: var(--rs-control-height);
+}
+
+.top-actions .org-filter-group select {
+  height: 26px;
+}
+
+/* 추이 차트 */
+.dedicated-trend-chart {
+  min-height: 208px;
+  border-radius: var(--rs-card-radius);
+  padding: 10px 10px 6px;
+}
+
+.dedicated-trend-svg {
+  height: 190px;
+}
+
+.dedicated-trend-legend,
+.dedicated-trend-summary {
+  font-size: var(--rs-font-small);
+}
+
+.dedicated-trend-summary {
+  margin-top: 7px;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
+/* 휴직 요약 */
+.kpi-leave-summary.show {
+  top: 12px;
+  right: 12px;
+  font-size: 10px;
+}
+
+.kpi-leave-total strong {
+  font-size: 11px;
+}
+
+/* 반응형 */
+@media (max-width: 1300px) {
+  .summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .hero {
+    padding: 20px 18px;
+    border-radius: 18px;
+  }
+
+  .hero h1 {
+    font-size: 23px;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel {
+    padding: 14px;
+  }
+}
+
