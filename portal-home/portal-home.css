@@ -1425,3 +1425,449 @@ body.auth-loading .app{visibility:visible; opacity:.35; pointer-events:none}
     .user-chip .role{display:inline-flex;padding:4px 8px;border-radius:999px;background:#0f172a;color:#fff;font-size:11px}
     .top-user-bar{display:flex;justify-content:flex-end;margin-bottom:12px}
     .nav-btn[hidden], .pill[hidden], .top-user-bar[hidden]{display:none !important}
+
+
+/* ===== ExeloLab Common Compact UI 적용: portal-home.css ===== */
+/* 기능 변경 없이 워크스페이스 화면의 크기/간격/카드/버튼만 한 단계 compact 적용 */
+
+:root {
+  --page-padding: 12px;
+  --card-padding: 14px;
+  --card-radius: 14px;
+  --card-gap: 10px;
+  --control-height: 30px;
+  --control-radius: 9px;
+  --font-title: 15px;
+  --font-base: 12px;
+  --font-small: 10.5px;
+  --shadow-card: 0 5px 14px rgba(15, 23, 42, 0.045);
+}
+
+/* 기본 레이아웃 */
+.app {
+  padding: var(--page-padding);
+}
+
+.layout,
+.shell,
+.embedded-app-wrap {
+  gap: var(--card-gap);
+}
+
+.card {
+  border-radius: var(--card-radius);
+  padding: var(--card-padding);
+  box-shadow: var(--shadow-card);
+}
+
+.header-card {
+  margin-bottom: var(--card-gap);
+}
+
+.header-top {
+  font-size: var(--font-small);
+  margin-bottom: 4px;
+}
+
+.title {
+  font-size: 24px;
+}
+
+.subtitle {
+  font-size: var(--font-base);
+  margin-top: 4px;
+}
+
+/* 탭/버튼 */
+.tabs {
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.pill,
+.small-btn,
+.auth-btn {
+  min-height: var(--control-height);
+  border-radius: var(--control-radius);
+  padding: 0 10px;
+  font-size: var(--font-base);
+  font-weight: 700;
+}
+
+.small-btn {
+  padding: 0 9px;
+}
+
+/* placeholder */
+.placeholder-grid {
+  gap: var(--card-gap);
+  margin-top: var(--card-gap);
+}
+
+.placeholder-box {
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.placeholder-title {
+  font-size: var(--font-title);
+  margin-bottom: 5px;
+}
+
+.placeholder-desc,
+.embedded-app-note {
+  font-size: var(--font-base);
+  line-height: 1.45;
+}
+
+/* 메모 */
+.memo-top {
+  padding: 14px 14px 0 14px;
+}
+
+.memo-board {
+  margin: 14px;
+  border-radius: 16px;
+  min-height: 640px;
+}
+
+.memo-note {
+  width: 230px;
+  min-width: 210px;
+  max-width: 250px;
+  min-height: 150px;
+  padding: 12px;
+  border-radius: 14px;
+}
+
+.memo-note.expanded {
+  min-width: 360px;
+}
+
+.memo-drag-handle {
+  margin-bottom: 7px;
+}
+
+.memo-tag,
+.memo-state,
+.trash-tag,
+.memo-meta {
+  font-size: var(--font-small);
+}
+
+.memo-title {
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.memo-content-view,
+.schedule-desc,
+.tips {
+  font-size: var(--font-base);
+  line-height: 1.5;
+}
+
+.memo-footer {
+  padding-top: 8px;
+  gap: 6px;
+}
+
+.memo-actions,
+.row-end {
+  gap: 5px;
+}
+
+.memo-pop {
+  width: 270px;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.memo-pop.trash {
+  width: 290px;
+}
+
+/* 입력 폼 */
+.field {
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.field label {
+  font-size: var(--font-base);
+}
+
+.field input[type="text"],
+.field textarea,
+.field select,
+.auth-input {
+  min-height: var(--control-height);
+  border-radius: var(--control-radius);
+  padding: 8px 10px;
+  font-size: var(--font-base);
+}
+
+.field textarea {
+  min-height: 82px;
+}
+
+.checkbox-row {
+  font-size: var(--font-base);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+/* 캘린더/스케줄 */
+.schedule-grid {
+  gap: 14px;
+}
+
+.weekdays,
+.calendar-grid {
+  gap: 6px !important;
+}
+
+.weekday {
+  font-size: var(--font-base);
+}
+
+.day-cell {
+  min-height: 92px !important;
+  border-radius: 12px;
+  padding: 7px;
+}
+
+.day-num {
+  margin-bottom: 4px;
+}
+
+.badge-mini,
+.scope-badge,
+.day-count,
+.muted-mini,
+.done-label,
+.schedule-meta,
+.schedule-owner,
+.reservation-meta {
+  font-size: var(--font-small);
+}
+
+.schedule-list {
+  gap: 8px;
+}
+
+.schedule-item,
+.reservation-card {
+  border-radius: 11px;
+}
+
+.schedule-head,
+.schedule-body,
+.reservation-head {
+  padding: 9px;
+  gap: 8px;
+}
+
+.schedule-time {
+  min-width: 78px;
+}
+
+.schedule-title,
+.reservation-title {
+  font-size: var(--font-base);
+}
+
+/* 공개범위/필터 */
+.scope-check-grid {
+  gap: 7px;
+}
+
+.scope-check,
+.month-scope-chip {
+  border-radius: var(--control-radius);
+  padding: 7px 9px;
+  font-size: var(--font-base);
+  gap: 6px;
+}
+
+.month-scope-filter-row {
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* 스위치/선택 패널 */
+.planner-switch-wrap {
+  margin: 0 0 10px 0;
+}
+
+.planner-switch,
+.selected-panel-switch,
+.selected-panel-status-filter {
+  border-radius: 12px;
+  padding: 3px;
+}
+
+.planner-switch-indicator,
+.selected-panel-switch-indicator {
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  border-radius: 9px;
+}
+
+.planner-switch button,
+.selected-panel-switch button,
+.selected-panel-status-filter button {
+  padding: 7px 13px;
+  border-radius: 9px;
+  font-size: var(--font-base);
+}
+
+.selected-panel-label {
+  font-size: var(--font-title);
+}
+
+.selected-panel-switch-row,
+.selected-panel-toolbar {
+  gap: 8px;
+}
+
+/* 예약 */
+.reservation-tabs {
+  gap: 6px;
+  padding-bottom: 5px;
+}
+
+.reservation-tab {
+  flex-basis: 92px;
+  min-width: 92px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: var(--font-base);
+}
+
+.reservation-timetable {
+  border-radius: 12px;
+}
+
+.reservation-timetable-grid {
+  grid-template-columns: 58px minmax(0, 1fr);
+}
+
+.reservation-time-row,
+.rsv-slot-cell {
+  height: 24px;
+}
+
+.reservation-time-label,
+.reservation-time-block-time,
+.reservation-time-block-meta {
+  font-size: var(--font-small);
+}
+
+.reservation-time-block {
+  left: 8px;
+  right: 8px;
+  border-radius: 9px;
+  padding: 6px 8px;
+}
+
+.reservation-time-block-title {
+  font-size: var(--font-base);
+}
+
+.reservation-time-slots-inner {
+  min-height: 1176px;
+}
+
+.reservation-modal-card {
+  width: min(390px, 100%);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+/* 로그인 */
+.auth-card {
+  width: min(390px, 100%);
+  border-radius: 18px;
+  padding: 22px;
+}
+
+.auth-title {
+  font-size: 22px;
+}
+
+.auth-subtitle {
+  font-size: var(--font-base);
+  margin-bottom: 14px;
+}
+
+.auth-field {
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.auth-label {
+  font-size: var(--font-base);
+}
+
+.auth-actions {
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.auth-error,
+.auth-success {
+  font-size: var(--font-base);
+  padding: 9px 10px;
+  border-radius: 10px;
+}
+
+.user-chip {
+  padding: 5px 8px;
+  font-size: var(--font-small);
+}
+
+.user-chip .role {
+  padding: 3px 6px;
+  font-size: 9.5px;
+}
+
+.top-user-bar {
+  margin-bottom: 8px;
+}
+
+/* iframe */
+.embedded-app-frame {
+  border-radius: 16px;
+  box-shadow: 0 3px 12px rgba(15,23,42,0.045);
+}
+
+#supplies-page .embedded-app-frame {
+  border-radius: 16px !important;
+}
+
+@media (max-width: 1100px) {
+  .app {
+    padding: 10px;
+  }
+
+  .memo-board {
+    min-height: 760px;
+  }
+}
+
+@media (max-width: 760px) {
+  .card {
+    padding: 12px;
+  }
+
+  .title {
+    font-size: 22px;
+  }
+
+  .memo-note.expanded {
+    min-width: 280px;
+  }
+}
+
