@@ -175,7 +175,9 @@ function loadAdminData(){
 }
 
 function loadReferenceData(){
-  return sb.from(REFERENCE_TABLE).select('*').order('doc_key',{ascending:true});
+  return scopedCompanyQuery(
+    sb.from(REFERENCE_TABLE).select('*')
+  ).order('doc_key',{ascending:true});
 }
 
 function loadAllData(includeAdmin){
@@ -185,17 +187,17 @@ function loadAllData(includeAdmin){
     includeAdmin?loadWastewaterRoleRows():Promise.resolve({data:[]}),
     includeAdmin?scopedCompanyQuery(sb.from(LOG_TABLE).select('*')).order('created_at',{ascending:false}).limit(200):Promise.resolve({data:[]}),
     scopedCompanyQuery(sb.from(APPROVAL_TABLE).select('*')).order('month_key',{ascending:false}),
-    sb.from(REFERENCE_TABLE).select('*').order('doc_key',{ascending:true})
+    scopedCompanyQuery(sb.from(REFERENCE_TABLE).select('*')).order('doc_key',{ascending:true})
   ]);
 }
 
 function saveReferenceDoc(existingId,payload){
-  if(existingId) return sb.from(REFERENCE_TABLE).update(payload).eq('id', existingId);
-  return sb.from(REFERENCE_TABLE).insert([payload]);
+  if(existingId) return scopedCompanyQuery(sb.from(REFERENCE_TABLE).update(payload).eq('id', existingId));
+  return sb.from(REFERENCE_TABLE).insert([withCompanyPayload(payload)]);
 }
 
 function deleteReferenceDocById(id){
-  return sb.from(REFERENCE_TABLE).delete().eq('id', id);
+  return scopedCompanyQuery(sb.from(REFERENCE_TABLE).delete().eq('id', id));
 }
 
 function insertDailyRow(payload){
@@ -404,12 +406,12 @@ function removeWastewaterApprover(employeeNo, actorName){
 
 
 function saveRelatedDocument(existingId,payload){
-  if(existingId) return sb.from(REFERENCE_TABLE).update(payload).eq('id', existingId).select('*').maybeSingle();
-  return sb.from(REFERENCE_TABLE).insert([payload]).select('*').maybeSingle();
+  if(existingId) return scopedCompanyQuery(sb.from(REFERENCE_TABLE).update(payload).eq('id', existingId)).select('*').maybeSingle();
+  return sb.from(REFERENCE_TABLE).insert([withCompanyPayload(payload)]).select('*').maybeSingle();
 }
 
 function deleteRelatedDocumentById(id){
-  return sb.from(REFERENCE_TABLE).delete().eq('id', id);
+  return scopedCompanyQuery(sb.from(REFERENCE_TABLE).delete().eq('id', id));
 }
 
 async function uploadRelatedDocFile(file,path){
