@@ -39,15 +39,16 @@
     .view.active { display: block; }
     .form {
       display: grid;
-      grid-template-columns: minmax(360px, 620px) auto;
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: 10px;
       margin-top: 16px;
       align-items: end;
-      width: fit-content;
+      width: var(--admin-content-width, 650px);
       max-width: 100%;
     }
     .form-fields {
-      width: min(620px, 100%);
+      width: 100%;
+      min-width: 0;
     }
     .form-actions {
       display: flex;
@@ -115,23 +116,27 @@
       align-items: center;
       margin: 16px 0 10px;
       flex-wrap: wrap;
+      width: var(--admin-content-width, 650px);
+      max-width: 100%;
     }
     .company-list {
       display: grid;
       gap: 10px;
       margin-top: 12px;
       justify-items: start;
+      width: var(--admin-content-width, 650px);
+      max-width: 100%;
     }
     .company-item {
       border: 1px solid #e2e8f0;
       border-radius: 16px;
       padding: 13px 14px;
-      display: inline-grid;
-      grid-template-columns: auto auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: 14px;
       align-items: center;
       background: #fff;
-      width: fit-content;
+      width: 100%;
       max-width: 100%;
       justify-self: start;
     }
@@ -717,6 +722,18 @@
     setFeedback('회사 목록을 불러왔습니다.', 'ok');
   }
 
+  function setAdminContentWidth(width) {
+    const safeWidth = Math.min(Math.max(Number(width) || 650, 620), 860);
+    document.documentElement.style.setProperty('--admin-content-width', safeWidth + 'px');
+  }
+
+  function calculateCompanyShellWidth(nameColWidth, domainColWidth) {
+    const summaryBase = 52 + 34 + 10 + 34 + 50;
+    const actionBase = 64 + 50 + 62 + 50 + 18;
+    const cardPaddingAndGap = 28 + 14;
+    return summaryBase + nameColWidth + domainColWidth + actionBase + cardPaddingAndGap;
+  }
+
   function renderCompanies() {
     els.companyCountBadge.textContent = '회사 ' + companies.length + '개';
 
@@ -726,6 +743,7 @@
     const domainColWidth = Math.min(Math.max(maxDomainLen * 8 + 24, 190), 360);
     const nameInputWidth = Math.min(Math.max(maxNameLen * 14 + 42, 170), 300);
     const domainInputWidth = Math.min(Math.max(maxDomainLen * 8 + 86, 260), 430);
+    setAdminContentWidth(calculateCompanyShellWidth(nameColWidth, domainColWidth));
 
     if (!companies.length) {
       els.companyList.innerHTML = '<div class="empty">등록된 회사가 없습니다.</div>';
