@@ -3,7 +3,7 @@ const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 window.sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 const DAILY_TABLE='wastewater';
-const DAILY_VIEW='wastewater_calendar_view';
+const DAILY_VIEW='wastewater';
 const PICKUP_TABLE='wastewater_pickups';
 const USERS_TABLE='users';
 const EMPLOYEES_TABLE='employees';
@@ -425,11 +425,11 @@ async function deleteRelatedDocFile(path){
 }
 
 async function logActivity(actorEmail,action,targetType,targetId,details){
-  return sb.from(LOG_TABLE).insert([{actor_email:actorEmail||'unknown',action,target_type:targetType,target_id:String(targetId||''),details:JSON.stringify(details||{})}]);
+  return sb.from(LOG_TABLE).insert([withCompanyPayload({actor_email:actorEmail||'unknown',action,target_type:targetType,target_id:String(targetId||''),details:JSON.stringify(details||{})})]);
 }
 
 async function logApprovalAction(actorEmail,monthKey,action,reason=''){
-  return sb.from(APPROVAL_LOG_TABLE).insert([{month_key:monthKey,actor_email:actorEmail||'unknown',action,reason}]);
+  return sb.from(APPROVAL_LOG_TABLE).insert([withCompanyPayload({month_key:monthKey,actor_email:actorEmail||'unknown',action,reason})]);
 }
 
 window.WastewaterApi={
