@@ -270,6 +270,73 @@
       background: #fff;
       font-size: 13px;
     }
+
+    .domain-field {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .domain-input-wrap {
+      min-height: 40px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      background: #fff;
+      display: grid;
+      grid-template-columns: auto minmax(110px, 1fr) auto;
+      align-items: center;
+      overflow: hidden;
+    }
+    .domain-prefix,
+    .domain-suffix {
+      height: 100%;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 10px;
+      font-size: 13px;
+      font-weight: 800;
+      color: #64748b;
+      background: #f8fafc;
+      white-space: nowrap;
+    }
+    .domain-prefix { border-right: 1px solid #e2e8f0; }
+    .domain-suffix { border-left: 1px solid #e2e8f0; }
+    .domain-input {
+      height: 38px;
+      border: 0;
+      outline: none;
+      padding: 0 10px;
+      font-size: 13px;
+      font-weight: 900;
+      color: #0f172a;
+      min-width: 0;
+      background: #fff;
+    }
+    .domain-input-wrap:focus-within {
+      border-color: #0f172a;
+      box-shadow: 0 0 0 3px rgba(15,23,42,.08);
+    }
+    .domain-preview {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+    .domain-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: #0f766e;
+      font-weight: 900;
+      text-decoration: none;
+      word-break: break-all;
+    }
+    .domain-link:hover { text-decoration: underline; }
+    .company-edit-grid {
+      display: grid;
+      gap: 8px;
+      width: min(520px, 100%);
+    }
+    .company-code-hidden { display: none; }
+
     @media (max-width: 1100px) {
       .grid { grid-template-columns: 1fr; }
       .form { grid-template-columns: 1fr; }
@@ -282,12 +349,23 @@
     <section class="grid">
       <article class="card">
         <h2>회사 관리</h2>
-        <p>회사명만 입력하면 company_code는 자동 생성됩니다. 회사명 수정, 활성/비활성, 삭제를 관리합니다.</p>
+        <p>회사명과 서브도메인을 등록합니다. company_code는 내부 식별값으로 자동 생성됩니다.</p>
 
         <div class="form">
-          <div class="field">
-            <label for="companyNameInput">회사명</label>
-            <input id="companyNameInput" class="input" placeholder="예: 삼천당제약" autocomplete="off">
+          <div>
+            <div class="field">
+              <label for="companyNameInput">회사명</label>
+              <input id="companyNameInput" class="input" placeholder="예: 삼천당제약" autocomplete="off">
+            </div>
+            <div class="domain-field">
+              <label for="companySubdomainInput">접속주소</label>
+              <div class="domain-input-wrap">
+                <span class="domain-prefix">https://</span>
+                <input id="companySubdomainInput" class="domain-input" placeholder="scd" autocomplete="off" spellcheck="false">
+                <span class="domain-suffix">.ops.exelolab.com</span>
+              </div>
+              <div class="domain-preview" id="companyDomainPreview">접속주소: https://[서브도메인].ops.exelolab.com</div>
+            </div>
           </div>
           <button id="createCompanyBtn" class="btn primary" type="button">회사 등록</button>
         </div>
@@ -348,6 +426,8 @@
 
   const els = {
     companyNameInput: document.getElementById('companyNameInput'),
+    companySubdomainInput: document.getElementById('companySubdomainInput'),
+    companyDomainPreview: document.getElementById('companyDomainPreview'),
     createCompanyBtn: document.getElementById('createCompanyBtn'),
     refreshCompaniesBtn: document.getElementById('refreshCompaniesBtn'),
     companyList: document.getElementById('companyList'),
@@ -423,6 +503,39 @@
     throw new Error('회사코드 자동 생성에 실패했습니다. 다시 시도해 주세요.');
   }
 
+
+  function normalizeSubdomain(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/\.ops\.exelolab\.com\/?$/i, '')
+      .replace(/[^a-z0-9-]/g, '');
+  }
+
+  function isValidSubdomain(value) {
+    const subdomain = String(value || '').trim();
+    if (!subdomain) return false;
+    if (subdomain.length < 2 || subdomain.length > 40) return false;
+    if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])$/.test(subdomain)) return false;
+
+    const reserved = new Set(['www', 'api', 'admin', 'root', 'mail', 'email', 'smtp', 'ftp', 'cdn', 'assets', 'static', 'support', 'help', 'login', 'portal', 'ops', 'app', 'apps']);
+    return !reserved.has(subdomain);
+  }
+
+  function getCompanyUrl(subdomain) {
+    const clean = normalizeSubdomain(subdomain);
+    return clean ? `https://${clean}.ops.exelolab.com` : '';
+  }
+
+  function updateDomainPreview() {
+    if (!els.companyDomainPreview || !els.companySubdomainInput) return;
+    const subdomain = normalizeSubdomain(els.companySubdomainInput.value);
+    els.companyDomainPreview.textContent = subdomain
+      ? `접속주소: ${getCompanyUrl(subdomain)}`
+      : '접속주소: https://[서브도메인].ops.exelolab.com';
+  }
+
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, (m) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
@@ -456,7 +569,7 @@
 
     const { data, error } = await sb()
       .from('companies')
-      .select('id, company_name, company_code, is_active, created_at')
+      .select('id, company_name, company_code, subdomain, is_active, created_at')
       .order('created_at', { ascending: true });
 
     if (error) throw error;
@@ -482,21 +595,36 @@
 
     els.companyList.innerHTML = companies.map(company => {
       const active = company.is_active !== false;
+      const subdomain = normalizeSubdomain(company.subdomain || '');
+      const companyUrl = getCompanyUrl(subdomain);
       return `
         <div class="company-item" data-company-row="${escapeHtml(company.id)}" data-editing="false">
           <div>
             <div class="company-title-row">
               <div class="company-name" data-company-name-text="${escapeHtml(company.id)}">${escapeHtml(company.company_name || '-')}</div>
-              <input
-                class="company-title-input"
-                data-edit-company-name="${escapeHtml(company.id)}"
-                value="${escapeHtml(company.company_name || '')}"
-                hidden
-              >
+              <div class="company-edit-grid" data-company-edit-grid="${escapeHtml(company.id)}" hidden>
+                <input
+                  class="company-title-input"
+                  data-edit-company-name="${escapeHtml(company.id)}"
+                  value="${escapeHtml(company.company_name || '')}"
+                >
+                <div class="domain-input-wrap">
+                  <span class="domain-prefix">https://</span>
+                  <input
+                    class="domain-input"
+                    data-edit-company-subdomain="${escapeHtml(company.id)}"
+                    value="${escapeHtml(subdomain)}"
+                    placeholder="scd"
+                    autocomplete="off"
+                    spellcheck="false"
+                  >
+                  <span class="domain-suffix">.ops.exelolab.com</span>
+                </div>
+              </div>
             </div>
             <div class="company-meta">
-              <span>code: ${escapeHtml(company.company_code || '-')}</span>
-              <span>id: ${escapeHtml(company.id || '-')}</span>
+              ${companyUrl ? `<a class="domain-link" href="${escapeHtml(companyUrl)}" target="_blank" rel="noopener">${escapeHtml(companyUrl)}</a>` : '<span>주소 미설정</span>'}
+              <span class="company-code-hidden">code: ${escapeHtml(company.company_code || '-')}</span>
               <span class="badge ${active ? 'active' : 'inactive'}">${active ? '활성' : '비활성'}</span>
             </div>
           </div>
@@ -524,7 +652,7 @@
       '<option value="">회사 선택</option>' +
       companies.map(company => `
         <option value="${escapeHtml(company.id)}" ${company.id === selectedCompanyId ? 'selected' : ''}>
-          ${escapeHtml(company.company_name || '-')} (${escapeHtml(company.company_code || '-')})
+          ${escapeHtml(company.company_name || '-')} (${escapeHtml(company.subdomain ? company.subdomain + '.ops.exelolab.com' : '주소 미설정')})
         </option>
       `).join('');
   }
@@ -533,14 +661,20 @@
     assertServiceAdmin();
 
     const name = String(els.companyNameInput.value || '').trim();
+    const subdomain = normalizeSubdomain(els.companySubdomainInput?.value || '');
 
     if (!name) {
       setFeedback('회사명을 입력해 주세요.', 'error');
       return;
     }
 
+    if (!isValidSubdomain(subdomain)) {
+      setFeedback('서브도메인은 영문 소문자, 숫자, 하이픈만 사용할 수 있으며 2~40자여야 합니다. 예약어는 사용할 수 없습니다.', 'error');
+      return;
+    }
+
     els.createCompanyBtn.disabled = true;
-    setFeedback('회사코드를 자동 생성하고 회사를 등록하는 중입니다.', '');
+    setFeedback('회사코드와 접속주소를 등록하는 중입니다.', '');
 
     try {
       const code = await generateUniqueCompanyCode();
@@ -550,6 +684,7 @@
         .insert({
           company_name: name,
           company_code: code,
+          subdomain,
           is_active: true
         })
         .select('id')
@@ -560,12 +695,14 @@
       await ensureCompanyApps(data.id);
 
       els.companyNameInput.value = '';
+      if (els.companySubdomainInput) els.companySubdomainInput.value = '';
+      updateDomainPreview();
       selectedCompanyId = data.id;
 
       await loadCompanies();
       await loadCompanyApps(selectedCompanyId);
 
-      setFeedback(`회사 등록이 완료되었습니다. 자동 생성 코드: ${code}`, 'ok');
+      setFeedback(`회사 등록이 완료되었습니다. 접속주소: ${getCompanyUrl(subdomain)}`, 'ok');
     } catch (error) {
       console.error(error);
       setFeedback(error.message || '회사 등록 중 오류가 발생했습니다.', 'error');
@@ -589,26 +726,46 @@
     setFeedback('회사 상태를 변경했습니다.', 'ok');
   }
 
-  async function updateCompanyName(companyId, nextName) {
+  async function updateCompanyInfo(companyId, nextName, nextSubdomain) {
     assertServiceAdmin();
 
     const name = String(nextName || '').trim();
+    const subdomain = normalizeSubdomain(nextSubdomain || '');
+
     if (!name) {
       setFeedback('수정할 회사명을 입력해 주세요.', 'error');
       return;
     }
 
-    setFeedback('회사명을 수정하는 중입니다.', '');
+    if (!isValidSubdomain(subdomain)) {
+      setFeedback('서브도메인은 영문 소문자, 숫자, 하이픈만 사용할 수 있으며 2~40자여야 합니다. 예약어는 사용할 수 없습니다.', 'error');
+      return;
+    }
+
+    const company = companies.find(item => item.id === companyId);
+    const beforeSubdomain = normalizeSubdomain(company?.subdomain || '');
+
+    if (beforeSubdomain && beforeSubdomain !== subdomain) {
+      const ok = confirm(
+        `접속주소를 변경하시겠습니까?\n\n` +
+        `기존 주소: ${getCompanyUrl(beforeSubdomain)}\n` +
+        `변경 주소: ${getCompanyUrl(subdomain)}\n\n` +
+        `운영 중인 회사라면 기존 사용자는 새 주소로 접속해야 합니다.`
+      );
+      if (!ok) return;
+    }
+
+    setFeedback('회사 정보를 수정하는 중입니다.', '');
 
     const { error } = await sb()
       .from('companies')
-      .update({ company_name: name })
+      .update({ company_name: name, subdomain })
       .eq('id', companyId);
 
     if (error) throw error;
 
     await loadCompanies();
-    setFeedback('회사명을 수정했습니다.', 'ok');
+    setFeedback('회사 정보를 수정했습니다.', 'ok');
   }
 
   async function deleteCompany(companyId) {
@@ -643,25 +800,28 @@
     if (!row) return;
 
     const nameText = row.querySelector(`[data-company-name-text="${CSS.escape(companyId)}"]`);
-    const input = row.querySelector(`[data-edit-company-name="${CSS.escape(companyId)}"]`);
+    const editGrid = row.querySelector(`[data-company-edit-grid="${CSS.escape(companyId)}"]`);
+    const nameInput = row.querySelector(`[data-edit-company-name="${CSS.escape(companyId)}"]`);
+    const subdomainInput = row.querySelector(`[data-edit-company-subdomain="${CSS.escape(companyId)}"]`);
     const editBtn = row.querySelector(`[data-edit-company="${CSS.escape(companyId)}"]`);
     const saveBtn = row.querySelector(`[data-save-company="${CSS.escape(companyId)}"]`);
     const cancelBtn = row.querySelector(`[data-cancel-company-edit="${CSS.escape(companyId)}"]`);
     const toggleBtn = row.querySelector('[data-toggle-company]');
     const deleteBtn = row.querySelector('[data-delete-company]');
+    const company = companies.find(item => item.id === companyId);
 
     row.dataset.editing = show ? 'true' : 'false';
 
     if (nameText) nameText.hidden = show;
-    if (input) {
-      input.hidden = !show;
-      if (show) {
-        input.value = nameText ? nameText.textContent : input.value;
-        setTimeout(() => {
-          input.focus();
-          input.select();
-        }, 0);
-      }
+    if (editGrid) editGrid.hidden = !show;
+
+    if (show) {
+      if (nameInput) nameInput.value = company?.company_name || '';
+      if (subdomainInput) subdomainInput.value = normalizeSubdomain(company?.subdomain || '');
+      setTimeout(() => {
+        nameInput?.focus();
+        nameInput?.select();
+      }, 0);
     }
 
     if (editBtn) editBtn.hidden = show;
@@ -735,6 +895,10 @@
 
   function bindEvents() {
     els.createCompanyBtn.addEventListener('click', () => createCompany());
+    els.companySubdomainInput?.addEventListener('input', () => {
+      els.companySubdomainInput.value = normalizeSubdomain(els.companySubdomainInput.value);
+      updateDomainPreview();
+    });
     els.refreshCompaniesBtn.addEventListener('click', () => {
       loadCompanies().catch(error => {
         console.error(error);
@@ -753,10 +917,10 @@
     });
 
     document.addEventListener('keydown', async (event) => {
-      const input = event.target.closest('[data-edit-company-name]');
+      const input = event.target.closest('[data-edit-company-name], [data-edit-company-subdomain]');
       if (!input) return;
 
-      const id = input.getAttribute('data-edit-company-name');
+      const id = input.getAttribute('data-edit-company-name') || input.getAttribute('data-edit-company-subdomain');
 
       if (event.key === 'Escape') {
         showCompanyEdit(id, false);
@@ -765,11 +929,13 @@
 
       if (event.key === 'Enter') {
         event.preventDefault();
+        const nameInput = document.querySelector(`[data-edit-company-name="${CSS.escape(id)}"]`);
+        const subdomainInput = document.querySelector(`[data-edit-company-subdomain="${CSS.escape(id)}"]`);
         try {
-          await updateCompanyName(id, input.value || '');
+          await updateCompanyInfo(id, nameInput?.value || '', subdomainInput?.value || '');
         } catch (error) {
           console.error(error);
-          setFeedback(error.message || '회사명 수정 중 오류가 발생했습니다.', 'error');
+          setFeedback(error.message || '회사 정보 수정 중 오류가 발생했습니다.', 'error');
         }
       }
     });
@@ -791,11 +957,12 @@
       if (saveCompanyBtn) {
         const id = saveCompanyBtn.getAttribute('data-save-company');
         const input = document.querySelector(`[data-edit-company-name="${CSS.escape(id)}"]`);
+        const subdomainInput = document.querySelector(`[data-edit-company-subdomain="${CSS.escape(id)}"]`);
         try {
-          await updateCompanyName(id, input?.value || '');
+          await updateCompanyInfo(id, input?.value || '', subdomainInput?.value || '');
         } catch (error) {
           console.error(error);
-          setFeedback(error.message || '회사명 수정 중 오류가 발생했습니다.', 'error');
+          setFeedback(error.message || '회사 정보 수정 중 오류가 발생했습니다.', 'error');
         }
         return;
       }
@@ -841,6 +1008,7 @@
 
   async function boot() {
     bindEvents();
+    updateDomainPreview();
 
     if (!isServiceAdmin()) {
       document.body.innerHTML = '<main class="page"><div class="empty">서비스 관리자 권한이 필요합니다.</div></main>';
