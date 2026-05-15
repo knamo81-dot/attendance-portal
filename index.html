@@ -658,7 +658,6 @@ body:not(.service-admin-enabled) .service-admin-btn{
   --portal-brand-color: #c8102e;
   --portal-brand-color-2: #e11d2e;
   --portal-brand-rgb: 200, 16, 46;
-  --current-header-accent: #c8102e;
 }
 
 .portal-common-header {
@@ -666,11 +665,11 @@ body:not(.service-admin-enabled) .service-admin-btn{
 }
 
 .nav-btn.home {
-  border-color: var(--current-header-accent) !important;
+  border-color: rgba(var(--portal-brand-rgb), 0.9) !important;
 }
 
 .nav-btn.home.active {
-  color: var(--current-header-accent) !important;
+  color: var(--portal-brand-color) !important;
   border-color: rgba(var(--portal-brand-rgb), 0.98) !important;
   box-shadow:
     0 5px 14px rgba(var(--portal-brand-rgb), 0.22),
@@ -682,7 +681,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
 }
 
 .nav-btn.home.active:hover {
-  color: var(--current-header-accent) !important;
+  color: var(--portal-brand-color) !important;
 }
 
 .auth-field input:focus {
@@ -692,6 +691,72 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
 .auth-button {
   background: linear-gradient(135deg, var(--portal-brand-color) 0%, var(--portal-brand-color-2) 100%);
+}
+
+
+/* ===== Logout Confirm Modal ===== */
+.logout-confirm-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,.48);
+  backdrop-filter:blur(3px);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:99999;
+}
+
+.logout-confirm-overlay.show{
+  display:flex;
+}
+
+.logout-confirm-box{
+  width:min(320px, calc(100vw - 40px));
+  background:#ffffff;
+  border-radius:18px;
+  padding:24px;
+  box-shadow:0 20px 60px rgba(0,0,0,.22);
+}
+
+.logout-confirm-title{
+  font-size:20px;
+  font-weight:800;
+  color:#0f172a;
+  margin-bottom:10px;
+  letter-spacing:-0.03em;
+}
+
+.logout-confirm-desc{
+  font-size:12px;
+  line-height:1.6;
+  color:#475569;
+  margin-bottom:20px;
+}
+
+.logout-confirm-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+}
+
+.logout-confirm-btn{
+  min-width:84px;
+  height:38px;
+  border:none;
+  border-radius:11px;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.logout-confirm-btn.cancel{
+  background:#e2e8f0;
+  color:#334155;
+}
+
+.logout-confirm-btn.confirm{
+  background:#c8102e;
+  color:#ffffff;
 }
 
 </style>
@@ -804,6 +869,20 @@ body:not(.service-admin-enabled) .service-admin-btn{
     </div>
   </div>
 
+
+<div id="logoutConfirmOverlay" class="logout-confirm-overlay">
+  <div class="logout-confirm-box">
+    <div class="logout-confirm-title">로그아웃</div>
+    <div class="logout-confirm-desc">
+      포탈에서 로그아웃하시겠습니까?
+    </div>
+    <div class="logout-confirm-actions">
+      <button type="button" id="logoutCancelBtn" class="logout-confirm-btn cancel">아니오</button>
+      <button type="button" id="logoutConfirmBtn" class="logout-confirm-btn confirm">예</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
@@ -834,7 +913,10 @@ body:not(.service-admin-enabled) .service-admin-btn{
     passwordSuccess: document.getElementById('passwordSuccess'),
     topUserBar: document.getElementById('topUserBar'),
     userChip: document.getElementById('userChip'),
-    serviceAdminBtn: document.getElementById('serviceAdminBtn')
+    serviceAdminBtn: document.getElementById('serviceAdminBtn'),
+    logoutConfirmOverlay: document.getElementById('logoutConfirmOverlay'),
+    logoutConfirmBtn: document.getElementById('logoutConfirmBtn'),
+    logoutCancelBtn: document.getElementById('logoutCancelBtn')
   };
 
   if (!window.supabase || !window.supabase.createClient) {
@@ -999,18 +1081,6 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
     const headerGradient = key === HOME_SRC ? getPortalBrandGradient() : meta.gradient;
     if (header && headerGradient) header.style.background = headerGradient;
-
-    let accentColor = '#c8102e';
-
-    if (key === HOME_SRC) {
-      accentColor = portalBrandColor;
-    } else if (meta.gradient) {
-      const match = meta.gradient.match(/#([0-9a-fA-F]{6})/);
-      if (match) accentColor = '#' + match[1];
-    }
-
-    document.documentElement.style.setProperty('--current-header-accent', accentColor);
-
     if (top) top.textContent = meta.top || '';
     if (title) title.textContent = meta.title || '';
     if (desc) desc.textContent = meta.desc || '';
@@ -1564,7 +1634,22 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
     logoutBtn?.addEventListener('click', function (event) {
       event.preventDefault();
+      els.logoutConfirmOverlay?.classList.add('show');
+    });
+
+    els.logoutCancelBtn?.addEventListener('click', function () {
+      els.logoutConfirmOverlay?.classList.remove('show');
+    });
+
+    els.logoutConfirmBtn?.addEventListener('click', function () {
+      els.logoutConfirmOverlay?.classList.remove('show');
       logout();
+    });
+
+    els.logoutConfirmOverlay?.addEventListener('click', function (event) {
+      if (event.target === els.logoutConfirmOverlay) {
+        els.logoutConfirmOverlay.classList.remove('show');
+      }
     });
 
     els.loginButton?.addEventListener('click', login);
