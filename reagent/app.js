@@ -81,6 +81,73 @@ window.ReagentApp.escapeHtml = function (value) {
     .replaceAll("'", "&#39;");
 };
 
+window.ReagentApp.getPortalSession = function () {
+  try {
+    if (window.parent && window.parent !== window && window.parent.portalSession) {
+      return window.parent.portalSession || {};
+    }
+  } catch (_) {}
+
+  return window.portalSession || {};
+};
+
+window.ReagentApp.getCompanyId = function () {
+  const session = window.ReagentApp.getPortalSession?.() || {};
+  const profile = session.profile || {};
+  const user = session.user || {};
+
+  return String(
+    session.companyId ||
+    session.company_id ||
+    profile.company_id ||
+    profile.companyId ||
+    user.company_id ||
+    user.companyId ||
+    ""
+  ).trim();
+};
+
+window.ReagentApp.isPortalAdminSession = function () {
+  const session = window.ReagentApp.getPortalSession?.() || {};
+  const profile = session.profile || {};
+  const user = session.user || {};
+  const roles = [
+    session.role,
+    session.user_role,
+    session.role_key,
+    profile.role,
+    profile.user_role,
+    profile.role_key,
+    user.role,
+    user.user_role,
+    user.role_key
+  ];
+
+  return roles.some((role) => {
+    const normalized = String(role || "").trim().toLowerCase();
+    return normalized === "admin" || normalized === "관리자";
+  });
+};
+
+window.ReagentApp.getPortalUserHint = function () {
+  const session = window.ReagentApp.getPortalSession?.() || {};
+  const profile = session.profile || {};
+  const user = session.user || {};
+
+  return {
+    company_id: window.ReagentApp.getCompanyId?.() || "",
+    email: profile.email || user.email || session.email || "",
+    employee_no: profile.employee_no || profile.employeeNo || user.employee_no || user.employeeNo || session.employee_no || session.employeeNo || "",
+    name: profile.name || profile.employee_name || profile.username || user.name || user.employee_name || session.name || "",
+    division_code: profile.division_code || user.division_code || session.division_code || "",
+    team_code: profile.team_code || user.team_code || session.team_code || "",
+    division_name: profile.division_name || profile.department || user.division_name || user.department || session.division_name || session.department || "",
+    team_name: profile.team_name || profile.team || user.team_name || user.team || session.team_name || session.team || "",
+    position: profile.position || user.position || session.position || "",
+    role: profile.authority || profile.role || user.authority || user.role || session.role || ""
+  };
+};
+
 
 window.ReagentApp.getCleanLabel = function (el) {
   return String(el?.textContent || "").replace(/\s+/g, "").trim();
@@ -88,8 +155,8 @@ window.ReagentApp.getCleanLabel = function (el) {
 
 window.ReagentApp.isGlobalAdmin = function () {
   const user = window.ReagentApp.currentUser || {};
-  const role = String(user.user_role || "").trim();
-  return role === "admin" || user.is_global_admin === true;
+  const role = String(user.user_role || user.role || "").trim().toLowerCase();
+  return role === "admin" || role === "관리자" || user.is_global_admin === true || window.ReagentApp.isPortalAdminSession?.() === true;
 };
 
 window.ReagentApp.isReagentOperator = function () {
@@ -244,10 +311,14 @@ window.ReagentApp.loadReagentPermission = async function () {
   const sb = window.ReagentApp.sb;
   const user = window.ReagentApp.currentUser || {};
 
-  user.user_role = "";
+  const companyId = window.ReagentApp.getCompanyId?.() || String(user.company_id || user.companyId || "").trim();
+  const portalAdmin = window.ReagentApp.isPortalAdminSession?.() === true;
+
+  user.company_id = companyId || user.company_id || user.companyId || "";
+  user.user_role = portalAdmin ? "admin" : "";
   user.reagent_role = "";
-  user.is_global_admin = false;
-  user.is_reagent_operator = false;
+  user.is_global_admin = portalAdmin;
+  user.is_reagent_operator = portalAdmin;
 
   if (!sb) {
     window.ReagentApp.currentUser = user;
@@ -307,10 +378,16 @@ window.ReagentApp.loadReagentPermission = async function () {
       const appKeys = ["reagent", "reagents", "supplies", "glassware", "reagent_glassware", "reagent-glassware"];
       const operatorRoleKeys = ["operator", "운영자"];
 
-      const { data: appRoles, error: appRoleError } = await sb
+      let appRoleQuery = sb
         .from("user_app_roles")
-        .select("employee_no,email,name,app_key,role_key")
+        .select("company_id,employee_no,email,name,app_key,role_key")
         .in("app_key", appKeys);
+
+      if (companyId) {
+        appRoleQuery = appRoleQuery.eq("company_id", companyId);
+      }
+
+      const { data: appRoles, error: appRoleError } = await appRoleQuery;
 
       if (appRoleError) {
         console.warn("시약초자 중앙 권한 조회 실패:", appRoleError);
@@ -546,10 +623,13 @@ window.ReagentApp.loadCurrentUser = async function () {
   const sb = window.ReagentApp.sb;
   const toast = window.ReagentApp.toast || (() => {});
 
+  const portalHint = window.ReagentApp.getPortalUserHint?.() || {};
   const storedHint = window.ReagentApp.getStoredUserHint?.() || {};
   const urlHint = window.ReagentApp.getUrlUserHint?.() || {};
+  const companyId = portalHint.company_id || window.ReagentApp.getCompanyId?.() || "";
 
   const email =
+    portalHint.email ||
     urlHint.email ||
     storedHint.email ||
     storedHint.user_email ||
@@ -557,6 +637,7 @@ window.ReagentApp.loadCurrentUser = async function () {
     "";
 
   const employeeNo =
+    portalHint.employee_no ||
     urlHint.employee_no ||
     storedHint.employee_no ||
     storedHint.employeeNo ||
@@ -565,6 +646,7 @@ window.ReagentApp.loadCurrentUser = async function () {
     "";
 
   const userName =
+    portalHint.name ||
     urlHint.name ||
     storedHint.name ||
     storedHint.user_name ||
@@ -572,17 +654,18 @@ window.ReagentApp.loadCurrentUser = async function () {
     "";
 
   window.ReagentApp.currentUser = {
+    company_id: companyId || "",
     email: email || "",
     employee_no: employeeNo || "",
     name: userName || "",
-    division_code: storedHint.division_code || "",
-    team_code: storedHint.team_code || "",
-    department: storedHint.department || storedHint.division_name || "",
-    division_name: storedHint.division_name || storedHint.department || "",
-    team: storedHint.team || storedHint.team_name || "",
-    team_name: storedHint.team_name || storedHint.team || "",
-    position: storedHint.position || "",
-    role: storedHint.role || storedHint.authority || "",
+    division_code: portalHint.division_code || storedHint.division_code || "",
+    team_code: portalHint.team_code || storedHint.team_code || "",
+    department: portalHint.division_name || storedHint.department || storedHint.division_name || "",
+    division_name: portalHint.division_name || storedHint.division_name || storedHint.department || "",
+    team: portalHint.team_name || storedHint.team || storedHint.team_name || "",
+    team_name: portalHint.team_name || storedHint.team_name || storedHint.team || "",
+    position: portalHint.position || storedHint.position || "",
+    role: portalHint.role || storedHint.role || storedHint.authority || "",
     user_role: "",
     reagent_role: "",
     is_global_admin: false,
@@ -599,6 +682,10 @@ window.ReagentApp.loadCurrentUser = async function () {
       .from("employees")
       .select("*")
       .limit(1);
+
+    if (companyId) {
+      query = query.eq("company_id", companyId);
+    }
 
     if (employeeNo) {
       query = query.eq("employee_no", employeeNo);
@@ -627,6 +714,7 @@ window.ReagentApp.loadCurrentUser = async function () {
       const displayTeam = teamName || divisionName || "";
 
       window.ReagentApp.currentUser = {
+        company_id: data.company_id || companyId || "",
         email: data.email || email || "",
         employee_no: data.employee_no || data.employeeNo || employeeNo || "",
         name: data.name || userName || "",
