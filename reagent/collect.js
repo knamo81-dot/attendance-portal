@@ -1017,25 +1017,30 @@ window.ReagentApp.collect = {
     return merges;
   },
 
-  createContiguousConditionalMerges(rows, keyFn, colSpec, startRowIndex, predicate = () => true) {
+  createContiguousConditionalMerges(rows, keyFn, colSpec, startRowIndex, predicate = () => true, options = {}) {
     const merges = [];
     let start = null;
     let currentKey = "";
 
     const getColStart = () => (typeof colSpec === "number" ? colSpec : colSpec.start);
     const getColEnd = () => (typeof colSpec === "number" ? colSpec : colSpec.end);
+    const includeSingle = options.includeSingle === true;
 
     const flush = (endExclusive) => {
       if (start === null) return;
       const endIndex = endExclusive - 1;
-      // 서로 붙어 있는 같은 값이 2행 이상일 때만 병합합니다.
-      // 단일 행은 위치/표시가 바뀌지 않도록 병합하지 않습니다.
-      if (endIndex > start) {
+
+      // 기본은 연속 2행 이상만 세로 병합합니다.
+      // includeSingle=true인 경우에는 단일 행도 가로 병합합니다.
+      // 비교업체 없음 사유(온라인/제조원/대리점/취급처 구매)는 N:P 3칸을 항상 가로 병합하고,
+      // 같은 사유가 바로 붙어 있으면 그 범위까지 세로로 함께 병합합니다.
+      if (endIndex > start || includeSingle) {
         merges.push({
           s: { r: startRowIndex + start, c: getColStart() },
           e: { r: startRowIndex + endIndex, c: getColEnd() }
         });
       }
+
       start = null;
       currentKey = "";
     };
@@ -1256,7 +1261,8 @@ window.ReagentApp.collect = {
       (row) => String(row.remark || ""),
       { start: 13, end: 15 },
       dataStart2,
-      (row) => !this.hasCompareData(row) && String(row.remark || "").trim() !== ""
+      (row) => !this.hasCompareData(row) && String(row.remark || "").trim() !== "",
+      { includeSingle: true }
     );
 
     ws2["!merges"] = [
