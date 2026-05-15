@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Integrated Operations Platform</title>
+  <title>ExeloLab Operations</title>
   
   <link rel="icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/icon-192.png">
@@ -541,6 +541,59 @@ body:not(.service-admin-enabled) .service-admin-btn{
   }
 }
 
+
+/* ===== Home Nav Button Accent Final ===== */
+/* 홈 버튼만 헤더 카드 색상에 맞춰 아이콘 + 테두리 강조 */
+.nav-btn.home {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  width: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border: 1px solid rgba(200, 16, 46, 0.85) !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.07)),
+    rgba(255,255,255,0.08) !important;
+  color: #ffffff !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06) !important;
+}
+
+.nav-btn.home .home-nav-icon {
+  width: 13px;
+  height: 13px;
+  display: block;
+  color: inherit;
+  flex: 0 0 auto;
+}
+
+.nav-btn.home .home-nav-text {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.nav-btn.home.active {
+  background: #ffffff !important;
+  color: #c8102e !important;
+  border-color: rgba(200, 16, 46, 0.95) !important;
+  box-shadow:
+    0 5px 14px rgba(200, 16, 46, 0.22),
+    inset 0 0 0 1px rgba(200, 16, 46, 0.06) !important;
+}
+
+.nav-btn.home:hover {
+  border-color: rgba(225, 29, 46, 1) !important;
+}
+
+.nav-btn.home.active:hover {
+  color: #b30e27 !important;
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -550,7 +603,14 @@ body:not(.service-admin-enabled) .service-admin-btn{
     <div class="layout">
       <div class="sidenav">
         <div>
-          <button type="button" id="homeNavBtn" class="nav-btn home active" data-portal-src="portal-main/portal-main.html" title="홈">홈</button>
+          <button type="button" id="homeNavBtn" class="nav-btn home active" data-portal-src="portal-main/portal-main.html" title="홈" aria-label="홈">
+            <svg class="home-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 10.6 12 4l8 6.6" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M6.5 10.5V20h11v-9.5" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M10 20v-5h4v5" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="home-nav-text">홈</span>
+          </button>
           <div class="nav-group">
             <button type="button" id="workspaceNavBtn" class="nav-btn" data-portal-src="portal-home/portal-home.html" title="업무">업무</button>
             <button type="button" id="wastewaterNavBtn" class="nav-btn" data-portal-src="wastewater/index.html" title="폐수">폐수</button>
