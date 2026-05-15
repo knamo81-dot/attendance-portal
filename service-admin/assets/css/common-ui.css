@@ -1,1 +1,20 @@
+:root {
+  --page-padding: 16px;
 
+  --card-padding: 14px;
+  --card-radius: 16px;
+  --card-gap: 10px;
+
+  --control-height: 32px;
+  --control-radius: 9px;
+
+  --font-title: 15px;
+  --font-base: 12px;
+  --font-small: 11px;
+
+  --gap-xs: 4px;
+  --gap-sm: 6px;
+  --gap-md: 10px;
+
+  --shadow-card: 0 6px 18px rgba(15, 23, 42, 0.05);
+}
