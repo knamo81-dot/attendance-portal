@@ -46,17 +46,29 @@ window.ReagentApp.collect = {
     const sb = window.ReagentApp.sb;
     if (!sb) throw new Error("Supabase 연결 정보가 없습니다.");
 
-    const row = {
+    const row = window.ReagentApp.withCompanyPayload({
       item_key: key,
       order_month: this.getOrderMonthFromKey(key),
       collected_qty: Number(collectedQty || 0),
       updated_by: this.getCurrentUserName(),
       ...extra
-    };
+    });
 
-    const { error } = await sb
-      .from("reagent_collect_items")
-      .upsert(row, { onConflict: "item_key,order_month" });
+    const { data: existing, error: findError } = await window.ReagentApp.scopedCompanyQuery(
+      sb
+        .from("reagent_collect_items")
+        .select("id")
+        .eq("item_key", key)
+        .eq("order_month", this.getOrderMonthFromKey(key))
+    ).maybeSingle();
+
+    if (findError) throw findError;
+
+    const { error } = existing?.id
+      ? await window.ReagentApp.scopedCompanyQuery(
+          sb.from("reagent_collect_items").update(row).eq("id", existing.id)
+        )
+      : await sb.from("reagent_collect_items").insert(row);
 
     if (error) throw error;
   },
@@ -65,9 +77,9 @@ window.ReagentApp.collect = {
     const sb = window.ReagentApp.sb;
     if (!sb) throw new Error("Supabase 연결 정보가 없습니다.");
 
-    const { error } = await sb
-      .from("reagent_collect_items")
-      .delete()
+    const { error } = await window.ReagentApp.scopedCompanyQuery(
+      sb.from("reagent_collect_items").delete()
+    )
       .eq("item_key", key)
       .eq("order_month", this.getOrderMonthFromKey(key));
 
