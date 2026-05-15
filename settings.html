@@ -3866,5 +3866,51 @@ create table if not exists user_app_roles (
 })();
 </script>
 
+
+<script id="portal-settings-tab-click-fix">
+(function(){
+  function showPortalSettingsTab(button){
+    var buttons = document.querySelectorAll('#settings-page .adminSubTabs .admin-subnav-btn');
+    var panels = document.querySelectorAll('#settings-page .admin-section-panel');
+    buttons.forEach(function(btn){ btn.classList.toggle('active', btn === button); });
+    panels.forEach(function(panel){
+      panel.hidden = true;
+      panel.style.display = 'none';
+    });
+
+    var portalPanel = document.getElementById('adminSectionPortal');
+    if (portalPanel) {
+      portalPanel.hidden = false;
+      portalPanel.style.display = '';
+    }
+
+    var title = document.getElementById('adminSectionTitle');
+    var desc = document.getElementById('adminSectionDesc');
+    if (title) title.textContent = '포탈 설정';
+    if (desc) desc.textContent = '포탈 홈 헤더와 공통 브랜드 색상을 설정합니다. 회사별 브랜드 컬러를 미리보고 저장 구조로 확장할 수 있습니다.';
+  }
+
+  document.addEventListener('click', function(event){
+    var button = event.target.closest && event.target.closest('#settings-page .adminSubTabs .admin-subnav-btn');
+    if (!button) return;
+
+    var section = button.getAttribute('data-admin-section');
+
+    if (section === 'portal') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      showPortalSettingsTab(button);
+      return;
+    }
+
+    var portalPanel = document.getElementById('adminSectionPortal');
+    if (portalPanel) {
+      portalPanel.hidden = true;
+      portalPanel.style.display = 'none';
+    }
+  }, true);
+})();
+</script>
+
 </body>
 </html>
