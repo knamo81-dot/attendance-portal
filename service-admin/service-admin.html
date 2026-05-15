@@ -337,16 +337,111 @@
     }
     .company-code-hidden { display: none; }
 
+
+    .layout-stack {
+      display: grid;
+      gap: 16px;
+      align-items: start;
+    }
+    .company-summary {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+    .company-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      font-size: 13px;
+      color: #64748b;
+      white-space: nowrap;
+    }
+    .company-label strong {
+      color: #0f172a;
+      font-weight: 900;
+      font-size: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 220px;
+      display: inline-block;
+      vertical-align: bottom;
+    }
+    .company-label .domain-link {
+      max-width: 360px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: inline-block;
+    }
+    .company-edit-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+    .company-edit-line[hidden],
+    .company-summary[hidden],
+    .company-actions .btn[hidden] {
+      display: none !important;
+    }
+    .company-edit-line .company-title-input {
+      width: 190px;
+      flex: 0 1 190px;
+    }
+    .company-edit-line .domain-input-wrap {
+      width: 360px;
+      flex: 0 1 360px;
+    }
+    .section-panel {
+      display: none;
+      margin-top: 0;
+    }
+    .section-panel.active {
+      display: block;
+    }
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .detail-title {
+      display: grid;
+      gap: 4px;
+    }
+    .detail-title strong {
+      font-size: 16px;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+    }
+    .detail-title span {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 700;
+    }
+
     @media (max-width: 1100px) {
       .grid { grid-template-columns: 1fr; }
       .form { grid-template-columns: 1fr; }
+      .company-item { grid-template-columns: 1fr; }
+      .company-actions { justify-content: flex-start; }
+      .company-edit-line { display: grid; grid-template-columns: 1fr; }
+      .company-edit-line .company-title-input,
+      .company-edit-line .domain-input-wrap { width: 100%; }
       .page { padding: 18px; }
     }
   </style>
 </head>
 <body>
   <main class="page">
-    <section class="grid">
+    <section class="layout-stack">
       <article class="card">
         <h2>회사 관리</h2>
         <p>회사명과 서브도메인을 등록합니다. company_code는 내부 식별값으로 자동 생성됩니다.</p>
@@ -380,33 +475,34 @@
         </div>
       </article>
 
-      <article class="card">
-        <h2>앱 사용 설정</h2>
-        <p>선택한 회사에서 사용할 앱을 켜고 끕니다. 저장 즉시 company_apps 테이블에 반영됩니다.</p>
-
-        <div class="field" style="margin-top:16px;">
-          <label for="selectedCompanySelect">회사 선택</label>
-          <select id="selectedCompanySelect" class="select">
-            <option value="">회사 선택</option>
-          </select>
+      <article id="appsPanel" class="card section-panel">
+        <div class="detail-header">
+          <div class="detail-title">
+            <strong id="appsPanelTitle">앱 사용 설정</strong>
+            <span id="appsPanelDesc">선택한 회사에서 사용할 앱을 켜고 끕니다.</span>
+          </div>
+          <button id="closeAppsPanelBtn" class="btn" type="button">닫기</button>
         </div>
-
         <div id="appsWrap" class="apps">
           <div class="empty">회사를 선택하면 앱 설정이 표시됩니다.</div>
         </div>
-
         <div class="notice">
-          현재 1차 활성화 범위는 <strong>회사 등록</strong>, <strong>회사 목록 조회</strong>, <strong>회사 활성/비활성</strong>, <strong>앱 ON/OFF</strong>입니다.
+          앱 사용 설정은 저장 즉시 company_apps 테이블에 반영됩니다.
         </div>
       </article>
-    </section>
 
-    <section class="card" style="margin-top:16px;">
-      <h2>회사별 관리자</h2>
-      <p>각 회사의 최초 관리자 계정 생성과 company_id 연결은 다음 단계에서 Auth 생성 방식 확정 후 연결합니다.</p>
-      <div class="notice">
-        Supabase Auth 유저 생성은 보안상 보통 서버/API 또는 Supabase 관리자 화면에서 처리하는 것이 안전합니다. 다음 단계에서 “Auth는 수동 생성 + users 테이블 연결” 방식으로 먼저 붙이는 것을 추천합니다.
-      </div>
+      <article id="adminsPanel" class="card section-panel">
+        <div class="detail-header">
+          <div class="detail-title">
+            <strong id="adminsPanelTitle">회사별 관리자</strong>
+            <span id="adminsPanelDesc">선택한 회사의 관리자 설정 영역입니다.</span>
+          </div>
+          <button id="closeAdminsPanelBtn" class="btn" type="button">닫기</button>
+        </div>
+        <div class="notice">
+          Supabase Auth 유저 생성은 보안상 보통 서버/API 또는 Supabase 관리자 화면에서 처리하는 것이 안전합니다. 다음 단계에서 “Auth는 수동 생성 + users 테이블 연결” 방식으로 먼저 붙이는 것을 추천합니다.
+        </div>
+      </article>
     </section>
 
     <div id="feedback" class="feedback"></div>
@@ -432,7 +528,14 @@
     refreshCompaniesBtn: document.getElementById('refreshCompaniesBtn'),
     companyList: document.getElementById('companyList'),
     companyCountBadge: document.getElementById('companyCountBadge'),
-    selectedCompanySelect: document.getElementById('selectedCompanySelect'),
+    appsPanel: document.getElementById('appsPanel'),
+    appsPanelTitle: document.getElementById('appsPanelTitle'),
+    appsPanelDesc: document.getElementById('appsPanelDesc'),
+    closeAppsPanelBtn: document.getElementById('closeAppsPanelBtn'),
+    adminsPanel: document.getElementById('adminsPanel'),
+    adminsPanelTitle: document.getElementById('adminsPanelTitle'),
+    adminsPanelDesc: document.getElementById('adminsPanelDesc'),
+    closeAdminsPanelBtn: document.getElementById('closeAdminsPanelBtn'),
     appsWrap: document.getElementById('appsWrap'),
     feedback: document.getElementById('feedback')
   };
@@ -576,9 +679,7 @@
 
     companies = data || [];
     renderCompanies();
-    renderCompanySelect();
-
-    if (selectedCompanyId) {
+    if (selectedCompanyId && els.appsPanel?.classList.contains('active')) {
       await loadCompanyApps(selectedCompanyId);
     }
 
@@ -599,36 +700,43 @@
       const companyUrl = getCompanyUrl(subdomain);
       return `
         <div class="company-item" data-company-row="${escapeHtml(company.id)}" data-editing="false">
-          <div>
-            <div class="company-title-row">
-              <div class="company-name" data-company-name-text="${escapeHtml(company.id)}">${escapeHtml(company.company_name || '-')}</div>
-              <div class="company-edit-grid" data-company-edit-grid="${escapeHtml(company.id)}" hidden>
-                <input
-                  class="company-title-input"
-                  data-edit-company-name="${escapeHtml(company.id)}"
-                  value="${escapeHtml(company.company_name || '')}"
-                >
-                <div class="domain-input-wrap">
-                  <span class="domain-prefix">https://</span>
-                  <input
-                    class="domain-input"
-                    data-edit-company-subdomain="${escapeHtml(company.id)}"
-                    value="${escapeHtml(subdomain)}"
-                    placeholder=""
-                    autocomplete="off"
-                    spellcheck="false"
-                  >
-                  <span class="domain-suffix">.ops.exelolab.com</span>
-                </div>
-              </div>
-            </div>
-            <div class="company-meta">
-              ${companyUrl ? `<a class="domain-link" href="${escapeHtml(companyUrl)}" target="_blank" rel="noopener">${escapeHtml(companyUrl)}</a>` : '<span>주소 미설정</span>'}
-              <span class="company-code-hidden">code: ${escapeHtml(company.company_code || '-')}</span>
-              <span class="badge ${active ? 'active' : 'inactive'}">${active ? '활성' : '비활성'}</span>
+          <div class="company-summary" data-company-view="${escapeHtml(company.id)}">
+            <span class="badge ${active ? 'active' : 'inactive'}">${active ? '활성' : '비활성'}</span>
+            <span class="company-label">회사: <strong>${escapeHtml(company.company_name || '-')}</strong></span>
+            <span class="company-label">서브도메인: ${
+              companyUrl
+                ? `<a class="domain-link" href="${escapeHtml(companyUrl)}" target="_blank" rel="noopener">${escapeHtml(companyUrl)}</a>`
+                : '<strong>주소 미설정</strong>'
+            }</span>
+            <span class="company-code-hidden">code: ${escapeHtml(company.company_code || '-')}</span>
+          </div>
+
+          <div class="company-edit-line" data-company-edit-grid="${escapeHtml(company.id)}" hidden>
+            <span class="badge ${active ? 'active' : 'inactive'}">${active ? '활성' : '비활성'}</span>
+            <span class="company-label">회사:</span>
+            <input
+              class="company-title-input"
+              data-edit-company-name="${escapeHtml(company.id)}"
+              value="${escapeHtml(company.company_name || '')}"
+            >
+            <span class="company-label">서브도메인:</span>
+            <div class="domain-input-wrap">
+              <span class="domain-prefix">https://</span>
+              <input
+                class="domain-input"
+                data-edit-company-subdomain="${escapeHtml(company.id)}"
+                value="${escapeHtml(subdomain)}"
+                placeholder=""
+                autocomplete="off"
+                spellcheck="false"
+              >
+              <span class="domain-suffix">.ops.exelolab.com</span>
             </div>
           </div>
+
           <div class="company-actions">
+            <button type="button" class="btn" data-open-apps="${escapeHtml(company.id)}">앱 설정</button>
+            <button type="button" class="btn" data-open-admins="${escapeHtml(company.id)}">관리자</button>
             <button type="button" class="btn" data-edit-company="${escapeHtml(company.id)}">수정</button>
             <button type="button" class="btn primary" data-save-company="${escapeHtml(company.id)}" hidden>저장</button>
             <button type="button" class="btn" data-cancel-company-edit="${escapeHtml(company.id)}" hidden>취소</button>
@@ -638,23 +746,13 @@
               data-toggle-company="${escapeHtml(company.id)}"
               data-next-active="${active ? 'false' : 'true'}"
             >
-              ${active ? '비활성화' : '활성화'}
+              ${active ? '비활성' : '활성'}
             </button>
             <button type="button" class="btn danger" data-delete-company="${escapeHtml(company.id)}">삭제</button>
           </div>
         </div>
       `;
     }).join('');
-  }
-
-  function renderCompanySelect() {
-    els.selectedCompanySelect.innerHTML =
-      '<option value="">회사 선택</option>' +
-      companies.map(company => `
-        <option value="${escapeHtml(company.id)}" ${company.id === selectedCompanyId ? 'selected' : ''}>
-          ${escapeHtml(company.company_name || '-')} (${escapeHtml(company.subdomain ? company.subdomain + '.ops.exelolab.com' : '주소 미설정')})
-        </option>
-      `).join('');
   }
 
   async function createCompany() {
@@ -764,6 +862,7 @@
 
     if (error) throw error;
 
+    showCompanyEdit(companyId, false);
     await loadCompanies();
     setFeedback('회사 정보를 수정했습니다.', 'ok');
   }
@@ -799,20 +898,22 @@
     const row = document.querySelector(`[data-company-row="${CSS.escape(companyId)}"]`);
     if (!row) return;
 
-    const nameText = row.querySelector(`[data-company-name-text="${CSS.escape(companyId)}"]`);
+    const view = row.querySelector(`[data-company-view="${CSS.escape(companyId)}"]`);
     const editGrid = row.querySelector(`[data-company-edit-grid="${CSS.escape(companyId)}"]`);
     const nameInput = row.querySelector(`[data-edit-company-name="${CSS.escape(companyId)}"]`);
     const subdomainInput = row.querySelector(`[data-edit-company-subdomain="${CSS.escape(companyId)}"]`);
     const editBtn = row.querySelector(`[data-edit-company="${CSS.escape(companyId)}"]`);
     const saveBtn = row.querySelector(`[data-save-company="${CSS.escape(companyId)}"]`);
     const cancelBtn = row.querySelector(`[data-cancel-company-edit="${CSS.escape(companyId)}"]`);
+    const appsBtn = row.querySelector(`[data-open-apps="${CSS.escape(companyId)}"]`);
+    const adminsBtn = row.querySelector(`[data-open-admins="${CSS.escape(companyId)}"]`);
     const toggleBtn = row.querySelector('[data-toggle-company]');
     const deleteBtn = row.querySelector('[data-delete-company]');
     const company = companies.find(item => item.id === companyId);
 
     row.dataset.editing = show ? 'true' : 'false';
 
-    if (nameText) nameText.hidden = show;
+    if (view) view.hidden = show;
     if (editGrid) editGrid.hidden = !show;
 
     if (show) {
@@ -824,11 +925,58 @@
       }, 0);
     }
 
+    if (appsBtn) appsBtn.hidden = show;
+    if (adminsBtn) adminsBtn.hidden = show;
     if (editBtn) editBtn.hidden = show;
-    if (saveBtn) saveBtn.hidden = !show;
+    if (saveBtn) {
+      saveBtn.hidden = !show;
+      saveBtn.disabled = false;
+    }
     if (cancelBtn) cancelBtn.hidden = !show;
     if (toggleBtn) toggleBtn.hidden = show;
     if (deleteBtn) deleteBtn.hidden = show;
+  }
+
+  function getCompanyById(companyId) {
+    return companies.find(item => item.id === companyId) || null;
+  }
+
+  function closeDetailPanels() {
+    els.appsPanel?.classList.remove('active');
+    els.adminsPanel?.classList.remove('active');
+  }
+
+  async function openAppsPanel(companyId) {
+    const company = getCompanyById(companyId);
+    if (!company) return;
+
+    selectedCompanyId = companyId;
+    closeDetailPanels();
+
+    if (els.appsPanelTitle) els.appsPanelTitle.textContent = `${company.company_name || '선택 회사'} 앱 사용 설정`;
+    if (els.appsPanelDesc) {
+      const url = getCompanyUrl(company.subdomain || '');
+      els.appsPanelDesc.textContent = url || '접속주소 미설정';
+    }
+
+    els.appsPanel?.classList.add('active');
+    await loadCompanyApps(companyId);
+  }
+
+  function openAdminsPanel(companyId) {
+    const company = getCompanyById(companyId);
+    if (!company) return;
+
+    selectedCompanyId = companyId;
+    closeDetailPanels();
+
+    if (els.adminsPanelTitle) els.adminsPanelTitle.textContent = `${company.company_name || '선택 회사'} 관리자`;
+    if (els.adminsPanelDesc) {
+      const url = getCompanyUrl(company.subdomain || '');
+      els.adminsPanelDesc.textContent = url || '접속주소 미설정';
+    }
+
+    els.adminsPanel?.classList.add('active');
   }
 
   async function loadCompanyApps(companyId) {
@@ -899,6 +1047,12 @@
       els.companySubdomainInput.value = normalizeSubdomain(els.companySubdomainInput.value);
       updateDomainPreview();
     });
+    els.closeAppsPanelBtn?.addEventListener('click', () => {
+      els.appsPanel?.classList.remove('active');
+    });
+    els.closeAdminsPanelBtn?.addEventListener('click', () => {
+      els.adminsPanel?.classList.remove('active');
+    });
     els.refreshCompaniesBtn.addEventListener('click', () => {
       loadCompanies().catch(error => {
         console.error(error);
@@ -906,15 +1060,6 @@
       });
     });
 
-    els.selectedCompanySelect.addEventListener('change', async () => {
-      selectedCompanyId = els.selectedCompanySelect.value || '';
-      try {
-        await loadCompanyApps(selectedCompanyId);
-      } catch (error) {
-        console.error(error);
-        setFeedback(error.message || '앱 설정을 불러오지 못했습니다.', 'error');
-      }
-    });
 
     document.addEventListener('keydown', async (event) => {
       const input = event.target.closest('[data-edit-company-name], [data-edit-company-subdomain]');
@@ -941,6 +1086,24 @@
     });
 
     document.addEventListener('click', async (event) => {
+      const openAppsBtn = event.target.closest('[data-open-apps]');
+      if (openAppsBtn) {
+        const id = openAppsBtn.getAttribute('data-open-apps');
+        try {
+          await openAppsPanel(id);
+        } catch (error) {
+          console.error(error);
+          setFeedback(error.message || '앱 설정을 불러오지 못했습니다.', 'error');
+        }
+        return;
+      }
+
+      const openAdminsBtn = event.target.closest('[data-open-admins]');
+      if (openAdminsBtn) {
+        openAdminsPanel(openAdminsBtn.getAttribute('data-open-admins'));
+        return;
+      }
+
       const editBtn = event.target.closest('[data-edit-company]');
       if (editBtn) {
         showCompanyEdit(editBtn.getAttribute('data-edit-company'), true);
@@ -958,10 +1121,12 @@
         const id = saveCompanyBtn.getAttribute('data-save-company');
         const input = document.querySelector(`[data-edit-company-name="${CSS.escape(id)}"]`);
         const subdomainInput = document.querySelector(`[data-edit-company-subdomain="${CSS.escape(id)}"]`);
+        saveCompanyBtn.disabled = true;
         try {
           await updateCompanyInfo(id, input?.value || '', subdomainInput?.value || '');
         } catch (error) {
           console.error(error);
+          saveCompanyBtn.disabled = false;
           setFeedback(error.message || '회사 정보 수정 중 오류가 발생했습니다.', 'error');
         }
         return;
