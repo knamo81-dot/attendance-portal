@@ -767,28 +767,70 @@ window.ReagentApp.collect = {
 
   sortPrepareRows(rows, view, tableView = "summary") {
     const categoryOrder = { "시약": 1, "초자": 2, "초자/소모품": 2, "안전용품": 3 };
+    const sortedRows = Array.isArray(rows) ? [...rows] : [];
 
-    return [...rows].sort((a, b) => {
-      // 1순위: 구분
-      if (view === "main") {
-        const ca = categoryOrder[a.category] || 99;
-        const cb = categoryOrder[b.category] || 99;
-        if (ca !== cb) return ca - cb;
+    // 제품취합 화면의 정렬 흐름과 맞춥니다.
+    // 구분 → 대표 기본거래처 → 일반 비교견적 → 기타 기본거래처 → 온라인 구매 → 거래처 → 용도 → 품명 → 비고
+    const getPrepareSortInfo = (row = {}) => {
+      const category = String(row.category || "");
+      const remark = String(row.remark || "").trim();
+      const vendor = String(row.purchaseVendor || "").trim();
+
+      return {
+        category,
+        categoryOrder: categoryOrder[category] || 99,
+        remark,
+        vendor,
+        isOnline: remark === "온라인 구매",
+        isGeneral: !vendor && remark !== "온라인 구매"
+      };
+    };
+
+    const firstVendorByBucket = {};
+    sortedRows.forEach((row) => {
+      const info = getPrepareSortInfo(row);
+      if (info.isOnline || info.isGeneral || !info.vendor) return;
+
+      const bucketKey = String(info.category || "");
+      if (!firstVendorByBucket[bucketKey]) {
+        firstVendorByBucket[bucketKey] = info.vendor;
+      }
+    });
+
+    const getPrepareBlockOrder = (row = {}) => {
+      const info = getPrepareSortInfo(row);
+      if (info.isOnline) return 9;
+      if (info.isGeneral) return 2;
+
+      const firstVendor = firstVendorByBucket[String(info.category || "")] || "";
+      if (info.vendor && info.vendor === firstVendor) return 1;
+      if (info.vendor) return 3;
+      return 2;
+    };
+
+    return sortedRows.sort((a, b) => {
+      const aInfo = getPrepareSortInfo(a);
+      const bInfo = getPrepareSortInfo(b);
+
+      if (aInfo.categoryOrder !== bInfo.categoryOrder) {
+        return aInfo.categoryOrder - bInfo.categoryOrder;
       }
 
-      // 2순위: 구매 거래처
-      const vendorCompare = String(a.purchaseVendor || "").localeCompare(String(b.purchaseVendor || ""), "ko");
+      const aBlockOrder = getPrepareBlockOrder(a);
+      const bBlockOrder = getPrepareBlockOrder(b);
+      if (aBlockOrder !== bBlockOrder) {
+        return aBlockOrder - bBlockOrder;
+      }
+
+      const vendorCompare = aInfo.vendor.localeCompare(bInfo.vendor, "ko");
       if (vendorCompare !== 0) return vendorCompare;
 
-      // 3순위: 용도
       const usageCompare = String(a.usage || "").localeCompare(String(b.usage || ""), "ko");
       if (usageCompare !== 0) return usageCompare;
 
-      // 4순위: 품명
       const nameCompare = String(a.name || "").localeCompare(String(b.name || ""), "ko");
       if (nameCompare !== 0) return nameCompare;
 
-      // 5순위: 비고
       return String(a.remark || "").localeCompare(String(b.remark || ""), "ko");
     });
   },
