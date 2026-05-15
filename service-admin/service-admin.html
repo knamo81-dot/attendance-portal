@@ -22,6 +22,8 @@
       border-radius: 22px;
       padding: 22px;
       box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+      width: fit-content;
+      max-width: 100%;
     }
     .card h2 {
       margin: 0 0 8px;
@@ -369,6 +371,8 @@
       background: #f8fafc;
       color: #475569;
       font-weight: 700;
+      width: calc(var(--admin-content-width, 650px) + 44px);
+      max-width: 100%;
     }
     .feedback.show { display: block; }
     .feedback.ok {
@@ -422,6 +426,7 @@
 
     @media (max-width: 1100px) {
       .page { padding: 18px; }
+      .card { width: 100%; }
       .form {
         grid-template-columns: 1fr;
         width: 100%;
