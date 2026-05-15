@@ -1522,11 +1522,11 @@ body.auth-loading .app{visibility:visible; opacity:.35; pointer-events:none}
 
 /* 메모 */
 .memo-top {
-  padding: 8px 14px 0 14px;
+  padding: 14px 14px 0 14px;
 }
 
 .memo-board {
-  margin: 8px 14px 14px 14px;
+  margin: 14px;
   border-radius: 16px;
   min-height: 640px;
 }
@@ -1871,12 +1871,32 @@ body.auth-loading .app{visibility:visible; opacity:.35; pointer-events:none}
   }
 }
 
-/* ===== 개인 메모 시작 위치 보정 ===== */
+
+/* ===== 개인 메모 상단 위치 강제 보정 ===== */
+
+.memo-wrap,
+.memo-section,
+.memo-container {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
 .memo-top {
-  padding-top: 8px;
+  padding: 4px 14px 0 14px !important;
+  margin-top: 0 !important;
+  min-height: auto !important;
+}
+
+.memo-top h2,
+.memo-top .title,
+.memo-top strong {
+  margin-top: 0 !important;
+  margin-bottom: 4px !important;
+  padding-top: 0 !important;
+  line-height: 1.2 !important;
 }
 
 .memo-board {
-  margin-top: 8px;
+  margin: 2px 14px 14px 14px !important;
 }
 
