@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
@@ -1444,100 +1444,7 @@ html.embed-mode #settings-page .real-form-card{
                 </div>
 
                 
-  
-              <div id="adminSectionPortal" class="admin-section-panel" hidden>
-                <div class="real-admin-top-note">
-                  포탈 공통 화면의 브랜드 색상을 설정하는 영역입니다. 현재는 저장 기능 연결 전 미리보기 중심으로 구성했으며,
-                  추후 Supabase 설정 테이블과 연결하면 회사별 브랜드 컬러를 저장할 수 있습니다.
-                </div>
-
-                <div class="portal-setting-layout">
-                  <div class="real-card portal-brand-card">
-                    <div class="real-box-head">
-                      <div>
-                        <div class="real-box-title">브랜드 컬러 설정</div>
-                        <div class="real-box-sub">홈 헤더, 홈 버튼, 공통 강조색에 사용할 대표 색상을 선택합니다.</div>
-                      </div>
-                      <div id="portalColorPreviewChip" class="portal-color-preview-chip">#c8102e</div>
-                    </div>
-
-                    <div class="portal-preview-header" id="portalPreviewHeader">
-                      <div>
-                        <div class="portal-preview-top">Integrated Operations Platform</div>
-                        <div class="portal-preview-title">통합 운영 플랫폼</div>
-                        <div class="portal-preview-desc">선택한 브랜드 컬러가 포탈 홈 헤더에 적용되는 모습입니다.</div>
-                      </div>
-                      <div class="portal-preview-home-btn">
-                        <svg viewBox="0 0 48 48" aria-hidden="true">
-                          <path d="M8.5 22 L24 8.5 L39.5 22" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-                          <path d="M13 20 V38 H35 V20" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-                          <text x="24" y="30.5" text-anchor="middle" class="portal-preview-home-text">홈</text>
-                        </svg>
-                      </div>
-                    </div>
-
-                    <div class="portal-color-section">
-                      <div class="portal-color-section-title">추천 테마 색</div>
-                      <div class="portal-color-grid" id="portalPresetColors">
-                        <button type="button" class="portal-color-swatch active" data-color="#c8102e" style="background:#c8102e" title="Crimson"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#0f172a" style="background:#0f172a" title="Navy"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#173a7a" style="background:#173a7a" title="Deep Blue"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#047857" style="background:#047857" title="Emerald"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#0284c7" style="background:#0284c7" title="Sky"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#7c3aed" style="background:#7c3aed" title="Purple"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#475569" style="background:#475569" title="Slate"></button>
-                      </div>
-                    </div>
-
-                    <div class="portal-color-section">
-                      <div class="portal-color-section-title">표준 색</div>
-                      <div class="portal-color-grid portal-color-grid-standard">
-                        <button type="button" class="portal-color-swatch" data-color="#dc2626" style="background:#dc2626"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#ea580c" style="background:#ea580c"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#d97706" style="background:#d97706"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#65a30d" style="background:#65a30d"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#16a34a" style="background:#16a34a"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#0891b2" style="background:#0891b2"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#2563eb" style="background:#2563eb"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#4f46e5" style="background:#4f46e5"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#9333ea" style="background:#9333ea"></button>
-                        <button type="button" class="portal-color-swatch" data-color="#be185d" style="background:#be185d"></button>
-                      </div>
-                    </div>
-
-                    <div class="real-inline-grid two" style="margin-top:12px;">
-                      <div class="real-field">
-                        <label>HEX 직접 입력</label>
-                        <input id="portalBrandHexInput" class="real-input" value="#c8102e" maxlength="7" placeholder="#c8102e">
-                      </div>
-                      <div class="real-field">
-                        <label>사용자 지정 색</label>
-                        <input id="portalBrandColorInput" class="portal-native-color" type="color" value="#c8102e">
-                      </div>
-                    </div>
-
-                    <div class="real-actions left">
-                      <button id="portalApplyPreviewBtn" type="button" class="real-btn">미리보기 적용</button>
-                      <button id="portalResetColorBtn" type="button" class="real-btn ghost">기본값</button>
-                      <button id="portalSaveColorBtn" type="button" class="real-btn soft">저장 준비</button>
-                    </div>
-                    <div id="portalSettingFeedback" class="real-feedback loading">현재 버전은 UI 미리보기까지 적용되어 있습니다. 저장은 system_settings 테이블 연결 후 활성화하면 됩니다.</div>
-                  </div>
-
-                  <div class="real-card portal-help-card">
-                    <div class="real-box-title">적용 예정 위치</div>
-                    <div class="portal-apply-list">
-                      <div><strong>포탈 홈 헤더</strong><span>회사 대표 색상으로 홈 화면을 브랜딩합니다.</span></div>
-                      <div><strong>홈 버튼</strong><span>사이드바 홈 아이콘 테두리와 강조색에 반영합니다.</span></div>
-                      <div><strong>상단 앱 프레임</strong><span>PWA/manifest theme_color와 연동하면 창 상단 색상까지 맞출 수 있습니다.</span></div>
-                      <div><strong>회사별 설정</strong><span>company_id 기준으로 저장하면 회사마다 다른 색상을 사용할 수 있습니다.</span></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-
-              <div id="realEmployeeModal" class="real-modal-bg" aria-hidden="true">
+                <div id="realEmployeeModal" class="real-modal-bg" aria-hidden="true">
                   <div class="real-modal-card">
                     <div class="real-modal-head">
                       <div class="real-modal-title">사원 입력 / 수정</div>
@@ -1777,6 +1684,98 @@ create table if not exists user_app_roles (
                   </div>
                 </div>
               </div>
+
+              <div id="adminSectionPortal" class="admin-section-panel" hidden>
+                <div class="real-admin-top-note">
+                  포탈 공통 화면의 브랜드 색상을 설정하는 영역입니다. 선택한 색상은 system_settings 테이블에 저장하고,
+                  포탈 index.html에서 company_id 기준으로 불러와 실제 헤더와 홈 버튼에 적용할 수 있습니다.
+                </div>
+
+                <div class="portal-setting-layout">
+                  <div class="real-card portal-brand-card">
+                    <div class="real-box-head">
+                      <div>
+                        <div class="real-box-title">브랜드 컬러 설정</div>
+                        <div class="real-box-sub">홈 헤더, 홈 버튼, 공통 강조색에 사용할 대표 색상을 선택합니다.</div>
+                      </div>
+                      <div id="portalColorPreviewChip" class="portal-color-preview-chip">#c8102e</div>
+                    </div>
+
+                    <div class="portal-preview-header" id="portalPreviewHeader">
+                      <div>
+                        <div class="portal-preview-top">Integrated Operations Platform</div>
+                        <div class="portal-preview-title">통합 운영 플랫폼</div>
+                        <div class="portal-preview-desc">선택한 브랜드 컬러가 포탈 홈 헤더에 적용되는 모습입니다.</div>
+                      </div>
+                      <div class="portal-preview-home-btn">
+                        <svg viewBox="0 0 48 48" aria-hidden="true">
+                          <path d="M8.5 22 L24 8.5 L39.5 22" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+                          <path d="M13 20 V38 H35 V20" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+                          <text x="24" y="30.5" text-anchor="middle" class="portal-preview-home-text">홈</text>
+                        </svg>
+                      </div>
+                    </div>
+
+                    <div class="portal-color-section">
+                      <div class="portal-color-section-title">추천 테마 색</div>
+                      <div class="portal-color-grid" id="portalPresetColors">
+                        <button type="button" class="portal-color-swatch active" data-color="#c8102e" style="background:#c8102e" title="Crimson"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#0f172a" style="background:#0f172a" title="Navy"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#173a7a" style="background:#173a7a" title="Deep Blue"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#047857" style="background:#047857" title="Emerald"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#0284c7" style="background:#0284c7" title="Sky"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#7c3aed" style="background:#7c3aed" title="Purple"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#475569" style="background:#475569" title="Slate"></button>
+                      </div>
+                    </div>
+
+                    <div class="portal-color-section">
+                      <div class="portal-color-section-title">표준 색</div>
+                      <div class="portal-color-grid portal-color-grid-standard">
+                        <button type="button" class="portal-color-swatch" data-color="#dc2626" style="background:#dc2626"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#ea580c" style="background:#ea580c"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#d97706" style="background:#d97706"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#65a30d" style="background:#65a30d"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#16a34a" style="background:#16a34a"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#0891b2" style="background:#0891b2"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#2563eb" style="background:#2563eb"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#4f46e5" style="background:#4f46e5"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#9333ea" style="background:#9333ea"></button>
+                        <button type="button" class="portal-color-swatch" data-color="#be185d" style="background:#be185d"></button>
+                      </div>
+                    </div>
+
+                    <div class="real-inline-grid two" style="margin-top:12px;">
+                      <div class="real-field">
+                        <label>HEX 직접 입력</label>
+                        <input id="portalBrandHexInput" class="real-input" value="#c8102e" maxlength="7" placeholder="#c8102e">
+                      </div>
+                      <div class="real-field">
+                        <label>사용자 지정 색</label>
+                        <input id="portalBrandColorInput" class="portal-native-color" type="color" value="#c8102e">
+                      </div>
+                    </div>
+
+                    <div class="real-actions left">
+                      <button id="portalApplyPreviewBtn" type="button" class="real-btn">미리보기 적용</button>
+                      <button id="portalResetColorBtn" type="button" class="real-btn ghost">기본값</button>
+                      <button id="portalSaveColorBtn" type="button" class="real-btn soft">저장</button>
+                    </div>
+                    <div id="portalSettingFeedback" class="real-feedback loading">현재 company_id의 저장값을 확인하는 중입니다.</div>
+                  </div>
+
+                  <div class="real-card portal-help-card">
+                    <div class="real-box-title">적용 예정 위치</div>
+                    <div class="portal-apply-list">
+                      <div><strong>포탈 홈 헤더</strong><span>회사 대표 색상으로 홈 화면을 브랜딩합니다.</span></div>
+                      <div><strong>홈 버튼</strong><span>사이드바 홈 아이콘 테두리와 강조색에 반영합니다.</span></div>
+                      <div><strong>상단 앱 프레임</strong><span>PWA/manifest theme_color와 연동하면 창 상단 색상까지 맞출 수 있습니다.</span></div>
+                      <div><strong>회사별 설정</strong><span>company_id 기준으로 저장하면 회사마다 다른 색상을 사용할 수 있습니다.</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
 
             </div>
           </div>
@@ -2262,7 +2261,7 @@ create table if not exists user_app_roles (
     }
 
     function renderAdminSection() {
-      const validAdminSections = ['org', 'employee', 'team', 'issue', 'resPlaces', 'permission'];
+      const validAdminSections = ['org', 'employee', 'team', 'issue', 'resPlaces', 'permission', 'portal'];
       if (!validAdminSections.includes(state.adminSection)) state.adminSection = 'org';
       const sectionMap = {
         org: {
@@ -2288,6 +2287,10 @@ create table if not exists user_app_roles (
         permission: {
           title: '권한 관리',
           desc: '프로그램별 권한을 먼저 눈으로 검증하는 화면입니다. 현재는 저장·조회만 수행하고 각 프로그램과 직접 연동하지 않습니다.'
+        },
+        portal: {
+          title: '포탈 설정',
+          desc: '포탈 공통 화면의 브랜드 색상과 회사별 표시 옵션을 관리합니다.'
         }
       };
       document.querySelectorAll('.admin-subnav-btn').forEach(btn => {
@@ -2311,6 +2314,9 @@ create table if not exists user_app_roles (
       if (state.adminSection === 'permission' && typeof window.loadPermissionAdminPage === 'function') {
         window.loadPermissionAdminPage();
       }
+      if (state.adminSection === 'portal' && typeof window.loadPortalBrandSettings === 'function') {
+        window.loadPortalBrandSettings();
+      }
     }
 
     if (typeof window !== 'undefined') {
@@ -2321,7 +2327,7 @@ create table if not exists user_app_roles (
       const btn = event.target.closest('.admin-subnav-btn');
       if (!btn) return;
       const sec = btn.dataset.adminSection || 'org';
-      const validAdminSections = ['org', 'employee', 'team', 'issue', 'resPlaces', 'permission'];
+      const validAdminSections = ['org', 'employee', 'team', 'issue', 'resPlaces', 'permission', 'portal'];
       state.adminSection = validAdminSections.includes(sec) ? sec : 'org';
       renderAdminSection();
       if (state.adminSection === 'org') loadOrganizations();
@@ -3788,127 +3794,223 @@ create table if not exists user_app_roles (
 
 <script id="portal-settings-brand-script">
 (function(){
+  const DEFAULT_COLOR = '#c8102e';
+  const SETTING_KEY = 'portal_brand';
+
   function $(id){ return document.getElementById(id); }
+
   function normalizeHex(value){
-    var v = String(value || '').trim();
+    let v = String(value || '').trim();
     if (!v) return '';
     if (v[0] !== '#') v = '#' + v;
     if (/^#[0-9a-fA-F]{6}$/.test(v)) return v.toLowerCase();
     return '';
   }
+
   function lighter(hex){
-    var h = normalizeHex(hex) || '#c8102e';
-    var r = parseInt(h.slice(1,3),16);
-    var g = parseInt(h.slice(3,5),16);
-    var b = parseInt(h.slice(5,7),16);
+    const h = normalizeHex(hex) || DEFAULT_COLOR;
+    let r = parseInt(h.slice(1,3),16);
+    let g = parseInt(h.slice(3,5),16);
+    let b = parseInt(h.slice(5,7),16);
     r = Math.min(255, Math.round(r + (255-r)*0.18));
     g = Math.min(255, Math.round(g + (255-g)*0.18));
     b = Math.min(255, Math.round(b + (255-b)*0.18));
-    return '#' + [r,g,b].map(function(n){ return n.toString(16).padStart(2,'0'); }).join('');
+    return '#' + [r,g,b].map(n => n.toString(16).padStart(2,'0')).join('');
   }
+
+  function getSupabaseClient(){
+    try {
+      const ctx = typeof window.getPortalAuthContext === 'function' ? window.getPortalAuthContext() : {};
+      if (ctx && ctx.supabase) return ctx.supabase;
+    } catch(e) {}
+    return window.portalSupabase || null;
+  }
+
+  function getCompanyId(){
+    if (typeof window.getPortalCompanyId === 'function') {
+      const v = window.getPortalCompanyId();
+      if (v) return v;
+    }
+    const candidates = [];
+    try {
+      candidates.push(window.parent?.portalSession?.companyId);
+      candidates.push(window.parent?.portalSession?.company_id);
+      candidates.push(window.parent?.portalSession?.profile?.company_id);
+      candidates.push(window.parent?.portalSession?.user?.company_id);
+    } catch(e) {}
+    try {
+      candidates.push(window.portalSession?.companyId);
+      candidates.push(window.portalSession?.company_id);
+      candidates.push(window.portalSession?.profile?.company_id);
+      candidates.push(window.portalSession?.user?.company_id);
+    } catch(e) {}
+    try {
+      const ctx = typeof window.getPortalAuthContext === 'function' ? window.getPortalAuthContext() : {};
+      candidates.push(ctx.companyId);
+      candidates.push(ctx.company_id);
+      candidates.push(ctx.profile?.company_id);
+      candidates.push(ctx.user?.company_id);
+    } catch(e) {}
+    const value = candidates.find(v => v !== undefined && v !== null && String(v).trim() !== '');
+    return value === undefined || value === null ? '' : String(value).trim();
+  }
+
+  function setFeedback(message, cls){
+    const el = $('portalSettingFeedback');
+    if (!el) return;
+    el.className = 'real-feedback ' + (cls || 'loading');
+    el.textContent = message || '';
+  }
+
   function applyPortalColor(hex){
     hex = normalizeHex(hex);
     if (!hex) return false;
-    var h2 = lighter(hex);
-    var preview = $('portalPreviewHeader');
-    var home = document.querySelector('#settings-page .portal-preview-home-btn');
-    var chip = $('portalColorPreviewChip');
-    var hexInput = $('portalBrandHexInput');
-    var colorInput = $('portalBrandColorInput');
+
+    const h2 = lighter(hex);
+    const preview = $('portalPreviewHeader');
+    const home = document.querySelector('#settings-page .portal-preview-home-btn');
+    const chip = $('portalColorPreviewChip');
+    const hexInput = $('portalBrandHexInput');
+    const colorInput = $('portalBrandColorInput');
+
     if (preview) preview.style.background = 'linear-gradient(135deg, ' + hex + ' 0%, ' + h2 + ' 100%)';
     if (home) home.style.color = hex;
     if (chip) chip.textContent = hex;
     if (hexInput) hexInput.value = hex;
     if (colorInput) colorInput.value = hex;
-    document.querySelectorAll('#settings-page .portal-color-swatch').forEach(function(btn){
+
+    document.querySelectorAll('#settings-page .portal-color-swatch').forEach(btn => {
       btn.classList.toggle('active', String(btn.dataset.color || '').toLowerCase() === hex);
     });
+
+    window.__PORTAL_SELECTED_BRAND_COLOR__ = hex;
     return true;
   }
-  function setFeedback(message, cls){
-    var el = $('portalSettingFeedback');
-    if (!el) return;
-    el.className = 'real-feedback ' + (cls || 'loading');
-    el.textContent = message;
-  }
-  function initPortalSetting(){
-    document.querySelectorAll('#settings-page .portal-color-swatch').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        applyPortalColor(btn.dataset.color);
-        setFeedback('미리보기 색상이 적용되었습니다. 저장 기능은 설정 테이블 연결 후 활성화하면 됩니다.', 'ok');
-      });
-    });
-    $('portalBrandColorInput')?.addEventListener('input', function(e){
-      applyPortalColor(e.target.value);
-    });
-    $('portalBrandHexInput')?.addEventListener('input', function(e){
-      var ok = applyPortalColor(e.target.value);
-      if (!ok) setFeedback('HEX 색상은 #c8102e 형식으로 입력해 주세요.', 'error');
-    });
-    $('portalApplyPreviewBtn')?.addEventListener('click', function(){
-      var ok = applyPortalColor($('portalBrandHexInput')?.value || $('portalBrandColorInput')?.value);
-      setFeedback(ok ? '미리보기를 적용했습니다.' : '색상 형식을 확인해 주세요.', ok ? 'ok' : 'error');
-    });
-    $('portalResetColorBtn')?.addEventListener('click', function(){
-      applyPortalColor('#c8102e');
-      setFeedback('기본 Crimson 색상으로 되돌렸습니다.', 'ok');
-    });
-    $('portalSaveColorBtn')?.addEventListener('click', function(){
-      setFeedback('저장 버튼은 준비 상태입니다. 다음 단계에서 Supabase system_settings 테이블과 연결하면 됩니다.', 'loading');
-    });
-    applyPortalColor('#c8102e');
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initPortalSetting);
-  } else {
-    initPortalSetting();
-  }
-})();
-</script>
 
+  async function loadPortalBrandSettings(){
+    const sb = getSupabaseClient();
+    const companyId = getCompanyId();
 
-<script id="portal-settings-tab-click-fix">
-(function(){
-  function showPortalSettingsTab(button){
-    var buttons = document.querySelectorAll('#settings-page .adminSubTabs .admin-subnav-btn');
-    var panels = document.querySelectorAll('#settings-page .admin-section-panel');
-    buttons.forEach(function(btn){ btn.classList.toggle('active', btn === button); });
-    panels.forEach(function(panel){
-      panel.hidden = true;
-      panel.style.display = 'none';
-    });
+    applyPortalColor(window.__PORTAL_SELECTED_BRAND_COLOR__ || DEFAULT_COLOR);
 
-    var portalPanel = document.getElementById('adminSectionPortal');
-    if (portalPanel) {
-      portalPanel.hidden = false;
-      portalPanel.style.display = '';
-    }
-
-    var title = document.getElementById('adminSectionTitle');
-    var desc = document.getElementById('adminSectionDesc');
-    if (title) title.textContent = '포탈 설정';
-    if (desc) desc.textContent = '포탈 홈 헤더와 공통 브랜드 색상을 설정합니다. 회사별 브랜드 컬러를 미리보고 저장 구조로 확장할 수 있습니다.';
-  }
-
-  document.addEventListener('click', function(event){
-    var button = event.target.closest && event.target.closest('#settings-page .adminSubTabs .admin-subnav-btn');
-    if (!button) return;
-
-    var section = button.getAttribute('data-admin-section');
-
-    if (section === 'portal') {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      showPortalSettingsTab(button);
+    if (!sb) {
+      setFeedback('Supabase 연결을 찾지 못했습니다. 포탈 세션 연결 후 다시 확인해 주세요.', 'error');
       return;
     }
 
-    var portalPanel = document.getElementById('adminSectionPortal');
-    if (portalPanel) {
-      portalPanel.hidden = true;
-      portalPanel.style.display = 'none';
+    if (!companyId) {
+      setFeedback('company_id를 확인하지 못했습니다. 포탈에서 로그인 후 설정 화면을 열어주세요.', 'error');
+      return;
     }
-  }, true);
+
+    setFeedback('저장된 브랜드 색상을 불러오는 중입니다.', 'loading');
+
+    const { data, error } = await sb
+      .from('system_settings')
+      .select('setting_value')
+      .eq('company_id', companyId)
+      .eq('setting_key', SETTING_KEY)
+      .maybeSingle();
+
+    if (error) {
+      setFeedback('system_settings 조회 실패: ' + error.message, 'error');
+      return;
+    }
+
+    const savedColor = normalizeHex(data?.setting_value?.brandColor || data?.setting_value?.brand_color || data?.setting_value?.color);
+    if (savedColor) {
+      applyPortalColor(savedColor);
+      setFeedback('저장된 브랜드 색상을 불러왔습니다.', 'ok');
+    } else {
+      setFeedback('저장된 색상이 없어 기본 색상으로 표시 중입니다.', 'loading');
+    }
+  }
+
+  async function savePortalBrandSettings(){
+    const sb = getSupabaseClient();
+    const companyId = getCompanyId();
+    const color = normalizeHex($('portalBrandHexInput')?.value || window.__PORTAL_SELECTED_BRAND_COLOR__ || DEFAULT_COLOR);
+
+    if (!color) {
+      setFeedback('HEX 색상은 #c8102e 형식으로 입력해 주세요.', 'error');
+      return;
+    }
+
+    if (!sb) {
+      setFeedback('Supabase 연결을 찾지 못했습니다.', 'error');
+      return;
+    }
+
+    if (!companyId) {
+      setFeedback('company_id를 확인하지 못해 저장할 수 없습니다.', 'error');
+      return;
+    }
+
+    setFeedback('브랜드 색상을 저장하는 중입니다.', 'loading');
+
+    const payload = {
+      company_id: companyId,
+      setting_key: SETTING_KEY,
+      setting_value: {
+        brandColor: color,
+        updatedFrom: 'settings.html'
+      },
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await sb
+      .from('system_settings')
+      .upsert(payload, { onConflict: 'company_id,setting_key' });
+
+    if (error) {
+      setFeedback('저장 실패: ' + error.message + ' / system_settings 테이블과 unique(company_id, setting_key)를 확인해 주세요.', 'error');
+      return;
+    }
+
+    applyPortalColor(color);
+    setFeedback('브랜드 색상을 저장했습니다. 포탈 index.html에서 이 값을 불러오면 실제 화면에 적용됩니다.', 'ok');
+  }
+
+  function initPortalSetting(){
+    document.querySelectorAll('#settings-page .portal-color-swatch').forEach(btn => {
+      btn.addEventListener('click', () => {
+        applyPortalColor(btn.dataset.color);
+        setFeedback('미리보기 색상이 적용되었습니다. 저장 버튼을 누르면 Supabase에 반영됩니다.', 'ok');
+      });
+    });
+
+    $('portalBrandColorInput')?.addEventListener('input', e => {
+      applyPortalColor(e.target.value);
+    });
+
+    $('portalBrandHexInput')?.addEventListener('input', e => {
+      const ok = applyPortalColor(e.target.value);
+      if (!ok) setFeedback('HEX 색상은 #c8102e 형식으로 입력해 주세요.', 'error');
+    });
+
+    $('portalApplyPreviewBtn')?.addEventListener('click', () => {
+      const ok = applyPortalColor($('portalBrandHexInput')?.value || $('portalBrandColorInput')?.value);
+      setFeedback(ok ? '미리보기를 적용했습니다.' : '색상 형식을 확인해 주세요.', ok ? 'ok' : 'error');
+    });
+
+    $('portalResetColorBtn')?.addEventListener('click', () => {
+      applyPortalColor(DEFAULT_COLOR);
+      setFeedback('기본 Crimson 색상으로 되돌렸습니다. 저장하려면 저장 버튼을 눌러주세요.', 'ok');
+    });
+
+    $('portalSaveColorBtn')?.addEventListener('click', savePortalBrandSettings);
+
+    applyPortalColor(DEFAULT_COLOR);
+  }
+
+  window.loadPortalBrandSettings = loadPortalBrandSettings;
+  window.applyPortalColorPreview = applyPortalColor;
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initPortalSetting, { once: true });
+  } else {
+    initPortalSetting();
+  }
 })();
 </script>
 
