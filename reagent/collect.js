@@ -769,8 +769,10 @@ window.ReagentApp.collect = {
     const categoryOrder = { "시약": 1, "초자": 2, "초자/소모품": 2, "안전용품": 3 };
     const sortedRows = Array.isArray(rows) ? [...rows] : [];
 
-    // 제품취합 화면의 정렬 흐름과 맞춥니다.
-    // 구분 → 대표 기본거래처 → 일반 비교견적 → 기타 기본거래처 → 온라인 구매 → 거래처 → 용도 → 품명 → 비고
+    // 제품취합 화면의 정렬 흐름과 맞추되, 비고(온라인/대리점/제조원/취급처 구매)는
+    // 행 위치를 바꾸는 기준으로 사용하지 않습니다.
+    // 정렬 기준: 구분 → 대표 기본거래처 → 일반 비교견적 → 기타 기본거래처 → 거래처 → 용도 → 품명 → 비고
+    // 엑셀 병합은 정렬 후 서로 붙어 있는 같은 비고만 묶습니다.
     const getPrepareSortInfo = (row = {}) => {
       const category = String(row.category || "");
       const remark = String(row.remark || "").trim();
@@ -781,15 +783,14 @@ window.ReagentApp.collect = {
         categoryOrder: categoryOrder[category] || 99,
         remark,
         vendor,
-        isOnline: remark === "온라인 구매",
-        isGeneral: !vendor && remark !== "온라인 구매"
+        isGeneral: !vendor
       };
     };
 
     const firstVendorByBucket = {};
     sortedRows.forEach((row) => {
       const info = getPrepareSortInfo(row);
-      if (info.isOnline || info.isGeneral || !info.vendor) return;
+      if (info.isGeneral || !info.vendor) return;
 
       const bucketKey = String(info.category || "");
       if (!firstVendorByBucket[bucketKey]) {
@@ -799,7 +800,6 @@ window.ReagentApp.collect = {
 
     const getPrepareBlockOrder = (row = {}) => {
       const info = getPrepareSortInfo(row);
-      if (info.isOnline) return 9;
       if (info.isGeneral) return 2;
 
       const firstVendor = firstVendorByBucket[String(info.category || "")] || "";
@@ -959,6 +959,14 @@ window.ReagentApp.collect = {
     }
   },
 
+  setUniformRowHeights(ws, startRowIndex, endRowIndex, height = 30) {
+    if (!ws) return;
+    ws["!rows"] = ws["!rows"] || [];
+    for (let r = startRowIndex; r <= endRowIndex; r += 1) {
+      ws["!rows"][r] = Object.assign({}, ws["!rows"][r] || {}, { hpt: height });
+    }
+  },
+
 
 
   makeGroupKey(row, fields) {
@@ -1006,6 +1014,55 @@ window.ReagentApp.collect = {
       }
     }
 
+    return merges;
+  },
+
+  createContiguousConditionalMerges(rows, keyFn, colSpec, startRowIndex, predicate = () => true) {
+    const merges = [];
+    let start = null;
+    let currentKey = "";
+
+    const getColStart = () => (typeof colSpec === "number" ? colSpec : colSpec.start);
+    const getColEnd = () => (typeof colSpec === "number" ? colSpec : colSpec.end);
+
+    const flush = (endExclusive) => {
+      if (start === null) return;
+      const endIndex = endExclusive - 1;
+      // 서로 붙어 있는 같은 값이 2행 이상일 때만 병합합니다.
+      // 단일 행은 위치/표시가 바뀌지 않도록 병합하지 않습니다.
+      if (endIndex > start) {
+        merges.push({
+          s: { r: startRowIndex + start, c: getColStart() },
+          e: { r: startRowIndex + endIndex, c: getColEnd() }
+        });
+      }
+      start = null;
+      currentKey = "";
+    };
+
+    rows.forEach((row, index) => {
+      const matches = predicate(row) === true;
+      const key = matches ? String(keyFn(row) ?? "") : "";
+
+      if (!matches || !key) {
+        flush(index);
+        return;
+      }
+
+      if (start === null) {
+        start = index;
+        currentKey = key;
+        return;
+      }
+
+      if (key !== currentKey) {
+        flush(index);
+        start = index;
+        currentKey = key;
+      }
+    });
+
+    flush(rows.length);
     return merges;
   },
 
@@ -1109,6 +1166,8 @@ window.ReagentApp.collect = {
 
     const dataStart1 = 3;
     const totalRow1 = dataStart1 + rows.length;
+    this.setUniformRowHeights(ws1, dataStart1, Math.max(dataStart1, totalRow1 - 1), 30);
+    this.setUniformRowHeights(ws1, totalRow1, totalRow1, 24);
 
     ws1["!merges"] = [
       { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
@@ -1141,22 +1200,12 @@ window.ReagentApp.collect = {
       ["", "", "", "", "", "", "", "", "", "", "단가", "금액", "거래처", "단가", "금액", "거래처"]
     ];
 
-    const conditionalCompareMerges = [];
-
     rows.forEach((row, index) => {
-      const excelRowIndex = 4 + index;
       const hasCompare = this.hasCompareData(row);
       const purchaseGroupAmount = this.getGroupAmount(rows, row, ["purchaseVendor"], "purchaseAmount");
       const compareGroupAmount = hasCompare
         ? this.getGroupAmount(rows.filter((item) => this.hasCompareData(item)), row, ["compareVendor"], "compareAmount")
         : 0;
-
-      if (!hasCompare) {
-        conditionalCompareMerges.push({
-          s: { r: excelRowIndex, c: 13 },
-          e: { r: excelRowIndex, c: 15 }
-        });
-      }
 
       sheet2Data.push([
         index + 1,
@@ -1191,8 +1240,24 @@ window.ReagentApp.collect = {
 
     const dataStart2 = 4;
     const totalRow2 = dataStart2 + rows.length;
+    this.setUniformRowHeights(ws2, dataStart2, Math.max(dataStart2, totalRow2 - 1), 30);
+    this.setUniformRowHeights(ws2, totalRow2, totalRow2, 24);
 
-    const compareRowsOnly = rows.filter((row) => this.hasCompareData(row));
+    const compareVendorMerges = this.createContiguousConditionalMerges(
+      rows,
+      (row) => this.makeGroupKey(row, ["compareVendor"]),
+      15,
+      dataStart2,
+      (row) => this.hasCompareData(row) && String(row.compareVendor || "").trim() !== ""
+    );
+
+    const noCompareRemarkMerges = this.createContiguousConditionalMerges(
+      rows,
+      (row) => String(row.remark || ""),
+      { start: 13, end: 15 },
+      dataStart2,
+      (row) => !this.hasCompareData(row) && String(row.remark || "").trim() !== ""
+    );
 
     ws2["!merges"] = [
       { s: { r: 0, c: 0 }, e: { r: 0, c: 15 } },
@@ -1210,8 +1275,8 @@ window.ReagentApp.collect = {
       { s: { r: 2, c: 13 }, e: { r: 2, c: 15 } },
       ...this.createSameValueMerges(rows, "usage", 9, dataStart2),
       ...this.createSameValueMerges(rows, "purchaseVendor", 12, dataStart2),
-      ...this.createContiguousMerges(compareRowsOnly, (row) => this.makeGroupKey(row, ["compareVendor"]), 15, dataStart2),
-      ...conditionalCompareMerges
+      ...compareVendorMerges,
+      ...noCompareRemarkMerges
     ];
 
     this.applyRangeStyle(ws2, "A1:P1", titleStyle);
@@ -1564,7 +1629,7 @@ if (els.count) els.count.textContent = String(rows.length);
     const firstVendorByBucket = {};
     groups.forEach((group) => {
       const info = getCollectSortInfo(group);
-      if (info.isOnline || info.isGeneral || !info.vendor) return;
+      if (info.isGeneral || !info.vendor) return;
 
       const bucketKey = `${info.confirmedOrder}||${info.category}`;
       if (!firstVendorByBucket[bucketKey]) {
@@ -1574,7 +1639,6 @@ if (els.count) els.count.textContent = String(rows.length);
 
     const getCollectBlockOrder = (group) => {
       const info = getCollectSortInfo(group);
-      if (info.isOnline) return 9;
       if (info.isGeneral) return 2;
 
       const bucketKey = `${info.confirmedOrder}||${info.category}`;
