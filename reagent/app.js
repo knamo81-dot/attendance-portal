@@ -230,12 +230,14 @@ window.ReagentApp.enforcePermissionDom = function () {
       btn.style.setProperty("display", "none", "important");
       btn.style.setProperty("visibility", "hidden", "important");
       btn.disabled = true;
+      btn.style.setProperty("pointer-events", "none", "important");
       btn.setAttribute("aria-hidden", "true");
       btn.dataset.permissionHidden = "1";
     } else {
       btn.style.removeProperty("display");
       btn.style.removeProperty("visibility");
       btn.disabled = false;
+      btn.style.removeProperty("pointer-events");
       btn.setAttribute("aria-hidden", "false");
       btn.dataset.permissionHidden = "0";
     }
@@ -287,7 +289,9 @@ window.ReagentApp.showTab = function (tab) {
   }
 
   const finalTab = document.querySelector(`.tab-btn[data-tab="${tab}"], button[data-tab="${tab}"]`);
-  const finalPage = document.getElementById(`page-${tab}`);
+  const finalPage =
+    document.getElementById(`page-${tab}`) ||
+    document.querySelector(`.page[data-tab="${tab}"], [data-page="${tab}"], section[data-tab="${tab}"]`);
 
   document.querySelectorAll(".tab-btn, button[data-tab]").forEach((b) => b.classList.remove("active"));
   document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
@@ -434,35 +438,56 @@ window.ReagentApp.loadReagentPermission = async function () {
   return user;
 };
 
-document.addEventListener("click", function (e) {
-  const btn = e.target.closest?.(".tab-btn, button[data-tab]");
-  if (!btn) return;
+window.ReagentApp.getTabButtonFromEvent = function (event) {
+  const target = event?.target;
+  if (!target || !target.closest) return null;
+  return target.closest(".tab-btn, button[data-tab]");
+};
+
+window.ReagentApp.handleTabButtonClick = function (btn, event) {
+  if (!btn) return false;
+
+  // 다른 스크립트에 남아 있는 기존 차단 핸들러보다 먼저 탭 전환을 확정합니다.
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+  }
 
   if (window.ReagentApp.canAccessTab?.(btn) === false) {
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
     window.ReagentApp.toast?.("접근 권한이 없는 기능입니다.", "warn");
     window.ReagentApp.showTab?.("request");
+    return false;
   }
-}, true);
 
+  const tab = btn.dataset?.tab || "request";
+  window.ReagentApp.showTab?.(tab);
+  return true;
+};
+
+window.ReagentApp.installTabClickGuard = function () {
+  if (window.ReagentApp._tabClickGuardInstalled) return;
+  window.ReagentApp._tabClickGuardInstalled = true;
+
+  document.addEventListener("click", function (e) {
+    const btn = window.ReagentApp.getTabButtonFromEvent?.(e);
+    if (!btn) return;
+    window.ReagentApp.handleTabButtonClick?.(btn, e);
+  }, true);
+};
 
 window.ReagentApp.bindTabs = function () {
+  window.ReagentApp.installTabClickGuard?.();
+
   document.querySelectorAll(".tab-btn, button[data-tab]").forEach((btn) => {
+    btn.disabled = false;
+    btn.style.removeProperty("pointer-events");
+
     if (btn.dataset.bound === "1") return;
     btn.dataset.bound = "1";
 
     btn.addEventListener("click", (e) => {
-      if (window.ReagentApp.canAccessTab?.(btn) === false) {
-        e.preventDefault();
-        e.stopPropagation();
-        window.ReagentApp.toast?.("접근 권한이 없는 기능입니다.", "warn");
-        window.ReagentApp.showTab?.("request");
-        return;
-      }
-
-      window.ReagentApp.showTab?.(btn.dataset.tab || "request");
+      window.ReagentApp.handleTabButtonClick?.(btn, e);
     });
   });
 };
