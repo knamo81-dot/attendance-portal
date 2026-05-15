@@ -18,3 +18,107 @@
 
   --shadow-card: 0 6px 18px rgba(15, 23, 42, 0.05);
 }
+
+/* ExeloLab Common Compact UI - prefix only */
+.el-page {
+  padding: var(--page-padding) var(--page-padding) var(--page-padding) 0;
+}
+
+.el-card {
+  padding: var(--card-padding);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-card);
+}
+
+.el-card h2,
+.el-title {
+  font-size: var(--font-title);
+}
+
+.el-card p,
+.el-text {
+  font-size: var(--font-base);
+}
+
+.el-input,
+.el-select {
+  height: var(--control-height);
+  border-radius: var(--control-radius);
+  font-size: var(--font-base);
+  padding: 0 10px;
+}
+
+.el-btn {
+  height: var(--control-height);
+  border-radius: var(--control-radius);
+  padding: 0 10px;
+  font-size: var(--font-base);
+}
+
+.el-btn-primary {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+}
+
+.el-btn-danger {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fff;
+}
+
+.el-btn-soft {
+  background: #f8fafc;
+  color: #334155;
+}
+
+.el-badge {
+  height: 20px;
+  padding: 0 7px;
+  font-size: var(--font-small);
+}
+
+.el-domain-wrap {
+  min-height: var(--control-height);
+  border-radius: var(--control-radius);
+}
+
+.el-domain-wrap .domain-prefix,
+.el-domain-wrap .domain-suffix {
+  font-size: var(--font-small);
+  padding: 0 8px;
+}
+
+.el-domain-wrap .domain-input {
+  height: calc(var(--control-height) - 2px);
+  font-size: var(--font-base);
+}
+
+.el-company-item,
+.el-app-row {
+  padding: 9px 10px;
+  border-radius: 12px;
+}
+
+.el-notice,
+.el-feedback {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: var(--font-base);
+}
+
+.el-toggle {
+  width: 42px;
+  height: 24px;
+}
+
+.el-toggle::after {
+  width: 18px;
+  height: 18px;
+  top: 3px;
+  left: 3px;
+}
+
+.el-toggle.on::after {
+  left: 21px;
+}
