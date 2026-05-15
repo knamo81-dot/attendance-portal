@@ -1,124 +1,182 @@
 :root {
-  --page-padding: 16px;
+  --page-padding: 14px;
 
-  --card-padding: 14px;
-  --card-radius: 16px;
-  --card-gap: 10px;
+  --card-padding: 12px;
+  --card-radius: 14px;
+  --card-gap: 8px;
 
-  --control-height: 32px;
-  --control-radius: 9px;
+  --control-height: 30px;
+  --control-radius: 8px;
 
-  --font-title: 15px;
-  --font-base: 12px;
-  --font-small: 11px;
+  --font-title: 14px;
+  --font-base: 11.5px;
+  --font-small: 10.5px;
 
-  --gap-xs: 4px;
-  --gap-sm: 6px;
-  --gap-md: 10px;
+  --gap-xs: 3px;
+  --gap-sm: 5px;
+  --gap-md: 8px;
 
-  --shadow-card: 0 6px 18px rgba(15, 23, 42, 0.05);
+  --shadow-card: 0 5px 14px rgba(15, 23, 42, 0.045);
 }
 
 /* ExeloLab Common Compact UI - prefix only */
-.el-page {
+.page.el-page {
   padding: var(--page-padding) var(--page-padding) var(--page-padding) 0;
 }
 
-.el-card {
+.card.el-card {
   padding: var(--card-padding);
   border-radius: var(--card-radius);
   box-shadow: var(--shadow-card);
 }
 
-.el-card h2,
+.card.el-card h2,
 .el-title {
   font-size: var(--font-title);
+  margin-bottom: 6px;
 }
 
-.el-card p,
+.card.el-card p,
 .el-text {
   font-size: var(--font-base);
+  line-height: 1.45;
 }
 
-.el-input,
-.el-select {
+.input.el-input,
+.select.el-select {
   height: var(--control-height);
   border-radius: var(--control-radius);
   font-size: var(--font-base);
-  padding: 0 10px;
+  padding: 0 9px;
 }
 
-.el-btn {
+.btn.el-btn {
   height: var(--control-height);
   border-radius: var(--control-radius);
-  padding: 0 10px;
+  padding: 0 9px;
   font-size: var(--font-base);
 }
 
-.el-btn-primary {
+.btn.el-btn-primary {
   background: #0f172a;
   color: #fff;
   border-color: #0f172a;
 }
 
-.el-btn-danger {
+.btn.el-btn-danger {
   color: #dc2626;
   border-color: #fecaca;
   background: #fff;
 }
 
-.el-btn-soft {
+.btn.el-btn-soft {
   background: #f8fafc;
   color: #334155;
 }
 
-.el-badge {
-  height: 20px;
-  padding: 0 7px;
+.badge.el-badge {
+  height: 18px;
+  padding: 0 6px;
   font-size: var(--font-small);
 }
 
-.el-domain-wrap {
+.domain-input-wrap.el-domain-wrap {
   min-height: var(--control-height);
   border-radius: var(--control-radius);
 }
 
-.el-domain-wrap .domain-prefix,
-.el-domain-wrap .domain-suffix {
+.domain-input-wrap.el-domain-wrap .domain-prefix,
+.domain-input-wrap.el-domain-wrap .domain-suffix {
   font-size: var(--font-small);
-  padding: 0 8px;
+  padding: 0 7px;
 }
 
-.el-domain-wrap .domain-input {
+.domain-input-wrap.el-domain-wrap .domain-input {
   height: calc(var(--control-height) - 2px);
   font-size: var(--font-base);
 }
 
-.el-company-item,
-.el-app-row {
-  padding: 9px 10px;
-  border-radius: 12px;
+.company-item.el-company-item,
+.app-row.el-app-row {
+  padding: 8px 9px;
+  border-radius: 11px;
 }
 
-.el-notice,
-.el-feedback {
-  padding: 10px 12px;
-  border-radius: 12px;
+.notice.el-notice,
+.feedback.el-feedback {
+  padding: 9px 10px;
+  border-radius: 11px;
   font-size: var(--font-base);
 }
 
-.el-toggle {
-  width: 42px;
-  height: 24px;
+.toggle.el-toggle {
+  width: 38px;
+  height: 22px;
 }
 
-.el-toggle::after {
-  width: 18px;
-  height: 18px;
+.toggle.el-toggle::after {
+  width: 16px;
+  height: 16px;
   top: 3px;
   left: 3px;
 }
 
-.el-toggle.on::after {
-  left: 21px;
+.toggle.el-toggle.on::after {
+  left: 19px;
+}
+
+.field {
+  gap: 4px;
+}
+
+.field label,
+.domain-field label {
+  font-size: var(--font-small);
+}
+
+.domain-field {
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.form {
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.form-actions,
+.company-actions,
+.detail-actions {
+  gap: 5px;
+}
+
+.toolbar {
+  margin: 12px 0 8px;
+}
+
+.company-list {
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.label,
+.company-name-text,
+.company-domain-text,
+.app-name {
+  font-size: var(--font-base);
+}
+
+.app-key,
+.domain-preview,
+.detail-title span {
+  font-size: var(--font-small);
+}
+
+.detail-title strong {
+  font-size: var(--font-title);
+}
+
+.apps {
+  gap: 8px;
+  margin-top: 12px;
 }
