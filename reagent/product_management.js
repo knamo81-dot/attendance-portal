@@ -13,6 +13,42 @@ window.ReagentApp.productManagement = {
     return window.ReagentApp.sb;
   },
 
+  getCompanyId() {
+    if (typeof window.ReagentApp.getCompanyId === "function") {
+      return String(window.ReagentApp.getCompanyId() || "").trim();
+    }
+
+    const user = window.ReagentApp.currentUser || {};
+    return String(user.company_id || user.companyId || "").trim();
+  },
+
+  requireCompanyId() {
+    const companyId = this.getCompanyId();
+    if (!companyId) {
+      this.toast("회사 정보가 확인되지 않았습니다. 다시 로그인해 주세요.", "warn");
+      return "";
+    }
+    return companyId;
+  },
+
+  withCompanyPayload(payload = {}) {
+    if (typeof window.ReagentApp.withCompanyPayload === "function") {
+      return window.ReagentApp.withCompanyPayload(payload);
+    }
+
+    const companyId = this.getCompanyId();
+    return companyId ? { ...payload, company_id: companyId } : { ...payload };
+  },
+
+  scopedCompanyQuery(query) {
+    if (typeof window.ReagentApp.scopedCompanyQuery === "function") {
+      return window.ReagentApp.scopedCompanyQuery(query);
+    }
+
+    const companyId = this.getCompanyId();
+    return companyId ? query.eq("company_id", companyId) : query;
+  },
+
   html(value) {
     return window.ReagentApp.escapeHtml
       ? window.ReagentApp.escapeHtml(value)
@@ -65,10 +101,13 @@ window.ReagentApp.productManagement = {
     let masterRows = Array.isArray(this.products) ? this.products : [];
 
     if (!masterRows.length && this.sb) {
-      const { data, error } = await this.sb
-        .from("product_master")
-        .select("id, category, name, maker, code, capacity, cas, grade, default_vendor, memo, is_active")
-        .limit(3000);
+      const productMasterQuery = this.scopedCompanyQuery(
+        this.sb
+          .from("product_master")
+          .select("id, company_id, category, name, maker, code, capacity, cas, grade, default_vendor, memo, is_active")
+      ).limit(3000);
+
+      const { data, error } = await productMasterQuery;
 
       if (error) {
         console.warn("제품 마스터 중복 확인 실패:", error);
@@ -638,13 +677,17 @@ window.ReagentApp.productManagement = {
       return;
     }
 
-    const { data, error } = await this.sb
-      .from("product_master")
-      .select("*")
+    const productQuery = this.scopedCompanyQuery(
+      this.sb
+        .from("product_master")
+        .select("*")
+    )
       .order("maker", { ascending: true })
       .order("name", { ascending: true })
       .order("capacity", { ascending: true })
       .order("code", { ascending: true });
+
+    const { data, error } = await productQuery;
 
     if (error) {
       console.error("제품 마스터 조회 실패:", error);
@@ -887,10 +930,14 @@ window.ReagentApp.productManagement = {
 
     if (!canSave) return;
 
-    const { error } = await this.sb
-      .from("product_master")
-      .update(row)
-      .eq("id", id);
+    const updateQuery = this.scopedCompanyQuery(
+      this.sb
+        .from("product_master")
+        .update(row)
+        .eq("id", id)
+    );
+
+    const { error } = await updateQuery;
 
     if (error) {
       console.error("제품 정보 수정 실패:", error);
@@ -981,14 +1028,23 @@ window.ReagentApp.productManagement = {
     try {
       let error;
       if (this.editingProductId) {
-        ({ error } = await this.sb
-          .from("product_master")
-          .update(row)
-          .eq("id", this.editingProductId));
+        const updateQuery = this.scopedCompanyQuery(
+          this.sb
+            .from("product_master")
+            .update(row)
+            .eq("id", this.editingProductId)
+        );
+        ({ error } = await updateQuery);
       } else {
+        const companyId = this.requireCompanyId();
+        if (!companyId) {
+          this._savingProduct = false;
+          return;
+        }
+
         ({ error } = await this.sb
           .from("product_master")
-          .insert({ ...row, created_by: user.name })
+          .insert(this.withCompanyPayload({ ...row, created_by: user.name }))
           .select()
           .single());
       }
@@ -1014,10 +1070,14 @@ window.ReagentApp.productManagement = {
     if (!ok) return;
 
     const user = this.getCurrentUser();
-    const { error } = await this.sb
-      .from("product_master")
-      .update({ is_active: false, updated_by: user.name })
-      .eq("id", this.editingProductId);
+    const deactivateQuery = this.scopedCompanyQuery(
+      this.sb
+        .from("product_master")
+        .update({ is_active: false, updated_by: user.name })
+        .eq("id", this.editingProductId)
+    );
+
+    const { error } = await deactivateQuery;
 
     if (error) {
       console.error("제품 사용중지 실패:", error);
@@ -1034,10 +1094,13 @@ window.ReagentApp.productManagement = {
   async loadRequests() {
     if (!this.sb) return;
 
-    const { data, error } = await this.sb
-      .from("product_registration_requests")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const requestQuery = this.scopedCompanyQuery(
+      this.sb
+        .from("product_registration_requests")
+        .select("*")
+    ).order("created_at", { ascending: false });
+
+    const { data, error } = await requestQuery;
 
     if (error) {
       console.error("제품 등록 요청 조회 실패:", error);
@@ -1285,10 +1348,14 @@ window.ReagentApp.productManagement = {
 
     if (!canSaveRequestEdit) return;
 
-    const { error } = await this.sb
-      .from("product_registration_requests")
-      .update(row)
-      .eq("id", id);
+    const requestEditQuery = this.scopedCompanyQuery(
+      this.sb
+        .from("product_registration_requests")
+        .update(row)
+        .eq("id", id)
+    );
+
+    const { error } = await requestEditQuery;
 
     if (error) {
       console.error("제품 등록 요청 수정 실패:", error);
@@ -1327,6 +1394,8 @@ window.ReagentApp.productManagement = {
     if (!ok) return;
 
     const user = this.getCurrentUser();
+    const companyId = this.requireCompanyId();
+    if (!companyId) return;
 
     try {
       const productRow = {
@@ -1351,19 +1420,23 @@ window.ReagentApp.productManagement = {
 
       const { error: insertError } = await this.sb
         .from("product_master")
-        .insert(productRow);
+        .insert(this.withCompanyPayload(productRow));
 
       if (insertError) throw insertError;
 
-      const { error: updateError } = await this.sb
-        .from("product_registration_requests")
-        .update({
-          status: "등록완료",
-          handled_by: user.name,
-          handled_at: new Date().toISOString(),
-          reject_reason: ""
-        })
-        .eq("id", id);
+      const approveUpdateQuery = this.scopedCompanyQuery(
+        this.sb
+          .from("product_registration_requests")
+          .update({
+            status: "등록완료",
+            handled_by: user.name,
+            handled_at: new Date().toISOString(),
+            reject_reason: ""
+          })
+          .eq("id", id)
+      );
+
+      const { error: updateError } = await approveUpdateQuery;
 
       if (updateError) throw updateError;
 
@@ -1386,15 +1459,19 @@ window.ReagentApp.productManagement = {
     }
 
     const user = this.getCurrentUser();
-    const { error } = await this.sb
-      .from("product_registration_requests")
-      .update({
-        status: "반려",
-        reject_reason: String(reason).trim(),
-        handled_by: user.name,
-        handled_at: new Date().toISOString()
-      })
-      .eq("id", id);
+    const rejectQuery = this.scopedCompanyQuery(
+      this.sb
+        .from("product_registration_requests")
+        .update({
+          status: "반려",
+          reject_reason: String(reason).trim(),
+          handled_by: user.name,
+          handled_at: new Date().toISOString()
+        })
+        .eq("id", id)
+    );
+
+    const { error } = await rejectQuery;
 
     if (error) {
       console.error("요청 반려 실패:", error);
