@@ -700,9 +700,35 @@ body:not(.service-admin-enabled) .service-admin-btn{
       companyName,
       company_name: companyName,
       role,
-      supabase: supabaseClient
+      supabase: supabaseClient,
+      buildCompanyScopedPayload,
+      buildCompanyScopedRows,
+      scopeCompanyQuery
     };
   }
+
+  function buildCompanyScopedPayload(payload = {}) {
+    const session = buildPortalSession();
+    return {
+      ...payload,
+      company_id: payload.company_id || payload.companyId || session.companyId || currentProfile?.company_id || currentCompany?.id || null
+    };
+  }
+
+  function buildCompanyScopedRows(rows = []) {
+    return (Array.isArray(rows) ? rows : []).map((row) => buildCompanyScopedPayload(row));
+  }
+
+  function scopeCompanyQuery(query) {
+    const session = buildPortalSession();
+    const companyId = session.companyId || currentProfile?.company_id || currentCompany?.id || '';
+    return companyId ? query.eq('company_id', companyId) : query;
+  }
+
+  window.buildCompanyScopedPayload = buildCompanyScopedPayload;
+  window.buildCompanyScopedRows = buildCompanyScopedRows;
+  window.scopeCompanyQuery = scopeCompanyQuery;
+
 
   function publishPortalSession() {
     const session = buildPortalSession();
@@ -1084,6 +1110,44 @@ body:not(.service-admin-enabled) .service-admin-btn{
     setTimeout(() => clearLoginInputs(), 800);
   }
 
+
+  function installUserAppRolesCompanyGuard() {
+    if (supabaseClient.__companyGuardInstalled) return;
+    const originalFrom = supabaseClient.from.bind(supabaseClient);
+
+    supabaseClient.from = function guardedFrom(tableName) {
+      const query = originalFrom(tableName);
+
+      if (String(tableName) !== 'user_app_roles') return query;
+
+      const originalInsert = query.insert?.bind(query);
+      const originalUpsert = query.upsert?.bind(query);
+
+      if (originalInsert) {
+        query.insert = function guardedInsert(values, options) {
+          const nextValues = Array.isArray(values)
+            ? buildCompanyScopedRows(values)
+            : buildCompanyScopedPayload(values);
+          return originalInsert(nextValues, options);
+        };
+      }
+
+      if (originalUpsert) {
+        query.upsert = function guardedUpsert(values, options) {
+          const nextValues = Array.isArray(values)
+            ? buildCompanyScopedRows(values)
+            : buildCompanyScopedPayload(values);
+          return originalUpsert(nextValues, options);
+        };
+      }
+
+      return query;
+    };
+
+    supabaseClient.__companyGuardInstalled = true;
+  }
+
+
   function bindEvents() {
     navButtons.forEach(function (btn) {
       btn.addEventListener('click', function (event) {
@@ -1108,6 +1172,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
   }
 
   async function boot() {
+    installUserAppRolesCompanyGuard();
     bindEvents();
     updatePortalHeader(HOME_SRC);
 
