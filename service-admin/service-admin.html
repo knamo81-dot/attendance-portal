@@ -39,10 +39,21 @@
     .view.active { display: block; }
     .form {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: minmax(360px, 620px) auto;
       gap: 10px;
       margin-top: 16px;
       align-items: end;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .form-fields {
+      width: min(620px, 100%);
+    }
+    .form-actions {
+      display: flex;
+      gap: 6px;
+      align-items: flex-end;
+      flex-wrap: nowrap;
     }
     .field {
       display: grid;
@@ -242,9 +253,10 @@
       border-radius: 12px;
       background: #fff;
       display: grid;
-      grid-template-columns: auto minmax(80px, 1fr) auto;
+      grid-template-columns: auto minmax(120px, 1fr) auto;
       align-items: center;
       overflow: hidden;
+      max-width: 100%;
     }
     .domain-prefix,
     .domain-suffix {
@@ -405,7 +417,17 @@
 
     @media (max-width: 1100px) {
       .page { padding: 18px; }
-      .form { grid-template-columns: 1fr; }
+      .form {
+        grid-template-columns: 1fr;
+        width: 100%;
+      }
+      .form-fields {
+        width: 100%;
+      }
+      .form-actions {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
       .company-item {
         display: grid;
         grid-template-columns: 1fr;
@@ -446,7 +468,7 @@
         <p>회사명과 서브도메인을 등록합니다. company_code는 내부 식별값으로 자동 생성됩니다.</p>
 
         <div class="form">
-          <div>
+          <div class="form-fields">
             <div class="field">
               <label for="companyNameInput">회사명</label>
               <input id="companyNameInput" class="input" placeholder="예: 삼천당제약" autocomplete="off">
@@ -461,12 +483,15 @@
               <div class="domain-preview" id="companyDomainPreview">접속주소: https://[서브도메인].ops.exelolab.com</div>
             </div>
           </div>
-          <button id="createCompanyBtn" class="btn primary" type="button">회사 등록</button>
+          <div class="form-actions">
+            <button id="createCompanyBtn" class="btn primary" type="button">등록</button>
+            <button id="cancelCompanyInputBtn" class="btn" type="button">취소</button>
+            <button id="refreshCompaniesBtn" class="btn" type="button">새로고침</button>
+          </div>
         </div>
 
         <div class="toolbar">
           <div class="badge" id="companyCountBadge">회사 0개</div>
-          <button id="refreshCompaniesBtn" class="btn" type="button">새로고침</button>
         </div>
 
         <div id="companyList" class="company-list">
@@ -520,6 +545,7 @@
     companySubdomainInput: document.getElementById('companySubdomainInput'),
     companyDomainPreview: document.getElementById('companyDomainPreview'),
     createCompanyBtn: document.getElementById('createCompanyBtn'),
+    cancelCompanyInputBtn: document.getElementById('cancelCompanyInputBtn'),
     refreshCompaniesBtn: document.getElementById('refreshCompaniesBtn'),
     companyList: document.getElementById('companyList'),
     companyCountBadge: document.getElementById('companyCountBadge'),
@@ -639,6 +665,13 @@
     els.companyDomainPreview.textContent = subdomain
       ? `접속주소: ${getCompanyUrl(subdomain)}`
       : '접속주소: https://[서브도메인].ops.exelolab.com';
+  }
+
+  function resetCompanyInputForm() {
+    if (els.companyNameInput) els.companyNameInput.value = '';
+    if (els.companySubdomainInput) els.companySubdomainInput.value = '';
+    updateDomainPreview();
+    setFeedback('', '');
   }
 
   function escapeHtml(value) {
@@ -804,9 +837,7 @@
 
       await ensureCompanyApps(data.id);
 
-      els.companyNameInput.value = '';
-      if (els.companySubdomainInput) els.companySubdomainInput.value = '';
-      updateDomainPreview();
+      resetCompanyInputForm();
       selectedCompanyId = data.id;
 
       await loadCompanies();
@@ -1067,10 +1098,24 @@
 
   function bindEvents() {
     els.createCompanyBtn.addEventListener('click', () => createCompany());
+    els.cancelCompanyInputBtn?.addEventListener('click', () => resetCompanyInputForm());
 
     els.companySubdomainInput?.addEventListener('input', () => {
       els.companySubdomainInput.value = normalizeSubdomain(els.companySubdomainInput.value);
       updateDomainPreview();
+    });
+
+    els.companyNameInput?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        createCompany();
+      }
+    });
+    els.companySubdomainInput?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        createCompany();
+      }
     });
 
     els.refreshCompaniesBtn.addEventListener('click', () => {
