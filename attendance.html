@@ -2208,6 +2208,133 @@ svg text{
 }
 </style>
 
+
+<style id="attendance-kpi-compact-refine-final">
+/* ===== 근태 KPI 카드 추가 압축 / 출퇴근 누락 요약 6개 한 줄 ===== */
+/* 기능/JS 변경 없음: 카드 높이, 여백, 그리드만 보정 */
+
+.kpis{
+  gap:10px !important;
+  margin-top:10px !important;
+}
+
+.kpi-slot{
+  min-height:116px !important;
+  border-radius:14px !important;
+}
+
+.kpis .card[data-kpi-card]{
+  border-radius:14px !important;
+  padding:10px 12px !important;
+}
+
+.kpis .card[data-kpi-card] .value,
+.kpis .card[data-kpi-card] .v,
+.kpis .card[data-kpi-card] strong{
+  line-height:1.15 !important;
+}
+
+.value{
+  font-size:24px !important;
+  margin:4px 0 2px !important;
+}
+
+.label{
+  font-size:11px !important;
+}
+
+.sub{
+  font-size:10.5px !important;
+  line-height:1.35 !important;
+}
+
+.kpiCardFlex,
+.overtimeCardFlex,
+.headcountCardFlex,
+.mobilityConcentrationCard{
+  gap:8px !important;
+}
+
+.riskMiniGuide,
+.operRiskGuide,
+.mobilityMiniGuide,
+.overtimeMiniGuide,
+.headcountSideInfo{
+  gap:4px !important;
+  padding-top:2px !important;
+}
+
+.riskMiniGuideRow,
+.operRiskGuideRow,
+.mobilityMiniGuideRow,
+.overtimeMiniGuideRow,
+.headcountSideRow{
+  padding:3px 6px !important;
+  font-size:10px !important;
+}
+
+/* 출퇴근 누락 분석 6개 요약 카드 한 줄 */
+.missingSummaryGrid{
+  grid-template-columns:repeat(6,minmax(0,1fr)) !important;
+  gap:10px !important;
+  margin-top:10px !important;
+}
+
+.missingSummaryGrid .card{
+  min-height:96px !important;
+  padding:10px 12px !important;
+  border-radius:14px !important;
+}
+
+.missingSummaryGrid .label{
+  font-size:10.5px !important;
+}
+
+.missingSummaryGrid .value{
+  font-size:23px !important;
+  margin:4px 0 2px !important;
+}
+
+.missingSummaryGrid .sub{
+  font-size:10.5px !important;
+  line-height:1.32 !important;
+}
+
+/* 누락 분석 하단 카드 여백도 살짝 정리 */
+.missingMiniGrid{
+  gap:10px !important;
+  margin-top:10px !important;
+}
+
+.missingMiniCard{
+  padding:11px 12px !important;
+  border-radius:14px !important;
+}
+
+@media (max-width:1500px){
+  .missingSummaryGrid{
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  }
+}
+
+@media (max-width:900px){
+  .missingSummaryGrid{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+}
+
+@media (max-width:700px){
+  .kpis,
+  .missingSummaryGrid{
+    grid-template-columns:1fr !important;
+  }
+
+  .kpi-slot{
+    min-height:108px !important;
+  }
+}
+</style>
+
 </head>
 <body>
 <script>
