@@ -711,7 +711,7 @@ th:first-child {
   width: 88px;
   min-width: 88px;
   text-align: center !important;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .admin-table th:nth-child(3),
