@@ -542,42 +542,36 @@ body:not(.service-admin-enabled) .service-admin-btn{
 }
 
 
-/* ===== Home Nav Minimal House ===== */
+/* ===== Big Home Symbol Button ===== */
 .nav-btn.home{
-  position: relative !important;
-  display:flex !important;
-  flex-direction:column !important;
-  align-items:center !important;
-  justify-content:center !important;
-  gap:1px !important;
   width:36px !important;
   height:36px !important;
   padding:0 !important;
   border-radius:11px !important;
-  border:1px solid rgba(200,16,46,.82) !important;
+  border:1px solid rgba(200,16,46,.85) !important;
   background:
     linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.06)),
     rgba(255,255,255,.08) !important;
   color:#ffffff !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
   overflow:hidden !important;
 }
 
-.nav-btn.home .home-nav-icon{
-  width:18px !important;
-  height:18px !important;
+.nav-btn.home .home-big-icon{
+  width:28px !important;
+  height:28px !important;
   display:block !important;
-  flex:0 0 auto !important;
   color:inherit !important;
-  margin-top:-1px !important;
 }
 
-.nav-btn.home .home-nav-text{
-  display:block !important;
-  font-size:8.7px !important;
-  font-weight:900 !important;
-  line-height:1 !important;
-  letter-spacing:-0.05em !important;
-  margin-top:-1px !important;
+.nav-btn.home .home-icon-text{
+  fill:currentColor;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:-0.04em;
+  font-family:Arial, sans-serif;
 }
 
 .nav-btn.home.active{
@@ -603,12 +597,12 @@ body:not(.service-admin-enabled) .service-admin-btn{
       <div class="sidenav">
         <div>
           <button type="button" id="homeNavBtn" class="nav-btn home active" data-portal-src="portal-main/portal-main.html" title="홈" aria-label="홈">
-            <svg class="home-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M5 11.5 12 5l7 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M7.2 10.8V18h9.6v-7.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span class="home-nav-text">홈</span>
-          </button>
+  <svg class="home-big-icon" viewBox="0 0 48 48" aria-hidden="true">
+    <path d="M10 22 L24 10 L38 22" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M14 20 V36 H34 V20" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="24" y="31" text-anchor="middle" class="home-icon-text">홈</text>
+  </svg>
+</button>
           <div class="nav-group">
             <button type="button" id="workspaceNavBtn" class="nav-btn" data-portal-src="portal-home/portal-home.html" title="업무">업무</button>
             <button type="button" id="wastewaterNavBtn" class="nav-btn" data-portal-src="wastewater/index.html" title="폐수">폐수</button>
