@@ -67,6 +67,84 @@
 
 
 
+
+<style id="attendance-report-modal-visibility-fix">
+/* ===== Attendance report modal visibility hotfix ===== */
+#attendanceReportModal.reportModalBg.show,
+#attendanceReportModal.reportModalBg[aria-hidden="false"] {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#attendanceReportModal .reportModal {
+  width: min(1120px, calc(100vw - 64px)) !important;
+  max-height: calc(100vh - 64px) !important;
+  overflow: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+#attendanceReportModal .reportModalTop {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 5 !important;
+  background: #ffffff !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+#attendanceReportModal .reportModalActions,
+#attendanceReportModal .reportSettings {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+#attendanceReportModal .reportAiStatus {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+#attendanceReportModal .reportSmallBtn {
+  min-height: 34px !important;
+  padding: 0 12px !important;
+  border-radius: 10px !important;
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  cursor: pointer !important;
+}
+
+#attendanceReportModal .reportSmallBtn.primary {
+  background: #16a34a !important;
+  border-color: #16a34a !important;
+  color: #ffffff !important;
+}
+
+#attendanceReportModal .reportSmallBtn.danger {
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+#attendanceReportModal .reportPreviewWrap {
+  min-height: 220px !important;
+}
+</style>
+
 </head>
 <body>
 
