@@ -907,7 +907,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
 
 
-/* ===== Attendance Portal Filter Polish ===== */
+/* ===== Attendance Portal Filter Polish v2 ===== */
 .portal-filters .portal-filter-item{
   min-width:max-content;
 }
@@ -917,7 +917,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
 }
 
 .portal-filters .portal-filter-item:has([data-portal-filter="period"]) .portal-filter-control{
-  min-width:110px;
+  min-width:105px;
 }
 
 .portal-filters .portal-filter-item:has([data-portal-filter="division"]) .portal-filter-control,
@@ -1824,6 +1824,16 @@ body:not(.service-admin-enabled) .service-admin-btn{
           source: 'portal-index'
         }, '*');
       } catch (_) {}
+
+      /* attendance robust filter retry */
+      if (normalizePortalSrc(frame?.getAttribute('src') || frame?.src || '') === 'attendance.html') {
+        setTimeout(function () {
+          try {
+            frame.contentWindow.postMessage({ type: 'portal-filters-request', source: 'portal-index-retry' }, '*');
+            frame.contentWindow.postMessage({ type: 'portal-tabs-request', source: 'portal-index-retry' }, '*');
+          } catch (_) {}
+        }, 900);
+      }
     };
     frame.src = src;
   }
