@@ -944,7 +944,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
           <div class="nav-group">
             <button type="button" id="workspaceNavBtn" class="nav-btn" data-portal-src="portal-home/portal-home.html" title="업무">업무</button>
             <button type="button" id="wastewaterNavBtn" class="nav-btn" data-portal-src="wastewater/index.html" title="폐수">폐수</button>
-            <button type="button" id="attendanceNavBtn" class="nav-btn" data-portal-src="attendance.html" title="근태">근태</button>
+            <button type="button" id="attendanceNavBtn" class="nav-btn" data-portal-src="attendance/index.html" title="근태">근태</button>
             <button type="button" id="researchStaffNavBtn" class="nav-btn" data-portal-src="research-staff/index.html" title="인력운영현황">인력</button>
             <button type="button" id="suppliesNavBtn" class="nav-btn" data-portal-src="reagent/index.html" title="시약">시약</button>
             <button type="button" id="mealNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
@@ -1208,7 +1208,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
       desc: '폐수/폐기물 배출시설 운영 기록과 수거 내역을 관리합니다.',
       gradient: 'linear-gradient(135deg, #047857 0%, #14b8a6 100%)'
     },
-    'attendance.html': {
+    'attendance/index.html': {
       top: 'Workforce Analytics',
       title: '근태 리스크 및 운영 분석',
       desc: '해당월 데이터를 기준으로 현재 상태를 설명하고, 관리자가 확인해야 할 핵심 리스크를 정리합니다.',
@@ -1253,7 +1253,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
       { id: 'reference', label: '관련자료' },
       { id: 'relatedDocs', label: '관련서류' }
     ],
-    'attendance.html': [
+    'attendance/index.html': [
       { id: 'attendance', label: '근태관리' },
       { id: 'dashboard', label: '분석대시보드' },
       { id: 'deep-analysis', label: '심층분석' },
@@ -1826,7 +1826,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
       } catch (_) {}
 
       /* attendance portal request retry final */
-      if (normalizePortalSrc(src) === 'attendance.html') {
+      if (normalizePortalSrc(src) === 'attendance/index.html') {
         [700, 1600, 3000, 5000].forEach(function (delay) {
           setTimeout(function () {
             try {
