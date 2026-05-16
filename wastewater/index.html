@@ -1132,13 +1132,31 @@ table {
 (function () {
   'use strict';
 
+  // 포탈 공통 탭과 폐수 앱 내부 탭을 연결합니다.
+  // 핵심: 포탈에서 쓰는 탭 ID와 폐수 앱 내부 currentTab 값을 동일하게 맞춥니다.
   const WASTEWATER_PORTAL_TABS = [
-    { id: 'daily', label: '일일입력', keywords: ['일일', '입력'] },
-    { id: 'pickup', label: '수거등록', keywords: ['수거', '등록'] },
-    { id: 'ledger', label: '운영일지', keywords: ['운영일지'] },
-    { id: 'reference', label: '관련자료', keywords: ['관련자료', '운영 관련자료', '자료'] },
-    { id: 'relatedDocs', label: '관련서류', keywords: ['관련서류', '서류'] }
+    { id: 'daily', label: '일일입력', keywords: ['일일', '입력'], aliases: [] },
+    { id: 'pickup', label: '수거등록', keywords: ['수거', '등록'], aliases: ['collect'] },
+    { id: 'ledger', label: '운영일지', keywords: ['운영일지'], aliases: [] },
+    { id: 'reference', label: '관련자료', keywords: ['관련자료', '운영관련자료', '운영 관련자료', '자료'], aliases: ['materials'] },
+    { id: 'relatedDocs', label: '관련서류', keywords: ['관련서류', '서류'], aliases: ['docs', 'relateddocs'] }
   ];
+
+  function normalizeTabId(tabId) {
+    const raw = String(tabId || '').trim();
+    if (!raw) return '';
+    const lower = raw.toLowerCase();
+
+    const found = WASTEWATER_PORTAL_TABS.find(function (tab) {
+      return tab.id === raw ||
+        String(tab.id).toLowerCase() === lower ||
+        (tab.aliases || []).some(function (alias) {
+          return String(alias).toLowerCase() === lower;
+        });
+    });
+
+    return found ? found.id : raw;
+  }
 
   function getButtonText(el) {
     return String(el && el.textContent ? el.textContent : '').replace(/\s+/g, '').trim();
@@ -1148,24 +1166,41 @@ table {
     return Array.from(document.querySelectorAll('.tabs-wrap .tab-btn, .tabs-main .tab-btn, .tabs .tab-btn, .tab-btn'));
   }
 
+  function findTabByButton(btn) {
+    if (!btn) return null;
+
+    const rawDataTab = btn.getAttribute('data-tab') || btn.getAttribute('data-target') || btn.dataset.tab || '';
+    const normalizedDataTab = normalizeTabId(rawDataTab);
+    if (normalizedDataTab) {
+      const byData = WASTEWATER_PORTAL_TABS.find(function (tab) { return tab.id === normalizedDataTab; });
+      if (byData) return byData;
+    }
+
+    const text = getButtonText(btn);
+    return WASTEWATER_PORTAL_TABS.find(function (tab) {
+      return tab.keywords.some(function (keyword) {
+        return text.includes(String(keyword).replace(/\s+/g, ''));
+      });
+    }) || null;
+  }
+
   function findInnerTabButton(tabId) {
-    const tab = WASTEWATER_PORTAL_TABS.find(function (item) { return item.id === tabId; });
+    const canonicalId = normalizeTabId(tabId);
+    const tab = WASTEWATER_PORTAL_TABS.find(function (item) { return item.id === canonicalId; });
     if (!tab) return null;
 
     const buttons = getTabButtons();
 
     let found = buttons.find(function (btn) {
       const dataTab = btn.getAttribute('data-tab') || btn.getAttribute('data-target') || btn.dataset.tab || '';
-      return dataTab === tabId;
+      return normalizeTabId(dataTab) === canonicalId;
     });
 
     if (found) return found;
 
     found = buttons.find(function (btn) {
-      const text = getButtonText(btn);
-      return tab.keywords.some(function (keyword) {
-        return text.includes(String(keyword).replace(/\s+/g, ''));
-      });
+      const matchedTab = findTabByButton(btn);
+      return matchedTab && matchedTab.id === canonicalId;
     });
 
     return found || null;
@@ -1176,19 +1211,8 @@ table {
       return btn.classList.contains('active');
     });
 
-    if (!activeButton) return WASTEWATER_PORTAL_TABS[0].id;
-
-    const dataTab = activeButton.getAttribute('data-tab') || activeButton.getAttribute('data-target') || activeButton.dataset.tab || '';
-    if (dataTab) return dataTab;
-
-    const text = getButtonText(activeButton);
-    const found = WASTEWATER_PORTAL_TABS.find(function (tab) {
-      return tab.keywords.some(function (keyword) {
-        return text.includes(String(keyword).replace(/\s+/g, ''));
-      });
-    });
-
-    return found ? found.id : WASTEWATER_PORTAL_TABS[0].id;
+    const activeTab = findTabByButton(activeButton);
+    return activeTab ? activeTab.id : WASTEWATER_PORTAL_TABS[0].id;
   }
 
   function notifyPortalTabs() {
@@ -1206,21 +1230,33 @@ table {
 
   function notifyPortalActiveTab(tabId) {
     if (!window.parent || window.parent === window || !tabId) return;
+    const canonicalId = normalizeTabId(tabId);
 
     window.parent.postMessage({
       type: 'portal-tab-active',
-      activeTabId: tabId,
-      tabId: tabId,
+      activeTabId: canonicalId,
+      tabId: canonicalId,
       source: 'wastewater'
     }, '*');
   }
 
   function activateWastewaterTab(tabId) {
-    const target = findInnerTabButton(tabId);
-    if (!target) return false;
+    const canonicalId = normalizeTabId(tabId);
+    const target = findInnerTabButton(canonicalId);
 
-    target.click();
-    notifyPortalActiveTab(tabId);
+    if (target) {
+      target.click();
+    } else if (typeof window.switchTab === 'function') {
+      window.switchTab(canonicalId);
+    } else {
+      return false;
+    }
+
+    // switchTab/renderApp 이후에도 포탈 버튼 색상이 다시 기존 탭으로 돌아가지 않도록
+    // 즉시 1회 + 렌더 완료 후 2회 더 활성 탭을 포탈에 알려줍니다.
+    notifyPortalActiveTab(canonicalId);
+    setTimeout(function () { notifyPortalActiveTab(canonicalId); }, 0);
+    setTimeout(function () { notifyPortalActiveTab(canonicalId); }, 120);
     return true;
   }
 
