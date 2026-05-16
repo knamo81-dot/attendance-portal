@@ -145,6 +145,60 @@
 }
 </style>
 
+
+<style id="attendance-ui-visibility-tuning">
+/* ===== attendance ui tuning ===== */
+#attendanceReportModal.reportModalBg{
+  background: rgba(15,23,42,.55) !important;
+  backdrop-filter: blur(4px);
+}
+
+#attendanceReportModal .reportModal{
+  width:min(980px, calc(100vw - 120px)) !important;
+  border-radius:22px !important;
+  box-shadow:0 24px 80px rgba(15,23,42,.28) !important;
+}
+
+#attendanceReportModal .reportPreviewWrap{
+  padding:24px !important;
+  background:#f8fafc !important;
+  border-radius:18px !important;
+}
+
+#attendanceReportModal .reportModalTop{
+  padding-right:6px !important;
+}
+
+#attendanceReportModal .reportSmallBtn{
+  transition:.16s ease;
+}
+
+#attendanceReportModal .reportSmallBtn:hover{
+  transform:translateY(-1px);
+}
+
+#attendanceReportModal .reportContent,
+#attendanceReportModal .reportPreview{
+  font-size:14px !important;
+  line-height:1.75 !important;
+}
+
+.mainTabs{
+  position:sticky;
+  top:0;
+  z-index:15;
+  backdrop-filter:blur(6px);
+}
+
+.mainTab{
+  transition:background .12s ease,color .12s ease,transform .08s ease;
+}
+
+.mainTab:active{
+  transform:scale(.98);
+}
+</style>
+
 </head>
 <body>
 
