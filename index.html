@@ -762,6 +762,84 @@ body:not(.service-admin-enabled) .service-admin-btn{
   }
 }
 
+
+/* ===== Portal Common Filters Area ===== */
+.portal-subtabs-wrap.show{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.portal-subtabs{
+  flex:1 1 auto;
+  min-width:0;
+}
+
+.portal-filters{
+  display:none;
+  align-items:center;
+  justify-content:flex-end;
+  gap:7px;
+  flex:0 0 auto;
+  min-width:0;
+}
+
+.portal-filters.show{
+  display:flex;
+}
+
+.portal-filter-item{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  height:32px;
+  padding:0 10px;
+  border:1px solid #dbe3ec;
+  border-radius:10px;
+  background:#ffffff;
+  box-shadow:0 2px 7px rgba(15,23,42,.028);
+}
+
+.portal-filter-item label{
+  font-size:10.5px;
+  font-weight:800;
+  color:#64748b;
+  white-space:nowrap;
+}
+
+.portal-filter-control{
+  height:24px;
+  min-width:82px;
+  border:none;
+  outline:none;
+  background:transparent;
+  color:#334155;
+  font-size:11px;
+  font-weight:800;
+}
+
+.portal-filter-control[type="month"]{
+  min-width:96px;
+}
+
+.portal-filter-control:focus{
+  color:var(--current-header-accent);
+}
+
+@media (max-width: 1100px){
+  .portal-subtabs-wrap.show{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+
+  .portal-filters{
+    width:100%;
+    justify-content:flex-start;
+    overflow-x:auto;
+  }
+}
+
 /* ===== Logout Confirm Modal ===== */
 .logout-confirm-overlay{
   position:fixed;
@@ -897,6 +975,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
         </div>
         <div id="portalSubtabsWrap" class="portal-subtabs-wrap" aria-label="프로그램 기능 버튼">
           <div id="portalSubtabs" class="portal-subtabs"></div>
+          <div id="portalFilters" class="portal-filters" aria-label="프로그램 공통 필터"></div>
         </div>
         <iframe id="portalFrame" title="포털 본문" src="portal-main/portal-main.html"></iframe>
       </div>
@@ -987,6 +1066,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
     serviceAdminBtn: document.getElementById('serviceAdminBtn'),
     portalSubtabsWrap: document.getElementById('portalSubtabsWrap'),
     portalSubtabs: document.getElementById('portalSubtabs'),
+    portalFilters: document.getElementById('portalFilters'),
     logoutConfirmOverlay: document.getElementById('logoutConfirmOverlay'),
     logoutConfirmBtn: document.getElementById('logoutConfirmBtn'),
     logoutCancelBtn: document.getElementById('logoutCancelBtn')
@@ -1185,6 +1265,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
   let currentPortalTabs = [];
   let currentPortalTabId = '';
+  let currentPortalFilters = [];
 
 
   function normalizePortalSrc(src) {
@@ -1253,6 +1334,92 @@ body:not(.service-admin-enabled) .service-admin-btn{
     const key = normalizePortalSrc(src);
     const tabs = portalDefaultTabs[key] || [];
     renderPortalSubtabs(tabs, tabs[0]?.id || '');
+    renderPortalFilters([]);
+  }
+
+  function normalizePortalFilters(filters) {
+    if (!Array.isArray(filters)) return [];
+    return filters.map(function (filter, index) {
+      const type = String(filter.type || 'select');
+      return {
+        id: String(filter.id || filter.key || ('filter_' + index)),
+        label: String(filter.label || filter.name || filter.id || ('필터 ' + (index + 1))),
+        type: type,
+        value: filter.value || '',
+        options: Array.isArray(filter.options) ? filter.options : []
+      };
+    }).filter(function (filter) {
+      return filter.id && filter.label;
+    });
+  }
+
+  function renderPortalFilters(filters) {
+    currentPortalFilters = normalizePortalFilters(filters);
+
+    if (!els.portalFilters) return;
+
+    if (!currentPortalFilters.length) {
+      els.portalFilters.classList.remove('show');
+      els.portalFilters.innerHTML = '';
+      return;
+    }
+
+    els.portalFilters.classList.add('show');
+    els.portalFilters.innerHTML = currentPortalFilters.map(function (filter) {
+      const value = String(filter.value || '');
+      if (filter.type === 'month') {
+        return '<div class="portal-filter-item"><label for="portalFilter_' + filter.id + '">' + filter.label + '</label><input id="portalFilter_' + filter.id + '" class="portal-filter-control" type="month" data-portal-filter="' + filter.id + '" value="' + value + '"></div>';
+      }
+
+      if (filter.type === 'text' || filter.type === 'search') {
+        return '<div class="portal-filter-item"><label for="portalFilter_' + filter.id + '">' + filter.label + '</label><input id="portalFilter_' + filter.id + '" class="portal-filter-control" type="' + filter.type + '" data-portal-filter="' + filter.id + '" value="' + value + '"></div>';
+      }
+
+      const options = filter.options.map(function (option) {
+        if (typeof option === 'string') {
+          const selected = option === value ? ' selected' : '';
+          return '<option value="' + option + '"' + selected + '>' + option + '</option>';
+        }
+
+        const optionValue = String(option.value || '');
+        const optionLabel = String(option.label || option.name || optionValue);
+        const selected = optionValue === value ? ' selected' : '';
+        return '<option value="' + optionValue + '"' + selected + '>' + optionLabel + '</option>';
+      }).join('');
+
+      return '<div class="portal-filter-item"><label for="portalFilter_' + filter.id + '">' + filter.label + '</label><select id="portalFilter_' + filter.id + '" class="portal-filter-control" data-portal-filter="' + filter.id + '">' + options + '</select></div>';
+    }).join('');
+
+    Array.from(els.portalFilters.querySelectorAll('[data-portal-filter]')).forEach(function (control) {
+      control.addEventListener('change', function () {
+        sendPortalFilterChange(control.getAttribute('data-portal-filter'), control.value);
+      });
+
+      control.addEventListener('input', function () {
+        if (control.tagName === 'INPUT' && (control.type === 'text' || control.type === 'search')) {
+          sendPortalFilterChange(control.getAttribute('data-portal-filter'), control.value);
+        }
+      });
+    });
+  }
+
+  function sendPortalFilterChange(filterId, value) {
+    if (!frame || !frame.contentWindow || !filterId) return;
+
+    const filterValues = {};
+    if (els.portalFilters) {
+      Array.from(els.portalFilters.querySelectorAll('[data-portal-filter]')).forEach(function (control) {
+        filterValues[control.getAttribute('data-portal-filter')] = control.value;
+      });
+    }
+
+    frame.contentWindow.postMessage({
+      type: 'portal-filter-change',
+      filterId: filterId,
+      value: value,
+      filters: filterValues,
+      source: 'portal-index'
+    }, '*');
   }
 
   function updatePortalHeader(src) {
@@ -1631,6 +1798,11 @@ body:not(.service-admin-enabled) .service-admin-btn{
           source: 'portal-index',
           fallbackTabs: fallbackTabs
         }, '*');
+
+        frame.contentWindow.postMessage({
+          type: 'portal-filters-request',
+          source: 'portal-index'
+        }, '*');
       } catch (_) {}
     };
     frame.src = src;
@@ -1885,6 +2057,20 @@ body:not(.service-admin-enabled) .service-admin-btn{
       if (payload.type === 'portal-tab-active') {
         const activeId = payload.activeTabId || payload.activeTab || payload.tabId || payload.tab || '';
         if (activeId) setPortalSubtabActive(activeId);
+        return;
+      }
+
+      if (payload.type === 'portal-filters-ready' || payload.type === 'portal-filters-update') {
+        if (payload.enabled === false) {
+          renderPortalFilters([]);
+          return;
+        }
+        renderPortalFilters(payload.filters || payload.portalFilters || []);
+        return;
+      }
+
+      if (payload.type === 'portal-filters-clear') {
+        renderPortalFilters([]);
       }
     });
   }
@@ -1940,7 +2126,8 @@ body:not(.service-admin-enabled) .service-admin-btn{
       portalSession: window.portalSession || null,
       lastPage: localStorage.getItem(LAST_PAGE_KEY),
       currentPortalTabs,
-      currentPortalTabId
+      currentPortalTabId,
+      currentPortalFilters
     };
   };
 
