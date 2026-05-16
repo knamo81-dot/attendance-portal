@@ -1827,7 +1827,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
       /* attendance portal request retry final */
       if (normalizePortalSrc(src) === 'attendance/index.html') {
-        [700, 1600, 3000, 5000].forEach(function (delay) {
+        [700, 1600].forEach(function (delay) {
           setTimeout(function () {
             try {
               frame.contentWindow.postMessage({ type: 'portal-tabs-request', source: 'portal-index-retry' }, '*');
