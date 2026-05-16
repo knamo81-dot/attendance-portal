@@ -916,13 +916,12 @@ body:not(.service-admin-enabled) .service-admin-btn{
   min-width:96px;
 }
 
-.portal-filters .portal-filter-item:has([data-portal-filter="periodSelect"]) .portal-filter-control,
-.portal-filters .portal-filter-item:has([data-portal-filter="monthSelect"]) .portal-filter-control{
+.portal-filters .portal-filter-item:has([data-portal-filter="period"]) .portal-filter-control{
   min-width:110px;
 }
 
-.portal-filters .portal-filter-item:has([data-portal-filter="divisionFilter"]) .portal-filter-control,
-.portal-filters .portal-filter-item:has([data-portal-filter="teamFilter"]) .portal-filter-control{
+.portal-filters .portal-filter-item:has([data-portal-filter="division"]) .portal-filter-control,
+.portal-filters .portal-filter-item:has([data-portal-filter="team"]) .portal-filter-control{
   min-width:105px;
 }
 
@@ -1259,7 +1258,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
       { id: 'dashboard', label: '분석대시보드' },
       { id: 'deep-analysis', label: '심층분석' },
       { id: 'trend-analysis', label: '트렌드분석' },
-      { id: 'missing-analysis', label: '출퇴근 누락 분석' }
+      { id: 'attendance-missing', label: '출퇴근 누락 분석' }
     ],
     'research-staff/index.html': [
       { id: 'dashboard', label: '메인 대시보드' },
