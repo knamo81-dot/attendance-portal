@@ -2448,3 +2448,80 @@ body,
     left:364px !important;
   }
 }
+
+/* ===== Reagent Collect Scroll UX Final Polish ===== */
+/* 현재 동작 유지: 제조사/제품코드가 품명 쪽 여유공간으로 자연스럽게 이동하는 방식 유지 */
+/* 가운데 경계선만 부드럽게 조정 */
+#page-collect .collect-table-wrap table th:nth-child(4),
+#page-collect .collect-table-wrap table td:nth-child(4){
+  border-right:1px solid rgba(148,163,184,.45) !important;
+  box-shadow:6px 0 10px rgba(15,23,42,.035) !important;
+}
+
+/* sticky 영역 배경 안정화 */
+#page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(1),
+#page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(2),
+#page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(3),
+#page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(4){
+  background:#fff !important;
+}
+
+#page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(1),
+#page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(2),
+#page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(3),
+#page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(4){
+  background:#f1f5f9 !important;
+}
+
+/* 가로 스크롤은 제품취합 테이블 박스 안에서만 보이도록 유지 */
+#page-collect .collect-table-wrap{
+  overflow-x:auto !important;
+  overflow-y:auto !important;
+  scrollbar-gutter:stable both-edges;
+}
+
+/* 스크롤바 시각 정리 */
+#page-collect .collect-table-wrap::-webkit-scrollbar{
+  height:12px;
+  width:12px;
+}
+
+#page-collect .collect-table-wrap::-webkit-scrollbar-track{
+  background:#f1f5f9;
+  border-radius:999px;
+}
+
+#page-collect .collect-table-wrap::-webkit-scrollbar-thumb{
+  background:#94a3b8;
+  border:3px solid #f1f5f9;
+  border-radius:999px;
+}
+
+#page-collect .collect-table-wrap::-webkit-scrollbar-thumb:hover{
+  background:#64748b;
+}
+
+/* Firefox */
+#page-collect .collect-table-wrap{
+  scrollbar-width:thin;
+  scrollbar-color:#94a3b8 #f1f5f9;
+}
+
+/* 품명/제조사/제품코드 식별성 유지 */
+#page-collect .collect-table-wrap table td:nth-child(2){
+  font-weight:700 !important;
+}
+
+#page-collect .collect-table-wrap table td:nth-child(3),
+#page-collect .collect-table-wrap table td:nth-child(4){
+  color:#334155 !important;
+}
+
+/* 작은 화면에서도 현재 이동감 유지 */
+@media (max-width:1200px){
+  #page-collect .collect-table-wrap table th:nth-child(4),
+  #page-collect .collect-table-wrap table td:nth-child(4){
+    box-shadow:5px 0 9px rgba(15,23,42,.035) !important;
+  }
+}
+
