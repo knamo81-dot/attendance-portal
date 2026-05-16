@@ -905,6 +905,27 @@ body:not(.service-admin-enabled) .service-admin-btn{
   color:#ffffff;
 }
 
+
+
+/* ===== Attendance Portal Filter Polish ===== */
+.portal-filters .portal-filter-item{
+  min-width:max-content;
+}
+
+.portal-filters .portal-filter-control{
+  min-width:96px;
+}
+
+.portal-filters .portal-filter-item:has([data-portal-filter="periodSelect"]) .portal-filter-control,
+.portal-filters .portal-filter-item:has([data-portal-filter="monthSelect"]) .portal-filter-control{
+  min-width:110px;
+}
+
+.portal-filters .portal-filter-item:has([data-portal-filter="divisionFilter"]) .portal-filter-control,
+.portal-filters .portal-filter-item:has([data-portal-filter="teamFilter"]) .portal-filter-control{
+  min-width:105px;
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1236,9 +1257,9 @@ body:not(.service-admin-enabled) .service-admin-btn{
     'attendance.html': [
       { id: 'attendance', label: '근태관리' },
       { id: 'dashboard', label: '분석대시보드' },
-      { id: 'deep', label: '심층분석' },
-      { id: 'trend', label: '트렌드분석' },
-      { id: 'missing', label: '출퇴근 누락 분석' }
+      { id: 'deep-analysis', label: '심층분석' },
+      { id: 'trend-analysis', label: '트렌드분석' },
+      { id: 'missing-analysis', label: '출퇴근 누락 분석' }
     ],
     'research-staff/index.html': [
       { id: 'dashboard', label: '메인 대시보드' },
