@@ -1990,3 +1990,94 @@ td {
   }
 }
 
+
+/* ===== 운영인력 리스트 자동 슬림화 최종 보정 ===== */
+.admin-table-wrap{
+  width:100% !important;
+  min-width:0 !important;
+  overflow-x:auto !important;
+}
+
+.admin-table{
+  width:100% !important;
+  table-layout:fixed !important;
+  min-width:unset !important;
+  font-size:12px !important;
+}
+
+.admin-table th,
+.admin-table td{
+  white-space:normal !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+  padding:6px 5px !important;
+  height:34px !important;
+  line-height:1.25 !important;
+}
+
+.admin-table input,
+.admin-table select{
+  width:100% !important;
+  min-width:0 !important;
+  max-width:100% !important;
+  height:28px !important;
+  padding:0 6px !important;
+  font-size:11px !important;
+  border-radius:8px !important;
+}
+
+.admin-table input[type="text"]{
+  min-width:0 !important;
+}
+
+.admin-table th:nth-child(n),
+.admin-table td:nth-child(n){
+  min-width:0 !important;
+  max-width:none !important;
+}
+
+/* 순번/사번/성명처럼 짧은 컬럼은 폭을 조금만 유지 */
+.admin-table th:nth-child(1),
+.admin-table td:nth-child(1){
+  width:46px !important;
+}
+
+.admin-table th:nth-child(2),
+.admin-table td:nth-child(2){
+  width:76px !important;
+}
+
+.admin-table th:nth-child(3),
+.admin-table td:nth-child(3){
+  width:76px !important;
+}
+
+/* 날짜/셀렉트 컬럼은 너무 찌그러지지 않게 최소 시각폭 확보 */
+.admin-table th:nth-child(9),
+.admin-table td:nth-child(9),
+.admin-table th:nth-child(10),
+.admin-table td:nth-child(10){
+  width:110px !important;
+}
+
+.admin-table th:nth-child(11),
+.admin-table td:nth-child(11){
+  width:90px !important;
+}
+
+.admin-table th:nth-child(12),
+.admin-table td:nth-child(12){
+  width:120px !important;
+}
+
+@media (max-width:1100px){
+  .admin-table{
+    font-size:11px !important;
+  }
+
+  .admin-table th,
+  .admin-table td{
+    padding:5px 4px !important;
+  }
+}
+
