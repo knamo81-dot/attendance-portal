@@ -139,7 +139,7 @@ button,input,textarea,select{font:inherit}
 
 .main-grid{
   display:grid;
-  grid-template-columns:500px 1fr;
+  grid-template-columns:420px minmax(0, 1fr);
   gap:18px;
   align-items:start;
 }
@@ -799,7 +799,7 @@ body {
 
 /* 카드/그리드 */
 .main-grid {
-  grid-template-columns: 430px 1fr;
+  grid-template-columns: 420px minmax(0, 1fr);
   gap: var(--ww-page-gap);
 }
 
@@ -1093,6 +1093,27 @@ table {
   }
 }
 
+
+
+
+/* ===== Main grid width stabilization: input form + content area ===== */
+.main-grid > *{
+  min-width:0;
+}
+
+.preview-card,
+.ledger-card,
+.admin-card,
+.log-card,
+.ref-card,
+.related-doc-content{
+  min-width:0;
+}
+
+.table-wrap{
+  min-width:0;
+  overflow-x:auto;
+}
 
 /* ===== Portal Common Tabs Bridge: Wastewater ===== */
 /* 포탈 공통 버튼을 사용하므로 폐수 내부 탭 버튼은 숨기되 DOM은 유지 */
