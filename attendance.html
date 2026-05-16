@@ -2666,6 +2666,7 @@ svg text{
 <style id="attendance-portal-bridge-style">
   /* 포탈 공통 버튼/필터 사용: 근태 내부 상단 버튼/필터는 DOM 유지 후 화면에서만 숨김 */
   .mainTabs,
+  .hero .filters,
   #floatingFilters,
   .floatingFilters{
     display:none !important;
@@ -15663,7 +15664,7 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
     { id: 'dashboard', label: '분석대시보드' },
     { id: 'deep-analysis', label: '심층분석' },
     { id: 'trend-analysis', label: '트렌드분석' },
-    { id: 'missing-analysis', label: '출퇴근 누락 분석' }
+    { id: 'attendance-missing', label: '출퇴근 누락 분석' }
   ];
 
   const TAB_ALIAS = {
@@ -15671,7 +15672,7 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
     dashboard: ['dashboard', 'analysis', '분석대시보드'],
     'deep-analysis': ['deep-analysis', 'deep', 'main-deep-analysis', '심층분석'],
     'trend-analysis': ['trend-analysis', 'trend', 'main-trend-analysis', '트렌드분석'],
-    'missing-analysis': ['missing-analysis', 'missing', 'main-missing-analysis', '출퇴근 누락 분석']
+    'attendance-missing': ['attendance-missing', 'missing', 'missing-analysis', 'main-attendance-missing', '출퇴근 누락 분석', '출퇴근누락분석']
   };
 
   function cleanText(value) {
@@ -15682,8 +15683,22 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
     return Array.from(document.querySelectorAll('.mainTab, .mainTabs button, button[data-main], button[data-tab], .tab[data-main]'));
   }
 
+  function normalizeActiveTab(raw) {
+    const value = String(raw || '').trim();
+    if (!value) return 'attendance';
+
+    for (const [tabId, aliases] of Object.entries(TAB_ALIAS)) {
+      if (tabId === value || aliases.includes(value) || aliases.map(cleanText).includes(cleanText(value))) {
+        return tabId;
+      }
+    }
+
+    return value;
+  }
+
   function resolveTabButton(tabId) {
-    const aliases = TAB_ALIAS[tabId] || [tabId];
+    const normalized = normalizeActiveTab(tabId);
+    const aliases = TAB_ALIAS[normalized] || [normalized];
     const buttons = getMainTabButtons();
 
     for (const alias of aliases) {
@@ -15703,17 +15718,6 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
     }
 
     return null;
-  }
-
-  function normalizeActiveTab(raw) {
-    const value = String(raw || '').trim();
-    if (!value) return 'attendance';
-
-    for (const [tabId, aliases] of Object.entries(TAB_ALIAS)) {
-      if (tabId === value || aliases.includes(value)) return tabId;
-    }
-
-    return value;
   }
 
   function getActiveTabId() {
@@ -15742,8 +15746,8 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
     if (!window.parent || window.parent === window || !tabId) return;
     window.parent.postMessage({
       type: 'portal-tab-active',
-      activeTabId: tabId,
-      tabId: tabId,
+      activeTabId: normalizeActiveTab(tabId),
+      tabId: normalizeActiveTab(tabId),
       source: 'attendance'
     }, '*');
   }
@@ -15754,9 +15758,12 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
     if (!btn) return false;
 
     btn.click();
-    postActiveTab(normalized);
-    setTimeout(postFilters, 0);
-    setTimeout(postTabs, 0);
+    setTimeout(function () {
+      postActiveTab(normalized);
+      postFilters();
+      postTabs();
+    }, 0);
+
     return true;
   }
 
@@ -15768,8 +15775,8 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
     }));
   }
 
-  function findSelectByCandidates(candidates) {
-    for (const selector of candidates) {
+  function firstExistingSelector(selectors) {
+    for (const selector of selectors) {
       const el = document.querySelector(selector);
       if (el) return el;
     }
@@ -15777,8 +15784,10 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
   }
 
   function getFilterElements() {
-    const month = findSelectByCandidates([
+    const month = firstExistingSelector([
+      '#period',
       '#periodSelect',
+      '#stickyPeriod',
       '#monthSelect',
       '#filterMonth',
       '#targetMonth',
@@ -15786,9 +15795,11 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
       'select[name="month"]'
     ]);
 
-    const division = findSelectByCandidates([
+    const division = firstExistingSelector([
+      '#division',
       '#divisionFilter',
       '#filterDivision',
+      '#stickyDivision',
       '#divisionSelect',
       '#deptFilter',
       '#departmentFilter',
@@ -15796,9 +15807,11 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
       'select[name="department"]'
     ]);
 
-    const team = findSelectByCandidates([
+    const team = firstExistingSelector([
+      '#team',
       '#teamFilter',
       '#filterTeam',
+      '#stickyTeam',
       '#teamSelect',
       'select[name="team"]'
     ]);
@@ -15809,29 +15822,39 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
   function getFilters() {
     const { month, division, team } = getFilterElements();
 
-    return [
-      {
-        id: 'periodSelect',
+    const filters = [];
+
+    if (month) {
+      filters.push({
+        id: 'period',
         label: '기준월',
         type: 'select',
-        value: month ? month.value : '',
+        value: month.value || '',
         options: optionList(month)
-      },
-      {
-        id: 'divisionFilter',
+      });
+    }
+
+    if (division) {
+      filters.push({
+        id: 'division',
         label: '본부',
         type: 'select',
-        value: division ? division.value : '',
+        value: division.value || '',
         options: optionList(division)
-      },
-      {
-        id: 'teamFilter',
+      });
+    }
+
+    if (team) {
+      filters.push({
+        id: 'team',
         label: '팀',
         type: 'select',
-        value: team ? team.value : '',
+        value: team.value || '',
         options: optionList(team)
-      }
-    ].filter((filter) => filter.options.length > 0 || filter.value !== '');
+      });
+    }
+
+    return filters;
   }
 
   function postFilters() {
@@ -15854,13 +15877,15 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
 
   function setFilter(filterId, value) {
     const { month, division, team } = getFilterElements();
+
+    const id = String(filterId || '');
     let target = null;
 
-    if (filterId === 'periodSelect' || filterId === 'monthSelect' || filterId === 'filterMonth') {
+    if (['period', 'periodSelect', 'monthSelect', 'filterMonth', 'stickyPeriod'].includes(id)) {
       target = month;
-    } else if (filterId === 'divisionFilter' || filterId === 'filterDivision' || filterId === 'deptFilter') {
+    } else if (['division', 'divisionFilter', 'filterDivision', 'deptFilter', 'stickyDivision'].includes(id)) {
       target = division;
-    } else if (filterId === 'teamFilter' || filterId === 'filterTeam') {
+    } else if (['team', 'teamFilter', 'filterTeam', 'stickyTeam'].includes(id)) {
       target = team;
     }
 
@@ -15873,8 +15898,25 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
     target.value = nextValue;
     triggerChange(target);
 
+    /* 기존 sticky 필터가 따로 존재하면 값 동기화 */
+    const mirrorMap = {
+      period: ['#period', '#stickyPeriod'],
+      division: ['#division', '#stickyDivision'],
+      team: ['#team', '#stickyTeam']
+    };
+
+    const key = target === month ? 'period' : (target === division ? 'division' : 'team');
+    (mirrorMap[key] || []).forEach((selector) => {
+      const el = document.querySelector(selector);
+      if (el && el !== target) {
+        el.value = nextValue;
+        triggerChange(el);
+      }
+    });
+
     setTimeout(postFilters, 80);
     setTimeout(postFilters, 350);
+    setTimeout(postFilters, 900);
   }
 
   window.portalTabs = TABS;
@@ -15935,11 +15977,12 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
     notifyAll();
   }
 
-  setTimeout(notifyAll, 300);
-  setTimeout(notifyAll, 900);
-  setTimeout(notifyAll, 1600);
-  setTimeout(notifyAll, 3000);
-  setTimeout(notifyAll, 5000);
+  setTimeout(notifyAll, 250);
+  setTimeout(notifyAll, 700);
+  setTimeout(notifyAll, 1400);
+  setTimeout(notifyAll, 2500);
+  setTimeout(notifyAll, 4000);
+  setTimeout(notifyAll, 6500);
 })();
 </script>
 
