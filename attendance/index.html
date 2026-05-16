@@ -1,1 +1,1032 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>근태 리스크 및 운영 분석 대시보드</title>
 
+<!-- ✅ 여기 추가 -->
+<link rel="icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="manifest" href="/manifest.json">
+  
+<!-- attendance detail final rules applied: holiday hidden, missing clock compensations -->
+<!-- missing analysis stabilized: potential start/end use same blank-clock display rule -->
+<!-- actual overtime source fixed: ERP I column 실제연장_시간 only; 연장신청_시간 excluded from overtime counts -->
+<!-- personal risk model refined: direct risk only absence/overtime; missing clocks, leave, sick leave, dispatch, work-shortage and short-time work excluded; outdoor/early-leave conditional weak only -->
+<!-- dispatch + half-day display fixed: no missing-clock warning and no work-time value in 근무시간 column; analysis columns still show 4:00 -->
+<!-- monthly work display fixed: dashboard/deep/trend 담당자 근무시간 uses 8시보정 합계(monthlyAdjustedWorkHours) instead of raw 근무시간 column 합계 -->
+<!-- totalLoadScore tuned: 0h=0, 0~7h=5, 7h+=10, 8.5h+=35, 9.5h+=75, 10.5h+=100 -->
+<!-- risk floor gate fixed: if monthly adjusted work hours is below 40h including 0h, final personal risk score is 0; period risk adder is not reapplied; total load display remains unchanged -->
+<!-- OT manual override fixed: auto 미인정 is default only; saved/pending 인정·부분인정·미인정 has priority over auto invalid display -->
+<!-- risk people display updated: outdoor replaced with issue days; hidden overtime displayed before monthly work; issue-only risk promotion softened -->
+<!-- risk promotion refined: OT 30h+ becomes risk only when total load is 9h+ or monthly hidden overtime is 10h+; OT 30h alone remains warning -->
+<!-- hidden overtime noise filter applied: values under 10 minutes are treated as 0:00 at detail-column generation stage -->
+<!-- org risk tab fix: undefined formatHourMinute references replaced with existing formatHoursToHM so dashboard/deep/trend/report/missing tabs bind normally -->
+<!-- organization risk score refined: org risk is calculated from risk/warning ratio, average total load, average OT, issue days, monthly hidden overtime, and recovery index; leave unused is no longer a direct org risk score driver -->
+<!-- org risk visual guide added: title threshold pills + score scale marker for normal/warning/risk 기준 -->
+<!-- dashboard interpretation/action guide reinforced: no calculation logic changed -->
+<!-- dashboard cleanup applied: bottom summary/alert cards removed, monthly trend hints added inside cause cards only -->
+<!-- hiring report main tab removed: panel/code kept inactive for safe rollback -->
+<!-- access role update fixed: admin auto display reads public.users; operator stored/deleted in public.attendance_operators server table -->
+<!-- admin feature visibility locked: only users.role=admin can see/open 관리자 기능 -->
+<!-- manual check server sync applied: absence_decision + approved_overtime_override saved to Supabase -->
+<!-- general user hard lock applied: only attendance tab, self records, no manual edit; non-admin/operator/auto-authority defaults to general -->
+<!-- general user attendance chart label fixed: division/team label replaced with user name -->
+<!-- effective access object added: admin/operator/director/manager/teamLeader/general unified with scope -->
+<!-- effective access menu binding added: admin only admin tab; director/manager/teamLeader/operator analysis tabs; general attendance tab only -->
+<!-- effective access filter lock refined: director fixed division with team all; manager/teamLeader fixed division and no team all -->
+<!-- effective access filter scope added: top division/team filters and displayed rows are limited to current access scope -->
+<link rel="stylesheet" href="./css/attendance.css">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+<!-- final build: additional data regeneration flow verified -->
+<!-- final build: print/PDF header meta + page footer patch applied -->
+<!-- final build: compact meta + analysisLevel/teamSummary payload applied -->
+<!-- final build: employee-master team/division report matching fixed -->
+<!-- final title patch: attendance risk and operations report -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</head>
+<body>
+
+  
+  
+<div class="app">
+  <div class="layout">
+    <div class="container">
+  <div class="hero">
+    <div>
+      <div class="label">Integrated Operations Platform</div>
+      <div style="font-size:34px;font-weight:800;margin:8px 0 6px">조직 컨디션 대시보드</div>
+    </div>
+    <div class="filters">
+      <select id="period"></select>
+      <select id="division"></select>
+      <select id="team"></select>
+      <div id="trendPeriodControl" class="trendPeriodControl" aria-hidden="true">
+        <span class="trendPeriodLabel">기간 기준</span>
+        <span class="trendPeriodToggle">
+          <button type="button" class="trendPeriodBtn active" data-trend-period-mode="year">해당년도</button>
+          <button type="button" class="trendPeriodBtn" data-trend-period-mode="rolling">최근 12개월</button>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div id="floatingFilters" class="floatingFilters" aria-hidden="true">
+    <div class="floatingFiltersInner">
+      <div class="floatingFiltersPanel">
+        <select id="stickyPeriod"></select>
+        <select id="stickyDivision"></select>
+        <select id="stickyTeam"></select>
+        <div id="stickyTrendPeriodControl" class="trendPeriodControl" aria-hidden="true">
+          <span class="trendPeriodLabel">기간 기준</span>
+          <span class="trendPeriodToggle">
+            <button type="button" class="trendPeriodBtn active" data-trend-period-mode="year">해당년도</button>
+            <button type="button" class="trendPeriodBtn" data-trend-period-mode="rolling">최근 12개월</button>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mainTabs">
+    <button class="mainTab active" data-main="attendance">근태관리</button>
+    <button class="mainTab" data-main="dashboard">분석대시보드</button>
+    <button class="mainTab" data-main="deep-analysis">심층분석</button>
+    <button class="mainTab" data-main="trend-analysis">트렌드분석</button>
+    <button class="mainTab" data-main="attendance-missing">출퇴근 누락 분석</button>
+    <div class="spacer"></div>
+    <button class="mainTab" data-main="admin" data-admin-hidden="Y" aria-hidden="true">관리자 기능</button>
+  </div>
+
+  <div id="main-attendance" class="mainPanel active">
+    <div class="card" style="margin-top:16px">
+      <div class="title">근태관리</div>
+      <div class="desc">출퇴근, 근태 상태, 연장근로, 휴가·외근 현황을 본부별·팀별로 빠르게 확인하는 실무용 화면입니다. 조직/사원 기준정보는 포털 DB를 마스터로 사용하며, 근태대상 N인 인원은 제외합니다.</div>
+      <div class="attLegend">
+        <span class="dot" style="background:#16a34a"></span>정상
+        <span class="dot" style="background:#d97706"></span>주의
+        <span class="dot" style="background:#ef4444"></span>문제
+        <span class="dot" style="background:#2563eb"></span>사유
+      </div>
+      <div id="attendanceLeaveToggle" class="attToggleWrap"></div>
+    </div>
+
+    <div id="attendanceKpis" class="attGrid"></div>
+
+    <div class="grid21">
+      <div class="card">
+        <div id="attendanceChartTitle" class="title">본부/팀별 근태 운영 상태</div>
+        <div class="desc">선택한 본부·팀 기준으로 전체와 정상 처리/주의/문제/사유 건수를 비교합니다. 전체는 정상 처리 + 주의 + 문제이며, 사유는 ERP 사유 중 주의/문제를 제외한 인정 근태 기준으로 집계합니다.</div>
+        <div id="attendanceChart" class="chart" style="height:360px"></div>
+      </div>
+      <div class="card">
+        <div class="title">근태 요약</div>
+        <div id="attendanceInsightList"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="attCardHeader">
+        <div class="attCardHeaderTop">
+          <div>
+            <div class="title">출퇴근 / 근태 상세</div>
+          </div>
+          <div class="attCardHeaderActions">
+            <button type="button" class="attHeaderBtn save" onclick="window.saveOvertimeCheckChanges && window.saveOvertimeCheckChanges()">💾 저장</button>
+            <button type="button" class="attHeaderBtn reload" onclick="window.location.reload()">🔄 새로고침</button>
+          </div>
+        </div>
+      </div>
+      <div class="attTableWrap">
+        <table class="attTable">
+          
+<thead>
+  <tr>
+    <th class="filterable"><div class="headerLabel"><span>일자</span><button class="filterTrigger" data-filter="date">▼</button></div><div class="filterDropdown" id="dropdown-date"></div></th>
+    <th class="filterable"><div class="headerLabel"><span>사번</span><button class="filterTrigger" data-filter="id">▼</button></div><div class="filterDropdown" id="dropdown-id"></div></th>
+    <th class="filterable"><div class="headerLabel"><span>이름</span><button class="filterTrigger" data-filter="name">▼</button></div><div class="filterDropdown" id="dropdown-name"></div></th>
+    <th class="filterable"><div class="headerLabel"><span>본부</span><button class="filterTrigger" data-filter="division">▼</button></div><div class="filterDropdown" id="dropdown-division"></div></th>
+    <th class="filterable"><div class="headerLabel"><span>팀</span><button class="filterTrigger" data-filter="team">▼</button></div><div class="filterDropdown" id="dropdown-team"></div></th>
+    <th class="filterable"><div class="headerLabel"><span>출근</span><button class="filterTrigger" data-filter="start">▼</button></div><div class="filterDropdown" id="dropdown-start"></div></th>
+    <th class="filterable"><div class="headerLabel"><span>퇴근</span><button class="filterTrigger" data-filter="end">▼</button></div><div class="filterDropdown" id="dropdown-end"></div></th>
+    <th class="filterable"><div class="headerLabel"><span>근무시간</span><button class="filterTrigger" data-filter="work">▼</button></div><div class="filterDropdown" id="dropdown-work"></div></th>
+    <th class="filterable"><div class="headerLabel"><span>OT발생</span><button class="filterTrigger" data-filter="ot">▼</button></div><div class="filterDropdown" id="dropdown-ot"></div></th>
+    <th class="filterable"><div class="headerLabel"><span>OT인정</span><button class="filterTrigger" data-filter="otapproved">▼</button></div><div class="filterDropdown" id="dropdown-otapproved"></div></th>
+    <th class="filterable"><div class="headerLabel"><span>상태</span><button class="filterTrigger" data-filter="status">▼</button></div><div class="filterDropdown" id="dropdown-status"></div></th>
+    <th class="filterable"><div class="headerLabel"><span>결근확인</span><button class="filterTrigger" data-filter="absencecheck">▼</button></div><div class="filterDropdown" id="dropdown-absencecheck"></div></th>
+    <th class="filterable"><div class="headerLabel"><span>OT확인</span><button class="filterTrigger" data-filter="otcheck">▼</button></div><div class="filterDropdown" id="dropdown-otcheck"></div></th>
+    <th class="filterable"><div class="headerLabel"><span>사유</span><button class="filterTrigger" data-filter="reason">▼</button></div><div class="filterDropdown" id="dropdown-reason"></div></th>
+    <th><div class="headerLabel"><span>실근무</span></div></th>
+    <th><div class="headerLabel"><span>8시보정</span></div></th>
+    <th><div class="headerLabel"><span>기본근무</span></div></th>
+    <th><div class="headerLabel"><span>숨은초과</span></div></th>
+    <th><div class="headerLabel"><span>ERP OT</span></div></th>
+  </tr>
+</thead>
+
+          <tbody id="attendanceTbody"></tbody>
+        </table>
+        <div id="attendanceEmpty" class="employeeEmpty" style="display:none;">표시할 근태 정보가 없습니다.</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="main-dashboard" class="mainPanel">
+  <div class="kpis dashboardRelayout" id="dashboardKpis" data-slot-ready="Y" data-drag-ready="Y">
+    <div class="card" data-kpi-card="target_headcount"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button><div class="label">분석 대상 인원</div><div class="headcountCardFlex"><div class="headcountCardMain"><div id="kpiTotal" class="value"></div><div class="sub">재직 · 근태대상 Y · 휴직 제외 기준</div></div><div id="kpiHeadcountSide" class="headcountSideInfo"><div class="headcountSideRow">휴직 <span id="kpiLeaveOnlyCount">0명</span></div><div class="headcountSideRow">복직 <span id="kpiReturnCount">0명</span></div><div class="headcountSideRow">휴직전환 <span id="kpiLeaveSwitchCount">0명</span></div></div></div></div>
+    <div class="card" data-kpi-card="avg_overtime"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button>
+      <div class="label">1인당 평균 연장근로시간</div>
+      <div class="overtimeCardFlex">
+        <div class="overtimeCardMain">
+          <div class="metricStatusWrap">
+            <div id="kpiOver" class="value"></div>
+            <div id="kpiOverStatus" class="metricStatusText"></div>
+          </div>
+          <div id="kpiOverPerPerson" class="sub riskCardSub" style="font-size:11px; color:#94a3b8;"></div>
+        </div>
+        <div id="kpiOverGuide" class="overtimeMiniGuide"></div>
+      </div>
+    </div>
+    <div class="card" data-kpi-card="total_overtime"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button><div class="label">월 총 연장근로</div><div id="kpiTotalOT" class="value"></div><div class="sub">선택 기간 기준 · 누적 피로</div></div>
+    <div class="card" data-kpi-card="overtime_concentration"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button><div class="label">연장근로 집중도</div><div class="mobilityConcentrationCard"><div class="mobilityConcentrationMain"><div id="kpiOvertimeSkew" class="value"></div><div class="sub">상위 20% 인원 연장근로 비중</div></div><div id="kpiOvertimeTopNames" class="mobilityTopNames"></div></div></div>
+    <div class="card" data-kpi-card="operational_risk"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button>
+      <div class="label">연장근로 리스크</div>
+      <div class="kpiCardFlex">
+        <div class="kpiCardMain">
+          <div class="riskScoreWrap">
+            <div id="kpiOperRisk" class="value"></div>
+            <div id="kpiOperRiskStatus" class="riskScoreStatus"></div>
+          </div>
+          <div class="sub riskCardSub">연장근로 집중도와 인당 평균 연장근로시간 기준</div>
+        </div>
+        <div class="operRiskGuide">
+          <div class="operRiskGuideRow" data-oper-guide="green">정상 <span class="guideToneGreen">안정</span></div>
+          <div class="operRiskGuideRow" data-oper-guide="amber">주의 <span class="guideToneAmber">관찰</span></div>
+          <div class="operRiskGuideRow" data-oper-guide="red">위험 <span class="guideToneRed">대응</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" data-kpi-card="avg_risk_score" style="display:none !important;"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button>
+      <div class="label">연장근로 리스크</div>
+      <div class="kpiCardFlex">
+        <div class="kpiCardMain">
+          <div class="riskScoreWrap">
+            <div id="kpiRisk" class="value"></div>
+            <div id="kpiRiskStatus" class="riskScoreStatus"></div>
+          </div>
+          <div id="kpiRiskSub" class="sub riskCardSub">선택 기간 기준 · 실근무 분석 대상</div>
+        </div>
+        <div class="operRiskGuide">
+          <div class="operRiskGuideRow" data-risk-guide="green">정상 <span class="guideToneGreen">안정</span></div>
+          <div class="operRiskGuideRow" data-risk-guide="amber">주의 <span class="guideToneAmber">관찰</span></div>
+          <div class="operRiskGuideRow" data-risk-guide="red">위험 <span class="guideToneRed">대응</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" data-kpi-card="high_risk_count"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button><div class="label">위험 인원</div><div id="kpiHigh" class="value"></div><div class="sub">선택 기간 기준 · 위험점수 75점 이상</div></div>
+    <div class="card" data-kpi-card="unused_leave"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button><div class="label">연차 미사용 인원</div><div id="kpiLeave" class="value"></div><div class="sub">선택 기간 기준 · 휴직 제외 대상 중 0건</div></div>
+    <div class="card" data-kpi-card="mobility_activity"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button>
+      <div class="label">외근/출장 활동도</div>
+      <div class="kpiCardFlex">
+        <div class="kpiCardMain">
+          <div class="metricStatusWrap">
+            <div id="kpiMobility" class="value"></div>
+            <div id="kpiMobilityStatus" class="metricStatusText"></div>
+          </div>
+          <div id="kpiMobilitySub" class="sub riskCardSub">1인당 평균 활동량</div>
+        </div>
+        <div id="kpiMobilityInlineGuide" class="mobilityMiniGuide"></div>
+      </div>
+    </div>
+    <div class="card" data-kpi-card="mobility_concentration"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button><div class="label">외근/출장 집중도</div><div class="mobilityConcentrationCard"><div class="mobilityConcentrationMain"><div id="kpiMobilitySkew" class="value"></div><div class="sub">상위 20% 인원 활동 비중</div></div><div id="kpiMobilityTopNames" class="mobilityTopNames"></div></div></div>
+    <div class="card" data-kpi-card="work_concentration"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button><div class="label">업무집중도</div><div class="mobilityConcentrationCard"><div class="mobilityConcentrationMain"><div id="kpiWorkConcentration" class="value"></div><div id="kpiWorkConcentrationSub" class="sub">상위 20% 인원이 전체 업무에서 차지하는 비중</div></div><div id="kpiWorkConcentrationTopNames" class="mobilityTopNames"></div></div></div>
+    <div class="card" data-kpi-card="work_concentration_status"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button>
+      <div class="label">업무집중 상태</div>
+      <div class="kpiCardFlex">
+        <div class="kpiCardMain">
+          <div class="riskScoreWrap">
+            <div id="kpiWorkConcentrationStatusLabel" class="value"></div>
+            <div id="kpiWorkConcentrationStatusAction" class="riskScoreStatus"></div>
+          </div>
+          <div id="kpiWorkConcentrationStatusSub" class="sub riskCardSub">업무 분배 불균형 상태</div>
+        </div>
+        <div class="operRiskGuide">
+          <div class="operRiskGuideRow" data-work-con-guide="green">정상 <span class="guideToneGreen">40% 미만</span></div>
+          <div class="operRiskGuideRow" data-work-con-guide="amber">주의 <span class="guideToneAmber">40~59%</span></div>
+          <div class="operRiskGuideRow" data-work-con-guide="red">위험 <span class="guideToneRed">60% 이상</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" data-kpi-card="operational_risk_total"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button>
+      <div class="label">운영 리스크</div>
+      <div class="kpiCardFlex">
+        <div class="kpiCardMain">
+          <div class="riskScoreWrap">
+            <div id="kpiOperationalRisk" class="value"></div>
+            <div id="kpiOperationalRiskStatus" class="riskScoreStatus"></div>
+          </div>
+          <div id="kpiOperationalRiskSub" class="sub riskCardSub">연장근로 리스크 + 업무집중 + 연차 리스크 종합 판단</div>
+        </div>
+        <div class="operRiskGuide">
+          <div class="operRiskGuideRow" data-operational-total-guide="green">정상 <span class="guideToneGreen">안정</span></div>
+          <div class="operRiskGuideRow" data-operational-total-guide="amber">주의 <span class="guideToneAmber">관찰</span></div>
+          <div class="operRiskGuideRow" data-operational-total-guide="red">위험 <span class="guideToneRed">대응</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" data-kpi-card="total_activity"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button><div class="label">총 건수</div><div id="kpiComplex" class="value"></div><div class="sub">전체 외근/출장 발생 횟수</div></div>
+    <div class="card" data-kpi-card="mobility_risk"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button><div class="label">외근 리스크</div><div class="kpiCardFlex"><div class="kpiCardMain"><div class="riskScoreWrap"><div id="kpiMobilityOperRisk" class="value"></div><div id="kpiMobilityOperRiskStatus" class="riskScoreStatus"></div></div><div id="kpiMobilityOperRiskSub" class="sub riskCardSub">외근 참여율과 편중도를 함께 반영</div></div><div class="operRiskGuide"><div class="operRiskGuideRow" data-mob-oper-guide="green">정상 <span class="guideToneGreen">안정</span></div><div class="operRiskGuideRow" data-mob-oper-guide="amber">주의 <span class="guideToneAmber">관찰</span></div><div class="operRiskGuideRow" data-mob-oper-guide="red">위험 <span class="guideToneRed">대응</span></div></div></div></div>
+    <div class="card" data-kpi-card="leave_deficiency"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button>
+      <div class="label">연차부족</div>
+      <div class="kpiCardFlex">
+        <div class="kpiCardMain">
+          <div class="riskScoreWrap">
+            <div id="kpiLeaveDef" class="value"></div>
+            <div id="kpiLeaveDefStatus" class="riskScoreStatus"></div>
+          </div>
+          <div id="kpiLeaveDefSub" class="sub riskCardSub">연차/반차 사용량과 부분 근무 비율 보정 기준</div>
+        </div>
+        <div class="riskMiniGuide">
+          <div class="riskMiniGuideRow" data-leave-def-guide="green">~39 <span class="guideToneGreen">정상</span></div>
+          <div class="riskMiniGuideRow" data-leave-def-guide="amber">40~69 <span class="guideToneAmber">주의</span></div>
+          <div class="riskMiniGuideRow" data-leave-def-guide="red">70↑ <span class="guideToneRed">위험</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" data-kpi-card="leave_risk"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button>
+      <div class="label">연차 리스크</div>
+      <div class="kpiCardFlex">
+        <div class="kpiCardMain">
+          <div class="riskScoreWrap">
+            <div id="kpiLeaveRisk" class="value"></div>
+            <div id="kpiLeaveRiskStatus" class="riskScoreStatus"></div>
+          </div>
+          <div id="kpiLeaveRiskSub" class="sub riskCardSub">미사용 인원과 사용 편중도를 함께 반영</div>
+        </div>
+        <div class="operRiskGuide">
+          <div class="operRiskGuideRow" data-leave-risk-guide="green">정상 <span class="guideToneGreen">안정</span></div>
+          <div class="operRiskGuideRow" data-leave-risk-guide="amber">주의 <span class="guideToneAmber">관찰</span></div>
+          <div class="operRiskGuideRow" data-leave-risk-guide="red">위험 <span class="guideToneRed">대응</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" data-kpi-card="retirement_risk"><button class="kpiDragHandle" type="button" aria-label="카드 이동">⋮⋮</button>
+      <div class="label">퇴직 리스크</div>
+      <div class="kpiCardFlex">
+        <div class="kpiCardMain">
+          <div class="riskScoreWrap">
+            <div id="kpiRetireRisk" class="value"></div>
+            <div id="kpiRetireRiskStatus" class="riskScoreStatus"></div>
+          </div>
+          <div id="kpiRetireRiskSub" class="sub riskCardSub">선택 기간 퇴사자와 퇴직사유 가중치 반영</div>
+        </div>
+        <div class="operRiskGuide">
+          <div class="operRiskGuideRow" data-retire-risk-guide="green">정상 <span class="guideToneGreen">안정</span></div>
+          <div class="operRiskGuideRow" data-retire-risk-guide="amber">주의 <span class="guideToneAmber">관찰</span></div>
+          <div class="operRiskGuideRow" data-retire-risk-guide="red">위험 <span class="guideToneRed">대응</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="summaryCards" class="gridAlerts"></div>
+  <div id="alertCards" class="gridAlerts"></div>
+
+
+  </div>
+
+</div>
+
+  <div id="main-deep-analysis" class="mainPanel">
+    <div class="card" style="margin-top:16px">
+      <div class="title">심층분석</div>
+      <div class="desc">핵심 추이, 분포, 레이더, 업무 부하 분석, 위험 조직, 위험지수 상위 담당자까지 심층 해석용 화면입니다. 업무 부하 비교는 실근무일수 기준으로 기본근무·연장근로·숨은초과·총부하를 함께 표시합니다.</div>
+    </div>
+
+
+  <div class="deepTopGrid">
+    <div class="deepLeftStack">
+      <div class="card compactCard">
+        <div id="pieTitle" class="title">본부 인원 분포</div>
+        <div id="pieLegend" class="legend"></div>
+        <div id="pieChart" class="chart small"></div>
+      </div>
+      <div class="card compactCard">
+        <div class="title">직급 분포</div>
+        <div class="legend"><span class="dot" style="background:var(--purple)"></span>인원 수</div>
+        <div id="gradeChart" class="chart small"></div>
+      </div>
+    </div>
+    <div class="card radarCenterCard">
+      <div class="radarHead">
+        <div>
+          <div class="title">조직 건강도 레이더</div>
+          <div class="desc">근태관리와 분리하여 재직 · 근태대상 Y · 휴직 제외 기준으로 계산합니다. 업무집중은 상위 20% 인원의 연장근로 비중 60%와 외근·출장 비중 40%를 합산해 산출합니다. 연차부족은 선택 기간 기준 연차/반차 사용량만을 바탕으로 계산하며, 공가·보건휴가·검진휴가 등 연차가 아닌 휴가는 제외합니다. 출산휴가·육아휴직·휴직으로 일부 기간만 근무한 경우 근무 비율만큼 기대 사용량을 낮춰 반영합니다.</div>
+        </div>
+        <div class="radarModeWrap">
+          <div id="radarModeLabel" class="radarModeLabel">피로도 기준: 실무추천</div>
+          <div class="radarModeTabs">
+            <button type="button" class="radarModeBtn active" data-fatigue-mode="recommended">실무추천</button>
+            <button type="button" class="radarModeBtn" data-fatigue-mode="concentration">집중도 강조</button>
+            <button type="button" class="radarModeBtn" data-fatigue-mode="leave">연차 강조</button>
+          </div>
+        </div>
+      </div>
+      <div class="legend"><span class="dot" style="background:var(--purple)"></span>선택 기간 기준</div>
+      <div id="radarChart" class="chart small"></div>
+      <div id="radarMetrics" class="radarMetricsGrid"></div>
+    </div>
+    <div class="card criteriaCard">
+      <div class="title">지표별 기준</div>
+      <div class="desc">레이더 5개 지표의 해석 기준입니다. 지표별 성격이 달라 동일 점수라도 주의·위험 구간을 다르게 적용합니다.</div>
+      <div class="criteriaGrid">
+        <div class="criteriaItem">
+          <div class="criteriaItemMain">
+            <div class="criteriaItemHead"><div class="criteriaItemTitle">피로도</div></div>
+            <div class="criteriaRule">총부하를 메인으로 숨은초과, 이슈, 회복부족, OT를 함께 반영한 현재 조직의 피로 체감 지표입니다.</div>
+          </div>
+          <div class="criteriaScale">
+            <div class="criteriaScaleRow green"><span class="labelTxt">정상</span><span class="rangeTxt">50 미만</span></div>
+            <div class="criteriaScaleRow amber"><span class="labelTxt">주의</span><span class="rangeTxt">50~74</span></div>
+            <div class="criteriaScaleRow red"><span class="labelTxt">위험</span><span class="rangeTxt">75 이상</span></div>
+          </div>
+        </div>
+        <div class="criteriaItem">
+          <div class="criteriaItemMain">
+            <div class="criteriaItemHead"><div class="criteriaItemTitle">업무집중</div></div>
+            <div class="criteriaRule">상위 집중 인원의 연장근로와 외근·출장 비중을 함께 봐서 특정 인원에게 일이 쏠리는 상태를 확인합니다.</div>
+          </div>
+          <div class="criteriaScale">
+            <div class="criteriaScaleRow green"><span class="labelTxt">정상</span><span class="rangeTxt">50 미만</span></div>
+            <div class="criteriaScaleRow amber"><span class="labelTxt">주의</span><span class="rangeTxt">50~69</span></div>
+            <div class="criteriaScaleRow red"><span class="labelTxt">위험</span><span class="rangeTxt">70 이상</span></div>
+          </div>
+        </div>
+        <div class="criteriaItem">
+          <div class="criteriaItemMain">
+            <div class="criteriaItemHead"><div class="criteriaItemTitle">직급불균형</div></div>
+            <div class="criteriaRule">직급 분포가 한쪽에 치우친 정도를 봅니다. 구조 지표라서 낮은 점수 범위에서도 경고가 의미 있습니다.</div>
+          </div>
+          <div class="criteriaScale">
+            <div class="criteriaScaleRow green"><span class="labelTxt">정상</span><span class="rangeTxt">40 미만</span></div>
+            <div class="criteriaScaleRow amber"><span class="labelTxt">주의</span><span class="rangeTxt">40~59</span></div>
+            <div class="criteriaScaleRow red"><span class="labelTxt">위험</span><span class="rangeTxt">60 이상</span></div>
+          </div>
+        </div>
+        <div class="criteriaItem">
+          <div class="criteriaItemMain">
+            <div class="criteriaItemHead"><div class="criteriaItemTitle">위험지수</div></div>
+            <div class="criteriaRule">개인별 복합 위험점수를 기반으로 평균, 상위 위험자, 고위험 비율까지 반영한 조직 경보 지표입니다.</div>
+          </div>
+          <div class="criteriaScale">
+            <div class="criteriaScaleRow green"><span class="labelTxt">정상</span><span class="rangeTxt">40 미만</span></div>
+            <div class="criteriaScaleRow amber"><span class="labelTxt">주의</span><span class="rangeTxt">40~59</span></div>
+            <div class="criteriaScaleRow red"><span class="labelTxt">위험</span><span class="rangeTxt">60 이상</span></div>
+          </div>
+        </div>
+        <div class="criteriaItem">
+          <div class="criteriaItemMain">
+            <div class="criteriaItemHead"><div class="criteriaItemTitle">연차부족</div></div>
+            <div class="criteriaRule">선택 기간 기준 연차·반차 사용 부족 수준입니다. 회복이 누적되지 못하는 조직 상태를 보여줍니다.</div>
+          </div>
+          <div class="criteriaScale">
+            <div class="criteriaScaleRow green"><span class="labelTxt">정상</span><span class="rangeTxt">50 미만</span></div>
+            <div class="criteriaScaleRow amber"><span class="labelTxt">주의</span><span class="rangeTxt">50~69</span></div>
+            <div class="criteriaScaleRow red"><span class="labelTxt">위험</span><span class="rangeTxt">70 이상</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="insight">업무 부하 분석</button>
+    <button class="tab" data-tab="overtime">연차사용 분석</button>
+    <button class="tab" data-tab="risk">위험 조직</button>
+    <button class="tab" data-tab="people">위험지수 상위 담당자</button>
+  </div>
+
+  <div id="panel-insight" class="panel active">
+    <div class="grid21">
+      <div class="card">
+        <div id="scopeTitle" class="title"></div>
+        <div id="scopeDesc" class="desc"></div>
+        <div class="legend">
+          <span class="dot" style="background:var(--blue)"></span>일평균 기본근무시간
+          <span class="dot" style="background:var(--red)"></span>일평균 연장근로시간
+          <span class="dot" style="background:var(--amber)"></span>일평균 숨은초과시간
+        </div>
+        <div id="scopeChart" class="chart" style="height:380px"></div>
+      </div>
+      <div class="card">
+        <div class="title">자동 인사이트</div>
+        <div id="insightList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="panel-overtime" class="panel">
+    <div class="card" style="margin-top:16px">
+      <div class="title">연차사용 분석</div>
+      <div class="desc">연장근로 관련 심층 기능을 별도 탭으로 확장하기 위한 영역입니다. 현재는 연차부족 원인 분석 기능을 이 탭으로 이동해 운영합니다.</div>
+      <div class="mini" style="margin-top:10px">추후 연장근로 사유, 팀별 편중, 장기 누적자 분석 같은 기능을 이 탭에 계속 확장할 수 있습니다.</div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="title">연차부족 원인 분석</div>
+      <div class="desc">위험 조직 점수 목록에서 본부나 팀을 선택하면, 선택 조직의 연차/반차 사용량과 미사용 인원 비율을 바로 확인할 수 있습니다. 공가·보건휴가·검진휴가 등 연차가 아닌 휴가는 연차부족 계산에서 제외하며, 출산휴가·육아휴직·휴직으로 일부 기간만 근무한 경우에는 근무비율만큼 기준 사용량을 자동 보정합니다.</div>
+      <div class="mini" style="margin-top:10px">
+        연차부족 기준: 연차/반차만 사용량으로 집계 · 공가/보건휴가/검진휴가/출장/교육은 근무일 포함 · 출산휴가/육아휴직/일반휴직은 제외
+      </div>
+      <div id="leaveCauseAnalysisCard" class="leaveCauseEmpty">위험 점수 목록에서 조직을 선택하세요.</div>
+    </div>
+  </div>
+
+  <div id="panel-risk" class="panel">
+    <div class="grid21">
+      <div class="card">
+        <div id="scoreTitle" class="title"></div>
+        <div id="scoreList"></div>
+      </div>
+      <div class="card">
+        <div class="title">조직 위험 해석</div>
+        <div id="riskInsightList"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="title">담당자 상태 분포</div>
+      <div class="desc">선택 기간 기준으로 위험지수 점수에 따라 위험 · 주의 · 정상 인원을 분류하고, 각 상태별 전체 인원을 모두 보여줍니다.</div>
+      <div id="statusCards" class="statusGrid"></div>
+    </div>
+  </div>
+
+  <div id="panel-people" class="panel">
+    <div class="card">
+      <div class="title">위험지수 상위 담당자</div>
+      <div class="desc">선택 기간 기준 위험 점수 순으로 전체 담당자를 모두 표시합니다. 위험지수와 함께 휴식지수를 같이 보여줘서, 과부하 속에서도 회복이 되고 있는지 해석할 수 있습니다.</div>
+      <div id="peopleList" class="scrollBox"></div>
+    </div>
+  </div>
+
+
+  </div>
+
+
+  <div id="main-trend-analysis" class="mainPanel">
+    <div class="card" style="margin-top:16px">
+      <div class="title">트렌드분석</div>
+      <div class="desc">현재 리스크를 먼저 진단하고, 이어서 월별 변화 흐름과 세부 KPI 근거를 확인하는 보고서형 화면입니다. 상단 기간 기준 버튼으로 해당년도 흐름과 최근 12개월 흐름을 전환할 수 있습니다.</div>
+      <div id="trendDataNotice" class="mini" style="margin-top:10px"></div>
+      <div class="reportActionBar">
+        <div class="reportActionText">현재 필터와 기간 기준을 반영해 보고서 창을 엽니다. 창 안에서 기존 저장본 불러오기와 새 보고서 재생성을 선택할 수 있습니다.</div>
+        <button id="attendanceReportOpenBtn" class="reportActionBtn" type="button">보고서 열기</button>
+      </div>
+    </div>
+
+    <div class="trendSummaryGrid" id="trendSummaryCards"></div>
+
+    <div class="trendGrid2">
+      <div class="card trendCard">
+        <div class="trendCardHead">
+          <div>
+            <div class="label" style="font-weight:800;color:#16a34a;margin-bottom:6px">STEP 1 · 현재 상태 판단</div>
+            <div class="title">1. 현재 리스크 진단</div>
+            <div class="desc">현재 조직의 리스크 분포를 한눈에 파악하고, 어떤 영역이 상대적으로 높은지 확인합니다. 기본은 현재월과 12개월 평균 비교입니다.</div>
+          </div>
+        </div>
+        <div id="trendRadarChecks" class="trendCheckGrid"></div>
+        <div id="trendRadarChart" class="trendRadarChart"></div>
+      </div>
+
+      <div class="card trendCard">
+        <div class="label" style="font-weight:800;color:#16a34a;margin-bottom:6px">해석 가이드</div>
+        <div class="title">리스크 지표 해석</div>
+        <div class="desc">값이 높을수록 관리 필요도가 높습니다. 현재 리스크 진단에서 튀는 항목을 우선 확인하세요.</div>
+        <div id="trendRadarCards" class="trendMetricCards"></div>
+      </div>
+    </div>
+
+    <div class="card trendCard">
+      <div class="trendCardHead">
+        <div>
+          <div class="label" style="font-weight:800;color:#16a34a;margin-bottom:6px">STEP 2 · 변화 흐름 확인</div>
+          <div class="title">2. 리스크 변화 흐름</div>
+          <div class="desc">연장근로, 외근, 업무집중, 운영, 휴식/연차 리스크가 월별로 어떻게 변하는지 확인합니다. 데이터가 3개월 이상 쌓이면 상승·완화 흐름을 판단하는 핵심 영역입니다.</div>
+        </div>
+        <div class="trendLegend compact">
+          <span><i style="background:#2563eb"></i>연장</span>
+          <span><i style="background:#0f766e"></i>외근</span>
+          <span><i style="background:#f59e0b"></i>집중</span>
+          <span><i style="background:#ef4444"></i>운영</span>
+          <span><i style="background:#7c3aed"></i>휴식</span>
+        </div>
+      </div>
+      <div id="trendRiskChart" class="trendChartLarge"></div>
+    </div>
+
+    <div class="card trendCard">
+      <div class="trendCardHead">
+        <div>
+          <div class="label" style="font-weight:800;color:#16a34a;margin-bottom:6px">STEP 3 · 세부 근거 확인</div>
+          <div class="title">3. 세부 KPI 분석</div>
+          <div class="desc">1인당 평균 연장근로시간, 위험 인원, 연차 미사용 인원 등 리스크를 구성하는 세부 지표를 수치 흐름으로 확인합니다.</div>
+        </div>
+        <div class="trendLegend">
+          <span><i style="background:#2563eb"></i>1인당 연장근로</span>
+          <span><i style="background:#ef4444"></i>위험 인원</span>
+          <span><i style="background:#7c3aed"></i>연차 미사용</span>
+        </div>
+      </div>
+      <div id="trendKpiChart" class="trendChartLarge"></div>
+    </div>
+
+    <div class="card trendCard">
+      <div class="trendCardHead">
+        <div>
+          <div class="label" style="font-weight:800;color:#16a34a;margin-bottom:6px">STEP 4 · 사람별 위험 흐름 확인</div>
+          <div class="title">4. 위험지수 상위 담당자</div>
+          <div class="desc">선택한 월 기준으로 위험지수가 높은 담당자를 정렬하고, 기간 기준에 따라 각 담당자의 월별 상태와 점수 흐름을 확인합니다.</div>
+        </div>
+        <div class="trendLegend compact">
+          <span><i style="background:#ef4444"></i>위험</span>
+          <span><i style="background:#f59e0b"></i>주의</span>
+          <span><i style="background:#16a34a"></i>정상</span>
+        </div>
+      </div>
+      <div id="trendTopPeopleTable"></div>
+    </div>
+  </div>
+
+
+  <div id="main-hiring-report" class="mainPanel">
+    <div class="card" style="margin-top:16px">
+      <div class="title">충원 검토 보고서</div>
+      <div class="desc">퇴사/퇴사예정, 신규 프로젝트, 업무 증가 등 충원 사유와 현재 근태 데이터를 함께 전달해 AI가 충원 검토 보고서를 생성합니다. 동일 데이터와 동일 입력값이면 서버에 저장된 보고서를 다시 불러옵니다.</div>
+      <div class="reportActionBar">
+        <div class="reportActionText">충원 사유와 검토 내용을 입력한 뒤 충원 보고서 생성/조회 버튼을 누르세요. 퇴사자는 이름 또는 사번으로 검색할 수 있고, 퇴직 상태가 아니어도 퇴사 예정자로 선택 가능합니다.</div>
+        <button id="hiringReportOpenBtn" class="reportActionBtn" type="button">충원 보고서 생성/조회</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="title">충원 검토 입력</div>
+      <div class="desc">AI가 판단할 수 있도록 최소한의 사유와 필요 시점을 입력합니다. 근태 데이터는 현재 선택된 본부/팀/기간 필터를 함께 반영합니다.</div>
+      <div class="aiHiringGrid">
+        <label><span>충원 사유</span><select id="hiringReason"><option value="퇴사/퇴사 예정">퇴사/퇴사 예정</option><option value="신규 프로젝트">신규 프로젝트</option><option value="업무 증가">업무 증가</option><option value="조직 개편">조직 개편</option><option value="기타">기타</option></select></label>
+        <label><span>충원 요청 인원</span><input id="hiringCount" type="number" min="1" value="1"></label>
+        <label><span>필요 시점</span><input id="hiringNeededDate" type="date"></label>
+        <label><span>업무 공백 영향도</span><select id="hiringImpact"><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select></label>
+        <label><span>퇴사/이탈 대상자 검색</span><input id="hiringEmployeeSearch" type="text" placeholder="이름 또는 사번 입력"></label>
+        <label><span>선택 대상자</span><select id="hiringEmployeeSelect"><option value="">선택 안 함</option></select></label>
+        <label class="full"><span>상세 사유 / 프로젝트 내용</span><textarea id="hiringDetail" rows="5" placeholder="예: 5월 신규 프로젝트 투입, 퇴사 예정자 업무 공백, 업무 재배분만으로 대응 어려운 사유 등"></textarea></label>
+      </div>
+      <div id="hiringSelectedInfo" class="mini" style="margin-top:12px">퇴사/이탈 대상자를 선택하면 사번, 본부, 팀, 직급, 퇴사예정일 정보가 표시됩니다.</div>
+    </div>
+  </div>
+
+  <div id="main-attendance-missing" class="mainPanel">
+    <div class="card" style="margin-top:16px">
+      <div class="title">출퇴근 누락 분석</div>
+      <div class="desc">기존 근태관리·분석대시보드·심층분석과 별도로, 확정 출근/퇴근 누락과 화면상 출근·퇴근 시간이 비어 보이는 잠재 확인 필요 건을 담당자 기준으로 분리 집계하는 전용 화면입니다. 0건 담당자도 표시하며, 출산휴가·육아휴직·휴직 등 연속 휴직성 인원은 자동 제외합니다.</div>
+      <div class="attLegend">
+        <span class="dot" style="background:#16a34a"></span>정상 0~1건
+        <span class="dot" style="background:#d97706"></span>주의 2~3건
+        <span class="dot" style="background:#ef4444"></span>문제 4건 이상
+      </div>
+    </div>
+
+    <div id="attendanceMissingSummary" class="missingSummaryGrid"></div>
+
+    <div class="missingMiniGrid">
+      <div class="missingMiniCard">
+        <div class="missingMiniTitle">누락 상위 담당자 TOP 5</div>
+        <div id="attendanceMissingTop5"></div>
+      </div>
+      <div class="missingMiniCard">
+        <div class="missingMiniTitle">집계 기준</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <span class="badge green">정상 0~1건</span>
+          <span class="badge amber">주의 2~3건</span>
+          <span class="badge red">문제 4건 이상</span>
+        </div>
+        <div class="desc" style="margin-bottom:0">총누락은 출근누락+퇴근누락의 확정 건만 포함합니다. 잠재출근/잠재퇴근은 근태관리 표에서 출근·퇴근 시간이 비어 보이는 확인 필요 건이며, 상태 판정과 순위에는 포함하지 않습니다.</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="title">담당자별 누락 현황
+<div style="margin:10px 0; padding:10px; background:#f5f7fa; border-radius:8px; font-size:13px; color:#555;">
+※ 출산휴가·육아휴직·휴직 등 연속 휴직성 인원은 자동 제외되며, 누락 0건 담당자도 현황에 포함됩니다.
+</div>
+</div>
+      <div class="desc">총누락 기준 내림차순으로 정렬됩니다. 누락 0건 담당자도 함께 표시합니다. 잠재출근/잠재퇴근은 참고용 확인 필요 건으로 별도 표시하며, 출근·퇴근 칸이 비어 보이는 건을 화면 기준 그대로 집계합니다.</div>
+      <div class="attTableWrap" style="max-height:none">
+        <table class="attTable missingTable" style="min-width:1280px;font-size:14px">
+          <thead>
+            <tr>
+              <th style="width:72px">순위</th>
+              <th>담당자</th>
+              <th>본부</th>
+              <th>팀</th>
+              <th>출근누락</th>
+              <th>퇴근누락</th>
+              <th>총 누락</th>
+              <th>잠재출근</th>
+              <th>잠재퇴근</th>
+              <th>상태</th>
+            </tr>
+          </thead>
+          <tbody id="attendanceMissingTbody"></tbody>
+        </table>
+        <div id="attendanceMissingEmpty" class="employeeEmpty" style="display:none;">출퇴근 누락 현황이 없습니다.</div>
+      </div>
+    </div>
+  </div>
+
+<div id="main-admin" class="mainPanel" data-admin-hidden="Y" aria-hidden="true">
+  <div class="adminFeatureTabs" role="tablist" aria-label="관리자 기능 탭">
+    <button type="button" class="adminFeatureTab active" data-admin-feature="upload">데이터 업로드</button>
+    <button type="button" class="adminFeatureTab" data-admin-feature="access">접근권한 설정</button>
+  </div>
+  <div id="adminFeatureUploadPanel" class="adminFeaturePanel active">
+  <div class="adminUploadLayout">
+    <div>
+      <div class="card">
+        <div class="title">관리자 전용 데이터 업로드</div>
+        <div class="desc">월별 누적 운영 기준입니다. 세콤DB와 ERP 근태 파일을 각각 선택하면 파일 날짜를 읽어 업로드 년월을 자동 감지합니다. 담당자가 년월을 확인한 뒤 상단의 [업로드 실행] 버튼으로 반영합니다.</div>
+        <div class="uploadBox">
+          <div style="font-size:36px">📁</div>
+          <div style="margin:8px 0 14px">조직·사원·팀변경·특이사항 기준정보는 포털 설정에서만 관리합니다. 세콤DB와 ERP 파일을 각각 선택한 뒤 감지된 년월을 확인하고 업로드를 실행하세요.</div>
+          <div style="display:grid;gap:12px;max-width:860px;margin:0 auto">
+            <div class="mini" style="text-align:left">
+              <strong>세콤DB 업로드</strong>
+              <div class="label" style="margin:6px 0 8px">출퇴근 시간, 실제근무시간이 들어있는 파일</div>
+              <input id="secomUploadInput" type="file" accept=".xlsx,.xls" style="width:100%">
+            </div>
+            <div class="mini" style="text-align:left">
+              <strong>ERP 근태 업로드</strong>
+              <div class="label" style="margin:6px 0 8px">근태구분 + 연장신청/실제연장 시간이 들어있는 파일</div>
+              <input id="erpUploadInput" type="file" accept=".xlsx,.xls" style="width:100%">
+            </div>
+            <div class="mini" style="text-align:left;background:#f8fafc">
+              <strong>업로드 기준월 확인</strong>
+              <div class="label" style="margin:6px 0 8px">파일을 선택하면 감지된 년월이 자동 입력됩니다. 필요 시 담당자가 수정한 뒤 업로드하세요.</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <span class="adminMute">감지된 년월</span>
+                <strong id="detectedUploadMonth" style="min-width:120px">-</strong>
+                <select id="uploadTargetYear" class="adminYearSelect" style="min-width:110px"></select>
+                <select id="uploadTargetMonth" class="adminYearSelect" style="min-width:90px">
+                  <option value="01">01월</option><option value="02">02월</option><option value="03">03월</option><option value="04">04월</option>
+                  <option value="05">05월</option><option value="06">06월</option><option value="07">07월</option><option value="08">08월</option>
+                  <option value="09">09월</option><option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+                </select>
+                <span id="uploadMonthCheckMessage" class="adminMute">파일을 선택해주세요.</span>
+              </div>
+            </div>
+            <div class="filters" style="justify-content:center">
+              <button id="applyUploadBtn" type="button" class="adminActionBtn primary">업로드 실행</button>
+              <button id="clearUploadBtn" type="button">업로드 데이터 비우기</button>
+            </div>
+          </div>
+        </div>
+        <div style="display:grid;gap:10px;margin-top:14px">
+          <div class="uploadItem"><strong>현재 반영 상태</strong><div id="uploadStatusLabel" class="label">업로드된 근태 데이터가 없습니다. 파일을 직접 올려서 반영하세요.</div><div class="progress"><div id="uploadStatusBar" style="width:0%"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="adminYearBar">
+          <div>
+            <div class="title">연도별 업로드 현황</div>
+            <div class="desc">선택한 연도의 1~12월 업로드 상태를 한눈에 확인합니다. 업로드는 상단에서 실행하고, 월카드는 결과 확인과 삭제에 사용합니다.</div>
+          </div>
+          <div class="adminYearControls">
+            <select id="adminUploadYear" class="adminYearSelect"></select>
+            <input id="adminAddYearInput" class="adminYearInput" type="number" min="2000" max="2099" placeholder="연도추가">
+            <button id="adminAddYearBtn" class="adminActionBtn" type="button">추가</button>
+            <button id="adminRefreshBtn" class="adminActionBtn primary" type="button">조회</button>
+          </div>
+        </div>
+        <div id="adminUploadYearSummary" class="adminSummaryPills"></div>
+        <div id="adminUploadMonthGrid" class="adminMonthGrid" style="margin-top:14px"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="title">업로드 배치 이력</div>
+        <div class="desc">선택한 연도 기준으로 최근 배치를 확인합니다. 잘못 업로드한 경우 배치 단위 삭제를 사용할 수 있습니다.</div>
+        <div class="adminHistoryTableWrap" style="margin-top:12px">
+          <table class="adminHistoryTable">
+            <thead>
+              <tr>
+                <th style="width:110px">기준월</th>
+                <th style="width:170px">업로드일시</th>
+                <th>ERP 파일</th>
+                <th>세콤 파일</th>
+                <th style="width:90px">ERP 건수</th>
+                <th style="width:90px">세콤 건수</th>
+                <th style="width:210px">Batch ID</th>
+                <th style="width:96px">관리</th>
+              </tr>
+            </thead>
+            <tbody id="adminBatchHistoryBody"></tbody>
+          </table>
+          <div id="adminBatchHistoryEmpty" class="adminHistoryEmpty" style="display:none;">선택한 연도의 업로드 이력이 없습니다.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  </div>
+
+  <div id="adminFeatureAccessPanel" class="adminFeaturePanel" aria-hidden="true">
+    <div class="card">
+      <div class="title">자동 권한 현황</div>
+      <div class="desc">사원정보를 기준으로 자동 판별되는 관리자/소장·본부장/담당/팀장 목록입니다. 이 표는 읽기 전용이며, 실제 접근제한은 다음 단계에서 연결합니다.</div>
+      <div class="accessAutoSummary">
+        <div class="accessAutoCard"><div class="k">관리자</div><div id="accessAdminCount" class="v">0</div></div>
+        <div class="accessAutoCard"><div class="k">소장/본부장</div><div id="accessDirectorCount" class="v">0</div></div>
+        <div class="accessAutoCard"><div class="k">담당</div><div id="accessManagerCount" class="v">0</div></div>
+        <div class="accessAutoCard"><div class="k">팀장</div><div id="accessLeaderCount" class="v">0</div></div>
+        <div class="accessAutoCard"><div class="k">운영자</div><div id="accessOperatorCount" class="v">0</div></div>
+      </div>
+      <div class="accessTableWrap">
+        <table class="accessTable">
+          <thead>
+            <tr>
+              <th style="width:120px">자동 권한</th>
+              <th style="width:100px">이름</th>
+              <th style="width:110px">사번</th>
+              <th>본부</th>
+              <th>팀</th>
+              <th style="width:100px">직책</th>
+              <th>기준값</th>
+            </tr>
+          </thead>
+          <tbody id="accessAutoTbody">
+            <tr><td colspan="7" class="accessEmpty">사원정보를 불러오는 중입니다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="title">운영자 설정</div>
+      <div class="desc">운영자를 사번·이름·이메일로 검색해 지정/해제합니다. 저장값은 서버(attendance_operators)에 즉시 반영됩니다.</div>
+      <div class="accessSearchBox">
+        <div class="accessSearchRow">
+          <div class="field">
+            <label>권한 대상자 검색</label>
+            <input id="accessOperatorKeyword" class="filterInput" type="text" placeholder="예: 100123 또는 홍길동 또는 email@company.com">
+          </div>
+          <button id="accessOperatorSearchBtn" type="button" class="adminActionBtn primary">사원 검색</button>
+          <button id="accessOperatorRefreshBtn" type="button" class="adminActionBtn">권한 새로고침</button>
+        </div>
+        <div class="sub" style="margin-top:8px">검색 후 운영자 지정 버튼을 누르면 서버에 저장됩니다.</div>
+      </div>
+
+      <div class="accessOperatorSectionTitle">검색 결과</div>
+      <div class="accessTableWrap">
+        <table class="accessTable">
+          <thead>
+            <tr>
+              <th style="width:110px">작업</th>
+              <th style="width:120px">이름</th>
+              <th style="width:110px">사번</th>
+              <th>본부</th>
+              <th>팀</th>
+              <th style="width:100px">직책</th>
+              <th style="width:120px">상태</th>
+            </tr>
+          </thead>
+          <tbody id="accessOperatorResultTbody">
+            <tr><td colspan="7" class="accessEmpty">검색어를 입력한 뒤 사원 검색을 눌러주세요.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="accessOperatorSectionTitle">현재 운영자 목록</div>
+      <div class="accessTableWrap">
+        <table class="accessTable">
+          <thead>
+            <tr>
+              <th style="width:110px">작업</th>
+              <th style="width:120px">이름</th>
+              <th style="width:110px">사번</th>
+              <th>본부</th>
+              <th>팀</th>
+              <th style="width:100px">직책</th>
+              <th style="width:120px">상태</th>
+            </tr>
+          </thead>
+          <tbody id="accessCurrentOperatorTbody">
+            <tr><td colspan="7" class="accessEmpty">현재 지정된 운영자가 없습니다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="accessActionBar">
+        <span id="accessSaveMsg" class="accessSaveMsg">반영되었습니다.</span>
+      </div>
+    </div>
+
+    </div>
+  </div>
+</div>
+    </div>
+  </div>
+
+<div id="empModalBg" class="modalBg">
+  <div class="modalCard">
+    <div id="empModalTitle" style="font-size:24px;font-weight:800;margin-bottom:14px;">사원 추가</div>
+    <div class="modalGrid">
+      <div class="modalRow">
+        <label for="mEmpId">사번 *</label>
+        <input id="mEmpId" type="text" placeholder="예: E001">
+      </div>
+      <div class="modalRow">
+        <label for="mEmpName">이름 *</label>
+        <input id="mEmpName" type="text" placeholder="예: 김민수">
+      </div>
+      <div class="modalRow">
+        <label for="mEmpDivision">본부 *</label>
+        <select id="mEmpDivision"></select>
+      </div>
+      <div class="modalRow">
+        <label for="mEmpTeam">팀 *</label>
+        <select id="mEmpTeam"></select>
+      </div>
+      <div class="modalRow">
+        <label for="mEmpSortOrder">순번</label>
+        <input id="mEmpSortOrder" type="number" min="0" step="1" placeholder="예: 10">
+      </div>
+      <div class="modalRow">
+        <label for="mEmpGrade">직급 *</label>
+        <select id="mEmpGrade">
+          <option value="">선택</option>
+          <option>사원</option>
+          <option>주임</option>
+          <option>대리</option>
+          <option>과장</option>
+          <option>차장</option>
+          <option>부장</option>
+          <option>이사부장</option>
+        </select>
+      </div>
+      <div class="modalRow">
+        <label for="mEmpAuthority">직책 *</label>
+        <select id="mEmpAuthority">
+          <option value="">선택</option>
+          <option>소장</option>
+          <option>담당</option>
+          <option>팀장</option>
+          <option>팀원</option>
+        </select>
+      </div>
+      <div class="modalRow full">
+        <label for="mEmpManagedTeams">관리팀코드</label>
+        <input id="mEmpManagedTeams" type="text" placeholder="예: AC01-02 또는 AC01-02,AC01-03">
+        <div class="label" style="margin-top:6px">담당이 여러 팀을 볼 때만 쉼표로 입력합니다. 지금은 비워두면 자기 팀코드가 자동으로 들어갑니다.</div>
+      </div>
+      <div class="modalRow">
+        <label for="mEmpAttendanceTarget">근태대상 *</label>
+        <select id="mEmpAttendanceTarget">
+          <option value="Y">Y</option>
+          <option value="N">N</option>
+        </select>
+      </div>
+      <div class="modalRow">
+        <label for="mEmpStatus">상태 *</label>
+        <select id="mEmpStatus">
+          <option>재직</option>
+          <option>퇴사</option>
+        </select>
+      </div>
+      <div class="modalRow">
+        <label for="mJoinDate">입사일 *</label>
+        <input id="mJoinDate" type="date">
+      </div>
+      <div class="modalRow full">
+        <label for="mLeaveDate">퇴사일</label>
+        <input id="mLeaveDate" type="date">
+      </div>
+      <div class="modalRow full">
+        <label for="mRetireReason">퇴직사유</label>
+        <select id="mRetireReason">
+          <option value="">선택</option>
+          <option>자발적 이직</option>
+          <option>개인사유</option>
+          <option>권고퇴직</option>
+          <option>계약만료</option>
+          <option>정년퇴직</option>
+          <option>기타</option>
+        </select>
+      </div>
+      <div class="modalRow full">
+        <label for="mEmpEmail">이메일</label>
+        <input id="mEmpEmail" type="email" placeholder="예: user@scd.co.kr">
+      </div>
+      <div class="modalRow full">
+        <label for="mEmpMemo">비고</label>
+        <input id="mEmpMemo" type="text" placeholder="예: 부장대우는 부장으로 통합 표기">
+      </div>
+    </div>
+    <div class="desc" style="margin-top:10px">사번은 중복될 수 없습니다. 퇴사자는 삭제하지 않고 상태를 변경해 관리합니다.</div>
+    <div class="modalActions">
+      <button id="empModalClose">닫기</button>
+      <button id="empModalSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+
+
+
+
+
+<div id="attendanceReportModal" class="reportModalBg" aria-hidden="true">
+  <div class="reportModal">
+    <div class="reportModalTop">
+      <div><div id="attendanceReportModalTitle" class="reportModalTitle">근태 분석 보고서</div><div id="attendanceReportModalDesc" class="reportModalDesc">월별 진단과 트렌드 분석 데이터를 기반으로 보고서를 불러오거나 다시 생성합니다.</div></div>
+      <div class="reportModalActions"><button id="attendanceReportLoadBtn" class="reportSmallBtn" type="button">기존 보고서 불러오기</button><button id="attendanceReportRegenerateBtn" class="reportSmallBtn primary" type="button">보고서 다시 생성</button><button id="attendanceReportPrintBtn" class="reportSmallBtn" type="button">PDF/인쇄</button><button id="attendanceReportCloseBtn" class="reportSmallBtn danger" type="button">닫기</button></div>
+    </div>
+    <div class="reportSettings"><span id="attendanceReportModeLabel" class="reportModePill" style="cursor:default">보고서</span><span class="reportModePill" style="cursor:default">기존 보고서 불러오기: 서버 저장본 조회</span><span class="reportModePill" style="cursor:default">보고서 다시 생성: 최신 양식으로 강제 생성</span></div>
+    <div id="attendanceReportStatus" class="reportAiStatus">보고서 요청 대기 중입니다.</div>
+    <div id="attendanceAdditionalDataPanel" class="reportAdditionalPanel" aria-hidden="true"></div>
+    <div class="reportPreviewWrap"><div id="attendanceReportPreview" class="attReportDoc fixedReportDoc"></div></div>
+  </div>
+</div>
+
+
+</div>
+
+
+
+
+
+
+<script src="./js/attendance.js"></script>
+</body>
+</html>
