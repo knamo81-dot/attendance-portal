@@ -66,7 +66,14 @@
     }, '*');
   }
 
+  function isReportModalOpen() {
+    var modal = document.getElementById('attendanceReportModal');
+    return !!(modal && (modal.classList.contains('show') || modal.getAttribute('aria-hidden') === 'false'));
+  }
+
   function renderCurrentTab(tabId) {
+    if (isReportModalOpen()) return;
+
     const id = normalizeTabId(tabId);
 
     try {
@@ -290,7 +297,7 @@
       if (typeof window.render === 'function') window.render();
     } catch (_) {}
 
-    renderCurrentTab(getActiveTabId());
+    if (!isReportModalOpen()) renderCurrentTab(getActiveTabId());
 
     setTimeout(postFilters, 150);
   }
