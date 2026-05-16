@@ -17,6 +17,29 @@
 
 <script src="./js/portal-home-url-email-helper.js"></script>
 
+
+<style id="portal-home-embedded-tab-hide">
+/* 포탈 공통 버튼 사용 시 내부 업무 탭은 숨기고 공간도 제거 */
+.workspace-tabs{
+  display:none !important;
+  height:0 !important;
+  min-height:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  overflow:hidden !important;
+}
+
+/* 내부 탭이 사라진 만큼 본문을 위로 붙임 */
+#home-page.home-root{
+  padding-top:0 !important;
+}
+
+#tab-content.content{
+  margin-top:0 !important;
+}
+</style>
+
 </head>
 <body class="auth-loading">
 
