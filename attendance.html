@@ -16419,7 +16419,7 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
         return '';
       }).filter(Boolean))).sort();
 
-      return [{ value: '전체', label: '전체' }].concat(values.map(function (v) {
+      return [{ value: '', label: '전체' }].concat(values.map(function (v) {
         return { value: v, label: v };
       }));
     } catch (_) {
@@ -16446,14 +16446,14 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
         id: 'division',
         label: '본부',
         type: 'select',
-        value: els.division ? els.division.value : (window.STATE?.division || '전체'),
+        value: els.division ? els.division.value : (window.STATE?.division || ''),
         options: divisionOptions.length ? divisionOptions : fallbackOptions('division')
       },
       {
         id: 'team',
         label: '팀',
         type: 'select',
-        value: els.team ? els.team.value : (window.STATE?.team || '전체'),
+        value: els.team ? els.team.value : (window.STATE?.team || ''),
         options: teamOptions.length ? teamOptions : fallbackOptions('team')
       }
     ].filter(function (filter) {
@@ -16495,7 +16495,7 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
       ? 'division'
       : (id === 'team' || id.includes('team') ? 'team' : 'period');
 
-    const nextValue = value || (kind === 'period' ? '' : '전체');
+    const nextValue = String(value ?? '');
 
     try {
       if (window.STATE) window.STATE[kind] = nextValue;
