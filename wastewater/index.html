@@ -1093,11 +1093,179 @@ table {
   }
 }
 
+
+/* ===== Portal Common Tabs Bridge: Wastewater ===== */
+/* 포탈 공통 버튼을 사용하므로 폐수 내부 탭 버튼은 숨기되 DOM은 유지 */
+.tabs-wrap,
+.tabs,
+.tabs-main{
+  display:none !important;
+  height:0 !important;
+  min-height:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  overflow:hidden !important;
+}
+
+/* 내부 탭이 사라진 공간만큼 본문을 위로 붙임 */
+.tab-panel.active{
+  margin-top:0 !important;
+}
+
+.app-shell{
+  padding-top:0 !important;
+}
+
+.stats{
+  margin-top:0 !important;
+}
+
 </style>
 </head>
 <body>
 <div id="app"></div>
 <script src="./api.js"></script>
 <script src="./app.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  const WASTEWATER_PORTAL_TABS = [
+    { id: 'daily', label: '일일입력', keywords: ['일일', '입력'] },
+    { id: 'collect', label: '수거등록', keywords: ['수거', '등록'] },
+    { id: 'ledger', label: '운영일지', keywords: ['운영일지'] },
+    { id: 'materials', label: '관련자료', keywords: ['관련자료', '운영 관련자료', '자료'] },
+    { id: 'docs', label: '관련서류', keywords: ['관련서류', '서류'] }
+  ];
+
+  function getButtonText(el) {
+    return String(el && el.textContent ? el.textContent : '').replace(/\s+/g, '').trim();
+  }
+
+  function getTabButtons() {
+    return Array.from(document.querySelectorAll('.tabs-wrap .tab-btn, .tabs-main .tab-btn, .tabs .tab-btn, .tab-btn'));
+  }
+
+  function findInnerTabButton(tabId) {
+    const tab = WASTEWATER_PORTAL_TABS.find(function (item) { return item.id === tabId; });
+    if (!tab) return null;
+
+    const buttons = getTabButtons();
+
+    let found = buttons.find(function (btn) {
+      const dataTab = btn.getAttribute('data-tab') || btn.getAttribute('data-target') || btn.dataset.tab || '';
+      return dataTab === tabId;
+    });
+
+    if (found) return found;
+
+    found = buttons.find(function (btn) {
+      const text = getButtonText(btn);
+      return tab.keywords.some(function (keyword) {
+        return text.includes(String(keyword).replace(/\s+/g, ''));
+      });
+    });
+
+    return found || null;
+  }
+
+  function getActiveTabId() {
+    const activeButton = getTabButtons().find(function (btn) {
+      return btn.classList.contains('active');
+    });
+
+    if (!activeButton) return WASTEWATER_PORTAL_TABS[0].id;
+
+    const dataTab = activeButton.getAttribute('data-tab') || activeButton.getAttribute('data-target') || activeButton.dataset.tab || '';
+    if (dataTab) return dataTab;
+
+    const text = getButtonText(activeButton);
+    const found = WASTEWATER_PORTAL_TABS.find(function (tab) {
+      return tab.keywords.some(function (keyword) {
+        return text.includes(String(keyword).replace(/\s+/g, ''));
+      });
+    });
+
+    return found ? found.id : WASTEWATER_PORTAL_TABS[0].id;
+  }
+
+  function notifyPortalTabs() {
+    if (!window.parent || window.parent === window) return;
+
+    window.parent.postMessage({
+      type: 'portal-tabs-ready',
+      tabs: WASTEWATER_PORTAL_TABS.map(function (tab) {
+        return { id: tab.id, label: tab.label };
+      }),
+      activeTabId: getActiveTabId(),
+      source: 'wastewater'
+    }, '*');
+  }
+
+  function notifyPortalActiveTab(tabId) {
+    if (!window.parent || window.parent === window || !tabId) return;
+
+    window.parent.postMessage({
+      type: 'portal-tab-active',
+      activeTabId: tabId,
+      tabId: tabId,
+      source: 'wastewater'
+    }, '*');
+  }
+
+  function activateWastewaterTab(tabId) {
+    const target = findInnerTabButton(tabId);
+    if (!target) return false;
+
+    target.click();
+    notifyPortalActiveTab(tabId);
+    return true;
+  }
+
+  window.portalTabs = WASTEWATER_PORTAL_TABS.map(function (tab) {
+    return { id: tab.id, label: tab.label };
+  });
+  window.portalActivateTab = activateWastewaterTab;
+
+  window.addEventListener('message', function (event) {
+    const payload = event && event.data ? event.data : {};
+
+    if (payload.type === 'portal-tabs-request') {
+      notifyPortalTabs();
+      return;
+    }
+
+    if (payload.type === 'portal-tab-change') {
+      const tabId = payload.tabId || payload.tab || '';
+      activateWastewaterTab(tabId);
+    }
+  });
+
+  document.addEventListener('click', function (event) {
+    const btn = event.target && event.target.closest
+      ? event.target.closest('.tab-btn')
+      : null;
+
+    if (!btn) return;
+
+    setTimeout(function () {
+      notifyPortalActiveTab(getActiveTabId());
+    }, 0);
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', notifyPortalTabs);
+  } else {
+    notifyPortalTabs();
+  }
+
+  setTimeout(notifyPortalTabs, 300);
+  setTimeout(notifyPortalTabs, 900);
+  setTimeout(notifyPortalTabs, 1600);
+})();
+</script>
+
 </body>
 </html>
