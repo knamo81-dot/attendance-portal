@@ -113,7 +113,7 @@
       height: calc(100vh - 20px);
       overflow: hidden;
       display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-rows: auto auto minmax(0, 1fr);
       gap: 10px;
     }
 
@@ -695,6 +695,70 @@ body:not(.service-admin-enabled) .service-admin-btn{
 }
 
 
+
+/* ===== Portal Common Function Tabs ===== */
+.portal-subtabs-wrap{
+  width:100%;
+  min-height:0;
+  display:none;
+}
+
+.portal-subtabs-wrap.show{
+  display:block;
+}
+
+.portal-subtabs{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  width:100%;
+  padding:0;
+}
+
+.portal-subtab{
+  flex:1 1 0;
+  min-width:0;
+  height:38px;
+  border-radius:13px;
+  border:1px solid #dbe3ec;
+  background:#ffffff;
+  color:#334155;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:-0.03em;
+  cursor:pointer;
+  box-shadow:0 3px 10px rgba(15,23,42,.035);
+  transition:background .16s ease, color .16s ease, border-color .16s ease, box-shadow .16s ease;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  padding:0 10px;
+}
+
+.portal-subtab:hover{
+  border-color:var(--current-header-accent);
+  color:var(--current-header-accent);
+}
+
+.portal-subtab.active{
+  background:var(--current-header-accent);
+  border-color:var(--current-header-accent);
+  color:#ffffff;
+  box-shadow:0 6px 16px rgba(15,23,42,.12);
+}
+
+@media (max-width: 900px){
+  .portal-subtabs{
+    overflow-x:auto;
+    padding-bottom:2px;
+  }
+
+  .portal-subtab{
+    flex:0 0 auto;
+    min-width:118px;
+  }
+}
+
 /* ===== Logout Confirm Modal ===== */
 .logout-confirm-overlay{
   position:fixed;
@@ -828,6 +892,9 @@ body:not(.service-admin-enabled) .service-admin-btn{
             <div class="header-powered">powered by ExeloLab Ops</div>
           </div>
         </div>
+        <div id="portalSubtabsWrap" class="portal-subtabs-wrap" aria-label="프로그램 기능 버튼">
+          <div id="portalSubtabs" class="portal-subtabs"></div>
+        </div>
         <iframe id="portalFrame" title="포털 본문" src="portal-main/portal-main.html"></iframe>
       </div>
     </div>
@@ -915,6 +982,8 @@ body:not(.service-admin-enabled) .service-admin-btn{
     topUserBar: document.getElementById('topUserBar'),
     userChip: document.getElementById('userChip'),
     serviceAdminBtn: document.getElementById('serviceAdminBtn'),
+    portalSubtabsWrap: document.getElementById('portalSubtabsWrap'),
+    portalSubtabs: document.getElementById('portalSubtabs'),
     logoutConfirmOverlay: document.getElementById('logoutConfirmOverlay'),
     logoutConfirmBtn: document.getElementById('logoutConfirmBtn'),
     logoutCancelBtn: document.getElementById('logoutCancelBtn')
@@ -1068,8 +1137,119 @@ body:not(.service-admin-enabled) .service-admin-btn{
     },
   };
 
+  const portalDefaultTabs = {
+    'portal-main/portal-main.html': [],
+    'portal-home/portal-home.html': [
+      { id: 'memo', label: '메모' },
+      { id: 'schedule', label: '일정/예약' }
+    ],
+    'wastewater/index.html': [
+      { id: 'daily', label: '일일입력' },
+      { id: 'collect', label: '수거등록' },
+      { id: 'ledger', label: '운영일지' },
+      { id: 'materials', label: '관련자료' },
+      { id: 'docs', label: '관련서류' }
+    ],
+    'attendance.html': [
+      { id: 'attendance', label: '근태관리' },
+      { id: 'dashboard', label: '분석대시보드' },
+      { id: 'deep', label: '심층분석' },
+      { id: 'trend', label: '트렌드분석' },
+      { id: 'missing', label: '출퇴근 누락 분석' }
+    ],
+    'research-staff/index.html': [
+      { id: 'main', label: '메인 대시보드' },
+      { id: 'analysis', label: '현황분석' },
+      { id: 'list', label: '운영인력 리스트' }
+    ],
+    'reagent/index.html': [
+      { id: 'request', label: '제품신청' },
+      { id: 'collect', label: '제품취합' },
+      { id: 'summary', label: '취합정리' },
+      { id: 'products', label: '제품관리' }
+    ],
+    'settings.html': [
+      { id: 'org', label: '조직관리' },
+      { id: 'employee', label: '사원정보관리' },
+      { id: 'team', label: '팀변경관리' },
+      { id: 'issue', label: '특이사항관리' },
+      { id: 'resPlaces', label: '예약장소설정' },
+      { id: 'permission', label: '권한관리' },
+      { id: 'portal', label: '포탈설정' }
+    ],
+    'service-admin/service-admin.html': []
+  };
+
+  let currentPortalTabs = [];
+  let currentPortalTabId = '';
+
+
   function normalizePortalSrc(src) {
     return String(src || '').split('?')[0];
+  }
+
+  function normalizePortalTabs(tabs) {
+    if (!Array.isArray(tabs)) return [];
+    return tabs.map(function (tab, index) {
+      if (typeof tab === 'string') return { id: 'tab_' + index, label: tab };
+      return {
+        id: String(tab.id || tab.key || tab.value || ('tab_' + index)),
+        label: String(tab.label || tab.name || tab.title || tab.id || ('탭 ' + (index + 1)))
+      };
+    }).filter(function (tab) { return tab.id && tab.label; });
+  }
+
+  function renderPortalSubtabs(tabs, activeId) {
+    currentPortalTabs = normalizePortalTabs(tabs);
+    currentPortalTabId = activeId || currentPortalTabs[0]?.id || '';
+
+    if (!els.portalSubtabsWrap || !els.portalSubtabs) return;
+
+    if (!currentPortalTabs.length) {
+      els.portalSubtabsWrap.classList.remove('show');
+      els.portalSubtabs.innerHTML = '';
+      return;
+    }
+
+    els.portalSubtabsWrap.classList.add('show');
+    els.portalSubtabs.innerHTML = currentPortalTabs.map(function (tab) {
+      const active = tab.id === currentPortalTabId ? ' active' : '';
+      return '<button type="button" class="portal-subtab' + active + '" data-portal-tab="' + tab.id + '" title="' + tab.label + '">' + tab.label + '</button>';
+    }).join('');
+
+    Array.from(els.portalSubtabs.querySelectorAll('.portal-subtab')).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const tabId = btn.getAttribute('data-portal-tab') || '';
+        setPortalSubtabActive(tabId);
+        sendPortalTabChange(tabId);
+      });
+    });
+  }
+
+  function setPortalSubtabActive(tabId) {
+    currentPortalTabId = tabId || currentPortalTabId;
+    if (!els.portalSubtabs) return;
+    Array.from(els.portalSubtabs.querySelectorAll('.portal-subtab')).forEach(function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-portal-tab') === currentPortalTabId);
+    });
+  }
+
+  function sendPortalTabChange(tabId) {
+    if (!frame || !frame.contentWindow || !tabId) return;
+    const tab = currentPortalTabs.find(function (item) { return item.id === tabId; }) || null;
+    frame.contentWindow.postMessage({
+      type: 'portal-tab-change',
+      tabId: tabId,
+      tab: tabId,
+      label: tab?.label || '',
+      source: 'portal-index'
+    }, '*');
+  }
+
+  function updatePortalSubtabs(src) {
+    const key = normalizePortalSrc(src);
+    const tabs = portalDefaultTabs[key] || [];
+    renderPortalSubtabs(tabs, tabs[0]?.id || '');
   }
 
   function updatePortalHeader(src) {
@@ -1436,7 +1616,20 @@ body:not(.service-admin-enabled) .service-admin-btn{
   function replacePortalFrame(src) {
     if (!frame || !src) return;
     updatePortalHeader(src);
-    frame.onload = postAuthToFrame;
+    updatePortalSubtabs(src);
+    frame.onload = function () {
+      postAuthToFrame();
+
+      try {
+        const key = normalizePortalSrc(src);
+        const fallbackTabs = portalDefaultTabs[key] || [];
+        frame.contentWindow.postMessage({
+          type: 'portal-tabs-request',
+          source: 'portal-index',
+          fallbackTabs: fallbackTabs
+        }, '*');
+      } catch (_) {}
+    };
     frame.src = src;
   }
 
@@ -1669,12 +1862,27 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
     window.addEventListener('message', function (event) {
       const payload = event?.data || {};
-      if (payload.type !== 'portal-brand-updated') return;
-      const nextColor = payload.brandColor || payload.brand_color || payload.color;
-      if (!isValidHexColor(nextColor)) return;
-      applyPortalBrandColor(nextColor);
-      const currentSrc = normalizePortalSrc(frame?.getAttribute('src') || frame?.src || HOME_SRC);
-      updatePortalHeader(currentSrc);
+
+      if (payload.type === 'portal-brand-updated') {
+        const nextColor = payload.brandColor || payload.brand_color || payload.color;
+        if (!isValidHexColor(nextColor)) return;
+        applyPortalBrandColor(nextColor);
+        const currentSrc = normalizePortalSrc(frame?.getAttribute('src') || frame?.src || HOME_SRC);
+        updatePortalHeader(currentSrc);
+        return;
+      }
+
+      if (payload.type === 'portal-tabs-ready' || payload.type === 'portal-tabs-update') {
+        const tabs = payload.tabs || payload.portalTabs || [];
+        const activeId = payload.activeTabId || payload.activeTab || payload.tabId || '';
+        renderPortalSubtabs(tabs, activeId);
+        return;
+      }
+
+      if (payload.type === 'portal-tab-active') {
+        const activeId = payload.activeTabId || payload.activeTab || payload.tabId || payload.tab || '';
+        if (activeId) setPortalSubtabActive(activeId);
+      }
     });
   }
 
@@ -1727,7 +1935,9 @@ body:not(.service-admin-enabled) .service-admin-btn{
       frameSrc: document.getElementById('portalFrame')?.src || '',
       navButtonCount: navButtons.length,
       portalSession: window.portalSession || null,
-      lastPage: localStorage.getItem(LAST_PAGE_KEY)
+      lastPage: localStorage.getItem(LAST_PAGE_KEY),
+      currentPortalTabs,
+      currentPortalTabId
     };
   };
 
