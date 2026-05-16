@@ -360,3 +360,43 @@
   setTimeout(notifyAll, 1200);
   setTimeout(notifyAll, 2500);
 })();
+
+
+/* ===== portal bridge performance tuning ===== */
+(function(){
+  let __attendanceTabBusy = false;
+  const originalActivate = window.activateTab;
+
+  if(typeof originalActivate === 'function' && !window.__attendanceActivateWrapped){
+    window.__attendanceActivateWrapped = true;
+
+    window.activateTab = function(tabId){
+      if(__attendanceTabBusy) return false;
+      __attendanceTabBusy = true;
+
+      const result = originalActivate(tabId);
+
+      requestAnimationFrame(()=>{
+        setTimeout(()=>{
+          __attendanceTabBusy = false;
+        },120);
+      });
+
+      return result;
+    };
+  }
+
+  const originalPostTabs = window.postTabs;
+  if(typeof originalPostTabs === 'function' && !window.__attendancePostTabsWrapped){
+    window.__attendancePostTabsWrapped = true;
+
+    let timer = null;
+    window.postTabs = function(){
+      clearTimeout(timer);
+      timer = setTimeout(()=>{
+        originalPostTabs();
+      },80);
+    };
+  }
+})();
+
