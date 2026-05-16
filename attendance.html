@@ -15679,57 +15679,20 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
     return String(value || '').replace(/\s+/g, '').trim();
   }
 
-  function getMainTabButtons() {
-    return Array.from(document.querySelectorAll('.mainTab, .mainTabs button, button[data-main], button[data-tab], .tab[data-main]'));
-  }
-
-  function normalizeActiveTab(raw) {
+  function normalizeTab(raw) {
     const value = String(raw || '').trim();
     if (!value) return 'attendance';
 
-    for (const [tabId, aliases] of Object.entries(TAB_ALIAS)) {
-      if (tabId === value || aliases.includes(value) || aliases.map(cleanText).includes(cleanText(value))) {
-        return tabId;
-      }
+    for (const [id, aliases] of Object.entries(TAB_ALIAS)) {
+      if (id === value || aliases.includes(value) || aliases.map(cleanText).includes(cleanText(value))) return id;
     }
 
     return value;
   }
 
-  function resolveTabButton(tabId) {
-    const normalized = normalizeActiveTab(tabId);
-    const aliases = TAB_ALIAS[normalized] || [normalized];
-    const buttons = getMainTabButtons();
-
-    for (const alias of aliases) {
-      const found = buttons.find((btn) => {
-        const dataMain = btn.getAttribute('data-main') || '';
-        const dataTab = btn.getAttribute('data-tab') || '';
-        const id = btn.id || '';
-        const text = cleanText(btn.textContent);
-
-        return dataMain === alias ||
-          dataTab === alias ||
-          id === alias ||
-          cleanText(alias) === text;
-      });
-
-      if (found) return found;
-    }
-
-    return null;
-  }
-
   function getActiveTabId() {
-    const active = document.querySelector('.mainTab.active, .mainTabs button.active, button[data-main].active, button[data-tab].active');
-    if (!active) return 'attendance';
-
-    return normalizeActiveTab(
-      active.getAttribute('data-main') ||
-      active.getAttribute('data-tab') ||
-      active.id ||
-      cleanText(active.textContent)
-    );
+    const active = document.querySelector('.mainTab.active[data-main]');
+    return normalizeTab(active?.dataset?.main || 'attendance');
   }
 
   function postTabs() {
@@ -15743,28 +15706,85 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
   }
 
   function postActiveTab(tabId) {
-    if (!window.parent || window.parent === window || !tabId) return;
+    if (!window.parent || window.parent === window) return;
+    const normalized = normalizeTab(tabId);
     window.parent.postMessage({
       type: 'portal-tab-active',
-      activeTabId: normalizeActiveTab(tabId),
-      tabId: normalizeActiveTab(tabId),
+      activeTabId: normalized,
+      tabId: normalized,
       source: 'attendance'
     }, '*');
   }
 
+  function afterTabRender(tabId) {
+    try {
+      if (typeof window.trendUpdatePeriodControlVisibility === 'function') window.trendUpdatePeriodControlVisibility();
+    } catch (_) {}
+
+    try {
+      if (tabId === 'dashboard' || tabId === 'deep-analysis') {
+        if (typeof window.rerenderDashboardVisibleCharts === 'function') {
+          window.rerenderDashboardVisibleCharts();
+          setTimeout(window.rerenderDashboardVisibleCharts, 80);
+        }
+      }
+    } catch (_) {}
+
+    try {
+      if (tabId === 'trend-analysis' && typeof window.renderTrendAnalysis === 'function') {
+        window.renderTrendAnalysis();
+        setTimeout(window.renderTrendAnalysis, 80);
+      }
+    } catch (_) {}
+
+    try {
+      if (tabId === 'attendance-missing' && typeof window.renderAttendanceMissingAnalysis === 'function') {
+        window.renderAttendanceMissingAnalysis();
+      }
+    } catch (_) {}
+
+    try {
+      if (typeof window.render === 'function') {
+        /* 근태관리 화면은 기존 render 흐름을 한 번 태워 표/카드 상태를 맞춤 */
+        if (tabId === 'attendance') setTimeout(window.render, 0);
+      }
+    } catch (_) {}
+  }
+
   function activateTab(tabId) {
-    const normalized = normalizeActiveTab(tabId);
-    const btn = resolveTabButton(normalized);
-    if (!btn) return false;
+    const normalized = normalizeTab(tabId);
 
-    btn.click();
-    setTimeout(function () {
-      postActiveTab(normalized);
-      postFilters();
-      postTabs();
-    }, 0);
+    let ok = false;
 
-    return true;
+    try {
+      if (typeof window.activateMainTabWithoutRender === 'function') {
+        ok = window.activateMainTabWithoutRender(normalized) === true;
+      }
+    } catch (_) {}
+
+    if (!ok) {
+      const btn = document.querySelector(`.mainTab[data-main="${normalized}"]`);
+      const panel = document.querySelector(`#main-${normalized}`);
+
+      if (btn && panel) {
+        document.querySelectorAll('.mainTab').forEach((x) => x.classList.remove('active'));
+        document.querySelectorAll('.mainPanel').forEach((x) => x.classList.remove('active'));
+        btn.classList.add('active');
+        panel.classList.add('active');
+        ok = true;
+      }
+    }
+
+    try {
+      if (typeof window.saveAttendanceMainTab === 'function') window.saveAttendanceMainTab(normalized);
+    } catch (_) {}
+
+    afterTabRender(normalized);
+    postActiveTab(normalized);
+    postTabs();
+    postFilters();
+
+    return ok;
   }
 
   function optionList(selectEl) {
@@ -15775,7 +15795,7 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
     }));
   }
 
-  function firstExistingSelector(selectors) {
+  function findSelect(selectors) {
     for (const selector of selectors) {
       const el = document.querySelector(selector);
       if (el) return el;
@@ -15784,18 +15804,17 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
   }
 
   function getFilterElements() {
-    const month = firstExistingSelector([
+    const month = findSelect([
       '#period',
       '#periodSelect',
       '#stickyPeriod',
       '#monthSelect',
       '#filterMonth',
-      '#targetMonth',
       'select[name="period"]',
       'select[name="month"]'
     ]);
 
-    const division = firstExistingSelector([
+    const division = findSelect([
       '#division',
       '#divisionFilter',
       '#filterDivision',
@@ -15807,7 +15826,7 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
       'select[name="department"]'
     ]);
 
-    const team = firstExistingSelector([
+    const team = findSelect([
       '#team',
       '#teamFilter',
       '#filterTeam',
@@ -15819,38 +15838,74 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
     return { month, division, team };
   }
 
+  function fallbackOptionsFromState(kind) {
+    try {
+      if (kind === 'period') {
+        const value = window.STATE?.period || '3M';
+        return [
+          { value: '1M', label: '1개월' },
+          { value: '3M', label: '3개월' },
+          { value: '6M', label: '6개월' },
+          { value: '12M', label: '12개월' },
+          { value: '26.03', label: '26.03' }
+        ].map((x) => x.value === value ? x : x);
+      }
+
+      if (kind === 'division') {
+        const divisions = Array.from(new Set((window.EMPLOYEES || window.employees || window.ROWS || [])
+          .map((row) => row.division || row.department || row.bonbu || '')
+          .filter(Boolean))).sort();
+        return [{ value: '전체', label: '전체' }].concat(divisions.map((v) => ({ value: v, label: v })));
+      }
+
+      if (kind === 'team') {
+        const teams = Array.from(new Set((window.EMPLOYEES || window.employees || window.ROWS || [])
+          .map((row) => row.team || '')
+          .filter(Boolean))).sort();
+        return [{ value: '전체', label: '전체' }].concat(teams.map((v) => ({ value: v, label: v })));
+      }
+    } catch (_) {}
+
+    return [];
+  }
+
   function getFilters() {
     const { month, division, team } = getFilterElements();
+    const state = window.STATE || {};
+
+    const periodOptions = month ? optionList(month) : fallbackOptionsFromState('period');
+    const divisionOptions = division ? optionList(division) : fallbackOptionsFromState('division');
+    const teamOptions = team ? optionList(team) : fallbackOptionsFromState('team');
 
     const filters = [];
 
-    if (month) {
+    if (periodOptions.length) {
       filters.push({
         id: 'period',
-        label: '기준월',
+        label: '기간',
         type: 'select',
-        value: month.value || '',
-        options: optionList(month)
+        value: month ? month.value : (state.period || '3M'),
+        options: periodOptions
       });
     }
 
-    if (division) {
+    if (divisionOptions.length) {
       filters.push({
         id: 'division',
         label: '본부',
         type: 'select',
-        value: division.value || '',
-        options: optionList(division)
+        value: division ? division.value : (state.division || '전체'),
+        options: divisionOptions
       });
     }
 
-    if (team) {
+    if (teamOptions.length) {
       filters.push({
         id: 'team',
         label: '팀',
         type: 'select',
-        value: team.value || '',
-        options: optionList(team)
+        value: team ? team.value : (state.team || '전체'),
+        options: teamOptions
       });
     }
 
@@ -15859,7 +15914,6 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
 
   function postFilters() {
     if (!window.parent || window.parent === window) return;
-
     const filters = getFilters();
     window.parent.postMessage({
       type: 'portal-filters-ready',
@@ -15875,48 +15929,56 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  function setFilter(filterId, value) {
-    const { month, division, team } = getFilterElements();
-
-    const id = String(filterId || '');
-    let target = null;
-
-    if (['period', 'periodSelect', 'monthSelect', 'filterMonth', 'stickyPeriod'].includes(id)) {
-      target = month;
-    } else if (['division', 'divisionFilter', 'filterDivision', 'deptFilter', 'stickyDivision'].includes(id)) {
-      target = division;
-    } else if (['team', 'teamFilter', 'filterTeam', 'stickyTeam'].includes(id)) {
-      target = team;
-    }
-
-    if (!target) return;
-
-    const nextValue = value || '';
-    const exists = Array.from(target.options || []).some((option) => option.value === nextValue);
-    if (!exists && nextValue !== '') return;
-
-    target.value = nextValue;
-    triggerChange(target);
-
-    /* 기존 sticky 필터가 따로 존재하면 값 동기화 */
-    const mirrorMap = {
-      period: ['#period', '#stickyPeriod'],
-      division: ['#division', '#stickyDivision'],
-      team: ['#team', '#stickyTeam']
+  function syncFilterDom(kind, value) {
+    const map = {
+      period: ['#period', '#periodSelect', '#stickyPeriod', '#monthSelect'],
+      division: ['#division', '#divisionFilter', '#filterDivision', '#stickyDivision', '#divisionSelect'],
+      team: ['#team', '#teamFilter', '#filterTeam', '#stickyTeam', '#teamSelect']
     };
 
-    const key = target === month ? 'period' : (target === division ? 'division' : 'team');
-    (mirrorMap[key] || []).forEach((selector) => {
+    (map[kind] || []).forEach((selector) => {
       const el = document.querySelector(selector);
-      if (el && el !== target) {
-        el.value = nextValue;
+      if (!el) return;
+      const exists = Array.from(el.options || []).some((option) => option.value === value);
+      if (exists || value === '') {
+        el.value = value;
         triggerChange(el);
       }
     });
+  }
 
-    setTimeout(postFilters, 80);
-    setTimeout(postFilters, 350);
-    setTimeout(postFilters, 900);
+  function setFilter(filterId, value) {
+    const id = String(filterId || '');
+    const kind = id.includes('division') || id === 'division'
+      ? 'division'
+      : (id.includes('team') || id === 'team' ? 'team' : 'period');
+
+    const nextValue = value || (kind === 'period' ? '3M' : '전체');
+
+    try {
+      if (window.STATE) window.STATE[kind] = nextValue;
+    } catch (_) {}
+
+    try {
+      if (kind === 'period' && typeof window.saveAttendanceUiState === 'function' && window.ATTENDANCE_UI_STATE_KEYS?.period) {
+        window.saveAttendanceUiState(window.ATTENDANCE_UI_STATE_KEYS.period, nextValue);
+      }
+    } catch (_) {}
+
+    syncFilterDom(kind, nextValue);
+
+    try {
+      if (typeof window.render === 'function') window.render();
+    } catch (_) {}
+
+    try {
+      if (getActiveTabId() === 'trend-analysis' && typeof window.renderTrendAnalysis === 'function') window.renderTrendAnalysis();
+      if (getActiveTabId() === 'attendance-missing' && typeof window.renderAttendanceMissingAnalysis === 'function') window.renderAttendanceMissingAnalysis();
+      if (typeof window.rerenderDashboardVisibleCharts === 'function') setTimeout(window.rerenderDashboardVisibleCharts, 80);
+    } catch (_) {}
+
+    setTimeout(postFilters, 120);
+    setTimeout(postFilters, 500);
   }
 
   window.portalTabs = TABS;
@@ -15948,10 +16010,7 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
   });
 
   document.addEventListener('click', function (event) {
-    const btn = event.target && event.target.closest
-      ? event.target.closest('.mainTab, .mainTabs button, button[data-main], button[data-tab]')
-      : null;
-
+    const btn = event.target && event.target.closest ? event.target.closest('.mainTab[data-main]') : null;
     if (!btn) return;
 
     setTimeout(function () {
@@ -15963,7 +16022,7 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
   document.addEventListener('change', function (event) {
     if (!event.target || event.target.tagName !== 'SELECT') return;
     setTimeout(postFilters, 0);
-    setTimeout(postFilters, 300);
+    setTimeout(postFilters, 400);
   });
 
   function notifyAll() {
@@ -15978,11 +16037,11 @@ function printReport(){const doc=document.getElementById('attendanceReportPrevie
   }
 
   setTimeout(notifyAll, 250);
-  setTimeout(notifyAll, 700);
-  setTimeout(notifyAll, 1400);
-  setTimeout(notifyAll, 2500);
-  setTimeout(notifyAll, 4000);
-  setTimeout(notifyAll, 6500);
+  setTimeout(notifyAll, 800);
+  setTimeout(notifyAll, 1600);
+  setTimeout(notifyAll, 3000);
+  setTimeout(notifyAll, 5000);
+  setTimeout(notifyAll, 8000);
 })();
 </script>
 
