@@ -2252,3 +2252,171 @@ html.embed-mode .shell{
   }
 }
 
+/* ===== Responsive Sticky Columns: Reagent Collect List ===== */
+/* 제품취합 리스트: 좁은 화면에서 선택/품명/제조사/제품코드를 고정하여 견적 입력 중 품목 식별 유지 */
+@media (max-width: 1600px){
+  .table-wrap:has(#collectList){
+    position:relative;
+  }
+
+  .table-wrap table:has(#collectList){
+    table-layout:fixed !important;
+    border-collapse:separate !important;
+    border-spacing:0 !important;
+    min-width:1480px !important;
+  }
+
+  .table-wrap table:has(#collectList) th,
+  .table-wrap table:has(#collectList) td{
+    background-clip:padding-box !important;
+  }
+
+  /* 고정 컬럼 폭 기준 */
+  .table-wrap table:has(#collectList) th:nth-child(1),
+  .table-wrap table:has(#collectList) td:nth-child(1){
+    width:70px !important;
+    min-width:70px !important;
+    max-width:70px !important;
+  }
+
+  .table-wrap table:has(#collectList) th:nth-child(2),
+  .table-wrap table:has(#collectList) td:nth-child(2){
+    width:260px !important;
+    min-width:260px !important;
+    max-width:260px !important;
+  }
+
+  .table-wrap table:has(#collectList) th:nth-child(3),
+  .table-wrap table:has(#collectList) td:nth-child(3){
+    width:105px !important;
+    min-width:105px !important;
+    max-width:105px !important;
+  }
+
+  .table-wrap table:has(#collectList) th:nth-child(4),
+  .table-wrap table:has(#collectList) td:nth-child(4){
+    width:105px !important;
+    min-width:105px !important;
+    max-width:105px !important;
+  }
+
+  /* sticky left positions: 선택 70 / 품명 260 / 제조사 105 / 제품코드 105 */
+  .table-wrap table:has(#collectList) th:nth-child(1),
+  .table-wrap table:has(#collectList) td:nth-child(1){
+    position:sticky !important;
+    left:0 !important;
+    z-index:8 !important;
+  }
+
+  .table-wrap table:has(#collectList) th:nth-child(2),
+  .table-wrap table:has(#collectList) td:nth-child(2){
+    position:sticky !important;
+    left:70px !important;
+    z-index:8 !important;
+  }
+
+  .table-wrap table:has(#collectList) th:nth-child(3),
+  .table-wrap table:has(#collectList) td:nth-child(3){
+    position:sticky !important;
+    left:330px !important;
+    z-index:8 !important;
+  }
+
+  .table-wrap table:has(#collectList) th:nth-child(4),
+  .table-wrap table:has(#collectList) td:nth-child(4){
+    position:sticky !important;
+    left:435px !important;
+    z-index:8 !important;
+    box-shadow:8px 0 12px rgba(15,23,42,.06) !important;
+  }
+
+  /* 헤더는 본문 sticky보다 위 */
+  .table-wrap table:has(#collectList) thead th:nth-child(1),
+  .table-wrap table:has(#collectList) thead th:nth-child(2),
+  .table-wrap table:has(#collectList) thead th:nth-child(3),
+  .table-wrap table:has(#collectList) thead th:nth-child(4){
+    z-index:12 !important;
+    background:#fbfdff !important;
+  }
+
+  /* 일반 행 배경 */
+  .table-wrap table:has(#collectList) tbody tr:not(.collect-row-confirmed) > td:nth-child(1),
+  .table-wrap table:has(#collectList) tbody tr:not(.collect-row-confirmed) > td:nth-child(2),
+  .table-wrap table:has(#collectList) tbody tr:not(.collect-row-confirmed) > td:nth-child(3),
+  .table-wrap table:has(#collectList) tbody tr:not(.collect-row-confirmed) > td:nth-child(4){
+    background:#ffffff !important;
+  }
+
+  /* 확정 행 배경 */
+  .table-wrap table:has(#collectList) tbody tr.collect-row-confirmed > td:nth-child(1),
+  .table-wrap table:has(#collectList) tbody tr.collect-row-confirmed > td:nth-child(2),
+  .table-wrap table:has(#collectList) tbody tr.collect-row-confirmed > td:nth-child(3),
+  .table-wrap table:has(#collectList) tbody tr.collect-row-confirmed > td:nth-child(4){
+    background:#f1f5f9 !important;
+  }
+
+  /* 품명은 고정 영역 안에서 너무 길면 자연스럽게 줄바꿈 */
+  .table-wrap table:has(#collectList) td:nth-child(2),
+  .table-wrap table:has(#collectList) .collect-name-cell{
+    white-space:normal !important;
+    line-height:1.32 !important;
+    word-break:keep-all !important;
+    overflow-wrap:anywhere !important;
+  }
+
+  /* sticky 경계선 강조 */
+  .table-wrap table:has(#collectList) th:nth-child(4),
+  .table-wrap table:has(#collectList) td:nth-child(4){
+    border-right:1px solid #cbd5e1 !important;
+  }
+}
+
+/* 큰 화면에서는 sticky 해제: 전체 컬럼을 자연스럽게 표시 */
+@media (min-width: 1601px){
+  .table-wrap table:has(#collectList) th:nth-child(1),
+  .table-wrap table:has(#collectList) th:nth-child(2),
+  .table-wrap table:has(#collectList) th:nth-child(3),
+  .table-wrap table:has(#collectList) th:nth-child(4),
+  .table-wrap table:has(#collectList) td:nth-child(1),
+  .table-wrap table:has(#collectList) td:nth-child(2),
+  .table-wrap table:has(#collectList) td:nth-child(3),
+  .table-wrap table:has(#collectList) td:nth-child(4){
+    position:static !important;
+    left:auto !important;
+    box-shadow:none !important;
+  }
+}
+
+/* 아주 좁은 화면에서는 고정 영역 폭을 조금 더 줄임 */
+@media (max-width: 1200px){
+  .table-wrap table:has(#collectList) th:nth-child(1),
+  .table-wrap table:has(#collectList) td:nth-child(1){
+    width:62px !important;
+    min-width:62px !important;
+    max-width:62px !important;
+  }
+
+  .table-wrap table:has(#collectList) th:nth-child(2),
+  .table-wrap table:has(#collectList) td:nth-child(2){
+    width:220px !important;
+    min-width:220px !important;
+    max-width:220px !important;
+    left:62px !important;
+  }
+
+  .table-wrap table:has(#collectList) th:nth-child(3),
+  .table-wrap table:has(#collectList) td:nth-child(3){
+    width:96px !important;
+    min-width:96px !important;
+    max-width:96px !important;
+    left:282px !important;
+  }
+
+  .table-wrap table:has(#collectList) th:nth-child(4),
+  .table-wrap table:has(#collectList) td:nth-child(4){
+    width:96px !important;
+    min-width:96px !important;
+    max-width:96px !important;
+    left:378px !important;
+  }
+}
