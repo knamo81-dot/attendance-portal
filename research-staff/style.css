@@ -2081,3 +2081,29 @@ td {
   }
 }
 
+
+/* ===== 구분 컬럼 폭 과확장 방지 ===== */
+.admin-table th:nth-child(8),
+.admin-table td:nth-child(8){
+  width:120px !important;
+  min-width:120px !important;
+  max-width:120px !important;
+}
+
+.admin-table td:nth-child(8) select{
+  width:100% !important;
+  max-width:110px !important;
+  margin:0 auto !important;
+}
+
+/* 비고 컬럼이 남는 폭 사용 */
+.admin-table th:nth-child(12),
+.admin-table td:nth-child(12){
+  width:auto !important;
+  min-width:140px !important;
+}
+
+/* 화면 넓을 때 구분만 비정상 확장되는 현상 차단 */
+.admin-table{
+  table-layout:fixed !important;
+}
