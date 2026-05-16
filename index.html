@@ -710,14 +710,17 @@ body:not(.service-admin-enabled) .service-admin-btn{
 .portal-subtabs{
   display:flex;
   align-items:center;
+  justify-content:flex-start;
   gap:8px;
   width:100%;
   padding:0;
+  overflow-x:auto;
+  overflow-y:hidden;
 }
 
 .portal-subtab{
-  flex:1 1 0;
-  min-width:0;
+  flex:0 0 auto;
+  min-width:max-content;
   height:38px;
   border-radius:13px;
   border:1px solid #dbe3ec;
@@ -730,9 +733,9 @@ body:not(.service-admin-enabled) .service-admin-btn{
   box-shadow:0 3px 10px rgba(15,23,42,.035);
   transition:background .16s ease, color .16s ease, border-color .16s ease, box-shadow .16s ease;
   white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  padding:0 10px;
+  overflow:visible;
+  text-overflow:clip;
+  padding:0 22px;
 }
 
 .portal-subtab:hover{
@@ -755,7 +758,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
   .portal-subtab{
     flex:0 0 auto;
-    min-width:118px;
+    min-width:max-content;
   }
 }
 
