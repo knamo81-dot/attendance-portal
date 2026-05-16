@@ -15654,398 +15654,7 @@ function openModal(reportType){
   modal.setAttribute('aria-hidden','false');
 }
 function closeModal(){const modal=document.getElementById('attendanceReportModal');if(!modal)return;modal.classList.remove('show');modal.setAttribute('aria-hidden','true');}
-function printReport(){const doc=document.getElementById('attendanceReportPreview');if(!doc)return;const win=window.open('','_blank');if(!win){window.print();return;}win.document.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>근태 보고서</title><style>${document.querySelector('style')?.innerHTML||''}body{background:#fff;padding:0}.attReportDoc{box-shadow:none;border:none;border-radius:0;max-width:none}.reportModalTop,.reportSettings,.reportAiStatus,.reportAdditionalPanel{display:none}</style></head><body><div class="attReportDoc">${doc.innerHTML}</div>
-<script id="attendance-portal-bridge">
-(function () {
-  'use strict';
-
-  const TABS = [
-    { id: 'attendance', label: '근태관리' },
-    { id: 'dashboard', label: '분석대시보드' },
-    { id: 'deep-analysis', label: '심층분석' },
-    { id: 'trend-analysis', label: '트렌드분석' },
-    { id: 'attendance-missing', label: '출퇴근 누락 분석' }
-  ];
-
-  const TAB_ALIAS = {
-    attendance: ['attendance', 'att', '근태관리'],
-    dashboard: ['dashboard', 'analysis', '분석대시보드'],
-    'deep-analysis': ['deep-analysis', 'deep', 'main-deep-analysis', '심층분석'],
-    'trend-analysis': ['trend-analysis', 'trend', 'main-trend-analysis', '트렌드분석'],
-    'attendance-missing': ['attendance-missing', 'missing', 'missing-analysis', 'main-attendance-missing', '출퇴근 누락 분석', '출퇴근누락분석']
-  };
-
-  function cleanText(value) {
-    return String(value || '').replace(/\s+/g, '').trim();
-  }
-
-  function normalizeTab(raw) {
-    const value = String(raw || '').trim();
-    if (!value) return 'attendance';
-
-    for (const [id, aliases] of Object.entries(TAB_ALIAS)) {
-      if (id === value || aliases.includes(value) || aliases.map(cleanText).includes(cleanText(value))) return id;
-    }
-
-    return value;
-  }
-
-  function getActiveTabId() {
-    const active = document.querySelector('.mainTab.active[data-main]');
-    return normalizeTab(active?.dataset?.main || 'attendance');
-  }
-
-  function postTabs() {
-    if (!window.parent || window.parent === window) return;
-    window.parent.postMessage({
-      type: 'portal-tabs-ready',
-      tabs: TABS,
-      activeTabId: getActiveTabId(),
-      source: 'attendance'
-    }, '*');
-  }
-
-  function postActiveTab(tabId) {
-    if (!window.parent || window.parent === window) return;
-    const normalized = normalizeTab(tabId);
-    window.parent.postMessage({
-      type: 'portal-tab-active',
-      activeTabId: normalized,
-      tabId: normalized,
-      source: 'attendance'
-    }, '*');
-  }
-
-  function afterTabRender(tabId) {
-    try {
-      if (typeof window.trendUpdatePeriodControlVisibility === 'function') window.trendUpdatePeriodControlVisibility();
-    } catch (_) {}
-
-    try {
-      if (tabId === 'dashboard' || tabId === 'deep-analysis') {
-        if (typeof window.rerenderDashboardVisibleCharts === 'function') {
-          window.rerenderDashboardVisibleCharts();
-          setTimeout(window.rerenderDashboardVisibleCharts, 80);
-        }
-      }
-    } catch (_) {}
-
-    try {
-      if (tabId === 'trend-analysis' && typeof window.renderTrendAnalysis === 'function') {
-        window.renderTrendAnalysis();
-        setTimeout(window.renderTrendAnalysis, 80);
-      }
-    } catch (_) {}
-
-    try {
-      if (tabId === 'attendance-missing' && typeof window.renderAttendanceMissingAnalysis === 'function') {
-        window.renderAttendanceMissingAnalysis();
-      }
-    } catch (_) {}
-
-    try {
-      if (typeof window.render === 'function') {
-        /* 근태관리 화면은 기존 render 흐름을 한 번 태워 표/카드 상태를 맞춤 */
-        if (tabId === 'attendance') setTimeout(window.render, 0);
-      }
-    } catch (_) {}
-  }
-
-  function activateTab(tabId) {
-    const normalized = normalizeTab(tabId);
-
-    let ok = false;
-
-    try {
-      if (typeof window.activateMainTabWithoutRender === 'function') {
-        ok = window.activateMainTabWithoutRender(normalized) === true;
-      }
-    } catch (_) {}
-
-    if (!ok) {
-      const btn = document.querySelector(`.mainTab[data-main="${normalized}"]`);
-      const panel = document.querySelector(`#main-${normalized}`);
-
-      if (btn && panel) {
-        document.querySelectorAll('.mainTab').forEach((x) => x.classList.remove('active'));
-        document.querySelectorAll('.mainPanel').forEach((x) => x.classList.remove('active'));
-        btn.classList.add('active');
-        panel.classList.add('active');
-        ok = true;
-      }
-    }
-
-    try {
-      if (typeof window.saveAttendanceMainTab === 'function') window.saveAttendanceMainTab(normalized);
-    } catch (_) {}
-
-    afterTabRender(normalized);
-    postActiveTab(normalized);
-    postTabs();
-    postFilters();
-
-    return ok;
-  }
-
-  function optionList(selectEl) {
-    if (!selectEl) return [];
-    return Array.from(selectEl.options || []).map((option) => ({
-      value: option.value,
-      label: option.textContent || option.value
-    }));
-  }
-
-  function findSelect(selectors) {
-    for (const selector of selectors) {
-      const el = document.querySelector(selector);
-      if (el) return el;
-    }
-    return null;
-  }
-
-  function getFilterElements() {
-    const month = findSelect([
-      '#period',
-      '#periodSelect',
-      '#stickyPeriod',
-      '#monthSelect',
-      '#filterMonth',
-      'select[name="period"]',
-      'select[name="month"]'
-    ]);
-
-    const division = findSelect([
-      '#division',
-      '#divisionFilter',
-      '#filterDivision',
-      '#stickyDivision',
-      '#divisionSelect',
-      '#deptFilter',
-      '#departmentFilter',
-      'select[name="division"]',
-      'select[name="department"]'
-    ]);
-
-    const team = findSelect([
-      '#team',
-      '#teamFilter',
-      '#filterTeam',
-      '#stickyTeam',
-      '#teamSelect',
-      'select[name="team"]'
-    ]);
-
-    return { month, division, team };
-  }
-
-  function fallbackOptionsFromState(kind) {
-    try {
-      if (kind === 'period') {
-        const value = window.STATE?.period || '3M';
-        return [
-          { value: '1M', label: '1개월' },
-          { value: '3M', label: '3개월' },
-          { value: '6M', label: '6개월' },
-          { value: '12M', label: '12개월' },
-          { value: '26.03', label: '26.03' }
-        ].map((x) => x.value === value ? x : x);
-      }
-
-      if (kind === 'division') {
-        const divisions = Array.from(new Set((window.EMPLOYEES || window.employees || window.ROWS || [])
-          .map((row) => row.division || row.department || row.bonbu || '')
-          .filter(Boolean))).sort();
-        return [{ value: '전체', label: '전체' }].concat(divisions.map((v) => ({ value: v, label: v })));
-      }
-
-      if (kind === 'team') {
-        const teams = Array.from(new Set((window.EMPLOYEES || window.employees || window.ROWS || [])
-          .map((row) => row.team || '')
-          .filter(Boolean))).sort();
-        return [{ value: '전체', label: '전체' }].concat(teams.map((v) => ({ value: v, label: v })));
-      }
-    } catch (_) {}
-
-    return [];
-  }
-
-  function getFilters() {
-    const { month, division, team } = getFilterElements();
-    const state = window.STATE || {};
-
-    const periodOptions = month ? optionList(month) : fallbackOptionsFromState('period');
-    const divisionOptions = division ? optionList(division) : fallbackOptionsFromState('division');
-    const teamOptions = team ? optionList(team) : fallbackOptionsFromState('team');
-
-    const filters = [];
-
-    if (periodOptions.length) {
-      filters.push({
-        id: 'period',
-        label: '기간',
-        type: 'select',
-        value: month ? month.value : (state.period || '3M'),
-        options: periodOptions
-      });
-    }
-
-    if (divisionOptions.length) {
-      filters.push({
-        id: 'division',
-        label: '본부',
-        type: 'select',
-        value: division ? division.value : (state.division || '전체'),
-        options: divisionOptions
-      });
-    }
-
-    if (teamOptions.length) {
-      filters.push({
-        id: 'team',
-        label: '팀',
-        type: 'select',
-        value: team ? team.value : (state.team || '전체'),
-        options: teamOptions
-      });
-    }
-
-    return filters;
-  }
-
-  function postFilters() {
-    if (!window.parent || window.parent === window) return;
-    const filters = getFilters();
-    window.parent.postMessage({
-      type: 'portal-filters-ready',
-      enabled: filters.length > 0,
-      filters,
-      source: 'attendance'
-    }, '*');
-  }
-
-  function triggerChange(el) {
-    if (!el) return;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-
-  function syncFilterDom(kind, value) {
-    const map = {
-      period: ['#period', '#periodSelect', '#stickyPeriod', '#monthSelect'],
-      division: ['#division', '#divisionFilter', '#filterDivision', '#stickyDivision', '#divisionSelect'],
-      team: ['#team', '#teamFilter', '#filterTeam', '#stickyTeam', '#teamSelect']
-    };
-
-    (map[kind] || []).forEach((selector) => {
-      const el = document.querySelector(selector);
-      if (!el) return;
-      const exists = Array.from(el.options || []).some((option) => option.value === value);
-      if (exists || value === '') {
-        el.value = value;
-        triggerChange(el);
-      }
-    });
-  }
-
-  function setFilter(filterId, value) {
-    const id = String(filterId || '');
-    const kind = id.includes('division') || id === 'division'
-      ? 'division'
-      : (id.includes('team') || id === 'team' ? 'team' : 'period');
-
-    const nextValue = value || (kind === 'period' ? '3M' : '전체');
-
-    try {
-      if (window.STATE) window.STATE[kind] = nextValue;
-    } catch (_) {}
-
-    try {
-      if (kind === 'period' && typeof window.saveAttendanceUiState === 'function' && window.ATTENDANCE_UI_STATE_KEYS?.period) {
-        window.saveAttendanceUiState(window.ATTENDANCE_UI_STATE_KEYS.period, nextValue);
-      }
-    } catch (_) {}
-
-    syncFilterDom(kind, nextValue);
-
-    try {
-      if (typeof window.render === 'function') window.render();
-    } catch (_) {}
-
-    try {
-      if (getActiveTabId() === 'trend-analysis' && typeof window.renderTrendAnalysis === 'function') window.renderTrendAnalysis();
-      if (getActiveTabId() === 'attendance-missing' && typeof window.renderAttendanceMissingAnalysis === 'function') window.renderAttendanceMissingAnalysis();
-      if (typeof window.rerenderDashboardVisibleCharts === 'function') setTimeout(window.rerenderDashboardVisibleCharts, 80);
-    } catch (_) {}
-
-    setTimeout(postFilters, 120);
-    setTimeout(postFilters, 500);
-  }
-
-  window.portalTabs = TABS;
-  window.portalActivateTab = activateTab;
-  window.portalFilters = getFilters;
-  window.portalSetFilter = setFilter;
-
-  window.addEventListener('message', function (event) {
-    const payload = event && event.data ? event.data : {};
-
-    if (payload.type === 'portal-tabs-request') {
-      postTabs();
-      return;
-    }
-
-    if (payload.type === 'portal-filters-request') {
-      postFilters();
-      return;
-    }
-
-    if (payload.type === 'portal-tab-change') {
-      activateTab(payload.tabId || payload.tab || '');
-      return;
-    }
-
-    if (payload.type === 'portal-filter-change') {
-      setFilter(payload.filterId || '', payload.value || '');
-    }
-  });
-
-  document.addEventListener('click', function (event) {
-    const btn = event.target && event.target.closest ? event.target.closest('.mainTab[data-main]') : null;
-    if (!btn) return;
-
-    setTimeout(function () {
-      postActiveTab(getActiveTabId());
-      postFilters();
-    }, 0);
-  });
-
-  document.addEventListener('change', function (event) {
-    if (!event.target || event.target.tagName !== 'SELECT') return;
-    setTimeout(postFilters, 0);
-    setTimeout(postFilters, 400);
-  });
-
-  function notifyAll() {
-    postTabs();
-    postFilters();
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', notifyAll);
-  } else {
-    notifyAll();
-  }
-
-  setTimeout(notifyAll, 250);
-  setTimeout(notifyAll, 800);
-  setTimeout(notifyAll, 1600);
-  setTimeout(notifyAll, 3000);
-  setTimeout(notifyAll, 5000);
-  setTimeout(notifyAll, 8000);
-})();
-</script>
-
-</body></html>`);win.document.close();setTimeout(()=>{win.focus();win.print();},300);}
+function printReport(){const doc=document.getElementById('attendanceReportPreview');if(!doc)return;const win=window.open('','_blank');if(!win){window.print();return;}win.document.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>근태 보고서</title><style>${document.querySelector('style')?.innerHTML||''}body{background:#fff;padding:0}.attReportDoc{box-shadow:none;border:none;border-radius:0;max-width:none}.reportModalTop,.reportSettings,.reportAiStatus,.reportAdditionalPanel{display:none}</style></head><body><div class="attReportDoc">${doc.innerHTML}</div></body></html>`);win.document.close();setTimeout(()=>{win.focus();win.print();},300);}
 function empForOption(e){return{employeeNo:e.employee_no||e.employeeNo||e.id||'',id:e.id||e.employee_no||'',name:e.name||'',division:e.department||e.division||'',team:e.team||'',position:e.position||e.grade||'',status:e.status||'',resignationDate:e.resignation_date||e.leaveDate||e.retireDate||'',memo:e.memo||''};}
 function refreshHiringEmployeeOptions(){const input=document.getElementById('hiringEmployeeSearch'),sel=document.getElementById('hiringEmployeeSelect'),info=document.getElementById('hiringSelectedInfo');if(!input||!sel)return;const kw=String(input.value||'').trim().toLowerCase();const list=Array.isArray(window.empMaster)?window.empMaster:(typeof empMaster!=='undefined'&&Array.isArray(empMaster)?empMaster:[]);const matched=list.map(empForOption).filter(e=>!kw||String(e.name).toLowerCase().includes(kw)||String(e.employeeNo).toLowerCase().includes(kw)).slice(0,80);sel.innerHTML='<option value="">선택 안 함</option>'+matched.map(e=>`<option value="${encodeURIComponent(JSON.stringify(e))}">${esc(e.name)} (${esc(e.employeeNo||'-')}) · ${esc(e.division||'-')} / ${esc(e.team||'-')}</option>`).join('');if(info)info.textContent=matched.length?`${matched.length}명 검색됨. 대상자를 선택하면 상세 정보가 표시됩니다.`:'검색 결과가 없습니다.';}
 function updateHiringSelectedInfo(){const info=document.getElementById('hiringSelectedInfo');if(!info)return;const e=getSelectedHiringEmployee();if(!e){info.textContent='퇴사/이탈 대상자를 선택하면 사번, 본부, 팀, 직급, 퇴사예정일 정보가 표시됩니다.';return;}info.innerHTML=`<b>선택 대상자</b> ${esc(e.name)} · 사번 ${esc(e.employeeNo||'-')} · ${esc(e.division||'-')} / ${esc(e.team||'-')} · 직급 ${esc(e.position||'-')} · 상태 ${esc(e.status||'-')} · 퇴사/예정일 ${esc(e.resignationDate||'-')}`;}
@@ -16620,5 +16229,361 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
   else initAdminFeatureTabs();
 })();
 </script>
+
+<script id="attendance-portal-bridge">
+(function () {
+  'use strict';
+
+  const TABS = [
+    { id: 'attendance', label: '근태관리' },
+    { id: 'dashboard', label: '분석대시보드' },
+    { id: 'deep-analysis', label: '심층분석' },
+    { id: 'trend-analysis', label: '트렌드분석' },
+    { id: 'attendance-missing', label: '출퇴근 누락 분석' }
+  ];
+
+  const TAB_ALIASES = {
+    attendance: ['attendance', '근태관리'],
+    dashboard: ['dashboard', '분석대시보드'],
+    'deep-analysis': ['deep-analysis', 'deep', '심층분석'],
+    'trend-analysis': ['trend-analysis', 'trend', '트렌드분석'],
+    'attendance-missing': ['attendance-missing', 'missing', 'missing-analysis', '출퇴근 누락 분석', '출퇴근누락분석']
+  };
+
+  function compact(value) {
+    return String(value || '').replace(/\s+/g, '').trim();
+  }
+
+  function normalizeTabId(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return 'attendance';
+
+    for (const [id, aliases] of Object.entries(TAB_ALIASES)) {
+      if (raw === id || aliases.includes(raw) || aliases.map(compact).includes(compact(raw))) return id;
+    }
+
+    return raw;
+  }
+
+  function getActiveTabId() {
+    const active = document.querySelector('.mainTab.active[data-main]');
+    return normalizeTabId(active?.getAttribute('data-main') || 'attendance');
+  }
+
+  function postTabs() {
+    if (!window.parent || window.parent === window) return;
+    window.parent.postMessage({
+      type: 'portal-tabs-ready',
+      tabs: TABS,
+      activeTabId: getActiveTabId(),
+      source: 'attendance'
+    }, '*');
+  }
+
+  function postActiveTab(tabId) {
+    if (!window.parent || window.parent === window) return;
+    const id = normalizeTabId(tabId);
+    window.parent.postMessage({
+      type: 'portal-tab-active',
+      activeTabId: id,
+      tabId: id,
+      source: 'attendance'
+    }, '*');
+  }
+
+  function renderCurrentTab(tabId) {
+    const id = normalizeTabId(tabId);
+
+    try {
+      if (typeof window.trendUpdatePeriodControlVisibility === 'function') {
+        window.trendUpdatePeriodControlVisibility();
+      }
+    } catch (_) {}
+
+    try {
+      if (id === 'attendance' && typeof window.render === 'function') {
+        window.render();
+      }
+    } catch (_) {}
+
+    try {
+      if ((id === 'dashboard' || id === 'deep-analysis') && typeof window.rerenderDashboardVisibleCharts === 'function') {
+        window.rerenderDashboardVisibleCharts();
+        setTimeout(window.rerenderDashboardVisibleCharts, 120);
+      }
+    } catch (_) {}
+
+    try {
+      if (id === 'trend-analysis' && typeof window.renderTrendAnalysis === 'function') {
+        window.renderTrendAnalysis();
+        setTimeout(window.renderTrendAnalysis, 120);
+      }
+    } catch (_) {}
+
+    try {
+      if (id === 'attendance-missing' && typeof window.renderAttendanceMissingAnalysis === 'function') {
+        window.renderAttendanceMissingAnalysis();
+      }
+    } catch (_) {}
+  }
+
+  function activateTab(tabId) {
+    const id = normalizeTabId(tabId);
+    let ok = false;
+
+    try {
+      if (typeof window.activateMainTabWithoutRender === 'function') {
+        ok = window.activateMainTabWithoutRender(id) === true;
+      }
+    } catch (_) {}
+
+    if (!ok) {
+      const btn = document.querySelector('.mainTab[data-main="' + id + '"]');
+      const panel = document.getElementById('main-' + id);
+      if (btn && panel) {
+        document.querySelectorAll('.mainTab').forEach(function (el) { el.classList.remove('active'); });
+        document.querySelectorAll('.mainPanel').forEach(function (el) { el.classList.remove('active'); });
+        btn.classList.add('active');
+        panel.classList.add('active');
+        ok = true;
+      }
+    }
+
+    try {
+      if (typeof window.saveAttendanceMainTab === 'function') {
+        window.saveAttendanceMainTab(id);
+      }
+    } catch (_) {}
+
+    renderCurrentTab(id);
+    postActiveTab(id);
+    postTabs();
+    postFilters();
+
+    return ok;
+  }
+
+  function findOne(selectors) {
+    for (const selector of selectors) {
+      const el = document.querySelector(selector);
+      if (el) return el;
+    }
+    return null;
+  }
+
+  function getFilterElements() {
+    return {
+      period: findOne(['#period', '#stickyPeriod', '#periodSelect', '#monthSelect']),
+      division: findOne(['#division', '#stickyDivision', '#divisionFilter', '#filterDivision']),
+      team: findOne(['#team', '#stickyTeam', '#teamFilter', '#filterTeam'])
+    };
+  }
+
+  function optionList(selectEl) {
+    if (!selectEl) return [];
+    return Array.from(selectEl.options || []).map(function (option) {
+      return {
+        value: option.value,
+        label: option.textContent || option.value
+      };
+    });
+  }
+
+  function fallbackOptions(kind) {
+    if (kind === 'period') {
+      const current = window.STATE?.period || '';
+      const base = [
+        { value: '1M', label: '1개월' },
+        { value: '3M', label: '3개월' },
+        { value: '6M', label: '6개월' },
+        { value: '12M', label: '12개월' }
+      ];
+      if (current && !base.some(function (x) { return x.value === current; })) {
+        base.unshift({ value: current, label: current });
+      }
+      return base;
+    }
+
+    try {
+      const rows = []
+        .concat(window.EMPLOYEES || [])
+        .concat(window.employees || [])
+        .concat(window.ROWS || [])
+        .concat(window.rows || []);
+
+      const key = kind === 'division' ? ['division', 'department'] : ['team'];
+      const values = Array.from(new Set(rows.map(function (row) {
+        for (const k of key) {
+          if (row && row[k]) return row[k];
+        }
+        return '';
+      }).filter(Boolean))).sort();
+
+      return [{ value: '전체', label: '전체' }].concat(values.map(function (v) {
+        return { value: v, label: v };
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function getFilters() {
+    const els = getFilterElements();
+
+    const periodOptions = optionList(els.period);
+    const divisionOptions = optionList(els.division);
+    const teamOptions = optionList(els.team);
+
+    return [
+      {
+        id: 'period',
+        label: '기간',
+        type: 'select',
+        value: els.period ? els.period.value : (window.STATE?.period || ''),
+        options: periodOptions.length ? periodOptions : fallbackOptions('period')
+      },
+      {
+        id: 'division',
+        label: '본부',
+        type: 'select',
+        value: els.division ? els.division.value : (window.STATE?.division || '전체'),
+        options: divisionOptions.length ? divisionOptions : fallbackOptions('division')
+      },
+      {
+        id: 'team',
+        label: '팀',
+        type: 'select',
+        value: els.team ? els.team.value : (window.STATE?.team || '전체'),
+        options: teamOptions.length ? teamOptions : fallbackOptions('team')
+      }
+    ].filter(function (filter) {
+      return Array.isArray(filter.options) && filter.options.length > 0;
+    });
+  }
+
+  function postFilters() {
+    if (!window.parent || window.parent === window) return;
+    const filters = getFilters();
+    window.parent.postMessage({
+      type: 'portal-filters-ready',
+      enabled: filters.length > 0,
+      filters: filters,
+      source: 'attendance'
+    }, '*');
+  }
+
+  function fireChange(el) {
+    if (!el) return;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function setSelectValue(el, value) {
+    if (!el) return;
+    const exists = Array.from(el.options || []).some(function (option) {
+      return option.value === value;
+    });
+    if (exists || value === '') {
+      el.value = value;
+      fireChange(el);
+    }
+  }
+
+  function setFilter(filterId, value) {
+    const id = String(filterId || '');
+    const kind = id === 'division' || id.includes('division')
+      ? 'division'
+      : (id === 'team' || id.includes('team') ? 'team' : 'period');
+
+    const nextValue = value || (kind === 'period' ? '' : '전체');
+
+    try {
+      if (window.STATE) window.STATE[kind] = nextValue;
+    } catch (_) {}
+
+    const selectorMap = {
+      period: ['#period', '#stickyPeriod', '#periodSelect', '#monthSelect'],
+      division: ['#division', '#stickyDivision', '#divisionFilter', '#filterDivision'],
+      team: ['#team', '#stickyTeam', '#teamFilter', '#teamSelect']
+    };
+
+    (selectorMap[kind] || []).forEach(function (selector) {
+      setSelectValue(document.querySelector(selector), nextValue);
+    });
+
+    try {
+      if (typeof window.render === 'function') window.render();
+    } catch (_) {}
+
+    renderCurrentTab(getActiveTabId());
+
+    setTimeout(postFilters, 150);
+    setTimeout(postFilters, 600);
+  }
+
+  window.portalTabs = TABS;
+  window.portalActivateTab = activateTab;
+  window.portalFilters = getFilters;
+  window.portalSetFilter = setFilter;
+
+  window.addEventListener('message', function (event) {
+    const payload = event && event.data ? event.data : {};
+
+    if (payload.type === 'portal-tabs-request') {
+      postTabs();
+      return;
+    }
+
+    if (payload.type === 'portal-filters-request') {
+      postFilters();
+      return;
+    }
+
+    if (payload.type === 'portal-tab-change') {
+      activateTab(payload.tabId || payload.tab || '');
+      return;
+    }
+
+    if (payload.type === 'portal-filter-change') {
+      setFilter(payload.filterId || '', payload.value || '');
+    }
+  });
+
+  document.addEventListener('click', function (event) {
+    const btn = event.target && event.target.closest ? event.target.closest('.mainTab[data-main]') : null;
+    if (!btn) return;
+
+    setTimeout(function () {
+      postActiveTab(btn.getAttribute('data-main'));
+      postFilters();
+    }, 0);
+  });
+
+  document.addEventListener('change', function (event) {
+    if (!event.target || event.target.tagName !== 'SELECT') return;
+    setTimeout(postFilters, 0);
+    setTimeout(postFilters, 350);
+  });
+
+  function notifyAll() {
+    postTabs();
+    postFilters();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', notifyAll);
+  } else {
+    notifyAll();
+  }
+
+  setTimeout(notifyAll, 250);
+  setTimeout(notifyAll, 800);
+  setTimeout(notifyAll, 1600);
+  setTimeout(notifyAll, 3000);
+  setTimeout(notifyAll, 5000);
+  setTimeout(notifyAll, 8000);
+})();
+</script>
+
 </body>
 </html>
