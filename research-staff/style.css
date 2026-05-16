@@ -1991,7 +1991,7 @@ td {
 }
 
 
-/* ===== 운영인력 리스트 자동 슬림화 최종 보정 ===== */
+/* ===== 운영인력 리스트 컬럼 폭 최종 정리: 사번~최종학위 최대폭 제한, 비고 유동폭 ===== */
 .admin-table-wrap{
   width:100% !important;
   min-width:0 !important;
@@ -2000,7 +2000,7 @@ td {
 
 .admin-table{
   width:100% !important;
-  table-layout:fixed !important;
+  table-layout:auto !important;
   min-width:unset !important;
   font-size:12px !important;
 }
@@ -2013,6 +2013,7 @@ td {
   padding:6px 5px !important;
   height:34px !important;
   line-height:1.25 !important;
+  vertical-align:middle !important;
 }
 
 .admin-table input,
@@ -2026,83 +2027,113 @@ td {
   border-radius:8px !important;
 }
 
-.admin-table input[type="text"]{
-  min-width:0 !important;
-}
-
+/* 기존 nth-child 폭 지정 충돌 최종 무력화 */
 .admin-table th:nth-child(n),
 .admin-table td:nth-child(n){
   min-width:0 !important;
   max-width:none !important;
 }
 
-/* 순번/사번/성명처럼 짧은 컬럼은 폭을 조금만 유지 */
+/* 순번 */
 .admin-table th:nth-child(1),
 .admin-table td:nth-child(1){
   width:46px !important;
+  min-width:46px !important;
+  max-width:46px !important;
+  text-align:center !important;
 }
 
+/* 사번 */
 .admin-table th:nth-child(2),
 .admin-table td:nth-child(2){
   width:76px !important;
+  min-width:68px !important;
+  max-width:76px !important;
+  text-align:center !important;
 }
 
+/* 성명 */
 .admin-table th:nth-child(3),
 .admin-table td:nth-child(3){
-  width:76px !important;
+  width:72px !important;
+  min-width:64px !important;
+  max-width:72px !important;
+  text-align:center !important;
 }
 
-/* 날짜/셀렉트 컬럼은 너무 찌그러지지 않게 최소 시각폭 확보 */
+/* 부서 */
+.admin-table th:nth-child(4),
+.admin-table td:nth-child(4){
+  width:86px !important;
+  min-width:76px !important;
+  max-width:86px !important;
+}
+
+/* 팀 */
+.admin-table th:nth-child(5),
+.admin-table td:nth-child(5){
+  width:86px !important;
+  min-width:76px !important;
+  max-width:86px !important;
+}
+
+/* 직위 */
+.admin-table th:nth-child(6),
+.admin-table td:nth-child(6){
+  width:74px !important;
+  min-width:64px !important;
+  max-width:74px !important;
+}
+
+/* 재직상태 */
+.admin-table th:nth-child(7),
+.admin-table td:nth-child(7){
+  width:78px !important;
+  min-width:68px !important;
+  max-width:78px !important;
+}
+
+/* 구분 */
+.admin-table th:nth-child(8),
+.admin-table td:nth-child(8){
+  width:120px !important;
+  min-width:108px !important;
+  max-width:120px !important;
+}
+
+/* 성별 */
 .admin-table th:nth-child(9),
-.admin-table td:nth-child(9),
+.admin-table td:nth-child(9){
+  width:76px !important;
+  min-width:68px !important;
+  max-width:76px !important;
+}
+
+/* 생년월일 */
 .admin-table th:nth-child(10),
 .admin-table td:nth-child(10){
-  width:110px !important;
+  width:104px !important;
+  min-width:96px !important;
+  max-width:104px !important;
 }
 
+/* 연구소 발령일 */
 .admin-table th:nth-child(11),
 .admin-table td:nth-child(11){
-  width:90px !important;
+  width:104px !important;
+  min-width:96px !important;
+  max-width:104px !important;
 }
 
+/* 최종학위 */
 .admin-table th:nth-child(12),
 .admin-table td:nth-child(12){
-  width:120px !important;
+  width:96px !important;
+  min-width:86px !important;
+  max-width:96px !important;
 }
 
-@media (max-width:1100px){
-  .admin-table{
-    font-size:11px !important;
-  }
-
-  .admin-table th,
-  .admin-table td{
-    padding:5px 4px !important;
-  }
-}
-
-
-/* ===== 최종학위 컬럼 과확장 방지 + 비고 폭 사용 ===== */
-.admin-table th:nth-child(11),
-.admin-table td:nth-child(11){
-  width:90px !important;
-  min-width:90px !important;
-  max-width:90px !important;
-}
-
-.admin-table th:nth-child(12),
-.admin-table td:nth-child(12){
-  width:110px !important;
-  min-width:110px !important;
-  max-width:110px !important;
-}
-
-.admin-table td:nth-child(12) select{
-  width:100% !important;
-  max-width:100px !important;
-  margin:0 auto !important;
-}
-
+/* 비고: 남는 폭 전부 사용 */
 .admin-table th:nth-child(13),
 .admin-table td:nth-child(13){
   width:auto !important;
@@ -2114,5 +2145,16 @@ td {
   width:100% !important;
   min-width:0 !important;
   max-width:100% !important;
+}
+
+@media (max-width:1100px){
+  .admin-table{
+    font-size:11px !important;
+  }
+
+  .admin-table th,
+  .admin-table td{
+    padding:5px 4px !important;
+  }
 }
 
