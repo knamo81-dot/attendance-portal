@@ -2124,3 +2124,131 @@ html.embed-mode .shell{
     font-size:23px !important;
   }
 }
+
+/* ===== Portal Compact Patch: Reagent Collect Controls ===== */
+/* 제품취합/제품관리 필터 영역이 화면 전체를 4등분으로 차지하지 않도록 필요한 폭만 사용 */
+.collect-filters{
+  display:flex !important;
+  align-items:flex-end !important;
+  justify-content:flex-start !important;
+  flex-wrap:wrap !important;
+  gap:8px !important;
+}
+
+.collect-filters .field{
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:0 !important;
+}
+
+/* 구분/상태/사용여부 같은 짧은 select */
+.collect-filters .field:has(select){
+  width:auto !important;
+  min-width:130px !important;
+  max-width:180px !important;
+}
+
+/* 검색 input은 너무 길어지지 않게 제한 */
+.collect-filters .field:has(input){
+  width:320px !important;
+  min-width:240px !important;
+  max-width:360px !important;
+}
+
+/* 버튼은 글자 길이에 맞게 */
+.collect-filters .field:has(button){
+  width:auto !important;
+  min-width:0 !important;
+}
+
+.collect-filters .field input,
+.collect-filters .field select,
+.collect-filters .field button{
+  width:auto !important;
+  min-width:0 !important;
+}
+
+.collect-filters .field input{
+  width:100% !important;
+}
+
+.collect-filters .field select{
+  min-width:130px !important;
+}
+
+.collect-filters .field button{
+  white-space:nowrap !important;
+  width:auto !important;
+}
+
+/* 제품취합 주요 버튼이 길게 늘어나지 않도록 */
+#confirmSelectedCollect,
+#sendToPrepare,
+#pmRefreshRequests,
+#pmResetProduct,
+#refreshMyRegistrationRequests{
+  width:auto !important;
+  min-width:max-content !important;
+  white-space:nowrap !important;
+  flex:0 0 auto !important;
+}
+
+/* 제품취합 요약카드는 기존보다 조금 더 균형 있게 */
+#page-collect .summary{
+  grid-template-columns:repeat(4, minmax(150px, 1fr)) !important;
+}
+
+/* 제품취합 테이블은 입력 컬럼 때문에 가로 스크롤 유지하되 과도한 폭은 줄임 */
+.table-wrap table:has(#collectList){
+  min-width:1480px !important;
+}
+
+.table-wrap table:has(#collectList) th:nth-child(2),
+.table-wrap table:has(#collectList) td:nth-child(2){
+  width:280px !important;
+}
+
+.table-wrap table:has(#collectList) th:nth-child(12),
+.table-wrap table:has(#collectList) td:nth-child(12),
+.table-wrap table:has(#collectList) th:nth-child(15),
+.table-wrap table:has(#collectList) td:nth-child(15){
+  width:108px !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="vendor1"],
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="vendor2"]{
+  width:100px !important;
+}
+
+/* 작은 화면에서는 다시 2열 배치 */
+@media (max-width:1200px){
+  .collect-filters{
+    display:grid !important;
+    grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .collect-filters .field,
+  .collect-filters .field:has(select),
+  .collect-filters .field:has(input),
+  .collect-filters .field:has(button){
+    width:100% !important;
+    max-width:none !important;
+  }
+
+  .collect-filters .field input,
+  .collect-filters .field select,
+  .collect-filters .field button{
+    width:100% !important;
+  }
+}
+
+@media (max-width:760px){
+  .collect-filters{
+    grid-template-columns:1fr !important;
+  }
+
+  #page-collect .summary{
+    grid-template-columns:1fr !important;
+  }
+}
+
