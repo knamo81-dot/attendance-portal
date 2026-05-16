@@ -1148,6 +1148,43 @@ table{
   }
 }
 
+
+
+/* ===== Reference document overflow fix: wrap long text + fit images ===== */
+.ref-layout > *,
+.ref-content,
+.doc-container,
+.doc-body,
+.doc-html,
+.doc-text,
+.doc-answer,
+.ref-paragraph,
+.related-doc-layout > *,
+.related-doc-content,
+.related-doc-body{
+  max-width:100% !important;
+  min-width:0 !important;
+  overflow-wrap:anywhere !important;
+  word-break:keep-all !important;
+  white-space:normal !important;
+}
+
+.doc-container,
+.ref-content,
+.related-doc-content{
+  overflow-x:hidden !important;
+}
+
+.doc-body img,
+.doc-html img,
+.doc-container img,
+.related-doc-body img,
+.related-doc-inline-image{
+  max-width:100% !important;
+  height:auto !important;
+  object-fit:contain !important;
+}
+
 /* ===== Portal Common Tabs Bridge: Wastewater ===== */
 /* 포탈 공통 버튼을 사용하므로 폐수 내부 탭 버튼은 숨기되 DOM은 유지 */
 .tabs-wrap,
