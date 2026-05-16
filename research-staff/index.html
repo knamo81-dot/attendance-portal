@@ -346,5 +346,245 @@
   <script src="./dashboard.js"></script>
   <script src="./analysis.js"></script>
   <script src="./admin.js"></script>
+
+  <script id="research-staff-portal-bridge">
+  (function () {
+    'use strict';
+
+    const TABS = [
+      { id: 'dashboard', label: '메인 대시보드' },
+      { id: 'analysis', label: '현황분석' },
+      { id: 'admin', label: '운영인력 리스트' }
+    ];
+
+    const LEAVE_OPTIONS = [
+      { value: 'exclude', label: '휴직 제외' },
+      { value: 'include', label: '휴직 포함' }
+    ];
+
+    function activeView() {
+      const el = document.querySelector('.tabs .tab-btn.active[data-view]');
+      return el ? el.getAttribute('data-view') : 'dashboard';
+    }
+
+    function optionsOf(selectEl) {
+      if (!selectEl) return [];
+      return Array.from(selectEl.options).map(function (option) {
+        return {
+          value: option.value,
+          label: option.textContent || option.value
+        };
+      });
+    }
+
+    function activeLeave() {
+      const el = document.querySelector('.leave-toggle-btn.active[data-leave-mode]');
+      return el ? el.getAttribute('data-leave-mode') : 'exclude';
+    }
+
+    function getFilters() {
+      const month = document.getElementById('referenceMonth');
+      const division = document.getElementById('filterDivision');
+      const team = document.getElementById('filterTeam');
+
+      return [
+        {
+          id: 'referenceMonth',
+          label: '기준년월',
+          type: 'month',
+          value: month ? month.value : ''
+        },
+        {
+          id: 'filterDivision',
+          label: '본부',
+          type: 'select',
+          value: division ? division.value : '',
+          options: optionsOf(division)
+        },
+        {
+          id: 'filterTeam',
+          label: '팀',
+          type: 'select',
+          value: team ? team.value : '',
+          options: optionsOf(team)
+        },
+        {
+          id: 'leaveMode',
+          label: '휴직',
+          type: 'select',
+          value: activeLeave(),
+          options: LEAVE_OPTIONS
+        }
+      ];
+    }
+
+    function postTabs() {
+      if (!window.parent || window.parent === window) return;
+      window.parent.postMessage({
+        type: 'portal-tabs-ready',
+        tabs: TABS,
+        activeTabId: activeView(),
+        source: 'research-staff'
+      }, '*');
+    }
+
+    function postFilters() {
+      if (!window.parent || window.parent === window) return;
+      window.parent.postMessage({
+        type: 'portal-filters-ready',
+        enabled: true,
+        filters: getFilters(),
+        source: 'research-staff'
+      }, '*');
+    }
+
+    function postActiveTab(id) {
+      if (!window.parent || window.parent === window || !id) return;
+      window.parent.postMessage({
+        type: 'portal-tab-active',
+        activeTabId: id,
+        tabId: id,
+        source: 'research-staff'
+      }, '*');
+    }
+
+    function triggerChange(el) {
+      if (!el) return;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function activateTab(id) {
+      const btn = document.querySelector('.tabs .tab-btn[data-view="' + id + '"]');
+      if (!btn) return false;
+      btn.click();
+      postActiveTab(id);
+      return true;
+    }
+
+    function setSelectValue(el, value) {
+      if (!el) return false;
+      const nextValue = value || '';
+      const exists = Array.from(el.options).some(function (option) {
+        return option.value === nextValue;
+      });
+
+      if (!exists && nextValue !== '') return false;
+      el.value = nextValue;
+      triggerChange(el);
+      return true;
+    }
+
+    function setFilter(id, value) {
+      if (id === 'referenceMonth') {
+        const el = document.getElementById('referenceMonth');
+        if (!el) return;
+        el.value = value || '';
+        triggerChange(el);
+        setTimeout(postFilters, 0);
+        return;
+      }
+
+      if (id === 'filterDivision') {
+        const el = document.getElementById('filterDivision');
+        if (!setSelectValue(el, value)) return;
+        setTimeout(postFilters, 80);
+        setTimeout(postFilters, 300);
+        setTimeout(postFilters, 700);
+        return;
+      }
+
+      if (id === 'filterTeam') {
+        const el = document.getElementById('filterTeam');
+        if (!setSelectValue(el, value)) return;
+        setTimeout(postFilters, 0);
+        return;
+      }
+
+      if (id === 'leaveMode') {
+        const btn = document.querySelector('.leave-toggle-btn[data-leave-mode="' + value + '"]');
+        if (!btn) return;
+        btn.click();
+        setTimeout(postFilters, 0);
+      }
+    }
+
+    window.portalTabs = TABS;
+    window.portalFilters = getFilters;
+    window.portalActivateTab = activateTab;
+    window.portalSetFilter = setFilter;
+
+    window.addEventListener('message', function (event) {
+      const payload = event && event.data ? event.data : {};
+
+      if (payload.type === 'portal-tabs-request') {
+        postTabs();
+        return;
+      }
+
+      if (payload.type === 'portal-filters-request') {
+        postFilters();
+        return;
+      }
+
+      if (payload.type === 'portal-tab-change') {
+        activateTab(payload.tabId || payload.tab || '');
+        return;
+      }
+
+      if (payload.type === 'portal-filter-change') {
+        setFilter(payload.filterId || '', payload.value || '');
+      }
+    });
+
+    document.addEventListener('click', function (event) {
+      const tab = event.target && event.target.closest
+        ? event.target.closest('.tabs .tab-btn[data-view]')
+        : null;
+
+      if (tab) {
+        setTimeout(function () {
+          postActiveTab(tab.getAttribute('data-view'));
+        }, 0);
+        return;
+      }
+
+      const leave = event.target && event.target.closest
+        ? event.target.closest('.leave-toggle-btn[data-leave-mode]')
+        : null;
+
+      if (leave) {
+        setTimeout(postFilters, 0);
+      }
+    });
+
+    document.addEventListener('change', function (event) {
+      if (!event.target) return;
+
+      if (['referenceMonth', 'filterDivision', 'filterTeam'].includes(event.target.id)) {
+        setTimeout(postFilters, 0);
+        setTimeout(postFilters, 300);
+      }
+    });
+
+    function postAll() {
+      postTabs();
+      postFilters();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', postAll);
+    } else {
+      postAll();
+    }
+
+    setTimeout(postAll, 200);
+    setTimeout(postAll, 700);
+    setTimeout(postAll, 1400);
+    setTimeout(postAll, 2500);
+    setTimeout(postAll, 4000);
+  })();
+  </script>
+
 </body>
 </html>
