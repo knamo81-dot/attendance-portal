@@ -3261,7 +3261,6 @@ function restoreSavedMainTab(preferredTab){
 /* ===== attendance performance guard: lazy tab render + cache ===== */
 const ATTENDANCE_HEAVY_TABS = new Set(['dashboard','deep-analysis','trend-analysis','attendance-missing']);
 let ATTENDANCE_RENDER_TOKEN = 0;
-let ATTENDANCE_RENDER_VERSION = 0;
 let ATTENDANCE_TAB_RENDER_CACHE = Object.create(null);
 
 function getAttendanceRenderSignature(tabName){
@@ -3270,7 +3269,6 @@ function getAttendanceRenderSignature(tabName){
   const firstRow = rows[0] || {};
   const lastRow = rows[rows.length - 1] || {};
   return [
-    String(ATTENDANCE_RENDER_VERSION || 0),
     String(tabName || ''),
     String(STATE?.period || ''),
     String(STATE?.division || ''),
@@ -3285,7 +3283,6 @@ function getAttendanceRenderSignature(tabName){
 }
 
 function invalidateAttendanceRenderCache(){
-  ATTENDANCE_RENDER_VERSION += 1;
   ATTENDANCE_TAB_RENDER_CACHE = Object.create(null);
 }
 window.invalidateAttendanceRenderCache = invalidateAttendanceRenderCache;
@@ -3301,6 +3298,13 @@ function shouldRunAttendanceAnalysisRender(tabName, options = {}){
   // 무거운 분석 탭은 현재 보이는 탭일 때만 계산합니다.
   if(ATTENDANCE_HEAVY_TABS.has(id) && !isAttendanceMainTabActive(id)){
     return false;
+  }
+
+  // 분석대시보드/심층분석은 필터 반영 정확도가 우선입니다.
+  // 두 탭은 지연이 크지 않으므로 캐시로 생략하지 않고, 보일 때마다 현재 필터 기준으로 다시 그립니다.
+  if(id === 'dashboard' || id === 'deep-analysis'){
+    ATTENDANCE_TAB_RENDER_CACHE[id] = getAttendanceRenderSignature(id);
+    return true;
   }
 
   const key = getAttendanceRenderSignature(id);
@@ -9758,7 +9762,7 @@ function renderAttendanceMissingAnalysis(){
   emptyEl.style.display = list.length ? 'none' : 'block';
 }
 
-function rerenderDashboardVisibleCharts(options = {}){
+function rerenderDashboardVisibleCharts(){
   const activeTab = getActiveAttendanceMainTab('attendance');
   if(activeTab !== 'dashboard' && activeTab !== 'deep-analysis') return;
 
@@ -9766,10 +9770,7 @@ function rerenderDashboardVisibleCharts(options = {}){
     if(getActiveAttendanceMainTab('attendance') !== activeTab) return;
     const months = periodMonths();
     const scoped = scopedEmployees();
-
-    // 분석대시보드는 필터 변경/내부 탭 전환 직후 캐시가 남아 있으면
-    // 이전 필터 기준 화면이 보일 수 있으므로, 보이는 상태에서는 강제 갱신을 기본값으로 둡니다.
-    renderAttendanceHeavyTab(activeTab, scoped, months, { force: options.force !== false });
+    renderAttendanceHeavyTab(activeTab, scoped, months);
   });
 }
 
