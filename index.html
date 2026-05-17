@@ -750,6 +750,18 @@ body:not(.service-admin-enabled) .service-admin-btn{
   box-shadow:0 4px 10px rgba(15,23,42,.10);
 }
 
+.portal-subtab.is-switching{
+  background:var(--current-header-accent);
+  border-color:var(--current-header-accent);
+  color:#ffffff;
+  box-shadow:0 4px 10px rgba(15,23,42,.10);
+  pointer-events:none;
+}
+
+.portal-subtabs.is-updating .portal-subtab{
+  transition:none !important;
+}
+
 @media (max-width: 900px){
   .portal-subtabs{
     overflow-x:auto;
@@ -1303,39 +1315,91 @@ body:not(.service-admin-enabled) .service-admin-btn{
     }).filter(function (tab) { return tab.id && tab.label; });
   }
 
+  function getPortalTabSignature(tabs) {
+    return normalizePortalTabs(tabs).map(function (tab) {
+      return tab.id + ':' + tab.label;
+    }).join('|');
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  let currentPortalTabSignature = '';
+  let portalSubtabSwitchTimer = null;
+
   function renderPortalSubtabs(tabs, activeId) {
-    currentPortalTabs = normalizePortalTabs(tabs);
-    currentPortalTabId = activeId || currentPortalTabs[0]?.id || '';
+    const nextTabs = normalizePortalTabs(tabs);
+    const nextSignature = getPortalTabSignature(nextTabs);
+    const nextActiveId = activeId || currentPortalTabId || nextTabs[0]?.id || '';
 
     if (!els.portalSubtabsWrap || !els.portalSubtabs) return;
 
-    if (!currentPortalTabs.length) {
+    if (!nextTabs.length) {
+      currentPortalTabs = [];
+      currentPortalTabId = '';
+      currentPortalTabSignature = '';
       els.portalSubtabsWrap.classList.remove('show');
       els.portalSubtabs.innerHTML = '';
       return;
     }
 
+    // 같은 탭 구성이 다시 도착하면 버튼 DOM을 다시 만들지 않고 active 상태만 갱신합니다.
+    // iframe 응답이 늦거나 재요청이 여러 번 와도 포탈 상단 버튼이 빈 초록 버튼처럼 깜빡이지 않게 하기 위함입니다.
+    if (currentPortalTabSignature === nextSignature && els.portalSubtabs.children.length) {
+      currentPortalTabs = nextTabs;
+      setPortalSubtabActive(nextActiveId);
+      return;
+    }
+
+    currentPortalTabs = nextTabs;
+    currentPortalTabId = nextActiveId;
+    currentPortalTabSignature = nextSignature;
+
     els.portalSubtabsWrap.classList.add('show');
+    els.portalSubtabs.classList.add('is-updating');
     els.portalSubtabs.innerHTML = currentPortalTabs.map(function (tab) {
       const active = tab.id === currentPortalTabId ? ' active' : '';
-      return '<button type="button" class="portal-subtab' + active + '" data-portal-tab="' + tab.id + '" title="' + tab.label + '">' + tab.label + '</button>';
+      return '<button type="button" class="portal-subtab' + active + '" data-portal-tab="' + escapeHtml(tab.id) + '" title="' + escapeHtml(tab.label) + '">' + escapeHtml(tab.label) + '</button>';
     }).join('');
 
     Array.from(els.portalSubtabs.querySelectorAll('.portal-subtab')).forEach(function (btn) {
       btn.addEventListener('click', function () {
         const tabId = btn.getAttribute('data-portal-tab') || '';
-        setPortalSubtabActive(tabId);
+        setPortalSubtabActive(tabId, true);
         sendPortalTabChange(tabId);
       });
     });
+
+    requestAnimationFrame(function () {
+      els.portalSubtabs?.classList.remove('is-updating');
+    });
   }
 
-  function setPortalSubtabActive(tabId) {
+  function setPortalSubtabActive(tabId, fromClick) {
     currentPortalTabId = tabId || currentPortalTabId;
     if (!els.portalSubtabs) return;
+
+    clearTimeout(portalSubtabSwitchTimer);
+
     Array.from(els.portalSubtabs.querySelectorAll('.portal-subtab')).forEach(function (btn) {
-      btn.classList.toggle('active', btn.getAttribute('data-portal-tab') === currentPortalTabId);
+      const isActive = btn.getAttribute('data-portal-tab') === currentPortalTabId;
+      btn.classList.toggle('active', isActive);
+      btn.classList.toggle('is-switching', !!fromClick && isActive);
     });
+
+    if (fromClick) {
+      portalSubtabSwitchTimer = setTimeout(function () {
+        Array.from(els.portalSubtabs.querySelectorAll('.portal-subtab')).forEach(function (btn) {
+          btn.classList.remove('is-switching');
+        });
+      }, 450);
+    }
   }
 
   function sendPortalTabChange(tabId) {
