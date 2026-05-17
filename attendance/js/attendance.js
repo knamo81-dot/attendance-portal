@@ -9642,7 +9642,51 @@ function rerenderDashboardVisibleCharts(){
   });
 }
 
+const ATTENDANCE_MAIN_TAB_LABELS = {
+  attendance: '근태관리',
+  dashboard: '분석대시보드',
+  'deep-analysis': '심층분석',
+  'trend-analysis': '트렌드분석',
+  'attendance-missing': '출퇴근 누락 분석',
+  admin: '관리자 기능'
+};
+
+function stabilizeAttendanceMainTabButtons(){
+  $$('.mainTab').forEach(btn => {
+    const mainName = String(btn?.dataset?.main || '').trim();
+    if(!mainName) return;
+    if(!String(btn.textContent || '').trim() && ATTENDANCE_MAIN_TAB_LABELS[mainName]){
+      btn.textContent = ATTENDANCE_MAIN_TAB_LABELS[mainName];
+    }
+    if(btn.tagName === 'BUTTON' && !btn.getAttribute('type')){
+      btn.setAttribute('type', 'button');
+    }
+  });
+}
+
+function renderMainTabDeferred(mainName){
+  const tabName = String(mainName || '').trim();
+  window.clearTimeout(window.__attendanceMainTabRenderTimer);
+  window.__attendanceMainTabRenderTimer = window.setTimeout(() => {
+    requestAnimationFrame(() => {
+      if(tabName === 'dashboard' || tabName === 'deep-analysis'){
+        rerenderDashboardVisibleCharts();
+      }
+      if(typeof trendUpdatePeriodControlVisibility === 'function'){
+        trendUpdatePeriodControlVisibility();
+      }
+      if(tabName === 'trend-analysis'){
+        renderTrendAnalysis();
+      }
+      if(tabName === 'attendance-missing'){
+        renderAttendanceMissingAnalysis();
+      }
+    });
+  }, 30);
+}
+
 function bindMainTabs(){
+  stabilizeAttendanceMainTabButtons();
   $$('.mainTab').forEach(btn => {
     btn.onclick = () => {
       const mainName = String(btn.dataset.main || '').trim();
@@ -9651,27 +9695,25 @@ function bindMainTabs(){
         if(typeof applyAttendanceMainMenuAccess === 'function') applyAttendanceMainMenuAccess();
         activateMainTabWithoutRender('attendance');
         saveAttendanceMainTab('attendance');
+        stabilizeAttendanceMainTabButtons();
         return;
       }
+
       if(mainName) saveAttendanceMainTab(mainName);
-      $$('.mainTab').forEach(x => x.classList.remove('active'));
-      $$('.mainPanel').forEach(x => x.classList.remove('active'));
-      btn.classList.add('active');
-      const panel = $('#main-' + mainName);
-      if(panel) panel.classList.add('active');
-      if(mainName === 'dashboard' || mainName === 'deep-analysis'){
-        rerenderDashboardVisibleCharts();
+
+      // 탭 버튼/패널 전환은 먼저 즉시 처리하고, 무거운 차트/분석 렌더는 다음 프레임으로 미룹니다.
+      const switched = activateMainTabWithoutRender(mainName);
+      if(!switched) return;
+
+      stabilizeAttendanceMainTabButtons();
+      if(typeof trendUpdatePeriodControlVisibility === 'function'){
+        trendUpdatePeriodControlVisibility();
       }
-      trendUpdatePeriodControlVisibility();
-      if(mainName === 'trend-analysis'){
-        requestAnimationFrame(() => { renderTrendAnalysis(); setTimeout(renderTrendAnalysis, 80); });
-      }
-      if(mainName === 'attendance-missing'){
-        renderAttendanceMissingAnalysis();
-      }
+      renderMainTabDeferred(mainName);
     };
   });
   if(typeof applyAttendanceMainMenuAccess === 'function') applyAttendanceMainMenuAccess();
+  stabilizeAttendanceMainTabButtons();
 }
 
 function renderTabs(){
