@@ -179,6 +179,28 @@
     } catch (_) {}
   }
 
+  let __bridgeRenderTimer = null;
+
+  function scheduleBridgeRender(tabId) {
+    if (isReportModalOpen()) return;
+
+    const id = normalizeTabId(tabId);
+
+    if (__bridgeRenderTimer) {
+      clearTimeout(__bridgeRenderTimer);
+      __bridgeRenderTimer = null;
+    }
+
+    // 포탈 공통 버튼/iframe 패널 전환이 먼저 그려지도록 한 프레임 양보한 뒤
+    // 무거운 근태/트렌드/누락 렌더를 실행합니다.
+    requestAnimationFrame(function () {
+      __bridgeRenderTimer = setTimeout(function () {
+        __bridgeRenderTimer = null;
+        renderCurrentTab(id);
+      }, 120);
+    });
+  }
+
   function activateTab(tabId) {
     const id = normalizeTabId(tabId);
     let ok = false;
@@ -207,10 +229,10 @@
       }
     } catch (_) {}
 
-    renderCurrentTab(id);
     postActiveTab(id);
     postTabs();
     postFilters();
+    scheduleBridgeRender(id);
 
     return ok;
   }
@@ -363,7 +385,7 @@
       setSelectValue(document.querySelector(selector), nextValue);
     });
 
-    if (!isReportModalOpen()) renderCurrentTab(getActiveTabId());
+    if (!isReportModalOpen()) scheduleBridgeRender(getActiveTabId());
 
     setTimeout(postFilters, 150);
   }
