@@ -396,15 +396,14 @@
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  function setSelectValue(el, value, options = {}) {
+  function setSelectValue(el, value) {
     if (!el) return;
     const exists = Array.from(el.options || []).some(function (option) {
       return option.value === value;
     });
     if (exists || value === '') {
-      if (el.value === value) return;
       el.value = value;
-      if (options.silent !== true) fireChange(el);
+      fireChange(el);
     }
   }
 
@@ -420,8 +419,6 @@
       if (window.STATE) window.STATE[kind] = nextValue;
     } catch (_) {}
 
-    // 포탈 공통 필터 변경은 attendance.js 내부 change 이벤트와 중복 렌더가 섞이지 않도록
-    // bridge에서 조용히 값을 반영한 뒤 현재 탭만 강제 재렌더합니다.
     invalidateAttendanceCache();
 
     const selectorMap = {
@@ -431,10 +428,10 @@
     };
 
     (selectorMap[kind] || []).forEach(function (selector) {
-      setSelectValue(document.querySelector(selector), nextValue, { silent: true });
+      setSelectValue(document.querySelector(selector), nextValue);
     });
 
-    if (!isReportModalOpen()) scheduleBridgeRender(getActiveTabId(), { force: true });
+    if (!isReportModalOpen()) scheduleBridgeRender(getActiveTabId());
 
     setTimeout(postFilters, 150);
   }
