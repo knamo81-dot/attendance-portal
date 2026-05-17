@@ -3330,15 +3330,42 @@ function renderAttendanceBaseView(scoped, months){
   ATTENDANCE_TAB_RENDER_CACHE.attendance = getAttendanceRenderSignature('attendance');
 }
 
+
+function refreshAttendanceDerivedMetricsForAnalysis(){
+  try{
+    dedupeEmpMasterByName();
+  }catch(_){}
+
+  try{
+    if(Array.isArray(REAL_ATTENDANCE_DATA) && REAL_ATTENDANCE_DATA.length){
+      rebuildDerivedMetricsFromAttendance();
+    }else{
+      syncDashboardDataFromEmpMaster();
+    }
+  }catch(error){
+    console.warn('[attendance] analysis derived metric refresh failed:', error);
+  }
+}
+window.refreshAttendanceDerivedMetricsForAnalysis = refreshAttendanceDerivedMetricsForAnalysis;
+
 function renderAttendanceHeavyTab(tabName, scoped, months, options = {}){
   const id = String(tabName || '').trim();
 
   if(id === 'dashboard' || id === 'deep-analysis'){
+    // 분석대시보드/심층분석은 근태관리 탭 렌더 결과를 따라가면 안 됩니다.
+    // 탭 진입/필터 변경 시점에 현재 STATE(period/division/team) 기준으로
+    // 파생 데이터(EMPLOYEES/MONTHLY)를 먼저 갱신한 뒤 화면을 그립니다.
+    refreshAttendanceDerivedMetricsForAnalysis();
+
     if(!shouldRunAttendanceAnalysisRender(id, options)) return;
-    renderTopCharts(scoped, months);
-    renderInsight(scoped, months);
-    renderRisk(scoped);
-    renderPeople(scoped);
+
+    const freshMonths = periodMonths();
+    const freshScoped = scopedEmployees();
+
+    renderTopCharts(freshScoped, freshMonths);
+    renderInsight(freshScoped, freshMonths);
+    renderRisk(freshScoped);
+    renderPeople(freshScoped);
     return;
   }
 
@@ -9768,9 +9795,7 @@ function rerenderDashboardVisibleCharts(){
 
   requestAnimationFrame(() => {
     if(getActiveAttendanceMainTab('attendance') !== activeTab) return;
-    const months = periodMonths();
-    const scoped = scopedEmployees();
-    renderAttendanceHeavyTab(activeTab, scoped, months);
+    renderAttendanceHeavyTab(activeTab, null, null, { force: true });
   });
 }
 
