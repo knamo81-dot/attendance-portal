@@ -120,7 +120,8 @@
     return false;
   }
 
-  function shouldSkipBridgeRender(tabId) {
+  function shouldSkipBridgeRender(tabId, options = {}) {
+    if (options && options.force === true) return false;
     const now = Date.now();
     const key = getBridgeRenderKey(tabId);
 
@@ -142,9 +143,66 @@
     return false;
   }
 
-  function renderCurrentTab(tabId) {
+  function invalidateAttendanceCache() {
+    try {
+      if (typeof window.invalidateAttendanceRenderCache === 'function') {
+        window.invalidateAttendanceRenderCache();
+      }
+    } catch (_) {}
+  }
+
+  function renderAttendanceHeavy(id, options = {}) {
+    const tabId = normalizeTabId(id);
+    const forceOptions = { force: options.force === true };
+
+    try {
+      if (
+        typeof window.renderAttendanceHeavyTab === 'function' &&
+        typeof window.scopedEmployees === 'function' &&
+        typeof window.periodMonths === 'function'
+      ) {
+        const months = window.periodMonths();
+        const scoped = window.scopedEmployees();
+        window.renderAttendanceHeavyTab(tabId, scoped, months, forceOptions);
+        return true;
+      }
+    } catch (error) {
+      console.warn('[portal-bridge] renderAttendanceHeavyTab failed:', error);
+    }
+
+    try {
+      if ((tabId === 'dashboard' || tabId === 'deep-analysis') && typeof window.rerenderDashboardVisibleCharts === 'function') {
+        window.rerenderDashboardVisibleCharts();
+        return true;
+      }
+    } catch (error) {
+      console.warn('[portal-bridge] rerenderDashboardVisibleCharts failed:', error);
+    }
+
+    try {
+      if (tabId === 'trend-analysis' && typeof window.renderTrendAnalysis === 'function') {
+        window.renderTrendAnalysis();
+        return true;
+      }
+    } catch (error) {
+      console.warn('[portal-bridge] renderTrendAnalysis failed:', error);
+    }
+
+    try {
+      if (tabId === 'attendance-missing' && typeof window.renderAttendanceMissingAnalysis === 'function') {
+        window.renderAttendanceMissingAnalysis();
+        return true;
+      }
+    } catch (error) {
+      console.warn('[portal-bridge] renderAttendanceMissingAnalysis failed:', error);
+    }
+
+    return false;
+  }
+
+  function renderCurrentTab(tabId, options = {}) {
     if (isReportModalOpen()) return;
-    if (shouldSkipBridgeRender(tabId)) return;
+    if (shouldSkipBridgeRender(tabId, options)) return;
 
     const id = normalizeTabId(tabId);
 
@@ -160,28 +218,14 @@
       }
     } catch (_) {}
 
-    try {
-      if ((id === 'dashboard' || id === 'deep-analysis') && typeof window.rerenderDashboardVisibleCharts === 'function') {
-        window.rerenderDashboardVisibleCharts();
-      }
-    } catch (_) {}
-
-    try {
-      if (id === 'trend-analysis' && typeof window.renderTrendAnalysis === 'function') {
-        window.renderTrendAnalysis();
-      }
-    } catch (_) {}
-
-    try {
-      if (id === 'attendance-missing' && typeof window.renderAttendanceMissingAnalysis === 'function') {
-        window.renderAttendanceMissingAnalysis();
-      }
-    } catch (_) {}
+    if (id === 'dashboard' || id === 'deep-analysis' || id === 'trend-analysis' || id === 'attendance-missing') {
+      renderAttendanceHeavy(id, options);
+    }
   }
 
   let __bridgeRenderTimer = null;
 
-  function scheduleBridgeRender(tabId) {
+  function scheduleBridgeRender(tabId, options = {}) {
     if (isReportModalOpen()) return;
 
     const id = normalizeTabId(tabId);
@@ -196,7 +240,7 @@
     requestAnimationFrame(function () {
       __bridgeRenderTimer = setTimeout(function () {
         __bridgeRenderTimer = null;
-        renderCurrentTab(id);
+        renderCurrentTab(id, options);
       }, 120);
     });
   }
@@ -352,14 +396,15 @@
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  function setSelectValue(el, value) {
+  function setSelectValue(el, value, options = {}) {
     if (!el) return;
     const exists = Array.from(el.options || []).some(function (option) {
       return option.value === value;
     });
     if (exists || value === '') {
+      if (el.value === value) return;
       el.value = value;
-      fireChange(el);
+      if (options.silent !== true) fireChange(el);
     }
   }
 
@@ -375,6 +420,10 @@
       if (window.STATE) window.STATE[kind] = nextValue;
     } catch (_) {}
 
+    // 포탈 공통 필터 변경은 attendance.js 내부 change 이벤트와 중복 렌더가 섞이지 않도록
+    // bridge에서 조용히 값을 반영한 뒤 현재 탭만 강제 재렌더합니다.
+    invalidateAttendanceCache();
+
     const selectorMap = {
       period: ['#period', '#stickyPeriod', '#periodSelect', '#monthSelect'],
       division: ['#division', '#stickyDivision', '#divisionFilter', '#filterDivision'],
@@ -382,10 +431,10 @@
     };
 
     (selectorMap[kind] || []).forEach(function (selector) {
-      setSelectValue(document.querySelector(selector), nextValue);
+      setSelectValue(document.querySelector(selector), nextValue, { silent: true });
     });
 
-    if (!isReportModalOpen()) scheduleBridgeRender(getActiveTabId());
+    if (!isReportModalOpen()) scheduleBridgeRender(getActiveTabId(), { force: true });
 
     setTimeout(postFilters, 150);
   }
