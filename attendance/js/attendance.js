@@ -3257,6 +3257,132 @@ function restoreSavedMainTab(preferredTab){
   }
   if(typeof trendUpdatePeriodControlVisibility === 'function') trendUpdatePeriodControlVisibility();
 }
+
+/* ===== attendance performance guard: lazy tab render + cache ===== */
+const ATTENDANCE_HEAVY_TABS = new Set(['dashboard','deep-analysis','trend-analysis','attendance-missing']);
+let ATTENDANCE_RENDER_TOKEN = 0;
+let ATTENDANCE_TAB_RENDER_CACHE = Object.create(null);
+
+function getAttendanceRenderSignature(tabName){
+  const rows = Array.isArray(REAL_ATTENDANCE_DATA) ? REAL_ATTENDANCE_DATA : [];
+  const employees = Array.isArray(EMPLOYEES) ? EMPLOYEES : [];
+  const firstRow = rows[0] || {};
+  const lastRow = rows[rows.length - 1] || {};
+  return [
+    String(tabName || ''),
+    String(STATE?.period || ''),
+    String(STATE?.division || ''),
+    String(STATE?.team || ''),
+    rows.length,
+    employees.length,
+    String(firstRow.date || ''),
+    String(lastRow.date || ''),
+    String(firstRow.recordId || firstRow.id || ''),
+    String(lastRow.recordId || lastRow.id || '')
+  ].join('|');
+}
+
+function invalidateAttendanceRenderCache(){
+  ATTENDANCE_TAB_RENDER_CACHE = Object.create(null);
+}
+
+function isAttendanceMainTabActive(tabName){
+  return getActiveAttendanceMainTab('attendance') === String(tabName || '').trim();
+}
+
+function shouldRunAttendanceAnalysisRender(tabName, options = {}){
+  const id = String(tabName || '').trim();
+  if(!id) return false;
+
+  // 무거운 분석 탭은 현재 보이는 탭일 때만 계산합니다.
+  if(ATTENDANCE_HEAVY_TABS.has(id) && !isAttendanceMainTabActive(id)){
+    return false;
+  }
+
+  const key = getAttendanceRenderSignature(id);
+  if(options.force === true){
+    ATTENDANCE_TAB_RENDER_CACHE[id] = key;
+    return true;
+  }
+
+  if(ATTENDANCE_TAB_RENDER_CACHE[id] === key){
+    return false;
+  }
+
+  ATTENDANCE_TAB_RENDER_CACHE[id] = key;
+  return true;
+}
+
+function renderAttendanceBaseView(scoped, months){
+  renderKpis(scoped);
+  if(typeof initKpiCardLayout === 'function') initKpiCardLayout();
+  renderSummary(months);
+  renderAlerts(months);
+  renderAttendanceTab();
+  ATTENDANCE_TAB_RENDER_CACHE.attendance = getAttendanceRenderSignature('attendance');
+}
+
+function renderAttendanceHeavyTab(tabName, scoped, months, options = {}){
+  const id = String(tabName || '').trim();
+
+  if(id === 'dashboard' || id === 'deep-analysis'){
+    if(!shouldRunAttendanceAnalysisRender(id, options)) return;
+    renderTopCharts(scoped, months);
+    renderInsight(scoped, months);
+    renderRisk(scoped);
+    renderPeople(scoped);
+    return;
+  }
+
+  if(id === 'trend-analysis'){
+    if(!shouldRunAttendanceAnalysisRender(id, options)) return;
+    renderTrendAnalysis();
+    return;
+  }
+
+  if(id === 'attendance-missing'){
+    if(!shouldRunAttendanceAnalysisRender(id, options)) return;
+    renderAttendanceMissingAnalysis();
+  }
+}
+
+function renderActiveAttendanceView(scoped, months, options = {}){
+  const activeTab = getActiveAttendanceMainTab('attendance');
+
+  if(activeTab === 'attendance'){
+    renderAttendanceBaseView(scoped, months);
+    return;
+  }
+
+  if(activeTab === 'dashboard' || activeTab === 'deep-analysis' || activeTab === 'trend-analysis' || activeTab === 'attendance-missing'){
+    renderAttendanceHeavyTab(activeTab, scoped, months, options);
+  }
+}
+
+function renderMainTabDeferredSafe(tabName){
+  const id = String(tabName || '').trim();
+  const token = ++ATTENDANCE_RENDER_TOKEN;
+  window.clearTimeout(window.__attendanceMainTabRenderTimer);
+  window.__attendanceMainTabRenderTimer = window.setTimeout(() => {
+    requestAnimationFrame(() => {
+      if(token !== ATTENDANCE_RENDER_TOKEN) return;
+      if(getActiveAttendanceMainTab('attendance') !== id) return;
+
+      const months = periodMonths();
+      const scoped = scopedEmployees();
+
+      if(id === 'attendance'){
+        renderAttendanceBaseView(scoped, months);
+      }else{
+        renderAttendanceHeavyTab(id, scoped, months);
+      }
+
+      if(typeof trendUpdatePeriodControlVisibility === 'function'){
+        trendUpdatePeriodControlVisibility();
+      }
+    });
+  }, 80);
+}
 restoreSavedAttendancePeriod();
 applyAttendanceAdminVisibility(false);
 resolveAttendanceAdminAccess(false).then(function(isAdmin){
@@ -4132,26 +4258,27 @@ async function updateAttendanceViewsAfterDataChange(options = {}){
     }else{
       syncDashboardDataFromEmpMaster();
     }
+
+    // 데이터/필터가 바뀐 경우 기존 분석 캐시는 무효화합니다.
+    invalidateAttendanceRenderCache();
+
     updateUploadStatus();
     if(options.refreshFilters !== false){
       renderFilters();
     }
     if(typeof refreshFloatingFilters === 'function') refreshFloatingFilters();
+
+    restoreSavedMainTab(keepTab);
+
     const months = periodMonths();
     const scoped = scopedEmployees();
-    renderKpis(scoped);
-    if(typeof initKpiCardLayout === 'function') initKpiCardLayout();
-    renderSummary(months);
-    renderAlerts(months);
-    renderAttendanceTab();
-    renderAttendanceMissingAnalysis();
-    renderTopCharts(scoped, months);
-    renderInsight(scoped, months);
-    renderRisk(scoped);
-    renderPeople(scoped);
-    renderTrendAnalysis();
+
+    // 현재 활성 탭만 렌더합니다. 보이지 않는 분석 탭은 클릭 시 계산합니다.
+    renderActiveAttendanceView(scoped, months, { force: true });
+
     renderTabs();
-    restoreSavedMainTab(keepTab);
+    if(typeof bindMainTabs === 'function') bindMainTabs();
+    if(typeof applyAttendanceManualEditControls === 'function') applyAttendanceManualEditControls();
   }catch(error){
     console.error('[UPDATE ATTENDANCE VIEWS FAILED]', error);
   }
@@ -9628,17 +9755,14 @@ function renderAttendanceMissingAnalysis(){
 }
 
 function rerenderDashboardVisibleCharts(){
-  const rerender = () => {
+  const activeTab = getActiveAttendanceMainTab('attendance');
+  if(activeTab !== 'dashboard' && activeTab !== 'deep-analysis') return;
+
+  requestAnimationFrame(() => {
+    if(getActiveAttendanceMainTab('attendance') !== activeTab) return;
     const months = periodMonths();
     const scoped = scopedEmployees();
-    renderTopCharts(scoped, months);
-    renderInsight(scoped, months);
-    renderRisk(scoped);
-    renderPeople(scoped);
-  };
-  requestAnimationFrame(() => {
-    rerender();
-    setTimeout(rerender, 80);
+    renderAttendanceHeavyTab(activeTab, scoped, months);
   });
 }
 
@@ -9709,7 +9833,7 @@ function bindMainTabs(){
       if(typeof trendUpdatePeriodControlVisibility === 'function'){
         trendUpdatePeriodControlVisibility();
       }
-      renderMainTabDeferred(mainName);
+      renderMainTabDeferredSafe(mainName);
     };
   });
   if(typeof applyAttendanceMainMenuAccess === 'function') applyAttendanceMainMenuAccess();
@@ -9764,6 +9888,7 @@ function render(){
     bindUploadRuntimeEvents();
     loadUploadedAttendanceData();
     window.__empMasterInitialized = true;
+    invalidateAttendanceRenderCache();
   }
   dedupeEmpMasterByName();
   if(Array.isArray(REAL_ATTENDANCE_DATA) && REAL_ATTENDANCE_DATA.length){
@@ -9773,19 +9898,15 @@ function render(){
   }
   updateUploadStatus();
   renderFilters();
-  const months=periodMonths(), scoped=scopedEmployees();
-  renderKpis(scoped);
-  renderSummary(months);
-  renderAlerts(months);
-  renderAttendanceTab();
-  renderAttendanceMissingAnalysis();
-  renderTopCharts(scoped, months);
-  renderInsight(scoped, months);
-  renderRisk(scoped);
-  renderPeople(scoped);
-  renderTrendAnalysis();
-  bindMainTabs();
   restoreSavedMainTab(keepTab);
+
+  const months = periodMonths();
+  const scoped = scopedEmployees();
+
+  // 최초/일반 렌더에서는 현재 활성 탭만 그립니다.
+  renderActiveAttendanceView(scoped, months);
+
+  bindMainTabs();
   renderTabs();
   if(typeof applyAttendanceManualEditControls === 'function') applyAttendanceManualEditControls();
 }
@@ -10099,13 +10220,8 @@ function debounce(fn, wait){
 const renderLightweight = debounce(() => {
   const months = periodMonths();
   const scoped = scopedEmployees();
-  renderAttendanceTab();
-  renderAttendanceMissingAnalysis();
-  renderTopCharts(scoped, months);
-  renderInsight(scoped, months);
-  renderRisk(scoped);
-  renderPeople(scoped);
-  renderTrendAnalysis();
+  invalidateAttendanceRenderCache();
+  renderActiveAttendanceView(scoped, months, { force: true });
 }, 120);
 
 document.addEventListener('click', function(e){
@@ -11362,7 +11478,7 @@ window.refreshAdminUploadManagementStrong = refreshAdminUploadManagementStrong;
       }catch(error){
         dbError('초기 데이터 로딩 중 오류가 발생했습니다.', error);
       }
-              bindUploadRuntimeEvents();
+      bindUploadRuntimeEvents();
       try{
         await window.loadAttendanceFromSupabase();
       }catch(error){
@@ -11375,6 +11491,7 @@ window.refreshAdminUploadManagementStrong = refreshAdminUploadManagementStrong;
         console.error('employee_special_notes 로딩 오류', error);
       }
       window.__empMasterInitialized = true;
+      invalidateAttendanceRenderCache();
     }
     dedupeEmpMasterByName();
     if(Array.isArray(REAL_ATTENDANCE_DATA) && REAL_ATTENDANCE_DATA.length){
@@ -11385,23 +11502,21 @@ window.refreshAdminUploadManagementStrong = refreshAdminUploadManagementStrong;
     updateUploadStatus();
     renderFilters();
     refreshFloatingFilters();
-            const months = periodMonths();
-    const scoped = scopedEmployees();
-    renderKpis(scoped);
-    initKpiCardLayout();
-    renderSummary(months);
-    renderAlerts(months);
-    renderAttendanceTab();
-    renderAttendanceMissingAnalysis();
-    renderTopCharts(scoped, months);
-    renderInsight(scoped, months);
-    renderRisk(scoped);
-    renderPeople(scoped);
-    renderTrendAnalysis();
-    bindMainTabs();
     restoreSavedMainTab(keepTab);
+
+    const months = periodMonths();
+    const scoped = scopedEmployees();
+
+    // 초기 로딩에서는 현재 활성 탭만 렌더합니다.
+    renderActiveAttendanceView(scoped, months);
+
+    bindMainTabs();
     renderTabs();
-    await refreshAdminUploadManagement();
+
+    // 관리자 월 카드도 현재 관리자 탭일 때만 새로 그립니다.
+    if(getActiveAttendanceMainTab('attendance') === 'admin'){
+      await refreshAdminUploadManagement();
+    }
     };
 
   window.refreshAdminUploadManagement = refreshAdminUploadManagement;
