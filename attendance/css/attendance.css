@@ -151,10 +151,10 @@ select,button{padding:10px 14px;border:1px solid var(--line);border-radius:12px;
 .statusList{display:grid;gap:10px}
 .statusMini{border:1px solid var(--line);border-radius:14px;padding:10px;background:#fff}
 svg text{fill:var(--muted);font-size:14px}
-.svg-bar{transition:opacity .18s ease, transform .18s ease;transform-box:fill-box;transform-origin:center bottom;animation:barGrow .45s ease-out;}
+.svg-bar{transition:opacity .18s ease;transform-box:fill-box;transform-origin:center bottom;animation:none;}
 .svg-bar:hover{opacity:.86}
 .svg-value-label{fill:#475569;font-size:12px;font-weight:700}
-@keyframes barGrow{from{transform:scaleY(.15)}to{transform:scaleY(1)}}
+/* barGrow animation disabled for stable chart rendering */
 @media (max-width:1100px){
   .kpis,.gridAlerts,.grid3,.grid21,.uploadGrid,.guideGrid,.statusGrid{grid-template-columns:1fr}
   .kpi-slot{min-height:160px}
@@ -715,8 +715,8 @@ body{
   box-sizing:border-box;
 }
 .layout{
-  max-width:1500px;
-  margin:0 auto;
+  max-width:none;
+  margin:0;
   width:100%;
   display:grid;
   grid-template-columns:1fr;
