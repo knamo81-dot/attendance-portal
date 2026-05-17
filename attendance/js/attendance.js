@@ -3362,6 +3362,13 @@ function renderAttendanceHeavyTab(tabName, scoped, months, options = {}){
     const freshMonths = periodMonths();
     const freshScoped = scopedEmployees();
 
+    // 분석대시보드/심층분석의 상단 KPI 카드는 근태관리 탭의 renderKpis 결과를 공유합니다.
+    // 따라서 분석 탭 진입/필터 변경 시에도 반드시 현재 필터 기준으로 KPI를 먼저 갱신해야 합니다.
+    // 이 처리가 없으면 분석대시보드가 근태관리 탭을 한번 눌렀을 때 갱신된 값을 뒤늦게 따라갑니다.
+    renderKpis(freshScoped);
+    renderSummary(freshMonths);
+    renderAlerts(freshMonths);
+
     renderTopCharts(freshScoped, freshMonths);
     renderInsight(freshScoped, freshMonths);
     renderRisk(freshScoped);
