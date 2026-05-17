@@ -9,9 +9,6 @@
 (function () {
   'use strict';
 
-  if (window.__ATTENDANCE_PORTAL_BRIDGE_MAIN_LOADED__) return;
-  window.__ATTENDANCE_PORTAL_BRIDGE_MAIN_LOADED__ = true;
-
   const TABS = [
     { id: 'attendance', label: '근태관리' },
     { id: 'dashboard', label: '분석대시보드' },
@@ -77,20 +74,16 @@
   let __lastBridgeRenderKey = '';
   let __lastBridgeRenderAt = 0;
 
-  function getBridgeRenderKey(tabId) {
-    return [
+  function shouldSkipBridgeRender(tabId) {
+    const now = Date.now();
+    const key = [
       normalizeTabId(tabId),
       document.querySelector('#period')?.value || '',
       document.querySelector('#division')?.value || '',
       document.querySelector('#team')?.value || ''
     ].join('|');
-  }
 
-  function shouldSkipBridgeRender(tabId) {
-    const now = Date.now();
-    const key = getBridgeRenderKey(tabId);
-
-    if (key === __lastBridgeRenderKey && now - __lastBridgeRenderAt < 1000) {
+    if (key === __lastBridgeRenderKey && now - __lastBridgeRenderAt < 800) {
       return true;
     }
 
@@ -319,6 +312,10 @@
     (selectorMap[kind] || []).forEach(function (selector) {
       setSelectValue(document.querySelector(selector), nextValue);
     });
+
+    try {
+      if (typeof window.render === 'function') window.render();
+    } catch (_) {}
 
     if (!isReportModalOpen()) renderCurrentTab(getActiveTabId());
 
