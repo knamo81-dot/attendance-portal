@@ -71,19 +71,69 @@
     return !!(modal && (modal.classList.contains('show') || modal.getAttribute('aria-hidden') === 'false'));
   }
 
+  const __BRIDGE_STARTED_AT = Date.now();
   let __lastBridgeRenderKey = '';
   let __lastBridgeRenderAt = 0;
 
-  function shouldSkipBridgeRender(tabId) {
-    const now = Date.now();
-    const key = [
+  function getBridgeRenderKey(tabId) {
+    return [
       normalizeTabId(tabId),
       document.querySelector('#period')?.value || '',
       document.querySelector('#division')?.value || '',
       document.querySelector('#team')?.value || ''
     ].join('|');
+  }
 
-    if (key === __lastBridgeRenderKey && now - __lastBridgeRenderAt < 800) {
+  function hasRenderedContent(tabId) {
+    const id = normalizeTabId(tabId);
+
+    if (id === 'attendance') {
+      const kpis = document.querySelector('#attendanceKpis');
+      const panel = document.querySelector('#main-attendance');
+      return !!(
+        (kpis && kpis.children && kpis.children.length > 0) ||
+        (panel && panel.querySelector('svg')) ||
+        (panel && panel.querySelector('table tbody tr'))
+      );
+    }
+
+    if (id === 'dashboard') {
+      const panel = document.querySelector('#main-dashboard');
+      return !!(panel && (panel.querySelector('svg') || panel.querySelector('.kpiCard') || panel.querySelector('.riskItem')));
+    }
+
+    if (id === 'deep-analysis') {
+      const panel = document.querySelector('#main-deep-analysis');
+      return !!(panel && (panel.querySelector('svg') || panel.querySelector('.riskItem') || panel.querySelector('table tbody tr')));
+    }
+
+    if (id === 'trend-analysis') {
+      const panel = document.querySelector('#main-trend-analysis');
+      return !!(panel && panel.querySelector('svg'));
+    }
+
+    if (id === 'attendance-missing') {
+      const panel = document.querySelector('#main-attendance-missing');
+      return !!(panel && (panel.querySelector('svg') || panel.querySelector('table tbody tr')));
+    }
+
+    return false;
+  }
+
+  function shouldSkipBridgeRender(tabId) {
+    const now = Date.now();
+    const key = getBridgeRenderKey(tabId);
+
+    // 초기 로딩 직후에는 attendance.js 자체 초기 렌더와 bridge 렌더가 겹치기 쉽습니다.
+    // 이미 화면 요소가 그려진 경우 bridge가 같은 화면을 다시 그리지 않도록 막습니다.
+    if (now - __BRIDGE_STARTED_AT < 2500 && hasRenderedContent(tabId)) {
+      __lastBridgeRenderKey = key;
+      __lastBridgeRenderAt = now;
+      return true;
+    }
+
+    // 같은 탭/같은 필터 기준으로 짧은 시간 안에 들어오는 중복 렌더 방지
+    if (key === __lastBridgeRenderKey && now - __lastBridgeRenderAt < 1200) {
       return true;
     }
 
@@ -313,10 +363,6 @@
       setSelectValue(document.querySelector(selector), nextValue);
     });
 
-    try {
-      if (typeof window.render === 'function') window.render();
-    } catch (_) {}
-
     if (!isReportModalOpen()) renderCurrentTab(getActiveTabId());
 
     setTimeout(postFilters, 150);
@@ -379,43 +425,4 @@
   setTimeout(notifyAll, 250);
   setTimeout(notifyAll, 1200);
   setTimeout(notifyAll, 2500);
-})();
-
-
-/* ===== portal bridge performance tuning ===== */
-(function(){
-  let __attendanceTabBusy = false;
-  const originalActivate = window.activateTab;
-
-  if(typeof originalActivate === 'function' && !window.__attendanceActivateWrapped){
-    window.__attendanceActivateWrapped = true;
-
-    window.activateTab = function(tabId){
-      if(__attendanceTabBusy) return false;
-      __attendanceTabBusy = true;
-
-      const result = originalActivate(tabId);
-
-      requestAnimationFrame(()=>{
-        setTimeout(()=>{
-          __attendanceTabBusy = false;
-        },120);
-      });
-
-      return result;
-    };
-  }
-
-  const originalPostTabs = window.postTabs;
-  if(typeof originalPostTabs === 'function' && !window.__attendancePostTabsWrapped){
-    window.__attendancePostTabsWrapped = true;
-
-    let timer = null;
-    window.postTabs = function(){
-      clearTimeout(timer);
-      timer = setTimeout(()=>{
-        originalPostTabs();
-      },80);
-    };
-  }
 })();
