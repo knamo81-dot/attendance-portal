@@ -9,6 +9,9 @@
 (function () {
   'use strict';
 
+  if (window.__ATTENDANCE_PORTAL_BRIDGE_MAIN_LOADED__) return;
+  window.__ATTENDANCE_PORTAL_BRIDGE_MAIN_LOADED__ = true;
+
   const TABS = [
     { id: 'attendance', label: '근태관리' },
     { id: 'dashboard', label: '분석대시보드' },
@@ -71,8 +74,34 @@
     return !!(modal && (modal.classList.contains('show') || modal.getAttribute('aria-hidden') === 'false'));
   }
 
+  let __lastBridgeRenderKey = '';
+  let __lastBridgeRenderAt = 0;
+
+  function getBridgeRenderKey(tabId) {
+    return [
+      normalizeTabId(tabId),
+      document.querySelector('#period')?.value || '',
+      document.querySelector('#division')?.value || '',
+      document.querySelector('#team')?.value || ''
+    ].join('|');
+  }
+
+  function shouldSkipBridgeRender(tabId) {
+    const now = Date.now();
+    const key = getBridgeRenderKey(tabId);
+
+    if (key === __lastBridgeRenderKey && now - __lastBridgeRenderAt < 1000) {
+      return true;
+    }
+
+    __lastBridgeRenderKey = key;
+    __lastBridgeRenderAt = now;
+    return false;
+  }
+
   function renderCurrentTab(tabId) {
     if (isReportModalOpen()) return;
+    if (shouldSkipBridgeRender(tabId)) return;
 
     const id = normalizeTabId(tabId);
 
@@ -91,14 +120,12 @@
     try {
       if ((id === 'dashboard' || id === 'deep-analysis') && typeof window.rerenderDashboardVisibleCharts === 'function') {
         window.rerenderDashboardVisibleCharts();
-        setTimeout(window.rerenderDashboardVisibleCharts, 120);
       }
     } catch (_) {}
 
     try {
       if (id === 'trend-analysis' && typeof window.renderTrendAnalysis === 'function') {
         window.renderTrendAnalysis();
-        setTimeout(window.renderTrendAnalysis, 120);
       }
     } catch (_) {}
 
@@ -292,10 +319,6 @@
     (selectorMap[kind] || []).forEach(function (selector) {
       setSelectValue(document.querySelector(selector), nextValue);
     });
-
-    try {
-      if (typeof window.render === 'function') window.render();
-    } catch (_) {}
 
     if (!isReportModalOpen()) renderCurrentTab(getActiveTabId());
 
