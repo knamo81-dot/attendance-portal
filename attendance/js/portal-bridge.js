@@ -265,9 +265,9 @@
 
   function fallbackOptions(kind) {
     if (kind === 'period') {
-      // 기간 필터는 실제 #period/#monthSelect 옵션만 사용합니다.
-      // 월 데이터 선택 UI에서 임시 1M/3M/6M/12M fallback이 노출되지 않도록 비워둡니다.
-      return [];
+      // 기간 필터는 본부/팀 필터와 함께 처음부터 표시하되,
+      // 실제 월 옵션이 준비되기 전에는 임시 안내값만 보여줍니다.
+      return [{ value: '', label: '기준월 불러오는 중...' }];
     }
 
     try {
