@@ -696,6 +696,7 @@ function validateEmpForm(){
   const joinDate = $('#mJoinDate').value;
   const leaveDate = $('#mLeaveDate').value;
   const retireReason = $('#mRetireReason').value.trim();
+  const managedTeamsInput = ($('#mEmpManagedTeams')?.value || '').trim();
   if(!id || !name || !divisionCode || !teamCode || !grade || !authority || !joinDate){
     alert('필수 항목을 모두 입력해주세요.');
     return null;
@@ -2414,7 +2415,9 @@ function readAttendanceStoredUsers(){
 }
 function getAttendanceRoleFromIdentity(obj){
   if(!obj || typeof obj !== 'object') return '';
-  return obj.role || obj.system_role || obj.systemRole || obj.user_role || obj.userRole || obj.portal_role || obj.portalRole || obj.access_role || obj.accessRole || obj.auth_role || obj.authRole || '';
+  return obj.role || obj.primaryRole || obj.system_role || obj.systemRole || obj.user_role || obj.userRole || obj.portal_role || obj.portalRole || obj.access_role || obj.accessRole || obj.auth_role || obj.authRole ||
+    obj?.user?.role || obj?.user?.primaryRole || obj?.user?.user_role || obj?.user?.systemRole ||
+    obj?.profile?.role || obj?.profile?.primaryRole || obj?.profile?.user_role || obj?.profile?.systemRole || '';
 }
 function getAttendanceEmailFromIdentity(obj){
   if(!obj || typeof obj !== 'object') return '';
@@ -2766,6 +2769,12 @@ function isCurrentAttendanceAdmin(){
   return ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin === true;
 }
 function getAttendanceFallbackAdminByStorage(){
+  try{
+    const access = window.currentAccess || window.ATTENDANCE_EFFECTIVE_ACCESS || {};
+    const role = access.role || access.primaryRole || access.systemRole || access.system_role || '';
+    if(access.isAdmin === true || isAttendanceAdminRole(role)) return true;
+  }catch(e){}
+
   const identities = readAttendanceStoredUsers();
   for(const item of identities){
     if(isAttendanceAdminRole(getAttendanceRoleFromIdentity(item))) return true;
@@ -2780,10 +2789,12 @@ function applyAttendanceAdminVisibility(isAdmin){
     adminTab.dataset.adminHidden = allowed ? 'N' : 'Y';
     adminTab.setAttribute('aria-hidden', allowed ? 'false' : 'true');
     adminTab.disabled = !allowed;
+    adminTab.style.setProperty('display', allowed ? '' : 'none', allowed ? '' : 'important');
   }
   if(adminPanel){
     adminPanel.dataset.adminHidden = allowed ? 'N' : 'Y';
     adminPanel.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+    adminPanel.style.setProperty('display', allowed ? '' : 'none', allowed ? '' : 'important');
   }
   if(!allowed && adminPanel && adminPanel.classList.contains('active')){
     activateMainTabWithoutRender('attendance');
@@ -3166,7 +3177,7 @@ function canAccessAttendanceMainTab(tabName){
   const isTeamLeader = !!(access.isTeamLeader || access.isLeader);
   const effectivePrivileged = isAdmin || isOperator || isDirector || isManager || isTeamLeader || !!access.canViewAll || !!access.canViewDivision || !!access.canViewManagedTeams || !!access.canViewTeam;
   const isGeneral = !effectivePrivileged && !!(access.isGeneral || (typeof isCurrentAttendanceGeneralUser === 'function' && isCurrentAttendanceGeneralUser()));
-  if(targetName === 'admin') return isAdmin;
+  if(targetName === 'admin') return isAdmin || getAttendanceFallbackAdminByStorage();
   if(isGeneral) return false;
   if(ATTENDANCE_ANALYSIS_MAIN_TABS.includes(targetName)){
     return isAdmin || isOperator || isDirector || isManager || isTeamLeader || !!access.canViewAll || !!access.canViewDivision || !!access.canViewManagedTeams || !!access.canViewTeam;
