@@ -959,6 +959,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
             <button type="button" id="attendanceNavBtn" class="nav-btn" data-portal-src="attendance/index.html" title="근태">근태</button>
             <button type="button" id="researchStaffNavBtn" class="nav-btn" data-portal-src="research-staff/index.html" title="인력운영현황">인력</button>
             <button type="button" id="suppliesNavBtn" class="nav-btn" data-portal-src="reagent/index.html" title="시약">시약</button>
+            <button type="button" id="aicNavBtn" class="nav-btn" data-portal-src="aic/index.html" title="AIC">AIC</button>
             <button type="button" id="mealNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
             <button type="button" id="docsNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
           </div>
@@ -1238,6 +1239,12 @@ body:not(.service-admin-enabled) .service-admin-btn{
       desc: '제품 신청, 취합, 정리 업무를 관리합니다.',
       gradient: 'linear-gradient(135deg, #173a7a 0%, #2251a3 100%)'
     },
+    'aic/index.html': {
+      top: 'Global Communication',
+      title: 'AI Communication',
+      desc: '글로벌 연구소 협업용 AI 번역 채팅 회의방입니다.',
+      gradient: 'linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%)'
+    },
     'settings.html': {
       top: 'Portal Settings',
       title: '설정',
@@ -1283,6 +1290,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
       { id: 'summary', label: '취합정리' },
       { id: 'products', label: '제품관리' }
     ],
+    'aic/index.html': [],
     'settings.html': [
       { id: 'org', label: '조직관리' },
       { id: 'employee', label: '사원정보관리' },
