@@ -11551,6 +11551,7 @@ window.refreshAdminUploadManagementStrong = refreshAdminUploadManagementStrong;
 
   window.render = async function(){
     const keepTab = getActiveAttendanceMainTab('attendance');
+    const renderToken = ATTENDANCE_RENDER_TOKEN;
     saveAttendanceMainTab(keepTab);
     if(!window.__empMasterInitialized){
       try{
@@ -11583,7 +11584,12 @@ window.refreshAdminUploadManagementStrong = refreshAdminUploadManagementStrong;
     updateUploadStatus();
     renderFilters();
     refreshFloatingFilters();
-    restoreSavedMainTab(keepTab);
+
+    // render()가 진행되는 동안 사용자가 다른 탭으로 이동했다면,
+    // 늦게 끝난 근태관리 렌더가 다시 이전 탭으로 되돌리지 않도록 중단합니다.
+    if(!restoreSavedMainTabIfStillCurrent(keepTab, renderToken)){
+      return;
+    }
 
     const months = periodMonths();
     const scoped = scopedEmployees();
