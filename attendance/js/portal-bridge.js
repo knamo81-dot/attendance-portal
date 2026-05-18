@@ -265,17 +265,9 @@
 
   function fallbackOptions(kind) {
     if (kind === 'period') {
-      const current = window.STATE?.period || '';
-      const base = [
-        { value: '1M', label: '1개월' },
-        { value: '3M', label: '3개월' },
-        { value: '6M', label: '6개월' },
-        { value: '12M', label: '12개월' }
-      ];
-      if (current && !base.some(function (x) { return x.value === current; })) {
-        base.unshift({ value: current, label: current });
-      }
-      return base;
+      // 기간 필터는 실제 #period/#monthSelect 옵션만 사용합니다.
+      // 월 데이터 선택 UI에서 임시 1M/3M/6M/12M fallback이 노출되지 않도록 비워둡니다.
+      return [];
     }
 
     try {
