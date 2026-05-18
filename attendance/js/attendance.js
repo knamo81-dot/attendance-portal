@@ -3238,6 +3238,13 @@ function activateMainTabWithoutRender(tabName){
   document.querySelectorAll('.mainPanel').forEach(x => x.classList.remove('active'));
   btn.classList.add('active');
   panel.classList.add('active');
+
+  // 탭이 실제로 전환되는 순간, 이전 탭에서 예약/진행 중이던 렌더를 무효화합니다.
+  // 특히 근태관리 렌더가 늦게 끝나며 다른 탭을 다시 근태관리로 되돌리는 현상을 막습니다.
+  try{
+    if(typeof ATTENDANCE_RENDER_TOKEN !== 'undefined') ATTENDANCE_RENDER_TOKEN++;
+  }catch(e){}
+
   ATTENDANCE_CURRENT_MAIN_TAB = targetName;
   try{ sessionStorage.setItem(ATTENDANCE_UI_STATE_KEYS.mainTab, targetName); }catch(e){}
   return true;
@@ -3290,6 +3297,20 @@ window.invalidateAttendanceRenderCache = invalidateAttendanceRenderCache;
 function isAttendanceMainTabActive(tabName){
   return getActiveAttendanceMainTab('attendance') === String(tabName || '').trim();
 }
+
+function isAttendanceRenderTokenCurrent(token, expectedTab){
+  if(typeof token === 'number' && token !== ATTENDANCE_RENDER_TOKEN) return false;
+  if(expectedTab && getActiveAttendanceMainTab('attendance') !== String(expectedTab || '').trim()) return false;
+  return true;
+}
+
+function restoreSavedMainTabIfStillCurrent(preferredTab, token){
+  const targetTab = String(preferredTab || readAttendanceMainTab() || 'attendance').trim() || 'attendance';
+  if(!isAttendanceRenderTokenCurrent(token, targetTab)) return false;
+  restoreSavedMainTab(targetTab);
+  return true;
+}
+window.restoreSavedMainTabIfStillCurrent = restoreSavedMainTabIfStillCurrent;
 
 function shouldRunAttendanceAnalysisRender(tabName, options = {}){
   const id = String(tabName || '').trim();
@@ -4169,7 +4190,8 @@ function renderFilters(){
     saveAttendanceMainTab(keepTab);
     STATE.period = (e.target.value || fallbackPeriod || 'ALL').trim() || 'ALL';
     saveAttendanceUiState(ATTENDANCE_UI_STATE_KEYS.period, STATE.period);
-    Promise.resolve(updateAttendanceViewsAfterDataChange({ refreshFilters: false, keepMainTab: keepTab })).finally(() => restoreSavedMainTab(keepTab));
+    const restoreToken = ATTENDANCE_RENDER_TOKEN;
+    Promise.resolve(updateAttendanceViewsAfterDataChange({ refreshFilters: false, keepMainTab: keepTab })).finally(() => restoreSavedMainTabIfStillCurrent(keepTab, restoreToken));
   };
 
   const filterMode = getAttendanceFilterAccessMode();
@@ -4237,7 +4259,8 @@ function renderFilters(){
       STATE.division = nextDivision;
       STATE.team = '전체';
     }
-    Promise.resolve(updateAttendanceViewsAfterDataChange({ refreshFilters: true, keepMainTab: keepTab })).finally(() => restoreSavedMainTab(keepTab));
+    const restoreToken = ATTENDANCE_RENDER_TOKEN;
+    Promise.resolve(updateAttendanceViewsAfterDataChange({ refreshFilters: true, keepMainTab: keepTab })).finally(() => restoreSavedMainTabIfStillCurrent(keepTab, restoreToken));
   };
 
   const teamBase = STATE.division==='전체' ? optionEmployees : optionEmployees.filter(e=>e.division===STATE.division);
@@ -4283,7 +4306,8 @@ function renderFilters(){
     }else{
       STATE.team = nextTeam || '전체';
     }
-    Promise.resolve(updateAttendanceViewsAfterDataChange({ refreshFilters: true, keepMainTab: keepTab })).finally(() => restoreSavedMainTab(keepTab));
+    const restoreToken = ATTENDANCE_RENDER_TOKEN;
+    Promise.resolve(updateAttendanceViewsAfterDataChange({ refreshFilters: true, keepMainTab: keepTab })).finally(() => restoreSavedMainTabIfStillCurrent(keepTab, restoreToken));
   };
 }
 
@@ -4292,6 +4316,7 @@ function renderFilters(){
 
 async function updateAttendanceViewsAfterDataChange(options = {}){
   const keepTab = String(options.keepMainTab || getActiveAttendanceMainTab('attendance')).trim() || 'attendance';
+  const updateToken = ATTENDANCE_RENDER_TOKEN;
   saveAttendanceMainTab(keepTab);
   try{
     dedupeEmpMasterByName();
@@ -4310,13 +4335,18 @@ async function updateAttendanceViewsAfterDataChange(options = {}){
     }
     if(typeof refreshFloatingFilters === 'function') refreshFloatingFilters();
 
-    restoreSavedMainTab(keepTab);
+    // 업데이트가 진행되는 사이 다른 탭을 눌렀다면, 기존 탭 복원/렌더를 더 이상 진행하지 않습니다.
+    if(!restoreSavedMainTabIfStillCurrent(keepTab, updateToken)){
+      return;
+    }
 
     const months = periodMonths();
     const scoped = scopedEmployees();
 
     // 현재 활성 탭만 렌더합니다. 보이지 않는 분석 탭은 클릭 시 계산합니다.
     renderActiveAttendanceView(scoped, months, { force: true });
+
+    if(!isAttendanceRenderTokenCurrent(updateToken, keepTab)) return;
 
     renderTabs();
     if(typeof bindMainTabs === 'function') bindMainTabs();
@@ -9830,9 +9860,12 @@ function stabilizeAttendanceMainTabButtons(){
 
 function renderMainTabDeferred(mainName){
   const tabName = String(mainName || '').trim();
+  const token = ++ATTENDANCE_RENDER_TOKEN;
   window.clearTimeout(window.__attendanceMainTabRenderTimer);
   window.__attendanceMainTabRenderTimer = window.setTimeout(() => {
     requestAnimationFrame(() => {
+      if(!isAttendanceRenderTokenCurrent(token, tabName)) return;
+
       if(tabName === 'dashboard' || tabName === 'deep-analysis'){
         rerenderDashboardVisibleCharts();
       }
@@ -9921,6 +9954,7 @@ window.addEventListener('message', async (event) => {
 
 function render(){
   const keepTab = getActiveAttendanceMainTab('attendance');
+  const renderToken = ATTENDANCE_RENDER_TOKEN;
   saveAttendanceMainTab(keepTab);
   if(!window.__empMasterInitialized){
     loadOrgMaster();
@@ -9938,13 +9972,20 @@ function render(){
   }
   updateUploadStatus();
   renderFilters();
-  restoreSavedMainTab(keepTab);
+
+  // render()가 시작된 뒤 사용자가 다른 탭으로 이동했다면,
+  // 오래된 render()가 다시 이전 탭으로 복원하지 못하게 막습니다.
+  if(!restoreSavedMainTabIfStillCurrent(keepTab, renderToken)){
+    return;
+  }
 
   const months = periodMonths();
   const scoped = scopedEmployees();
 
   // 최초/일반 렌더에서는 현재 활성 탭만 그립니다.
   renderActiveAttendanceView(scoped, months);
+
+  if(!isAttendanceRenderTokenCurrent(renderToken, keepTab)) return;
 
   bindMainTabs();
   renderTabs();
