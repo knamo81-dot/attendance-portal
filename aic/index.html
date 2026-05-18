@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIC | AI Communication</title>
+
+  <!-- 포탈 루트 기준 공통 assets 사용 -->
+  <link rel="stylesheet" href="../assets/css/iframe-module-base.css" />
+  <link rel="stylesheet" href="./css/aic.css" />
+</head>
+<body>
+  <div id="aicRoot" class="module-root aic-root">
+    <div class="aic-shell">
+      <aside class="aic-room-panel module-card">
+        <div class="aic-room-head">
+          <div>
+            <div class="aic-panel-title">회의방 목록</div>
+            <div class="aic-panel-sub">한↔영 번역 채팅</div>
+          </div>
+          <div class="aic-room-actions">
+            <button id="aicCreateRoomBtn" class="aic-icon-btn primary" type="button" title="회의방 생성">+</button>
+            <button id="aicSettingsBtn" class="aic-icon-btn" type="button" title="내 번역 설정">⚙</button>
+          </div>
+        </div>
+
+        <div id="aicRoomList" class="aic-room-list"></div>
+      </aside>
+
+      <main class="aic-chat-workspace module-card">
+        <div id="aicChatSlots" class="aic-chat-slots"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- 회의방 생성 모달 -->
+  <div id="aicRoomModal" class="aic-modal-overlay" hidden>
+    <div class="aic-modal">
+      <h2>새 회의방 만들기</h2>
+      <p>글로벌 커뮤니케이션용 번역 채팅 회의방을 생성합니다.</p>
+
+      <label class="aic-field">
+        <span>회의방 이름</span>
+        <input id="aicNewRoomName" class="module-input" placeholder="예: Global R&D Quick Talk" />
+      </label>
+
+      <label class="aic-field">
+        <span>참여자</span>
+        <input id="aicNewRoomMembers" class="module-input" placeholder="예: 김남호 · Global Director" />
+      </label>
+
+      <div class="aic-modal-actions">
+        <button id="aicRoomCancelBtn" class="module-btn" type="button">취소</button>
+        <button id="aicRoomCreateConfirmBtn" class="module-btn primary" type="button">생성</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 개인 번역 설정 모달 -->
+  <div id="aicSettingsModal" class="aic-modal-overlay" hidden>
+    <div class="aic-modal">
+      <h2>내 번역 기본 설정</h2>
+      <p>AIC 회의방에서 기본 적용되는 개인 번역 설정입니다.</p>
+
+      <div class="aic-setting-note">
+        포탈 설정과 분리된 AIC 개인 설정입니다. 추후 Supabase에 사용자별로 저장할 수 있습니다.
+      </div>
+
+      <label class="aic-field">
+        <span>기본 입력 언어</span>
+        <select id="aicSetDefaultLang" class="module-select">
+          <option value="ko">한국어 입력</option>
+          <option value="en">English Input</option>
+        </select>
+      </label>
+
+      <label class="aic-field">
+        <span>번역 방향</span>
+        <select id="aicSetDirection" class="module-select">
+          <option value="auto">자동 감지</option>
+          <option value="ko-en">한국어 → 영어</option>
+          <option value="en-ko">영어 → 한국어</option>
+        </select>
+      </label>
+
+      <label class="aic-field">
+        <span>번역 톤</span>
+        <select id="aicSetTone" class="module-select">
+          <option value="business">비즈니스 영어</option>
+          <option value="meeting">간단 회의 영어</option>
+          <option value="polite">정중한 이메일식 영어</option>
+          <option value="casual">캐주얼 대화식 영어</option>
+        </select>
+      </label>
+
+      <label class="aic-field">
+        <span>번역 표시 방식</span>
+        <select id="aicSetDisplay" class="module-select">
+          <option value="both">원문 + 번역 같이 표시</option>
+          <option value="translated">번역문만 표시</option>
+        </select>
+      </label>
+
+      <div class="aic-toggle-row">
+        <div>
+          <strong>자동번역 사용</strong>
+          <span>메시지 전송 시 자동으로 번역문을 생성합니다.</span>
+        </div>
+        <button id="aicAutoTranslateSwitch" class="aic-switch on" type="button" aria-label="자동번역 사용"></button>
+      </div>
+
+      <div class="aic-modal-actions">
+        <button id="aicSettingsCancelBtn" class="module-btn" type="button">취소</button>
+        <button id="aicSettingsSaveBtn" class="module-btn primary" type="button">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./js/aic-config.js"></script>
+  <script src="./js/aic-auth.js"></script>
+  <script src="./js/aic-portal-bridge.js"></script>
+  <script src="./js/aic-main.js"></script>
+</body>
+</html>
