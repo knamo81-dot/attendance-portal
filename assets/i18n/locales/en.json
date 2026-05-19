@@ -1,0 +1,13 @@
+{
+  "aic.roomList": "Meeting Rooms",
+  "aic.translationChat": "KO ↔ EN Translation Chat",
+  "aic.chatView": "Chat View",
+  "aic.chatGuide": "Multiple rooms, limited visible slots",
+  "aic.inputPlaceholder": "Enter your message",
+  "aic.send": "Send",
+  "aic.createRoom": "Create Room",
+  "aic.settings": "Settings",
+  "aic.participants": "Participants",
+  "aic.close": "Close",
+  "aic.pin": "Pin"
+}
