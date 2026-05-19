@@ -1,25 +1,46 @@
-/* AIC main
-   초기 버전: 서버 저장/실제 AI 호출 없이 UI 구조와 포탈 연동 골격만 구현.
-   Supabase 테이블/번역 API 연결 시 state 처리부를 교체하면 됩니다.
+/* AIC main rebuild clean version
+   서버 저장/실시간/실제 번역 API는 추후 연결.
 */
 (function () {
   'use strict';
 
   var els = {};
-  var slotResizeTimer = null;
+  var resizeTimer = null;
+
+  var CONFIG = {
+    defaultSettings: {
+      defaultLang: 'ko',
+      direction: 'auto',
+      tone: 'business',
+      display: 'both',
+      autoTranslate: true
+    },
+    slotPolicy: {
+      defaultVisibleSlots: 2,
+      maxVisibleSlots: 3,
+      notebookMaxSlots: 2,
+      mobileMaxSlots: 1,
+      notebookBreakpoint: 1280,
+      mobileBreakpoint: 900
+    }
+  };
+
+  if (window.AIC_CONFIG) {
+    CONFIG.defaultSettings = Object.assign({}, CONFIG.defaultSettings, window.AIC_CONFIG.defaultSettings || {});
+    CONFIG.slotPolicy = Object.assign({}, CONFIG.slotPolicy, window.AIC_CONFIG.slotPolicy || {});
+  }
 
   var state = {
     activeSlotIndex: 0,
-    visibleSlotCount: 1,
+    visibleSlotCount: CONFIG.slotPolicy.defaultVisibleSlots,
+    preferredSlotCount: CONFIG.slotPolicy.defaultVisibleSlots,
     openSlots: [],
     settings: loadSettings(),
-    preferredSlotCount: (window.AIC_CONFIG && window.AIC_CONFIG.slotPolicy && window.AIC_CONFIG.slotPolicy.defaultVisibleSlots) || 2,
     rooms: [
       {
         id: 'r1',
         name: 'Global R&D',
         members: '김남호 · Global Director',
-        pinned: false,
         messages: [
           {
             type: 'me',
@@ -45,7 +66,6 @@
         id: 'r2',
         name: 'Wastewater Review',
         members: '김남호 · Reviewer',
-        pinned: false,
         messages: [
           {
             type: 'me',
@@ -59,7 +79,19 @@
         id: 'r3',
         name: 'QA Quick Check',
         members: '김남호 · QA',
-        pinned: false,
+        messages: [
+          {
+            type: 'other',
+            sender: 'QA',
+            original: 'Can you share the test condition?',
+            translated: '시험 조건을 공유해주실 수 있나요?'
+          }
+        ]
+      },
+      {
+        id: 'r4',
+        name: 'Raw Material Talk',
+        members: '김남호 · Supplier',
         messages: []
       }
     ]
@@ -78,35 +110,12 @@
       .replace(/'/g, '&#39;');
   }
 
-  function getDefaultSettings() {
-    var fallback = {
-      defaultLang: 'ko',
-      direction: 'auto',
-      tone: 'business',
-      display: 'both',
-      autoTranslate: true
-    };
-    return Object.assign({}, fallback, (window.AIC_CONFIG && window.AIC_CONFIG.defaultSettings) || {});
-  }
-
-  function getSlotPolicy() {
-    var fallback = {
-      defaultVisibleSlots: 2,
-      maxVisibleSlots: 3,
-      notebookMaxSlots: 2,
-      mobileMaxSlots: 1,
-      notebookBreakpoint: 1280,
-      mobileBreakpoint: 900
-    };
-    return Object.assign({}, fallback, (window.AIC_CONFIG && window.AIC_CONFIG.slotPolicy) || {});
-  }
-
   function loadSettings() {
     try {
       var raw = localStorage.getItem('aic_user_settings');
-      if (raw) return Object.assign({}, getDefaultSettings(), JSON.parse(raw));
+      if (raw) return Object.assign({}, CONFIG.defaultSettings, JSON.parse(raw));
     } catch (_) {}
-    return Object.assign({}, getDefaultSettings());
+    return Object.assign({}, CONFIG.defaultSettings);
   }
 
   function saveSettingsToLocal() {
@@ -135,9 +144,7 @@
     if (!state.settings.autoTranslate) return '자동번역 OFF 상태입니다.';
 
     var tone = getToneLabel(state.settings.tone);
-    if (lang === 'ko') {
-      return '[' + tone + '] Preview translation: ' + text;
-    }
+    if (lang === 'ko') return '[' + tone + '] Preview translation: ' + text;
     return '[' + tone + '] 미리보기 번역: ' + text;
   }
 
@@ -149,48 +156,38 @@
     return state.openSlots.findIndex(function (slot) { return slot && slot.roomId === roomId; });
   }
 
-  function calculateSlotCount() {
-    var policy = getSlotPolicy();
+  function getMaxSlotsByWidth() {
     var width = els.slots ? els.slots.clientWidth : window.innerWidth;
-    var maxSlots = policy.maxVisibleSlots;
+    var policy = CONFIG.slotPolicy;
 
-    if (width < policy.mobileBreakpoint) {
-      maxSlots = policy.mobileMaxSlots;
-    } else if (width < policy.notebookBreakpoint) {
-      maxSlots = policy.notebookMaxSlots;
+    if (width < policy.mobileBreakpoint) return policy.mobileMaxSlots;
+    if (width < policy.notebookBreakpoint) return policy.notebookMaxSlots;
+    return policy.maxVisibleSlots;
+  }
+
+  function normalizeSlotCount() {
+    return Math.max(1, Math.min(
+      Number(state.preferredSlotCount) || CONFIG.slotPolicy.defaultVisibleSlots,
+      getMaxSlotsByWidth(),
+      CONFIG.slotPolicy.maxVisibleSlots
+    ));
+  }
+
+  function ensureSlots(fill) {
+    state.visibleSlotCount = normalizeSlotCount();
+
+    while (state.openSlots.length > state.visibleSlotCount) {
+      state.openSlots.pop();
     }
 
-    return Math.max(1, Math.min(Number(state.preferredSlotCount) || policy.defaultVisibleSlots, maxSlots, policy.maxVisibleSlots));
-  }
-
-  function setPreferredSlotCount(count) {
-    state.preferredSlotCount = Number(count) || 1;
-    syncSlotCount();
-    render();
-  }
-
-  function syncSlotCount() {
-    var next = calculateSlotCount();
-    state.visibleSlotCount = next;
-
-    while (state.openSlots.length > next) {
-      var removableIndex = -1;
-      for (var i = state.openSlots.length - 1; i >= 0; i--) {
-        if (!state.openSlots[i].pinned) {
-          removableIndex = i;
-          break;
-        }
+    if (fill !== false) {
+      while (state.openSlots.length < state.visibleSlotCount && state.openSlots.length < state.rooms.length) {
+        var room = state.rooms.find(function (r) {
+          return getOpenSlotIndex(r.id) < 0;
+        });
+        if (!room) break;
+        state.openSlots.push({ roomId: room.id, pinned: false });
       }
-      if (removableIndex < 0) removableIndex = state.openSlots.length - 1;
-      state.openSlots.splice(removableIndex, 1);
-    }
-
-    while (state.openSlots.length < next && state.openSlots.length < state.rooms.length) {
-      var candidate = state.rooms.find(function (room) {
-        return getOpenSlotIndex(room.id) < 0;
-      });
-      if (!candidate) break;
-      state.openSlots.push({ roomId: candidate.id, pinned: false });
     }
 
     if (!state.openSlots.length && state.rooms[0]) {
@@ -201,13 +198,14 @@
       state.activeSlotIndex = Math.max(0, state.openSlots.length - 1);
     }
 
-    document.documentElement.style.setProperty('--aic-visible-slots', String(Math.max(1, state.visibleSlotCount || state.openSlots.length || 1)));
+    document.documentElement.style.setProperty('--aic-visible-slots', String(state.visibleSlotCount));
   }
 
   function openRoom(roomId) {
-    var existingIndex = getOpenSlotIndex(roomId);
-    if (existingIndex >= 0) {
-      state.activeSlotIndex = existingIndex;
+    var existing = getOpenSlotIndex(roomId);
+
+    if (existing >= 0) {
+      state.activeSlotIndex = existing;
       render();
       return;
     }
@@ -219,14 +217,16 @@
       return;
     }
 
-    var replaceIndex = state.activeSlotIndex;
-    if (state.openSlots[replaceIndex] && state.openSlots[replaceIndex].pinned) {
-      replaceIndex = state.openSlots.findIndex(function (slot) { return !slot.pinned; });
-      if (replaceIndex < 0) replaceIndex = state.activeSlotIndex;
+    var target = state.activeSlotIndex;
+
+    if (state.openSlots[target] && state.openSlots[target].pinned) {
+      var freeIndex = state.openSlots.findIndex(function (slot) { return !slot.pinned; });
+      if (freeIndex >= 0) target = freeIndex;
+      else return;
     }
 
-    state.openSlots[replaceIndex] = { roomId: roomId, pinned: false };
-    state.activeSlotIndex = replaceIndex;
+    state.openSlots[target] = { roomId: roomId, pinned: false };
+    state.activeSlotIndex = target;
     render();
   }
 
@@ -235,138 +235,138 @@
     if (state.activeSlotIndex >= state.openSlots.length) {
       state.activeSlotIndex = Math.max(0, state.openSlots.length - 1);
     }
-    document.documentElement.style.setProperty('--aic-visible-slots', String(Math.max(1, state.visibleSlotCount || state.openSlots.length || 1)));
-    renderRoomList();
-    renderChatSlots();
+    render(false);
   }
 
   function togglePin(index) {
     var slot = state.openSlots[index];
     if (!slot) return;
     slot.pinned = !slot.pinned;
-    render();
+    render(false);
   }
 
+  function setPreferredSlotCount(count) {
+    state.preferredSlotCount = Number(count) || 1;
+    render(true);
+  }
 
-  function renderSlotToolbar() {
-    if (!els.slotToolbar) return;
+  function renderSlotButtons() {
+    if (!els.slotButtons) return;
 
-    var policy = getSlotPolicy();
-    var width = els.slots ? els.slots.clientWidth : window.innerWidth;
-    var maxSlots = policy.maxVisibleSlots;
+    var max = getMaxSlotsByWidth();
 
-    if (width < policy.mobileBreakpoint) {
-      maxSlots = policy.mobileMaxSlots;
-    } else if (width < policy.notebookBreakpoint) {
-      maxSlots = policy.notebookMaxSlots;
-    }
+    els.slotButtons.innerHTML = [1, 2, 3].map(function (count) {
+      return [
+        '<button type="button" class="aic-slot-btn',
+        state.visibleSlotCount === count ? ' active' : '',
+        '" data-slot-count="', count, '"',
+        count > max ? ' disabled' : '',
+        '>', count, '개 보기</button>'
+      ].join('');
+    }).join('');
 
-    els.slotToolbar.innerHTML = [
-      '<div>',
-      '  <div class="aic-toolbar-title">채팅창 보기</div>',
-      '  <div class="aic-toolbar-sub">회의방은 여러 개, 화면 표시 슬롯은 제한</div>',
-      '</div>',
-      '<div class="aic-slot-buttons">',
-      '  <button type="button" class="aic-slot-btn' + (state.visibleSlotCount === 1 ? ' active' : '') + '" data-slot-count="1">1개 보기</button>',
-      '  <button type="button" class="aic-slot-btn' + (state.visibleSlotCount === 2 ? ' active' : '') + '" data-slot-count="2"' + (maxSlots < 2 ? ' disabled' : '') + '>2개 보기</button>',
-      '  <button type="button" class="aic-slot-btn' + (state.visibleSlotCount === 3 ? ' active' : '') + '" data-slot-count="3"' + (maxSlots < 3 ? ' disabled' : '') + '>3개 보기</button>',
-      '</div>'
-    ].join('');
-
-    Array.from(els.slotToolbar.querySelectorAll('[data-slot-count]')).forEach(function (btn) {
+    Array.from(els.slotButtons.querySelectorAll('[data-slot-count]')).forEach(function (btn) {
       btn.addEventListener('click', function () {
         if (btn.disabled) return;
-        setPreferredSlotCount(Number(btn.getAttribute('data-slot-count')) || 1);
+        setPreferredSlotCount(Number(btn.getAttribute('data-slot-count')));
       });
     });
   }
 
   function renderRoomList() {
+    if (!els.roomList) return;
+
     els.roomList.innerHTML = state.rooms.map(function (room) {
       var slotIndex = getOpenSlotIndex(room.id);
       var open = slotIndex >= 0;
+
       return [
-        '<div class="aic-room-item' + (open ? ' active' : '') + '" data-room-id="' + esc(room.id) + '">',
+        '<div class="aic-room-item', open ? ' active' : '', '" data-room-id="', esc(room.id), '">',
         '  <div class="aic-room-name-row">',
-        '    <div class="aic-room-name">' + esc(room.name) + '</div>',
-        '    <div class="aic-room-slot' + (open ? ' open' : '') + '">' + (open ? ('열림 ' + (slotIndex + 1)) : '') + '</div>',
+        '    <div class="aic-room-name">', esc(room.name), '</div>',
+        '    <div class="aic-room-slot', open ? ' open' : '', '">', open ? ('열림 ' + (slotIndex + 1)) : '', '</div>',
         '  </div>',
-        '  <div class="aic-room-meta">' + esc(room.members) + '<br>' + room.messages.length + '개 메시지</div>',
+        '  <div class="aic-room-meta">', esc(room.members), '<br>', room.messages.length, '개 메시지</div>',
         '</div>'
       ].join('');
     }).join('');
 
-    Array.from(els.roomList.querySelectorAll('[data-room-id]')).forEach(function (item) {
-      item.addEventListener('click', function () {
-        openRoom(item.getAttribute('data-room-id'));
+    Array.from(els.roomList.querySelectorAll('[data-room-id]')).forEach(function (el) {
+      el.addEventListener('click', function () {
+        openRoom(el.getAttribute('data-room-id'));
       });
     });
   }
 
+  function buildMessage(msg) {
+    var showOriginal = state.settings.display === 'both';
+    var sender = msg.sender || (msg.type === 'me' ? getCurrentUserName() : '상대방');
+
+    return [
+      '<div class="aic-message ', msg.type === 'me' ? 'me' : 'other', '">',
+      '  <div class="aic-message-name">', esc(sender), '</div>',
+      showOriginal ? '<div class="aic-message-original">' + esc(msg.original) + '</div>' : '',
+      '  <div class="', showOriginal ? 'aic-message-translated' : 'aic-message-original', '">', esc(msg.translated), '</div>',
+      '</div>'
+    ].join('');
+  }
+
   function renderChatSlots() {
+    if (!els.slots) return;
+
     var html = '';
 
-    if (!state.openSlots.length) {
-      html = '<div class="aic-chat-empty">회의방을 선택하세요.</div>';
-    } else {
-      html = state.openSlots.map(function (slot, index) {
-        var room = getRoom(slot.roomId);
-        if (!room) {
-          return '<div class="aic-chat-empty">회의방 정보가 없습니다.</div>';
-        }
+    for (var i = 0; i < state.visibleSlotCount; i++) {
+      var slot = state.openSlots[i];
 
-        var messages = room.messages.map(function (msg) {
-          var showOriginal = state.settings.display === 'both';
-          var sender = msg.sender || (msg.type === 'me' ? getCurrentUserName() : '상대방');
+      if (!slot) {
+        html += '<div class="aic-empty-slot">회의방을 선택하세요.</div>';
+        continue;
+      }
 
-          return [
-            '<div class="aic-message ' + (msg.type === 'me' ? 'me' : 'other') + '">',
-            '  <div class="aic-message-name">' + esc(sender) + '</div>',
-            showOriginal ? '<div class="aic-message-original">' + esc(msg.original) + '</div>' : '',
-            '  <div class="' + (showOriginal ? 'aic-message-translated' : 'aic-message-original') + '">' + esc(msg.translated) + '</div>',
-            '</div>'
-          ].join('');
-        }).join('');
+      var room = getRoom(slot.roomId);
+      if (!room) {
+        html += '<div class="aic-empty-slot">회의방 정보가 없습니다.</div>';
+        continue;
+      }
 
-        if (!messages) {
-          messages = '<div class="aic-chat-empty">아직 메시지가 없습니다.<br>아래 입력창으로 메시지를 작성하세요.</div>';
-        }
+      var messages = room.messages.map(buildMessage).join('');
+      if (!messages) {
+        messages = '<div class="aic-empty-message">아직 메시지가 없습니다.<br>아래 입력창으로 메시지를 작성하세요.</div>';
+      }
 
-        return [
-          '<section class="aic-chat-window' + (index === state.activeSlotIndex ? ' active' : '') + '" data-slot-index="' + index + '">',
-          '  <div class="aic-chat-head">',
-          '    <div style="min-width:0;">',
-          '      <div class="aic-chat-title">' + esc(room.name) + '</div>',
-          '      <div class="aic-chat-meta">' + esc(room.members) + ' · ' + (index + 1) + '번 슬롯</div>',
-          '    </div>',
-          '    <div class="aic-chat-actions">',
-          '      <button class="aic-chat-action pin' + (slot.pinned ? ' active' : '') + '" data-pin-slot="' + index + '" type="button">' + (slot.pinned ? '고정됨' : '고정') + '</button>',
-          '      <button class="aic-chat-action" data-invite-slot="' + index + '" type="button">참여자</button>',
-          '      <button class="aic-chat-action dark" data-close-slot="' + index + '" type="button">닫기</button>',
-          '    </div>',
-          '  </div>',
-          '  <div class="aic-messages" data-message-box="' + index + '">' + messages + '</div>',
-          '  <div class="aic-chat-input">',
-          '    <select class="module-select" data-lang-slot="' + index + '">',
-          '      <option value="ko"' + (state.settings.defaultLang === 'ko' ? ' selected' : '') + '>한국어</option>',
-          '      <option value="en"' + (state.settings.defaultLang === 'en' ? ' selected' : '') + '>English</option>',
-          '    </select>',
-          '    <input class="module-input" data-input-slot="' + index + '" placeholder="메시지를 입력하세요" />',
-          '    <button class="module-btn accent aic-send-btn" data-send-slot="' + index + '" type="button">전송</button>',
-          '  </div>',
-          '</section>'
-        ].join('');
-      }).join('');
+      html += [
+        '<section class="aic-chat-window', i === state.activeSlotIndex ? ' active' : '', '" data-slot-index="', i, '">',
+        '  <div class="aic-chat-head">',
+        '    <div class="aic-chat-title-box">',
+        '      <div class="aic-chat-title">', esc(room.name), '</div>',
+        '      <div class="aic-chat-meta">', esc(room.members), ' · ', i + 1, '번 슬롯</div>',
+        '    </div>',
+        '    <div class="aic-chat-actions">',
+        '      <button class="aic-chat-action pin', slot.pinned ? ' active' : '', '" data-pin-slot="', i, '" type="button">', slot.pinned ? '고정됨' : '고정', '</button>',
+        '      <button class="aic-chat-action" data-invite-slot="', i, '" type="button">참여자</button>',
+        '      <button class="aic-chat-action dark" data-close-slot="', i, '" type="button">닫기</button>',
+        '    </div>',
+        '  </div>',
+        '  <div class="aic-messages" data-message-box="', i, '">', messages, '</div>',
+        '  <div class="aic-chat-input">',
+        '    <select class="module-select" data-lang-slot="', i, '">',
+        '      <option value="ko"', state.settings.defaultLang === 'ko' ? ' selected' : '', '>한국어</option>',
+        '      <option value="en"', state.settings.defaultLang === 'en' ? ' selected' : '', '>English</option>',
+        '    </select>',
+        '    <input class="module-input" data-input-slot="', i, '" placeholder="메시지를 입력하세요" />',
+        '    <button class="module-btn accent aic-send-btn" data-send-slot="', i, '" type="button">전송</button>',
+        '  </div>',
+        '</section>'
+      ].join('');
     }
 
     els.slots.innerHTML = html;
 
-    Array.from(els.slots.querySelectorAll('[data-slot-index]')).forEach(function (windowEl) {
-      windowEl.addEventListener('mousedown', function () {
-        state.activeSlotIndex = Number(windowEl.getAttribute('data-slot-index')) || 0;
-        Array.from(els.slots.querySelectorAll('.aic-chat-window')).forEach(function (el, idx) {
-          el.classList.toggle('active', idx === state.activeSlotIndex);
-        });
+    Array.from(els.slots.querySelectorAll('[data-slot-index]')).forEach(function (win) {
+      win.addEventListener('mousedown', function () {
+        state.activeSlotIndex = Number(win.getAttribute('data-slot-index')) || 0;
+        render(false);
       });
     });
 
@@ -385,13 +385,15 @@
     });
 
     Array.from(els.slots.querySelectorAll('[data-close-slot]')).forEach(function (btn) {
-      btn.addEventListener('click', function () {
+      btn.addEventListener('click', function (event) {
+        event.stopPropagation();
         closeSlot(Number(btn.getAttribute('data-close-slot')) || 0);
       });
     });
 
     Array.from(els.slots.querySelectorAll('[data-pin-slot]')).forEach(function (btn) {
-      btn.addEventListener('click', function () {
+      btn.addEventListener('click', function (event) {
+        event.stopPropagation();
         togglePin(Number(btn.getAttribute('data-pin-slot')) || 0);
       });
     });
@@ -404,12 +406,14 @@
   function sendMessage(slotIndex) {
     var slot = state.openSlots[slotIndex];
     if (!slot) return;
+
     var room = getRoom(slot.roomId);
     if (!room) return;
 
     var input = els.slots.querySelector('[data-input-slot="' + slotIndex + '"]');
     var lang = els.slots.querySelector('[data-lang-slot="' + slotIndex + '"]');
     var text = input ? input.value.trim() : '';
+
     if (!text) return;
 
     room.messages.push({
@@ -420,10 +424,11 @@
     });
 
     if (input) input.value = '';
-    render();
+    render(false);
   }
 
   function openRoomModal() {
+    if (!els.roomModal) return;
     els.roomModal.hidden = false;
     setTimeout(function () {
       if (els.newRoomName) els.newRoomName.focus();
@@ -431,29 +436,31 @@
   }
 
   function closeRoomModal() {
-    els.roomModal.hidden = true;
+    if (els.roomModal) els.roomModal.hidden = true;
   }
 
   function createRoom() {
-    var name = (els.newRoomName.value || '').trim() || '새 회의방';
-    var members = (els.newRoomMembers.value || '').trim() || (getCurrentUserName() + ' · 참여자');
+    var name = (els.newRoomName && els.newRoomName.value || '').trim() || '새 회의방';
+    var members = (els.newRoomMembers && els.newRoomMembers.value || '').trim() || (getCurrentUserName() + ' · 참여자');
     var id = 'room_' + Date.now();
 
     state.rooms.unshift({
       id: id,
       name: name,
       members: members,
-      pinned: false,
       messages: []
     });
 
-    els.newRoomName.value = '';
-    els.newRoomMembers.value = '';
+    if (els.newRoomName) els.newRoomName.value = '';
+    if (els.newRoomMembers) els.newRoomMembers.value = '';
+
     closeRoomModal();
     openRoom(id);
   }
 
   function openSettingsModal() {
+    if (!els.settingsModal) return;
+
     els.setDefaultLang.value = state.settings.defaultLang;
     els.setDirection.value = state.settings.direction;
     els.setTone.value = state.settings.tone;
@@ -463,7 +470,7 @@
   }
 
   function closeSettingsModal() {
-    els.settingsModal.hidden = true;
+    if (els.settingsModal) els.settingsModal.hidden = true;
   }
 
   function saveSettings() {
@@ -475,34 +482,54 @@
 
     saveSettingsToLocal();
     closeSettingsModal();
-    render();
+    render(false);
   }
 
   function bind() {
-    els.createRoomBtn.addEventListener('click', openRoomModal);
-    els.roomCancelBtn.addEventListener('click', closeRoomModal);
-    els.roomCreateBtn.addEventListener('click', createRoom);
+    if (els.createRoomBtn) els.createRoomBtn.addEventListener('click', openRoomModal);
+    if (els.roomCancelBtn) els.roomCancelBtn.addEventListener('click', closeRoomModal);
+    if (els.roomCreateBtn) els.roomCreateBtn.addEventListener('click', createRoom);
 
-    els.settingsBtn.addEventListener('click', openSettingsModal);
-    els.settingsCancelBtn.addEventListener('click', closeSettingsModal);
-    els.settingsSaveBtn.addEventListener('click', saveSettings);
+    if (els.settingsBtn) els.settingsBtn.addEventListener('click', openSettingsModal);
+    if (els.settingsCancelBtn) els.settingsCancelBtn.addEventListener('click', closeSettingsModal);
+    if (els.settingsSaveBtn) els.settingsSaveBtn.addEventListener('click', saveSettings);
 
-    els.autoSwitch.addEventListener('click', function () {
-      els.autoSwitch.classList.toggle('on');
-    });
+    if (els.autoSwitch) {
+      els.autoSwitch.addEventListener('click', function () {
+        els.autoSwitch.classList.toggle('on');
+      });
+    }
 
     window.addEventListener('resize', function () {
-      clearTimeout(slotResizeTimer);
-      slotResizeTimer = setTimeout(function () {
-        safeRender();
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () {
+        render(true);
       }, 120);
+    });
+
+    window.addEventListener('message', function (event) {
+      var data = event && event.data ? event.data : {};
+      if (
+        data.type === 'portal-auth' ||
+        data.type === 'portal-tabs-request' ||
+        data.type === 'portal-frame-active' ||
+        data.type === 'portal-layout-refresh'
+      ) {
+        scheduleRender();
+      }
+    });
+
+    window.addEventListener('load', scheduleRender);
+    window.addEventListener('pageshow', scheduleRender);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) scheduleRender();
     });
   }
 
   function cacheEls() {
     els.roomList = $('aicRoomList');
     els.slots = $('aicChatSlots');
-    els.slotToolbar = $('aicSlotToolbar');
+    els.slotButtons = $('aicSlotButtons');
 
     els.createRoomBtn = $('aicCreateRoomBtn');
     els.settingsBtn = $('aicSettingsBtn');
@@ -523,63 +550,35 @@
     els.settingsSaveBtn = $('aicSettingsSaveBtn');
   }
 
-  function render() {
-    syncSlotCount();
-    renderSlotToolbar();
+  function render(fill) {
+    ensureSlots(fill !== false);
+    renderSlotButtons();
     renderRoomList();
     renderChatSlots();
   }
 
-  function safeRender() {
-    render();
+  function scheduleRender() {
+    render(true);
 
     requestAnimationFrame(function () {
-      render();
+      render(true);
     });
 
     setTimeout(function () {
-      render();
-    }, 80);
+      render(true);
+    }, 120);
 
     setTimeout(function () {
-      render();
-    }, 220);
-
-    setTimeout(function () {
-      render();
-    }, 520);
+      render(true);
+    }, 360);
   }
 
-  function installVisibilityRenderHooks() {
-    window.addEventListener('load', safeRender);
-    window.addEventListener('pageshow', safeRender);
-
-    document.addEventListener('visibilitychange', function () {
-      if (!document.hidden) safeRender();
-    });
-
-    // 포탈 iframe 전환/표시 타이밍에서 부모 레이아웃 계산이 늦게 잡히는 경우 보정
-    window.addEventListener('message', function (event) {
-      var data = event && event.data ? event.data : {};
-      if (
-        data.type === 'portal-auth' ||
-        data.type === 'portal-tabs-request' ||
-        data.type === 'portal-tab-change' ||
-        data.type === 'portal-layout-refresh' ||
-        data.type === 'portal-frame-active'
-      ) {
-        safeRender();
-      }
-    });
-  }
-
-  window.aicRender = safeRender;
+  window.aicRender = scheduleRender;
 
   function bootstrap() {
     cacheEls();
     bind();
-    installVisibilityRenderHooks();
-    safeRender();
+    scheduleRender();
 
     if (window.aicNotifyTabsReady) {
       window.aicNotifyTabsReady();
@@ -592,3 +591,4 @@
     bootstrap();
   }
 })();
+
