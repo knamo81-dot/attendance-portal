@@ -134,6 +134,32 @@
     }
   }
 
+  async function refreshAdminView() {
+    ensureInternalAdminVisible();
+
+    try {
+      if (typeof window.renderAdmin === 'function') window.renderAdmin();
+    } catch (_) {}
+
+    try {
+      if (typeof window.renderEmpMaster === 'function') window.renderEmpMaster();
+    } catch (_) {}
+
+    try {
+      if (typeof window.renderOrgTree === 'function') window.renderOrgTree();
+    } catch (_) {}
+
+    try {
+      if (typeof window.refreshAdminUploadManagement === 'function') {
+        await window.refreshAdminUploadManagement(false);
+      } else if (typeof window.refreshAdminMonthCardsImmediately === 'function') {
+        await window.refreshAdminMonthCardsImmediately({ forceYearReload: false });
+      }
+    } catch (error) {
+      console.warn('[portal-bridge] refresh admin upload management failed:', error);
+    }
+  }
+
   function getPortalTabs() {
     return canShowAdminTab() ? BASE_TABS.concat([ADMIN_TAB]) : BASE_TABS.slice();
   }
@@ -307,10 +333,7 @@
 
     try {
       if (id === 'admin') {
-        ensureInternalAdminVisible();
-        if (typeof window.renderAdmin === 'function') window.renderAdmin();
-        if (typeof window.renderEmpMaster === 'function') window.renderEmpMaster();
-        if (typeof window.renderOrgTree === 'function') window.renderOrgTree();
+        refreshAdminView();
       }
     } catch (_) {}
   }
@@ -343,6 +366,8 @@
 
     if (id === 'admin') {
       ensureInternalAdminVisible();
+      setTimeout(function () { refreshAdminView(); }, 0);
+      setTimeout(function () { refreshAdminView(); }, 350);
     }
 
     try {
@@ -552,6 +577,7 @@
 
   window.portalTabs = getPortalTabs();
   window.portalGetTabs = getPortalTabs;
+  window.portalRefreshAdminView = refreshAdminView;
   window.portalActivateTab = activateTab;
   window.portalFilters = getFilters;
   window.portalSetFilter = setFilter;
