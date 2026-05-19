@@ -546,3 +546,90 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== AIC slot view toolbar / final layout ===== */
+.aic-chat-workspace {
+  gap: var(--card-gap);
+}
+
+.aic-slot-toolbar {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 7px 9px;
+  border: 1px solid var(--module-line);
+  border-radius: var(--card-radius);
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--card-gap);
+  margin-bottom: var(--card-gap);
+}
+
+.aic-toolbar-title {
+  font-size: var(--font-title);
+  font-weight: 900;
+  color: var(--module-text);
+  letter-spacing: -0.03em;
+}
+
+.aic-toolbar-sub {
+  margin-top: 2px;
+  font-size: var(--font-small);
+  color: var(--module-muted);
+  font-weight: 700;
+}
+
+.aic-slot-buttons {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.aic-slot-btn {
+  height: var(--control-height);
+  border-radius: var(--control-radius);
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: var(--font-base);
+  font-weight: 900;
+  padding: 0 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.aic-slot-btn.active {
+  background: var(--module-dark);
+  border-color: var(--module-dark);
+  color: #ffffff;
+}
+
+.aic-slot-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.aic-chat-workspace {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.aic-chat-slots {
+  flex: 1 1 auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+@media (max-width: 900px) {
+  .aic-slot-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .aic-slot-buttons {
+    width: 100%;
+    overflow-x: auto;
+  }
+}
