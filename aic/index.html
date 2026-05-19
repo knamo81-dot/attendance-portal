@@ -5,40 +5,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AIC | AI Communication</title>
 
-  <!-- 포탈 루트 기준 공통 assets 사용 -->
   <link rel="stylesheet" href="../assets/css/common-ui.css" />
   <link rel="stylesheet" href="./css/aic.css" />
 </head>
 <body>
-  <div id="aicRoot" class="module-root aic-root">
-    <div class="aic-shell">
-      <aside class="aic-room-panel module-card">
-        <div class="aic-room-head">
-          <div>
-            <div class="aic-panel-title">회의방 목록</div>
-            <div class="aic-panel-sub">한↔영 번역 채팅</div>
-          </div>
-          <div class="aic-room-actions">
-            <button id="aicCreateRoomBtn" class="aic-icon-btn primary" type="button" title="회의방 생성">+</button>
-            <button id="aicSettingsBtn" class="aic-icon-btn" type="button" title="내 번역 설정">⚙</button>
-          </div>
+  <div id="aicRoot" class="aic-root">
+    <aside class="aic-sidebar">
+      <div class="aic-sidebar-head">
+        <div>
+          <div class="aic-title">회의방 목록</div>
+          <div class="aic-subtitle">한↔영 번역 채팅</div>
         </div>
+        <div class="aic-head-actions">
+          <button id="aicCreateRoomBtn" class="aic-icon-btn primary" type="button" title="회의방 생성">+</button>
+          <button id="aicSettingsBtn" class="aic-icon-btn" type="button" title="번역 설정">⚙</button>
+        </div>
+      </div>
 
-        <div id="aicRoomList" class="aic-room-list"></div>
-      </aside>
+      <div id="aicRoomList" class="aic-room-list"></div>
+    </aside>
 
-      <main class="aic-chat-workspace module-card">
-        <div id="aicSlotToolbar" class="aic-slot-toolbar"></div>
-        <div id="aicChatSlots" class="aic-chat-slots"></div>
-      </main>
-    </div>
+    <main class="aic-main">
+      <section class="aic-toolbar">
+        <div>
+          <div class="aic-title">채팅창 보기</div>
+          <div class="aic-subtitle">회의방은 여러 개, 화면 표시 슬롯은 제한</div>
+        </div>
+        <div id="aicSlotButtons" class="aic-slot-buttons"></div>
+      </section>
+
+      <section id="aicChatSlots" class="aic-slots"></section>
+    </main>
   </div>
 
-  <!-- 회의방 생성 모달 -->
   <div id="aicRoomModal" class="aic-modal-overlay" hidden>
     <div class="aic-modal">
       <h2>새 회의방 만들기</h2>
-      <p>글로벌 커뮤니케이션용 번역 채팅 회의방을 생성합니다.</p>
+      <p>번역 채팅 회의방을 생성합니다.</p>
 
       <label class="aic-field">
         <span>회의방 이름</span>
@@ -57,15 +60,10 @@
     </div>
   </div>
 
-  <!-- 개인 번역 설정 모달 -->
   <div id="aicSettingsModal" class="aic-modal-overlay" hidden>
     <div class="aic-modal">
       <h2>내 번역 기본 설정</h2>
       <p>AIC 회의방에서 기본 적용되는 개인 번역 설정입니다.</p>
-
-      <div class="aic-setting-note">
-        포탈 설정과 분리된 AIC 개인 설정입니다. 추후 Supabase에 사용자별로 저장할 수 있습니다.
-      </div>
 
       <label class="aic-field">
         <span>기본 입력 언어</span>
