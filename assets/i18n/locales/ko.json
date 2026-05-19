@@ -1,0 +1,13 @@
+{
+  "aic.roomList": "회의방 목록",
+  "aic.translationChat": "한↔영 번역 채팅",
+  "aic.chatView": "채팅창 보기",
+  "aic.chatGuide": "회의방은 여러 개, 화면 표시 슬롯은 제한",
+  "aic.inputPlaceholder": "메시지를 입력하세요",
+  "aic.send": "전송",
+  "aic.createRoom": "회의방 생성",
+  "aic.settings": "설정",
+  "aic.participants": "참여자",
+  "aic.close": "닫기",
+  "aic.pin": "고정"
+}
