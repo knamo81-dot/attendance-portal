@@ -1,59 +1,53 @@
 /* AIC 전용 layout/css
-   공통 변수는 ../assets/css/iframe-module-base.css 기준으로 사용합니다.
+   공통 변수는 ../assets/css/common-ui.css 기준으로 사용합니다.
+   iframe + 슬롯형 다중 채팅창 안정화 버전
 */
 
 :root {
   --aic-room-width: 260px;
-  --aic-slot-min: 320px;
   --aic-message-radius: 13px;
 }
 
-/* ===== AIC iframe height fix ===== */
+/* iframe 내부 전체 기준 */
 html,
 body {
   width: 100%;
   height: 100%;
+  margin: 0;
   overflow: hidden;
 }
 
-.module-root.aic-root {
-  height: 100%;
-  min-height: 100%;
-  max-height: 100%;
-}
-
+.module-root.aic-root,
 .aic-root {
-  background: transparent;
   width: 100%;
-  height: 100%;
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
+  height: 100vh;
+  min-height: 100vh;
+  max-height: 100vh;
+  padding: var(--page-padding);
   overflow: hidden;
+  background: transparent;
 }
 
+/* 전체 AIC 레이아웃 */
 .aic-shell {
   width: 100%;
-  height: 100%;
-  flex: 1;
+  height: calc(100vh - (var(--page-padding) * 2));
+  min-height: 0;
   display: grid;
   grid-template-columns: var(--aic-room-width) minmax(0, 1fr);
   gap: var(--card-gap);
-  min-width: 0;
-  min-height: 0;
-}
-
-.aic-room-panel,
-.aic-chat-workspace {
-  min-width: 0;
-  min-height: 0;
   overflow: hidden;
 }
 
+/* 좌측 회의방 목록 */
 .aic-room-panel {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #f8fafc;
   display: flex;
   flex-direction: column;
-  background: #f8fafc;
 }
 
 .aic-room-head {
@@ -65,17 +59,19 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: var(--gap-sm);
-  flex-shrink: 0;
+  flex: 0 0 auto;
 }
 
-.aic-panel-title {
+.aic-panel-title,
+.aic-toolbar-title {
   font-size: var(--font-title);
   font-weight: 900;
   color: var(--module-text);
   letter-spacing: -0.03em;
 }
 
-.aic-panel-sub {
+.aic-panel-sub,
+.aic-toolbar-sub {
   margin-top: 2px;
   font-size: var(--font-small);
   color: var(--module-muted);
@@ -111,7 +107,7 @@ body {
 }
 
 .aic-room-list {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   padding: var(--card-gap);
@@ -184,55 +180,92 @@ body {
   font-weight: 700;
 }
 
+/* 우측 채팅 워크스페이스 */
 .aic-chat-workspace {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
   background: #ffffff;
   padding: var(--card-gap);
-  height: 100%;
-  min-height: 0;
-  display: flex;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--card-gap);
 }
 
+/* 보기 방식 툴바 */
+.aic-slot-toolbar {
+  min-height: 44px;
+  padding: 7px 9px;
+  border: 1px solid var(--module-line);
+  border-radius: var(--card-radius);
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--card-gap);
+  overflow: hidden;
+}
+
+.aic-slot-buttons {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.aic-slot-btn {
+  height: var(--control-height);
+  border-radius: var(--control-radius);
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: var(--font-base);
+  font-weight: 900;
+  padding: 0 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.aic-slot-btn.active {
+  background: var(--module-dark);
+  border-color: var(--module-dark);
+  color: #ffffff;
+}
+
+.aic-slot-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+/* 슬롯 그리드 */
 .aic-chat-slots {
   width: 100%;
   height: 100%;
-  flex: 1;
-  display: grid;
-  gap: var(--card-gap);
-  grid-template-columns: repeat(var(--aic-visible-slots, 1), minmax(0, 1fr));
-  min-width: 0;
   min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--aic-visible-slots, 2), minmax(0, 1fr));
+  gap: var(--card-gap);
+  overflow: hidden;
 }
 
+/* 개별 채팅창 */
 .aic-chat-window {
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
-  height: 100%;
   border: 1px solid var(--module-line);
   background: #ffffff;
   border-radius: var(--card-radius);
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: 48px minmax(0, 1fr) auto;
 }
 
 .aic-chat-window.active {
   border-color: var(--module-accent);
   box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.08);
-}
-
-.aic-chat-empty {
-  min-height: 0;
-  border: 1px dashed #cbd5e1;
-  background: #f8fafc;
-  border-radius: var(--card-radius);
-  display: grid;
-  place-items: center;
-  color: var(--module-muted);
-  font-size: var(--font-base);
-  font-weight: 800;
-  text-align: center;
-  line-height: 1.6;
-  padding: 20px;
 }
 
 .aic-chat-head {
@@ -244,7 +277,13 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: var(--gap-sm);
-  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.aic-chat-title-box,
+.aic-chat-head > div:first-child {
+  min-width: 0;
 }
 
 .aic-chat-title {
@@ -299,10 +338,12 @@ body {
   color: #92400e;
 }
 
+/* 메시지 영역 */
 .aic-messages {
-  flex: 1;
   min-height: 0;
-  overflow: auto;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 10px;
   background: linear-gradient(180deg, #f8fafc 0%, #eef6ff 100%);
   display: flex;
@@ -357,14 +398,32 @@ body {
   overflow-wrap: anywhere;
 }
 
+.aic-empty-message,
+.aic-chat-empty {
+  height: 100%;
+  min-height: 0;
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  border-radius: var(--card-radius);
+  display: grid;
+  place-items: center;
+  color: var(--module-muted);
+  font-size: var(--font-base);
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.6;
+  padding: 20px;
+}
+
+/* 입력창 */
 .aic-chat-input {
+  min-height: 44px;
   padding: 8px;
   border-top: 1px solid var(--module-line);
   background: #ffffff;
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr) auto;
   gap: 6px;
-  flex-shrink: 0;
 }
 
 .aic-chat-input .module-select {
@@ -375,6 +434,7 @@ body {
   min-width: 48px;
 }
 
+/* Modal */
 .aic-modal-overlay {
   position: fixed;
   inset: 0;
@@ -503,126 +563,26 @@ body {
   gap: 7px;
 }
 
-@media (max-width: 1100px) {
+/* Responsive */
+@media (max-width: 1280px) {
   :root {
     --aic-room-width: 220px;
-  }
-
-  .aic-chat-input {
-    grid-template-columns: 88px minmax(0, 1fr) auto;
   }
 
   .aic-message {
     max-width: 88%;
   }
-}
-
-@media (max-width: 760px) {
-  body {
-    overflow: auto;
-  }
-
-  .module-root.aic-root {
-    min-height: 100vh;
-    height: auto;
-    max-height: none;
-    overflow: visible;
-  }
-
-  .aic-shell {
-    height: auto;
-    grid-template-columns: 1fr;
-  }
-
-  .aic-room-panel {
-    max-height: 260px;
-  }
-
-  .aic-chat-workspace {
-    height: 620px;
-  }
 
   .aic-chat-input {
-    grid-template-columns: 1fr;
+    grid-template-columns: 88px minmax(0, 1fr) auto;
   }
-}
-
-/* ===== AIC slot view toolbar / final layout ===== */
-.aic-chat-workspace {
-  gap: var(--card-gap);
-}
-
-.aic-slot-toolbar {
-  flex: 0 0 auto;
-  min-height: 44px;
-  padding: 7px 9px;
-  border: 1px solid var(--module-line);
-  border-radius: var(--card-radius);
-  background: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--card-gap);
-  margin-bottom: var(--card-gap);
-}
-
-.aic-toolbar-title {
-  font-size: var(--font-title);
-  font-weight: 900;
-  color: var(--module-text);
-  letter-spacing: -0.03em;
-}
-
-.aic-toolbar-sub {
-  margin-top: 2px;
-  font-size: var(--font-small);
-  color: var(--module-muted);
-  font-weight: 700;
-}
-
-.aic-slot-buttons {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.aic-slot-btn {
-  height: var(--control-height);
-  border-radius: var(--control-radius);
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
-  font-size: var(--font-base);
-  font-weight: 900;
-  padding: 0 10px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.aic-slot-btn.active {
-  background: var(--module-dark);
-  border-color: var(--module-dark);
-  color: #ffffff;
-}
-
-.aic-slot-btn:disabled {
-  opacity: 0.42;
-  cursor: not-allowed;
-}
-
-.aic-chat-workspace {
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-.aic-chat-slots {
-  flex: 1 1 auto !important;
-  height: auto !important;
-  min-height: 0 !important;
-  overflow: hidden !important;
 }
 
 @media (max-width: 900px) {
+  .aic-chat-slots {
+    grid-template-columns: 1fr;
+  }
+
   .aic-slot-toolbar {
     align-items: flex-start;
     flex-direction: column;
@@ -634,157 +594,37 @@ body {
   }
 }
 
-
-/* ===== AIC SLOT HEIGHT FINAL FIX v2 ===== */
-/* 포탈 iframe 내부에서 채팅창이 상단 한 줄로 눌리는 현상 보정 */
-
-html,
-body {
-  width: 100% !important;
-  height: 100% !important;
-  overflow: hidden !important;
-}
-
-.module-root.aic-root,
-.aic-root {
-  width: 100% !important;
-  height: 100vh !important;
-  min-height: 100vh !important;
-  max-height: 100vh !important;
-  padding: var(--page-padding) !important;
-  overflow: hidden !important;
-  display: block !important;
-}
-
-.aic-shell {
-  width: 100% !important;
-  height: calc(100vh - (var(--page-padding) * 2)) !important;
-  min-height: calc(100vh - (var(--page-padding) * 2)) !important;
-  max-height: calc(100vh - (var(--page-padding) * 2)) !important;
-  display: grid !important;
-  grid-template-columns: var(--aic-room-width) minmax(0, 1fr) !important;
-  gap: var(--card-gap) !important;
-  overflow: hidden !important;
-}
-
-.aic-room-panel {
-  height: 100% !important;
-  min-height: 0 !important;
-  max-height: 100% !important;
-  overflow: hidden !important;
-}
-
-.aic-chat-workspace {
-  height: 100% !important;
-  min-height: 0 !important;
-  max-height: 100% !important;
-  padding: var(--card-gap) !important;
-  display: grid !important;
-  grid-template-rows: auto minmax(0, 1fr) !important;
-  gap: var(--card-gap) !important;
-  overflow: hidden !important;
-}
-
-.aic-slot-toolbar {
-  min-height: 44px !important;
-  margin-bottom: 0 !important;
-  flex: none !important;
-}
-
-.aic-chat-slots {
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 0 !important;
-  max-height: 100% !important;
-  display: grid !important;
-  grid-template-columns: repeat(var(--aic-visible-slots, 2), minmax(0, 1fr)) !important;
-  gap: var(--card-gap) !important;
-  overflow: hidden !important;
-}
-
-.aic-chat-window {
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 0 !important;
-  max-height: 100% !important;
-  display: grid !important;
-  grid-template-rows: auto minmax(0, 1fr) auto !important;
-  overflow: hidden !important;
-}
-
-.aic-chat-head {
-  height: 48px !important;
-  min-height: 48px !important;
-  flex: none !important;
-}
-
-.aic-messages {
-  min-height: 0 !important;
-  height: 100% !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  flex: none !important;
-}
-
-.aic-chat-input {
-  min-height: 44px !important;
-  flex: none !important;
-}
-
-.aic-chat-empty {
-  height: 100% !important;
-  min-height: 0 !important;
-}
-
-@media (max-width: 1280px) {
-  .aic-shell {
-    grid-template-columns: var(--aic-room-width) minmax(0, 1fr) !important;
-  }
-
-  .aic-chat-slots {
-    grid-template-columns: repeat(var(--aic-visible-slots, 1), minmax(0, 1fr)) !important;
-  }
-}
-
-@media (max-width: 900px) {
-  .aic-chat-slots {
-    grid-template-columns: 1fr !important;
-  }
-}
-
 @media (max-width: 760px) {
   html,
   body {
-    overflow: auto !important;
+    overflow: auto;
   }
 
   .module-root.aic-root,
   .aic-root {
-    height: auto !important;
-    min-height: 100vh !important;
-    max-height: none !important;
-    overflow: visible !important;
+    height: auto;
+    min-height: 100vh;
+    max-height: none;
+    overflow: visible;
   }
 
   .aic-shell {
-    height: auto !important;
-    min-height: 100vh !important;
-    max-height: none !important;
-    grid-template-columns: 1fr !important;
-    overflow: visible !important;
+    height: auto;
+    min-height: 100vh;
+    grid-template-columns: 1fr;
+    overflow: visible;
   }
 
   .aic-room-panel {
-    max-height: 260px !important;
+    max-height: 260px;
   }
 
   .aic-chat-workspace {
-    height: 680px !important;
-    min-height: 680px !important;
-    max-height: none !important;
+    height: 680px;
+    min-height: 680px;
   }
 
-  .aic-chat-window {
-    min-height: 0 !important;
+  .aic-chat-input {
+    grid-template-columns: 1fr;
   }
 }
