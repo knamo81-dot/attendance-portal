@@ -201,7 +201,7 @@
       state.activeSlotIndex = Math.max(0, state.openSlots.length - 1);
     }
 
-    document.documentElement.style.setProperty('--aic-visible-slots', String(Math.max(1, state.openSlots.length || 1)));
+    document.documentElement.style.setProperty('--aic-visible-slots', String(Math.max(1, state.visibleSlotCount || state.openSlots.length || 1)));
   }
 
   function openRoom(roomId) {
@@ -235,7 +235,7 @@
     if (state.activeSlotIndex >= state.openSlots.length) {
       state.activeSlotIndex = Math.max(0, state.openSlots.length - 1);
     }
-    document.documentElement.style.setProperty('--aic-visible-slots', String(Math.max(1, state.openSlots.length || 1)));
+    document.documentElement.style.setProperty('--aic-visible-slots', String(Math.max(1, state.visibleSlotCount || state.openSlots.length || 1)));
     renderRoomList();
     renderChatSlots();
   }
@@ -494,8 +494,7 @@
     window.addEventListener('resize', function () {
       clearTimeout(slotResizeTimer);
       slotResizeTimer = setTimeout(function () {
-        syncSlotCount();
-        render();
+        safeRender();
       }, 120);
     });
   }
@@ -531,13 +530,56 @@
     renderChatSlots();
   }
 
-  window.aicRender = render;
+  function safeRender() {
+    render();
+
+    requestAnimationFrame(function () {
+      render();
+    });
+
+    setTimeout(function () {
+      render();
+    }, 80);
+
+    setTimeout(function () {
+      render();
+    }, 220);
+
+    setTimeout(function () {
+      render();
+    }, 520);
+  }
+
+  function installVisibilityRenderHooks() {
+    window.addEventListener('load', safeRender);
+    window.addEventListener('pageshow', safeRender);
+
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) safeRender();
+    });
+
+    // 포탈 iframe 전환/표시 타이밍에서 부모 레이아웃 계산이 늦게 잡히는 경우 보정
+    window.addEventListener('message', function (event) {
+      var data = event && event.data ? event.data : {};
+      if (
+        data.type === 'portal-auth' ||
+        data.type === 'portal-tabs-request' ||
+        data.type === 'portal-tab-change' ||
+        data.type === 'portal-layout-refresh' ||
+        data.type === 'portal-frame-active'
+      ) {
+        safeRender();
+      }
+    });
+  }
+
+  window.aicRender = safeRender;
 
   function bootstrap() {
     cacheEls();
     bind();
-    syncSlotCount();
-    render();
+    installVisibilityRenderHooks();
+    safeRender();
 
     if (window.aicNotifyTabsReady) {
       window.aicNotifyTabsReady();
