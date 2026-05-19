@@ -8,6 +8,16 @@
   window.AIC_CONFIG = {
     source: 'aic',
     tabs: [],
+
+    slotPolicy: {
+      defaultVisibleSlots: 2,
+      maxVisibleSlots: 3,
+      notebookMaxSlots: 2,
+      mobileMaxSlots: 1,
+      notebookBreakpoint: 1280,
+      mobileBreakpoint: 900
+    },
+
     defaultSettings: {
       defaultLang: 'ko',
       direction: 'auto',
