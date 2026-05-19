@@ -9,7 +9,7 @@
 (function () {
   'use strict';
 
-  const TABS = [
+  const BASE_TABS = [
     { id: 'attendance', label: '근태관리' },
     { id: 'dashboard', label: '분석대시보드' },
     { id: 'deep-analysis', label: '심층분석' },
@@ -17,12 +17,134 @@
     { id: 'attendance-missing', label: '출퇴근 누락 분석' }
   ];
 
+  const ADMIN_TAB = { id: 'admin', label: '관리자 기능' };
+
+  function isAdminOperatorRoleText(value) {
+    const text = compact(value).toLowerCase();
+    return text.includes('관리자') || text.includes('운영자') || text.includes('admin') || text.includes('operator');
+  }
+
+  function hasAdminOperatorRoleInDom() {
+    const candidates = [
+      document.body,
+      document.querySelector('.top-user-bar'),
+      document.querySelector('.user-chip'),
+      document.querySelector('.role'),
+      document.querySelector('[data-role]'),
+      document.querySelector('[data-user-role]'),
+      document.querySelector('[data-authority]')
+    ].filter(Boolean);
+
+    return candidates.some(function (el) {
+      const text = [
+        el.textContent || '',
+        el.getAttribute?.('data-role') || '',
+        el.getAttribute?.('data-user-role') || '',
+        el.getAttribute?.('data-authority') || ''
+      ].join(' ');
+      return isAdminOperatorRoleText(text);
+    });
+  }
+
+  function hasAdminOperatorRoleInState() {
+    try {
+      const sources = [
+        window.currentAccess,
+        window.ATTENDANCE_EFFECTIVE_ACCESS,
+        window.currentUser,
+        window.portalUser,
+        window.USER,
+        window.user
+      ].filter(Boolean);
+
+      return sources.some(function (obj) {
+        if (!obj || typeof obj !== 'object') return false;
+        const roleText = [
+          obj.role,
+          obj.primaryRole,
+          obj.systemRole,
+          obj.system_role,
+          obj.userRole,
+          obj.user_role,
+          obj.authority,
+          obj.accessRole,
+          obj.access_role,
+          obj?.profile?.role,
+          obj?.profile?.authority,
+          obj?.user?.role,
+          obj?.user?.authority
+        ].filter(Boolean).join(' ');
+        return obj.isAdmin === true || obj.isOperator === true || isAdminOperatorRoleText(roleText);
+      });
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function getInternalAdminTab() {
+    return document.querySelector('.mainTab[data-main="admin"]');
+  }
+
+  function getInternalAdminPanel() {
+    return document.getElementById('main-admin');
+  }
+
+  function isInternalAdminTabAllowed() {
+    const tab = getInternalAdminTab();
+    const panel = getInternalAdminPanel();
+
+    if (!tab && !panel) return false;
+
+    if (tab) {
+      const hidden = tab.dataset.adminHidden === 'Y' || tab.getAttribute('aria-hidden') === 'true';
+      const styleHidden = tab.style && tab.style.display === 'none';
+      if (!hidden && !tab.disabled && !styleHidden) return true;
+    }
+
+    if (panel) {
+      const hidden = panel.dataset.adminHidden === 'Y' || panel.getAttribute('aria-hidden') === 'true';
+      const styleHidden = panel.style && panel.style.display === 'none';
+      if (!hidden && !styleHidden) return true;
+    }
+
+    return false;
+  }
+
+  function canShowAdminTab() {
+    return isInternalAdminTabAllowed() || hasAdminOperatorRoleInState() || hasAdminOperatorRoleInDom();
+  }
+
+  function ensureInternalAdminVisible() {
+    if (!canShowAdminTab()) return;
+
+    const tab = getInternalAdminTab();
+    const panel = getInternalAdminPanel();
+
+    if (tab) {
+      tab.dataset.adminHidden = 'N';
+      tab.setAttribute('aria-hidden', 'false');
+      tab.disabled = false;
+      tab.style.display = '';
+    }
+
+    if (panel) {
+      panel.dataset.adminHidden = 'N';
+      panel.setAttribute('aria-hidden', 'false');
+      panel.style.display = '';
+    }
+  }
+
+  function getPortalTabs() {
+    return canShowAdminTab() ? BASE_TABS.concat([ADMIN_TAB]) : BASE_TABS.slice();
+  }
+
   const TAB_ALIASES = {
     attendance: ['attendance', '근태관리'],
     dashboard: ['dashboard', '분석대시보드'],
     'deep-analysis': ['deep-analysis', 'deep', '심층분석'],
     'trend-analysis': ['trend-analysis', 'trend', '트렌드분석'],
-    'attendance-missing': ['attendance-missing', 'missing', 'missing-analysis', '출퇴근 누락 분석', '출퇴근누락분석']
+    'attendance-missing': ['attendance-missing', 'missing', 'missing-analysis', '출퇴근 누락 분석', '출퇴근누락분석'],
+    admin: ['admin', '관리자 기능', '관리자기능', '설정', '관리']
   };
 
   function compact(value) {
@@ -49,7 +171,7 @@
     if (!window.parent || window.parent === window) return;
     window.parent.postMessage({
       type: 'portal-tabs-ready',
-      tabs: TABS,
+      tabs: getPortalTabs(),
       activeTabId: getActiveTabId(),
       source: 'attendance'
     }, '*');
@@ -117,6 +239,11 @@
       return !!(panel && (panel.querySelector('svg') || panel.querySelector('table tbody tr')));
     }
 
+    if (id === 'admin') {
+      const panel = document.querySelector('#main-admin');
+      return !!(panel && (panel.querySelector('table tbody tr') || panel.querySelector('.card') || panel.querySelector('[id*="admin"]')));
+    }
+
     return false;
   }
 
@@ -177,6 +304,15 @@
         window.renderAttendanceMissingAnalysis();
       }
     } catch (_) {}
+
+    try {
+      if (id === 'admin') {
+        ensureInternalAdminVisible();
+        if (typeof window.renderAdmin === 'function') window.renderAdmin();
+        if (typeof window.renderEmpMaster === 'function') window.renderEmpMaster();
+        if (typeof window.renderOrgTree === 'function') window.renderOrgTree();
+      }
+    } catch (_) {}
   }
 
   let __bridgeRenderTimer = null;
@@ -204,6 +340,10 @@
   function activateTab(tabId) {
     const id = normalizeTabId(tabId);
     let ok = false;
+
+    if (id === 'admin') {
+      ensureInternalAdminVisible();
+    }
 
     try {
       if (typeof window.activateMainTabWithoutRender === 'function') {
@@ -410,7 +550,8 @@
     setTimeout(postFilters, 150);
   }
 
-  window.portalTabs = TABS;
+  window.portalTabs = getPortalTabs();
+  window.portalGetTabs = getPortalTabs;
   window.portalActivateTab = activateTab;
   window.portalFilters = getFilters;
   window.portalSetFilter = setFilter;
