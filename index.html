@@ -938,93 +938,30 @@ body:not(.service-admin-enabled) .service-admin-btn{
 }
 
 
-
-
-/* ===== Portal Common Iframe Workspace Final ===== */
-/* 포탈 헤더/공통탭 아래 남는 공간을 공통 iframe 흰색 박스로 고정 */
-html,
-body {
-  width: 100% !important;
-  height: 100% !important;
-  overflow: hidden !important;
-}
-
-.app {
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  overflow: hidden !important;
-}
-
-.layout {
-  height: calc(100dvh - (var(--portal-app-padding, 10px) * 2)) !important;
+/* ===== Portal AIC iframe layout final fix ===== */
+/* AIC는 공통 subtab이 없으므로 포탈 헤더 + iframe 2행 구조로 사용 */
+body.portal-page-aic .portal-main {
   min-height: 0 !important;
-  overflow: hidden !important;
-  align-items: stretch !important;
-}
-
-.sidenav {
-  height: calc(100dvh - (var(--portal-app-padding, 10px) * 2)) !important;
-  min-height: 0 !important;
-  max-height: calc(100dvh - (var(--portal-app-padding, 10px) * 2)) !important;
-}
-
-.portal-main {
-  min-width: 0 !important;
-  min-height: 0 !important;
-  height: calc(100dvh - (var(--portal-app-padding, 10px) * 2)) !important;
-  max-height: calc(100dvh - (var(--portal-app-padding, 10px) * 2)) !important;
   overflow: hidden !important;
   display: grid !important;
-  grid-template-rows: auto auto minmax(0, 1fr) !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
   gap: var(--portal-gap, 10px) !important;
-}
-
-/* 공통 탭이 없는 프로그램은 row가 자연스럽게 0으로 접히도록 */
-.portal-subtabs-wrap {
-  min-height: 0 !important;
-  flex: 0 0 auto !important;
-}
-
-/* iframe을 직접 카드처럼 쓰지 않고, 공통 흰색 박스를 부모로 둠 */
-.portal-frame-shell {
-  width: 100% !important;
-  height: 100% !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  max-height: 100% !important;
-  overflow: hidden !important;
-  border-radius: var(--portal-frame-radius, 16px) !important;
-  background: #ffffff !important;
-  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.045) !important;
-  display: block !important;
-}
-
-#portalFrame {
-  width: 100% !important;
-  height: 100% !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  max-height: 100% !important;
-  border: none !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  display: block !important;
-}
-
-/* iframe 내부 문서가 길면 iframe 내부에서 스크롤이 생기도록 둠 */
-.portal-frame-shell iframe {
-  overflow: auto !important;
-}
-
-/* AIC도 이제 공통 프레임 구조를 그대로 사용 */
-body.portal-page-aic .portal-main {
-  grid-template-rows: auto auto minmax(0, 1fr) !important;
 }
 
 body.portal-page-aic #portalSubtabsWrap {
   display: none !important;
+}
+
+body.portal-page-aic #portalFrame {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  display: block !important;
+  align-self: stretch !important;
+  justify-self: stretch !important;
+  overflow: hidden !important;
+  background: #ffffff !important;
 }
 
 </style>
@@ -1100,9 +1037,7 @@ body.portal-page-aic #portalSubtabsWrap {
           <div id="portalSubtabs" class="portal-subtabs"></div>
           <div id="portalFilters" class="portal-filters" aria-label="프로그램 공통 필터"></div>
         </div>
-        <div id="portalFrameShell" class="portal-frame-shell">
-          <iframe id="portalFrame" title="포털 본문" src="portal-main/portal-main.html"></iframe>
-        </div>
+        <iframe id="portalFrame" title="포털 본문" src="portal-main/portal-main.html"></iframe>
       </div>
     </div>
   </div>
