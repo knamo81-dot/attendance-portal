@@ -937,6 +937,55 @@ body:not(.service-admin-enabled) .service-admin-btn{
   min-width:105px;
 }
 
+
+/* ===== Portal iframe fixed workspace final ===== */
+/* 포탈 헤더/탭을 제외한 남은 공간을 iframe 흰색 박스가 항상 꽉 채우도록 고정 */
+.portal-main {
+  min-height: 0 !important;
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-rows: auto auto minmax(0, 1fr) !important;
+}
+
+#portalSubtabsWrap {
+  min-height: 0 !important;
+}
+
+/* AIC는 상단 공통 탭이 없으므로 subtabs 영역을 완전히 접고 iframe 공간을 최대로 확보 */
+body.portal-page-aic .portal-main {
+  grid-template-rows: auto 0 minmax(0, 1fr) !important;
+}
+
+body.portal-page-aic #portalSubtabsWrap {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+/* iframe 흰색 박스 */
+#portalFrame {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  align-self: stretch !important;
+  justify-self: stretch !important;
+  display: block !important;
+  overflow: hidden !important;
+}
+
+/* AIC에서 iframe 자체를 남은 영역 전체 카드로 사용 */
+body.portal-page-aic #portalFrame {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  background: #ffffff !important;
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1514,6 +1563,12 @@ body:not(.service-admin-enabled) .service-admin-btn{
     }, '*');
   }
 
+
+  function applyPortalPageClass(src) {
+    const key = normalizePortalSrc(src);
+    document.body.classList.toggle('portal-page-aic', key === 'aic/index.html');
+  }
+
   function updatePortalHeader(src) {
     const key = normalizePortalSrc(src);
     const meta = portalHeaderMeta[key] || portalHeaderMeta[HOME_SRC];
@@ -1877,10 +1932,31 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
   function replacePortalFrame(src) {
     if (!frame || !src) return;
+    applyPortalPageClass(src);
     updatePortalHeader(src);
     updatePortalSubtabs(src);
     frame.onload = function () {
       postAuthToFrame();
+
+      try {
+        if (normalizePortalSrc(src) === 'aic/index.html') {
+          frame.contentWindow.postMessage({
+            type: 'portal-frame-active',
+            source: 'portal-index',
+            module: 'aic'
+          }, '*');
+
+          setTimeout(function () {
+            try {
+              frame.contentWindow.postMessage({
+                type: 'portal-layout-refresh',
+                source: 'portal-index-delay',
+                module: 'aic'
+              }, '*');
+            } catch (_) {}
+          }, 250);
+        }
+      } catch (_) {}
 
       try {
         const key = normalizePortalSrc(src);
