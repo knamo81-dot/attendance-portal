@@ -110,6 +110,14 @@
       .replace(/'/g, '&#39;');
   }
 
+  function tr(key, fallback) {
+    if (window.I18N && typeof window.I18N.t === 'function') {
+      var value = window.I18N.t(key);
+      return value && value !== key ? value : fallback;
+    }
+    return fallback;
+  }
+
   function loadSettings() {
     try {
       var raw = localStorage.getItem('aic_user_settings');
@@ -141,11 +149,11 @@
 
   function fakeTranslate(text, lang) {
     if (!String(text || '').trim()) return '';
-    if (!state.settings.autoTranslate) return '자동번역 OFF 상태입니다.';
+    if (!state.settings.autoTranslate) return tr('aic.autoTranslateOff', '자동번역 OFF 상태입니다.');
 
     var tone = getToneLabel(state.settings.tone);
     if (lang === 'ko') return '[' + tone + '] Preview translation: ' + text;
-    return '[' + tone + '] 미리보기 번역: ' + text;
+    return '[' + tone + '] ' + tr('aic.previewTranslation', '미리보기 번역') + ': ' + text;
   }
 
   function getRoom(roomId) {
@@ -156,8 +164,38 @@
     return state.openSlots.findIndex(function (slot) { return slot && slot.roomId === roomId; });
   }
 
+  function getStableLayoutWidth() {
+    var candidates = [];
+
+    if (els && els.slots && els.slots.clientWidth) {
+      candidates.push(els.slots.clientWidth);
+    }
+
+    if (els && els.root && els.root.clientWidth) {
+      candidates.push(Math.max(0, els.root.clientWidth - 280));
+    }
+
+    if (document.documentElement && document.documentElement.clientWidth) {
+      candidates.push(document.documentElement.clientWidth);
+    }
+
+    if (window.innerWidth) {
+      candidates.push(window.innerWidth);
+    }
+
+    candidates = candidates.filter(function (width) {
+      return Number(width) && width > 120;
+    });
+
+    if (!candidates.length) return window.innerWidth || 1024;
+
+    // iframe 전환 순간에 clientWidth가 비정상적으로 작게 잡히는 것을 피하기 위해
+    // 가장 큰 유효 폭을 기준으로 슬롯 수를 계산합니다.
+    return Math.max.apply(null, candidates);
+  }
+
   function getMaxSlotsByWidth() {
-    var width = els.slots ? els.slots.clientWidth : window.innerWidth;
+    var width = getStableLayoutWidth();
     var policy = CONFIG.slotPolicy;
 
     if (width < policy.mobileBreakpoint) return policy.mobileMaxSlots;
@@ -261,7 +299,7 @@
         state.visibleSlotCount === count ? ' active' : '',
         '" data-slot-count="', count, '"',
         count > max ? ' disabled' : '',
-        '>', count, '개 보기</button>'
+        '>', count, tr('aic.slotViewSuffix', '개 보기'), '</button>'
       ].join('');
     }).join('');
 
@@ -284,7 +322,7 @@
         '<div class="aic-room-item', open ? ' active' : '', '" data-room-id="', esc(room.id), '">',
         '  <div class="aic-room-name-row">',
         '    <div class="aic-room-name">', esc(room.name), '</div>',
-        '    <div class="aic-room-slot', open ? ' open' : '', '">', open ? ('열림 ' + (slotIndex + 1)) : '', '</div>',
+        '    <div class="aic-room-slot', open ? ' open' : '', '">', open ? (tr('aic.open', '열림') + ' ' + (slotIndex + 1)) : '', '</div>',
         '  </div>',
         '  <div class="aic-room-meta">', esc(room.members), '<br>', room.messages.length, '개 메시지</div>',
         '</div>'
@@ -320,19 +358,19 @@
       var slot = state.openSlots[i];
 
       if (!slot) {
-        html += '<div class="aic-empty-slot">회의방을 선택하세요.</div>';
+        html += '<div class="aic-empty-slot">' + tr('aic.selectRoom', '회의방을 선택하세요.') + '</div>';
         continue;
       }
 
       var room = getRoom(slot.roomId);
       if (!room) {
-        html += '<div class="aic-empty-slot">회의방 정보가 없습니다.</div>';
+        html += '<div class="aic-empty-slot">' + tr('aic.roomNotFound', '회의방 정보가 없습니다.') + '</div>';
         continue;
       }
 
       var messages = room.messages.map(buildMessage).join('');
       if (!messages) {
-        messages = '<div class="aic-empty-message">아직 메시지가 없습니다.<br>아래 입력창으로 메시지를 작성하세요.</div>';
+        messages = '<div class="aic-empty-message">' + tr('aic.noMessages', '아직 메시지가 없습니다.') + '<br>' + tr('aic.writeMessageGuide', '아래 입력창으로 메시지를 작성하세요.') + '</div>';
       }
 
       html += [
@@ -340,10 +378,10 @@
         '  <div class="aic-chat-head">',
         '    <div class="aic-chat-title-box">',
         '      <div class="aic-chat-title">', esc(room.name), '</div>',
-        '      <div class="aic-chat-meta">', esc(room.members), ' · ', i + 1, '번 슬롯</div>',
+        '      <div class="aic-chat-meta">', esc(room.members), ' · ', i + 1, tr('aic.slotNumberSuffix', '번 슬롯') + '</div>',
         '    </div>',
         '    <div class="aic-chat-actions">',
-        '      <button class="aic-chat-action pin', slot.pinned ? ' active' : '', '" data-pin-slot="', i, '" type="button">', slot.pinned ? '고정됨' : '고정', '</button>',
+        '      <button class="aic-chat-action pin', slot.pinned ? ' active' : '', '" data-pin-slot="', i, '" type="button">', slot.pinned ? tr('aic.pinned', '고정됨') : tr('aic.pin', '고정'), '</button>',
         '      <button class="aic-chat-action" data-invite-slot="', i, '" type="button">참여자</button>',
         '      <button class="aic-chat-action dark" data-close-slot="', i, '" type="button">닫기</button>',
         '    </div>',
@@ -351,10 +389,10 @@
         '  <div class="aic-messages" data-message-box="', i, '">', messages, '</div>',
         '  <div class="aic-chat-input">',
         '    <select class="module-select" data-lang-slot="', i, '">',
-        '      <option value="ko"', state.settings.defaultLang === 'ko' ? ' selected' : '', '>한국어</option>',
+        '      <option value="ko"', state.settings.defaultLang === 'ko' ? ' selected' : '', '>', tr('aic.korean', '한국어'), '</option>',
         '      <option value="en"', state.settings.defaultLang === 'en' ? ' selected' : '', '>English</option>',
         '    </select>',
-        '    <input class="module-input" data-input-slot="', i, '" placeholder="메시지를 입력하세요" />',
+        '    <input class="module-input" data-input-slot="', i, '" placeholder="', tr('aic.inputPlaceholder', '메시지를 입력하세요'), '" />',
         '    <button class="module-btn accent aic-send-btn" data-send-slot="', i, '" type="button">전송</button>',
         '  </div>',
         '</section>'
@@ -440,7 +478,7 @@
   }
 
   function createRoom() {
-    var name = (els.newRoomName && els.newRoomName.value || '').trim() || '새 회의방';
+    var name = (els.newRoomName && els.newRoomName.value || '').trim() || tr('aic.newRoomDefaultName', '새 회의방');
     var members = (els.newRoomMembers && els.newRoomMembers.value || '').trim() || (getCurrentUserName() + ' · 참여자');
     var id = 'room_' + Date.now();
 
@@ -527,6 +565,7 @@
   }
 
   function cacheEls() {
+    els.root = $('aicRoot');
     els.roomList = $('aicRoomList');
     els.slots = $('aicChatSlots');
     els.slotButtons = $('aicSlotButtons');
@@ -558,19 +597,24 @@
   }
 
   function scheduleRender() {
-    render(true);
+    clearTimeout(resizeTimer);
 
     requestAnimationFrame(function () {
       render(true);
+
+      requestAnimationFrame(function () {
+        render(true);
+      });
     });
 
-    setTimeout(function () {
+    // iframe 전환 직후 포탈 레이아웃이 안정된 뒤 다시 계산
+    resizeTimer = setTimeout(function () {
       render(true);
-    }, 120);
+    }, 180);
 
     setTimeout(function () {
       render(true);
-    }, 360);
+    }, 520);
   }
 
   window.aicRender = scheduleRender;
@@ -578,6 +622,18 @@
   function bootstrap() {
     cacheEls();
     bind();
+
+    if (window.I18N && typeof window.I18N.changeLanguage === 'function' && !window.I18N.__aicPatched) {
+      var originalChangeLanguage = window.I18N.changeLanguage.bind(window.I18N);
+      window.I18N.changeLanguage = function (lang) {
+        return Promise.resolve(originalChangeLanguage(lang)).then(function (result) {
+          scheduleRender();
+          return result;
+        });
+      };
+      window.I18N.__aicPatched = true;
+    }
+
     scheduleRender();
 
     if (window.aicNotifyTabsReady) {
@@ -591,4 +647,3 @@
     bootstrap();
   }
 })();
-
