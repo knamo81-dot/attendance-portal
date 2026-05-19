@@ -633,3 +633,158 @@ body {
     overflow-x: auto;
   }
 }
+
+
+/* ===== AIC SLOT HEIGHT FINAL FIX v2 ===== */
+/* 포탈 iframe 내부에서 채팅창이 상단 한 줄로 눌리는 현상 보정 */
+
+html,
+body {
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.module-root.aic-root,
+.aic-root {
+  width: 100% !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  max-height: 100vh !important;
+  padding: var(--page-padding) !important;
+  overflow: hidden !important;
+  display: block !important;
+}
+
+.aic-shell {
+  width: 100% !important;
+  height: calc(100vh - (var(--page-padding) * 2)) !important;
+  min-height: calc(100vh - (var(--page-padding) * 2)) !important;
+  max-height: calc(100vh - (var(--page-padding) * 2)) !important;
+  display: grid !important;
+  grid-template-columns: var(--aic-room-width) minmax(0, 1fr) !important;
+  gap: var(--card-gap) !important;
+  overflow: hidden !important;
+}
+
+.aic-room-panel {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+.aic-chat-workspace {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  padding: var(--card-gap) !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  gap: var(--card-gap) !important;
+  overflow: hidden !important;
+}
+
+.aic-slot-toolbar {
+  min-height: 44px !important;
+  margin-bottom: 0 !important;
+  flex: none !important;
+}
+
+.aic-chat-slots {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  display: grid !important;
+  grid-template-columns: repeat(var(--aic-visible-slots, 2), minmax(0, 1fr)) !important;
+  gap: var(--card-gap) !important;
+  overflow: hidden !important;
+}
+
+.aic-chat-window {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
+  overflow: hidden !important;
+}
+
+.aic-chat-head {
+  height: 48px !important;
+  min-height: 48px !important;
+  flex: none !important;
+}
+
+.aic-messages {
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  flex: none !important;
+}
+
+.aic-chat-input {
+  min-height: 44px !important;
+  flex: none !important;
+}
+
+.aic-chat-empty {
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+@media (max-width: 1280px) {
+  .aic-shell {
+    grid-template-columns: var(--aic-room-width) minmax(0, 1fr) !important;
+  }
+
+  .aic-chat-slots {
+    grid-template-columns: repeat(var(--aic-visible-slots, 1), minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .aic-chat-slots {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 760px) {
+  html,
+  body {
+    overflow: auto !important;
+  }
+
+  .module-root.aic-root,
+  .aic-root {
+    height: auto !important;
+    min-height: 100vh !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .aic-shell {
+    height: auto !important;
+    min-height: 100vh !important;
+    max-height: none !important;
+    grid-template-columns: 1fr !important;
+    overflow: visible !important;
+  }
+
+  .aic-room-panel {
+    max-height: 260px !important;
+  }
+
+  .aic-chat-workspace {
+    height: 680px !important;
+    min-height: 680px !important;
+    max-height: none !important;
+  }
+
+  .aic-chat-window {
+    min-height: 0 !important;
+  }
+}
