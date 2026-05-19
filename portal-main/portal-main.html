@@ -12,8 +12,11 @@
   --line:#d9e2ec;
   --text:#1f2937;
   --muted:#64748b;
+  --accent:#0ea5e9;
+  --dark:#0f172a;
   --shadow:var(--shadow-card, 0 5px 14px rgba(15,23,42,.045));
   --radius:var(--card-radius, 14px);
+  --page-pad:var(--page-padding, 14px);
 }
 
 *{box-sizing:border-box}
@@ -22,110 +25,271 @@ html,body{
   margin:0;
   padding:0;
   width:100%;
+  height:100%;
   min-width:0;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",Arial,sans-serif;
   background:var(--bg);
   color:var(--text);
+  overflow:hidden;
 }
 
 body{
-  padding:0;
   max-width:none;
 }
 
 .app{
   width:100%;
+  height:100vh;
   max-width:none;
   margin:0;
-  padding:0;
+  padding:var(--page-pad);
+  overflow:hidden;
 }
 
-.shell{
+.home-frame{
   width:100%;
+  height:100%;
   max-width:none;
   margin:0;
-  display:grid;
-  gap:var(--gap-md, 8px);
-}
-
-.card{
-  width:100%;
-  max-width:none;
   background:var(--card);
   border:1px solid var(--line);
   border-radius:var(--radius);
   box-shadow:var(--shadow);
   overflow:hidden;
-}
-
-.grid{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:var(--gap-md, 8px);
-}
-
-.quick{
-  padding:var(--card-padding, 12px);
-  min-height:78px;
   display:flex;
   flex-direction:column;
-  justify-content:center;
-  transition:transform .15s ease, box-shadow .15s ease;
+  min-height:0;
 }
 
-.quick:hover{
-  transform:translateY(-1px);
-  box-shadow:0 8px 18px rgba(15,23,42,.08);
+.home-header{
+  flex:0 0 auto;
+  height:44px;
+  padding:0 14px;
+  border-bottom:1px solid #e2e8f0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  background:#ffffff;
 }
 
-.quick-title{
-  font-size:var(--font-title, 13px);
-  font-weight:800;
+.home-title{
+  font-size:13px;
+  font-weight:900;
   letter-spacing:-.03em;
-  margin-bottom:5px;
   color:#0f172a;
+  white-space:nowrap;
 }
 
-.quick-desc{
-  font-size:var(--font-base, 11px);
-  line-height:1.45;
-  color:var(--muted);
+.home-tabs{
+  display:flex;
+  align-items:center;
+  gap:6px;
 }
 
-@media (max-width:1100px){
-  .grid{
-    grid-template-columns:1fr;
-  }
+.home-tab{
+  height:28px;
+  border:1px solid #cbd5e1;
+  border-radius:999px;
+  background:#ffffff;
+  color:#334155;
+  padding:0 12px;
+  font-size:11px;
+  font-weight:800;
+  cursor:pointer;
+  white-space:nowrap;
+}
+
+.home-tab.active{
+  background:var(--dark);
+  border-color:var(--dark);
+  color:#ffffff;
+}
+
+.home-scroll{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:16px;
+}
+
+.home-panel{
+  display:none;
+  width:100%;
+  min-height:100%;
+}
+
+.home-panel.active{
+  display:block;
+}
+
+.empty-home{
+  min-height:calc(100vh - 78px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  color:#94a3b8;
+  font-size:12px;
+  font-weight:700;
+}
+
+.settings-wrap{
+  max-width:760px;
+  margin:0 auto;
+  display:grid;
+  gap:12px;
+}
+
+.setting-card{
+  border:1px solid #e2e8f0;
+  border-radius:14px;
+  background:#ffffff;
+  padding:14px;
+}
+
+.setting-card h2{
+  margin:0 0 8px;
+  font-size:13px;
+  color:#0f172a;
+  letter-spacing:-.03em;
+}
+
+.setting-card p{
+  margin:0 0 12px;
+  font-size:11px;
+  line-height:1.55;
+  color:#64748b;
+}
+
+.lang-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
+.lang-btn{
+  height:30px;
+  border:1px solid #cbd5e1;
+  border-radius:8px;
+  background:#fff;
+  color:#334155;
+  padding:0 12px;
+  font-size:11px;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.lang-btn.primary{
+  background:#0f172a;
+  border-color:#0f172a;
+  color:#fff;
 }
 
 @media (max-width:760px){
-  .quick{
-    padding:14px;
-  }
+  :root{--page-pad:10px}
+  .home-header{height:auto;min-height:44px;align-items:flex-start;flex-direction:column;padding:10px}
+  .home-tabs{width:100%}
+  .home-tab{flex:1}
+  .home-scroll{padding:12px}
 }
 </style>
 </head>
 <body>
 <div class="app">
-  <main class="shell">
-    <section class="grid">
-      <article class="card el-card quick">
-        <div class="quick-title el-title">워크스페이스</div>
-        <div class="quick-desc el-text">메모와 일정·예약을 통합 관리합니다.</div>
-      </article>
+  <main class="home-frame">
+    <header class="home-header">
+      <div class="home-title" data-i18n="portal.home.title">포탈 홈</div>
+      <nav class="home-tabs" aria-label="Portal Home Tabs">
+        <button type="button" class="home-tab active" data-tab="home" data-i18n="portal.home.tabHome">홈</button>
+        <button type="button" class="home-tab" data-tab="settings" data-i18n="portal.home.tabSettings">설정</button>
+      </nav>
+    </header>
 
-      <article class="card el-card quick">
-        <div class="quick-title el-title">연구소 운영</div>
-        <div class="quick-desc el-text">근태, 폐수, 시약 등 운영 시스템으로 이동합니다.</div>
-      </article>
+    <section class="home-scroll">
+      <section id="homePanel" class="home-panel active">
+        <div class="empty-home" data-i18n="portal.home.emptyText">홈 화면 준비 중입니다.</div>
+      </section>
 
-      <article class="card el-card quick">
-        <div class="quick-title el-title">통합 포털</div>
-        <div class="quick-desc el-text">연구소 운영 데이터를 한 곳에서 관리합니다.</div>
-      </article>
+      <section id="settingsPanel" class="home-panel">
+        <div class="settings-wrap">
+          <article class="setting-card">
+            <h2 data-i18n="portal.settings.languageTitle">언어 설정</h2>
+            <p data-i18n="portal.settings.languageDesc">포탈 홈에서 먼저 다국어 전환 구조를 테스트합니다.</p>
+            <div class="lang-row">
+              <button type="button" class="lang-btn primary" data-lang="ko">KO</button>
+              <button type="button" class="lang-btn" data-lang="en">EN</button>
+            </div>
+          </article>
+
+          <article class="setting-card">
+            <h2 data-i18n="portal.settings.noticeTitle">적용 안내</h2>
+            <p data-i18n="portal.settings.noticeDesc">홈에서 검증한 뒤 근태, 폐수, 시약초자 등 업무 프로그램으로 순차 적용할 수 있습니다.</p>
+          </article>
+        </div>
+      </section>
     </section>
   </main>
 </div>
+
+<script src="../assets/i18n/i18n-core.js"></script>
+<script>
+(function(){
+  const tabButtons = document.querySelectorAll('.home-tab');
+  const panels = {
+    home: document.getElementById('homePanel'),
+    settings: document.getElementById('settingsPanel')
+  };
+
+  function activateTab(tabName){
+    tabButtons.forEach(btn => {
+      const isActive = btn.dataset.tab === tabName;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+
+    Object.entries(panels).forEach(([key, panel]) => {
+      if(panel) panel.classList.toggle('active', key === tabName);
+    });
+  }
+
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+  });
+
+  function markLanguage(lang){
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+      btn.classList.toggle('primary', btn.dataset.lang === lang);
+    });
+  }
+
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lang = btn.dataset.lang || 'ko';
+
+      if(typeof window.setLanguage === 'function'){
+        window.setLanguage(lang);
+      }else if(window.i18n && typeof window.i18n.setLanguage === 'function'){
+        window.i18n.setLanguage(lang);
+      }else{
+        localStorage.setItem('portal.lang', lang);
+      }
+
+      markLanguage(lang);
+    });
+  });
+
+  const savedLang = localStorage.getItem('portal.lang') || localStorage.getItem('i18n.lang') || localStorage.getItem('lang') || 'ko';
+  markLanguage(savedLang);
+
+  if(typeof window.setLanguage === 'function'){
+    window.setLanguage(savedLang);
+  }else if(window.i18n && typeof window.i18n.setLanguage === 'function'){
+    window.i18n.setLanguage(savedLang);
+  }
+})();
+</script>
 </body>
 </html>
 
