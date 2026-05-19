@@ -939,6 +939,23 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
 
 
+
+/* ===== Portal Grid Row Fix ===== */
+/* subtabs가 없는 화면(AIC/홈)에서 iframe이 auto 행에 들어가 납작해지는 문제 방지 */
+.portal-common-header {
+  grid-row: 1 !important;
+}
+
+#portalSubtabsWrap {
+  grid-row: 2 !important;
+}
+
+#portalFrame {
+  grid-row: 3 !important;
+  align-self: stretch !important;
+  justify-self: stretch !important;
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
