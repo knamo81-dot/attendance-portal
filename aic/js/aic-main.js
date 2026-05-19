@@ -13,6 +13,7 @@
     visibleSlotCount: 1,
     openSlots: [],
     settings: loadSettings(),
+    preferredSlotCount: (window.AIC_CONFIG && window.AIC_CONFIG.slotPolicy && window.AIC_CONFIG.slotPolicy.defaultVisibleSlots) || 2,
     rooms: [
       {
         id: 'r1',
@@ -77,12 +78,35 @@
       .replace(/'/g, '&#39;');
   }
 
+  function getDefaultSettings() {
+    var fallback = {
+      defaultLang: 'ko',
+      direction: 'auto',
+      tone: 'business',
+      display: 'both',
+      autoTranslate: true
+    };
+    return Object.assign({}, fallback, (window.AIC_CONFIG && window.AIC_CONFIG.defaultSettings) || {});
+  }
+
+  function getSlotPolicy() {
+    var fallback = {
+      defaultVisibleSlots: 2,
+      maxVisibleSlots: 3,
+      notebookMaxSlots: 2,
+      mobileMaxSlots: 1,
+      notebookBreakpoint: 1280,
+      mobileBreakpoint: 900
+    };
+    return Object.assign({}, fallback, (window.AIC_CONFIG && window.AIC_CONFIG.slotPolicy) || {});
+  }
+
   function loadSettings() {
     try {
       var raw = localStorage.getItem('aic_user_settings');
-      if (raw) return Object.assign({}, window.AIC_CONFIG.defaultSettings, JSON.parse(raw));
+      if (raw) return Object.assign({}, getDefaultSettings(), JSON.parse(raw));
     } catch (_) {}
-    return Object.assign({}, window.AIC_CONFIG.defaultSettings);
+    return Object.assign({}, getDefaultSettings());
   }
 
   function saveSettingsToLocal() {
@@ -126,10 +150,23 @@
   }
 
   function calculateSlotCount() {
+    var policy = getSlotPolicy();
     var width = els.slots ? els.slots.clientWidth : window.innerWidth;
-    if (width >= 1360) return 3;
-    if (width >= 860) return 2;
-    return 1;
+    var maxSlots = policy.maxVisibleSlots;
+
+    if (width < policy.mobileBreakpoint) {
+      maxSlots = policy.mobileMaxSlots;
+    } else if (width < policy.notebookBreakpoint) {
+      maxSlots = policy.notebookMaxSlots;
+    }
+
+    return Math.max(1, Math.min(Number(state.preferredSlotCount) || policy.defaultVisibleSlots, maxSlots, policy.maxVisibleSlots));
+  }
+
+  function setPreferredSlotCount(count) {
+    state.preferredSlotCount = Number(count) || 1;
+    syncSlotCount();
+    render();
   }
 
   function syncSlotCount() {
@@ -198,8 +235,9 @@
     if (state.activeSlotIndex >= state.openSlots.length) {
       state.activeSlotIndex = Math.max(0, state.openSlots.length - 1);
     }
-    syncSlotCount();
-    render();
+    document.documentElement.style.setProperty('--aic-visible-slots', String(Math.max(1, state.openSlots.length || 1)));
+    renderRoomList();
+    renderChatSlots();
   }
 
   function togglePin(index) {
@@ -207,6 +245,40 @@
     if (!slot) return;
     slot.pinned = !slot.pinned;
     render();
+  }
+
+
+  function renderSlotToolbar() {
+    if (!els.slotToolbar) return;
+
+    var policy = getSlotPolicy();
+    var width = els.slots ? els.slots.clientWidth : window.innerWidth;
+    var maxSlots = policy.maxVisibleSlots;
+
+    if (width < policy.mobileBreakpoint) {
+      maxSlots = policy.mobileMaxSlots;
+    } else if (width < policy.notebookBreakpoint) {
+      maxSlots = policy.notebookMaxSlots;
+    }
+
+    els.slotToolbar.innerHTML = [
+      '<div>',
+      '  <div class="aic-toolbar-title">채팅창 보기</div>',
+      '  <div class="aic-toolbar-sub">회의방은 여러 개, 화면 표시 슬롯은 제한</div>',
+      '</div>',
+      '<div class="aic-slot-buttons">',
+      '  <button type="button" class="aic-slot-btn' + (state.visibleSlotCount === 1 ? ' active' : '') + '" data-slot-count="1">1개 보기</button>',
+      '  <button type="button" class="aic-slot-btn' + (state.visibleSlotCount === 2 ? ' active' : '') + '" data-slot-count="2"' + (maxSlots < 2 ? ' disabled' : '') + '>2개 보기</button>',
+      '  <button type="button" class="aic-slot-btn' + (state.visibleSlotCount === 3 ? ' active' : '') + '" data-slot-count="3"' + (maxSlots < 3 ? ' disabled' : '') + '>3개 보기</button>',
+      '</div>'
+    ].join('');
+
+    Array.from(els.slotToolbar.querySelectorAll('[data-slot-count]')).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (btn.disabled) return;
+        setPreferredSlotCount(Number(btn.getAttribute('data-slot-count')) || 1);
+      });
+    });
   }
 
   function renderRoomList() {
@@ -431,6 +503,7 @@
   function cacheEls() {
     els.roomList = $('aicRoomList');
     els.slots = $('aicChatSlots');
+    els.slotToolbar = $('aicSlotToolbar');
 
     els.createRoomBtn = $('aicCreateRoomBtn');
     els.settingsBtn = $('aicSettingsBtn');
@@ -453,6 +526,7 @@
 
   function render() {
     syncSlotCount();
+    renderSlotToolbar();
     renderRoomList();
     renderChatSlots();
   }
