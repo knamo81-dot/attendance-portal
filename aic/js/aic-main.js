@@ -400,6 +400,66 @@
   }
 
 
+  async function deleteRoomFromServer(room) {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+    if (!sb || !companyId || !room) return;
+
+    var messagesResult = await sb
+      .from('aic_messages')
+      .delete()
+      .eq('company_id', companyId)
+      .eq('room_id', room.id);
+
+    if (messagesResult.error) throw messagesResult.error;
+
+    var membersResult = await sb
+      .from('aic_room_members')
+      .delete()
+      .eq('company_id', companyId)
+      .eq('room_id', room.id);
+
+    if (membersResult.error) throw membersResult.error;
+
+    var roomResult = await sb
+      .from('aic_rooms')
+      .delete()
+      .eq('company_id', companyId)
+      .eq('id', room.id);
+
+    if (roomResult.error) throw roomResult.error;
+  }
+
+  async function deleteRoom(roomId) {
+    var room = getRoom(roomId);
+    if (!room) return;
+
+    var ok = confirm('이 회의방을 삭제하시겠습니까?\n회의방, 참여자, 메시지가 함께 삭제됩니다.');
+    if (!ok) return;
+
+    try {
+      await deleteRoomFromServer(room);
+    } catch (error) {
+      alert('회의방 삭제 실패: ' + (error?.message || 'Supabase 권한/테이블을 확인해 주세요.'));
+      return;
+    }
+
+    state.rooms = state.rooms.filter(function (item) {
+      return item.id !== roomId;
+    });
+
+    state.openSlots = state.openSlots.filter(function (slot) {
+      return slot && slot.roomId !== roomId;
+    });
+
+    if (state.activeSlotIndex >= state.openSlots.length) {
+      state.activeSlotIndex = Math.max(0, state.openSlots.length - 1);
+    }
+
+    render(false);
+  }
+
+
   function getToneLabel(value) {
     return ({
       business: '비즈니스 영어',
@@ -488,10 +548,6 @@
         if (!room) break;
         state.openSlots.push({ roomId: room.id, pinned: false });
       }
-    }
-
-    if (!state.openSlots.length && state.rooms[0]) {
-      state.openSlots.push({ roomId: state.rooms[0].id, pinned: false });
     }
 
     if (state.activeSlotIndex >= state.openSlots.length) {
@@ -589,15 +645,26 @@
         '<div class="aic-room-item', open ? ' active' : '', '" data-room-id="', esc(room.id), '">',
         '  <div class="aic-room-name-row">',
         '    <div class="aic-room-name">', esc(room.name), '</div>',
-        '    <div class="aic-room-slot', open ? ' open' : '', '">', open ? (tr('aic.open', '열림') + ' ' + (slotIndex + 1)) : '', '</div>',
+        '    <div class="aic-room-right-actions">',
+        '      <div class="aic-room-slot', open ? ' open' : '', '">', open ? (tr('aic.open', '열림') + ' ' + (slotIndex + 1)) : '', '</div>',
+        '      <button class="aic-room-delete" type="button" data-delete-room="', esc(room.id), '" title="회의방 삭제" aria-label="회의방 삭제">×</button>',
+        '    </div>',
         '  </div>',
         '  <div class="aic-room-meta">', esc(room.members), '<br>', room.messages.length, '개 메시지</div>',
         '</div>'
       ].join('');
     }).join('');
 
+    Array.from(els.roomList.querySelectorAll('[data-delete-room]')).forEach(function (btn) {
+      btn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        deleteRoom(btn.getAttribute('data-delete-room') || '');
+      });
+    });
+
     Array.from(els.roomList.querySelectorAll('[data-room-id]')).forEach(function (el) {
-      el.addEventListener('click', function () {
+      el.addEventListener('click', function (event) {
+        if (event.target && event.target.closest('[data-delete-room]')) return;
         openRoom(el.getAttribute('data-room-id'));
       });
     });
@@ -669,18 +736,8 @@
     els.slots.innerHTML = html;
 
     Array.from(els.slots.querySelectorAll('[data-slot-index]')).forEach(function (win) {
-      win.addEventListener('mousedown', function (event) {
-        // 입력창/버튼/select를 클릭할 때 render가 다시 실행되면
-        // DOM이 교체되어 타이핑·버튼 클릭이 끊기므로 인터랙션 요소는 제외합니다.
-        if (event.target && event.target.closest('input, textarea, select, button, [contenteditable="true"]')) {
-          return;
-        }
-
+      win.addEventListener('mousedown', function () {
         state.activeSlotIndex = Number(win.getAttribute('data-slot-index')) || 0;
-
-        // 이미 활성 슬롯이면 불필요한 재렌더링을 하지 않습니다.
-        if (win.classList.contains('active')) return;
-
         render(false);
       });
     });
