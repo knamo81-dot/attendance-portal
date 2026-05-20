@@ -104,17 +104,42 @@ html,body{
 <script src="../assets/i18n/i18n-core.js"></script>
 <script>
 (function(){
+  function applyLanguage(lang){
+    const nextLang = String(lang || 'ko').trim() || 'ko';
+
+    try {
+      localStorage.setItem('portal_lang', nextLang);
+      localStorage.setItem('portal.lang', nextLang);
+      localStorage.setItem('i18n.lang', nextLang);
+      localStorage.setItem('lang', nextLang);
+    } catch (_) {}
+
+    if (typeof window.setLanguage === 'function') {
+      window.setLanguage(nextLang);
+    } else if (window.i18n && typeof window.i18n.setLanguage === 'function') {
+      window.i18n.setLanguage(nextLang);
+    }
+  }
+
   const savedLang =
+    localStorage.getItem('portal_lang') ||
     localStorage.getItem('portal.lang') ||
     localStorage.getItem('i18n.lang') ||
     localStorage.getItem('lang') ||
     'ko';
 
-  if(typeof window.setLanguage === 'function'){
-    window.setLanguage(savedLang);
-  }else if(window.i18n && typeof window.i18n.setLanguage === 'function'){
-    window.i18n.setLanguage(savedLang);
-  }
+  applyLanguage(savedLang);
+
+  window.addEventListener('message', function(event){
+    const payload = event && event.data ? event.data : {};
+    if (payload.type === 'portal-language-changed' || payload.type === 'LANGUAGE_CHANGED') {
+      applyLanguage(payload.language || payload.lang || 'ko');
+    }
+  });
+
+  window.addEventListener('portal-language-changed', function(event){
+    applyLanguage(event?.detail?.language || event?.detail?.lang || 'ko');
+  });
 })();
 </script>
 </body>
