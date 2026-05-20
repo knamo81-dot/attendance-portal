@@ -255,44 +255,6 @@
   </div>
 
 
-
-  <script>
-    window.AIC_I18N_FALLBACK = {
-      'aic.newRoomTitle': '새 회의방 만들기',
-      'aic.newRoomDesc': '번역 채팅 회의방을 생성합니다.',
-      'aic.roomName': '회의방 이름',
-      'aic.members': '참여자',
-      'aic.cancel': '취소',
-      'aic.create': '생성',
-      'aic.myTranslationSettings': '내 번역 기본 설정',
-      'aic.myTranslationSettingsDesc': 'AIC 회의방에서 기본 적용되는 개인 번역 설정입니다.',
-      'aic.defaultInputLang': '기본 입력 언어',
-      'aic.translationDirection': '번역 방향',
-      'aic.translationTone': '번역 톤',
-      'aic.displayMode': '번역 표시 방식',
-      'aic.autoTranslate': '자동번역 사용',
-      'aic.autoTranslateDesc': '메시지 전송 시 자동으로 번역문을 생성합니다.',
-      'aic.save': '저장',
-      'aic.close': '닫기',
-      'aic.participants': '참여자',
-      'aic.participantsDesc': '현재 회의방의 참여자를 확인하고 추가합니다.',
-      'aic.participantName': '이름',
-      'aic.participantEmail': '이메일/메모',
-      'aic.add': '추가'
-    };
-    document.addEventListener('DOMContentLoaded', function(){
-      var dict = window.AIC_I18N_FALLBACK || {};
-      document.querySelectorAll('[data-i18n]').forEach(function(el){
-        var key = el.getAttribute('data-i18n');
-        if (dict[key] && (!el.textContent || el.textContent.trim() === key)) el.textContent = dict[key];
-      });
-      document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el){
-        var key = el.getAttribute('data-i18n-placeholder');
-        if (dict[key] && (!el.getAttribute('placeholder') || el.getAttribute('placeholder') === key)) el.setAttribute('placeholder', dict[key]);
-      });
-    });
-  </script>
-
   <script src="../assets/i18n/i18n-core.js"></script>
   <script src="./js/aic-config.js"></script>
   <script src="./js/aic-auth.js"></script>
