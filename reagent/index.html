@@ -315,7 +315,11 @@
         <h3>제품 마스터 관리</h3>
         <p>제품 신청 화면의 제품검색과 자동입력에 사용되는 기준 데이터입니다.</p>
       </div>
-      
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+        <button class="btn" id="pmDownloadTemplate" type="button">엑셀 양식 다운로드</button>
+        <button class="btn primary" id="pmUploadExcel" type="button">엑셀 업로드</button>
+        <input id="pmUploadExcelFile" type="file" accept=".xlsx,.xls" style="display:none;"/>
+      </div>
     </div>
     <div class="card-body">
       <div class="collect-filters">
