@@ -962,19 +962,25 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
 <style id="personal-settings-style">
   .top-user-bar { pointer-events: auto !important; }
-  .user-chip { cursor: pointer; border: 0; overflow: visible !important; position: relative; }
-  .user-chip:focus-visible { outline: 3px solid rgba(255,255,255,.75); outline-offset: 3px; }
-  .user-menu {
-    position: absolute; top: 42px; right: 0; width: 188px; padding: 8px;
-    border-radius: 16px; background: #fff; color: #0f172a;
-    box-shadow: 0 18px 45px rgba(15,23,42,.22); border: 1px solid #e2e8f0; display: none;
+  .user-chip { cursor: default; border: 0; overflow: hidden !important; position: relative; }
+  .personal-settings-icon-btn {
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+    backdrop-filter: blur(6px);
+    font-size: 15px;
+    line-height: 1;
   }
-  .user-menu.show { display: block; }
-  .user-menu button {
-    width: 100%; height: 34px; border: 0; background: transparent; border-radius: 10px;
-    padding: 0 10px; text-align: left; font-weight: 800; color: #334155; cursor: pointer;
-  }
-  .user-menu button:hover { background: #f1f5f9; }
+  .personal-settings-icon-btn:hover { background: rgba(255, 255, 255, 0.32); }
+  .personal-settings-icon-btn:focus-visible { outline: 3px solid rgba(255,255,255,.75); outline-offset: 3px; }
   .personal-settings-overlay {
     position: fixed; inset: 0; z-index: 3000; display: none; align-items: center; justify-content: center;
     padding: 22px; background: rgba(15,23,42,.46); backdrop-filter: blur(3px);
@@ -1095,6 +1101,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
   <div id="topUserBar" class="top-user-bar" hidden>
     <div id="userChip" class="user-chip"></div>
+    <button type="button" id="personalSettingsIconBtn" class="personal-settings-icon-btn" title="개인 설정" aria-label="개인 설정">⚙</button>
   </div>
 
 
@@ -1212,6 +1219,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
     passwordSuccess: document.getElementById('passwordSuccess'),
     topUserBar: document.getElementById('topUserBar'),
     userChip: document.getElementById('userChip'),
+    personalSettingsIconBtn: document.getElementById('personalSettingsIconBtn'),
     serviceAdminBtn: document.getElementById('serviceAdminBtn'),
     portalSubtabsWrap: document.getElementById('portalSubtabsWrap'),
     portalSubtabs: document.getElementById('portalSubtabs'),
@@ -1750,7 +1758,12 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
   function broadcastPortalLanguage(language) {
     const lang = String(language || 'ko').trim() || 'ko';
-    try { localStorage.setItem('portal_lang', lang); } catch (_) {}
+    try {
+      localStorage.setItem('portal_lang', lang);
+      localStorage.setItem('portal.lang', lang);
+      localStorage.setItem('i18n.lang', lang);
+      localStorage.setItem('lang', lang);
+    } catch (_) {}
     try {
       window.dispatchEvent(new CustomEvent('portal-language-changed', { detail: { language: lang, lang } }));
     } catch (_) {}
@@ -1987,24 +2000,8 @@ body:not(.service-admin-enabled) .service-admin-btn{
     if (!els.userChip) return;
     const session = buildPortalSession();
     const name = currentProfile?.name || currentUser?.email || '사용자';
-    const company = session.companyName ? `<span class="role">${session.companyName}</span>` : '';
-    els.userChip.innerHTML = `<button type="button" id="userChipButton" style="all:unset; display:inline-flex; align-items:center; gap:6px; cursor:pointer;" aria-haspopup="menu" aria-expanded="false"><span>${name}</span>${company}<span class="role">${roleLabel(session.role)}</span><span aria-hidden="true">▾</span></button><div id="userMenu" class="user-menu" role="menu"><button type="button" id="openPersonalSettings" role="menuitem">개인 설정</button><button type="button" id="userMenuLogout" role="menuitem">로그아웃</button></div>`;
-    const chipButton = document.getElementById('userChipButton');
-    const userMenu = document.getElementById('userMenu');
-    chipButton?.addEventListener('click', function (event) {
-      event.stopPropagation();
-      const show = !userMenu?.classList.contains('show');
-      userMenu?.classList.toggle('show', show);
-      chipButton?.setAttribute('aria-expanded', show ? 'true' : 'false');
-    });
-    document.getElementById('openPersonalSettings')?.addEventListener('click', function () {
-      userMenu?.classList.remove('show');
-      openPersonalSettings();
-    });
-    document.getElementById('userMenuLogout')?.addEventListener('click', function () {
-      userMenu?.classList.remove('show');
-      els.logoutConfirmOverlay?.classList.add('show');
-    });
+    const company = session.companyName ? `<span class="role">${escapeHtml(session.companyName)}</span>` : '';
+    els.userChip.innerHTML = `<span>${escapeHtml(name)}</span>${company}<span class="role">${escapeHtml(roleLabel(session.role))}</span>`;
     updateServiceAdminButtonVisibility();
   }
 
@@ -2436,15 +2433,10 @@ body:not(.service-admin-enabled) .service-admin-btn{
     els.psLanguage?.addEventListener('change', function () {
       broadcastPortalLanguage(els.psLanguage.value || 'ko');
     });
-    document.addEventListener('click', function (event) {
-      const menu = document.getElementById('userMenu');
-      const chip = document.getElementById('userChipButton');
-      if (!menu || !chip) return;
-      if (menu.contains(event.target) || chip.contains(event.target)) return;
-      menu.classList.remove('show');
-      chip.setAttribute('aria-expanded', 'false');
+    els.personalSettingsIconBtn?.addEventListener('click', function (event) {
+      event.preventDefault();
+      openPersonalSettings();
     });
-
     window.addEventListener('message', function (event) {
       const payload = event?.data || {};
 
