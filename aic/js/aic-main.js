@@ -32,6 +32,7 @@
 
   var state = {
     activeSlotIndex: 0,
+    activeParticipantsRoomId: '',
     visibleSlotCount: CONFIG.slotPolicy.defaultVisibleSlots,
     preferredSlotCount: CONFIG.slotPolicy.defaultVisibleSlots,
     openSlots: [],
@@ -436,6 +437,13 @@
       });
     });
 
+    Array.from(els.slots.querySelectorAll('[data-invite-slot]')).forEach(function (btn) {
+      btn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        openParticipantsModal(Number(btn.getAttribute('data-invite-slot')) || 0);
+      });
+    });
+
     Array.from(els.slots.querySelectorAll('[data-message-box]')).forEach(function (box) {
       box.scrollTop = box.scrollHeight;
     });
@@ -464,6 +472,134 @@
     if (input) input.value = '';
     render(false);
   }
+
+
+  function splitMembers(value) {
+    return String(value || '')
+      .split('·')
+      .map(function (item) { return item.trim(); })
+      .filter(Boolean);
+  }
+
+  function getRoomMembers(room) {
+    if (!room) return [];
+    if (!Array.isArray(room.memberList)) {
+      room.memberList = splitMembers(room.members).map(function (name) {
+        return { name: name, email: '' };
+      });
+    }
+    return room.memberList;
+  }
+
+  function syncRoomMembersText(room) {
+    if (!room) return;
+    room.members = getRoomMembers(room).map(function (member) {
+      return member.name || member.email || '';
+    }).filter(Boolean).join(' · ');
+  }
+
+  function openParticipantsModal(slotIndex) {
+    var slot = state.openSlots[slotIndex];
+    if (!slot) return;
+
+    var room = getRoom(slot.roomId);
+    if (!room || !els.participantsModal) return;
+
+    state.activeParticipantsRoomId = room.id;
+    renderParticipantsModal();
+
+    els.participantsModal.hidden = false;
+    setTimeout(function () {
+      if (els.participantName) els.participantName.focus();
+    }, 50);
+  }
+
+  function closeParticipantsModal() {
+    if (els.participantsModal) els.participantsModal.hidden = true;
+    state.activeParticipantsRoomId = '';
+    if (els.participantName) els.participantName.value = '';
+    if (els.participantEmail) els.participantEmail.value = '';
+  }
+
+  function renderParticipantsModal() {
+    var room = getRoom(state.activeParticipantsRoomId);
+    if (!room) return;
+
+    var members = getRoomMembers(room);
+
+    if (els.participantsRoomName) {
+      els.participantsRoomName.textContent = room.name + ' · ' + members.length + '명';
+    }
+
+    if (!els.participantsList) return;
+
+    if (!members.length) {
+      els.participantsList.innerHTML = '<div class="aic-participant-empty">' + tr('aic.noParticipants', '등록된 참여자가 없습니다.') + '</div>';
+      return;
+    }
+
+    els.participantsList.innerHTML = members.map(function (member, index) {
+      return [
+        '<div class="aic-participant-item">',
+        '  <div>',
+        '    <div class="aic-participant-name">', esc(member.name || member.email || '-'), '</div>',
+        '    <div class="aic-participant-meta">', esc(member.email || tr('aic.noParticipantMemo', '이메일/메모 없음')), '</div>',
+        '  </div>',
+        '  <button class="aic-participant-remove" type="button" data-remove-participant="', index, '">삭제</button>',
+        '</div>'
+      ].join('');
+    }).join('');
+
+    Array.from(els.participantsList.querySelectorAll('[data-remove-participant]')).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        removeParticipant(Number(btn.getAttribute('data-remove-participant')) || 0);
+      });
+    });
+  }
+
+  function addParticipant() {
+    var room = getRoom(state.activeParticipantsRoomId);
+    if (!room) return;
+
+    var name = String(els.participantName && els.participantName.value || '').trim();
+    var email = String(els.participantEmail && els.participantEmail.value || '').trim();
+
+    if (!name && !email) return;
+    if (!name) name = email;
+
+    var members = getRoomMembers(room);
+    var duplicate = members.some(function (member) {
+      return String(member.name || '').trim() === name || (email && String(member.email || '').trim() === email);
+    });
+
+    if (duplicate) {
+      if (els.participantName) els.participantName.value = '';
+      if (els.participantEmail) els.participantEmail.value = '';
+      return;
+    }
+
+    members.push({ name: name, email: email });
+    syncRoomMembersText(room);
+
+    if (els.participantName) els.participantName.value = '';
+    if (els.participantEmail) els.participantEmail.value = '';
+
+    renderParticipantsModal();
+    render(false);
+  }
+
+  function removeParticipant(index) {
+    var room = getRoom(state.activeParticipantsRoomId);
+    if (!room) return;
+
+    var members = getRoomMembers(room);
+    members.splice(index, 1);
+    syncRoomMembersText(room);
+
+    renderParticipantsModal();
+    render(false);
+  }
+
 
   function openRoomModal() {
     if (!els.roomModal) return;
@@ -532,6 +668,24 @@
     if (els.settingsCancelBtn) els.settingsCancelBtn.addEventListener('click', closeSettingsModal);
     if (els.settingsSaveBtn) els.settingsSaveBtn.addEventListener('click', saveSettings);
 
+    if (els.participantsCloseBtn) els.participantsCloseBtn.addEventListener('click', closeParticipantsModal);
+    if (els.participantAddBtn) els.participantAddBtn.addEventListener('click', addParticipant);
+    if (els.participantName) {
+      els.participantName.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') addParticipant();
+      });
+    }
+    if (els.participantEmail) {
+      els.participantEmail.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') addParticipant();
+      });
+    }
+    if (els.participantsModal) {
+      els.participantsModal.addEventListener('click', function (event) {
+        if (event.target === els.participantsModal) closeParticipantsModal();
+      });
+    }
+
     if (els.autoSwitch) {
       els.autoSwitch.addEventListener('click', function () {
         els.autoSwitch.classList.toggle('on');
@@ -587,6 +741,14 @@
     els.autoSwitch = $('aicAutoTranslateSwitch');
     els.settingsCancelBtn = $('aicSettingsCancelBtn');
     els.settingsSaveBtn = $('aicSettingsSaveBtn');
+
+    els.participantsModal = $('aicParticipantsModal');
+    els.participantsRoomName = $('aicParticipantsRoomName');
+    els.participantsList = $('aicParticipantsList');
+    els.participantName = $('aicParticipantName');
+    els.participantEmail = $('aicParticipantEmail');
+    els.participantAddBtn = $('aicParticipantAddBtn');
+    els.participantsCloseBtn = $('aicParticipantsCloseBtn');
   }
 
   function render(fill) {
