@@ -160,6 +160,30 @@
     console.warn('[AIC DB]', message);
   }
 
+  function showModal(el) {
+    if (!el) return;
+    el.hidden = false;
+    el.removeAttribute('hidden');
+    el.style.display = 'flex';
+  }
+
+  function hideModal(el) {
+    if (!el) return;
+    el.hidden = true;
+    el.setAttribute('hidden', '');
+    el.style.display = 'none';
+  }
+
+  function bindClick(el, handler) {
+    if (!el || el.dataset.aicBound === '1') return;
+    el.dataset.aicBound = '1';
+    el.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      handler(event);
+    });
+  }
+
   function normalizeDbRoom(row, membersByRoom, messagesByRoom) {
     var roomId = String(row.id || '');
     var members = membersByRoom[roomId] || [];
@@ -782,14 +806,14 @@
     state.activeParticipantsRoomId = room.id;
     renderParticipantsModal();
 
-    els.participantsModal.hidden = false;
+    showModal(els.participantsModal);
     setTimeout(function () {
       if (els.participantName) els.participantName.focus();
     }, 50);
   }
 
   function closeParticipantsModal() {
-    if (els.participantsModal) els.participantsModal.hidden = true;
+    hideModal(els.participantsModal);
     state.activeParticipantsRoomId = '';
     if (els.participantName) els.participantName.value = '';
     if (els.participantEmail) els.participantEmail.value = '';
@@ -897,14 +921,14 @@
 
   function openRoomModal() {
     if (!els.roomModal) return;
-    els.roomModal.hidden = false;
+    showModal(els.roomModal);
     setTimeout(function () {
       if (els.newRoomName) els.newRoomName.focus();
     }, 50);
   }
 
   function closeRoomModal() {
-    if (els.roomModal) els.roomModal.hidden = true;
+    hideModal(els.roomModal);
   }
 
   async function createRoom() {
@@ -951,11 +975,11 @@
     els.setTone.value = state.settings.tone;
     els.setDisplay.value = state.settings.display;
     els.autoSwitch.classList.toggle('on', !!state.settings.autoTranslate);
-    els.settingsModal.hidden = false;
+    showModal(els.settingsModal);
   }
 
   function closeSettingsModal() {
-    if (els.settingsModal) els.settingsModal.hidden = true;
+    hideModal(els.settingsModal);
   }
 
   function saveSettings() {
@@ -971,16 +995,16 @@
   }
 
   function bind() {
-    if (els.createRoomBtn) els.createRoomBtn.addEventListener('click', openRoomModal);
-    if (els.roomCancelBtn) els.roomCancelBtn.addEventListener('click', closeRoomModal);
-    if (els.roomCreateBtn) els.roomCreateBtn.addEventListener('click', createRoom);
+    bindClick(els.createRoomBtn, openRoomModal);
+    bindClick(els.roomCancelBtn, closeRoomModal);
+    bindClick(els.roomCreateBtn, createRoom);
 
-    if (els.settingsBtn) els.settingsBtn.addEventListener('click', openSettingsModal);
-    if (els.settingsCancelBtn) els.settingsCancelBtn.addEventListener('click', closeSettingsModal);
-    if (els.settingsSaveBtn) els.settingsSaveBtn.addEventListener('click', saveSettings);
+    bindClick(els.settingsBtn, openSettingsModal);
+    bindClick(els.settingsCancelBtn, closeSettingsModal);
+    bindClick(els.settingsSaveBtn, saveSettings);
 
-    if (els.participantsCloseBtn) els.participantsCloseBtn.addEventListener('click', closeParticipantsModal);
-    if (els.participantAddBtn) els.participantAddBtn.addEventListener('click', addParticipant);
+    bindClick(els.participantsCloseBtn, closeParticipantsModal);
+    bindClick(els.participantAddBtn, addParticipant);
     if (els.participantName) {
       els.participantName.addEventListener('keydown', function (event) {
         if (event.key === 'Enter') addParticipant();
