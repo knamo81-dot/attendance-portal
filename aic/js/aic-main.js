@@ -735,10 +735,29 @@
 
     els.slots.innerHTML = html;
 
+    // 채팅창 전체 mousedown 재렌더링 제거
+    // 입력창/버튼/select 클릭 시 DOM이 다시 그려져 타이핑과 버튼 클릭이 끊기는 문제를 방지합니다.
     Array.from(els.slots.querySelectorAll('[data-slot-index]')).forEach(function (win) {
-      win.addEventListener('mousedown', function () {
-        state.activeSlotIndex = Number(win.getAttribute('data-slot-index')) || 0;
-        render(false);
+      win.addEventListener('click', function (event) {
+        if (event.target && event.target.closest('input, textarea, select, button, [contenteditable="true"]')) {
+          return;
+        }
+
+        var nextIndex = Number(win.getAttribute('data-slot-index')) || 0;
+        if (state.activeSlotIndex === nextIndex) return;
+
+        state.activeSlotIndex = nextIndex;
+        Array.from(els.slots.querySelectorAll('[data-slot-index]')).forEach(function (item) {
+          item.classList.toggle('active', Number(item.getAttribute('data-slot-index')) === state.activeSlotIndex);
+        });
+      });
+    });
+
+    Array.from(els.slots.querySelectorAll('input, textarea, select, button')).forEach(function (control) {
+      ['mousedown', 'mouseup', 'click', 'touchstart', 'touchend'].forEach(function (eventName) {
+        control.addEventListener(eventName, function (event) {
+          event.stopPropagation();
+        });
       });
     });
 
