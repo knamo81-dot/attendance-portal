@@ -41,6 +41,10 @@
     openSlots: [],
     settings: loadSettings(),
     rooms: [],
+    selectedRoomParticipants: [],
+    selectedInviteParticipants: [],
+    roomSearchResults: [],
+    inviteSearchResults: [],
     dbReady: false,
     dbLoading: false
   };
@@ -156,6 +160,122 @@
     );
   }
 
+
+  function getEmployeeDepartment(row) {
+    return row.department || row.division_name || row.division || row.division_code || row.headquarters || row.org_name || '';
+  }
+
+  function getEmployeeTeam(row) {
+    return row.team || row.team_name || row.team_code || row.group_name || '';
+  }
+
+  function normalizePerson(row) {
+    return {
+      id: row.id || row.employee_no || row.employeeNo || row.email || row.user_email || '',
+      name: row.name || row.user_name || row.display_name || row.email || row.user_email || '',
+      email: row.email || row.user_email || '',
+      department: getEmployeeDepartment(row),
+      team: getEmployeeTeam(row),
+      position: row.position || row.job_title || row.title || '',
+      language: row.preferred_language || row.language || 'ko'
+    };
+  }
+
+  function personKey(person) {
+    return String(person.email || person.id || person.name || '').trim().toLowerCase();
+  }
+
+  function memberKey(member) {
+    return String(member.email || member.id || member.name || '').trim().toLowerCase();
+  }
+
+  function isSamePerson(a, b) {
+    var ak = personKey(a);
+    var bk = personKey(b);
+    return !!ak && !!bk && ak === bk;
+  }
+
+  function isRoomCreator(room) {
+    if (!room) return false;
+    var creatorEmail = String(room.created_by_email || '').trim().toLowerCase();
+    var currentEmail = String(getCurrentUserEmail() || '').trim().toLowerCase();
+    return !!creatorEmail && !!currentEmail && creatorEmail === currentEmail;
+  }
+
+  function getCurrentUserPerson() {
+    return {
+      name: getCurrentUserName(),
+      email: getCurrentUserEmail(),
+      department: '',
+      team: '',
+      position: '',
+      language: 'ko'
+    };
+  }
+
+  function ensureCreatorIncluded(list) {
+    var creator = getCurrentUserPerson();
+    if (!creator.email && !creator.name) return list;
+    var exists = list.some(function (item) { return isSamePerson(item, creator) || String(item.name || '') === creator.name; });
+    return exists ? list : [creator].concat(list);
+  }
+
+  function uniquePeople(list) {
+    var seen = {};
+    return (Array.isArray(list) ? list : []).filter(function (person) {
+      var key = personKey(person);
+      if (!key) return false;
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
+  }
+
+  async function searchPeople(keyword) {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+    var q = String(keyword || '').trim();
+    if (!sb || !companyId || !q) return [];
+
+    var safe = q.replaceAll('%', '\\\\%').replaceAll(',', ' ');
+    var pattern = '%' + safe + '%';
+    var results = [];
+
+    try {
+      var employeesQuery = sb
+        .from('employees')
+        .select('*')
+        .eq('company_id', companyId)
+        .or('name.ilike.' + pattern + ',email.ilike.' + pattern + ',employee_no.ilike.' + pattern + ',department.ilike.' + pattern + ',team.ilike.' + pattern)
+        .limit(30);
+
+      var employees = await employeesQuery;
+      if (!employees.error && Array.isArray(employees.data)) {
+        results = results.concat(employees.data.map(normalizePerson));
+      }
+    } catch (error) {
+      console.warn('[AIC] employees search skipped:', error);
+    }
+
+    try {
+      var usersQuery = sb
+        .from('users')
+        .select('*')
+        .eq('company_id', companyId)
+        .or('name.ilike.' + pattern + ',email.ilike.' + pattern + ',user_name.ilike.' + pattern)
+        .limit(30);
+
+      var users = await usersQuery;
+      if (!users.error && Array.isArray(users.data)) {
+        results = results.concat(users.data.map(normalizePerson));
+      }
+    } catch (error) {
+      console.warn('[AIC] users search skipped:', error);
+    }
+
+    return uniquePeople(results).slice(0, 30);
+  }
+
   function showDbWarn(message) {
     console.warn('[AIC DB]', message);
   }
@@ -169,6 +289,8 @@
     return {
       id: roomId,
       name: row.name || '회의방',
+      created_by_email: row.created_by_email || '',
+      created_by_name: row.created_by_name || '',
       members: members.map(function (member) {
         return member.user_name || member.user_email || '';
       }).filter(Boolean).join(' · '),
@@ -317,6 +439,9 @@
         room_id: room.id,
         user_name: member.name || member.email || '',
         user_email: member.email || '',
+        department: member.department || '',
+        team: member.team || '',
+        position: member.position || '',
         role: member.role || '',
         language: member.language || 'ko'
       };
@@ -433,6 +558,11 @@
   async function deleteRoom(roomId) {
     var room = getRoom(roomId);
     if (!room) return;
+
+    if (!isRoomCreator(room)) {
+      alert('회의방 삭제는 생성자만 할 수 있습니다.');
+      return;
+    }
 
     var ok = confirm('이 회의방을 삭제하시겠습니까?\n회의방, 참여자, 메시지가 함께 삭제됩니다.');
     if (!ok) return;
@@ -647,7 +777,7 @@
         '    <div class="aic-room-name">', esc(room.name), '</div>',
         '    <div class="aic-room-right-actions">',
         '      <div class="aic-room-slot', open ? ' open' : '', '">', open ? (tr('aic.open', '열림') + ' ' + (slotIndex + 1)) : '', '</div>',
-        '      <button class="aic-room-delete" type="button" data-delete-room="', esc(room.id), '" title="회의방 삭제" aria-label="회의방 삭제">×</button>',
+        isRoomCreator(room) ? '      <button class="aic-room-delete" type="button" data-delete-room="' + esc(room.id) + '" title="회의방 삭제" aria-label="회의방 삭제">×</button>' : '',
         '    </div>',
         '  </div>',
         '  <div class="aic-room-meta">', esc(room.members), '<br>', room.messages.length, '개 메시지</div>',
@@ -858,6 +988,158 @@
     }).filter(Boolean).join(' · ');
   }
 
+  function renderPersonMeta(person) {
+    return [person.department, person.team, person.position, person.email]
+      .filter(Boolean)
+      .join(' / ') || tr('aic.noParticipantMemo', '이메일/부서 정보 없음');
+  }
+
+  function buildSearchResultRow(person, context, selectedList) {
+    var checked = selectedList.some(function (item) { return isSamePerson(item, person); });
+    return [
+      '<label class="aic-user-row">',
+      '  <input type="checkbox" data-pick-person-context="', context, '" data-pick-person="', esc(personKey(person)), '"', checked ? ' checked' : '', ' />',
+      '  <div>',
+      '    <div class="aic-user-name">', esc(person.name || person.email || '-'), '</div>',
+      '    <div class="aic-user-meta">', esc(renderPersonMeta(person)), '</div>',
+      '  </div>',
+      '</label>'
+    ].join('');
+  }
+
+  function buildSelectedChip(person, context) {
+    return [
+      '<div class="aic-selected-chip">',
+      '  <div>',
+      '    <div class="aic-participant-name">', esc(person.name || person.email || '-'), '</div>',
+      '    <div class="aic-participant-meta">', esc(renderPersonMeta(person)), '</div>',
+      '  </div>',
+      '  <button class="aic-selected-remove" type="button" data-remove-selected-context="', context, '" data-remove-selected="', esc(personKey(person)), '">삭제</button>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderRoomParticipantPicker() {
+    if (els.roomSelectedCount) els.roomSelectedCount.textContent = String(state.selectedRoomParticipants.length);
+
+    if (els.roomSelectedParticipants) {
+      if (!state.selectedRoomParticipants.length) {
+        els.roomSelectedParticipants.innerHTML = '<div class="aic-participant-empty">' + tr('aic.noSelectedParticipants', '선택된 참여자가 없습니다.') + '</div>';
+      } else {
+        els.roomSelectedParticipants.innerHTML = state.selectedRoomParticipants.map(function (person) {
+          return buildSelectedChip(person, 'room');
+        }).join('');
+      }
+    }
+
+    bindPickerRemoveButtons();
+  }
+
+  function renderInviteParticipantPicker() {
+    if (els.inviteSelectedCount) els.inviteSelectedCount.textContent = String(state.selectedInviteParticipants.length);
+
+    if (els.inviteSelectedParticipants) {
+      if (!state.selectedInviteParticipants.length) {
+        els.inviteSelectedParticipants.innerHTML = '<div class="aic-participant-empty">' + tr('aic.noSelectedParticipants', '선택된 참여자가 없습니다.') + '</div>';
+      } else {
+        els.inviteSelectedParticipants.innerHTML = state.selectedInviteParticipants.map(function (person) {
+          return buildSelectedChip(person, 'invite');
+        }).join('');
+      }
+    }
+
+    bindPickerRemoveButtons();
+  }
+
+  function bindPickerRemoveButtons() {
+    Array.from(document.querySelectorAll('[data-remove-selected-context]')).forEach(function (btn) {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', function () {
+        var context = btn.getAttribute('data-remove-selected-context');
+        var key = btn.getAttribute('data-remove-selected');
+
+        if (context === 'room') {
+          state.selectedRoomParticipants = state.selectedRoomParticipants.filter(function (person) {
+            return personKey(person) !== key;
+          });
+          renderRoomParticipantPicker();
+          renderSearchResults('room');
+        } else {
+          state.selectedInviteParticipants = state.selectedInviteParticipants.filter(function (person) {
+            return personKey(person) !== key;
+          });
+          renderInviteParticipantPicker();
+          renderSearchResults('invite');
+        }
+      });
+    });
+  }
+
+  function renderSearchResults(context) {
+    var resultsEl = context === 'room' ? els.roomParticipantResults : els.inviteParticipantResults;
+    var results = context === 'room' ? state.roomSearchResults : state.inviteSearchResults;
+    var selected = context === 'room' ? state.selectedRoomParticipants : state.selectedInviteParticipants;
+
+    if (!resultsEl) return;
+
+    if (!results.length) {
+      resultsEl.innerHTML = '<div class="aic-participant-empty">' + tr('aic.noSearchResults', '검색 결과가 없습니다.') + '</div>';
+      return;
+    }
+
+    resultsEl.innerHTML = results.map(function (person) {
+      return buildSearchResultRow(person, context, selected);
+    }).join('');
+
+    Array.from(resultsEl.querySelectorAll('[data-pick-person-context]')).forEach(function (input) {
+      input.addEventListener('change', function () {
+        var key = input.getAttribute('data-pick-person');
+        var source = context === 'room' ? state.roomSearchResults : state.inviteSearchResults;
+        var person = source.find(function (item) { return personKey(item) === key; });
+        if (!person) return;
+
+        if (context === 'room') {
+          if (input.checked) {
+            state.selectedRoomParticipants = uniquePeople(state.selectedRoomParticipants.concat([person]));
+          } else {
+            state.selectedRoomParticipants = state.selectedRoomParticipants.filter(function (item) { return personKey(item) !== key; });
+          }
+          renderRoomParticipantPicker();
+        } else {
+          if (input.checked) {
+            state.selectedInviteParticipants = uniquePeople(state.selectedInviteParticipants.concat([person]));
+          } else {
+            state.selectedInviteParticipants = state.selectedInviteParticipants.filter(function (item) { return personKey(item) !== key; });
+          }
+          renderInviteParticipantPicker();
+        }
+      });
+    });
+  }
+
+  async function runParticipantSearch(context) {
+    var input = context === 'room' ? els.roomParticipantSearch : els.inviteParticipantSearch;
+    var resultsEl = context === 'room' ? els.roomParticipantResults : els.inviteParticipantResults;
+    var keyword = String(input?.value || '').trim();
+
+    if (!keyword) {
+      if (resultsEl) resultsEl.innerHTML = '<div class="aic-participant-empty">' + tr('aic.searchParticipantGuide', '검색어를 입력해 참여자를 찾으세요.') + '</div>';
+      return;
+    }
+
+    if (resultsEl) resultsEl.innerHTML = '<div class="aic-participant-empty">' + tr('aic.searching', '검색 중입니다...') + '</div>';
+
+    try {
+      var results = await searchPeople(keyword);
+      if (context === 'room') state.roomSearchResults = results;
+      else state.inviteSearchResults = results;
+      renderSearchResults(context);
+    } catch (error) {
+      if (resultsEl) resultsEl.innerHTML = '<div class="aic-participant-empty">' + esc(error?.message || '검색 실패') + '</div>';
+    }
+  }
+
   function openParticipantsModal(slotIndex) {
     var slot = state.openSlots[slotIndex];
     if (!slot) return;
@@ -866,19 +1148,28 @@
     if (!room || !els.participantsModal) return;
 
     state.activeParticipantsRoomId = room.id;
+    state.selectedInviteParticipants = [];
+    state.inviteSearchResults = [];
+    if (els.inviteParticipantSearch) els.inviteParticipantSearch.value = '';
+
     renderParticipantsModal();
+    renderInviteParticipantPicker();
+
+    if (els.inviteParticipantResults) {
+      els.inviteParticipantResults.innerHTML = '<div class="aic-participant-empty">' + tr('aic.searchParticipantGuide', '검색어를 입력해 참여자를 찾으세요.') + '</div>';
+    }
 
     els.participantsModal.hidden = false;
     setTimeout(function () {
-      if (els.participantName) els.participantName.focus();
+      if (els.inviteParticipantSearch) els.inviteParticipantSearch.focus();
     }, 50);
   }
 
   function closeParticipantsModal() {
     if (els.participantsModal) els.participantsModal.hidden = true;
     state.activeParticipantsRoomId = '';
-    if (els.participantName) els.participantName.value = '';
-    if (els.participantEmail) els.participantEmail.value = '';
+    state.selectedInviteParticipants = [];
+    state.inviteSearchResults = [];
   }
 
   function renderParticipantsModal() {
@@ -903,7 +1194,7 @@
         '<div class="aic-participant-item">',
         '  <div>',
         '    <div class="aic-participant-name">', esc(member.name || member.email || '-'), '</div>',
-        '    <div class="aic-participant-meta">', esc(member.email || tr('aic.noParticipantMemo', '이메일/메모 없음')), '</div>',
+        '    <div class="aic-participant-meta">', esc(renderPersonMeta(member)), '</div>',
         '  </div>',
         '  <button class="aic-participant-remove" type="button" data-remove-participant="', index, '">삭제</button>',
         '</div>'
@@ -921,40 +1212,38 @@
     var room = getRoom(state.activeParticipantsRoomId);
     if (!room) return;
 
-    var name = String(els.participantName && els.participantName.value || '').trim();
-    var email = String(els.participantEmail && els.participantEmail.value || '').trim();
-
-    if (!name && !email) return;
-    if (!name) name = email;
-
     var members = getRoomMembers(room);
-    var duplicate = members.some(function (member) {
-      return String(member.name || '').trim() === name || (email && String(member.email || '').trim() === email);
+    var candidates = state.selectedInviteParticipants.filter(function (person) {
+      return !members.some(function (member) { return isSamePerson(member, person); });
     });
 
-    if (duplicate) {
-      if (els.participantName) els.participantName.value = '';
-      if (els.participantEmail) els.participantEmail.value = '';
+    if (!candidates.length) {
+      alert(tr('aic.selectParticipantsFirst', '추가할 참여자를 선택해 주세요.'));
       return;
     }
 
-    var member = { name: name, email: email };
-
     try {
-      var savedId = await insertParticipantToServer(room, member);
-      if (savedId) member.id = savedId;
+      for (var i = 0; i < candidates.length; i++) {
+        var member = Object.assign({}, candidates[i]);
+        var savedId = await insertParticipantToServer(room, member);
+        if (savedId) member.id = savedId;
+        members.push(member);
+      }
     } catch (error) {
       alert('참여자 저장 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
       return;
     }
 
-    members.push(member);
+    state.selectedInviteParticipants = [];
+    state.inviteSearchResults = [];
+    if (els.inviteParticipantSearch) els.inviteParticipantSearch.value = '';
     syncRoomMembersText(room);
 
-    if (els.participantName) els.participantName.value = '';
-    if (els.participantEmail) els.participantEmail.value = '';
-
     renderParticipantsModal();
+    renderInviteParticipantPicker();
+    if (els.inviteParticipantResults) {
+      els.inviteParticipantResults.innerHTML = '<div class="aic-participant-empty">' + tr('aic.searchParticipantGuide', '검색어를 입력해 참여자를 찾으세요.') + '</div>';
+    }
     render(false);
   }
 
@@ -983,6 +1272,13 @@
 
   function openRoomModal() {
     if (!els.roomModal) return;
+    state.selectedRoomParticipants = [];
+    state.roomSearchResults = [];
+    if (els.roomParticipantSearch) els.roomParticipantSearch.value = '';
+    if (els.roomParticipantResults) {
+      els.roomParticipantResults.innerHTML = '<div class="aic-participant-empty">' + tr('aic.searchParticipantGuide', '검색어를 입력해 참여자를 찾으세요.') + '</div>';
+    }
+    renderRoomParticipantPicker();
     els.roomModal.hidden = false;
     setTimeout(function () {
       if (els.newRoomName) els.newRoomName.focus();
@@ -991,27 +1287,25 @@
 
   function closeRoomModal() {
     if (els.roomModal) els.roomModal.hidden = true;
+    state.selectedRoomParticipants = [];
+    state.roomSearchResults = [];
   }
 
   async function createRoom() {
     var name = (els.newRoomName && els.newRoomName.value || '').trim() || tr('aic.newRoomDefaultName', '새 회의방');
-    var membersText = (els.newRoomMembers && els.newRoomMembers.value || '').trim() || getCurrentUserName();
     var id = 'room_' + Date.now();
+
+    var selectedMembers = ensureCreatorIncluded(state.selectedRoomParticipants);
 
     var room = {
       id: id,
       name: name,
-      members: membersText,
-      memberList: splitMembers(membersText).map(function (memberName) {
-        return { name: memberName, email: '' };
-      }),
+      created_by_email: getCurrentUserEmail(),
+      created_by_name: getCurrentUserName(),
+      members: selectedMembers.map(function (member) { return member.name || member.email || ''; }).filter(Boolean).join(' · '),
+      memberList: selectedMembers,
       messages: []
     };
-
-    if (!room.memberList.length) {
-      room.memberList = [{ name: getCurrentUserName(), email: getCurrentUserEmail() }];
-      syncRoomMembersText(room);
-    }
 
     try {
       await insertRoomToServer(room);
@@ -1023,7 +1317,9 @@
     state.rooms.unshift(room);
 
     if (els.newRoomName) els.newRoomName.value = '';
-    if (els.newRoomMembers) els.newRoomMembers.value = '';
+
+    state.selectedRoomParticipants = [];
+    state.roomSearchResults = [];
 
     closeRoomModal();
     openRoom(id);
@@ -1067,16 +1363,21 @@
 
     if (els.participantsCloseBtn) els.participantsCloseBtn.addEventListener('click', closeParticipantsModal);
     if (els.participantAddBtn) els.participantAddBtn.addEventListener('click', addParticipant);
-    if (els.participantName) {
-      els.participantName.addEventListener('keydown', function (event) {
-        if (event.key === 'Enter') addParticipant();
+
+    if (els.roomParticipantSearchBtn) els.roomParticipantSearchBtn.addEventListener('click', function () { runParticipantSearch('room'); });
+    if (els.roomParticipantSearch) {
+      els.roomParticipantSearch.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') runParticipantSearch('room');
       });
     }
-    if (els.participantEmail) {
-      els.participantEmail.addEventListener('keydown', function (event) {
-        if (event.key === 'Enter') addParticipant();
+
+    if (els.inviteParticipantSearchBtn) els.inviteParticipantSearchBtn.addEventListener('click', function () { runParticipantSearch('invite'); });
+    if (els.inviteParticipantSearch) {
+      els.inviteParticipantSearch.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') runParticipantSearch('invite');
       });
     }
+
     if (els.participantsModal) {
       els.participantsModal.addEventListener('click', function (event) {
         if (event.target === els.participantsModal) closeParticipantsModal();
@@ -1144,11 +1445,20 @@
     els.settingsCancelBtn = $('aicSettingsCancelBtn');
     els.settingsSaveBtn = $('aicSettingsSaveBtn');
 
+    els.roomParticipantSearch = $('aicRoomParticipantSearch');
+    els.roomParticipantSearchBtn = $('aicRoomParticipantSearchBtn');
+    els.roomParticipantResults = $('aicRoomParticipantResults');
+    els.roomSelectedParticipants = $('aicRoomSelectedParticipants');
+    els.roomSelectedCount = $('aicRoomSelectedCount');
+
     els.participantsModal = $('aicParticipantsModal');
     els.participantsRoomName = $('aicParticipantsRoomName');
     els.participantsList = $('aicParticipantsList');
-    els.participantName = $('aicParticipantName');
-    els.participantEmail = $('aicParticipantEmail');
+    els.inviteParticipantSearch = $('aicInviteParticipantSearch');
+    els.inviteParticipantSearchBtn = $('aicInviteParticipantSearchBtn');
+    els.inviteParticipantResults = $('aicInviteParticipantResults');
+    els.inviteSelectedParticipants = $('aicInviteSelectedParticipants');
+    els.inviteSelectedCount = $('aicInviteSelectedCount');
     els.participantAddBtn = $('aicParticipantAddBtn');
     els.participantsCloseBtn = $('aicParticipantsCloseBtn');
   }
