@@ -959,6 +959,65 @@ body:not(.service-admin-enabled) .service-admin-btn{
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style id="personal-settings-style">
+  .top-user-bar { pointer-events: auto !important; }
+  .user-chip { cursor: pointer; border: 0; overflow: visible !important; position: relative; }
+  .user-chip:focus-visible { outline: 3px solid rgba(255,255,255,.75); outline-offset: 3px; }
+  .user-menu {
+    position: absolute; top: 42px; right: 0; width: 188px; padding: 8px;
+    border-radius: 16px; background: #fff; color: #0f172a;
+    box-shadow: 0 18px 45px rgba(15,23,42,.22); border: 1px solid #e2e8f0; display: none;
+  }
+  .user-menu.show { display: block; }
+  .user-menu button {
+    width: 100%; height: 34px; border: 0; background: transparent; border-radius: 10px;
+    padding: 0 10px; text-align: left; font-weight: 800; color: #334155; cursor: pointer;
+  }
+  .user-menu button:hover { background: #f1f5f9; }
+  .personal-settings-overlay {
+    position: fixed; inset: 0; z-index: 3000; display: none; align-items: center; justify-content: center;
+    padding: 22px; background: rgba(15,23,42,.46); backdrop-filter: blur(3px);
+  }
+  .personal-settings-overlay.show { display: flex; }
+  .personal-settings-modal {
+    width: min(760px, 100%); max-height: calc(100vh - 44px); overflow: auto;
+    border-radius: 24px; background: #fff; box-shadow: 0 28px 70px rgba(15,23,42,.32);
+    border: 1px solid #e2e8f0;
+  }
+  .personal-settings-head {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
+    padding: 22px 24px 16px; border-bottom: 1px solid #e2e8f0;
+  }
+  .personal-settings-head h2 { margin: 0; font-size: 22px; color: #0f172a; }
+  .personal-settings-head p { margin: 6px 0 0; color: #64748b; font-size: 13px; }
+  .personal-settings-close {
+    width: 36px; height: 36px; border-radius: 12px; border: 1px solid #cbd5e1; background: #fff;
+    font-size: 20px; cursor: pointer;
+  }
+  .personal-settings-body { padding: 20px 24px 24px; }
+  .personal-settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .personal-settings-field { display: flex; flex-direction: column; gap: 7px; }
+  .personal-settings-field.full { grid-column: 1 / -1; }
+  .personal-settings-field label { font-size: 12px; font-weight: 900; color: #334155; }
+  .personal-settings-field input, .personal-settings-field select {
+    height: 40px; border: 1px solid #cbd5e1; border-radius: 12px; padding: 0 12px; font: inherit;
+  }
+  .personal-settings-field input[readonly] { background: #f8fafc; color: #64748b; }
+  .personal-settings-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid #e2e8f0; }
+  .personal-settings-section h3 { margin: 0 0 12px; font-size: 15px; color: #0f172a; }
+  .personal-settings-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+  .personal-settings-btn {
+    height: 38px; border-radius: 12px; border: 1px solid #cbd5e1; background: #fff; padding: 0 14px;
+    font-weight: 900; cursor: pointer;
+  }
+  .personal-settings-btn.primary { border-color: var(--portal-brand-color, #c8102e); background: var(--portal-brand-color, #c8102e); color: #fff; }
+  .personal-settings-msg { margin-top: 12px; display: none; border-radius: 12px; padding: 10px 12px; font-size: 13px; font-weight: 800; }
+  .personal-settings-msg.show { display: block; }
+  .personal-settings-msg.success { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+  .personal-settings-msg.warn { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+  @media (max-width: 700px) { .personal-settings-grid { grid-template-columns: 1fr; } }
+</style>
 </head>
 <body>
   <div class="app">
@@ -1021,7 +1080,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
             <div id="portalHeaderDesc" class="header-desc">운영 시스템과 업무 환경을 하나의 포탈에서 통합 관리합니다.</div>
           </div>
           <div class="header-right">
-            <div class="header-slogan">Work Smarter. Think Deeper.</div>
+            <div class="header-slogan">Work smarter. Think deeper.</div>
             <div class="header-powered">powered by ExeloLab Ops</div>
           </div>
         </div>
@@ -1036,6 +1095,44 @@ body:not(.service-admin-enabled) .service-admin-btn{
 
   <div id="topUserBar" class="top-user-bar" hidden>
     <div id="userChip" class="user-chip"></div>
+  </div>
+
+
+  <div id="personalSettingsOverlay" class="personal-settings-overlay" aria-hidden="true">
+    <div class="personal-settings-modal" role="dialog" aria-modal="true" aria-labelledby="personalSettingsTitle">
+      <div class="personal-settings-head">
+        <div>
+          <h2 id="personalSettingsTitle">개인 설정</h2>
+          <p>내 정보, 연락처, 언어, 비밀번호를 관리합니다.</p>
+        </div>
+        <button type="button" id="personalSettingsClose" class="personal-settings-close" aria-label="닫기">×</button>
+      </div>
+      <div class="personal-settings-body">
+        <div class="personal-settings-grid">
+          <div class="personal-settings-field"><label>이름</label><input id="psName" readonly /></div>
+          <div class="personal-settings-field"><label>이메일</label><input id="psEmail" readonly /></div>
+          <div class="personal-settings-field"><label>회사</label><input id="psCompany" readonly /></div>
+          <div class="personal-settings-field"><label>권한</label><input id="psRole" readonly /></div>
+          <div class="personal-settings-field"><label>연락처</label><input id="psPhone" placeholder="연락처 입력" /></div>
+          <div class="personal-settings-field"><label>언어</label><select id="psLanguage"><option value="ko">한국어</option><option value="en">English</option></select></div>
+        </div>
+        <div class="personal-settings-actions">
+          <button type="button" id="psSaveProfile" class="personal-settings-btn primary">개인 설정 저장</button>
+        </div>
+
+        <div class="personal-settings-section">
+          <h3>비밀번호 변경</h3>
+          <div class="personal-settings-grid">
+            <div class="personal-settings-field"><label>새 비밀번호</label><input id="psNewPassword" type="password" autocomplete="new-password" placeholder="6자 이상" /></div>
+            <div class="personal-settings-field"><label>새 비밀번호 확인</label><input id="psConfirmPassword" type="password" autocomplete="new-password" placeholder="다시 입력" /></div>
+          </div>
+          <div class="personal-settings-actions">
+            <button type="button" id="psChangePassword" class="personal-settings-btn">비밀번호 변경</button>
+          </div>
+        </div>
+        <div id="personalSettingsMsg" class="personal-settings-msg"></div>
+      </div>
+    </div>
   </div>
 
   <div id="authOverlay" class="auth-overlay" hidden>
@@ -1121,7 +1218,20 @@ body:not(.service-admin-enabled) .service-admin-btn{
     portalFilters: document.getElementById('portalFilters'),
     logoutConfirmOverlay: document.getElementById('logoutConfirmOverlay'),
     logoutConfirmBtn: document.getElementById('logoutConfirmBtn'),
-    logoutCancelBtn: document.getElementById('logoutCancelBtn')
+    logoutCancelBtn: document.getElementById('logoutCancelBtn'),
+    personalSettingsOverlay: document.getElementById('personalSettingsOverlay'),
+    personalSettingsClose: document.getElementById('personalSettingsClose'),
+    personalSettingsMsg: document.getElementById('personalSettingsMsg'),
+    psName: document.getElementById('psName'),
+    psEmail: document.getElementById('psEmail'),
+    psCompany: document.getElementById('psCompany'),
+    psRole: document.getElementById('psRole'),
+    psPhone: document.getElementById('psPhone'),
+    psLanguage: document.getElementById('psLanguage'),
+    psSaveProfile: document.getElementById('psSaveProfile'),
+    psNewPassword: document.getElementById('psNewPassword'),
+    psConfirmPassword: document.getElementById('psConfirmPassword'),
+    psChangePassword: document.getElementById('psChangePassword')
   };
 
   if (!window.supabase || !window.supabase.createClient) {
@@ -1622,6 +1732,134 @@ body:not(.service-admin-enabled) .service-admin-btn{
     return '일반사용자';
   }
 
+
+
+  function getPreferredLanguage() {
+    return String(currentProfile?.preferred_language || currentProfile?.language || localStorage.getItem('portal_lang') || 'ko').trim() || 'ko';
+  }
+
+  function getProfilePhone() {
+    return String(currentProfile?.phone || currentProfile?.mobile || currentProfile?.mobile_phone || currentProfile?.contact || currentProfile?.tel || '').trim();
+  }
+
+  function setPersonalSettingsMessage(message, type = 'success') {
+    if (!els.personalSettingsMsg) return;
+    els.personalSettingsMsg.textContent = message || '';
+    els.personalSettingsMsg.className = 'personal-settings-msg' + (message ? ' show ' + type : '');
+  }
+
+  function broadcastPortalLanguage(language) {
+    const lang = String(language || 'ko').trim() || 'ko';
+    try { localStorage.setItem('portal_lang', lang); } catch (_) {}
+    try {
+      window.dispatchEvent(new CustomEvent('portal-language-changed', { detail: { language: lang, lang } }));
+    } catch (_) {}
+    try {
+      if (frame?.contentWindow) {
+        frame.contentWindow.postMessage({ type: 'portal-language-changed', language: lang, lang }, '*');
+      }
+    } catch (_) {}
+  }
+
+  window.getPortalSettings = function () {
+    return {
+      language: getPreferredLanguage(),
+      lang: getPreferredLanguage(),
+      phone: getProfilePhone(),
+      theme: currentProfile?.theme || localStorage.getItem('portal_theme') || 'light'
+    };
+  };
+
+  function fillPersonalSettingsForm() {
+    const session = buildPortalSession();
+    if (els.psName) els.psName.value = currentProfile?.name || currentUser?.email || '';
+    if (els.psEmail) els.psEmail.value = currentUser?.email || '';
+    if (els.psCompany) els.psCompany.value = session.companyName || '';
+    if (els.psRole) els.psRole.value = roleLabel(session.role);
+    if (els.psPhone) els.psPhone.value = getProfilePhone();
+    if (els.psLanguage) els.psLanguage.value = getPreferredLanguage();
+    if (els.psNewPassword) els.psNewPassword.value = '';
+    if (els.psConfirmPassword) els.psConfirmPassword.value = '';
+    setPersonalSettingsMessage('');
+  }
+
+  function openPersonalSettings() {
+    if (!currentUser) return;
+    fillPersonalSettingsForm();
+    els.personalSettingsOverlay?.classList.add('show');
+    els.personalSettingsOverlay?.setAttribute('aria-hidden', 'false');
+  }
+
+  function closePersonalSettings() {
+    els.personalSettingsOverlay?.classList.remove('show');
+    els.personalSettingsOverlay?.setAttribute('aria-hidden', 'true');
+  }
+
+  async function savePersonalSettings() {
+    if (!currentUser?.email) return;
+    const phone = String(els.psPhone?.value || '').trim();
+    const language = String(els.psLanguage?.value || 'ko').trim() || 'ko';
+
+    if (els.psSaveProfile) els.psSaveProfile.disabled = true;
+    setPersonalSettingsMessage('');
+
+    try {
+      const payload = {
+        phone,
+        preferred_language: language
+      };
+
+      const { error } = await supabaseClient
+        .from('users')
+        .update(payload)
+        .eq('email', currentUser.email);
+
+      if (error) throw error;
+
+      currentProfile = { ...(currentProfile || {}), ...payload };
+      publishPortalSession();
+      applyRoleUI();
+      broadcastPortalLanguage(language);
+      postAuthToFrame();
+      setPersonalSettingsMessage('개인 설정이 저장되었습니다.', 'success');
+    } catch (error) {
+      console.error('savePersonalSettings error:', error);
+      setPersonalSettingsMessage('저장 실패: users 테이블에 phone, preferred_language 컬럼이 있는지 확인해 주세요. ' + (error?.message || ''), 'warn');
+    } finally {
+      if (els.psSaveProfile) els.psSaveProfile.disabled = false;
+    }
+  }
+
+  async function changePersonalPassword() {
+    const newPassword = els.psNewPassword?.value || '';
+    const confirmPassword = els.psConfirmPassword?.value || '';
+
+    if (newPassword.length < 6) {
+      setPersonalSettingsMessage('비밀번호는 6자 이상으로 입력해 주세요.', 'warn');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPersonalSettingsMessage('새 비밀번호와 확인 값이 서로 다릅니다.', 'warn');
+      return;
+    }
+
+    if (els.psChangePassword) els.psChangePassword.disabled = true;
+    setPersonalSettingsMessage('');
+
+    try {
+      const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      if (els.psNewPassword) els.psNewPassword.value = '';
+      if (els.psConfirmPassword) els.psConfirmPassword.value = '';
+      setPersonalSettingsMessage('비밀번호가 변경되었습니다.', 'success');
+    } catch (error) {
+      console.error('changePersonalPassword error:', error);
+      setPersonalSettingsMessage(error?.message || '비밀번호 변경 중 오류가 발생했습니다.', 'warn');
+    } finally {
+      if (els.psChangePassword) els.psChangePassword.disabled = false;
+    }
+  }
+
   function buildPortalSession() {
     const companyId = currentProfile?.company_id || currentCompany?.id || '';
     const companyCode = currentCompany?.company_code || '';
@@ -1640,6 +1878,9 @@ body:not(.service-admin-enabled) .service-admin-btn{
       companyName,
       company_name: companyName,
       role,
+      language: getPreferredLanguage(),
+      preferred_language: getPreferredLanguage(),
+      phone: getProfilePhone(),
       supabase: supabaseClient,
       buildCompanyScopedPayload,
       buildCompanyScopedRows,
@@ -1747,14 +1988,30 @@ body:not(.service-admin-enabled) .service-admin-btn{
     const session = buildPortalSession();
     const name = currentProfile?.name || currentUser?.email || '사용자';
     const company = session.companyName ? `<span class="role">${session.companyName}</span>` : '';
-    els.userChip.innerHTML = `<span>${name}</span>${company}<span class="role">${roleLabel(session.role)}</span>`;
+    els.userChip.innerHTML = `<button type="button" id="userChipButton" style="all:unset; display:inline-flex; align-items:center; gap:6px; cursor:pointer;" aria-haspopup="menu" aria-expanded="false"><span>${name}</span>${company}<span class="role">${roleLabel(session.role)}</span><span aria-hidden="true">▾</span></button><div id="userMenu" class="user-menu" role="menu"><button type="button" id="openPersonalSettings" role="menuitem">개인 설정</button><button type="button" id="userMenuLogout" role="menuitem">로그아웃</button></div>`;
+    const chipButton = document.getElementById('userChipButton');
+    const userMenu = document.getElementById('userMenu');
+    chipButton?.addEventListener('click', function (event) {
+      event.stopPropagation();
+      const show = !userMenu?.classList.contains('show');
+      userMenu?.classList.toggle('show', show);
+      chipButton?.setAttribute('aria-expanded', show ? 'true' : 'false');
+    });
+    document.getElementById('openPersonalSettings')?.addEventListener('click', function () {
+      userMenu?.classList.remove('show');
+      openPersonalSettings();
+    });
+    document.getElementById('userMenuLogout')?.addEventListener('click', function () {
+      userMenu?.classList.remove('show');
+      els.logoutConfirmOverlay?.classList.add('show');
+    });
     updateServiceAdminButtonVisibility();
   }
 
   async function fetchProfile(email) {
     const { data, error } = await supabaseClient
       .from('users')
-      .select('email,name,role,is_active,must_change_password,company_id')
+      .select('*')
       .eq('email', email)
       .maybeSingle();
     if (error) throw error;
@@ -1818,6 +2075,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
     await loadPortalBrandSettings();
     publishPortalSession();
     applyRoleUI();
+    broadcastPortalLanguage(getPreferredLanguage());
     return true;
   }
 
@@ -1852,6 +2110,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
     if (session.companyId) params.push('company_id=' + encodeURIComponent(session.companyId));
     if (session.companyCode) params.push('company_code=' + encodeURIComponent(session.companyCode));
     if (session.companyName) params.push('company_name=' + encodeURIComponent(session.companyName));
+    if (session.language) params.push('lang=' + encodeURIComponent(session.language));
 
     if (src === HOME_SRC) {
       params.push('portal_auth=1');
@@ -1881,7 +2140,10 @@ body:not(.service-admin-enabled) .service-admin-btn{
         companyCode: session.companyCode,
         company_name: session.companyName,
         companyName: session.companyName,
-        role: session.role
+        role: session.role,
+        language: session.language,
+        preferred_language: session.language,
+        phone: session.phone
       },
       company: {
         id: session.companyId,
@@ -1890,6 +2152,11 @@ body:not(.service-admin-enabled) .service-admin-btn{
         company_code: session.companyCode,
         name: session.companyName,
         company_name: session.companyName
+      },
+      settings: {
+        language: session.language,
+        lang: session.language,
+        phone: session.phone
       }
     }, '*');
   }
@@ -1900,6 +2167,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
     updatePortalSubtabs(src);
     frame.onload = function () {
       postAuthToFrame();
+      broadcastPortalLanguage(getPreferredLanguage());
 
       try {
         const key = normalizePortalSrc(src);
@@ -2157,6 +2425,25 @@ body:not(.service-admin-enabled) .service-admin-btn{
     els.loginPassword?.addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
     els.changePasswordButton?.addEventListener('click', changePassword);
     els.confirmPassword?.addEventListener('keydown', (e) => { if (e.key === 'Enter') changePassword(); });
+
+
+    els.personalSettingsClose?.addEventListener('click', closePersonalSettings);
+    els.personalSettingsOverlay?.addEventListener('click', function (event) {
+      if (event.target === els.personalSettingsOverlay) closePersonalSettings();
+    });
+    els.psSaveProfile?.addEventListener('click', savePersonalSettings);
+    els.psChangePassword?.addEventListener('click', changePersonalPassword);
+    els.psLanguage?.addEventListener('change', function () {
+      broadcastPortalLanguage(els.psLanguage.value || 'ko');
+    });
+    document.addEventListener('click', function (event) {
+      const menu = document.getElementById('userMenu');
+      const chip = document.getElementById('userChipButton');
+      if (!menu || !chip) return;
+      if (menu.contains(event.target) || chip.contains(event.target)) return;
+      menu.classList.remove('show');
+      chip.setAttribute('aria-expanded', 'false');
+    });
 
     window.addEventListener('message', function (event) {
       const payload = event?.data || {};
