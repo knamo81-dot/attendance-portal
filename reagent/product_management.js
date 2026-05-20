@@ -193,6 +193,9 @@ window.ReagentApp.productManagement = {
       saveProduct: document.getElementById("pmSaveProduct"),
       resetProduct: document.getElementById("pmResetProduct"),
       deactivateProduct: document.getElementById("pmDeactivateProduct"),
+      downloadTemplate: document.getElementById("pmDownloadTemplate"),
+      uploadExcel: document.getElementById("pmUploadExcel"),
+      uploadExcelFile: document.getElementById("pmUploadExcelFile"),
 
       requestKeyword: document.getElementById("pmRequestKeyword"),
       requestStatus: document.getElementById("pmRequestStatus"),
@@ -286,6 +289,21 @@ window.ReagentApp.productManagement = {
     if (els.deactivateProduct && !els.deactivateProduct.dataset.bound) {
       els.deactivateProduct.dataset.bound = "1";
       els.deactivateProduct.addEventListener("click", () => this.deactivateCurrentProduct());
+    }
+
+    if (els.downloadTemplate && !els.downloadTemplate.dataset.bound) {
+      els.downloadTemplate.dataset.bound = "1";
+      els.downloadTemplate.addEventListener("click", () => this.downloadProductMasterTemplate());
+    }
+
+    if (els.uploadExcel && !els.uploadExcel.dataset.bound) {
+      els.uploadExcel.dataset.bound = "1";
+      els.uploadExcel.addEventListener("click", () => els.uploadExcelFile?.click());
+    }
+
+    if (els.uploadExcelFile && !els.uploadExcelFile.dataset.bound) {
+      els.uploadExcelFile.dataset.bound = "1";
+      els.uploadExcelFile.addEventListener("change", (event) => this.handleProductMasterExcelUpload(event));
     }
 
     [
@@ -1061,6 +1079,295 @@ window.ReagentApp.productManagement = {
     } finally {
       this._savingProduct = false;
     }
+  },
+
+
+
+  getProductMasterTemplateRows() {
+    return [
+      {
+        "구분": "시약",
+        "품명": "예: Sodium chloride",
+        "제조원": "예: Sigma-Aldrich",
+        "등급": "예: GR",
+        "제품번호": "예: S7653",
+        "CAS": "7647-14-5",
+        "단위": "500 g",
+        "기본거래처": "예: 대정화금",
+        "선정사유": "최저가 구매",
+        "비고": "예: 연구소 표준 품목",
+        "사용여부": "사용"
+      },
+      {
+        "구분": "초자",
+        "품명": "예: Beaker",
+        "제조원": "예: DURAN",
+        "등급": "",
+        "제품번호": "예: 2110624",
+        "CAS": "",
+        "단위": "250 mL",
+        "기본거래처": "",
+        "선정사유": "",
+        "비고": "",
+        "사용여부": "사용"
+      },
+      {
+        "구분": "안전용품",
+        "품명": "예: Nitrile gloves",
+        "제조원": "예: Kimberly-Clark",
+        "등급": "",
+        "제품번호": "",
+        "CAS": "",
+        "단위": "M / 100매",
+        "기본거래처": "",
+        "선정사유": "",
+        "비고": "",
+        "사용여부": "사용"
+      }
+    ];
+  },
+
+  downloadProductMasterTemplate() {
+    if (!window.XLSX) {
+      this.toast("엑셀 라이브러리를 불러오지 못했습니다. xlsx-js-style 로딩을 확인하세요.", "warn");
+      return;
+    }
+
+    const headers = ["구분", "품명", "제조원", "등급", "제품번호", "CAS", "단위", "기본거래처", "선정사유", "비고", "사용여부"];
+    const rows = this.getProductMasterTemplateRows();
+    const worksheet = XLSX.utils.json_to_sheet(rows, { header: headers });
+    worksheet["!cols"] = headers.map((header) => ({ wch: Math.max(12, header.length * 2 + 8) }));
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "제품마스터_양식");
+    XLSX.writeFile(workbook, `제품마스터_업로드양식_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  },
+
+  normalizeExcelText(value) {
+    const text = String(value ?? "").replace(/ /g, " ").trim();
+    if (["-", "—", "–", "N/A", "n/a", "없음"].includes(text)) return "";
+    return text;
+  },
+
+  normalizeExcelHeader(value) {
+    return String(value || "").replace(/\s+/g, "").replace(/[()\[\]{}._-]/g, "").toLowerCase();
+  },
+
+  getExcelCell(row, candidates = []) {
+    const entries = Object.entries(row || {});
+    const normalizedCandidates = candidates.map((candidate) => this.normalizeExcelHeader(candidate));
+    for (const [key, value] of entries) {
+      if (normalizedCandidates.includes(this.normalizeExcelHeader(key))) {
+        return this.normalizeExcelText(value);
+      }
+    }
+    return "";
+  },
+
+  normalizeProductCategory(value, fallback = "") {
+    const raw = this.normalizeExcelText(value || fallback);
+    const compact = raw.replace(/\s+/g, "");
+    if (!compact) return "시약";
+    if (compact.includes("안전")) return "안전용품";
+    if (compact.includes("초자") || compact.includes("소모")) return "초자";
+    if (compact.includes("시약")) return "시약";
+    return raw;
+  },
+
+  normalizeActiveValue(value) {
+    const text = this.normalizeExcelText(value).replace(/\s+/g, "").toLowerCase();
+    if (!text) return true;
+    if (["사용중지", "중지", "비활성", "false", "n", "no", "0", "미사용"].includes(text)) return false;
+    return true;
+  },
+
+  normalizeVendorReason(value) {
+    const text = this.normalizeExcelText(value);
+    if (!text) return "";
+
+    const compact = text.replace(/\s+/g, "");
+    const reasonMap = {
+      "최저가": "최저가 구매",
+      "최저가구매": "최저가 구매",
+      "제조원": "제조원 구매",
+      "제조원구매": "제조원 구매",
+      "취급처": "취급처 구매",
+      "취급처구매": "취급처 구매",
+      "대리점": "대리점 구매",
+      "대리점구매": "대리점 구매",
+      "온라인": "온라인 구매",
+      "온라인구매": "온라인 구매"
+    };
+
+    return reasonMap[compact] || text;
+  },
+
+  buildProductMasterRowFromExcel(row = {}, sheetName = "") {
+    const category = this.normalizeProductCategory(
+      this.getExcelCell(row, ["구분", "분류", "카테고리", "category"]),
+      sheetName
+    );
+
+    const defaultVendor = this.getExcelCell(row, ["기본거래처", "거래처", "기본 거래처", "default_vendor", "defaultVendor"]);
+    const vendorReason = this.normalizeVendorReason(
+      this.getExcelCell(row, ["선정사유", "거래처선정사유", "기본거래처선정사유", "선정 사유", "default_vendor_reason", "defaultVendorReason"])
+    );
+
+    return {
+      category,
+      name: this.getExcelCell(row, ["품명", "제품명", "제품", "name", "product_name", "productName"]),
+      maker: this.getExcelCell(row, ["제조원", "제조사", "제조업체", "maker", "manufacturer"]),
+      code: this.getExcelCell(row, ["제품번호", "제품코드", "제품 코드", "code", "product_code", "productCode"]),
+      capacity: this.getExcelCell(row, ["단위", "규격", "용량", "capacity", "size"]),
+      cas: this.getExcelCell(row, ["CAS", "cas", "CAS번호", "CAS No", "cas no"]),
+      grade: this.getExcelCell(row, ["등급", "grade"]),
+      default_vendor: defaultVendor,
+      default_vendor_reason: vendorReason,
+      memo: this.getExcelCell(row, ["비고", "메모", "memo", "note"]),
+      is_active: this.normalizeActiveValue(this.getExcelCell(row, ["사용여부", "사용", "상태", "is_active", "active"]))
+    };
+  },
+
+  getProductDuplicateKey(row = {}) {
+    const code = this.normalizeDuplicateValue(row.code);
+    if (code) return `code:${code}`;
+
+    const name = this.normalizeDuplicateValue(row.name);
+    const maker = this.normalizeDuplicateValue(row.maker);
+    const capacity = this.normalizeDuplicateValue(row.capacity);
+    if (name || maker || capacity) return `product:${name}|${maker}|${capacity}`;
+    return "";
+  },
+
+  async handleProductMasterExcelUpload(event) {
+    const input = event?.target;
+    const file = input?.files?.[0];
+    if (input) input.value = "";
+    if (!file) return;
+
+    if (!this.sb) {
+      this.toast("Supabase 연결 정보가 없습니다.", "warn");
+      return;
+    }
+
+    const companyId = this.requireCompanyId();
+    if (!companyId) return;
+
+    if (!window.XLSX) {
+      this.toast("엑셀 라이브러리를 불러오지 못했습니다. xlsx-js-style 로딩을 확인하세요.", "warn");
+      return;
+    }
+
+    try {
+      const user = this.getCurrentUser();
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const parsedRows = [];
+      const invalidRows = [];
+      const seenInFile = new Set();
+
+      workbook.SheetNames.forEach((sheetName) => {
+        const worksheet = workbook.Sheets[sheetName];
+        const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: "", raw: false });
+
+        rawRows.forEach((rawRow, index) => {
+          const row = this.buildProductMasterRowFromExcel(rawRow, sheetName);
+          const rowLabel = `${sheetName} ${index + 2}행`;
+
+          if (!row.name) {
+            const hasAnyValue = Object.values(rawRow || {}).some((value) => this.normalizeExcelText(value));
+            if (hasAnyValue) invalidRows.push(`${rowLabel}: 품명 없음`);
+            return;
+          }
+
+          if (row.default_vendor && !row.default_vendor_reason) {
+            invalidRows.push(`${rowLabel}: 기본거래처가 있으나 선정사유 없음`);
+            return;
+          }
+
+          const duplicateKey = this.getProductDuplicateKey(row);
+          if (duplicateKey && seenInFile.has(duplicateKey)) {
+            invalidRows.push(`${rowLabel}: 파일 내 중복`);
+            return;
+          }
+          if (duplicateKey) seenInFile.add(duplicateKey);
+
+          parsedRows.push({ ...row, created_by: user.name, updated_by: user.name });
+        });
+      });
+
+      if (!parsedRows.length) {
+        this.toast(`등록 가능한 제품이 없습니다.${invalidRows.length ? ` 제외 ${invalidRows.length}건` : ""}`, "warn");
+        return;
+      }
+
+      const existingRows = Array.isArray(this.products) && this.products.length
+        ? this.products
+        : await this.fetchProductMasterForDuplicateCheck();
+
+      const existingKeys = new Set((existingRows || []).map((row) => this.getProductDuplicateKey(row)).filter(Boolean));
+      const insertRows = [];
+      const duplicateRows = [];
+
+      parsedRows.forEach((row) => {
+        const key = this.getProductDuplicateKey(row);
+        if (key && existingKeys.has(key)) {
+          duplicateRows.push(row);
+        } else {
+          insertRows.push(row);
+          if (key) existingKeys.add(key);
+        }
+      });
+
+      const summary = [
+        `엑셀에서 ${parsedRows.length}건을 확인했습니다.`,
+        `신규 등록 예정: ${insertRows.length}건`,
+        `기존/중복 제외: ${duplicateRows.length}건`,
+        `오류/누락 제외: ${invalidRows.length}건`
+      ].join("\n");
+
+      if (!insertRows.length) {
+        alert(`${summary}\n\n새로 등록할 제품이 없습니다.`);
+        return;
+      }
+
+      const ok = confirm(`${summary}\n\n신규 제품만 제품 마스터에 등록할까요?`);
+      if (!ok) return;
+
+      const rowsWithCompany = Array.isArray(window.ReagentApp.withCompanyRows)
+        ? window.ReagentApp.withCompanyRows(insertRows)
+        : insertRows.map((row) => this.withCompanyPayload(row));
+
+      const { error } = await this.sb
+        .from("product_master")
+        .insert(rowsWithCompany);
+
+      if (error) throw error;
+
+      this.toast(`제품 마스터 ${insertRows.length}건을 등록했습니다.`, "success");
+      await this.loadProducts();
+      window.ReagentApp.request?.loadProductMaster?.(true);
+    } catch (error) {
+      console.error("제품 마스터 엑셀 업로드 실패:", error);
+      this.toast(`엑셀 업로드 실패: ${error.message || "파일 형식과 컬럼명을 확인하세요."}`, "warn");
+    }
+  },
+
+  async fetchProductMasterForDuplicateCheck() {
+    if (!this.sb) return [];
+
+    const query = this.scopedCompanyQuery(
+      this.sb
+        .from("product_master")
+        .select("id, company_id, category, name, maker, code, capacity, cas, grade, default_vendor, default_vendor_reason, memo, is_active")
+    ).limit(10000);
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn("제품 마스터 중복용 조회 실패:", error);
+      return [];
+    }
+    return Array.isArray(data) ? data : [];
   },
 
   async deactivateCurrentProduct() {
