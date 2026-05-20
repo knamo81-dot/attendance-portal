@@ -160,30 +160,6 @@
     console.warn('[AIC DB]', message);
   }
 
-  function showModal(el) {
-    if (!el) return;
-    el.hidden = false;
-    el.removeAttribute('hidden');
-    el.style.display = 'flex';
-  }
-
-  function hideModal(el) {
-    if (!el) return;
-    el.hidden = true;
-    el.setAttribute('hidden', '');
-    el.style.display = 'none';
-  }
-
-  function bindClick(el, handler) {
-    if (!el || el.dataset.aicBound === '1') return;
-    el.dataset.aicBound = '1';
-    el.addEventListener('click', function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-      handler(event);
-    });
-  }
-
   function normalizeDbRoom(row, membersByRoom, messagesByRoom) {
     var roomId = String(row.id || '');
     var members = membersByRoom[roomId] || [];
@@ -693,8 +669,18 @@
     els.slots.innerHTML = html;
 
     Array.from(els.slots.querySelectorAll('[data-slot-index]')).forEach(function (win) {
-      win.addEventListener('mousedown', function () {
+      win.addEventListener('mousedown', function (event) {
+        // 입력창/버튼/select를 클릭할 때 render가 다시 실행되면
+        // DOM이 교체되어 타이핑·버튼 클릭이 끊기므로 인터랙션 요소는 제외합니다.
+        if (event.target && event.target.closest('input, textarea, select, button, [contenteditable="true"]')) {
+          return;
+        }
+
         state.activeSlotIndex = Number(win.getAttribute('data-slot-index')) || 0;
+
+        // 이미 활성 슬롯이면 불필요한 재렌더링을 하지 않습니다.
+        if (win.classList.contains('active')) return;
+
         render(false);
       });
     });
@@ -806,14 +792,14 @@
     state.activeParticipantsRoomId = room.id;
     renderParticipantsModal();
 
-    showModal(els.participantsModal);
+    els.participantsModal.hidden = false;
     setTimeout(function () {
       if (els.participantName) els.participantName.focus();
     }, 50);
   }
 
   function closeParticipantsModal() {
-    hideModal(els.participantsModal);
+    if (els.participantsModal) els.participantsModal.hidden = true;
     state.activeParticipantsRoomId = '';
     if (els.participantName) els.participantName.value = '';
     if (els.participantEmail) els.participantEmail.value = '';
@@ -921,14 +907,14 @@
 
   function openRoomModal() {
     if (!els.roomModal) return;
-    showModal(els.roomModal);
+    els.roomModal.hidden = false;
     setTimeout(function () {
       if (els.newRoomName) els.newRoomName.focus();
     }, 50);
   }
 
   function closeRoomModal() {
-    hideModal(els.roomModal);
+    if (els.roomModal) els.roomModal.hidden = true;
   }
 
   async function createRoom() {
@@ -975,11 +961,11 @@
     els.setTone.value = state.settings.tone;
     els.setDisplay.value = state.settings.display;
     els.autoSwitch.classList.toggle('on', !!state.settings.autoTranslate);
-    showModal(els.settingsModal);
+    els.settingsModal.hidden = false;
   }
 
   function closeSettingsModal() {
-    hideModal(els.settingsModal);
+    if (els.settingsModal) els.settingsModal.hidden = true;
   }
 
   function saveSettings() {
@@ -995,16 +981,16 @@
   }
 
   function bind() {
-    bindClick(els.createRoomBtn, openRoomModal);
-    bindClick(els.roomCancelBtn, closeRoomModal);
-    bindClick(els.roomCreateBtn, createRoom);
+    if (els.createRoomBtn) els.createRoomBtn.addEventListener('click', openRoomModal);
+    if (els.roomCancelBtn) els.roomCancelBtn.addEventListener('click', closeRoomModal);
+    if (els.roomCreateBtn) els.roomCreateBtn.addEventListener('click', createRoom);
 
-    bindClick(els.settingsBtn, openSettingsModal);
-    bindClick(els.settingsCancelBtn, closeSettingsModal);
-    bindClick(els.settingsSaveBtn, saveSettings);
+    if (els.settingsBtn) els.settingsBtn.addEventListener('click', openSettingsModal);
+    if (els.settingsCancelBtn) els.settingsCancelBtn.addEventListener('click', closeSettingsModal);
+    if (els.settingsSaveBtn) els.settingsSaveBtn.addEventListener('click', saveSettings);
 
-    bindClick(els.participantsCloseBtn, closeParticipantsModal);
-    bindClick(els.participantAddBtn, addParticipant);
+    if (els.participantsCloseBtn) els.participantsCloseBtn.addEventListener('click', closeParticipantsModal);
+    if (els.participantAddBtn) els.participantAddBtn.addEventListener('click', addParticipant);
     if (els.participantName) {
       els.participantName.addEventListener('keydown', function (event) {
         if (event.key === 'Enter') addParticipant();
