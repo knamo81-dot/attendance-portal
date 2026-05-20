@@ -53,4 +53,3 @@ window.ReagentApp.scopedCompanyQuery = function (query) {
   const companyId = window.ReagentApp.getCompanyId?.() || "";
   return companyId ? query.eq("company_id", companyId) : query;
 };
-
