@@ -7,6 +7,76 @@
 
   <link rel="stylesheet" href="../assets/css/common-ui.css" />
   <link rel="stylesheet" href="./css/aic.css" />
+
+  <style id="aic-participants-style">
+    .aic-participant-room-name{
+      margin-top:4px;
+      font-size:12px;
+      font-weight:800;
+      color:#64748b;
+    }
+    .aic-participant-list{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      margin:16px 0;
+      max-height:260px;
+      overflow:auto;
+    }
+    .aic-participant-item{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border:1px solid #e2e8f0;
+      border-radius:12px;
+      background:#f8fafc;
+    }
+    .aic-participant-name{
+      font-size:13px;
+      font-weight:900;
+      color:#0f172a;
+    }
+    .aic-participant-meta{
+      margin-top:3px;
+      font-size:11px;
+      font-weight:700;
+      color:#64748b;
+    }
+    .aic-participant-remove{
+      height:30px;
+      border:1px solid #fecaca;
+      border-radius:10px;
+      background:#fff;
+      color:#b91c1c;
+      font-size:11px;
+      font-weight:900;
+      cursor:pointer;
+      padding:0 10px;
+      flex:0 0 auto;
+    }
+    .aic-participant-add-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr auto;
+      gap:8px;
+      align-items:end;
+      margin-top:12px;
+    }
+    .aic-participant-empty{
+      padding:18px 12px;
+      text-align:center;
+      color:#94a3b8;
+      border:1px dashed #cbd5e1;
+      border-radius:12px;
+      font-size:12px;
+      font-weight:800;
+    }
+    @media (max-width:760px){
+      .aic-participant-add-grid{grid-template-columns:1fr;}
+    }
+  </style>
+
 </head>
 <body>
   <div id="aicRoot" class="aic-root">
@@ -146,6 +216,44 @@
       </div>
     </div>
   </div>
+
+
+  <div id="aicParticipantsModal" class="aic-modal-overlay" hidden>
+    <div class="aic-modal">
+      <h2 data-i18n="aic.participants">참여자</h2>
+      <p data-i18n="aic.participantsDesc">현재 회의방의 참여자를 확인하고 추가합니다.</p>
+      <div id="aicParticipantsRoomName" class="aic-participant-room-name"></div>
+
+      <div id="aicParticipantsList" class="aic-participant-list"></div>
+
+      <div class="aic-participant-add-grid">
+        <label class="aic-field">
+          <span data-i18n="aic.participantName">이름</span>
+          <input
+            id="aicParticipantName"
+            class="module-input"
+            placeholder="예: 김남호"
+            data-i18n-placeholder="aic.participantNamePlaceholder"
+          />
+        </label>
+        <label class="aic-field">
+          <span data-i18n="aic.participantEmail">이메일/메모</span>
+          <input
+            id="aicParticipantEmail"
+            class="module-input"
+            placeholder="예: name@example.com"
+            data-i18n-placeholder="aic.participantEmailPlaceholder"
+          />
+        </label>
+        <button id="aicParticipantAddBtn" class="module-btn primary" type="button" data-i18n="aic.add">추가</button>
+      </div>
+
+      <div class="aic-modal-actions">
+        <button id="aicParticipantsCloseBtn" class="module-btn" type="button" data-i18n="aic.close">닫기</button>
+      </div>
+    </div>
+  </div>
+
 
   <script src="../assets/i18n/i18n-core.js"></script>
   <script src="./js/aic-config.js"></script>
