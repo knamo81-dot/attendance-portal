@@ -1,5 +1,8 @@
 /* AIC main rebuild clean version
-   서버 저장/실시간/실제 번역 API는 추후 연결.
+   Supabase 저장 연결 버전
+   - 회의방: public.aic_rooms
+   - 메시지: public.aic_messages
+   - 참여자: public.aic_room_members
 */
 (function () {
   'use strict';
@@ -37,7 +40,9 @@
     preferredSlotCount: CONFIG.slotPolicy.defaultVisibleSlots,
     openSlots: [],
     settings: loadSettings(),
-    rooms: []
+    rooms: [],
+    dbReady: false,
+    dbLoading: false
   };
 
   function $(id) {
@@ -75,11 +80,325 @@
     } catch (_) {}
   }
 
+  function getPortalSession() {
+    try {
+      if (window.parent && typeof window.parent.getPortalSession === 'function') {
+        return window.parent.getPortalSession() || {};
+      }
+    } catch (_) {}
+
+    try {
+      if (window.parent && window.parent.portalSession) {
+        return window.parent.portalSession || {};
+      }
+    } catch (_) {}
+
+    return window.portalSession || {};
+  }
+
+  function getSupabaseClient() {
+    try {
+      var session = getPortalSession();
+      if (session && session.supabase) return session.supabase;
+    } catch (_) {}
+
+    try {
+      if (window.parent && window.parent.portalSupabase) {
+        return window.parent.portalSupabase;
+      }
+    } catch (_) {}
+
+    if (window.portalSupabase) return window.portalSupabase;
+    if (window.aicSupabase) return window.aicSupabase;
+
+    return null;
+  }
+
+  function getCompanyId() {
+    var session = getPortalSession();
+    return String(
+      session.companyId ||
+      session.company_id ||
+      session.company?.id ||
+      session.company?.company_id ||
+      window.currentCompanyId ||
+      ''
+    ).trim();
+  }
+
+  function getCurrentUserEmail() {
+    var auth = window.aicAuth || {};
+    var user = auth.user || {};
+    var session = getPortalSession();
+
+    return String(
+      user.email ||
+      session.email ||
+      session.user?.email ||
+      session.profile?.email ||
+      ''
+    ).trim();
+  }
+
   function getCurrentUserName() {
     var auth = window.aicAuth || {};
     var user = auth.user || {};
-    return user.name || (user.email ? String(user.email).split('@')[0] : '') || '김남호';
+    var session = getPortalSession();
+
+    return (
+      user.name ||
+      session.profile?.name ||
+      session.user?.name ||
+      session.user_name ||
+      session.name ||
+      (getCurrentUserEmail() ? getCurrentUserEmail().split('@')[0] : '') ||
+      '사용자'
+    );
   }
+
+  function showDbWarn(message) {
+    console.warn('[AIC DB]', message);
+  }
+
+  function normalizeDbRoom(row, membersByRoom, messagesByRoom) {
+    var roomId = String(row.id || '');
+    var members = membersByRoom[roomId] || [];
+    var messages = messagesByRoom[roomId] || [];
+    var currentEmail = getCurrentUserEmail();
+
+    return {
+      id: roomId,
+      name: row.name || '회의방',
+      members: members.map(function (member) {
+        return member.user_name || member.user_email || '';
+      }).filter(Boolean).join(' · '),
+      memberList: members.map(function (member) {
+        return {
+          id: member.id || '',
+          name: member.user_name || member.user_email || '',
+          email: member.user_email || '',
+          role: member.role || '',
+          language: member.language || 'ko'
+        };
+      }),
+      messages: messages.map(function (message) {
+        var senderEmail = String(message.sender_email || '').trim();
+        return {
+          id: message.id || '',
+          type: senderEmail && currentEmail && senderEmail === currentEmail ? 'me' : 'other',
+          sender: message.sender_name || senderEmail || '상대방',
+          original: message.original || '',
+          translated: message.translated || '',
+          created_at: message.created_at || ''
+        };
+      })
+    };
+  }
+
+  async function loadRoomsFromServer() {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+
+    if (!sb || !companyId) {
+      state.dbReady = false;
+      state.rooms = [];
+      render(false);
+      return;
+    }
+
+    state.dbLoading = true;
+
+    try {
+      var roomsResult = await sb
+        .from('aic_rooms')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('updated_at', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (roomsResult.error) throw roomsResult.error;
+
+      var roomRows = Array.isArray(roomsResult.data) ? roomsResult.data : [];
+      var roomIds = roomRows.map(function (room) { return String(room.id || ''); }).filter(Boolean);
+
+      if (!roomIds.length) {
+        state.rooms = [];
+        state.openSlots = [];
+        state.dbReady = true;
+        render(false);
+        return;
+      }
+
+      var membersResult = await sb
+        .from('aic_room_members')
+        .select('*')
+        .eq('company_id', companyId)
+        .in('room_id', roomIds)
+        .order('created_at', { ascending: true });
+
+      if (membersResult.error) throw membersResult.error;
+
+      var messagesResult = await sb
+        .from('aic_messages')
+        .select('*')
+        .eq('company_id', companyId)
+        .in('room_id', roomIds)
+        .order('created_at', { ascending: true });
+
+      if (messagesResult.error) throw messagesResult.error;
+
+      var membersByRoom = {};
+      (membersResult.data || []).forEach(function (member) {
+        var roomId = String(member.room_id || '');
+        if (!membersByRoom[roomId]) membersByRoom[roomId] = [];
+        membersByRoom[roomId].push(member);
+      });
+
+      var messagesByRoom = {};
+      (messagesResult.data || []).forEach(function (message) {
+        var roomId = String(message.room_id || '');
+        if (!messagesByRoom[roomId]) messagesByRoom[roomId] = [];
+        messagesByRoom[roomId].push(message);
+      });
+
+      state.rooms = roomRows.map(function (row) {
+        return normalizeDbRoom(row, membersByRoom, messagesByRoom);
+      });
+
+      state.openSlots = state.openSlots.filter(function (slot) {
+        return slot && getRoom(slot.roomId);
+      });
+
+      state.dbReady = true;
+      render(true);
+    } catch (error) {
+      state.dbReady = false;
+      showDbWarn(error?.message || error);
+      state.rooms = [];
+      state.openSlots = [];
+      render(false);
+      alert('AIC 서버 데이터 조회 실패: Supabase 테이블 생성 SQL을 먼저 실행했는지 확인해 주세요.\n\n' + (error?.message || ''));
+    } finally {
+      state.dbLoading = false;
+    }
+  }
+
+  async function insertRoomToServer(room) {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+    if (!sb || !companyId || !room) return;
+
+    var now = new Date().toISOString();
+    var userEmail = getCurrentUserEmail();
+    var userName = getCurrentUserName();
+
+    var roomResult = await sb.from('aic_rooms').insert({
+      id: room.id,
+      company_id: companyId,
+      name: room.name,
+      created_by_email: userEmail,
+      created_by_name: userName,
+      created_at: now,
+      updated_at: now
+    });
+
+    if (roomResult.error) throw roomResult.error;
+
+    var members = getRoomMembers(room);
+    if (!members.length) {
+      members = [{ name: userName, email: userEmail }];
+      room.memberList = members;
+      syncRoomMembersText(room);
+    }
+
+    var memberRows = members.map(function (member) {
+      return {
+        company_id: companyId,
+        room_id: room.id,
+        user_name: member.name || member.email || '',
+        user_email: member.email || '',
+        role: member.role || '',
+        language: member.language || 'ko'
+      };
+    });
+
+    if (memberRows.length) {
+      var memberResult = await sb.from('aic_room_members').insert(memberRows);
+      if (memberResult.error) throw memberResult.error;
+    }
+  }
+
+  async function insertMessageToServer(room, message) {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+    if (!sb || !companyId || !room || !message) return;
+
+    var messageResult = await sb.from('aic_messages').insert({
+      company_id: companyId,
+      room_id: room.id,
+      sender_name: message.sender || getCurrentUserName(),
+      sender_email: getCurrentUserEmail(),
+      original: message.original || '',
+      translated: message.translated || ''
+    }).select('id, created_at').maybeSingle();
+
+    if (messageResult.error) throw messageResult.error;
+
+    if (messageResult.data) {
+      message.id = messageResult.data.id || message.id;
+      message.created_at = messageResult.data.created_at || message.created_at;
+    }
+
+    try {
+      await sb
+        .from('aic_rooms')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('company_id', companyId)
+        .eq('id', room.id);
+    } catch (_) {}
+  }
+
+  async function insertParticipantToServer(room, member) {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+    if (!sb || !companyId || !room || !member) return null;
+
+    var result = await sb.from('aic_room_members').insert({
+      company_id: companyId,
+      room_id: room.id,
+      user_name: member.name || member.email || '',
+      user_email: member.email || '',
+      role: member.role || '',
+      language: member.language || 'ko'
+    }).select('id').maybeSingle();
+
+    if (result.error) throw result.error;
+    return result.data?.id || null;
+  }
+
+  async function deleteParticipantFromServer(room, member) {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+    if (!sb || !companyId || !room || !member) return;
+
+    var query = sb
+      .from('aic_room_members')
+      .delete()
+      .eq('company_id', companyId)
+      .eq('room_id', room.id);
+
+    if (member.id) {
+      query = query.eq('id', member.id);
+    } else if (member.email) {
+      query = query.eq('user_email', member.email);
+    } else {
+      query = query.eq('user_name', member.name || '');
+    }
+
+    var result = await query;
+    if (result.error) throw result.error;
+  }
+
 
   function getToneLabel(value) {
     return ({
@@ -257,6 +576,11 @@
   function renderRoomList() {
     if (!els.roomList) return;
 
+    if (!state.rooms.length) {
+      els.roomList.innerHTML = '<div class="aic-empty-message">회의방이 없습니다.<br>+ 버튼으로 새 회의방을 생성하세요.</div>';
+      return;
+    }
+
     els.roomList.innerHTML = state.rooms.map(function (room) {
       var slotIndex = getOpenSlotIndex(room.id);
       var open = slotIndex >= 0;
@@ -391,7 +715,7 @@
     });
   }
 
-  function sendMessage(slotIndex) {
+  async function sendMessage(slotIndex) {
     var slot = state.openSlots[slotIndex];
     if (!slot) return;
 
@@ -404,15 +728,23 @@
 
     if (!text) return;
 
-    room.messages.push({
+    var message = {
       type: 'me',
       sender: getCurrentUserName(),
       original: text,
       translated: fakeTranslate(text, lang ? lang.value : state.settings.defaultLang)
-    });
+    };
+
+    room.messages.push(message);
 
     if (input) input.value = '';
     render(false);
+
+    try {
+      await insertMessageToServer(room, message);
+    } catch (error) {
+      alert('메시지 저장 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
+    }
   }
 
 
@@ -499,7 +831,7 @@
     });
   }
 
-  function addParticipant() {
+  async function addParticipant() {
     var room = getRoom(state.activeParticipantsRoomId);
     if (!room) return;
 
@@ -520,7 +852,17 @@
       return;
     }
 
-    members.push({ name: name, email: email });
+    var member = { name: name, email: email };
+
+    try {
+      var savedId = await insertParticipantToServer(room, member);
+      if (savedId) member.id = savedId;
+    } catch (error) {
+      alert('참여자 저장 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
+      return;
+    }
+
+    members.push(member);
     syncRoomMembersText(room);
 
     if (els.participantName) els.participantName.value = '';
@@ -530,11 +872,21 @@
     render(false);
   }
 
-  function removeParticipant(index) {
+  async function removeParticipant(index) {
     var room = getRoom(state.activeParticipantsRoomId);
     if (!room) return;
 
     var members = getRoomMembers(room);
+    var member = members[index];
+    if (!member) return;
+
+    try {
+      await deleteParticipantFromServer(room, member);
+    } catch (error) {
+      alert('참여자 삭제 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
+      return;
+    }
+
     members.splice(index, 1);
     syncRoomMembersText(room);
 
@@ -555,17 +907,34 @@
     if (els.roomModal) els.roomModal.hidden = true;
   }
 
-  function createRoom() {
+  async function createRoom() {
     var name = (els.newRoomName && els.newRoomName.value || '').trim() || tr('aic.newRoomDefaultName', '새 회의방');
-    var members = (els.newRoomMembers && els.newRoomMembers.value || '').trim() || (getCurrentUserName() + ' · 참여자');
+    var membersText = (els.newRoomMembers && els.newRoomMembers.value || '').trim() || getCurrentUserName();
     var id = 'room_' + Date.now();
 
-    state.rooms.unshift({
+    var room = {
       id: id,
       name: name,
-      members: members,
+      members: membersText,
+      memberList: splitMembers(membersText).map(function (memberName) {
+        return { name: memberName, email: '' };
+      }),
       messages: []
-    });
+    };
+
+    if (!room.memberList.length) {
+      room.memberList = [{ name: getCurrentUserName(), email: getCurrentUserEmail() }];
+      syncRoomMembersText(room);
+    }
+
+    try {
+      await insertRoomToServer(room);
+    } catch (error) {
+      alert('회의방 저장 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
+      return;
+    }
+
+    state.rooms.unshift(room);
 
     if (els.newRoomName) els.newRoomName.value = '';
     if (els.newRoomMembers) els.newRoomMembers.value = '';
@@ -643,8 +1012,13 @@
 
     window.addEventListener('message', function (event) {
       var data = event && event.data ? event.data : {};
+      if (data.type === 'portal-auth') {
+        loadRoomsFromServer();
+        scheduleRender();
+        return;
+      }
+
       if (
-        data.type === 'portal-auth' ||
         data.type === 'portal-tabs-request' ||
         data.type === 'portal-frame-active' ||
         data.type === 'portal-layout-refresh'
@@ -739,6 +1113,7 @@
     }
 
     scheduleRender();
+    loadRoomsFromServer();
 
     if (window.aicNotifyTabsReady) {
       window.aicNotifyTabsReady();
