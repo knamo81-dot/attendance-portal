@@ -37,65 +37,7 @@
     preferredSlotCount: CONFIG.slotPolicy.defaultVisibleSlots,
     openSlots: [],
     settings: loadSettings(),
-    rooms: [
-      {
-        id: 'r1',
-        name: 'Global R&D',
-        members: '김남호 · Global Director',
-        messages: [
-          {
-            type: 'me',
-            sender: '김남호',
-            original: '이번 폐수 보고서 관련해서 확인 부탁드립니다.',
-            translated: 'Please review the wastewater report.'
-          },
-          {
-            type: 'other',
-            sender: 'Global Director',
-            original: 'I will check it this afternoon.',
-            translated: '오늘 오후에 확인하겠습니다.'
-          },
-          {
-            type: 'me',
-            sender: '김남호',
-            original: '감사합니다. 수정 후 다시 공유드리겠습니다.',
-            translated: 'Thank you. I will share the revised version again.'
-          }
-        ]
-      },
-      {
-        id: 'r2',
-        name: 'Wastewater Review',
-        members: '김남호 · Reviewer',
-        messages: [
-          {
-            type: 'me',
-            sender: '김남호',
-            original: '4월 보고서 검토 요청드립니다.',
-            translated: 'Please review the April report.'
-          }
-        ]
-      },
-      {
-        id: 'r3',
-        name: 'QA Quick Check',
-        members: '김남호 · QA',
-        messages: [
-          {
-            type: 'other',
-            sender: 'QA',
-            original: 'Can you share the test condition?',
-            translated: '시험 조건을 공유해주실 수 있나요?'
-          }
-        ]
-      },
-      {
-        id: 'r4',
-        name: 'Raw Material Talk',
-        members: '김남호 · Supplier',
-        messages: []
-      }
-    ]
+    rooms: []
   };
 
   function $(id) {
