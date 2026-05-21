@@ -128,19 +128,60 @@
   function normalizeDbMessage(message) {
     var currentEmail = getCurrentUserEmail();
     var senderEmail = String(message.sender_email || '').trim();
+    var original = message.original || '';
     return {
       id: message.id || '',
       type: senderEmail && currentEmail && senderEmail === currentEmail ? 'me' : 'other',
       sender: message.sender_name || senderEmail || '상대방',
-      original: message.original || '',
+      original: original,
       translated: message.translated || '',
+      source_lang: message.source_lang || detectTextLanguage(original),
       created_at: message.created_at || ''
     };
+  }
+
+  function detectTextLanguage(text) {
+    var value = String(text || '').trim();
+    if (!value) return 'auto';
+
+    var koreanCount = (value.match(/[가-힣]/g) || []).length;
+    var latinCount = (value.match(/[A-Za-z]/g) || []).length;
+
+    if (koreanCount > 0 && koreanCount >= latinCount * 0.25) return 'ko';
+    if (latinCount > 0) return 'en';
+
+    return state.settings.defaultLang || getCurrentLang() || 'ko';
+  }
+
+  function getViewerLanguage() {
+    var lang = String(
+      getCurrentLang() ||
+      state.settings.defaultLang ||
+      'ko'
+    ).toLowerCase();
+
+    if (lang.indexOf('en') === 0) return 'en';
+    return 'ko';
+  }
+
+  function getPreferredMessageText(msg) {
+    var original = String(msg?.original || '');
+    var translated = String(msg?.translated || '');
+    var sourceLang = msg?.source_lang || detectTextLanguage(original);
+    var viewerLang = getViewerLanguage();
+
+    // 내 언어와 원문 언어가 같으면 원문을 보여주고,
+    // 다르면 번역문을 보여줍니다.
+    if (sourceLang === viewerLang) return original || translated;
+    return translated || original;
   }
 
   async function translateWithAi(text, sourceLang, room) {
     if (!String(text || '').trim()) return '';
     if (!state.settings.autoTranslate) return tr('aic.autoTranslateOff', '자동번역 OFF 상태입니다.');
+
+    var detectedSourceLang = detectTextLanguage(text);
+    var requestedSourceLang = sourceLang || state.settings.defaultLang || detectedSourceLang || 'auto';
 
     try {
       var response = await fetch(getAicTranslateEndpoint(), {
@@ -148,7 +189,10 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: text,
-          sourceLang: sourceLang || state.settings.defaultLang || 'ko',
+          sourceLang: requestedSourceLang,
+          detectedSourceLang: detectedSourceLang,
+          viewerLang: getViewerLanguage(),
+          targetLang: detectedSourceLang === 'ko' ? 'en' : 'ko',
           direction: state.settings.direction || 'auto',
           tone: state.settings.tone || 'business',
           display: state.settings.display || 'both',
@@ -663,12 +707,14 @@
       }),
       messages: messages.map(function (message) {
         var senderEmail = String(message.sender_email || '').trim();
+        var original = message.original || '';
         return {
           id: message.id || '',
           type: senderEmail && currentEmail && senderEmail === currentEmail ? 'me' : 'other',
           sender: message.sender_name || senderEmail || '상대방',
-          original: message.original || '',
+          original: original,
           translated: message.translated || '',
+          source_lang: message.source_lang || detectTextLanguage(original),
           created_at: message.created_at || ''
         };
       })
@@ -1328,15 +1374,32 @@
 
   function buildMessage(msg) {
     var displayMode = state.settings.display || 'both';
-    var showOriginal = displayMode === 'both' || displayMode === 'original';
-    var showTranslated = displayMode === 'both' || displayMode === 'translated';
     var sender = msg.sender || (msg.type === 'me' ? getCurrentUserName() : '상대방');
+    var preferredText = getPreferredMessageText(msg);
+
+    if (displayMode === 'original') {
+      return [
+        '<div class="aic-message ', msg.type === 'me' ? 'me' : 'other', '">',
+        '  <div class="aic-message-name">', esc(sender), '</div>',
+        '  <div class="aic-message-original">', esc(msg.original), '</div>',
+        '</div>'
+      ].join('');
+    }
+
+    if (displayMode === 'translated') {
+      return [
+        '<div class="aic-message ', msg.type === 'me' ? 'me' : 'other', '">',
+        '  <div class="aic-message-name">', esc(sender), '</div>',
+        '  <div class="aic-message-original">', esc(preferredText), '</div>',
+        '</div>'
+      ].join('');
+    }
 
     return [
       '<div class="aic-message ', msg.type === 'me' ? 'me' : 'other', '">',
       '  <div class="aic-message-name">', esc(sender), '</div>',
-      showOriginal ? '<div class="aic-message-original">' + esc(msg.original) + '</div>' : '',
-      showTranslated ? '<div class="aic-message-translated">' + esc(msg.translated) + '</div>' : '',
+      '  <div class="aic-message-original">', esc(msg.original), '</div>',
+      '  <div class="aic-message-translated">', esc(msg.translated), '</div>',
       '</div>'
     ].join('');
   }
@@ -1481,6 +1544,7 @@
       sender: getCurrentUserName(),
       original: text,
       translated: tr('aic.searching', '검색 중입니다...'),
+      source_lang: detectTextLanguage(text),
       created_at: new Date().toISOString()
     };
 
