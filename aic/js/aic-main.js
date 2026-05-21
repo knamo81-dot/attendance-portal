@@ -161,23 +161,75 @@
   }
 
 
+  function isCodeLike(value) {
+    var text = String(value || '').trim();
+    if (!text) return false;
+    return /^[A-Z]{1,5}\d{1,4}(-\d{1,4})?$/i.test(text);
+  }
+
   function getEmployeeDepartment(row) {
-    return row.department || row.department_name || row.division_name || row.division || row.division_code || row.headquarters || row.headquarter || row.org_name || row.organization || row.bonbu || '';
+    var candidates = [
+      row.department_name,
+      row.department,
+      row.division_name,
+      row.headquarters,
+      row.headquarter,
+      row.org_name,
+      row.organization,
+      row.bonbu,
+      row.division
+    ];
+
+    for (var i = 0; i < candidates.length; i++) {
+      var value = String(candidates[i] || '').trim();
+      if (value && !isCodeLike(value)) return value;
+    }
+
+    return '';
   }
 
   function getEmployeeTeam(row) {
-    return row.team || row.team_name || row.team_code || row.group_name || row.part || row.part_name || '';
+    var candidates = [
+      row.team,
+      row.team_name,
+      row.group_name,
+      row.part_name,
+      row.part
+    ];
+
+    for (var i = 0; i < candidates.length; i++) {
+      var value = String(candidates[i] || '').trim();
+      if (value && !isCodeLike(value)) return value;
+    }
+
+    return '';
+  }
+
+  function getPersonName(row) {
+    var value = String(row.name || row.user_name || row.display_name || '').trim();
+    if (value && value.indexOf('@') < 0) return value;
+    return String(row.email || row.user_email || '').trim();
   }
 
   function normalizePerson(row) {
     return {
       id: row.id || row.employee_no || row.employeeNo || row.email || row.user_email || '',
-      name: row.name || row.user_name || row.display_name || row.email || row.user_email || '',
+      employee_no: row.employee_no || row.employeeNo || '',
+      name: getPersonName(row),
       email: row.email || row.user_email || '',
       department: getEmployeeDepartment(row),
       team: getEmployeeTeam(row),
       position: row.position || row.job_title || row.title || '',
-      language: row.preferred_language || row.language || 'ko'
+      language: row.preferred_language || row.language || 'ko',
+      _searchText: [
+        row.name, row.user_name, row.display_name,
+        row.email, row.user_email,
+        row.employee_no, row.employeeNo,
+        row.division_code, row.team_code,
+        row.department, row.department_name,
+        row.team, row.team_name,
+        row.position, row.job_title, row.title
+      ].join(' ').toLowerCase()
     };
   }
 
@@ -266,7 +318,9 @@
             person.email,
             person.department,
             person.team,
-            person.position
+            person.position,
+            person.employee_no,
+            person._searchText
           ].join(' ').toLowerCase();
 
           if (searchTarget.indexOf(q) >= 0) {
@@ -284,6 +338,66 @@
     await runTableSearch('profiles');
 
     return uniquePeople(results).slice(0, 50);
+  }
+
+  async function loadPeopleIndex() {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+    var people = [];
+
+    if (!sb) return { byEmail: {}, byName: {} };
+
+    async function loadTable(tableName) {
+      try {
+        var query = sb.from(tableName).select('*').limit(500);
+        if (companyId) query = query.eq('company_id', companyId);
+
+        var response = await query;
+        if (!response.error && Array.isArray(response.data)) {
+          response.data.forEach(function (row) {
+            people.push(normalizePerson(row));
+          });
+        }
+      } catch (_) {}
+    }
+
+    await loadTable('employees');
+    await loadTable('users');
+    await loadTable('profiles');
+
+    people = uniquePeople(people);
+
+    var byEmail = {};
+    var byName = {};
+
+    people.forEach(function (person) {
+      var emailKey = String(person.email || '').trim().toLowerCase();
+      var nameKey = String(person.name || '').trim().toLowerCase();
+
+      if (emailKey && !byEmail[emailKey]) byEmail[emailKey] = person;
+      if (nameKey && !byName[nameKey]) byName[nameKey] = person;
+    });
+
+    return { byEmail: byEmail, byName: byName };
+  }
+
+  function enrichMemberRow(member, peopleIndex) {
+    var emailKey = String(member.user_email || member.email || '').trim().toLowerCase();
+    var nameKey = String(member.user_name || member.name || '').trim().toLowerCase();
+
+    var person = (emailKey && peopleIndex.byEmail[emailKey]) ||
+      (nameKey && peopleIndex.byName[nameKey]) ||
+      null;
+
+    if (!person) return member;
+
+    return Object.assign({}, member, {
+      user_name: person.name || member.user_name || member.user_email || '',
+      user_email: person.email || member.user_email || '',
+      department: person.department || member.department || '',
+      team: person.team || member.team || '',
+      position: person.position || member.position || ''
+    });
   }
 
   function showDbWarn(message) {
@@ -382,8 +496,13 @@
 
       if (messagesResult.error) throw messagesResult.error;
 
+      var peopleIndex = await loadPeopleIndex();
+      var enrichedMembers = (membersResult.data || []).map(function (member) {
+        return enrichMemberRow(member, peopleIndex);
+      });
+
       var membersByRoom = {};
-      (membersResult.data || []).forEach(function (member) {
+      enrichedMembers.forEach(function (member) {
         var roomId = String(member.room_id || '');
         if (!membersByRoom[roomId]) membersByRoom[roomId] = [];
         membersByRoom[roomId].push(member);
@@ -506,6 +625,9 @@
       room_id: room.id,
       user_name: member.name || member.email || '',
       user_email: member.email || '',
+      department: member.department || '',
+      team: member.team || '',
+      position: member.position || '',
       role: member.role || '',
       language: member.language || 'ko'
     }).select('id').maybeSingle();
@@ -994,16 +1116,22 @@
     return room.memberList;
   }
 
+  function getDisplayName(person) {
+    return String(person.name || person.email || '').trim();
+  }
+
   function syncRoomMembersText(room) {
     if (!room) return;
     room.members = getRoomMembers(room).map(function (member) {
-      return member.name || member.email || '';
+      return getDisplayName(member);
     }).filter(Boolean).join(' · ');
   }
 
   function renderPersonMeta(person) {
     var orgText = [person.department, person.team, person.position]
-      .filter(Boolean)
+      .filter(function (value) {
+        return value && !isCodeLike(value);
+      })
       .join(' / ');
 
     if (orgText) return orgText;
@@ -1319,7 +1447,7 @@
       name: name,
       created_by_email: getCurrentUserEmail(),
       created_by_name: getCurrentUserName(),
-      members: selectedMembers.map(function (member) { return member.name || member.email || ''; }).filter(Boolean).join(' · '),
+      members: selectedMembers.map(function (member) { return getDisplayName(member); }).filter(Boolean).join(' · '),
       memberList: selectedMembers,
       messages: []
     };
