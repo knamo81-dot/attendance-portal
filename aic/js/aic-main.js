@@ -74,6 +74,21 @@
     return fallback;
   }
 
+  function getCurrentLang() {
+    return String(
+      window.I18N?.currentLang ||
+      localStorage.getItem('portal_lang') ||
+      localStorage.getItem('i18n.lang') ||
+      'ko'
+    ).trim() || 'ko';
+  }
+
+  function trKey(key, fallback) {
+    if (!key) return fallback || '';
+    var value = tr(key, fallback || '');
+    return value && value !== key ? value : (fallback || '');
+  }
+
   function loadSettings() {
     try {
       var raw = localStorage.getItem('aic_user_settings');
@@ -174,12 +189,20 @@
   function getDivisionNameByCode(code) {
     var key = String(code || '').trim();
     if (!key) return '';
+
+    var i18nName = trKey('org.' + key, '');
+    if (i18nName) return i18nName;
+
     return state.orgMaps.divisions[key] || '';
   }
 
   function getTeamNameByCode(code) {
     var key = String(code || '').trim();
     if (!key) return '';
+
+    var i18nName = trKey('team.' + key, '');
+    if (i18nName) return i18nName;
+
     return state.orgMaps.teams[key] || '';
   }
 
@@ -233,6 +256,30 @@
     return String(row.email || row.user_email || '').trim();
   }
 
+  function translatePosition(row) {
+    var raw = String(row.position || row.grade || row.job_title || row.title || '').trim();
+    if (!raw) return '';
+
+    var duty = String(row.duty || row.authority || '').trim();
+    var divisionCode = String(row.division_code || '').trim();
+
+    if (duty === '소장') {
+      if (divisionCode === 'AB01') return trKey('position.소장.Global', raw);
+      return trKey('position.소장.Central', raw);
+    }
+
+    if (duty === '부소장') {
+      if (divisionCode === 'AB01') return trKey('position.부소장.Global', raw);
+      return trKey('position.부소장.Central', raw);
+    }
+
+    if (duty === '팀장') {
+      return trKey('position.팀장', raw);
+    }
+
+    return trKey('grade.' + raw, raw);
+  }
+
   function normalizePerson(row) {
     return {
       id: row.id || row.employee_no || row.employeeNo || row.email || row.user_email || '',
@@ -241,7 +288,7 @@
       email: row.email || row.user_email || '',
       department: getEmployeeDepartment(row),
       team: getEmployeeTeam(row),
-      position: row.position || row.grade || row.job_title || row.title || '',
+      position: translatePosition(row),
       language: row.preferred_language || row.language || 'ko',
       _searchText: [
         row.name, row.user_name, row.display_name,
@@ -1082,8 +1129,8 @@
         '    </div>',
         '    <div class="aic-chat-actions">',
         '      <button class="aic-chat-action pin', slot.pinned ? ' active' : '', '" data-pin-slot="', i, '" type="button">', slot.pinned ? tr('aic.pinned', '고정됨') : tr('aic.pin', '고정'), '</button>',
-        '      <button class="aic-chat-action" data-invite-slot="', i, '" type="button">참여자</button>',
-        '      <button class="aic-chat-action dark" data-close-slot="', i, '" type="button">닫기</button>',
+        '      <button class="aic-chat-action" data-invite-slot="', i, '" type="button">', tr('aic.participants', '참여자'), '</button>',
+        '      <button class="aic-chat-action dark" data-close-slot="', i, '" type="button">', tr('aic.close', '닫기'), '</button>',
         '    </div>',
         '  </div>',
         '  <div class="aic-messages" data-message-box="', i, '">', messages, '</div>',
@@ -1093,7 +1140,7 @@
         '      <option value="en"', state.settings.defaultLang === 'en' ? ' selected' : '', '>English</option>',
         '    </select>',
         '    <input class="module-input" data-input-slot="', i, '" placeholder="', tr('aic.inputPlaceholder', '메시지를 입력하세요'), '" />',
-        '    <button class="module-btn accent aic-send-btn" data-send-slot="', i, '" type="button">전송</button>',
+        '    <button class="module-btn accent aic-send-btn" data-send-slot="', i, '" type="button">', tr('aic.send', '전송'), '</button>',
         '  </div>',
         '</section>'
       ].join('');
@@ -1260,7 +1307,7 @@
       '    <div class="aic-participant-name">', esc(person.name || person.email || '-'), '</div>',
       '    <div class="aic-participant-meta">', esc(renderPersonMeta(person)), '</div>',
       '  </div>',
-      '  <button class="aic-selected-remove" type="button" data-remove-selected-context="', context, '" data-remove-selected="', esc(personKey(person)), '">삭제</button>',
+      '  <button class="aic-selected-remove" type="button" data-remove-selected-context="', context, '" data-remove-selected="', esc(personKey(person)), '">', tr('aic.delete', '삭제'), '</button>',
       '</div>'
     ].join('');
   }
@@ -1442,7 +1489,7 @@
         '    <div class="aic-participant-name">', esc(member.name || member.email || '-'), '</div>',
         '    <div class="aic-participant-meta">', esc(renderPersonMeta(member)), '</div>',
         '  </div>',
-        '  <button class="aic-participant-remove" type="button" data-remove-participant="', index, '">삭제</button>',
+        '  <button class="aic-participant-remove" type="button" data-remove-participant="', index, '">', tr('aic.delete', '삭제'), '</button>',
         '</div>'
       ].join('');
     }).join('');
