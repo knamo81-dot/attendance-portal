@@ -187,6 +187,12 @@
     return translated || original;
   }
 
+  function buildMessageFooter(msg) {
+    var timeText = formatMessageTime(msg?.created_at);
+    if (!timeText) return '';
+    return '<div class="aic-message-time">' + esc(timeText) + '</div>';
+  }
+
   async function translateWithAi(text, sourceLang, room) {
     if (!String(text || '').trim()) return '';
     if (!state.settings.autoTranslate) return tr('aic.autoTranslateOff', '자동번역 OFF 상태입니다.');
@@ -308,6 +314,24 @@
     if (sameDate) return hh + ':' + mm;
     if (isYesterday) return '어제';
     return String(time.getMonth() + 1) + '/' + String(time.getDate());
+  }
+
+  function formatMessageTime(value) {
+    var time = value ? new Date(value) : null;
+    if (!time || Number.isNaN(time.getTime())) return '';
+
+    var now = new Date();
+    var sameDate =
+      time.getFullYear() === now.getFullYear() &&
+      time.getMonth() === now.getMonth() &&
+      time.getDate() === now.getDate();
+
+    var hh = String(time.getHours()).padStart(2, '0');
+    var mm = String(time.getMinutes()).padStart(2, '0');
+
+    if (sameDate) return hh + ':' + mm;
+
+    return String(time.getMonth() + 1) + '/' + String(time.getDate()) + ' ' + hh + ':' + mm;
   }
 
   function getRoomPreviewText(room) {
@@ -1555,6 +1579,7 @@
       '  <div class="aic-message-name">', esc(sender), '</div>',
       '  <div class="aic-message-original">', esc(msg.original), '</div>',
       '  <div class="aic-message-translated">', esc(msg.translated), '</div>',
+      buildMessageFooter(msg),
       '</div>'
     ].join('');
   }
