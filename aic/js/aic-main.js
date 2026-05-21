@@ -117,6 +117,14 @@
       // 내가 보낸 임시 메시지가 DB 저장 후 Realtime으로 다시 들어오는 경우 중복 표시 방지
       var itemId = String(item.id || '').trim();
       if (itemId.indexOf('temp_') === 0) {
+        var itemEmail = String(item.sender_email || '').trim().toLowerCase();
+        var messageEmail = String(message.sender_email || '').trim().toLowerCase();
+
+        if (itemEmail && messageEmail && itemEmail === messageEmail &&
+          String(item.original || '').trim() === original) {
+          return true;
+        }
+
         return String(item.sender || '').trim() === sender &&
           String(item.original || '').trim() === original;
       }
@@ -133,6 +141,7 @@
       id: message.id || '',
       type: senderEmail && currentEmail && senderEmail === currentEmail ? 'me' : 'other',
       sender: message.sender_name || senderEmail || '상대방',
+      sender_email: senderEmail,
       original: original,
       translated: message.translated || '',
       source_lang: message.source_lang || detectTextLanguage(original),
@@ -712,6 +721,7 @@
           id: message.id || '',
           type: senderEmail && currentEmail && senderEmail === currentEmail ? 'me' : 'other',
           sender: message.sender_name || senderEmail || '상대방',
+          sender_email: senderEmail,
           original: original,
           translated: message.translated || '',
           source_lang: message.source_lang || detectTextLanguage(original),
@@ -1142,8 +1152,17 @@
     room.messages = Array.isArray(room.messages) ? room.messages : [];
 
     var tempIndex = room.messages.findIndex(function (item) {
-      return String(item.id || '').indexOf('temp_') === 0 &&
-        String(item.sender || '').trim() === String(message.sender || '').trim() &&
+      if (String(item.id || '').indexOf('temp_') !== 0) return false;
+
+      var itemEmail = String(item.sender_email || '').trim().toLowerCase();
+      var messageEmail = String(message.sender_email || '').trim().toLowerCase();
+
+      if (itemEmail && messageEmail && itemEmail === messageEmail &&
+        String(item.original || '').trim() === String(message.original || '').trim()) {
+        return true;
+      }
+
+      return String(item.sender || '').trim() === String(message.sender || '').trim() &&
         String(item.original || '').trim() === String(message.original || '').trim();
     });
 
@@ -1372,9 +1391,9 @@
     });
   }
 
-  function buildMessage(msg) {
+  function buildMessage(room, msg) {
     var displayMode = state.settings.display || 'both';
-    var sender = msg.sender || (msg.type === 'me' ? getCurrentUserName() : '상대방');
+    var sender = getMessageSenderName(room, msg);
     var preferredText = getPreferredMessageText(msg);
 
     if (displayMode === 'original') {
@@ -1423,7 +1442,9 @@
         continue;
       }
 
-      var messages = room.messages.map(buildMessage).join('');
+      var messages = room.messages.map(function (message) {
+        return buildMessage(room, message);
+      }).join('');
       if (!messages) {
         messages = '<div class="aic-empty-message">' + tr('aic.noMessages', '아직 메시지가 없습니다.') + '<br>' + tr('aic.writeMessageGuide', '아래 입력창으로 메시지를 작성하세요.') + '</div>';
       }
@@ -1542,6 +1563,7 @@
       id: tempId,
       type: 'me',
       sender: getCurrentUserName(),
+      sender_email: getCurrentUserEmail(),
       original: text,
       translated: tr('aic.searching', '검색 중입니다...'),
       source_lang: detectTextLanguage(text),
@@ -1580,6 +1602,31 @@
 
   function getDisplayName(person) {
     return String(person.name || person.email || '').trim();
+  }
+
+  function getMessageSenderName(room, msg) {
+    var fallback = String(msg?.sender || '').trim() || (msg?.type === 'me' ? getCurrentUserName() : '상대방');
+    var senderEmail = String(msg?.sender_email || '').trim().toLowerCase();
+
+    if (room && senderEmail) {
+      var members = getRoomMembers(room);
+      var matched = members.find(function (member) {
+        return String(member.email || '').trim().toLowerCase() === senderEmail;
+      });
+
+      if (matched && String(matched.name || '').trim()) {
+        return String(matched.name || '').trim();
+      }
+    }
+
+    // 이메일 앞부분이나 시스템 아이디처럼 저장된 이름이면, 현재 사용자 정보에서 한 번 더 보정
+    var currentEmail = String(getCurrentUserEmail() || '').trim().toLowerCase();
+    if (senderEmail && currentEmail && senderEmail === currentEmail) {
+      var currentName = String(getCurrentUserName() || '').trim();
+      if (currentName && currentName.indexOf('@') < 0) return currentName;
+    }
+
+    return fallback;
   }
 
   function syncRoomMembersText(room) {
