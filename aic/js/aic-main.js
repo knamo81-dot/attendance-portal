@@ -49,6 +49,8 @@
       divisions: {},
       teams: {}
     },
+    realtimeChannel: null,
+    realtimeReady: false,
     dbReady: false,
     dbLoading: false
   };
@@ -87,6 +89,74 @@
     if (!key) return fallback || '';
     var value = tr(key, fallback || '');
     return value && value !== key ? value : (fallback || '');
+  }
+
+  function getAicTranslateEndpoint() {
+    return String(window.AIC_API?.translateEndpoint || '/api/aic-translate').trim() || '/api/aic-translate';
+  }
+
+  function getAicClientId() {
+    if (!window.__aicClientId) {
+      window.__aicClientId = 'aic_' + Date.now() + '_' + Math.random().toString(16).slice(2);
+    }
+    return window.__aicClientId;
+  }
+
+  function hasMessage(room, message) {
+    if (!room || !message) return false;
+    var id = String(message.id || '').trim();
+
+    return (room.messages || []).some(function (item) {
+      if (id && String(item.id || '').trim() === id) return true;
+      return false;
+    });
+  }
+
+  function normalizeDbMessage(message) {
+    var currentEmail = getCurrentUserEmail();
+    var senderEmail = String(message.sender_email || '').trim();
+    return {
+      id: message.id || '',
+      type: senderEmail && currentEmail && senderEmail === currentEmail ? 'me' : 'other',
+      sender: message.sender_name || senderEmail || '상대방',
+      original: message.original || '',
+      translated: message.translated || '',
+      created_at: message.created_at || ''
+    };
+  }
+
+  async function translateWithAi(text, sourceLang, room) {
+    if (!String(text || '').trim()) return '';
+    if (!state.settings.autoTranslate) return tr('aic.autoTranslateOff', '자동번역 OFF 상태입니다.');
+
+    try {
+      var response = await fetch(getAicTranslateEndpoint(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: text,
+          sourceLang: sourceLang || state.settings.defaultLang || 'ko',
+          direction: state.settings.direction || 'auto',
+          tone: state.settings.tone || 'business',
+          display: state.settings.display || 'both',
+          roomId: room?.id || '',
+          roomName: room?.name || '',
+          senderName: getCurrentUserName(),
+          senderEmail: getCurrentUserEmail()
+        })
+      });
+
+      var data = await response.json().catch(function () { return {}; });
+
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || ('AI 번역 실패: HTTP ' + response.status));
+      }
+
+      return data.translated || data.translation || '';
+    } catch (error) {
+      console.warn('[AIC AI]', error);
+      return fakeTranslate(text, sourceLang || state.settings.defaultLang);
+    }
   }
 
   function loadSettings() {
@@ -672,6 +742,7 @@
       });
 
       state.dbReady = true;
+      subscribeRealtime();
       render(true);
     } catch (error) {
       state.dbReady = false;
@@ -745,7 +816,7 @@
       sender_email: getCurrentUserEmail(),
       original: message.original || '',
       translated: message.translated || ''
-    }).select('id, created_at').maybeSingle();
+    }).select('id, created_at, sender_name, sender_email, original, translated, room_id').maybeSingle();
 
     if (messageResult.error) throw messageResult.error;
 
@@ -872,6 +943,101 @@
     render(false);
   }
 
+
+  function subscribeRealtime() {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+
+    if (!sb || !companyId || typeof sb.channel !== 'function') return;
+
+    unsubscribeRealtime();
+
+    var channelName = 'aic-chat-' + companyId;
+
+    state.realtimeChannel = sb
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'aic_messages',
+          filter: 'company_id=eq.' + companyId
+        },
+        function (payload) {
+          handleRealtimeMessage(payload.new || {});
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'aic_room_members',
+          filter: 'company_id=eq.' + companyId
+        },
+        function () {
+          loadRoomsFromServer();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'aic_rooms',
+          filter: 'company_id=eq.' + companyId
+        },
+        function () {
+          loadRoomsFromServer();
+        }
+      )
+      .subscribe(function (status) {
+        state.realtimeReady = status === 'SUBSCRIBED';
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[AIC Realtime]', status);
+        }
+      });
+  }
+
+  function unsubscribeRealtime() {
+    var sb = getSupabaseClient();
+
+    if (state.realtimeChannel && sb && typeof sb.removeChannel === 'function') {
+      try {
+        sb.removeChannel(state.realtimeChannel);
+      } catch (_) {}
+    }
+
+    state.realtimeChannel = null;
+    state.realtimeReady = false;
+  }
+
+  function handleRealtimeMessage(row) {
+    if (!row || !row.room_id) return;
+
+    var roomId = String(row.room_id || '');
+    var room = getRoom(roomId);
+
+    if (!room) {
+      loadRoomsFromServer();
+      return;
+    }
+
+    var message = normalizeDbMessage(row);
+
+    if (hasMessage(room, message)) return;
+
+    room.messages = Array.isArray(room.messages) ? room.messages : [];
+    room.messages.push(message);
+
+    // 최신 메시지가 들어온 회의방을 목록 상단으로 이동합니다.
+    state.rooms = [room].concat(state.rooms.filter(function (item) {
+      return item.id !== room.id;
+    }));
+
+    render(false);
+  }
 
   function getToneLabel(value) {
     return ({
@@ -1227,25 +1393,30 @@
 
     if (!text) return;
 
+    if (input) input.value = '';
+
+    var tempId = 'temp_' + Date.now() + '_' + Math.random().toString(16).slice(2);
     var message = {
+      id: tempId,
       type: 'me',
       sender: getCurrentUserName(),
       original: text,
-      translated: fakeTranslate(text, lang ? lang.value : state.settings.defaultLang)
+      translated: tr('aic.searching', '검색 중입니다...'),
+      created_at: new Date().toISOString()
     };
 
     room.messages.push(message);
-
-    if (input) input.value = '';
     render(false);
 
     try {
+      message.translated = await translateWithAi(text, lang ? lang.value : state.settings.defaultLang, room);
+      render(false);
+
       await insertMessageToServer(room, message);
     } catch (error) {
       alert('메시지 저장 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
     }
   }
-
 
   function splitMembers(value) {
     return String(value || '')
@@ -1710,7 +1881,14 @@
     window.addEventListener('load', scheduleRender);
     window.addEventListener('pageshow', scheduleRender);
     document.addEventListener('visibilitychange', function () {
-      if (!document.hidden) scheduleRender();
+      if (!document.hidden) {
+        scheduleRender();
+        subscribeRealtime();
+      }
+    });
+
+    window.addEventListener('beforeunload', function () {
+      unsubscribeRealtime();
     });
   }
 
