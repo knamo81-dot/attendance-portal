@@ -54,6 +54,8 @@
     realtimeReady: false,
     realtimeSubscribing: false,
     realtimeResubscribeTimer: null,
+    readMap: loadReadMap(),
+    readSaveTimer: null,
     dbReady: false,
     dbLoading: false
   };
@@ -237,6 +239,130 @@
     try {
       localStorage.setItem('aic_user_settings', JSON.stringify(state.settings));
     } catch (_) {}
+  }
+
+  function getReadStorageKey() {
+    var companyId = getCompanyId();
+    var email = getCurrentUserEmail();
+    return 'aic_read_map__' + (companyId || 'default') + '__' + (email || 'anonymous');
+  }
+
+  function loadReadMap() {
+    return {};
+  }
+
+  function reloadReadMap() {
+    try {
+      var raw = localStorage.getItem(getReadStorageKey());
+      state.readMap = raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      state.readMap = {};
+    }
+  }
+
+  function saveReadMap() {
+    clearTimeout(state.readSaveTimer);
+    state.readSaveTimer = setTimeout(function () {
+      try {
+        localStorage.setItem(getReadStorageKey(), JSON.stringify(state.readMap || {}));
+      } catch (_) {}
+    }, 80);
+  }
+
+  function getMessageTimeValue(message) {
+    var value = message && message.created_at ? Date.parse(message.created_at) : 0;
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function getLastMessage(room) {
+    var messages = Array.isArray(room?.messages) ? room.messages : [];
+    if (!messages.length) return null;
+
+    return messages.reduce(function (latest, message) {
+      if (!latest) return message;
+      return getMessageTimeValue(message) >= getMessageTimeValue(latest) ? message : latest;
+    }, null);
+  }
+
+  function formatAicTime(value) {
+    var time = value ? new Date(value) : null;
+    if (!time || Number.isNaN(time.getTime())) return '';
+
+    var now = new Date();
+    var sameDate =
+      time.getFullYear() === now.getFullYear() &&
+      time.getMonth() === now.getMonth() &&
+      time.getDate() === now.getDate();
+
+    var yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+
+    var isYesterday =
+      time.getFullYear() === yesterday.getFullYear() &&
+      time.getMonth() === yesterday.getMonth() &&
+      time.getDate() === yesterday.getDate();
+
+    var hh = String(time.getHours()).padStart(2, '0');
+    var mm = String(time.getMinutes()).padStart(2, '0');
+
+    if (sameDate) return hh + ':' + mm;
+    if (isYesterday) return '어제';
+    return String(time.getMonth() + 1) + '/' + String(time.getDate());
+  }
+
+  function getRoomPreviewText(room) {
+    var last = getLastMessage(room);
+    if (!last) return '아직 메시지가 없습니다.';
+
+    var sender = getMessageSenderName(room, last);
+    var text = getPreferredMessageText(last) || last.original || last.translated || '';
+    text = String(text || '').replace(/\s+/g, ' ').trim();
+
+    if (text.length > 42) text = text.slice(0, 42) + '…';
+
+    return (sender ? sender + ': ' : '') + text;
+  }
+
+  function getRoomLastTime(room) {
+    var last = getLastMessage(room);
+    return last ? formatAicTime(last.created_at) : '';
+  }
+
+  function getLastReadAt(roomId) {
+    return String((state.readMap || {})[roomId] || '').trim();
+  }
+
+  function getUnreadCount(room) {
+    if (!room) return 0;
+
+    var currentEmail = String(getCurrentUserEmail() || '').trim().toLowerCase();
+    var lastRead = Date.parse(getLastReadAt(room.id) || '');
+    if (!Number.isFinite(lastRead)) lastRead = 0;
+
+    return (room.messages || []).filter(function (message) {
+      var senderEmail = String(message.sender_email || '').trim().toLowerCase();
+      if (senderEmail && currentEmail && senderEmail === currentEmail) return false;
+
+      var created = getMessageTimeValue(message);
+      return created > lastRead;
+    }).length;
+  }
+
+  function markRoomRead(roomId) {
+    var room = getRoom(roomId);
+    if (!room) return;
+
+    var last = getLastMessage(room);
+    if (!last) return;
+
+    state.readMap[roomId] = last.created_at || new Date().toISOString();
+    saveReadMap();
+  }
+
+  function markVisibleRoomsRead() {
+    (state.openSlots || []).forEach(function (slot) {
+      if (slot && slot.roomId) markRoomRead(slot.roomId);
+    });
   }
 
   function getPortalSession() {
@@ -744,6 +870,7 @@
     }
 
     state.dbLoading = true;
+    reloadReadMap();
 
     try {
       var roomsResult = await sb
@@ -1178,6 +1305,10 @@
       return item.id !== room.id;
     }));
 
+    if (getOpenSlotIndex(room.id) >= 0) {
+      markRoomRead(room.id);
+    }
+
     render(false);
   }
 
@@ -1280,6 +1411,7 @@
 
   function openRoom(roomId) {
     var existing = getOpenSlotIndex(roomId);
+    markRoomRead(roomId);
 
     if (existing >= 0) {
       state.activeSlotIndex = existing;
@@ -1371,7 +1503,11 @@
         isRoomCreator(room) ? '      <button class="aic-room-delete" type="button" data-delete-room="' + esc(room.id) + '" title="회의방 삭제" aria-label="회의방 삭제">×</button>' : '',
         '    </div>',
         '  </div>',
-        '  <div class="aic-room-meta">', esc(room.members), '<br>', room.messages.length, '개 메시지</div>',
+        '  <div class="aic-room-preview-row">',
+        '    <div class="aic-room-preview">', esc(getRoomPreviewText(room)), '</div>',
+        getUnreadCount(room) > 0 ? '    <div class="aic-unread-badge">' + getUnreadCount(room) + '</div>' : '',
+        '  </div>',
+        '  <div class="aic-room-meta">', esc(room.members), '<br>', room.messages.length, '개 메시지', getRoomLastTime(room) ? ' · ' + esc(getRoomLastTime(room)) : '', '</div>',
         '</div>'
       ].join('');
     }).join('');
@@ -1541,6 +1677,8 @@
     Array.from(els.slots.querySelectorAll('[data-message-box]')).forEach(function (box) {
       box.scrollTop = box.scrollHeight;
     });
+
+    markVisibleRoomsRead();
   }
 
   async function sendMessage(slotIndex) {
@@ -1571,6 +1709,7 @@
     };
 
     room.messages.push(message);
+    markRoomRead(room.id);
     render(false);
 
     try {
@@ -2055,6 +2194,7 @@
       var data = event && event.data ? event.data : {};
       if (data.type === 'portal-auth') {
         unsubscribeRealtime();
+        reloadReadMap();
         loadRoomsFromServer();
         scheduleRender();
         return;
@@ -2161,6 +2301,7 @@
   function bootstrap() {
     cacheEls();
     bind();
+    reloadReadMap();
 
     if (window.I18N && typeof window.I18N.changeLanguage === 'function' && !window.I18N.__aicPatched) {
       var originalChangeLanguage = window.I18N.changeLanguage.bind(window.I18N);
