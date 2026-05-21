@@ -97,5 +97,6 @@
   "position.소장.Global": "소장",
   "position.부소장.Global": "부소장",
   "position.팀장": "팀장",
-  "aic.delete": "삭제"
+  "aic.delete": "삭제",
+  "aic.displayOriginalOnly": "원문만 표시"
 }
