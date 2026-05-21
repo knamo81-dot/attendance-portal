@@ -191,6 +191,46 @@ body {
   font-weight: 700;
 }
 
+.aic-room-preview-row {
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.aic-room-preview {
+  min-width: 0;
+  font-size: var(--aic-small-size);
+  font-weight: 800;
+  color: #334155;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aic-unread-badge {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 2px 5px rgba(239, 68, 68, 0.25);
+}
+
+.aic-room-item.active .aic-room-preview {
+  color: #1d4ed8;
+}
+
+
 .aic-main {
   padding: var(--aic-gap);
   display: grid;
