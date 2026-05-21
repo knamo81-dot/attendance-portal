@@ -45,6 +45,10 @@
     selectedInviteParticipants: [],
     roomSearchResults: [],
     inviteSearchResults: [],
+    orgMaps: {
+      divisions: {},
+      teams: {}
+    },
     dbReady: false,
     dbLoading: false
   };
@@ -167,7 +171,22 @@
     return /^[A-Z]{1,5}\d{1,4}(-\d{1,4})?$/i.test(text);
   }
 
+  function getDivisionNameByCode(code) {
+    var key = String(code || '').trim();
+    if (!key) return '';
+    return state.orgMaps.divisions[key] || '';
+  }
+
+  function getTeamNameByCode(code) {
+    var key = String(code || '').trim();
+    if (!key) return '';
+    return state.orgMaps.teams[key] || '';
+  }
+
   function getEmployeeDepartment(row) {
+    var mappedName = getDivisionNameByCode(row.division_code);
+    if (mappedName) return mappedName;
+
     var candidates = [
       row.department_name,
       row.department,
@@ -189,6 +208,9 @@
   }
 
   function getEmployeeTeam(row) {
+    var mappedName = getTeamNameByCode(row.team_code);
+    if (mappedName) return mappedName;
+
     var candidates = [
       row.team,
       row.team_name,
@@ -219,16 +241,17 @@
       email: row.email || row.user_email || '',
       department: getEmployeeDepartment(row),
       team: getEmployeeTeam(row),
-      position: row.position || row.job_title || row.title || '',
+      position: row.position || row.grade || row.job_title || row.title || '',
       language: row.preferred_language || row.language || 'ko',
       _searchText: [
         row.name, row.user_name, row.display_name,
         row.email, row.user_email,
         row.employee_no, row.employeeNo,
-        row.division_code, row.team_code,
+        row.division_code, getDivisionNameByCode(row.division_code),
+        row.team_code, getTeamNameByCode(row.team_code),
         row.department, row.department_name,
         row.team, row.team_name,
-        row.position, row.job_title, row.title
+        row.position, row.grade, row.job_title, row.title
       ].join(' ').toLowerCase()
     };
   }
@@ -283,7 +306,83 @@
     });
   }
 
+  async function loadOrgMaps() {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+
+    if (!sb) return;
+
+    async function loadDivisions() {
+      try {
+        var query = sb
+          .from('divisions')
+          .select('division_code, division_name')
+          .limit(500);
+
+        if (companyId) {
+          query = query.eq('company_id', companyId);
+        }
+
+        var response = await query;
+
+        if (response.error && companyId) {
+          response = await sb
+            .from('divisions')
+            .select('division_code, division_name')
+            .limit(500);
+        }
+
+        if (!response.error && Array.isArray(response.data)) {
+          response.data.forEach(function (row) {
+            var code = String(row.division_code || '').trim();
+            var name = String(row.division_name || '').trim();
+            if (code && name) state.orgMaps.divisions[code] = name;
+          });
+        }
+      } catch (error) {
+        console.warn('[AIC ORG] divisions load skipped:', error);
+      }
+    }
+
+    async function loadTeams() {
+      try {
+        var query = sb
+          .from('teams')
+          .select('team_code, team_name, division_code')
+          .limit(1000);
+
+        if (companyId) {
+          query = query.eq('company_id', companyId);
+        }
+
+        var response = await query;
+
+        if (response.error && companyId) {
+          response = await sb
+            .from('teams')
+            .select('team_code, team_name, division_code')
+            .limit(1000);
+        }
+
+        if (!response.error && Array.isArray(response.data)) {
+          response.data.forEach(function (row) {
+            var code = String(row.team_code || '').trim();
+            var name = String(row.team_name || '').trim();
+            if (code && name) state.orgMaps.teams[code] = name;
+          });
+        }
+      } catch (error) {
+        console.warn('[AIC ORG] teams load skipped:', error);
+      }
+    }
+
+    await loadDivisions();
+    await loadTeams();
+  }
+
   async function searchPeople(keyword) {
+    await loadOrgMaps();
+
     var sb = getSupabaseClient();
     var companyId = getCompanyId();
     var q = String(keyword || '').trim().toLowerCase();
@@ -341,6 +440,8 @@
   }
 
   async function loadPeopleIndex() {
+    await loadOrgMaps();
+
     var sb = getSupabaseClient();
     var companyId = getCompanyId();
     var people = [];
@@ -1654,7 +1755,9 @@
     }
 
     scheduleRender();
-    loadRoomsFromServer();
+    loadOrgMaps().then(function () {
+      loadRoomsFromServer();
+    });
 
     if (window.aicNotifyTabsReady) {
       window.aicNotifyTabsReady();
