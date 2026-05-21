@@ -162,11 +162,11 @@
 
 
   function getEmployeeDepartment(row) {
-    return row.department || row.division_name || row.division || row.division_code || row.headquarters || row.org_name || '';
+    return row.department || row.department_name || row.division_name || row.division || row.division_code || row.headquarters || row.headquarter || row.org_name || row.organization || row.bonbu || '';
   }
 
   function getEmployeeTeam(row) {
-    return row.team || row.team_name || row.team_code || row.group_name || '';
+    return row.team || row.team_name || row.team_code || row.group_name || row.part || row.part_name || '';
   }
 
   function normalizePerson(row) {
@@ -234,46 +234,56 @@
   async function searchPeople(keyword) {
     var sb = getSupabaseClient();
     var companyId = getCompanyId();
-    var q = String(keyword || '').trim();
-    if (!sb || !companyId || !q) return [];
+    var q = String(keyword || '').trim().toLowerCase();
 
-    var safe = q.replaceAll('%', '\\\\%').replaceAll(',', ' ');
-    var pattern = '%' + safe + '%';
+    if (!sb || !q) return [];
+
     var results = [];
 
-    try {
-      var employeesQuery = sb
-        .from('employees')
-        .select('*')
-        .eq('company_id', companyId)
-        .or('name.ilike.' + pattern + ',email.ilike.' + pattern + ',employee_no.ilike.' + pattern + ',department.ilike.' + pattern + ',team.ilike.' + pattern)
-        .limit(30);
+    async function runTableSearch(tableName) {
+      try {
+        var query = sb
+          .from(tableName)
+          .select('*')
+          .limit(200);
 
-      var employees = await employeesQuery;
-      if (!employees.error && Array.isArray(employees.data)) {
-        results = results.concat(employees.data.map(normalizePerson));
+        if (companyId) {
+          query = query.eq('company_id', companyId);
+        }
+
+        var response = await query;
+
+        if (response.error || !Array.isArray(response.data)) {
+          console.warn('[AIC SEARCH]', tableName, response.error);
+          return;
+        }
+
+        response.data.forEach(function (row) {
+          var person = normalizePerson(row);
+
+          var searchTarget = [
+            person.name,
+            person.email,
+            person.department,
+            person.team,
+            person.position
+          ].join(' ').toLowerCase();
+
+          if (searchTarget.indexOf(q) >= 0) {
+            results.push(person);
+          }
+        });
+
+      } catch (error) {
+        console.warn('[AIC SEARCH]', tableName, error);
       }
-    } catch (error) {
-      console.warn('[AIC] employees search skipped:', error);
     }
 
-    try {
-      var usersQuery = sb
-        .from('users')
-        .select('*')
-        .eq('company_id', companyId)
-        .or('name.ilike.' + pattern + ',email.ilike.' + pattern + ',user_name.ilike.' + pattern)
-        .limit(30);
+    await runTableSearch('employees');
+    await runTableSearch('users');
+    await runTableSearch('profiles');
 
-      var users = await usersQuery;
-      if (!users.error && Array.isArray(users.data)) {
-        results = results.concat(users.data.map(normalizePerson));
-      }
-    } catch (error) {
-      console.warn('[AIC] users search skipped:', error);
-    }
-
-    return uniquePeople(results).slice(0, 30);
+    return uniquePeople(results).slice(0, 50);
   }
 
   function showDbWarn(message) {
@@ -299,6 +309,9 @@
           id: member.id || '',
           name: member.user_name || member.user_email || '',
           email: member.user_email || '',
+          department: member.department || member.division || member.headquarters || '',
+          team: member.team || member.team_name || '',
+          position: member.position || member.job_title || '',
           role: member.role || '',
           language: member.language || 'ko'
         };
@@ -989,9 +1002,13 @@
   }
 
   function renderPersonMeta(person) {
-    return [person.department, person.team, person.position, person.email]
+    var orgText = [person.department, person.team, person.position]
       .filter(Boolean)
-      .join(' / ') || tr('aic.noParticipantMemo', '이메일/부서 정보 없음');
+      .join(' / ');
+
+    if (orgText) return orgText;
+
+    return person.email || tr('aic.noParticipantMemo', '부서/팀 정보 없음');
   }
 
   function buildSearchResultRow(person, context, selectedList) {
