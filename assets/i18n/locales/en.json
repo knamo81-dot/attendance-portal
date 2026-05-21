@@ -97,5 +97,6 @@
   "position.소장.Global": "Head of Global R&D",
   "position.부소장.Global": "Director of Global R&D",
   "position.팀장": "Team Manager",
-  "aic.delete": "Delete"
+  "aic.delete": "Delete",
+  "aic.displayOriginalOnly": "Show Original Only"
 }
