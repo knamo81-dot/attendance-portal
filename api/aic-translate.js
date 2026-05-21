@@ -11,6 +11,29 @@ function safeText(value, fallback = '') {
   return String(value).trim();
 }
 
+function normalizeLang(value) {
+  const lang = safeText(value, '').toLowerCase();
+  if (lang.startsWith('ko') || lang === 'kr' || lang === 'korean') return 'ko';
+  if (lang.startsWith('en') || lang === 'english') return 'en';
+  return '';
+}
+
+function detectTextLanguage(text) {
+  const value = safeText(text);
+  if (!value) return 'auto';
+
+  const koreanCount = (value.match(/[가-힣]/g) || []).length;
+  const latinCount = (value.match(/[A-Za-z]/g) || []).length;
+
+  if (koreanCount > 0 && koreanCount >= latinCount * 0.25) return 'ko';
+  if (latinCount > 0) return 'en';
+  return 'auto';
+}
+
+function langLabel(lang) {
+  return lang === 'ko' ? 'Korean' : 'English';
+}
+
 function normalizeTone(value) {
   const tone = safeText(value, 'business');
   const map = {
@@ -22,26 +45,52 @@ function normalizeTone(value) {
   return map[tone] || map.business;
 }
 
-function normalizeDirection(value, sourceLang) {
-  const direction = safeText(value, 'auto');
-  if (direction === 'ko-en') return 'Korean to English';
-  if (direction === 'en-ko') return 'English to Korean';
-  if (sourceLang === 'ko') return 'Korean to English';
-  if (sourceLang === 'en') return 'English to Korean';
-  return 'auto-detect the source language and translate to the other language between Korean and English';
+function resolveTranslationPlan(payload) {
+  const text = safeText(payload.text);
+  const direction = safeText(payload.direction, 'auto');
+  const detected = normalizeLang(payload.detectedSourceLang) || detectTextLanguage(text);
+  const requestedSource = normalizeLang(payload.sourceLang);
+  let sourceLang = detected || requestedSource || 'auto';
+  let targetLang = normalizeLang(payload.targetLang);
+
+  if (direction === 'ko-en') {
+    sourceLang = 'ko';
+    targetLang = 'en';
+  } else if (direction === 'en-ko') {
+    sourceLang = 'en';
+    targetLang = 'ko';
+  } else {
+    if (sourceLang === 'ko') targetLang = 'en';
+    else if (sourceLang === 'en') targetLang = 'ko';
+    else {
+      sourceLang = requestedSource || 'auto';
+      targetLang = normalizeLang(payload.viewerLang) || 'en';
+    }
+  }
+
+  if (!targetLang || targetLang === sourceLang) {
+    targetLang = sourceLang === 'ko' ? 'en' : 'ko';
+  }
+
+  return { sourceLang, targetLang };
 }
 
 function buildPrompt(payload) {
   const text = safeText(payload.text);
   const tone = normalizeTone(payload.tone);
-  const direction = normalizeDirection(payload.direction, payload.sourceLang);
+  const plan = resolveTranslationPlan(payload);
+
+  const directionText =
+    plan.sourceLang === 'auto'
+      ? `Auto-detect the source language and translate to ${langLabel(plan.targetLang)}`
+      : `${langLabel(plan.sourceLang)} to ${langLabel(plan.targetLang)}`;
 
   return [
     'You are an AI translator for an internal R&D collaboration chat.',
     'Translate the user message between Korean and English.',
     'Return only the translated message. Do not add explanations, markdown, labels, quotes, or alternatives.',
     '',
-    `Direction: ${direction}`,
+    `Direction: ${directionText}`,
     `Tone: ${tone}`,
     '',
     'Rules:',
@@ -105,11 +154,14 @@ module.exports = async function handler(req, res) {
       return json(res, 400, { ok: false, error: 'text가 필요합니다.' });
     }
 
+    const plan = resolveTranslationPlan(payload);
     const translated = await callOpenAI(payload);
 
     return json(res, 200, {
       ok: true,
       translated,
+      sourceLang: plan.sourceLang,
+      targetLang: plan.targetLang,
       model: OPENAI_MODEL
     });
   } catch (error) {
