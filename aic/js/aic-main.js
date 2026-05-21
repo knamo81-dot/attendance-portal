@@ -50,7 +50,10 @@
       teams: {}
     },
     realtimeChannel: null,
+    realtimeChannelName: '',
     realtimeReady: false,
+    realtimeSubscribing: false,
+    realtimeResubscribeTimer: null,
     dbReady: false,
     dbLoading: false
   };
@@ -105,9 +108,19 @@
   function hasMessage(room, message) {
     if (!room || !message) return false;
     var id = String(message.id || '').trim();
+    var sender = String(message.sender || '').trim();
+    var original = String(message.original || '').trim();
 
     return (room.messages || []).some(function (item) {
       if (id && String(item.id || '').trim() === id) return true;
+
+      // 내가 보낸 임시 메시지가 DB 저장 후 Realtime으로 다시 들어오는 경우 중복 표시 방지
+      var itemId = String(item.id || '').trim();
+      if (itemId.indexOf('temp_') === 0) {
+        return String(item.sender || '').trim() === sender &&
+          String(item.original || '').trim() === original;
+      }
+
       return false;
     });
   }
@@ -662,7 +675,8 @@
     };
   }
 
-  async function loadRoomsFromServer() {
+  async function loadRoomsFromServer(options) {
+    options = options || {};
     var sb = getSupabaseClient();
     var companyId = getCompanyId();
 
@@ -692,6 +706,7 @@
         state.rooms = [];
         state.openSlots = [];
         state.dbReady = true;
+        if (!options.skipRealtime) subscribeRealtime();
         render(false);
         return;
       }
@@ -742,7 +757,7 @@
       });
 
       state.dbReady = true;
-      subscribeRealtime();
+      if (!options.skipRealtime) subscribeRealtime();
       render(true);
     } catch (error) {
       state.dbReady = false;
@@ -944,17 +959,50 @@
   }
 
 
-  function subscribeRealtime() {
+  function getRealtimeChannelName() {
+    var companyId = getCompanyId();
+    return companyId ? ('aic-chat-' + companyId) : '';
+  }
+
+  function scheduleRealtimeReconnect(delay) {
+    clearTimeout(state.realtimeResubscribeTimer);
+    state.realtimeResubscribeTimer = setTimeout(function () {
+      state.realtimeSubscribing = false;
+      state.realtimeReady = false;
+      state.realtimeChannel = null;
+      state.realtimeChannelName = '';
+      subscribeRealtime({ force: true });
+    }, Number(delay) || 800);
+  }
+
+  function subscribeRealtime(options) {
+    var force = !!(options && options.force);
     var sb = getSupabaseClient();
     var companyId = getCompanyId();
 
     if (!sb || !companyId || typeof sb.channel !== 'function') return;
 
+    var channelName = getRealtimeChannelName();
+    if (!channelName) return;
+
+    // 이미 같은 회사 채널을 구독 중이면 postgres_changes 콜백을 다시 붙이지 않습니다.
+    // Supabase는 subscribe() 이후 .on('postgres_changes') 추가를 허용하지 않아
+    // 모바일/PC 전환, visibilitychange, loadRoomsFromServer 반복 시 오류가 날 수 있습니다.
+    if (!force && state.realtimeChannel && state.realtimeChannelName === channelName) {
+      return;
+    }
+
+    if (!force && state.realtimeSubscribing && state.realtimeChannelName === channelName) {
+      return;
+    }
+
     unsubscribeRealtime();
 
-    var channelName = 'aic-chat-' + companyId;
+    state.realtimeSubscribing = true;
+    state.realtimeReady = false;
+    state.realtimeChannelName = channelName;
 
-    state.realtimeChannel = sb
+    var channel = sb
       .channel(channelName)
       .on(
         'postgres_changes',
@@ -977,7 +1025,7 @@
           filter: 'company_id=eq.' + companyId
         },
         function () {
-          loadRoomsFromServer();
+          loadRoomsFromServer({ skipRealtime: true });
         }
       )
       .on(
@@ -989,19 +1037,36 @@
           filter: 'company_id=eq.' + companyId
         },
         function () {
-          loadRoomsFromServer();
+          loadRoomsFromServer({ skipRealtime: true });
         }
-      )
-      .subscribe(function (status) {
-        state.realtimeReady = status === 'SUBSCRIBED';
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('[AIC Realtime]', status);
+      );
+
+    state.realtimeChannel = channel;
+
+    channel.subscribe(function (status) {
+      if (status === 'SUBSCRIBED') {
+        state.realtimeReady = true;
+        state.realtimeSubscribing = false;
+        return;
+      }
+
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        console.warn('[AIC Realtime]', status);
+        state.realtimeReady = false;
+        state.realtimeSubscribing = false;
+
+        if (state.realtimeChannelName === channelName) {
+          scheduleRealtimeReconnect(1200);
         }
-      });
+      }
+    });
   }
 
   function unsubscribeRealtime() {
     var sb = getSupabaseClient();
+
+    clearTimeout(state.realtimeResubscribeTimer);
+    state.realtimeResubscribeTimer = null;
 
     if (state.realtimeChannel && sb && typeof sb.removeChannel === 'function') {
       try {
@@ -1010,7 +1075,9 @@
     }
 
     state.realtimeChannel = null;
+    state.realtimeChannelName = '';
     state.realtimeReady = false;
+    state.realtimeSubscribing = false;
   }
 
   function handleRealtimeMessage(row) {
@@ -1026,10 +1093,20 @@
 
     var message = normalizeDbMessage(row);
 
-    if (hasMessage(room, message)) return;
-
     room.messages = Array.isArray(room.messages) ? room.messages : [];
-    room.messages.push(message);
+
+    var tempIndex = room.messages.findIndex(function (item) {
+      return String(item.id || '').indexOf('temp_') === 0 &&
+        String(item.sender || '').trim() === String(message.sender || '').trim() &&
+        String(item.original || '').trim() === String(message.original || '').trim();
+    });
+
+    if (tempIndex >= 0) {
+      room.messages[tempIndex] = message;
+    } else {
+      if (hasMessage(room, message)) return;
+      room.messages.push(message);
+    }
 
     // 최신 메시지가 들어온 회의방을 목록 상단으로 이동합니다.
     state.rooms = [room].concat(state.rooms.filter(function (item) {
@@ -1864,6 +1941,7 @@
     window.addEventListener('message', function (event) {
       var data = event && event.data ? event.data : {};
       if (data.type === 'portal-auth') {
+        unsubscribeRealtime();
         loadRoomsFromServer();
         scheduleRender();
         return;
@@ -1884,6 +1962,9 @@
       if (!document.hidden) {
         scheduleRender();
         subscribeRealtime();
+      } else {
+        // 모바일 브라우저에서 백그라운드 전환 시 채널이 애매하게 남는 경우가 있어 정리합니다.
+        unsubscribeRealtime();
       }
     });
 
