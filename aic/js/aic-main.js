@@ -1327,14 +1327,16 @@
   }
 
   function buildMessage(msg) {
-    var showOriginal = state.settings.display === 'both';
+    var displayMode = state.settings.display || 'both';
+    var showOriginal = displayMode === 'both' || displayMode === 'original';
+    var showTranslated = displayMode === 'both' || displayMode === 'translated';
     var sender = msg.sender || (msg.type === 'me' ? getCurrentUserName() : '상대방');
 
     return [
       '<div class="aic-message ', msg.type === 'me' ? 'me' : 'other', '">',
       '  <div class="aic-message-name">', esc(sender), '</div>',
       showOriginal ? '<div class="aic-message-original">' + esc(msg.original) + '</div>' : '',
-      '  <div class="', showOriginal ? 'aic-message-translated' : 'aic-message-original', '">', esc(msg.translated), '</div>',
+      showTranslated ? '<div class="aic-message-translated">' + esc(msg.translated) + '</div>' : '',
       '</div>'
     ].join('');
   }
