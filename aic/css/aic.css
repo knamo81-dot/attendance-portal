@@ -416,6 +416,24 @@ body {
   margin-bottom: 4px;
 }
 
+.aic-message-time {
+  margin-top: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  opacity: .58;
+  text-align: right;
+  line-height: 1.2;
+}
+
+.aic-message.other .aic-message-time {
+  color: #64748b;
+}
+
+.aic-message.me .aic-message-time {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+
 .aic-message-original {
   font-size: var(--aic-base-size);
   font-weight: 800;
@@ -617,29 +635,173 @@ body {
 }
 
 @media (max-width: 760px) {
+  .aic-root {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* AIC mobile chat polish */
+@media (max-width: 760px) {
   html,
   body {
-    overflow: auto;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
   }
 
   .aic-root {
-    height: auto;
-    min-height: 100vh;
-    max-height: none;
+    height: 100dvh;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    padding: 8px;
     grid-template-columns: 1fr;
-    overflow: visible;
+    grid-template-rows: minmax(160px, 30dvh) minmax(0, 1fr);
+    overflow: hidden;
   }
 
   .aic-sidebar {
-    max-height: 260px;
+    max-height: none;
+    min-height: 0;
+  }
+
+  .aic-room-list {
+    padding: 8px;
+  }
+
+  .aic-room-item {
+    padding: 9px;
   }
 
   .aic-main {
-    height: 680px;
-    min-height: 680px;
+    height: auto;
+    min-height: 0;
+    padding: 8px;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .aic-toolbar {
+    min-height: auto;
+    padding: 7px;
+  }
+
+  .aic-slots {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .aic-chat-window {
+    min-height: 0;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .aic-chat-head {
+    padding: 8px;
+    align-items: flex-start;
+  }
+
+  .aic-chat-actions {
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .aic-chat-action {
+    height: 26px;
+    padding: 0 7px;
+    font-size: 10px;
+  }
+
+  .aic-messages {
+    padding: 9px;
+    gap: 7px;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .aic-message {
+    max-width: 92%;
+    padding: 8px 9px;
+    line-height: 1.45;
+  }
+
+  .aic-message-name {
+    margin-bottom: 3px;
+  }
+
+  .aic-message-original,
+  .aic-message-translated {
+    font-size: 11px;
+  }
+
+  .aic-message-time {
+    font-size: 9px;
   }
 
   .aic-chat-input {
-    grid-template-columns: 1fr;
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    min-height: 48px;
+    padding: 7px;
+    grid-template-columns: 78px minmax(0, 1fr) 46px;
+    gap: 5px;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(6px);
+  }
+
+  .aic-chat-input .module-select,
+  .aic-chat-input .module-input,
+  .aic-chat-input .module-btn {
+    min-height: 32px;
+    font-size: 11px;
+  }
+
+  .aic-send-btn {
+    min-width: 46px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
+@media (max-width: 420px) {
+  .aic-root {
+    padding: 6px;
+    grid-template-rows: minmax(140px, 28dvh) minmax(0, 1fr);
+  }
+
+  .aic-sidebar-head {
+    min-height: 48px;
+    padding: 8px;
+  }
+
+  .aic-title {
+    font-size: 12px;
+  }
+
+  .aic-subtitle {
+    font-size: 9px;
+  }
+
+  .aic-icon-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  .aic-room-preview {
+    max-width: 100%;
+  }
+
+  .aic-chat-meta {
+    max-width: 180px;
+  }
+
+  .aic-chat-input {
+    grid-template-columns: 72px minmax(0, 1fr) 42px;
+  }
+
+  .aic-message {
+    max-width: 94%;
   }
 }
