@@ -1268,6 +1268,19 @@ html.embed-mode #settings-page .real-form-card{
 }
 </style>
 
+
+<style id="settings-iframe-portal-tabs-only">
+/* 포탈 iframe 안에서는 settings 내부 탭 버튼을 숨기고,
+   포탈 상단 공통 버튼만 사용합니다. */
+html.embed-mode #settings-page .adminSubTabs,
+html.embed-mode .adminSubTabs {
+  display: none !important;
+}
+html.embed-mode #settings-page .admin-header-title {
+  margin-top: 0 !important;
+}
+</style>
+
 </head>
 <body class="settings-embed-body">
 <script>
@@ -4010,6 +4023,62 @@ create table if not exists user_app_roles (
     document.addEventListener('DOMContentLoaded', initPortalSetting, { once: true });
   } else {
     initPortalSetting();
+  }
+})();
+</script>
+
+
+<script id="settings-portal-tab-bridge">
+(function () {
+  'use strict';
+
+  function getSectionButton(sectionId) {
+    var id = String(sectionId || '').trim() || 'org';
+    return (
+      document.querySelector('.admin-subnav-btn[data-admin-section="' + id + '"]') ||
+      document.querySelector('.admin-subnav-btn[data-admin-section="org"]') ||
+      document.querySelector('.admin-subnav-btn')
+    );
+  }
+
+  function activateSettingsSection(sectionId) {
+    var btn = getSectionButton(sectionId);
+    if (btn && typeof btn.click === 'function') {
+      btn.click();
+      return true;
+    }
+
+    // click 이벤트가 아직 준비되지 않았을 때를 대비한 최소 fallback
+    var id = String(sectionId || '').trim() || 'org';
+    document.querySelectorAll('.admin-section-panel').forEach(function (panel) {
+      panel.hidden = panel.id !== ('adminSection' + id.charAt(0).toUpperCase() + id.slice(1));
+    });
+    document.querySelectorAll('.admin-subnav-btn').forEach(function (item) {
+      item.classList.toggle('active', item.getAttribute('data-admin-section') === id);
+    });
+    return false;
+  }
+
+  // 포탈에서 iframe.contentWindow 함수 직접 호출 시 사용
+  window.openPortalSettingsSection = activateSettingsSection;
+
+  // 포탈 공통 탭 클릭 수신
+  window.addEventListener('message', function (event) {
+    var data = event && event.data ? event.data : {};
+    if (!data || typeof data !== 'object') return;
+
+    if (data.type === 'portal-tab-change') {
+      activateSettingsSection(data.tabId || data.tab || 'org');
+    }
+  });
+
+  // iframe 로드 후 현재 기본 탭 정리
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      activateSettingsSection('org');
+    });
+  } else {
+    activateSettingsSection('org');
   }
 })();
 </script>
