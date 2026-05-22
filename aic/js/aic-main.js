@@ -51,6 +51,7 @@
     },
     realtimeChannel: null,
     realtimeChannelName: '',
+    realtimeActualChannelName: '',
     realtimeReady: false,
     realtimeSubscribing: false,
     realtimeResubscribeTimer: null,
@@ -963,7 +964,13 @@
         state.rooms = [];
         state.openSlots = [];
         state.dbReady = true;
-        if (!options.skipRealtime) subscribeRealtime();
+        if (!options.skipRealtime) {
+          try {
+            subscribeRealtime();
+          } catch (realtimeError) {
+            console.warn('[AIC Realtime] skipped:', realtimeError);
+          }
+        }
         render(false);
         return;
       }
@@ -1016,7 +1023,13 @@
       });
 
       state.dbReady = true;
-      if (!options.skipRealtime) subscribeRealtime();
+      if (!options.skipRealtime) {
+        try {
+          subscribeRealtime();
+        } catch (realtimeError) {
+          console.warn('[AIC Realtime] skipped:', realtimeError);
+        }
+      }
       render(true);
     } catch (error) {
       state.dbReady = false;
@@ -1241,17 +1254,15 @@
 
     if (!sb || !companyId || typeof sb.channel !== 'function') return;
 
-    var channelName = getRealtimeChannelName();
-    if (!channelName) return;
+    var baseChannelName = getRealtimeChannelName();
+    if (!baseChannelName) return;
 
     // 이미 같은 회사 채널을 구독 중이면 postgres_changes 콜백을 다시 붙이지 않습니다.
-    // Supabase는 subscribe() 이후 .on('postgres_changes') 추가를 허용하지 않아
-    // 모바일/PC 전환, visibilitychange, loadRoomsFromServer 반복 시 오류가 날 수 있습니다.
-    if (!force && state.realtimeChannel && state.realtimeChannelName === channelName) {
+    if (!force && state.realtimeChannel && state.realtimeChannelName === baseChannelName) {
       return;
     }
 
-    if (!force && state.realtimeSubscribing && state.realtimeChannelName === channelName) {
+    if (!force && state.realtimeSubscribing && state.realtimeChannelName === baseChannelName) {
       return;
     }
 
@@ -1259,78 +1270,93 @@
 
     state.realtimeSubscribing = true;
     state.realtimeReady = false;
-    state.realtimeChannelName = channelName;
+    state.realtimeChannelName = baseChannelName;
 
-    var channel = sb
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'aic_messages',
-          filter: 'company_id=eq.' + companyId
-        },
-        function (payload) {
-          handleRealtimeMessage(payload.new || {});
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'aic_room_members',
-          filter: 'company_id=eq.' + companyId
-        },
-        function () {
-          loadRoomsFromServer({ skipRealtime: true });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'aic_rooms',
-          filter: 'company_id=eq.' + companyId
-        },
-        function () {
-          loadRoomsFromServer({ skipRealtime: true });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'aic_message_reads',
-          filter: 'company_id=eq.' + companyId
-        },
-        function (payload) {
-          handleRealtimeRead(payload.new || {});
-        }
-      );
+    // Supabase는 동일한 channel 객체가 이미 subscribe 된 뒤에는 .on() 추가를 허용하지 않습니다.
+    // 모바일/PC 전환, visibilitychange, loadRoomsFromServer 반복 시 같은 channel name이 재사용되면
+    // "cannot add postgres_changes callbacks after subscribe()"가 발생할 수 있어 실제 채널명은 매번 고유하게 만듭니다.
+    var actualChannelName = baseChannelName + '-' + getAicClientId() + '-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+    state.realtimeActualChannelName = actualChannelName;
 
-    state.realtimeChannel = channel;
+    try {
+      var channel = sb
+        .channel(actualChannelName)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'aic_messages',
+            filter: 'company_id=eq.' + companyId
+          },
+          function (payload) {
+            handleRealtimeMessage(payload.new || {});
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'aic_room_members',
+            filter: 'company_id=eq.' + companyId
+          },
+          function () {
+            loadRoomsFromServer({ skipRealtime: true });
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'aic_rooms',
+            filter: 'company_id=eq.' + companyId
+          },
+          function () {
+            loadRoomsFromServer({ skipRealtime: true });
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'aic_message_reads',
+            filter: 'company_id=eq.' + companyId
+          },
+          function (payload) {
+            handleRealtimeRead(payload.new || {});
+          }
+        );
 
-    channel.subscribe(function (status) {
-      if (status === 'SUBSCRIBED') {
-        state.realtimeReady = true;
-        state.realtimeSubscribing = false;
-        return;
-      }
+      state.realtimeChannel = channel;
 
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        console.warn('[AIC Realtime]', status);
-        state.realtimeReady = false;
-        state.realtimeSubscribing = false;
-
-        if (state.realtimeChannelName === channelName) {
-          scheduleRealtimeReconnect(1200);
+      channel.subscribe(function (status) {
+        if (status === 'SUBSCRIBED') {
+          state.realtimeReady = true;
+          state.realtimeSubscribing = false;
+          return;
         }
-      }
-    });
+
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.warn('[AIC Realtime]', status);
+          state.realtimeReady = false;
+          state.realtimeSubscribing = false;
+
+          if (state.realtimeChannelName === baseChannelName) {
+            scheduleRealtimeReconnect(1200);
+          }
+        }
+      });
+    } catch (error) {
+      console.warn('[AIC Realtime] subscribe failed:', error);
+      state.realtimeReady = false;
+      state.realtimeSubscribing = false;
+      state.realtimeChannel = null;
+      state.realtimeActualChannelName = '';
+      scheduleRealtimeReconnect(1500);
+    }
   }
 
   function unsubscribeRealtime() {
@@ -1347,6 +1373,7 @@
 
     state.realtimeChannel = null;
     state.realtimeChannelName = '';
+    state.realtimeActualChannelName = '';
     state.realtimeReady = false;
     state.realtimeSubscribing = false;
   }
