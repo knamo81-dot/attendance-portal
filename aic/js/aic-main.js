@@ -54,8 +54,10 @@
     realtimeReady: false,
     realtimeSubscribing: false,
     realtimeResubscribeTimer: null,
-    readMap: loadReadMap(),
+    readMap: {},
     readSaveTimer: null,
+    readSyncReady: false,
+    readSavingRooms: {},
     dbReady: false,
     dbLoading: false
   };
@@ -247,32 +249,74 @@
     } catch (_) {}
   }
 
-  function getReadStorageKey() {
+  async function loadReadMapFromServer(roomIds) {
+    var sb = getSupabaseClient();
     var companyId = getCompanyId();
     var email = getCurrentUserEmail();
-    return 'aic_read_map__' + (companyId || 'default') + '__' + (email || 'anonymous');
-  }
 
-  function loadReadMap() {
-    return {};
-  }
+    state.readMap = {};
+    state.readSyncReady = false;
 
-  function reloadReadMap() {
+    if (!sb || !companyId || !email || !Array.isArray(roomIds) || !roomIds.length) {
+      state.readSyncReady = true;
+      return;
+    }
+
     try {
-      var raw = localStorage.getItem(getReadStorageKey());
-      state.readMap = raw ? JSON.parse(raw) : {};
-    } catch (_) {
-      state.readMap = {};
+      var result = await sb
+        .from('aic_message_reads')
+        .select('room_id, last_read_at')
+        .eq('company_id', companyId)
+        .eq('user_email', email)
+        .in('room_id', roomIds);
+
+      if (result.error) throw result.error;
+
+      (result.data || []).forEach(function (row) {
+        var roomId = String(row.room_id || '').trim();
+        if (roomId) state.readMap[roomId] = row.last_read_at || '';
+      });
+
+      state.readSyncReady = true;
+    } catch (error) {
+      state.readSyncReady = true;
+      console.warn('[AIC READ] server load skipped:', error);
+    }
+  }
+
+  async function saveRoomReadToServer(roomId, lastReadAt) {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+    var email = getCurrentUserEmail();
+
+    if (!sb || !companyId || !email || !roomId || !lastReadAt) return;
+    if (state.readSavingRooms[roomId]) return;
+
+    state.readSavingRooms[roomId] = true;
+
+    try {
+      var payload = {
+        company_id: companyId,
+        room_id: roomId,
+        user_email: email,
+        last_read_at: lastReadAt,
+        updated_at: new Date().toISOString()
+      };
+
+      var result = await sb
+        .from('aic_message_reads')
+        .upsert(payload, { onConflict: 'company_id,room_id,user_email' });
+
+      if (result.error) throw result.error;
+    } catch (error) {
+      console.warn('[AIC READ] server save skipped:', error);
+    } finally {
+      delete state.readSavingRooms[roomId];
     }
   }
 
   function saveReadMap() {
-    clearTimeout(state.readSaveTimer);
-    state.readSaveTimer = setTimeout(function () {
-      try {
-        localStorage.setItem(getReadStorageKey(), JSON.stringify(state.readMap || {}));
-      } catch (_) {}
-    }, 80);
+    // 서버 저장형으로 전환되어 localStorage 저장은 사용하지 않습니다.
   }
 
   function getMessageTimeValue(message) {
@@ -379,8 +423,14 @@
     var last = getLastMessage(room);
     if (!last) return;
 
-    state.readMap[roomId] = last.created_at || new Date().toISOString();
-    saveReadMap();
+    var value = last.created_at || new Date().toISOString();
+    var current = Date.parse(state.readMap[roomId] || '');
+    var next = Date.parse(value || '');
+
+    if (Number.isFinite(current) && Number.isFinite(next) && current >= next) return;
+
+    state.readMap[roomId] = value;
+    saveRoomReadToServer(roomId, value);
   }
 
   function markVisibleRoomsRead() {
@@ -894,8 +944,6 @@
     }
 
     state.dbLoading = true;
-    reloadReadMap();
-
     try {
       var roomsResult = await sb
         .from('aic_rooms')
@@ -910,6 +958,8 @@
       var roomIds = roomRows.map(function (room) { return String(room.id || ''); }).filter(Boolean);
 
       if (!roomIds.length) {
+        state.readMap = {};
+        state.readSyncReady = true;
         state.rooms = [];
         state.openSlots = [];
         state.dbReady = true;
@@ -935,6 +985,8 @@
         .order('created_at', { ascending: true });
 
       if (messagesResult.error) throw messagesResult.error;
+
+      await loadReadMapFromServer(roomIds);
 
       var peopleIndex = await loadPeopleIndex();
       var enrichedMembers = (membersResult.data || []).map(function (member) {
@@ -1246,6 +1298,18 @@
         function () {
           loadRoomsFromServer({ skipRealtime: true });
         }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'aic_message_reads',
+          filter: 'company_id=eq.' + companyId
+        },
+        function (payload) {
+          handleRealtimeRead(payload.new || {});
+        }
       );
 
     state.realtimeChannel = channel;
@@ -1285,6 +1349,26 @@
     state.realtimeChannelName = '';
     state.realtimeReady = false;
     state.realtimeSubscribing = false;
+  }
+
+  function handleRealtimeRead(row) {
+    if (!row || !row.room_id) return;
+
+    var email = String(row.user_email || '').trim().toLowerCase();
+    var currentEmail = String(getCurrentUserEmail() || '').trim().toLowerCase();
+
+    if (!email || !currentEmail || email !== currentEmail) return;
+
+    var roomId = String(row.room_id || '').trim();
+    var nextValue = row.last_read_at || '';
+    var current = Date.parse(state.readMap[roomId] || '');
+    var next = Date.parse(nextValue || '');
+
+    if (!roomId || !Number.isFinite(next)) return;
+    if (Number.isFinite(current) && current >= next) return;
+
+    state.readMap[roomId] = nextValue;
+    renderRoomList();
   }
 
   function handleRealtimeMessage(row) {
@@ -2219,7 +2303,6 @@
       var data = event && event.data ? event.data : {};
       if (data.type === 'portal-auth') {
         unsubscribeRealtime();
-        reloadReadMap();
         loadRoomsFromServer();
         scheduleRender();
         return;
@@ -2326,7 +2409,6 @@
   function bootstrap() {
     cacheEls();
     bind();
-    reloadReadMap();
 
     if (window.I18N && typeof window.I18N.changeLanguage === 'function' && !window.I18N.__aicPatched) {
       var originalChangeLanguage = window.I18N.changeLanguage.bind(window.I18N);
