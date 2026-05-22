@@ -1531,7 +1531,7 @@
         '    <div class="aic-room-preview">', esc(getRoomPreviewText(room)), '</div>',
         getUnreadCount(room) > 0 ? '    <div class="aic-unread-badge">' + getUnreadCount(room) + '</div>' : '',
         '  </div>',
-        '  <div class="aic-room-meta">', esc(room.members), '<br>', room.messages.length, '개 메시지', getRoomLastTime(room) ? ' · ' + esc(getRoomLastTime(room)) : '', '</div>',
+        '  <div class="aic-room-meta">', esc(room.members), getRoomLastTime(room) ? '<br>' + esc(getRoomLastTime(room)) : '', '</div>',
         '</div>'
       ].join('');
     }).join('');
