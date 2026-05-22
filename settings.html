@@ -4216,5 +4216,242 @@ create table if not exists user_app_roles (
 </script>
 
 
+
+<script id="settings-global-company-id-fix-final">
+(function () {
+  'use strict';
+
+  function readPortalSessionSafe() {
+    try {
+      if (window.parent && typeof window.parent.getPortalSession === 'function') {
+        return window.parent.getPortalSession() || {};
+      }
+    } catch (_) {}
+
+    try {
+      if (window.parent && window.parent.portalSession) {
+        return window.parent.portalSession || {};
+      }
+    } catch (_) {}
+
+    return window.portalSession || {};
+  }
+
+  function resolveSettingsCompanyId() {
+    var session = readPortalSessionSafe();
+
+    var candidates = [
+      session.companyId,
+      session.company_id,
+      session.company && session.company.id,
+      session.company && session.company.company_id,
+      session.profile && session.profile.company_id,
+      window.currentCompanyId,
+      window.companyId,
+      localStorage.getItem('company_id'),
+      localStorage.getItem('currentCompanyId'),
+      localStorage.getItem('portal_company_id')
+    ];
+
+    for (var i = 0; i < candidates.length; i++) {
+      var value = String(candidates[i] || '').trim();
+      if (value && value !== 'null' && value !== 'undefined') return value;
+    }
+
+    return '';
+  }
+
+  var originalGetCompanyId = window.getCompanyId;
+  window.getCompanyId = function () {
+    var existing = '';
+    try {
+      if (typeof originalGetCompanyId === 'function') {
+        existing = String(originalGetCompanyId() || '').trim();
+      }
+    } catch (_) {}
+
+    return existing || resolveSettingsCompanyId();
+  };
+
+  window.__settingsResolveCompanyId = window.getCompanyId;
+
+  var COMPANY_SCOPED_TABLES = {
+    divisions: true,
+    teams: true,
+    users: true,
+    employees: true,
+    managed_teams: true,
+    user_app_roles: true,
+    portal_reservation_resources: true,
+    portal_reservations: true,
+    portal_schedules: true,
+    portal_memos: true,
+    system_settings: true
+  };
+
+  function shouldPatchTable(tableName) {
+    return !!COMPANY_SCOPED_TABLES[String(tableName || '').trim()];
+  }
+
+  function patchDbRow(row) {
+    if (!row || typeof row !== 'object') return row;
+
+    var companyId = window.__settingsResolveCompanyId ? window.__settingsResolveCompanyId() : '';
+    if (companyId && !row.company_id) {
+      row.company_id = companyId;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(row, 'companyId')) {
+      delete row.companyId;
+    }
+
+    return row;
+  }
+
+  function patchDbPayload(payload) {
+    if (Array.isArray(payload)) {
+      return payload.map(function (row) {
+        return patchDbRow(Object.assign({}, row));
+      });
+    }
+
+    if (payload && typeof payload === 'object') {
+      return patchDbRow(Object.assign({}, payload));
+    }
+
+    return payload;
+  }
+
+  function patchEdgeBody(body) {
+    if (!body || typeof body !== 'object') return body;
+
+    var companyId = window.__settingsResolveCompanyId ? window.__settingsResolveCompanyId() : '';
+    if (!companyId) return body;
+
+    var next = Array.isArray(body) ? body.slice() : Object.assign({}, body);
+
+    if (Array.isArray(next)) {
+      return next.map(function (item) {
+        if (!item || typeof item !== 'object') return item;
+        var row = Object.assign({}, item);
+        if (!row.company_id) row.company_id = companyId;
+        if (!row.companyId) row.companyId = companyId;
+        return row;
+      });
+    }
+
+    if (!next.company_id) next.company_id = companyId;
+    if (!next.companyId) next.companyId = companyId;
+
+    if (next.employee && typeof next.employee === 'object') {
+      next.employee = Object.assign({}, next.employee);
+      if (!next.employee.company_id) next.employee.company_id = companyId;
+      if (!next.employee.companyId) next.employee.companyId = companyId;
+    }
+
+    if (next.user && typeof next.user === 'object') {
+      next.user = Object.assign({}, next.user);
+      if (!next.user.company_id) next.user.company_id = companyId;
+      if (!next.user.companyId) next.user.companyId = companyId;
+    }
+
+    return next;
+  }
+
+  function patchSupabaseFrom(client) {
+    if (!client || client.__settingsGlobalCompanyIdFromPatch) return;
+    if (typeof client.from !== 'function') return;
+
+    var originalFrom = client.from.bind(client);
+
+    client.from = function (tableName) {
+      var query = originalFrom(tableName);
+
+      if (shouldPatchTable(tableName)) {
+        ['insert', 'upsert', 'update'].forEach(function (method) {
+          if (!query || typeof query[method] !== 'function') return;
+
+          var originalMethod = query[method].bind(query);
+          query[method] = function (payload) {
+            return originalMethod(patchDbPayload(payload));
+          };
+        });
+      }
+
+      return query;
+    };
+
+    client.__settingsGlobalCompanyIdFromPatch = true;
+  }
+
+  function patchFunctionsInvoke(client) {
+    if (!client || client.__settingsGlobalCompanyIdInvokePatch) return;
+    if (!client.functions || typeof client.functions.invoke !== 'function') return;
+
+    var originalInvoke = client.functions.invoke.bind(client.functions);
+
+    client.functions.invoke = function (functionName, options) {
+      try {
+        if (options && options.body && typeof options.body === 'object') {
+          options = Object.assign({}, options, {
+            body: patchEdgeBody(options.body)
+          });
+        }
+      } catch (_) {}
+
+      return originalInvoke(functionName, options);
+    };
+
+    client.__settingsGlobalCompanyIdInvokePatch = true;
+  }
+
+  function patchFetch() {
+    var originalFetch = window.fetch;
+    if (typeof originalFetch !== 'function' || window.__settingsGlobalCompanyIdFetchPatch) return;
+
+    window.fetch = function (input, init) {
+      try {
+        var url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+        var isEdgeFunction = String(url || '').indexOf('/functions/v1/') >= 0;
+
+        if (isEdgeFunction && init && typeof init.body === 'string') {
+          var parsed = JSON.parse(init.body);
+          init = Object.assign({}, init, {
+            body: JSON.stringify(patchEdgeBody(parsed))
+          });
+        }
+      } catch (_) {}
+
+      return originalFetch.call(this, input, init);
+    };
+
+    window.__settingsGlobalCompanyIdFetchPatch = true;
+  }
+
+  function patchAllSupabaseClients() {
+    try { patchSupabaseFrom(window.portalSupabase); patchFunctionsInvoke(window.portalSupabase); } catch (_) {}
+    try { patchSupabaseFrom(window.settingsSupabase); patchFunctionsInvoke(window.settingsSupabase); } catch (_) {}
+    try { patchSupabaseFrom(window.supabaseClient); patchFunctionsInvoke(window.supabaseClient); } catch (_) {}
+    try { patchSupabaseFrom(window.sb); patchFunctionsInvoke(window.sb); } catch (_) {}
+
+    try {
+      if (window.parent) {
+        patchSupabaseFrom(window.parent.portalSupabase); patchFunctionsInvoke(window.parent.portalSupabase);
+        patchSupabaseFrom(window.parent.settingsSupabase); patchFunctionsInvoke(window.parent.settingsSupabase);
+        patchSupabaseFrom(window.parent.supabaseClient); patchFunctionsInvoke(window.parent.supabaseClient);
+      }
+    } catch (_) {}
+
+    patchFetch();
+  }
+
+  patchAllSupabaseClients();
+  document.addEventListener('DOMContentLoaded', patchAllSupabaseClients);
+  setTimeout(patchAllSupabaseClients, 250);
+  setTimeout(patchAllSupabaseClients, 1000);
+  setTimeout(patchAllSupabaseClients, 2500);
+})();
+</script>
+
 </body>
 </html>
