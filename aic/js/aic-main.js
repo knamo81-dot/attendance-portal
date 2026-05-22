@@ -51,11 +51,15 @@
     },
     realtimeChannel: null,
     realtimeChannelName: '',
+    realtimeChannelBaseName: '',
+    realtimeSeq: 0,
     realtimeReady: false,
     realtimeSubscribing: false,
     realtimeResubscribeTimer: null,
     readRealtimeChannel: null,
     readRealtimeChannelName: '',
+    readRealtimeChannelBaseName: '',
+    readRealtimeSeq: 0,
     readRealtimeReady: false,
     readRealtimeSubscribing: false,
     readRealtimeResubscribeTimer: null,
@@ -1271,14 +1275,16 @@
 
     if (!sb || !companyId || !email || typeof sb.channel !== 'function') return;
 
-    var channelName = getReadRealtimeChannelName();
-    if (!channelName) return;
+    var baseChannelName = getReadRealtimeChannelName();
+    if (!baseChannelName) return;
 
-    if (!force && state.readRealtimeChannel && state.readRealtimeChannelName === channelName) {
+    // 같은 사용자/회사 read realtime이 이미 살아 있으면 다시 붙이지 않습니다.
+    // Supabase는 subscribe() 이후 같은 채널에 postgres_changes 콜백을 추가하면 오류가 납니다.
+    if (!force && state.readRealtimeChannel && state.readRealtimeChannelBaseName === baseChannelName) {
       return;
     }
 
-    if (!force && state.readRealtimeSubscribing && state.readRealtimeChannelName === channelName) {
+    if (!force && state.readRealtimeSubscribing && state.readRealtimeChannelBaseName === baseChannelName) {
       return;
     }
 
@@ -1286,42 +1292,60 @@
 
     state.readRealtimeSubscribing = true;
     state.readRealtimeReady = false;
+    state.readRealtimeChannelBaseName = baseChannelName;
+    state.readRealtimeSeq = (Number(state.readRealtimeSeq) || 0) + 1;
+
+    // 실제 Supabase 채널명은 매번 고유하게 생성합니다.
+    // removeChannel이 비동기로 정리되는 순간에 같은 이름을 재사용하면
+    // "cannot add postgres_changes callbacks after subscribe()" 오류가 날 수 있습니다.
+    var channelName = baseChannelName + '-' + getAicClientId() + '-' + state.readRealtimeSeq;
     state.readRealtimeChannelName = channelName;
 
-    var channel = sb
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'aic_message_reads',
-          filter: 'company_id=eq.' + companyId
-        },
-        function (payload) {
-          handleReadRealtimeChange(payload.new || payload.old || {});
+    try {
+      var channel = sb
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'aic_message_reads',
+            filter: 'company_id=eq.' + companyId
+          },
+          function (payload) {
+            handleReadRealtimeChange(payload.new || payload.old || {});
+          }
+        );
+
+      state.readRealtimeChannel = channel;
+
+      channel.subscribe(function (status) {
+        if (status === 'SUBSCRIBED') {
+          state.readRealtimeReady = true;
+          state.readRealtimeSubscribing = false;
+          return;
         }
-      );
 
-    state.readRealtimeChannel = channel;
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.warn('[AIC READ Realtime]', status);
+          state.readRealtimeReady = false;
+          state.readRealtimeSubscribing = false;
 
-    channel.subscribe(function (status) {
-      if (status === 'SUBSCRIBED') {
-        state.readRealtimeReady = true;
-        state.readRealtimeSubscribing = false;
-        return;
-      }
-
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        console.warn('[AIC READ Realtime]', status);
-        state.readRealtimeReady = false;
-        state.readRealtimeSubscribing = false;
-
-        if (state.readRealtimeChannelName === channelName) {
-          scheduleReadRealtimeReconnect(1500);
+          if (state.readRealtimeChannelBaseName === baseChannelName) {
+            scheduleReadRealtimeReconnect(1500);
+          }
         }
-      }
-    });
+      });
+    } catch (error) {
+      // read realtime은 보조 기능입니다.
+      // 실패해도 채팅/회의방 조회는 계속 동작해야 하므로 alert를 띄우지 않습니다.
+      console.warn('[AIC READ Realtime] subscribe skipped:', error);
+      state.readRealtimeReady = false;
+      state.readRealtimeSubscribing = false;
+      state.readRealtimeChannel = null;
+      state.readRealtimeChannelName = '';
+      state.readRealtimeChannelBaseName = '';
+    }
   }
 
   function unsubscribeReadRealtime() {
@@ -1338,6 +1362,7 @@
 
     state.readRealtimeChannel = null;
     state.readRealtimeChannelName = '';
+    state.readRealtimeChannelBaseName = '';
     state.readRealtimeReady = false;
     state.readRealtimeSubscribing = false;
   }
@@ -1369,17 +1394,15 @@
 
     if (!sb || !companyId || typeof sb.channel !== 'function') return;
 
-    var channelName = getRealtimeChannelName();
-    if (!channelName) return;
+    var baseChannelName = getRealtimeChannelName();
+    if (!baseChannelName) return;
 
-    // 이미 같은 회사 채널을 구독 중이면 postgres_changes 콜백을 다시 붙이지 않습니다.
-    // Supabase는 subscribe() 이후 .on('postgres_changes') 추가를 허용하지 않아
-    // 모바일/PC 전환, visibilitychange, loadRoomsFromServer 반복 시 오류가 날 수 있습니다.
-    if (!force && state.realtimeChannel && state.realtimeChannelName === channelName) {
+    // 이미 같은 회사 채팅 realtime을 구독 중이면 postgres_changes 콜백을 다시 붙이지 않습니다.
+    if (!force && state.realtimeChannel && state.realtimeChannelBaseName === baseChannelName) {
       return;
     }
 
-    if (!force && state.realtimeSubscribing && state.realtimeChannelName === channelName) {
+    if (!force && state.realtimeSubscribing && state.realtimeChannelBaseName === baseChannelName) {
       return;
     }
 
@@ -1387,66 +1410,80 @@
 
     state.realtimeSubscribing = true;
     state.realtimeReady = false;
+    state.realtimeChannelBaseName = baseChannelName;
+    state.realtimeSeq = (Number(state.realtimeSeq) || 0) + 1;
+
+    // 실제 채널명은 고유하게 생성해서 기존 subscribe 완료 채널 재사용 충돌을 피합니다.
+    var channelName = baseChannelName + '-' + getAicClientId() + '-' + state.realtimeSeq;
     state.realtimeChannelName = channelName;
 
-    var channel = sb
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'aic_messages',
-          filter: 'company_id=eq.' + companyId
-        },
-        function (payload) {
-          handleRealtimeMessage(payload.new || {});
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'aic_room_members',
-          filter: 'company_id=eq.' + companyId
-        },
-        function () {
-          loadRoomsFromServer({ skipRealtime: true });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'aic_rooms',
-          filter: 'company_id=eq.' + companyId
-        },
-        function () {
-          loadRoomsFromServer({ skipRealtime: true });
-        }
-      );
+    try {
+      var channel = sb
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'aic_messages',
+            filter: 'company_id=eq.' + companyId
+          },
+          function (payload) {
+            handleRealtimeMessage(payload.new || {});
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'aic_room_members',
+            filter: 'company_id=eq.' + companyId
+          },
+          function () {
+            loadRoomsFromServer({ skipRealtime: true });
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'aic_rooms',
+            filter: 'company_id=eq.' + companyId
+          },
+          function () {
+            loadRoomsFromServer({ skipRealtime: true });
+          }
+        );
 
-    state.realtimeChannel = channel;
+      state.realtimeChannel = channel;
 
-    channel.subscribe(function (status) {
-      if (status === 'SUBSCRIBED') {
-        state.realtimeReady = true;
-        state.realtimeSubscribing = false;
-        return;
-      }
-
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        console.warn('[AIC Realtime]', status);
-        state.realtimeReady = false;
-        state.realtimeSubscribing = false;
-
-        if (state.realtimeChannelName === channelName) {
-          scheduleRealtimeReconnect(1200);
+      channel.subscribe(function (status) {
+        if (status === 'SUBSCRIBED') {
+          state.realtimeReady = true;
+          state.realtimeSubscribing = false;
+          return;
         }
-      }
-    });
+
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.warn('[AIC Realtime]', status);
+          state.realtimeReady = false;
+          state.realtimeSubscribing = false;
+
+          if (state.realtimeChannelBaseName === baseChannelName) {
+            scheduleRealtimeReconnect(1200);
+          }
+        }
+      });
+    } catch (error) {
+      console.warn('[AIC Realtime] subscribe skipped:', error);
+      state.realtimeReady = false;
+      state.realtimeSubscribing = false;
+      state.realtimeChannel = null;
+      state.realtimeChannelName = '';
+      state.realtimeChannelBaseName = '';
+    }
   }
 
   function unsubscribeRealtime() {
@@ -1463,6 +1500,7 @@
 
     state.realtimeChannel = null;
     state.realtimeChannelName = '';
+    state.realtimeChannelBaseName = '';
     state.realtimeReady = false;
     state.realtimeSubscribing = false;
   }
