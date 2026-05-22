@@ -816,3 +816,78 @@ body {
     max-width: 94%;
   }
 }
+
+/* =========================================================
+   Step 3-1 Common Button Shape Link: AIC
+   - 버튼 색상은 기존 AIC 스타일 유지
+   - 높이/반경/패딩/폰트/정렬만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+button,
+.aic-icon-btn,
+.aic-slot-btn,
+.aic-chat-action,
+.aic-send-btn,
+.aic-switch,
+.aic-room-slot,
+.aic-unread-badge {
+  min-height: var(--common-control-height, var(--aic-control-height, 28px));
+  border-radius: var(--common-control-radius, var(--aic-control-radius, 8px));
+  font-size: var(--aic-base-size, 11px);
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.aic-icon-btn,
+.aic-slot-btn,
+.aic-send-btn {
+  height: var(--common-control-height, var(--aic-control-height, 28px));
+  padding: 0 var(--common-control-padding-x, 10px);
+}
+
+.aic-icon-btn {
+  width: var(--common-control-height, var(--aic-control-height, 28px));
+  padding: 0;
+}
+
+.aic-chat-action {
+  min-height: calc(var(--common-control-height, var(--aic-control-height, 28px)) - 4px);
+  padding: 0 8px;
+  font-size: var(--aic-small-size, 10px);
+}
+
+.aic-room-slot,
+.aic-unread-badge {
+  min-height: calc(var(--common-control-height, var(--aic-control-height, 28px)) - 10px);
+  padding: 0 7px;
+  font-size: 9px;
+  border-radius: 999px;
+}
+
+.aic-switch {
+  width: 42px;
+  height: 24px;
+  min-height: 24px;
+  border-radius: 999px;
+}
+
+.aic-modal-actions button,
+.aic-head-actions button,
+.aic-chat-actions button {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 760px) {
+  .aic-slot-buttons {
+    padding-bottom: 2px;
+  }
+
+  .aic-chat-input .module-btn {
+    min-width: 44px;
+  }
+}
