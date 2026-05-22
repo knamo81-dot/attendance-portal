@@ -236,3 +236,40 @@
     --font-small: 9.5px;
   }
 }
+
+/* =========================================================
+   Step 3-2 Common Card Surface Link: work-home common-ui
+   - 모듈 프레임/공통 카드 높이와 레이아웃은 유지
+   - 겉모양(radius, shadow, border, background)만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+.card.el-card,
+.module-frame {
+  background-color: var(--common-card, var(--module-card, #ffffff));
+  border-color: var(--common-line, var(--module-line, #e2e8f0));
+  border-radius: var(--common-card-radius, var(--card-radius, 14px));
+  box-shadow: var(--common-shadow-card, var(--shadow-card, 0 5px 14px rgba(15, 23, 42, 0.045)));
+}
+
+.module-frame-header {
+  border-bottom-color: var(--common-line, var(--module-line, #e2e8f0));
+}
+
+.module-frame-body {
+  background-color: var(--common-card, var(--module-card, #ffffff));
+}
+
+.module-input,
+.module-select,
+.module-btn,
+.btn.el-btn,
+.badge.el-badge {
+  border-color: var(--common-line, #cbd5e1);
+}
+
+.module-input,
+.module-select {
+  border-radius: var(--common-control-radius, var(--control-radius, 8px));
+  background-color: var(--common-card, #ffffff);
+}
+
