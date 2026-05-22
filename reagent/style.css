@@ -2525,3 +2525,53 @@ body,
   }
 }
 
+/* =========================================================
+   Portal iframe fit patch
+   - 통합 iframe 플랫폼 내부 배치 최적화
+   - 시약·초자 기존 신청/취합/정리/제품관리 로직은 변경하지 않음
+========================================================= */
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  background: transparent !important;
+  overflow-x: hidden;
+}
+
+.shell {
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  padding: 10px;
+}
+
+.page.active {
+  width: 100%;
+}
+
+.card,
+.card-body,
+.card-head,
+.table-wrap,
+.form-grid,
+.summary {
+  min-width: 0;
+}
+
+.table-wrap {
+  max-width: 100%;
+}
+
+html.embed-mode body,
+html.embed-mode .shell {
+  background: transparent !important;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    padding: 8px;
+  }
+}
