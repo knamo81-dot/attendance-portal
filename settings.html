@@ -2553,17 +2553,52 @@ create table if not exists user_app_roles (
       const emailRaw = String(payload.email_raw || payload.email || '').trim();
       const role = payload.role || 'viewer';
       const empNo = String(payload.employee_no || '').trim();
+      const companyId = typeof getCompanyId === 'function' ? String(getCompanyId() || '').trim() : '';
 
-      let canonicalEmail = emailLower;
-      const hitLower = await sb.from('users').select('email').eq('email', emailLower).maybeSingle();
-      if(!hitLower.error && hitLower.data && hitLower.data.email) canonicalEmail = hitLower.data.email;
-      else if(emailRaw && emailRaw !== emailLower){
-        const hitRaw = await sb.from('users').select('email').eq('email', emailRaw).maybeSingle();
-        if(!hitRaw.error && hitRaw.data && hitRaw.data.email) canonicalEmail = hitRaw.data.email;
+      if(!emailLower){
+        return { ok:false, error: { message: 'users 동기화 실패: 이메일이 없습니다.' } };
       }
 
-      const portalUser = {
-        email: canonicalEmail,
+      // 기존 users 행을 먼저 찾습니다.
+      // 수정 저장 시 insert를 시도하면 users_email_key 중복 오류가 나므로
+      // 기존 행이 있으면 반드시 update로만 처리합니다.
+      let existingUser = null;
+
+      const hitLower = await sb
+        .from('users')
+        .select('*')
+        .eq('email', emailLower)
+        .maybeSingle();
+
+      if(!hitLower.error && hitLower.data){
+        existingUser = hitLower.data;
+      }
+
+      if(!existingUser && emailRaw && emailRaw !== emailLower){
+        const hitRaw = await sb
+          .from('users')
+          .select('*')
+          .eq('email', emailRaw)
+          .maybeSingle();
+
+        if(!hitRaw.error && hitRaw.data){
+          existingUser = hitRaw.data;
+        }
+      }
+
+      if(!existingUser && empNo){
+        const hitEmp = await sb
+          .from('users')
+          .select('*')
+          .eq('employee_no', empNo)
+          .maybeSingle();
+
+        if(!hitEmp.error && hitEmp.data){
+          existingUser = hitEmp.data;
+        }
+      }
+
+      const baseUser = {
         name: payload.name,
         role,
         is_active: payload.is_active !== false,
@@ -2571,19 +2606,74 @@ create table if not exists user_app_roles (
         employee_no: payload.employee_no,
         updated_at: new Date().toISOString()
       };
-      const res = await sb.from('users').upsert(portalUser, { onConflict: 'email' }).select();
-      if(res.error) return { ok:false, error: res.error };
 
-      let roleRes = await sb.from('users').update({ role }).eq('email', canonicalEmail).select();
-      if((!roleRes.data || !roleRes.data.length) && empNo && !roleRes.error){
-        roleRes = await sb.from('users').update({ role }).eq('employee_no', empNo).select();
+      // public.users에는 company_id 컬럼이 있고 NOT NULL일 수 있으므로
+      // 신규 insert일 때만 아니라 update에도 값이 있으면 같이 보강합니다.
+      if(companyId){
+        baseUser.company_id = companyId;
       }
-      if(roleRes.error) return { ok:false, error: roleRes.error };
 
-      const row = (roleRes.data && roleRes.data[0]) || (res.data && res.data[0]) || null;
+      let row = null;
+
+      if(existingUser){
+        let updateQuery = sb.from('users').update(baseUser);
+
+        if(existingUser.id !== undefined && existingUser.id !== null){
+          updateQuery = updateQuery.eq('id', existingUser.id);
+        }else{
+          updateQuery = updateQuery.eq('email', existingUser.email || emailLower);
+        }
+
+        const updateRes = await updateQuery.select();
+        if(updateRes.error) return { ok:false, error: updateRes.error };
+
+        row = updateRes.data && updateRes.data[0] ? updateRes.data[0] : {
+          ...existingUser,
+          ...baseUser
+        };
+      }else{
+        const insertUser = {
+          ...baseUser,
+          email: emailLower,
+          created_at: new Date().toISOString()
+        };
+
+        const insertRes = await sb.from('users').insert(insertUser).select();
+
+        if(insertRes.error){
+          // 동시 저장/기존 대소문자 이메일 등으로 unique 충돌이 나면 다시 update로 회수합니다.
+          const msg = String(insertRes.error.message || '');
+          if(msg.includes('duplicate key') || msg.includes('users_email_key')){
+            const retryFind = await sb
+              .from('users')
+              .select('*')
+              .eq('email', emailLower)
+              .maybeSingle();
+
+            if(!retryFind.error && retryFind.data){
+              const retryUpdate = await sb
+                .from('users')
+                .update(baseUser)
+                .eq('email', retryFind.data.email)
+                .select();
+
+              if(retryUpdate.error) return { ok:false, error: retryUpdate.error };
+              row = retryUpdate.data && retryUpdate.data[0] ? retryUpdate.data[0] : retryFind.data;
+            }else{
+              return { ok:false, error: insertRes.error };
+            }
+          }else{
+            return { ok:false, error: insertRes.error };
+          }
+        }else{
+          row = insertRes.data && insertRes.data[0] ? insertRes.data[0] : null;
+        }
+      }
+
       if(!row){
         return { ok:false, error: { message: 'public.users에 반영된 행을 찾지 못했습니다. email·employee_no 매칭·RLS(select/update)를 확인하세요.' } };
       }
+
       if(String(row.role || '') !== String(role)){
         return { ok:false, error: { message: `users.role이 ${role}(으)로 저장되지 않았습니다(현재 ${row.role}). Edge Function·DB 트리거·다른 동기화가 덮어쓰는지 확인하세요.` } };
       }
@@ -3110,7 +3200,11 @@ create table if not exists user_app_roles (
     let edgeData = null;
     let edgeOk = false;
     if(isNewEmployee){
-      const { data, error } = await sb.functions.invoke('create-employee-account', { body: payload });
+      const edgePayload = {
+        ...payload,
+        company_id: (typeof getCompanyId === 'function' ? getCompanyId() : '') || undefined
+      };
+      const { data, error } = await sb.functions.invoke('create-employee-account', { body: edgePayload });
       edgeData = data;
       edgeOk = !error && data && data.ok === true;
       const edgeMsg = (error && error.message) || (data && data.error) || '계정/사원 저장 Edge Function 호출에 실패했습니다.';
@@ -3240,7 +3334,11 @@ create table if not exists user_app_roles (
         is_active: (emp.status || '재직') !== '퇴사',
         role: bulkRole,
       };
-      const { data, error } = await sb.functions.invoke('create-employee-account', { body: payload });
+      const edgePayload = {
+        ...payload,
+        company_id: (typeof getCompanyId === 'function' ? getCompanyId() : '') || undefined
+      };
+      const { data, error } = await sb.functions.invoke('create-employee-account', { body: edgePayload });
       if(error || !data?.ok){
         failed.push(`${emp.name || emp.employee_no}: ${(error && error.message) || data?.error || '등록 실패'}`);
         continue;
@@ -4117,175 +4215,6 @@ create table if not exists user_app_roles (
 })();
 </script>
 
-
-<script id="settings-company-id-save-fix">
-(function () {
-  'use strict';
-
-  function readPortalSession() {
-    try {
-      if (window.parent && typeof window.parent.getPortalSession === 'function') {
-        return window.parent.getPortalSession() || {};
-      }
-    } catch (_) {}
-
-    try {
-      if (window.parent && window.parent.portalSession) {
-        return window.parent.portalSession || {};
-      }
-    } catch (_) {}
-
-    return window.portalSession || {};
-  }
-
-  function resolveCompanyIdFallback() {
-    var session = readPortalSession();
-
-    var candidates = [
-      session.companyId,
-      session.company_id,
-      session.company && session.company.id,
-      session.company && session.company.company_id,
-      window.currentCompanyId,
-      window.companyId,
-      localStorage.getItem('company_id'),
-      localStorage.getItem('currentCompanyId'),
-      localStorage.getItem('portal_company_id')
-    ];
-
-    for (var i = 0; i < candidates.length; i++) {
-      var value = String(candidates[i] || '').trim();
-      if (value && value !== 'null' && value !== 'undefined') return value;
-    }
-
-    return '';
-  }
-
-  // 기존 getCompanyId가 있으면 결과가 비어 있을 때만 보완합니다.
-  var originalGetCompanyId = window.getCompanyId;
-  window.getCompanyId = function () {
-    var original = '';
-    try {
-      if (typeof originalGetCompanyId === 'function') {
-        original = String(originalGetCompanyId() || '').trim();
-      }
-    } catch (_) {}
-
-    return original || resolveCompanyIdFallback();
-  };
-
-  window.__settingsResolveCompanyId = window.getCompanyId;
-
-  function patchPayload(payload) {
-    if (!payload || typeof payload !== 'object') return payload;
-
-    var companyId = window.__settingsResolveCompanyId();
-    if (companyId && !payload.company_id) {
-      payload.company_id = companyId;
-    }
-
-    return payload;
-  }
-
-  function patchArrayPayload(rows) {
-    if (Array.isArray(rows)) {
-      rows.forEach(patchPayload);
-    } else {
-      patchPayload(rows);
-    }
-
-    return rows;
-  }
-
-  function patchSupabaseClient(client) {
-    if (!client || client.__settingsCompanyPatchApplied) return client;
-
-    try {
-      var originalFrom = client.from;
-      if (typeof originalFrom !== 'function') return client;
-
-      client.from = function (tableName) {
-        var query = originalFrom.apply(client, arguments);
-
-        if (String(tableName) === 'users' || String(tableName) === 'employees') {
-          ['insert', 'upsert', 'update'].forEach(function (method) {
-            if (!query || typeof query[method] !== 'function') return;
-
-            var originalMethod = query[method];
-            query[method] = function (payload) {
-              if (String(tableName) === 'users' || String(tableName) === 'employees') {
-                patchArrayPayload(payload);
-              }
-              return originalMethod.apply(query, arguments);
-            };
-          });
-        }
-
-        return query;
-      };
-
-      client.__settingsCompanyPatchApplied = true;
-    } catch (error) {
-      console.warn('[settings] company_id patch skipped:', error);
-    }
-
-    return client;
-  }
-
-  function patchKnownClients() {
-    try { patchSupabaseClient(window.portalSupabase); } catch (_) {}
-    try { patchSupabaseClient(window.settingsSupabase); } catch (_) {}
-    try { patchSupabaseClient(window.supabaseClient); } catch (_) {}
-    try {
-      if (window.parent) {
-        patchSupabaseClient(window.parent.portalSupabase);
-        patchSupabaseClient(window.parent.settingsSupabase);
-        patchSupabaseClient(window.parent.supabaseClient);
-      }
-    } catch (_) {}
-  }
-
-  patchKnownClients();
-  document.addEventListener('DOMContentLoaded', patchKnownClients);
-  setTimeout(patchKnownClients, 300);
-  setTimeout(patchKnownClients, 1200);
-
-  // Edge Function 호출에도 company_id가 누락되지 않도록 fetch body를 보강합니다.
-  var originalFetch = window.fetch;
-  if (typeof originalFetch === 'function' && !window.__settingsFetchCompanyPatchApplied) {
-    window.fetch = function (input, init) {
-      try {
-        var url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
-        var isFunctionCall = /\/functions\/v1\/|\/auth|employee|user|profile/i.test(String(url || ''));
-
-        if (isFunctionCall && init && init.body && typeof init.body === 'string') {
-          var data = JSON.parse(init.body);
-          var companyId = window.__settingsResolveCompanyId();
-
-          if (companyId && data && typeof data === 'object') {
-            if (!data.company_id) data.company_id = companyId;
-            if (!data.companyId) data.companyId = companyId;
-
-            if (data.employee && typeof data.employee === 'object' && !data.employee.company_id) {
-              data.employee.company_id = companyId;
-            }
-
-            if (data.user && typeof data.user === 'object' && !data.user.company_id) {
-              data.user.company_id = companyId;
-            }
-
-            init = Object.assign({}, init, { body: JSON.stringify(data) });
-          }
-        }
-      } catch (_) {}
-
-      return originalFetch.apply(this, arguments);
-    };
-
-    window.__settingsFetchCompanyPatchApplied = true;
-  }
-})();
-</script>
 
 </body>
 </html>
