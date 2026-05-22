@@ -2269,4 +2269,61 @@ button,
   }
 }
 
+/* =========================================================
+   Step 3-2 Common Card Surface Link: research-staff
+   - 카드 높이/레이아웃/차트/표 영역은 유지
+   - 카드 겉모양(radius, shadow, border, background)만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+.summary-card,
+.panel,
+.insight-box,
+.comment-box,
+.notice,
+.analysis-standard-card,
+.admin-list-count,
+.leave-toggle,
+.reference-filter,
+.org-filter-group,
+.dedicated-trend-chart,
+.dedicated-trend-summary {
+  border-color: var(--common-line, var(--line));
+  border-radius: var(--common-card-radius, var(--rs-card-radius, 15px));
+  background-color: var(--common-card, var(--panel));
+}
+
+.summary-card,
+.panel,
+.analysis-standard-card,
+.dedicated-trend-chart,
+.dedicated-trend-summary {
+  box-shadow: var(--common-shadow-card, var(--rs-shadow, 0 5px 14px rgba(15, 23, 42, 0.045)));
+}
+
+.insight-box,
+.comment-box,
+.notice,
+.admin-list-count,
+.leave-toggle,
+.reference-filter,
+.org-filter-group {
+  box-shadow: var(--common-shadow-soft, 0 3px 10px rgba(15, 23, 42, 0.04));
+}
+
+.table-wrap,
+.admin-table-wrap {
+  border-radius: var(--common-card-radius, var(--rs-card-radius, 15px));
+}
+
+/* 카드 내부 작은 박스는 살짝 낮은 radius 유지 */
+.insight-box,
+.comment-box,
+.notice,
+.analysis-standard-card,
+.admin-list-count,
+.leave-toggle,
+.reference-filter,
+.org-filter-group {
+  border-radius: var(--common-control-radius, var(--rs-control-radius, 10px));
+}
 
