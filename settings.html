@@ -1281,6 +1281,40 @@ html.embed-mode #settings-page .admin-header-title {
 }
 </style>
 
+
+<style id="settings-iframe-header-cleanup-final">
+/* 포탈 iframe 안에서는 포탈 공통 버튼이 메뉴 역할을 하므로
+   settings 내부의 중복 메뉴명/설명은 7개 섹션 모두 숨깁니다. */
+html.embed-mode #settings-page .admin-header-title,
+html.embed-mode #settings-page .admin-header-desc,
+html.embed-mode #adminSectionTitle,
+html.embed-mode #adminSectionDesc {
+  display: none !important;
+}
+
+/* 내부 탭 버튼도 iframe에서는 숨기고 포탈 공통 버튼만 사용합니다. */
+html.embed-mode #settings-page .adminSubTabs,
+html.embed-mode .adminSubTabs {
+  display: none !important;
+}
+
+/* 제목/설명 제거 후 본문 박스가 너무 위에 붙지 않도록 최소 여백만 유지합니다. */
+html.embed-mode #settings-page .admin-main-card.real-admin-main {
+  padding-top: 8px !important;
+}
+
+html.embed-mode #settings-page .admin-section-panel {
+  margin-top: 0 !important;
+}
+
+/* 첫 번째 안내 박스가 바로 위에 붙어 보이지 않도록 살짝만 여백을 둡니다. */
+html.embed-mode #settings-page .admin-section-panel > .real-admin-top-note:first-child,
+html.embed-mode #settings-page .admin-section-panel > .admin-header-desc:first-child,
+html.embed-mode #settings-page .admin-section-panel > .real-card:first-child {
+  margin-top: 0 !important;
+}
+</style>
+
 </head>
 <body class="settings-embed-body">
 <script>
