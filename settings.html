@@ -20,7 +20,47 @@
     #settings-page.settings-root { display: block; }
     .settings-session-hint { margin: 0 0 12px; padding: 12px 14px; border-radius: 14px; background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; font-size: 14px; line-height: 1.5; }
     body.settings-embed-body { margin: 0; }
-  </style>
+  
+/* =========================================================
+   Step 3-3 Common Input Shape Link: settings
+========================================================= */
+.real-input,
+.real-select,
+.admin-input,
+.admin-select,
+.auth-input{
+  border-radius: var(--common-control-radius, 10px) !important;
+  border-color: var(--common-line, #cbd5e1) !important;
+  background:#fff !important;
+  color:#0f172a !important;
+  outline:none !important;
+}
+
+.real-input:focus,
+.real-select:focus,
+.admin-input:focus,
+.admin-select:focus,
+.auth-input:focus{
+  border-color: var(--common-focus, #2563eb) !important;
+  box-shadow: 0 0 0 3px rgba(37,99,235,.10) !important;
+}
+
+textarea.real-input,
+textarea.admin-input{
+  min-height:84px;
+  padding:10px 12px !important;
+  line-height:1.5;
+}
+
+input[type="checkbox"],
+input[type="radio"]{
+  min-height:auto !important;
+  height:auto !important;
+  width:auto !important;
+  box-shadow:none !important;
+}
+
+</style>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
