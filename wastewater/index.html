@@ -8,19 +8,43 @@
 <link rel="stylesheet" href="../common/theme.css" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
+/* =========================================================
+   Common theme token link
+   - common/theme.css의 --common-* 값을 사용하도록 연결
+   - 폐수 고유 navy/header/status 보조 색상은 유지
+   - fallback 값을 함께 넣어 common 파일 누락 시에도 기존 화면 유지
+========================================================= */
 :root {
-  --bg:#eef3f8; --card:#fff; --line:#dce5ef; --text:#14213d; --muted:#6b7a90; --navy:#0e1a38;
-  --soft:#f7fafc; --danger:#ff3b30; --ok:#0f9d58; --ok-soft:#e7f8ef; --warn:#f79009; --warn-soft:#fff3e6;
-  --shadow:0 8px 18px rgba(15,23,42,.08); --radius:20px; --sky-soft:#eaf4ff; --sky-text:#175cd3;
-  --amber-soft:#fff4e5; --amber-text:#b54708; --indigo-soft:#eef2ff; --indigo-text:#3538cd;
-  --green-soft:#ecfdf3; --green-text:#027a48; --rose-soft:#fff1f3; --rose-text:#c01048;
+  --bg:var(--common-bg, #eef3f8);
+  --card:var(--common-card, #fff);
+  --line:var(--common-line, #dce5ef);
+  --text:var(--common-text, #14213d);
+  --muted:var(--common-muted, #6b7a90);
+
+  /* 폐수 프로그램 고유 색상은 유지 */
+  --navy:#0e1a38;
+  --soft:#f7fafc;
+  --sky-soft:#eaf4ff; --sky-text:#175cd3;
+  --amber-soft:#fff4e5; --amber-text:#b54708;
+  --indigo-soft:#eef2ff; --indigo-text:#3538cd;
+  --green-soft:#ecfdf3; --green-text:#027a48;
+  --rose-soft:#fff1f3; --rose-text:#c01048;
+
+  --danger:var(--common-danger, #ff3b30);
+  --ok:var(--common-success, #0f9d58);
+  --ok-soft:#e7f8ef;
+  --warn:var(--common-warning, #f79009);
+  --warn-soft:#fff3e6;
+
+  --shadow:var(--common-shadow-panel, 0 8px 18px rgba(15,23,42,.08));
+  --radius:var(--common-card-radius, 20px);
 }
 
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;height:100%}
 body{
   margin:0;
-  font-family:Arial,sans-serif;
+  font-family:var(--common-font-family, Arial,sans-serif);
   background:var(--bg);
   color:var(--text);
   overflow-x:hidden;
@@ -346,7 +370,7 @@ th{background:#f5f8fc;color:var(--navy);font-weight:800;position:sticky;top:0}
   box-shadow:var(--shadow);
 }
 .doc-editor{padding:22px;border-radius:18px}
-.ref-editor-textarea{min-height:360px;font-family:Arial,sans-serif;line-height:1.7}
+.ref-editor-textarea{min-height:360px;font-family:var(--common-font-family, Arial,sans-serif);line-height:1.7}
 .doc-title{font-size:24px;font-weight:900;margin-bottom:6px;color:var(--navy);letter-spacing:-.02em}
 .doc-meta-top{font-size:13px;color:#667085}
 .doc-meta{font-size:13px;color:#667085;margin-bottom:18px;padding-bottom:10px;border-bottom:2px solid #e4e7ec}
@@ -735,13 +759,13 @@ table td {
 :root {
   --ww-page-gap: 12px;
   --ww-card-padding: 18px;
-  --ww-card-radius: 16px;
+  --ww-card-radius: var(--common-card-radius, 16px);
   --ww-control-height: 34px;
-  --ww-control-radius: 11px;
+  --ww-control-radius: var(--common-control-radius, 11px);
   --ww-font-base: 13px;
-  --ww-font-small: 11.5px;
+  --ww-font-small: var(--common-font-size-small, 11.5px);
   --ww-font-title: 16px;
-  --ww-shadow: 0 5px 14px rgba(15,23,42,.05);
+  --ww-shadow: var(--common-shadow-card, 0 5px 14px rgba(15,23,42,.05));
 }
 
 /* 전체 */
