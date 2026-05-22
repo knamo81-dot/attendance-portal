@@ -1987,3 +1987,113 @@ button,
     justify-content: flex-start;
   }
 }
+
+/* =========================================================
+   Step 3-2 Common Card Surface Link: portal-home
+   - 카드/메모/일정/예약 박스의 높이와 레이아웃은 유지
+   - 겉모양(radius, shadow, border, background)만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+.card,
+.placeholder-box,
+.memo-board,
+.memo-note,
+.memo-pop,
+.trash-item,
+.schedule-item,
+.reservation-card,
+.reservation-timetable,
+.reservation-time-block,
+.reservation-modal-card,
+.auth-card,
+.user-chip,
+.scope-check,
+.month-scope-chip,
+.planner-switch,
+.selected-panel-switch,
+.selected-panel-status-filter,
+.reservation-tab,
+.embedded-app-frame {
+  border-color: var(--common-line, #e2e8f0);
+  border-radius: var(--common-card-radius, var(--card-radius, 14px));
+}
+
+.card,
+.placeholder-box,
+.memo-pop,
+.trash-item,
+.schedule-item,
+.reservation-card,
+.reservation-timetable,
+.reservation-modal-card,
+.auth-card,
+.embedded-app-frame {
+  background-color: var(--common-card, #fff);
+}
+
+.card,
+.memo-note,
+.memo-pop,
+.reservation-time-block,
+.reservation-modal-card,
+.auth-card,
+.embedded-app-frame {
+  box-shadow: var(--common-shadow-card, var(--shadow-card, 0 5px 14px rgba(15,23,42,0.045)));
+}
+
+/* 내부 보조 박스는 컨트롤 radius 기준으로 살짝 낮게 유지 */
+.placeholder-box,
+.trash-item,
+.schedule-item,
+.reservation-card,
+.reservation-timetable,
+.scope-check,
+.month-scope-chip,
+.planner-switch,
+.selected-panel-switch,
+.selected-panel-status-filter,
+.reservation-tab,
+.user-chip,
+.field input[type="text"],
+.field textarea,
+.field select,
+.auth-input {
+  border-radius: var(--common-control-radius, var(--control-radius, 9px));
+}
+
+/* 의미 색상/배경이 있는 일정·예약 상태 카드는 기존 색 유지 */
+.schedule-item.scope-all,
+.schedule-item.scope-lab,
+.schedule-item.scope-team,
+.schedule-item.scope-personal,
+.schedule-item.completed,
+.reservation-card.available,
+.reservation-card.partial,
+.reservation-card.full,
+.reservation-time-block.available,
+.reservation-time-block.partial,
+.reservation-time-block.full,
+.reservation-time-block.mine,
+.scope-check.scope-all,
+.scope-check.scope-lab,
+.scope-check.scope-team,
+.scope-check.scope-private,
+.month-scope-chip.all,
+.month-scope-chip.lab,
+.month-scope-chip.team,
+.month-scope-chip.personal {
+  box-shadow: var(--common-shadow-soft, 0 3px 10px rgba(15,23,42,0.04));
+}
+
+/* 메모 보드/캘린더 셀은 높이 유지, 외곽만 공통화 */
+.memo-board,
+.day-cell {
+  border-color: var(--common-line, #e2e8f0);
+  border-radius: var(--common-card-radius, var(--card-radius, 14px));
+}
+
+.memo-image-frame {
+  border-color: var(--common-line, #e2e8f0);
+  border-radius: var(--common-control-radius, var(--control-radius, 9px));
+  box-shadow: var(--common-shadow-soft, 0 2px 8px rgba(15,23,42,0.06));
+}
