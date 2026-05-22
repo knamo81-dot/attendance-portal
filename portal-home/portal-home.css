@@ -1906,3 +1906,84 @@ body.auth-loading .app{visibility:visible; opacity:.35; pointer-events:none}
 .memo-board {
   margin: 2px 14px 14px 14px !important;
 }
+
+/* =========================================================
+   Step 3-1 Common Button Shape Link: portal-home
+   - 버튼 색상은 기존 업무 홈 스타일 유지
+   - 높이/반경/패딩/폰트/정렬만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+button,
+.pill,
+.small-btn,
+.auth-btn,
+.scope-check,
+.month-scope-chip,
+.planner-switch button,
+.selected-panel-switch button,
+.selected-panel-status-filter button,
+.reservation-tab,
+.reservation-status-pill,
+.badge-mini,
+.scope-badge,
+.reservation-badge,
+.user-chip {
+  min-height: var(--common-control-height, var(--control-height, 30px));
+  border-radius: var(--common-control-radius, var(--control-radius, 9px));
+  font-size: var(--font-base, 12px);
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pill,
+.small-btn,
+.auth-btn,
+.scope-check,
+.month-scope-chip,
+.reservation-tab {
+  height: var(--common-control-height, var(--control-height, 30px));
+  padding: 0 var(--common-control-padding-x, 10px);
+}
+
+.planner-switch button,
+.selected-panel-switch button,
+.selected-panel-status-filter button {
+  min-height: calc(var(--common-control-height, var(--control-height, 30px)) - 4px);
+  padding: 0 13px;
+}
+
+.badge-mini,
+.scope-badge,
+.reservation-badge,
+.reservation-status-pill,
+.user-chip {
+  min-height: calc(var(--common-control-height, var(--control-height, 30px)) - 8px);
+  padding: 0 8px;
+  font-size: var(--font-small, 10.5px);
+}
+
+.memo-actions .small-btn,
+.row-end .small-btn,
+.auth-actions .auth-btn {
+  flex: 0 0 auto;
+}
+
+.schedule-head {
+  min-height: var(--common-control-height, var(--control-height, 30px));
+}
+
+@media (max-width: 760px) {
+  .auth-actions .auth-btn {
+    flex: 1;
+  }
+
+  .month-scope-chip,
+  .scope-check {
+    justify-content: flex-start;
+  }
+}
