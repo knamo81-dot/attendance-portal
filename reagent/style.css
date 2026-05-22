@@ -1,13 +1,22 @@
+/* =========================================================
+   Common theme token link
+   - common/theme.css의 --common-* 값을 사용하도록 연결
+   - 시약·초자 고유 primary/header 색상은 유지
+   - fallback 값을 함께 넣어 common 파일 누락 시에도 기존 화면 유지
+========================================================= */
 :root{
-    --bg:#f5f7fb;
-    --card:#ffffff;
-    --line:#d9e2ec;
-    --text:#1f2937;
-    --muted:#6b7280;
+    --bg:var(--common-bg, #f5f7fb);
+    --card:var(--common-card, #ffffff);
+    --line:var(--common-line, #d9e2ec);
+    --text:var(--common-text, #1f2937);
+    --muted:var(--common-muted, #6b7280);
+
+    /* 시약·초자 프로그램 고유 색상은 유지 */
     --primary:#1d4ed8;
     --primary-soft:#eaf2ff;
-    --shadow:0 10px 28px rgba(15,23,42,.08);
-    --radius:18px
+
+    --shadow:var(--common-shadow-panel, 0 10px 28px rgba(15,23,42,.08));
+    --radius:var(--common-card-radius, 18px)
     }
     
     *{box-sizing:border-box}
@@ -17,7 +26,7 @@
     padding:0;
     width:100%;
     min-width:0;
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    font-family:var(--common-font-family, -apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",sans-serif);
     background:var(--bg);
     color:var(--text)
     }
@@ -1788,13 +1797,13 @@ tr:not(.collect-row-confirmed) .vendor-group-td{
 :root{
   --rg-page-gap:10px;
   --rg-card-padding:14px;
-  --rg-card-radius:14px;
+  --rg-card-radius:var(--common-card-radius, 14px);
   --rg-control-height:34px;
-  --rg-control-radius:10px;
+  --rg-control-radius:var(--common-control-radius, 10px);
   --rg-font-title:16px;
   --rg-font-base:12px;
-  --rg-font-small:11px;
-  --rg-shadow:0 5px 14px rgba(15,23,42,.045);
+  --rg-font-small:var(--common-font-size-small, 11px);
+  --rg-shadow:var(--common-shadow-card, 0 5px 14px rgba(15,23,42,.045));
 }
 
 body{
