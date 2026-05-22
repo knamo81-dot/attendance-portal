@@ -1456,6 +1456,103 @@ button,
   border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
 }
 
+
+
+/* =========================================================
+   Step 3-3 Common Input Shape Link: wastewater
+   - input/select/textarea의 폭/레이아웃/표 구조는 유지
+   - 높이/반경/폰트/테두리/포커스만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+input,
+select,
+textarea,
+.input,
+.select,
+.textarea,
+.editor-select,
+.search-input,
+.ref-editor-textarea,
+.prepare-remark-select {
+  border-color: var(--common-line, var(--line));
+  border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
+  background-color: var(--common-card, #fff);
+  color: var(--common-text, var(--text));
+  font-size: var(--ww-font-base, 13px);
+  outline: none;
+}
+
+.input,
+.select,
+textarea,
+.textarea,
+.ref-editor-textarea {
+  min-height: var(--common-control-height, var(--ww-control-height, 34px));
+  border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
+  padding: 9px 11px;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.input:focus,
+.select:focus,
+.textarea:focus,
+.ref-editor-textarea:focus,
+.editor-select:focus,
+.search-input:focus {
+  border-color: var(--common-focus, var(--module-accent, #0ea5e9));
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.10);
+}
+
+/* 문서 편집/긴 텍스트 영역은 기존 높이 유지 */
+.textarea {
+  min-height: 76px;
+}
+
+.ref-editor-textarea {
+  min-height: 360px;
+  line-height: 1.7;
+}
+
+.rich-editor {
+  outline: none;
+}
+
+.rich-editor:focus {
+  border-color: var(--common-focus, var(--module-accent, #0ea5e9));
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.10);
+}
+
+/* 툴바/검색/선택 입력은 버튼 높이와 맞춤 */
+.editor-select,
+.search-input,
+.toolbar-right input,
+.toolbar-right select,
+.ledger-approval-box input,
+.ledger-approval-box select {
+  min-height: var(--common-control-height, var(--ww-control-height, 34px));
+  height: var(--common-control-height, var(--ww-control-height, 34px));
+  border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
+}
+
+/* 체크박스는 공통 높이 강제 제외 */
+input[type="checkbox"],
+.checkbox-row input[type="checkbox"] {
+  min-height: auto !important;
+  height: 16px !important;
+  width: 16px !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+
+/* 서명 이미지/파일류 input은 브라우저 기본 동작 유지 */
+input[type="file"] {
+  height: auto !important;
+  min-height: var(--common-control-height, var(--ww-control-height, 34px));
+  padding: 7px 10px;
+}
+
 </style>
 </head>
 <body>
