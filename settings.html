@@ -1268,6 +1268,22 @@ html.embed-mode #settings-page .real-form-card{
 }
 </style>
 
+
+<style id="portal-iframe-settings-button-hide">
+/* 포탈 iframe 내부에서는 설정앱 자체의 상단 사용자/설정 버튼을 숨깁니다.
+   실제 설정 호출은 포탈 상단 버튼이 window.openPortalSettings()를 통해 처리합니다. */
+html.embed-mode .top-user-bar,
+html.embed-mode #topUserBar,
+html.embed-mode .personal-settings-icon-btn,
+html.embed-mode #personalSettingsIconBtn,
+html.embed-mode [data-personal-settings],
+html.embed-mode [data-open-settings],
+html.embed-mode .settings-floating-btn,
+html.embed-mode .settings-icon-btn {
+  display: none !important;
+}
+</style>
+
 </head>
 <body class="settings-embed-body">
 <script>
@@ -4011,6 +4027,59 @@ create table if not exists user_app_roles (
   } else {
     initPortalSetting();
   }
+})();
+</script>
+
+
+<script id="portal-settings-iframe-bridge">
+(function () {
+  'use strict';
+
+  function clickSection(tabId) {
+    var section = String(tabId || '').trim() || 'org';
+    var btn =
+      document.querySelector('.admin-subnav-btn[data-admin-section="' + section + '"]') ||
+      document.querySelector('.admin-subnav-btn[data-admin-section="org"]') ||
+      document.querySelector('.admin-subnav-btn');
+
+    if (btn && typeof btn.click === 'function') {
+      btn.click();
+      return true;
+    }
+
+    return false;
+  }
+
+  function focusSettingsRoot() {
+    var root = document.getElementById('settings-page') || document.body;
+    if (!root) return;
+
+    try {
+      root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (_) {
+      try { root.scrollIntoView(); } catch (e) {}
+    }
+  }
+
+  function openFromPortal(tabId) {
+    clickSection(tabId || 'org');
+    focusSettingsRoot();
+  }
+
+  // 포탈 index의 iframe.contentWindow.openPortalSettings() 호출을 받는 함수
+  window.openPortalSettings = openFromPortal;
+  window.openSettings = openFromPortal;
+  window.openSettingsModal = openFromPortal;
+
+  // postMessage 방식으로도 받을 수 있게 보조 연결
+  window.addEventListener('message', function (event) {
+    var data = event && event.data ? event.data : {};
+    if (!data || typeof data !== 'object') return;
+
+    if (data.type === 'portal-open-settings' || data.type === 'open-portal-settings') {
+      openFromPortal(data.tabId || data.tab || 'org');
+    }
+  });
 })();
 </script>
 
