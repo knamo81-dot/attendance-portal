@@ -54,6 +54,11 @@
     realtimeReady: false,
     realtimeSubscribing: false,
     realtimeResubscribeTimer: null,
+    readRealtimeChannel: null,
+    readRealtimeChannelName: '',
+    readRealtimeReady: false,
+    readRealtimeSubscribing: false,
+    readRealtimeResubscribeTimer: null,
     readMap: {},
     readSaveTimer: null,
     readSyncReady: false,
@@ -964,7 +969,10 @@
         state.rooms = [];
         state.openSlots = [];
         state.dbReady = true;
-        if (!options.skipRealtime) subscribeRealtime();
+        if (!options.skipRealtime) {
+          subscribeRealtime();
+          subscribeReadRealtime();
+        }
         render(false);
         return;
       }
@@ -1017,7 +1025,10 @@
       });
 
       state.dbReady = true;
-      if (!options.skipRealtime) subscribeRealtime();
+      if (!options.skipRealtime) {
+        subscribeRealtime();
+        subscribeReadRealtime();
+      }
       render(true);
     } catch (error) {
       state.dbReady = false;
@@ -1233,6 +1244,122 @@
       state.realtimeChannelName = '';
       subscribeRealtime({ force: true });
     }, Number(delay) || 800);
+  }
+
+  function getReadRealtimeChannelName() {
+    var companyId = getCompanyId();
+    var email = String(getCurrentUserEmail() || '').trim().toLowerCase().replace(/[^a-z0-9_@.-]/g, '_');
+    return companyId && email ? ('aic-read-' + companyId + '-' + email) : '';
+  }
+
+  function scheduleReadRealtimeReconnect(delay) {
+    clearTimeout(state.readRealtimeResubscribeTimer);
+    state.readRealtimeResubscribeTimer = setTimeout(function () {
+      state.readRealtimeSubscribing = false;
+      state.readRealtimeReady = false;
+      state.readRealtimeChannel = null;
+      state.readRealtimeChannelName = '';
+      subscribeReadRealtime({ force: true });
+    }, Number(delay) || 1000);
+  }
+
+  function subscribeReadRealtime(options) {
+    var force = !!(options && options.force);
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+    var email = String(getCurrentUserEmail() || '').trim();
+
+    if (!sb || !companyId || !email || typeof sb.channel !== 'function') return;
+
+    var channelName = getReadRealtimeChannelName();
+    if (!channelName) return;
+
+    if (!force && state.readRealtimeChannel && state.readRealtimeChannelName === channelName) {
+      return;
+    }
+
+    if (!force && state.readRealtimeSubscribing && state.readRealtimeChannelName === channelName) {
+      return;
+    }
+
+    unsubscribeReadRealtime();
+
+    state.readRealtimeSubscribing = true;
+    state.readRealtimeReady = false;
+    state.readRealtimeChannelName = channelName;
+
+    var channel = sb
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'aic_message_reads',
+          filter: 'company_id=eq.' + companyId
+        },
+        function (payload) {
+          handleReadRealtimeChange(payload.new || payload.old || {});
+        }
+      );
+
+    state.readRealtimeChannel = channel;
+
+    channel.subscribe(function (status) {
+      if (status === 'SUBSCRIBED') {
+        state.readRealtimeReady = true;
+        state.readRealtimeSubscribing = false;
+        return;
+      }
+
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        console.warn('[AIC READ Realtime]', status);
+        state.readRealtimeReady = false;
+        state.readRealtimeSubscribing = false;
+
+        if (state.readRealtimeChannelName === channelName) {
+          scheduleReadRealtimeReconnect(1500);
+        }
+      }
+    });
+  }
+
+  function unsubscribeReadRealtime() {
+    var sb = getSupabaseClient();
+
+    clearTimeout(state.readRealtimeResubscribeTimer);
+    state.readRealtimeResubscribeTimer = null;
+
+    if (state.readRealtimeChannel && sb && typeof sb.removeChannel === 'function') {
+      try {
+        sb.removeChannel(state.readRealtimeChannel);
+      } catch (_) {}
+    }
+
+    state.readRealtimeChannel = null;
+    state.readRealtimeChannelName = '';
+    state.readRealtimeReady = false;
+    state.readRealtimeSubscribing = false;
+  }
+
+  function handleReadRealtimeChange(row) {
+    if (!row || !row.room_id) return;
+
+    var currentEmail = String(getCurrentUserEmail() || '').trim().toLowerCase();
+    var rowEmail = String(row.user_email || '').trim().toLowerCase();
+
+    if (!currentEmail || !rowEmail || currentEmail !== rowEmail) return;
+
+    var roomId = String(row.room_id || '').trim();
+    var nextValue = row.last_read_at || '';
+    var current = Date.parse(state.readMap[roomId] || '');
+    var next = Date.parse(nextValue || '');
+
+    if (!roomId || !Number.isFinite(next)) return;
+    if (Number.isFinite(current) && current >= next) return;
+
+    state.readMap[roomId] = nextValue;
+    renderRoomList();
   }
 
   function subscribeRealtime(options) {
