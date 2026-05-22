@@ -4117,5 +4117,175 @@ create table if not exists user_app_roles (
 })();
 </script>
 
+
+<script id="settings-company-id-save-fix">
+(function () {
+  'use strict';
+
+  function readPortalSession() {
+    try {
+      if (window.parent && typeof window.parent.getPortalSession === 'function') {
+        return window.parent.getPortalSession() || {};
+      }
+    } catch (_) {}
+
+    try {
+      if (window.parent && window.parent.portalSession) {
+        return window.parent.portalSession || {};
+      }
+    } catch (_) {}
+
+    return window.portalSession || {};
+  }
+
+  function resolveCompanyIdFallback() {
+    var session = readPortalSession();
+
+    var candidates = [
+      session.companyId,
+      session.company_id,
+      session.company && session.company.id,
+      session.company && session.company.company_id,
+      window.currentCompanyId,
+      window.companyId,
+      localStorage.getItem('company_id'),
+      localStorage.getItem('currentCompanyId'),
+      localStorage.getItem('portal_company_id')
+    ];
+
+    for (var i = 0; i < candidates.length; i++) {
+      var value = String(candidates[i] || '').trim();
+      if (value && value !== 'null' && value !== 'undefined') return value;
+    }
+
+    return '';
+  }
+
+  // 기존 getCompanyId가 있으면 결과가 비어 있을 때만 보완합니다.
+  var originalGetCompanyId = window.getCompanyId;
+  window.getCompanyId = function () {
+    var original = '';
+    try {
+      if (typeof originalGetCompanyId === 'function') {
+        original = String(originalGetCompanyId() || '').trim();
+      }
+    } catch (_) {}
+
+    return original || resolveCompanyIdFallback();
+  };
+
+  window.__settingsResolveCompanyId = window.getCompanyId;
+
+  function patchPayload(payload) {
+    if (!payload || typeof payload !== 'object') return payload;
+
+    var companyId = window.__settingsResolveCompanyId();
+    if (companyId && !payload.company_id) {
+      payload.company_id = companyId;
+    }
+
+    return payload;
+  }
+
+  function patchArrayPayload(rows) {
+    if (Array.isArray(rows)) {
+      rows.forEach(patchPayload);
+    } else {
+      patchPayload(rows);
+    }
+
+    return rows;
+  }
+
+  function patchSupabaseClient(client) {
+    if (!client || client.__settingsCompanyPatchApplied) return client;
+
+    try {
+      var originalFrom = client.from;
+      if (typeof originalFrom !== 'function') return client;
+
+      client.from = function (tableName) {
+        var query = originalFrom.apply(client, arguments);
+
+        if (String(tableName) === 'users' || String(tableName) === 'employees') {
+          ['insert', 'upsert', 'update'].forEach(function (method) {
+            if (!query || typeof query[method] !== 'function') return;
+
+            var originalMethod = query[method];
+            query[method] = function (payload) {
+              if (String(tableName) === 'users' || String(tableName) === 'employees') {
+                patchArrayPayload(payload);
+              }
+              return originalMethod.apply(query, arguments);
+            };
+          });
+        }
+
+        return query;
+      };
+
+      client.__settingsCompanyPatchApplied = true;
+    } catch (error) {
+      console.warn('[settings] company_id patch skipped:', error);
+    }
+
+    return client;
+  }
+
+  function patchKnownClients() {
+    try { patchSupabaseClient(window.portalSupabase); } catch (_) {}
+    try { patchSupabaseClient(window.settingsSupabase); } catch (_) {}
+    try { patchSupabaseClient(window.supabaseClient); } catch (_) {}
+    try {
+      if (window.parent) {
+        patchSupabaseClient(window.parent.portalSupabase);
+        patchSupabaseClient(window.parent.settingsSupabase);
+        patchSupabaseClient(window.parent.supabaseClient);
+      }
+    } catch (_) {}
+  }
+
+  patchKnownClients();
+  document.addEventListener('DOMContentLoaded', patchKnownClients);
+  setTimeout(patchKnownClients, 300);
+  setTimeout(patchKnownClients, 1200);
+
+  // Edge Function 호출에도 company_id가 누락되지 않도록 fetch body를 보강합니다.
+  var originalFetch = window.fetch;
+  if (typeof originalFetch === 'function' && !window.__settingsFetchCompanyPatchApplied) {
+    window.fetch = function (input, init) {
+      try {
+        var url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+        var isFunctionCall = /\/functions\/v1\/|\/auth|employee|user|profile/i.test(String(url || ''));
+
+        if (isFunctionCall && init && init.body && typeof init.body === 'string') {
+          var data = JSON.parse(init.body);
+          var companyId = window.__settingsResolveCompanyId();
+
+          if (companyId && data && typeof data === 'object') {
+            if (!data.company_id) data.company_id = companyId;
+            if (!data.companyId) data.companyId = companyId;
+
+            if (data.employee && typeof data.employee === 'object' && !data.employee.company_id) {
+              data.employee.company_id = companyId;
+            }
+
+            if (data.user && typeof data.user === 'object' && !data.user.company_id) {
+              data.user.company_id = companyId;
+            }
+
+            init = Object.assign({}, init, { body: JSON.stringify(data) });
+          }
+        }
+      } catch (_) {}
+
+      return originalFetch.apply(this, arguments);
+    };
+
+    window.__settingsFetchCompanyPatchApplied = true;
+  }
+})();
+</script>
+
 </body>
 </html>
