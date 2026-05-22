@@ -4118,11 +4118,12 @@ create table if not exists user_app_roles (
 </script>
 
 
-<script id="settings-company-id-save-fix">
+
+<script id="settings-employee-create-edge-fix-final">
 (function () {
   'use strict';
 
-  function readPortalSession() {
+  function getParentSession() {
     try {
       if (window.parent && typeof window.parent.getPortalSession === 'function') {
         return window.parent.getPortalSession() || {};
@@ -4138,8 +4139,8 @@ create table if not exists user_app_roles (
     return window.portalSession || {};
   }
 
-  function resolveCompanyIdFallback() {
-    var session = readPortalSession();
+  function getCompanyIdSafe() {
+    var session = getParentSession();
 
     var candidates = [
       session.companyId,
@@ -4149,141 +4150,183 @@ create table if not exists user_app_roles (
       window.currentCompanyId,
       window.companyId,
       localStorage.getItem('company_id'),
-      localStorage.getItem('currentCompanyId'),
-      localStorage.getItem('portal_company_id')
+      localStorage.getItem('portal_company_id'),
+      localStorage.getItem('currentCompanyId')
     ];
 
     for (var i = 0; i < candidates.length; i++) {
-      var value = String(candidates[i] || '').trim();
-      if (value && value !== 'null' && value !== 'undefined') return value;
+      var v = String(candidates[i] || '').trim();
+      if (v && v !== 'null' && v !== 'undefined') return v;
     }
 
     return '';
   }
 
-  // 기존 getCompanyId가 있으면 결과가 비어 있을 때만 보완합니다.
-  var originalGetCompanyId = window.getCompanyId;
-  window.getCompanyId = function () {
-    var original = '';
-    try {
-      if (typeof originalGetCompanyId === 'function') {
-        original = String(originalGetCompanyId() || '').trim();
-      }
-    } catch (_) {}
+  function normalizeEmployeePayload(data) {
+    if (!data || typeof data !== 'object') return data;
 
-    return original || resolveCompanyIdFallback();
-  };
+    var companyId = getCompanyIdSafe();
+    if (!companyId) return data;
 
-  window.__settingsResolveCompanyId = window.getCompanyId;
+    if (!data.company_id) data.company_id = companyId;
+    if (!data.companyId) data.companyId = companyId;
 
-  function patchPayload(payload) {
-    if (!payload || typeof payload !== 'object') return payload;
-
-    var companyId = window.__settingsResolveCompanyId();
-    if (companyId && !payload.company_id) {
-      payload.company_id = companyId;
+    if (data.employee && typeof data.employee === 'object') {
+      if (!data.employee.company_id) data.employee.company_id = companyId;
+      if (!data.employee.companyId) data.employee.companyId = companyId;
     }
 
-    return payload;
-  }
-
-  function patchArrayPayload(rows) {
-    if (Array.isArray(rows)) {
-      rows.forEach(patchPayload);
-    } else {
-      patchPayload(rows);
+    if (data.user && typeof data.user === 'object') {
+      if (!data.user.company_id) data.user.company_id = companyId;
+      if (!data.user.companyId) data.user.companyId = companyId;
     }
 
-    return rows;
-  }
-
-  function patchSupabaseClient(client) {
-    if (!client || client.__settingsCompanyPatchApplied) return client;
-
-    try {
-      var originalFrom = client.from;
-      if (typeof originalFrom !== 'function') return client;
-
-      client.from = function (tableName) {
-        var query = originalFrom.apply(client, arguments);
-
-        if (String(tableName) === 'users' || String(tableName) === 'employees') {
-          ['insert', 'upsert', 'update'].forEach(function (method) {
-            if (!query || typeof query[method] !== 'function') return;
-
-            var originalMethod = query[method];
-            query[method] = function (payload) {
-              if (String(tableName) === 'users' || String(tableName) === 'employees') {
-                patchArrayPayload(payload);
-              }
-              return originalMethod.apply(query, arguments);
-            };
-          });
-        }
-
-        return query;
-      };
-
-      client.__settingsCompanyPatchApplied = true;
-    } catch (error) {
-      console.warn('[settings] company_id patch skipped:', error);
+    if (data.profile && typeof data.profile === 'object') {
+      if (!data.profile.company_id) data.profile.company_id = companyId;
+      if (!data.profile.companyId) data.profile.companyId = companyId;
     }
 
-    return client;
+    return data;
   }
 
-  function patchKnownClients() {
-    try { patchSupabaseClient(window.portalSupabase); } catch (_) {}
-    try { patchSupabaseClient(window.settingsSupabase); } catch (_) {}
-    try { patchSupabaseClient(window.supabaseClient); } catch (_) {}
-    try {
-      if (window.parent) {
-        patchSupabaseClient(window.parent.portalSupabase);
-        patchSupabaseClient(window.parent.settingsSupabase);
-        patchSupabaseClient(window.parent.supabaseClient);
-      }
-    } catch (_) {}
+  function isEmployeeCreateUrl(url) {
+    var s = String(url || '').toLowerCase();
+    return (
+      s.indexOf('/functions/v1/') >= 0 ||
+      s.indexOf('create-user') >= 0 ||
+      s.indexOf('create_employee') >= 0 ||
+      s.indexOf('create-employee') >= 0 ||
+      s.indexOf('admin-create') >= 0 ||
+      s.indexOf('employee') >= 0 ||
+      s.indexOf('sync-user') >= 0
+    );
   }
 
-  patchKnownClients();
-  document.addEventListener('DOMContentLoaded', patchKnownClients);
-  setTimeout(patchKnownClients, 300);
-  setTimeout(patchKnownClients, 1200);
-
-  // Edge Function 호출에도 company_id가 누락되지 않도록 fetch body를 보강합니다.
+  // fetch 기반 Edge Function 호출 보강
   var originalFetch = window.fetch;
-  if (typeof originalFetch === 'function' && !window.__settingsFetchCompanyPatchApplied) {
-    window.fetch = function (input, init) {
+  if (typeof originalFetch === 'function' && !window.__settingsEmployeeEdgeFetchFixApplied) {
+    window.fetch = async function (input, init) {
+      var nextInput = input;
+      var nextInit = init;
+
       try {
         var url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
-        var isFunctionCall = /\/functions\/v1\/|\/auth|employee|user|profile/i.test(String(url || ''));
-
-        if (isFunctionCall && init && init.body && typeof init.body === 'string') {
-          var data = JSON.parse(init.body);
-          var companyId = window.__settingsResolveCompanyId();
-
-          if (companyId && data && typeof data === 'object') {
-            if (!data.company_id) data.company_id = companyId;
-            if (!data.companyId) data.companyId = companyId;
-
-            if (data.employee && typeof data.employee === 'object' && !data.employee.company_id) {
-              data.employee.company_id = companyId;
-            }
-
-            if (data.user && typeof data.user === 'object' && !data.user.company_id) {
-              data.user.company_id = companyId;
-            }
-
-            init = Object.assign({}, init, { body: JSON.stringify(data) });
-          }
+        if (isEmployeeCreateUrl(url) && init && typeof init.body === 'string') {
+          var body = JSON.parse(init.body);
+          normalizeEmployeePayload(body);
+          nextInit = Object.assign({}, init, { body: JSON.stringify(body) });
         }
       } catch (_) {}
 
-      return originalFetch.apply(this, arguments);
+      var res = await originalFetch.call(this, nextInput, nextInit);
+
+      // 기존 "non-2xx"만 보이는 문제를 줄이기 위해 실제 본문 에러도 console에 남김
+      try {
+        var url2 = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+        if (isEmployeeCreateUrl(url2) && res && !res.ok) {
+          var clone = res.clone();
+          clone.text().then(function (txt) {
+            console.warn('[settings employee edge error]', res.status, txt);
+          }).catch(function () {});
+        }
+      } catch (_) {}
+
+      return res;
     };
 
-    window.__settingsFetchCompanyPatchApplied = true;
+    window.__settingsEmployeeEdgeFetchFixApplied = true;
   }
+
+  function patchFunctionsInvoke(client) {
+    if (!client || client.__settingsEmployeeInvokeFixApplied) return client;
+    if (!client.functions || typeof client.functions.invoke !== 'function') return client;
+
+    var originalInvoke = client.functions.invoke.bind(client.functions);
+
+    client.functions.invoke = function (functionName, options) {
+      try {
+        var name = String(functionName || '').toLowerCase();
+        var shouldPatch =
+          name.indexOf('user') >= 0 ||
+          name.indexOf('employee') >= 0 ||
+          name.indexOf('profile') >= 0 ||
+          name.indexOf('admin') >= 0 ||
+          name.indexOf('sync') >= 0;
+
+        if (shouldPatch && options && options.body && typeof options.body === 'object') {
+          options = Object.assign({}, options, {
+            body: normalizeEmployeePayload(Object.assign({}, options.body))
+          });
+        }
+      } catch (_) {}
+
+      return originalInvoke(functionName, options);
+    };
+
+    client.__settingsEmployeeInvokeFixApplied = true;
+    return client;
+  }
+
+  function patchSupabaseFrom(client) {
+    if (!client || client.__settingsEmployeeFromFixApplied) return client;
+    if (typeof client.from !== 'function') return client;
+
+    var originalFrom = client.from.bind(client);
+
+    client.from = function (tableName) {
+      var query = originalFrom(tableName);
+      var table = String(tableName || '').toLowerCase();
+
+      if (table === 'users' || table === 'employees' || table === 'research_staff_profiles') {
+        ['insert', 'upsert', 'update'].forEach(function (method) {
+          if (!query || typeof query[method] !== 'function') return;
+          var originalMethod = query[method].bind(query);
+
+          query[method] = function (payload) {
+            try {
+              if (Array.isArray(payload)) {
+                payload = payload.map(function (row) {
+                  return normalizeEmployeePayload(Object.assign({}, row));
+                });
+              } else if (payload && typeof payload === 'object') {
+                payload = normalizeEmployeePayload(Object.assign({}, payload));
+              }
+            } catch (_) {}
+            return originalMethod(payload);
+          };
+        });
+      }
+
+      return query;
+    };
+
+    client.__settingsEmployeeFromFixApplied = true;
+    return client;
+  }
+
+  function patchAllClients() {
+    try { patchFunctionsInvoke(window.portalSupabase); patchSupabaseFrom(window.portalSupabase); } catch (_) {}
+    try { patchFunctionsInvoke(window.settingsSupabase); patchSupabaseFrom(window.settingsSupabase); } catch (_) {}
+    try { patchFunctionsInvoke(window.supabaseClient); patchSupabaseFrom(window.supabaseClient); } catch (_) {}
+    try { patchFunctionsInvoke(window.supabase); patchSupabaseFrom(window.supabase); } catch (_) {}
+
+    try {
+      if (window.parent) {
+        patchFunctionsInvoke(window.parent.portalSupabase); patchSupabaseFrom(window.parent.portalSupabase);
+        patchFunctionsInvoke(window.parent.settingsSupabase); patchSupabaseFrom(window.parent.settingsSupabase);
+        patchFunctionsInvoke(window.parent.supabaseClient); patchSupabaseFrom(window.parent.supabaseClient);
+      }
+    } catch (_) {}
+  }
+
+  window.__settingsGetCompanyIdSafe = getCompanyIdSafe;
+  window.__settingsNormalizeEmployeePayload = normalizeEmployeePayload;
+
+  patchAllClients();
+  document.addEventListener('DOMContentLoaded', patchAllClients);
+  setTimeout(patchAllClients, 250);
+  setTimeout(patchAllClients, 1000);
+  setTimeout(patchAllClients, 2500);
 })();
 </script>
 
