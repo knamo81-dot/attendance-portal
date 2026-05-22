@@ -891,3 +891,75 @@ button,
     min-width: 44px;
   }
 }
+
+/* =========================================================
+   Step 3-2 Common Card Surface Link: AIC
+   - 채팅 높이/슬롯/사이드바 레이아웃은 유지
+   - 겉모양(radius, shadow, border, background)만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+.aic-sidebar,
+.aic-main,
+.aic-toolbar,
+.aic-chat-window,
+.aic-room-item,
+.aic-empty-message,
+.aic-empty-slot,
+.aic-modal,
+.aic-toggle-row,
+.aic-message.other {
+  border-color: var(--common-line, var(--aic-line));
+  border-radius: var(--common-card-radius, var(--aic-radius));
+  background-color: var(--common-card, var(--aic-card));
+}
+
+.aic-sidebar,
+.aic-main,
+.aic-chat-window,
+.aic-modal {
+  box-shadow: var(--common-shadow-card, var(--aic-shadow));
+}
+
+.aic-toolbar,
+.aic-room-item,
+.aic-empty-message,
+.aic-empty-slot,
+.aic-toggle-row,
+.aic-message.other {
+  box-shadow: var(--common-shadow-soft, 0 3px 10px rgba(15,23,42,.04));
+}
+
+/* 내부 헤더/입력 영역은 선과 배경만 공통화 */
+.aic-sidebar-head,
+.aic-chat-head,
+.aic-chat-input {
+  border-color: var(--common-line, var(--aic-line));
+  background-color: var(--common-card, #ffffff);
+}
+
+/* 채팅 말풍선은 레이아웃 유지, radius만 공통 기준에 연결 */
+.aic-message {
+  border-radius: var(--common-message-radius, var(--common-control-radius, 12px));
+}
+
+.aic-message.me {
+  background: var(--aic-dark);
+  color: #ffffff;
+}
+
+.aic-message.other {
+  background: var(--common-card, #ffffff);
+  color: var(--aic-text);
+}
+
+/* 모달은 떠 있는 요소라 modal shadow 우선 사용 */
+.aic-modal {
+  box-shadow: var(--common-shadow-modal, 0 20px 60px rgba(15,23,42,.24));
+}
+
+/* 활성 상태 색상은 AIC 고유 accent 유지 */
+.aic-chat-window.active,
+.aic-room-item.active {
+  border-color: var(--aic-accent);
+}
+
