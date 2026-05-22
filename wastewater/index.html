@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>폐수/폐기물 운영일지</title>
+<link rel="stylesheet" href="../common/mobile.css" />
+<link rel="stylesheet" href="../common/theme.css" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
@@ -1228,6 +1230,49 @@ table{
   margin-top:0 !important;
 }
 
+
+/* =========================================================
+   Portal iframe fit patch
+   - 통합 iframe 플랫폼 내부에서 자연스럽게 보이도록 외곽 여백/높이만 정리
+   - 폐수 앱의 기존 로직과 내부 컴포넌트 스타일은 변경하지 않음
+========================================================= */
+html,
+body{
+  width:100%;
+  min-height:100%;
+}
+
+body{
+  background:transparent;
+}
+
+.app-shell{
+  width:100%;
+  max-width:none;
+  margin:0;
+  padding:10px;
+  min-height:100vh;
+}
+
+.portal-header{
+  margin-top:0;
+}
+
+@media (max-width:760px){
+  .app-shell{
+    padding:8px;
+  }
+
+  .portal-header{
+    border-radius:20px;
+    padding:24px 22px;
+  }
+
+  .portal-title{
+    font-size:24px;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -1410,5 +1455,6 @@ table{
 })();
 </script>
 
+<script src="../common/common.js"></script>
 </body>
 </html>
