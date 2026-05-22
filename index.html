@@ -956,6 +956,49 @@ body:not(.service-admin-enabled) .service-admin-btn{
   justify-self: stretch !important;
 }
 
+
+/* =========================================================
+   Step 3-3 Common Input Shape Link: portal-index
+========================================================= */
+.auth-field input,
+.portal-filter-control,
+.logout-confirm-btn {
+  border-radius: var(--common-control-radius, 10px);
+  font-size: 12px;
+}
+
+.auth-field input{
+  min-height: var(--common-control-height, 36px);
+  border-color: var(--common-line, #cbd5e1);
+  background:#fff;
+  color:#0f172a;
+  outline:none;
+}
+
+.auth-field input:focus,
+.portal-filter-control:focus{
+  border-color: var(--current-header-accent, #c8102e);
+  box-shadow: 0 0 0 3px rgba(var(--portal-brand-rgb, 200,16,46), .10);
+}
+
+.portal-filter-item{
+  border-radius: var(--common-control-radius, 10px);
+}
+
+.portal-filter-control{
+  min-height:24px;
+  background:transparent;
+  color:#334155;
+}
+
+input[type="checkbox"],
+input[type="radio"]{
+  min-height:auto !important;
+  height:auto !important;
+  width:auto !important;
+  box-shadow:none !important;
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
