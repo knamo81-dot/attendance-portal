@@ -2158,3 +2158,47 @@ td {
   }
 }
 
+/* =========================================================
+   Portal iframe fit patch
+   - 통합 iframe 플랫폼 내부 배치 최적화
+   - 인력 프로그램 기존 로직은 변경하지 않음
+========================================================= */
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  background: transparent;
+  overflow-x: hidden;
+}
+
+.app {
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  padding: 10px;
+}
+
+.view.active {
+  width: 100%;
+}
+
+.summary-grid,
+.content-grid,
+.panel,
+.summary-card {
+  min-width: 0;
+}
+
+.table-wrap {
+  max-width: 100%;
+}
+
+@media (max-width: 760px) {
+  .app {
+    padding: 8px;
+  }
+}
+
