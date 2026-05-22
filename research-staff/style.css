@@ -1,25 +1,35 @@
+/* =========================================================
+   Common theme token link
+   - common/theme.css의 --common-* 값을 사용하도록 연결
+   - 인력 고유 primary/header 색상은 유지
+   - fallback 값을 함께 넣어 common 파일 누락 시에도 기존 화면 유지
+========================================================= */
 :root {
-  --bg: #eef2f6;
-  --panel: #ffffff;
-  --line: #dbe4ef;
-  --text: #0f172a;
-  --muted: #667085;
+  --bg: var(--common-bg, #eef2f6);
+  --panel: var(--common-card, #ffffff);
+  --line: var(--common-line, #dbe4ef);
+  --text: var(--common-text, #0f172a);
+  --muted: var(--common-muted, #667085);
+
+  /* 인력 프로그램 고유 색상은 유지 */
   --primary: #111827;
   --primary-dark: #0f172a;
   --primary-soft: #f1f5f9;
   --female: #ec4899;
-  --success: #059669;
-  --warning: #b45309;
-  --danger: #dc2626;
-  --shadow: 0 6px 14px rgba(15, 23, 42, 0.05);
-  --radius: 18px;
+
+  --success: var(--common-success, #059669);
+  --warning: var(--common-warning, #b45309);
+  --danger: var(--common-danger, #dc2626);
+
+  --shadow: var(--common-shadow-card, 0 6px 14px rgba(15, 23, 42, 0.05));
+  --radius: var(--common-card-radius, 18px);
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  font-family: Arial, "Noto Sans KR", sans-serif;
+  font-family: var(--common-font-family, Arial, "Noto Sans KR", sans-serif);
   background: var(--bg);
   color: var(--text);
 }
@@ -1633,15 +1643,15 @@ th:first-child {
 /* 기능/JS 변경 없이 인력운영현황 화면 밀도만 조정 */
 
 :root {
-  --rs-page-gap: 12px;
-  --rs-card-padding: 18px;
-  --rs-card-radius: 15px;
+  --rs-page-gap: var(--common-page-gap, 12px);
+  --rs-card-padding: var(--common-card-padding, 18px);
+  --rs-card-radius: var(--common-card-radius, 15px);
   --rs-control-height: 34px;
-  --rs-control-radius: 10px;
+  --rs-control-radius: var(--common-control-radius, 10px);
   --rs-font-title: 16px;
   --rs-font-base: 12.5px;
-  --rs-font-small: 11px;
-  --rs-shadow: 0 5px 14px rgba(15, 23, 42, 0.045);
+  --rs-font-small: var(--common-font-size-small, 11px);
+  --rs-shadow: var(--common-shadow-card, 0 5px 14px rgba(15, 23, 42, 0.045));
 }
 
 /* 기본 */
