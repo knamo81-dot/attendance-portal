@@ -2584,3 +2584,72 @@ html.embed-mode .shell {
     padding: 8px;
   }
 }
+
+/* =========================================================
+   Step 3-1 Common Button Shape Link: reagent
+   - 버튼 색상은 기존 시약·초자 스타일 유지
+   - 높이/반경/패딩/폰트/정렬만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+button,
+.btn,
+.tab-btn,
+.ghost-btn,
+.prepare-finalize-btn,
+.badge {
+  min-height: var(--common-control-height, var(--rg-control-height, 34px));
+  border-radius: var(--common-control-radius, var(--rg-control-radius, 10px));
+  font-size: var(--rg-font-base, 12px);
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.btn,
+.tab-btn {
+  height: var(--common-control-height, var(--rg-control-height, 34px)) !important;
+  padding: 0 var(--common-control-padding-x, 12px) !important;
+}
+
+.ghost-btn {
+  min-height: calc(var(--common-control-height, var(--rg-control-height, 34px)) - 4px);
+  height: auto;
+  padding: 0 10px;
+  font-size: var(--rg-font-small, 11px);
+}
+
+.badge {
+  min-height: calc(var(--common-control-height, var(--rg-control-height, 34px)) - 6px);
+  padding: 0 10px;
+  font-size: var(--rg-font-small, 11px);
+}
+
+.request-list-toggle .btn,
+.prepare-control-group .btn,
+.prepare-finalize-group .prepare-finalize-btn {
+  height: calc(var(--common-control-height, var(--rg-control-height, 34px)) - 2px) !important;
+  padding: 0 11px !important;
+}
+
+#openSearch,
+#addItem,
+#clearForm,
+#requestNew,
+#addToCollect,
+#confirmSelectedCollect,
+#sendToPrepare,
+#downloadExcel {
+  height: var(--common-control-height, var(--rg-control-height, 34px)) !important;
+  padding: 0 var(--common-control-padding-x, 13px) !important;
+}
+
+@media (max-width: 760px) {
+  .tab-btn,
+  .btn {
+    width: 100%;
+  }
+}
