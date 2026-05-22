@@ -1803,6 +1803,43 @@ body:not(.service-admin-enabled) .service-admin-btn{
     els.personalSettingsOverlay?.setAttribute('aria-hidden', 'false');
   }
 
+  // ===== iframe 앱 설정 버튼 브릿지 =====
+  // 포탈 상단 설정 버튼 클릭 시
+  // iframe 내부 설정 함수가 우선 실행되도록 연결
+  async function openPortalOrIframeSettings() {
+    try {
+      const frame = document.getElementById('portalFrame');
+
+      if (frame && frame.contentWindow) {
+        const win = frame.contentWindow;
+
+        // 앱 내부 설정 함수 우선 호출
+        if (typeof win.openPortalSettings === 'function') {
+          win.openPortalSettings();
+          return;
+        }
+
+        if (typeof win.openSettings === 'function') {
+          win.openSettings();
+          return;
+        }
+
+        if (typeof win.openSettingsModal === 'function') {
+          win.openSettingsModal();
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('iframe settings bridge error:', err);
+    }
+
+    // iframe 설정 함수가 없으면 기존 개인 설정 모달 실행
+    openPersonalSettings();
+  }
+
+  // 외부에서도 호출 가능하도록 전역 노출
+  window.openPortalOrIframeSettings = openPortalOrIframeSettings;
+
   function closePersonalSettings() {
     els.personalSettingsOverlay?.classList.remove('show');
     els.personalSettingsOverlay?.setAttribute('aria-hidden', 'true');
@@ -2435,7 +2472,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
     });
     els.personalSettingsIconBtn?.addEventListener('click', function (event) {
       event.preventDefault();
-      openPersonalSettings();
+      openPortalOrIframeSettings();
     });
     window.addEventListener('message', function (event) {
       const payload = event?.data || {};
