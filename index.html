@@ -1803,67 +1803,6 @@ body:not(.service-admin-enabled) .service-admin-btn{
     els.personalSettingsOverlay?.setAttribute('aria-hidden', 'false');
   }
 
-  // ===== iframe 앱 설정 버튼 브릿지 =====
-  // 포탈 상단 설정 버튼 클릭 시
-  // iframe 내부 설정 함수가 우선 실행되도록 연결
-  async function openPortalOrIframeSettings() {
-    try {
-      const frameEl = document.getElementById('portalFrame');
-
-      if (frameEl && frameEl.contentWindow) {
-        const win = frameEl.contentWindow;
-
-        // 앱 내부 설정 함수 우선 호출
-        if (typeof win.openPortalSettings === 'function') {
-          win.openPortalSettings();
-          return;
-        }
-
-        if (typeof win.openSettings === 'function') {
-          win.openSettings();
-          return;
-        }
-
-        if (typeof win.openSettingsModal === 'function') {
-          win.openSettingsModal();
-          return;
-        }
-
-        // 함수가 아직 준비되지 않은 iframe을 위해 postMessage도 함께 지원
-        try {
-          win.postMessage({
-            type: 'portal-open-settings',
-            tabId: 'org',
-            source: 'portal-index'
-          }, '*');
-        } catch (_) {}
-      }
-    } catch (err) {
-      console.warn('iframe settings bridge error:', err);
-    }
-
-    // iframe 설정 함수가 없으면 기존 개인 설정 모달 실행
-    openPersonalSettings();
-  }
-
-  // 외부에서도 호출 가능하도록 전역 노출
-  window.openPortalOrIframeSettings = openPortalOrIframeSettings;
-
-
-  // ===== 포탈 상단 개인설정 버튼 클릭 연결 보강 =====
-  // 버튼은 포탈 index에 있고, 기능은 현재 iframe 앱에 있을 수 있으므로
-  // openPortalOrIframeSettings()를 우선 호출하도록 강제 연결합니다.
-  function bindPersonalSettingsIconBridge() {
-    if (!els.personalSettingsIconBtn || els.personalSettingsIconBtn.dataset.portalBridgeBound === '1') return;
-
-    els.personalSettingsIconBtn.dataset.portalBridgeBound = '1';
-    els.personalSettingsIconBtn.addEventListener('click', function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-      openPortalOrIframeSettings();
-    }, true);
-  }
-
   function closePersonalSettings() {
     els.personalSettingsOverlay?.classList.remove('show');
     els.personalSettingsOverlay?.setAttribute('aria-hidden', 'true');
@@ -2496,7 +2435,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
     });
     els.personalSettingsIconBtn?.addEventListener('click', function (event) {
       event.preventDefault();
-      openPortalOrIframeSettings();
+      openPersonalSettings();
     });
     window.addEventListener('message', function (event) {
       const payload = event?.data || {};
@@ -2595,11 +2534,6 @@ body:not(.service-admin-enabled) .service-admin-btn{
   };
 
   boot();
-
-  // 포탈 상단 톱니 버튼 브릿지 초기화
-  bindPersonalSettingsIconBridge();
-  document.addEventListener('DOMContentLoaded', bindPersonalSettingsIconBridge);
-
 })();
 </script>
 </body>
