@@ -1372,6 +1372,90 @@ button,
   }
 }
 
+
+
+/* =========================================================
+   Step 3-2 Common Card Surface Link: wastewater
+   - 카드 높이/레이아웃/표/문서 영역은 유지
+   - 카드 겉모양(radius, shadow, border, background)만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+.card,
+.form-card,
+.preview-card,
+.ledger-card,
+.admin-card,
+.log-card,
+.ref-card,
+.related-doc-form,
+.related-doc-item,
+.mini-card,
+.hint-box,
+.type-box,
+.ref-paragraph,
+.doc-container,
+.doc-editor,
+.rich-editor,
+.approval-box,
+.sign-box,
+.login-card,
+.portal-access-card,
+.portal-access-help,
+.table-wrap,
+.approval-alert-modal {
+  border-color: var(--common-line, var(--line));
+  border-radius: var(--common-card-radius, var(--ww-card-radius, 16px));
+  background-color: var(--common-card, #fff);
+}
+
+.card,
+.form-card,
+.preview-card,
+.ledger-card,
+.admin-card,
+.log-card,
+.ref-card,
+.related-doc-item,
+.doc-container,
+.login-card,
+.portal-access-card,
+.approval-alert-modal {
+  box-shadow: var(--common-shadow-card, var(--ww-shadow, 0 5px 14px rgba(15,23,42,.05)));
+}
+
+/* 내부 보조 박스는 컨트롤 radius 기준으로 살짝 낮게 유지 */
+.mini-card,
+.hint-box,
+.type-box,
+.ref-paragraph,
+.doc-editor,
+.rich-editor,
+.approval-box,
+.sign-box,
+.portal-access-help,
+.table-wrap,
+.related-doc-form {
+  border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
+}
+
+/* KPI/상태 강조 카드의 배경색은 기존 의미 색상을 유지 */
+.kpi-accent.water,
+.kpi-accent.wastewater,
+.kpi-accent.waste,
+.kpi-accent.over,
+.type-box.wastewater,
+.type-box.waste {
+  box-shadow: var(--common-shadow-soft, 0 3px 10px rgba(15,23,42,.04));
+}
+
+/* 문서/관련자료 이미지 박스도 외곽만 공통화 */
+.related-doc-inline-image,
+.related-doc-body img,
+.signature-preview {
+  border-color: var(--common-line, var(--line));
+  border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
+}
+
 </style>
 </head>
 <body>
