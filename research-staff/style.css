@@ -2327,3 +2327,63 @@ button,
   border-radius: var(--common-control-radius, var(--rs-control-radius, 10px));
 }
 
+/* =========================================================
+   Step 3-3 Common Input Shape Link: research-staff
+   - input/select의 폭/테이블 컬럼/레이아웃은 유지
+   - 높이/반경/폰트/테두리/포커스만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+input,
+select {
+  min-height: var(--common-control-height, var(--rs-control-height, 34px));
+  border-radius: var(--common-control-radius, var(--rs-control-radius, 10px));
+  border-color: var(--common-line, var(--line));
+  background-color: var(--common-card, #fff);
+  color: var(--common-text, var(--text));
+  font-size: var(--rs-font-base, 12.5px);
+  outline: none;
+}
+
+input:focus,
+select:focus {
+  border-color: var(--common-focus, var(--primary-dark, #0f172a));
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+}
+
+/* 관리자 테이블 안 입력칸은 기존 compact 크기 유지 */
+.admin-table input,
+.admin-table select {
+  min-height: 28px !important;
+  height: 28px !important;
+  border-radius: var(--common-control-radius, 8px) !important;
+  border-color: var(--common-line, var(--line)) !important;
+  font-size: var(--rs-font-small, 11px) !important;
+}
+
+/* 기준년월/조직 필터 내부 입력은 기존 얇은 형태 유지 */
+.reference-filter input[type="month"],
+.org-filter-group select {
+  min-height: 26px !important;
+  height: 26px !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* 검색/상단 액션 입력은 버튼과 높이만 맞춤 */
+.admin-actions input,
+.top-actions input,
+.top-actions select {
+  min-height: var(--common-control-height, var(--rs-control-height, 34px));
+  height: var(--common-control-height, var(--rs-control-height, 34px));
+}
+
+/* 체크박스는 공통 높이 강제 제외 */
+input[type="checkbox"],
+.admin-table input[type="checkbox"] {
+  min-height: auto !important;
+  height: 16px !important;
+  width: 16px !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
