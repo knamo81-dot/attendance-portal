@@ -2715,3 +2715,76 @@ button,
 .modal {
   box-shadow: var(--common-shadow-modal, 0 30px 70px rgba(15,23,42,.28));
 }
+
+/* =========================================================
+   Step 3-3 Common Input Shape Link: reagent
+   - 일반 input/select의 폭/테이블 컬럼/취합 입력칸 특수 로직은 유지
+   - 높이/반경/폰트/테두리/포커스만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+input,
+select,
+.prepare-remark-select {
+  min-height: var(--common-control-height, var(--rg-control-height, 34px));
+  border-radius: var(--common-control-radius, var(--rg-control-radius, 10px));
+  border-color: var(--common-line, var(--line));
+  background-color: var(--common-card, #fff);
+  color: var(--common-text, var(--text));
+  font-size: var(--rg-font-base, 12px);
+  outline: none;
+}
+
+input:focus,
+select:focus,
+.prepare-remark-select:focus {
+  border-color: var(--common-focus, var(--primary, #1d4ed8));
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.10);
+}
+
+/* 기본 폼 입력은 버튼 높이와 맞춤 */
+.field input,
+.field select,
+.order-month-wrap select,
+.prepare-remark-select {
+  min-height: var(--common-control-height, var(--rg-control-height, 34px));
+  height: var(--common-control-height, var(--rg-control-height, 34px));
+  border-radius: var(--common-control-radius, var(--rg-control-radius, 10px));
+  font-size: var(--rg-font-base, 12px);
+}
+
+/* 취합 필터는 기존 폭 제어 유지, 높이만 공통화 */
+.collect-filters .field input,
+.collect-filters .field select {
+  height: var(--common-control-height, var(--rg-control-height, 34px)) !important;
+  min-height: var(--common-control-height, var(--rg-control-height, 34px)) !important;
+  border-radius: var(--common-control-radius, var(--rg-control-radius, 10px)) !important;
+}
+
+/* 제품취합 테이블 내부 input은 기존 compact/특수 스타일 유지 */
+.table-wrap table:has(#collectList) input.collect-input,
+.vendor-quote-box input.collect-input {
+  min-height: 24px !important;
+  height: 24px !important;
+  border-radius: 7px !important;
+  font-size: 11.5px !important;
+}
+
+/* 자동 선택/확정 행의 투명 input 로직 유지 */
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected input.collect-input,
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected input[readonly],
+.vendor-quote-box.auto-vendor-selected input.collect-input,
+.collect-row-confirmed input.collect-input,
+.collect-row-confirmed input[readonly] {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 체크박스는 공통 높이 강제 제외 */
+input[type="checkbox"] {
+  min-height: auto !important;
+  height: 16px !important;
+  width: 16px !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+
