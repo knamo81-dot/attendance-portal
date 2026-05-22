@@ -1,1 +1,13 @@
+/* =========================================================
+   Common Theme
+   - 공통 색상/라운드/그림자 변수 관리용
+   - 기존 assets/css/common-ui.css 변수와 충돌하지 않도록 보조 변수만 선언합니다.
+========================================================= */
 
+:root {
+  --common-theme-bg: #f8fafc;
+  --common-theme-card: #ffffff;
+  --common-theme-line: rgba(226, 232, 240, 0.9);
+  --common-theme-text: #0f172a;
+  --common-theme-muted: #64748b;
+}
