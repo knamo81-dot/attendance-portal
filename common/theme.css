@@ -1,13 +1,64 @@
 /* =========================================================
-   Common Theme
-   - 공통 색상/라운드/그림자 변수 관리용
-   - 기존 assets/css/common-ui.css 변수와 충돌하지 않도록 보조 변수만 선언합니다.
+   ExeloLab Common Theme Tokens
+   Step 2-1: 안전한 공통 변수화
+
+   원칙:
+   - 각 프로그램의 헤더/버튼 메인 색상은 앱별로 유지합니다.
+   - 공통 배경, 카드, 선, 글자색, radius, shadow, spacing만 정의합니다.
+   - 기존 앱의 --bg, --card, --primary 같은 변수는 덮어쓰지 않습니다.
 ========================================================= */
 
 :root {
-  --common-theme-bg: #f8fafc;
-  --common-theme-card: #ffffff;
-  --common-theme-line: rgba(226, 232, 240, 0.9);
-  --common-theme-text: #0f172a;
-  --common-theme-muted: #64748b;
+  /* Base colors */
+  --common-bg: #f5f7fb;
+  --common-card: #ffffff;
+  --common-line: #d9e2ec;
+  --common-text: #0f172a;
+  --common-muted: #64748b;
+  --common-soft: #f8fafc;
+
+  /* Status colors */
+  --common-success: #059669;
+  --common-warning: #b45309;
+  --common-danger: #dc2626;
+  --common-info: #1d4ed8;
+
+  /* Surface */
+  --common-card-radius: 18px;
+  --common-panel-radius: 18px;
+  --common-control-radius: 12px;
+  --common-pill-radius: 999px;
+
+  /* Shadow */
+  --common-shadow-card: 0 6px 14px rgba(15, 23, 42, 0.05);
+  --common-shadow-panel: 0 8px 18px rgba(15, 23, 42, 0.08);
+  --common-shadow-soft: 0 3px 10px rgba(15, 23, 42, 0.04);
+
+  /* Spacing */
+  --common-page-padding: 10px;
+  --common-page-gap: 14px;
+  --common-card-padding: 18px;
+  --common-panel-padding: 24px;
+
+  /* Control */
+  --common-control-height: 40px;
+  --common-control-padding-x: 14px;
+
+  /* Typography */
+  --common-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", Arial, sans-serif;
+  --common-font-size-base: 13px;
+  --common-font-size-small: 12px;
+  --common-font-size-title: 18px;
 }
+
+/* 앱별 색상용 권장 변수명
+   각 앱 style.css에서 필요할 때만 선언해서 사용합니다.
+
+   예)
+   :root {
+     --app-primary: #111827;
+     --app-header-start: #111827;
+     --app-header-end: #374151;
+     --app-accent: #1d4ed8;
+   }
+*/
