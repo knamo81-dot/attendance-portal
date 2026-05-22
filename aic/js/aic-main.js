@@ -1596,7 +1596,9 @@
       state.openSlots.pop();
     }
 
-    if (fill !== false) {
+    // AIC 진입 시 자동으로 첫 회의방을 열지 않습니다.
+    // 사용자가 직접 회의방을 클릭했을 때만 슬롯이 열립니다.
+    if (fill === true && state.openSlots.length) {
       while (state.openSlots.length < state.visibleSlotCount && state.openSlots.length < state.rooms.length) {
         var room = state.rooms.find(function (r) {
           return getOpenSlotIndex(r.id) < 0;
