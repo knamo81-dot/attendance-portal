@@ -51,14 +51,11 @@
     },
     realtimeChannel: null,
     realtimeChannelName: '',
-    realtimeActualChannelName: '',
     realtimeReady: false,
     realtimeSubscribing: false,
     realtimeResubscribeTimer: null,
-    readMap: {},
+    readMap: loadReadMap(),
     readSaveTimer: null,
-    readSyncReady: false,
-    readSavingRooms: {},
     dbReady: false,
     dbLoading: false
   };
@@ -250,74 +247,32 @@
     } catch (_) {}
   }
 
-  async function loadReadMapFromServer(roomIds) {
-    var sb = getSupabaseClient();
+  function getReadStorageKey() {
     var companyId = getCompanyId();
     var email = getCurrentUserEmail();
-
-    state.readMap = {};
-    state.readSyncReady = false;
-
-    if (!sb || !companyId || !email || !Array.isArray(roomIds) || !roomIds.length) {
-      state.readSyncReady = true;
-      return;
-    }
-
-    try {
-      var result = await sb
-        .from('aic_message_reads')
-        .select('room_id, last_read_at')
-        .eq('company_id', companyId)
-        .eq('user_email', email)
-        .in('room_id', roomIds);
-
-      if (result.error) throw result.error;
-
-      (result.data || []).forEach(function (row) {
-        var roomId = String(row.room_id || '').trim();
-        if (roomId) state.readMap[roomId] = row.last_read_at || '';
-      });
-
-      state.readSyncReady = true;
-    } catch (error) {
-      state.readSyncReady = true;
-      console.warn('[AIC READ] server load skipped:', error);
-    }
+    return 'aic_read_map__' + (companyId || 'default') + '__' + (email || 'anonymous');
   }
 
-  async function saveRoomReadToServer(roomId, lastReadAt) {
-    var sb = getSupabaseClient();
-    var companyId = getCompanyId();
-    var email = getCurrentUserEmail();
+  function loadReadMap() {
+    return {};
+  }
 
-    if (!sb || !companyId || !email || !roomId || !lastReadAt) return;
-    if (state.readSavingRooms[roomId]) return;
-
-    state.readSavingRooms[roomId] = true;
-
+  function reloadReadMap() {
     try {
-      var payload = {
-        company_id: companyId,
-        room_id: roomId,
-        user_email: email,
-        last_read_at: lastReadAt,
-        updated_at: new Date().toISOString()
-      };
-
-      var result = await sb
-        .from('aic_message_reads')
-        .upsert(payload, { onConflict: 'company_id,room_id,user_email' });
-
-      if (result.error) throw result.error;
-    } catch (error) {
-      console.warn('[AIC READ] server save skipped:', error);
-    } finally {
-      delete state.readSavingRooms[roomId];
+      var raw = localStorage.getItem(getReadStorageKey());
+      state.readMap = raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      state.readMap = {};
     }
   }
 
   function saveReadMap() {
-    // 서버 저장형으로 전환되어 localStorage 저장은 사용하지 않습니다.
+    clearTimeout(state.readSaveTimer);
+    state.readSaveTimer = setTimeout(function () {
+      try {
+        localStorage.setItem(getReadStorageKey(), JSON.stringify(state.readMap || {}));
+      } catch (_) {}
+    }, 80);
   }
 
   function getMessageTimeValue(message) {
@@ -424,14 +379,8 @@
     var last = getLastMessage(room);
     if (!last) return;
 
-    var value = last.created_at || new Date().toISOString();
-    var current = Date.parse(state.readMap[roomId] || '');
-    var next = Date.parse(value || '');
-
-    if (Number.isFinite(current) && Number.isFinite(next) && current >= next) return;
-
-    state.readMap[roomId] = value;
-    saveRoomReadToServer(roomId, value);
+    state.readMap[roomId] = last.created_at || new Date().toISOString();
+    saveReadMap();
   }
 
   function markVisibleRoomsRead() {
@@ -945,6 +894,8 @@
     }
 
     state.dbLoading = true;
+    reloadReadMap();
+
     try {
       var roomsResult = await sb
         .from('aic_rooms')
@@ -959,18 +910,10 @@
       var roomIds = roomRows.map(function (room) { return String(room.id || ''); }).filter(Boolean);
 
       if (!roomIds.length) {
-        state.readMap = {};
-        state.readSyncReady = true;
         state.rooms = [];
         state.openSlots = [];
         state.dbReady = true;
-        if (!options.skipRealtime) {
-          try {
-            subscribeRealtime();
-          } catch (realtimeError) {
-            console.warn('[AIC Realtime] skipped:', realtimeError);
-          }
-        }
+        if (!options.skipRealtime) subscribeRealtime();
         render(false);
         return;
       }
@@ -992,8 +935,6 @@
         .order('created_at', { ascending: true });
 
       if (messagesResult.error) throw messagesResult.error;
-
-      await loadReadMapFromServer(roomIds);
 
       var peopleIndex = await loadPeopleIndex();
       var enrichedMembers = (membersResult.data || []).map(function (member) {
@@ -1023,13 +964,7 @@
       });
 
       state.dbReady = true;
-      if (!options.skipRealtime) {
-        try {
-          subscribeRealtime();
-        } catch (realtimeError) {
-          console.warn('[AIC Realtime] skipped:', realtimeError);
-        }
-      }
+      if (!options.skipRealtime) subscribeRealtime();
       render(true);
     } catch (error) {
       state.dbReady = false;
@@ -1254,15 +1189,17 @@
 
     if (!sb || !companyId || typeof sb.channel !== 'function') return;
 
-    var baseChannelName = getRealtimeChannelName();
-    if (!baseChannelName) return;
+    var channelName = getRealtimeChannelName();
+    if (!channelName) return;
 
     // 이미 같은 회사 채널을 구독 중이면 postgres_changes 콜백을 다시 붙이지 않습니다.
-    if (!force && state.realtimeChannel && state.realtimeChannelName === baseChannelName) {
+    // Supabase는 subscribe() 이후 .on('postgres_changes') 추가를 허용하지 않아
+    // 모바일/PC 전환, visibilitychange, loadRoomsFromServer 반복 시 오류가 날 수 있습니다.
+    if (!force && state.realtimeChannel && state.realtimeChannelName === channelName) {
       return;
     }
 
-    if (!force && state.realtimeSubscribing && state.realtimeChannelName === baseChannelName) {
+    if (!force && state.realtimeSubscribing && state.realtimeChannelName === channelName) {
       return;
     }
 
@@ -1270,93 +1207,66 @@
 
     state.realtimeSubscribing = true;
     state.realtimeReady = false;
-    state.realtimeChannelName = baseChannelName;
+    state.realtimeChannelName = channelName;
 
-    // Supabase는 동일한 channel 객체가 이미 subscribe 된 뒤에는 .on() 추가를 허용하지 않습니다.
-    // 모바일/PC 전환, visibilitychange, loadRoomsFromServer 반복 시 같은 channel name이 재사용되면
-    // "cannot add postgres_changes callbacks after subscribe()"가 발생할 수 있어 실제 채널명은 매번 고유하게 만듭니다.
-    var actualChannelName = baseChannelName + '-' + getAicClientId() + '-' + Date.now() + '-' + Math.random().toString(16).slice(2);
-    state.realtimeActualChannelName = actualChannelName;
-
-    try {
-      var channel = sb
-        .channel(actualChannelName)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'aic_messages',
-            filter: 'company_id=eq.' + companyId
-          },
-          function (payload) {
-            handleRealtimeMessage(payload.new || {});
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'aic_room_members',
-            filter: 'company_id=eq.' + companyId
-          },
-          function () {
-            loadRoomsFromServer({ skipRealtime: true });
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'DELETE',
-            schema: 'public',
-            table: 'aic_rooms',
-            filter: 'company_id=eq.' + companyId
-          },
-          function () {
-            loadRoomsFromServer({ skipRealtime: true });
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'aic_message_reads',
-            filter: 'company_id=eq.' + companyId
-          },
-          function (payload) {
-            handleRealtimeRead(payload.new || {});
-          }
-        );
-
-      state.realtimeChannel = channel;
-
-      channel.subscribe(function (status) {
-        if (status === 'SUBSCRIBED') {
-          state.realtimeReady = true;
-          state.realtimeSubscribing = false;
-          return;
+    var channel = sb
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'aic_messages',
+          filter: 'company_id=eq.' + companyId
+        },
+        function (payload) {
+          handleRealtimeMessage(payload.new || {});
         }
-
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          console.warn('[AIC Realtime]', status);
-          state.realtimeReady = false;
-          state.realtimeSubscribing = false;
-
-          if (state.realtimeChannelName === baseChannelName) {
-            scheduleRealtimeReconnect(1200);
-          }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'aic_room_members',
+          filter: 'company_id=eq.' + companyId
+        },
+        function () {
+          loadRoomsFromServer({ skipRealtime: true });
         }
-      });
-    } catch (error) {
-      console.warn('[AIC Realtime] subscribe failed:', error);
-      state.realtimeReady = false;
-      state.realtimeSubscribing = false;
-      state.realtimeChannel = null;
-      state.realtimeActualChannelName = '';
-      scheduleRealtimeReconnect(1500);
-    }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'aic_rooms',
+          filter: 'company_id=eq.' + companyId
+        },
+        function () {
+          loadRoomsFromServer({ skipRealtime: true });
+        }
+      );
+
+    state.realtimeChannel = channel;
+
+    channel.subscribe(function (status) {
+      if (status === 'SUBSCRIBED') {
+        state.realtimeReady = true;
+        state.realtimeSubscribing = false;
+        return;
+      }
+
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        console.warn('[AIC Realtime]', status);
+        state.realtimeReady = false;
+        state.realtimeSubscribing = false;
+
+        if (state.realtimeChannelName === channelName) {
+          scheduleRealtimeReconnect(1200);
+        }
+      }
+    });
   }
 
   function unsubscribeRealtime() {
@@ -1373,29 +1283,8 @@
 
     state.realtimeChannel = null;
     state.realtimeChannelName = '';
-    state.realtimeActualChannelName = '';
     state.realtimeReady = false;
     state.realtimeSubscribing = false;
-  }
-
-  function handleRealtimeRead(row) {
-    if (!row || !row.room_id) return;
-
-    var email = String(row.user_email || '').trim().toLowerCase();
-    var currentEmail = String(getCurrentUserEmail() || '').trim().toLowerCase();
-
-    if (!email || !currentEmail || email !== currentEmail) return;
-
-    var roomId = String(row.room_id || '').trim();
-    var nextValue = row.last_read_at || '';
-    var current = Date.parse(state.readMap[roomId] || '');
-    var next = Date.parse(nextValue || '');
-
-    if (!roomId || !Number.isFinite(next)) return;
-    if (Number.isFinite(current) && current >= next) return;
-
-    state.readMap[roomId] = nextValue;
-    renderRoomList();
   }
 
   function handleRealtimeMessage(row) {
@@ -1642,7 +1531,7 @@
         '    <div class="aic-room-preview">', esc(getRoomPreviewText(room)), '</div>',
         getUnreadCount(room) > 0 ? '    <div class="aic-unread-badge">' + getUnreadCount(room) + '</div>' : '',
         '  </div>',
-        '  <div class="aic-room-meta">', esc(room.members), getRoomLastTime(room) ? '<br>' + esc(getRoomLastTime(room)) : '', '</div>',
+        '  <div class="aic-room-meta">', esc(room.members), '<br>', room.messages.length, '개 메시지', getRoomLastTime(room) ? ' · ' + esc(getRoomLastTime(room)) : '', '</div>',
         '</div>'
       ].join('');
     }).join('');
@@ -2330,6 +2219,7 @@
       var data = event && event.data ? event.data : {};
       if (data.type === 'portal-auth') {
         unsubscribeRealtime();
+        reloadReadMap();
         loadRoomsFromServer();
         scheduleRender();
         return;
@@ -2436,6 +2326,7 @@
   function bootstrap() {
     cacheEls();
     bind();
+    reloadReadMap();
 
     if (window.I18N && typeof window.I18N.changeLanguage === 'function' && !window.I18N.__aicPatched) {
       var originalChangeLanguage = window.I18N.changeLanguage.bind(window.I18N);
