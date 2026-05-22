@@ -1203,6 +1203,12 @@ body:not(.service-admin-enabled) .service-admin-btn{
   const navButtons = Array.from(document.querySelectorAll('.nav-btn[data-portal-src]'));
   const logoutBtn = document.getElementById('logoutNavBtn');
   const homeBtn = document.getElementById('homeNavBtn');
+  if (frame) {
+    frame.addEventListener('load', function () {
+      setTimeout(syncCurrentPortalTabToFrame, 80);
+      setTimeout(syncCurrentPortalTabToFrame, 350);
+    });
+  }
 
   const els = {
     overlay: document.getElementById('authOverlay'),
@@ -1547,9 +1553,40 @@ body:not(.service-admin-enabled) .service-admin-btn{
     }
   }
 
+
+  function syncCurrentPortalTabToFrame() {
+    const src = normalizePortalSrc(frame?.getAttribute('src') || frame?.src || '');
+    if (src !== 'settings.html') return;
+    const tabId = currentPortalTabId || currentPortalTabs[0]?.id || 'org';
+
+    try {
+      if (frame?.contentWindow?.openPortalSettingsSection) {
+        frame.contentWindow.openPortalSettingsSection(tabId);
+        return;
+      }
+    } catch (_) {}
+
+    try {
+      frame?.contentWindow?.postMessage({
+        type: 'portal-tab-change',
+        tabId: tabId,
+        tab: tabId,
+        source: 'portal-index'
+      }, '*');
+    } catch (_) {}
+  }
+
   function sendPortalTabChange(tabId) {
     if (!frame || !frame.contentWindow || !tabId) return;
     const tab = currentPortalTabs.find(function (item) { return item.id === tabId; }) || null;
+
+    try {
+      if (normalizePortalSrc(frame.getAttribute('src') || frame.src || '') === 'settings.html' &&
+          typeof frame.contentWindow.openPortalSettingsSection === 'function') {
+        frame.contentWindow.openPortalSettingsSection(tabId);
+      }
+    } catch (_) {}
+
     frame.contentWindow.postMessage({
       type: 'portal-tab-change',
       tabId: tabId,
