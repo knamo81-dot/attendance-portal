@@ -2653,3 +2653,65 @@ button,
     width: 100%;
   }
 }
+
+/* =========================================================
+   Step 3-2 Common Card Surface Link: reagent
+   - 카드 높이/레이아웃/취합 테이블/거래처 음영 로직은 유지
+   - 카드 겉모양(radius, shadow, border, background)만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+.card,
+.tile,
+.table-wrap,
+.modal,
+.modal-head,
+.modal-search,
+.modal-foot,
+.result-item,
+.prepare-control-group,
+.vendor-quote-box,
+.toast {
+  border-color: var(--common-line, var(--line));
+  border-radius: var(--common-card-radius, var(--rg-card-radius, 14px));
+}
+
+.card,
+.tile,
+.table-wrap,
+.modal,
+.prepare-control-group {
+  background-color: var(--common-card, var(--card));
+}
+
+.card,
+.modal,
+.toast {
+  box-shadow: var(--common-shadow-card, var(--rg-shadow, 0 5px 14px rgba(15,23,42,.045)));
+}
+
+/* 내부 보조 박스는 컨트롤 radius 기준으로 살짝 낮게 유지 */
+.tile,
+.table-wrap,
+.prepare-control-group,
+.vendor-quote-box,
+.result-item,
+.meta span,
+.prepare-remark-select,
+.order-month-wrap select {
+  border-radius: var(--common-control-radius, var(--rg-control-radius, 10px));
+}
+
+/* 헤더 배너/선택 거래처/확정 행의 의미 색상은 유지 */
+.reagent-header-card,
+.vendor-cell.auto-vendor-selected,
+.vendor-quote-box.auto-vendor-selected,
+.collect-row-confirmed > td,
+.request-row-collected > td,
+.request-detail-collected > td {
+  box-shadow: var(--common-shadow-soft, 0 3px 10px rgba(15,23,42,.04));
+}
+
+/* 모달 외곽은 화면 위에 뜨는 요소라 기존보다 조금 큰 그림자 유지 */
+.modal {
+  box-shadow: var(--common-shadow-modal, 0 30px 70px rgba(15,23,42,.28));
+}
