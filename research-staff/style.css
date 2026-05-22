@@ -2211,3 +2211,62 @@ body {
     padding: 8px;
   }
 }
+
+/* =========================================================
+   Step 3-1 Common Button Shape Link: research-staff
+   - 버튼 색상은 각 클래스의 기존 색상 유지
+   - 높이/반경/패딩/폰트/정렬만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+button,
+.btn,
+.tab-btn,
+.leave-toggle-btn,
+.readonly-badge {
+  min-height: var(--common-control-height, var(--rs-control-height, 34px));
+  border-radius: var(--common-control-radius, var(--rs-control-radius, 10px));
+  font-size: var(--rs-font-base, 12.5px);
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.btn,
+.tab-btn {
+  height: var(--common-control-height, var(--rs-control-height, 34px));
+  padding: 0 var(--common-control-padding-x, 12px);
+}
+
+.btn.secondary {
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid var(--line);
+}
+
+.tab-btn {
+  border: 1px solid var(--line);
+}
+
+.leave-toggle-btn {
+  height: calc(var(--common-control-height, var(--rs-control-height, 34px)) - 8px);
+  min-height: calc(var(--common-control-height, var(--rs-control-height, 34px)) - 8px);
+  padding: 0 10px;
+}
+
+.admin-actions .btn,
+.top-actions .btn {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 720px) {
+  .top-actions .btn,
+  .admin-actions .btn {
+    min-width: 0;
+  }
+}
+
+
