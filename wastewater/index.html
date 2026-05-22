@@ -1297,6 +1297,81 @@ body{
   }
 }
 
+
+
+/* =========================================================
+   Step 3-1 Common Button Shape Link: wastewater
+   - 버튼 색상은 기존 폐수 프로그램 스타일 유지
+   - 높이/반경/패딩/폰트/정렬만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+button,
+.btn,
+.tab-btn,
+.admin-mini-btn,
+.small-btn,
+.ref-btn,
+.type-chip,
+.inline-badge,
+.role-badge {
+  min-height: var(--common-control-height, var(--ww-control-height, 34px));
+  border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
+  font-size: var(--ww-font-base, 13px);
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.btn,
+.tab-btn,
+.admin-mini-btn,
+.ref-btn,
+.type-chip {
+  min-height: var(--common-control-height, var(--ww-control-height, 34px));
+  padding: 0 var(--common-control-padding-x, 13px);
+}
+
+.btn {
+  border-radius: 999px;
+}
+
+.btn.block {
+  width: 100%;
+  border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
+}
+
+.small-btn {
+  min-height: calc(var(--common-control-height, var(--ww-control-height, 34px)) - 6px);
+  padding: 0 9px;
+  font-size: var(--ww-font-small, 11.5px);
+}
+
+.inline-badge,
+.role-badge {
+  min-height: calc(var(--common-control-height, var(--ww-control-height, 34px)) - 8px);
+  padding: 0 10px;
+  font-size: var(--ww-font-small, 11.5px);
+}
+
+.rich-toolbar .btn,
+.ledger-approval-box .btn,
+.approval-alert-foot .btn,
+.related-doc-actions .btn,
+.toolbar-right .btn {
+  min-height: var(--common-control-height, var(--ww-control-height, 34px));
+  padding: 0 var(--common-control-padding-x, 13px);
+}
+
+@media (max-width: 720px) {
+  .approval-alert-foot .btn {
+    width: 100%;
+  }
+}
+
 </style>
 </head>
 <body>
