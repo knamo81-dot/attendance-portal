@@ -1553,6 +1553,65 @@ input[type="file"] {
   padding: 7px 10px;
 }
 
+
+
+/* =========================================================
+   Step 3-4-1/2 Common Table Surface + Density Link: wastewater
+   - table min-width/overflow/sticky/보고서 구조는 유지
+   - 테이블 선/헤더/본문색 + padding/font/row-height만 공통화
+   - 기능/JS 변경 없음
+========================================================= */
+.table-wrap {
+  border-color: var(--common-line, var(--line));
+  background-color: var(--common-card, #ffffff);
+}
+
+table {
+  color: var(--common-text, var(--text));
+  background-color: var(--common-card, #ffffff);
+}
+
+th,
+td {
+  border-color: var(--common-line, var(--line));
+  font-size: var(--ww-font-base, 13px);
+  line-height: 1.35;
+}
+
+th,
+.table-wrap table th {
+  background-color: var(--common-table-head-bg, #f2f4f7);
+  color: var(--common-table-head-text, var(--navy));
+  font-weight: 800;
+}
+
+td {
+  color: var(--common-text, var(--text));
+}
+
+/* 3-4-2: 표 밀도 통일. 구조/폭은 변경하지 않음 */
+.table-wrap th,
+.table-wrap td {
+  padding: 8px 9px;
+}
+
+/* 숫자/over/상태 의미 색상은 기존 유지 */
+td.num {
+  text-align: right;
+}
+
+tr.over-row td {
+  background: #fff1f3;
+}
+
+/* 문서/결재 표의 가독성 유지 */
+.sign-box table th,
+.sign-box table td,
+.doc-container table th,
+.doc-container table td {
+  line-height: 1.45;
+}
+
 </style>
 </head>
 <body>

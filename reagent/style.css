@@ -2788,3 +2788,76 @@ input[type="checkbox"] {
   box-shadow: none !important;
 }
 
+/* =========================================================
+   Step 3-4-1/2 Common Table Surface + Density Link: reagent
+   - 취합 테이블 컬럼 폭/table-layout/overflow/sticky 구조는 유지
+   - 테이블 선/헤더/본문색 + padding/font/row-height만 공통화
+   - 기능/JS 변경 없음
+========================================================= */
+.table-wrap {
+  border-color: var(--common-line, var(--line));
+  background-color: var(--common-card, #ffffff);
+}
+
+table {
+  color: var(--common-text, var(--text));
+  background-color: var(--common-card, #ffffff);
+}
+
+th,
+td {
+  border-color: var(--common-line, var(--line));
+  font-size: var(--rg-font-base, 12px);
+  line-height: 1.35;
+}
+
+th {
+  background-color: var(--common-table-head-bg, #fbfdff);
+  color: var(--common-muted, var(--muted));
+  font-weight: 800;
+}
+
+td {
+  color: var(--common-text, var(--text));
+}
+
+/* 3-4-2: 일반 표 밀도 통일 */
+.table-wrap table:not(:has(#collectList)) th,
+.table-wrap table:not(:has(#collectList)) td {
+  padding: 8px 8px;
+}
+
+/* 제품취합 표는 기존 컬럼/폭/입력 구조를 유지하고 밀도만 보정 */
+.table-wrap table:has(#collectList) th,
+.table-wrap table:has(#collectList) td {
+  border-color: var(--common-line, var(--line)) !important;
+  font-size: var(--rg-font-small, 11px) !important;
+  line-height: 1.28 !important;
+}
+
+/* 의미 색상 행/셀은 유지 */
+.collect-row-confirmed > td,
+.request-row-collected > td,
+.request-detail-collected > td,
+.collect-detail-confirmed > td,
+.collect-detail-row .collect-detail-confirmed > td {
+  background: #f1f5f9 !important;
+}
+
+.request-detail-pending > td,
+.collect-detail-row tbody tr:not(.collect-detail-confirmed) > td {
+  background: #fff !important;
+}
+
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) tr:not(.collect-row-confirmed) > td.vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) .collect-row-confirmed > td.vendor-cell.auto-vendor-selected {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+}
+
+/* 입력칸 3-3 compact 유지 */
+.table-wrap table:has(#collectList) input.collect-input,
+.vendor-quote-box input.collect-input {
+  border-color: var(--common-line, var(--line));
+}

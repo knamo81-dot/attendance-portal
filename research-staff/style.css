@@ -2464,3 +2464,85 @@ th:first-child {
 .admin-table select {
   border-color: var(--common-line, var(--line)) !important;
 }
+
+/* =========================================================
+   Step 3-4-1/2 Common Table Surface + Density Link: research-staff
+   - 컬럼 폭/table-layout/overflow/sticky 구조는 유지
+   - 테이블 선/헤더/본문색 + padding/font/row-height만 공통화
+   - 기능/JS 변경 없음
+========================================================= */
+.table-wrap,
+.admin-table-wrap {
+  border-color: var(--common-line, var(--line));
+  background-color: var(--common-card, #ffffff);
+}
+
+table,
+.admin-table {
+  color: var(--common-text, var(--text));
+}
+
+th,
+td,
+.admin-table th,
+.admin-table td {
+  border-color: var(--common-line, var(--line));
+  font-size: var(--rs-font-base, 12.5px);
+  line-height: 1.35;
+}
+
+th,
+.admin-table th {
+  background-color: var(--common-table-head-bg, #f3f6fa);
+  color: var(--common-table-head-text, #172033);
+  font-weight: 900;
+}
+
+td,
+.admin-table td {
+  color: var(--common-text, var(--text));
+}
+
+td:first-child,
+th:first-child {
+  background-color: var(--common-table-first-bg, #f8fafc);
+}
+
+.total-row td {
+  background-color: var(--common-table-total-bg, #f1f5f9);
+  font-weight: 900;
+}
+
+/* 3-4-2: 일반 표 밀도만 살짝 통일 */
+.table-wrap table:not(.admin-table) th,
+.table-wrap table:not(.admin-table) td {
+  padding: 8px 8px;
+}
+
+/* 관리자 테이블은 기존 compact 구조 유지 */
+.admin-table th,
+.admin-table td {
+  border-color: var(--common-line, var(--line)) !important;
+  font-size: var(--rs-font-small, 11px) !important;
+  line-height: 1.25 !important;
+  background-clip: padding-box;
+}
+
+.admin-table th {
+  background-color: var(--common-table-head-bg, #f8fafc) !important;
+  color: var(--common-muted, #64748b) !important;
+}
+
+/* 의미 색상 행은 유지 */
+.admin-table tr.edited td {
+  background: #fff7ed !important;
+}
+
+.admin-table tr.leave-row td {
+  background: #f5f3ff !important;
+}
+
+.admin-table tr.leave-row.edited td {
+  background: #fff7ed !important;
+}
+
