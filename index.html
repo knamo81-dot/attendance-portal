@@ -999,6 +999,64 @@ input[type="radio"]{
   box-shadow:none !important;
 }
 
+
+
+/* =========================================================
+   Step 3-4-1/2 Common Table/Filter Surface + Density Link: portal-index
+   - 포탈 shell은 table이 거의 없어 필터/서브탭 표면만 정리
+   - shell grid/iframe/height 구조는 유지
+   - 기능/JS 변경 없음
+========================================================= */
+.portal-subtabs,
+.portal-filters {
+  color: var(--common-text, #0f172a);
+}
+
+.portal-subtab,
+.portal-filter-item {
+  border-color: var(--common-line, #dbe3ec);
+  line-height: 1.35;
+}
+
+.portal-filter-item label {
+  color: var(--common-muted, #64748b);
+}
+
+.portal-filter-control {
+  color: var(--common-text, #334155);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+/* 포탈 내부 보조 table 대비 최소 공통화 */
+.portal-main table,
+.auth-card table,
+.logout-confirm-box table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--common-text, #0f172a);
+}
+
+.portal-main th,
+.portal-main td,
+.auth-card th,
+.auth-card td,
+.logout-confirm-box th,
+.logout-confirm-box td {
+  border-bottom: 1px solid var(--common-line, #e2e8f0);
+  padding: 8px 8px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.portal-main th,
+.auth-card th,
+.logout-confirm-box th {
+  background: var(--common-table-head-bg, #f8fafc);
+  color: var(--common-muted, #64748b);
+  font-weight: 800;
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

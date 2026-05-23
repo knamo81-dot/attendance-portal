@@ -315,3 +315,45 @@ input[type="file"] {
   height: auto !important;
   min-height: var(--common-control-height, var(--control-height, 28px));
 }
+
+/* =========================================================
+   Step 3-4-1/2 Common Table Surface + Density Link: work-home common-ui
+   - 공통 모듈 내부 table의 구조/폭/overflow는 유지
+   - 선/헤더/본문색 + padding/font/line-height만 공통화
+   - 기능/JS 변경 없음
+========================================================= */
+.module-frame table,
+.card.el-card table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--common-text, var(--module-text, #0f172a));
+}
+
+.module-frame th,
+.module-frame td,
+.card.el-card th,
+.card.el-card td {
+  border-color: var(--common-line, var(--module-line, #e2e8f0));
+  padding: 7px 8px;
+  font-size: var(--font-base, 11px);
+  line-height: 1.35;
+}
+
+.module-frame th,
+.card.el-card th {
+  background-color: var(--common-table-head-bg, #f8fafc);
+  color: var(--common-muted, var(--module-muted, #64748b));
+  font-weight: 800;
+}
+
+.module-frame td,
+.card.el-card td {
+  color: var(--common-text, var(--module-text, #0f172a));
+}
+
+.module-frame .table-wrap,
+.card.el-card .table-wrap {
+  border-color: var(--common-line, var(--module-line, #e2e8f0));
+  background-color: var(--common-card, var(--module-card, #ffffff));
+}
+

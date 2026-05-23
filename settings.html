@@ -60,6 +60,74 @@ input[type="radio"]{
   box-shadow:none !important;
 }
 
+
+
+/* =========================================================
+   Step 3-4-1/2 Common Table Surface + Density Link: settings
+   - real-table min-width/overflow/toolbar 구조는 유지
+   - 선/헤더/본문색 + padding/font/line-height만 공통화
+   - 기능/JS 변경 없음
+========================================================= */
+.real-table-wrap,
+.permission-table-wrap {
+  border-color: var(--common-line, #dbe3ef) !important;
+  background-color: var(--common-card, #ffffff) !important;
+}
+
+.real-table,
+.permission-table,
+.admin-table {
+  color: var(--common-text, #0f172a);
+  border-collapse: collapse;
+}
+
+.real-table th,
+.real-table td,
+.permission-table th,
+.permission-table td,
+.admin-table th,
+.admin-table td {
+  border-color: var(--common-line, #e2e8f0) !important;
+  font-size: var(--st-font-base, 12.5px) !important;
+  line-height: 1.35 !important;
+}
+
+.real-table th,
+.permission-table th,
+.admin-table th {
+  background-color: var(--common-table-head-bg, #f8fafc) !important;
+  color: var(--common-muted, #64748b) !important;
+  font-weight: 800 !important;
+}
+
+.real-table td,
+.permission-table td,
+.admin-table td {
+  color: var(--common-text, #1f2937) !important;
+}
+
+/* 3-4-2: 설정/관리자 테이블 밀도 정리 */
+.real-table th,
+.real-table td,
+.permission-table th,
+.permission-table td {
+  padding: 9px 9px !important;
+}
+
+/* 빈 행/안내 문구는 기존 의미 유지 */
+.real-empty,
+.real-empty-row,
+.admin-empty {
+  color: var(--common-muted, #64748b) !important;
+  line-height: 1.45 !important;
+}
+
+/* 선택 목록 행은 table은 아니지만 표형 리스트라 선/밀도만 맞춤 */
+.real-selection-row {
+  border-bottom-color: var(--common-line, #f1f5f9) !important;
+  line-height: 1.35 !important;
+}
+
 </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

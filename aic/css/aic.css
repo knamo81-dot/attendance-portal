@@ -1040,4 +1040,53 @@ input[type="radio"],
   box-shadow: none !important;
 }
 
+/* =========================================================
+   Step 3-4-1/2 Common Table/List Surface + Density Link: AIC
+   - AIC는 일반 table이 거의 없어서 채팅 리스트/방 리스트 표면만 정리
+   - 채팅 높이/슬롯/grid/overflow 구조는 유지
+   - 기능/JS 변경 없음
+========================================================= */
+.aic-room-list,
+.aic-messages {
+  color: var(--common-text, var(--aic-text));
+}
 
+.aic-room-item,
+.aic-message.other,
+.aic-empty-message,
+.aic-empty-slot {
+  border-color: var(--common-line, var(--aic-line));
+  line-height: 1.35;
+}
+
+.aic-room-name,
+.aic-chat-title {
+  color: var(--common-text, var(--aic-text));
+}
+
+.aic-room-meta,
+.aic-chat-meta,
+.aic-message-time {
+  color: var(--common-muted, var(--aic-muted));
+}
+
+/* 표가 추가될 경우를 대비한 최소 공통 table 스타일 */
+.aic-root table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--common-text, var(--aic-text));
+}
+
+.aic-root th,
+.aic-root td {
+  border-color: var(--common-line, var(--aic-line));
+  padding: 7px 8px;
+  font-size: var(--aic-base-size, 11px);
+  line-height: 1.35;
+}
+
+.aic-root th {
+  background: var(--common-table-head-bg, #f8fafc);
+  color: var(--common-muted, var(--aic-muted));
+  font-weight: 900;
+}
