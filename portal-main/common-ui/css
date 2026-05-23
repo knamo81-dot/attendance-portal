@@ -357,3 +357,50 @@ input[type="file"] {
   background-color: var(--common-card, var(--module-card, #ffffff));
 }
 
+/* =========================================================
+   Step 3-5/6 Common Modal Toast Feedback Link: common-ui
+   - 공통 클래스가 있는 경우에만 적용
+   - 레이아웃/position/z-index/overflow 구조는 변경하지 않음
+========================================================= */
+.module-modal,
+.modal,
+.dialog,
+.popup,
+.toast,
+.alert,
+.feedback {
+  border-radius: var(--common-modal-radius, var(--card-radius, 14px));
+  border-color: var(--common-modal-border, var(--module-line, #e2e8f0));
+  background-color: var(--common-modal-bg, var(--module-card, #ffffff));
+  color: var(--common-text, var(--module-text, #0f172a));
+}
+
+.module-modal,
+.modal,
+.dialog,
+.popup {
+  box-shadow: var(--common-modal-shadow, 0 20px 60px rgba(15,23,42,.22));
+}
+
+.toast,
+.alert,
+.feedback {
+  padding: var(--common-alert-padding, 11px 13px);
+  font-size: var(--common-alert-font-size, var(--font-base, 11px));
+  line-height: 1.45;
+  box-shadow: var(--common-toast-shadow, 0 12px 30px rgba(15,23,42,.14));
+}
+
+.module-modal-title,
+.modal-title,
+.dialog-title {
+  font-size: var(--common-modal-title-size, var(--font-title, 13px));
+  color: var(--common-text, var(--module-text, #0f172a));
+  line-height: 1.25;
+}
+
+.module-modal-actions,
+.modal-actions,
+.dialog-actions {
+  gap: var(--common-modal-button-gap, 8px);
+}

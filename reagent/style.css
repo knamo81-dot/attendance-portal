@@ -2861,3 +2861,64 @@ td {
 .vendor-quote-box input.collect-input {
   border-color: var(--common-line, var(--line));
 }
+
+/* =========================================================
+   Step 3-5/6 Common Modal Toast Feedback Link: reagent
+   - modal display/grid/width/max-height/overflow 구조는 유지
+   - radius, shadow, border, background, font, gap만 공통화
+   - 기능/JS 변경 없음
+========================================================= */
+.modal-backdrop {
+  background: var(--common-overlay-bg, rgba(15,23,42,.42));
+  backdrop-filter: blur(var(--common-overlay-blur, 2px));
+}
+
+.modal {
+  border: 1px solid var(--common-modal-border, var(--line));
+  border-radius: var(--common-modal-radius, 22px);
+  background: var(--common-modal-bg, #ffffff);
+  box-shadow: var(--common-modal-shadow, 0 30px 70px rgba(15,23,42,.28));
+  color: var(--common-text, var(--text));
+}
+
+.modal-head,
+.modal-search,
+.modal-foot {
+  border-color: var(--common-line, var(--line));
+}
+
+.modal-head h2,
+.modal-head h3,
+.result-title {
+  color: var(--common-text, var(--text));
+  line-height: 1.25;
+}
+
+.modal-head p,
+.small,
+.search-hint {
+  color: var(--common-muted, var(--muted));
+  font-size: var(--common-modal-body-size, 12px);
+  line-height: 1.45;
+}
+
+.modal-foot,
+.actions {
+  gap: var(--common-modal-button-gap, 8px);
+}
+
+.toast {
+  border-radius: var(--common-toast-radius, 14px);
+  padding: var(--common-toast-padding, 12px 14px);
+  font-size: var(--common-toast-font-size, 12px);
+  line-height: 1.45;
+  box-shadow: var(--common-toast-shadow, 0 12px 30px rgba(15,23,42,.18));
+}
+
+.toast.success {
+  background: var(--common-success, #065f46);
+}
+
+.toast.warn {
+  background: #92400e;
+}

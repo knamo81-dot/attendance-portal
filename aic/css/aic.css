@@ -1090,3 +1090,49 @@ input[type="radio"],
   color: var(--common-muted, var(--aic-muted));
   font-weight: 900;
 }
+
+/* =========================================================
+   Step 3-5/6 Common Modal + Feedback Link: AIC
+   - position/display/z-index/width/height/overflow 구조는 유지
+   - 모달/알림의 radius, shadow, border, background, font, gap만 공통화
+   - 기능/JS 변경 없음
+========================================================= */
+.aic-modal-overlay {
+  background: var(--common-overlay-bg, rgba(15, 23, 42, 0.42));
+  backdrop-filter: blur(var(--common-overlay-blur, 2px));
+}
+
+.aic-modal {
+  border: 1px solid var(--common-modal-border, var(--aic-line));
+  border-radius: var(--common-modal-radius, 18px);
+  background: var(--common-modal-bg, #ffffff);
+  box-shadow: var(--common-modal-shadow, 0 20px 60px rgba(15,23,42,.24));
+  color: var(--common-text, var(--aic-text));
+}
+
+.aic-modal h2 {
+  font-size: var(--common-modal-title-size, 18px);
+  color: var(--common-text, var(--aic-text));
+  line-height: 1.25;
+}
+
+.aic-modal p,
+.aic-field span,
+.aic-toggle-row strong,
+.aic-toggle-row span {
+  line-height: 1.45;
+}
+
+.aic-modal p {
+  font-size: var(--common-modal-body-size, 12px);
+  color: var(--common-muted, var(--aic-muted));
+}
+
+.aic-modal-actions {
+  gap: var(--common-modal-button-gap, 8px);
+}
+
+.aic-toggle-row {
+  border-color: var(--common-line, var(--aic-line));
+  border-radius: var(--common-control-radius, 12px);
+}

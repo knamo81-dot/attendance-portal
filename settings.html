@@ -128,6 +128,85 @@ input[type="radio"]{
   line-height: 1.35 !important;
 }
 
+
+
+/* =========================================================
+   Step 3-5/6 Common Modal Alert Feedback Link: settings
+   - auth/employee modal position/display/z-index/overflow 구조는 유지
+   - radius, shadow, border, background, font, gap만 공통화
+   - 기능/JS 변경 없음
+========================================================= */
+.auth-overlay,
+.real-modal-bg {
+  background: var(--common-overlay-bg, rgba(15,23,42,.35));
+  backdrop-filter: blur(var(--common-overlay-blur, 3px));
+}
+
+.auth-card,
+.real-modal-card {
+  border: 1px solid var(--common-modal-border, #dbe3ef);
+  border-radius: var(--common-modal-radius, 22px);
+  background: var(--common-modal-bg, #ffffff);
+  box-shadow: var(--common-modal-shadow, 0 20px 60px rgba(15,23,42,.18));
+  color: var(--common-text, #0f172a);
+}
+
+.auth-title,
+.real-modal-title,
+.admin-header-title {
+  font-size: var(--common-modal-title-size, 18px);
+  line-height: 1.25;
+  color: var(--common-text, #0f172a);
+}
+
+.auth-subtitle,
+.auth-helper,
+.admin-header-desc {
+  font-size: var(--common-modal-body-size, 13px);
+  line-height: 1.5;
+  color: var(--common-muted, #64748b);
+}
+
+.auth-actions,
+.real-actions,
+.admin-actions,
+.logout-confirm-actions {
+  gap: var(--common-modal-button-gap, 8px);
+}
+
+.auth-error,
+.auth-success,
+.admin-feedback,
+.real-feedback,
+.real-warning-box,
+.settings-session-hint {
+  border-radius: var(--common-alert-radius, 14px);
+  padding: var(--common-alert-padding, 11px 13px);
+  font-size: var(--common-alert-font-size, 12px);
+  line-height: 1.45;
+}
+
+.auth-error.show,
+.admin-feedback.error {
+  background: var(--common-alert-error-bg, #fef2f2);
+  color: var(--common-alert-error-text, #b91c1c);
+  border-color: var(--common-alert-error-line, #fecaca);
+}
+
+.auth-success.show,
+.admin-feedback.success {
+  background: var(--common-alert-success-bg, #f0fdf4);
+  color: var(--common-alert-success-text, #166534);
+  border-color: var(--common-alert-success-line, #bbf7d0);
+}
+
+.real-warning-box,
+.settings-session-hint {
+  background: var(--common-alert-warning-bg, #fffbeb);
+  color: var(--common-alert-warning-text, #92400e);
+  border-color: var(--common-alert-warning-line, #fde68a);
+}
+
 </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

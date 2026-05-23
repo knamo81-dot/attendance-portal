@@ -1057,6 +1057,72 @@ input[type="radio"]{
   font-weight: 800;
 }
 
+
+
+/* =========================================================
+   Step 3-5/6 Common Modal Alert Feedback Link: portal-index
+   - auth/logout overlay position/display/z-index 구조는 유지
+   - radius, shadow, border, background, font, gap만 공통화
+   - 기능/JS 변경 없음
+========================================================= */
+.auth-overlay,
+.logout-confirm-overlay {
+  background: var(--common-overlay-bg, rgba(15,23,42,.48));
+  backdrop-filter: blur(var(--common-overlay-blur, 3px));
+}
+
+.auth-card,
+.logout-confirm-box,
+.personal-settings-panel,
+.personal-settings-modal {
+  border: 1px solid var(--common-modal-border, #e2e8f0);
+  border-radius: var(--common-modal-radius, 18px);
+  background: var(--common-modal-bg, #ffffff);
+  box-shadow: var(--common-modal-shadow, 0 24px 80px rgba(15,23,42,.24));
+  color: var(--common-text, #0f172a);
+}
+
+.auth-card h1,
+.logout-confirm-title,
+.personal-settings-title {
+  font-size: var(--common-modal-title-size, 20px);
+  line-height: 1.25;
+  color: var(--common-text, #0f172a);
+}
+
+.auth-card p,
+.logout-confirm-desc,
+.personal-settings-desc {
+  font-size: var(--common-modal-body-size, 12px);
+  line-height: 1.5;
+  color: var(--common-muted, #64748b);
+}
+
+.auth-message,
+.personal-settings-message {
+  border-radius: var(--common-alert-radius, 14px);
+  padding: var(--common-alert-padding, 11px 13px);
+  font-size: var(--common-alert-font-size, 12px);
+  line-height: 1.45;
+}
+
+.auth-message.error {
+  background: var(--common-alert-error-bg, #fef2f2);
+  color: var(--common-alert-error-text, #b91c1c);
+  border-color: var(--common-alert-error-line, #fecaca);
+}
+
+.auth-message.success {
+  background: var(--common-alert-success-bg, #ecfdf5);
+  color: var(--common-alert-success-text, #047857);
+  border-color: var(--common-alert-success-line, #a7f3d0);
+}
+
+.logout-confirm-actions,
+.personal-settings-actions {
+  gap: var(--common-modal-button-gap, 8px);
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

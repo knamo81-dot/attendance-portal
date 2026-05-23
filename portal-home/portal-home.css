@@ -2247,3 +2247,71 @@ input[type="radio"],
   color: var(--common-muted, #64748b);
   font-weight: 800;
 }
+
+/* =========================================================
+   Step 3-5/6 Common Modal Popup + Feedback Link: portal-home
+   - 팝업 위치/보드 absolute/display/z-index/overflow 구조는 유지
+   - radius, shadow, border, background, font, button gap만 공통화
+   - 기능/JS 변경 없음
+========================================================= */
+.memo-pop,
+.reservation-modal-card,
+.auth-card {
+  border: 1px solid var(--common-modal-border, var(--common-line, #e2e8f0));
+  border-radius: var(--common-modal-radius, 18px);
+  background: var(--common-modal-bg, var(--common-card, #ffffff));
+  box-shadow: var(--common-modal-shadow, 0 20px 60px rgba(15,23,42,.20));
+  color: var(--common-text, #0f172a);
+}
+
+.reservation-modal-overlay,
+.auth-overlay {
+  background: var(--common-overlay-bg, rgba(15,23,42,.42));
+  backdrop-filter: blur(var(--common-overlay-blur, 3px));
+}
+
+.memo-pop h3,
+.reservation-modal-title,
+.auth-title {
+  font-size: var(--common-modal-title-size, 18px);
+  line-height: 1.25;
+  color: var(--common-text, #0f172a);
+}
+
+.memo-pop p,
+.reservation-modal-desc,
+.auth-subtitle,
+.auth-helper {
+  font-size: var(--common-modal-body-size, 13px);
+  line-height: 1.5;
+  color: var(--common-muted, #64748b);
+}
+
+.memo-actions,
+.reservation-modal-actions,
+.auth-actions {
+  gap: var(--common-modal-button-gap, 8px);
+}
+
+.toast,
+.memo-board-status,
+.auth-error,
+.auth-success {
+  border-radius: var(--common-toast-radius, 14px);
+  box-shadow: var(--common-toast-shadow, 0 12px 30px rgba(15,23,42,.14));
+  font-size: var(--common-toast-font-size, 12px);
+  line-height: 1.45;
+}
+
+.auth-error {
+  background: var(--common-alert-error-bg, #fef2f2);
+  color: var(--common-alert-error-text, #b91c1c);
+  border: 1px solid var(--common-alert-error-line, #fecaca);
+}
+
+.auth-success {
+  background: var(--common-alert-success-bg, #f0fdf4);
+  color: var(--common-alert-success-text, #166534);
+  border: 1px solid var(--common-alert-success-line, #bbf7d0);
+}
+

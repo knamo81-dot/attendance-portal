@@ -2546,3 +2546,59 @@ th:first-child {
   background: #fff7ed !important;
 }
 
+/* =========================================================
+   Step 3-5/6 Common Modal Feedback Link: research-staff
+   - 현재 파일 내 모달/피드백 클래스가 있는 경우만 적용
+   - position/display/z-index/width/height/overflow 구조는 변경하지 않음
+========================================================= */
+.modal,
+.dialog,
+.popup,
+.alert,
+.feedback,
+.notice {
+  border-color: var(--common-line, var(--line));
+  border-radius: var(--common-modal-radius, var(--rs-card-radius, 15px));
+  background-color: var(--common-modal-bg, var(--panel));
+  color: var(--common-text, var(--text));
+}
+
+.modal,
+.dialog,
+.popup {
+  box-shadow: var(--common-modal-shadow, 0 20px 60px rgba(15,23,42,.22));
+}
+
+.alert,
+.feedback,
+.notice {
+  padding: var(--common-alert-padding, 11px 13px);
+  font-size: var(--common-alert-font-size, var(--rs-font-base, 12.5px));
+  line-height: 1.5;
+  box-shadow: var(--common-shadow-soft, 0 3px 10px rgba(15,23,42,.04));
+}
+
+.msg.ok,
+.feedback.ok {
+  color: var(--common-alert-success-text, #047857);
+}
+
+.msg.err,
+.feedback.error {
+  color: var(--common-alert-error-text, #b91c1c);
+}
+
+.modal-title,
+.dialog-title,
+.popup-title {
+  font-size: var(--common-modal-title-size, var(--rs-font-title, 16px));
+  line-height: 1.25;
+  color: var(--common-text, var(--text));
+}
+
+.modal-actions,
+.dialog-actions,
+.popup-actions {
+  gap: var(--common-modal-button-gap, 8px);
+}
+
