@@ -1419,5 +1419,150 @@
   }
 }
 </style>
+
+
+<!-- =========================================================
+  Mobile Schedule Action Button Position Patch v9
+  - 펼쳐진 일정 카드의 수정/삭제 버튼을 카드 하단 우측 가로 정렬
+  - 본문 중간에 떠 보이는 현상 보정
+========================================================= -->
+<style id="portal-home-mobile-schedule-action-position-v9">
+@media (max-width: 768px) {
+  #tab-content .selected-date-panel .schedule-item,
+  #tab-content .selected-schedule-panel .schedule-item,
+  #tab-content .daily-schedule-panel .schedule-item,
+  #tab-content .schedule-list .schedule-item,
+  #tab-content .selected-date-panel .event-item,
+  #tab-content .selected-schedule-panel .event-item,
+  #tab-content .daily-schedule-panel .event-item {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  #tab-content .mobile-schedule-action-row {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 10px !important;
+    width: 100% !important;
+    margin: 18px 0 0 !important;
+    padding: 12px 12px 0 !important;
+    box-sizing: border-box !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.22) !important;
+  }
+
+  #tab-content .mobile-schedule-action-row button {
+    position: static !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 auto !important;
+    min-width: 72px !important;
+    min-height: 42px !important;
+    height: 42px !important;
+    margin: 0 !important;
+    padding: 0 16px !important;
+    border-radius: 14px !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+    transform: none !important;
+  }
+
+  #tab-content .selected-date-panel .schedule-item button,
+  #tab-content .selected-schedule-panel .schedule-item button,
+  #tab-content .daily-schedule-panel .schedule-item button,
+  #tab-content .schedule-list .schedule-item button,
+  #tab-content .selected-date-panel .event-item button,
+  #tab-content .selected-schedule-panel .event-item button,
+  #tab-content .daily-schedule-panel .event-item button {
+    max-width: 100% !important;
+  }
+}
+</style>
+
+<script id="portal-home-mobile-schedule-action-position-v9">
+(function () {
+  'use strict';
+
+  var MOBILE_QUERY = '(max-width: 768px)';
+  var CARD_SELECTOR = [
+    '#tab-content .selected-date-panel .schedule-item',
+    '#tab-content .selected-schedule-panel .schedule-item',
+    '#tab-content .daily-schedule-panel .schedule-item',
+    '#tab-content .schedule-list .schedule-item',
+    '#tab-content .selected-date-panel .event-item',
+    '#tab-content .selected-schedule-panel .event-item',
+    '#tab-content .daily-schedule-panel .event-item'
+  ].join(',');
+
+  function isMobile() {
+    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  function isEditDeleteButton(button) {
+    var text = (button.innerText || button.textContent || '').replace(/\s+/g, '').trim();
+    return text === '수정' || text === '삭제';
+  }
+
+  function normalizeScheduleActionButtons() {
+    if (!isMobile()) return;
+
+    var cards = Array.prototype.slice.call(document.querySelectorAll(CARD_SELECTOR));
+    cards.forEach(function (card) {
+      if (!card || !card.querySelectorAll) return;
+
+      var buttons = Array.prototype.slice.call(card.querySelectorAll('button')).filter(isEditDeleteButton);
+      if (buttons.length === 0) return;
+
+      var row = card.querySelector(':scope > .mobile-schedule-action-row');
+      if (!row) {
+        row = document.createElement('div');
+        row.className = 'mobile-schedule-action-row';
+        card.appendChild(row);
+      }
+
+      buttons.forEach(function (button) {
+        if (button.parentElement !== row) row.appendChild(button);
+      });
+    });
+  }
+
+  var raf = 0;
+  function scheduleNormalize() {
+    if (raf) return;
+    raf = window.requestAnimationFrame(function () {
+      raf = 0;
+      normalizeScheduleActionButtons();
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', scheduleNormalize);
+  document.addEventListener('click', function () {
+    setTimeout(scheduleNormalize, 60);
+  }, true);
+  window.addEventListener('resize', scheduleNormalize);
+  window.addEventListener('orientationchange', scheduleNormalize);
+
+  var observer = new MutationObserver(function () {
+    if (!isMobile()) return;
+    scheduleNormalize();
+  });
+
+  if (document.documentElement) {
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  setTimeout(scheduleNormalize, 250);
+  setTimeout(scheduleNormalize, 900);
+})();
+</script>
+
 </body>
 </html>
