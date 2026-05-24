@@ -558,9 +558,10 @@
 
 
 /* =========================================================
-   Mobile Memo Fullscreen Modal v20
-   - 모바일 메모 카드 클릭 시 전체화면 상세/수정/삭제 모달
-   - 기존 PC 메모 로직은 건드리지 않고 기존 버튼을 찾아 클릭 이벤트 재사용
+   Mobile Memo Fullscreen Modal Improve v21
+   - 메모 클릭 시 전체화면 내용 수정 모달
+   - 제목 중복 제거, 본문 textarea 중심
+   - 닫기 버튼이 있으므로 취소 대신 수정 버튼 사용
 ========================================================= */
 (function () {
   'use strict';
@@ -624,25 +625,29 @@
       return textOf(el);
     }
 
-    var lines = textOf(card).split('\n').map(function (v) { return v.trim(); }).filter(Boolean);
     var title = getMemoTitle(card);
-    return lines.filter(function (v) {
+    var lines = textOf(card).split('\n').map(function (v) { return v.trim(); }).filter(Boolean);
+    var filtered = lines.filter(function (v) {
       return v !== title &&
-             v !== '상세보기' &&
-             v !== '열기' &&
-             v !== '닫기' &&
-             v !== '수정' &&
-             v !== '삭제';
-    }).join('\n');
+        v !== '상세보기' &&
+        v !== '열기' &&
+        v !== '닫기' &&
+        v !== '수정' &&
+        v !== '삭제' &&
+        !/^#?메모$/.test(v) &&
+        !/^최근 메모$/.test(v) &&
+        !/^작성:/.test(v) &&
+        !/^수정:/.test(v);
+    });
+
+    return filtered.join('\n').trim();
   }
 
   function getMemoMeta(card) {
-    var text = textOf(card);
-    var lines = text.split('\n').map(function (v) { return v.trim(); }).filter(Boolean);
-    var meta = lines.filter(function (v) {
-      return /작성|수정|최근|날짜|메모/.test(v);
-    }).slice(-4);
-    return meta.join('\n');
+    var lines = textOf(card).split('\n').map(function (v) { return v.trim(); }).filter(Boolean);
+    return lines.filter(function (v) {
+      return /^작성:/.test(v) || /^수정:/.test(v);
+    }).join('\n');
   }
 
   function ensureModal() {
@@ -656,19 +661,13 @@
       '  <button type="button" class="mobile-memo-modal-close">닫기</button>',
       '</div>',
       '<div class="mobile-memo-modal-body">',
-      '  <div class="mobile-memo-modal-field">',
-      '    <label>제목</label>',
-      '    <input class="mobile-memo-modal-input" type="text" />',
-      '  </div>',
-      '  <div class="mobile-memo-modal-field">',
-      '    <label>내용</label>',
-      '    <textarea class="mobile-memo-modal-textarea"></textarea>',
-      '  </div>',
+      '  <div class="mobile-memo-modal-content-label">내용</div>',
+      '  <textarea class="mobile-memo-modal-textarea" placeholder="메모 내용을 입력하세요"></textarea>',
       '  <div class="mobile-memo-modal-meta"></div>',
       '</div>',
       '<div class="mobile-memo-modal-actions">',
       '  <button type="button" class="mobile-memo-modal-delete">삭제</button>',
-      '  <button type="button" class="mobile-memo-modal-cancel">취소</button>',
+      '  <button type="button" class="mobile-memo-modal-edit">수정</button>',
       '  <button type="button" class="mobile-memo-modal-save">저장</button>',
       '</div>'
     ].join('');
@@ -676,15 +675,8 @@
     document.body.appendChild(modal);
 
     modal.querySelector('.mobile-memo-modal-close').addEventListener('click', closeModal);
-    modal.querySelector('.mobile-memo-modal-cancel').addEventListener('click', closeModal);
-    modal.querySelector('.mobile-memo-modal-delete').addEventListener('click', function () {
-      if (!currentCard) return;
-      var btn = findButton(currentCard, ['삭제', '휴지통']);
-      if (btn) {
-        closeModal();
-        btn.click();
-      }
-    });
+    modal.querySelector('.mobile-memo-modal-delete').addEventListener('click', deleteMemo);
+    modal.querySelector('.mobile-memo-modal-edit').addEventListener('click', focusContent);
     modal.querySelector('.mobile-memo-modal-save').addEventListener('click', saveModal);
 
     return modal;
@@ -700,7 +692,6 @@
     var meta = getMemoMeta(card);
 
     m.querySelector('.mobile-memo-modal-title').textContent = title || '메모';
-    m.querySelector('.mobile-memo-modal-input').value = title || '';
     m.querySelector('.mobile-memo-modal-textarea').value = content || '';
     m.querySelector('.mobile-memo-modal-meta').textContent = meta || '';
 
@@ -715,6 +706,15 @@
     currentCard = null;
   }
 
+  function focusContent() {
+    if (!modal) return;
+    var ta = modal.querySelector('.mobile-memo-modal-textarea');
+    if (ta) {
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    }
+  }
+
   function setNativeValue(el, value) {
     if (!el) return;
     el.value = value;
@@ -725,16 +725,19 @@
   function saveModal() {
     if (!currentCard || !modal) return;
 
-    var title = modal.querySelector('.mobile-memo-modal-input').value || '';
     var content = modal.querySelector('.mobile-memo-modal-textarea').value || '';
 
-    var titleEl = q(currentCard, ['.memo-title', '.note-title', '[class*="title"]']);
-    var contentEl = q(currentCard, ['.memo-content', '.memo-body', '.memo-text', '.memo-detail', '.note-content', '.note-body', '.note-text', '.note-detail', 'textarea']);
-
-    if (titleEl) {
-      if (titleEl.tagName === 'INPUT' || titleEl.tagName === 'TEXTAREA') setNativeValue(titleEl, title);
-      else titleEl.textContent = title;
-    }
+    var contentEl = q(currentCard, [
+      '.memo-content',
+      '.memo-body',
+      '.memo-text',
+      '.memo-detail',
+      '.note-content',
+      '.note-body',
+      '.note-text',
+      '.note-detail',
+      'textarea'
+    ]);
 
     if (contentEl) {
       if (contentEl.tagName === 'INPUT' || contentEl.tagName === 'TEXTAREA') setNativeValue(contentEl, content);
@@ -747,6 +750,17 @@
     if (editBtn) {
       setTimeout(function () {
         try { editBtn.click(); } catch (_) {}
+      }, 30);
+    }
+  }
+
+  function deleteMemo() {
+    if (!currentCard) return;
+    var btn = findButton(currentCard, ['삭제', '휴지통']);
+    if (btn) {
+      closeModal();
+      setTimeout(function () {
+        try { btn.click(); } catch (_) {}
       }, 30);
     }
   }
