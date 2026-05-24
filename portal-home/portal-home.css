@@ -1,8 +1,3 @@
-/* portal-home.css | Phase 1 split from original portal-home.html
-   기능 변경 없이 기존 inline CSS를 외부 파일로 분리했습니다. */
-
-
-
 /* =========================================================
    Common theme token link
    - common/theme.css의 --common-* 값을 사용하도록 연결
@@ -635,9 +630,6 @@
       border-top: 1px solid #e2e8f0;
       padding: 12px;
       background: var(--common-card, #fff);
-      display: block !important;
-      height: auto !important;
-      min-height: 0 !important;
     }
     .schedule-desc {
       font-size: 13px;
@@ -645,8 +637,6 @@
       line-height: 1.6;
       white-space: pre-wrap;
       margin-bottom: 12px;
-      height: auto !important;
-      min-height: 0 !important;
     }
     .tips {
       font-size: 13px;
@@ -2321,20 +2311,217 @@ input[type="radio"],
 }
 
 
-/* ===== mobile schedule detail compact fix ===== */
-.schedule-body > *{
-  flex:0 0 auto !important;
+/* =========================================================
+   Mobile Schedule Detail Height Strong Fix v10
+   - 모바일에서 일정 상세 펼침 시 본문 영역이 과하게 길어지는 문제 보정
+   - 일정 내용 높이는 실제 텍스트만큼만 사용
+   - 수정/삭제 버튼은 상세 내용 바로 아래 우측 정렬
+========================================================= */
+@media (max-width: 768px) {
+  #tab-content .selected-date-panel .schedule-item,
+  #tab-content .selected-schedule-panel .schedule-item,
+  #tab-content .daily-schedule-panel .schedule-item,
+  #tab-content .schedule-list .schedule-item,
+  #tab-content .selected-date-panel .event-item,
+  #tab-content .selected-schedule-panel .event-item,
+  #tab-content .daily-schedule-panel .event-item {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    display: block !important;
+    overflow: hidden !important;
+  }
+
+  #tab-content .schedule-body,
+  #tab-content .schedule-item .schedule-body,
+  #tab-content .event-item .schedule-body {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 14px 14px 12px !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  #tab-content .schedule-desc,
+  #tab-content .schedule-body .schedule-desc,
+  #tab-content .schedule-item [class*="desc"],
+  #tab-content .schedule-item [class*="detail"],
+  #tab-content .schedule-item [class*="memo"],
+  #tab-content .schedule-item [class*="note"] {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 0 12px 0 !important;
+    padding: 0 !important;
+    line-height: 1.55 !important;
+    white-space: pre-wrap !important;
+    overflow: visible !important;
+  }
+
+  #tab-content .mobile-schedule-action-row,
+  #tab-content .schedule-actions,
+  #tab-content .schedule-action-row {
+    position: static !important;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 10px !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 8px 0 0 0 !important;
+    padding: 10px 0 0 0 !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.22) !important;
+    box-sizing: border-box !important;
+  }
+
+  #tab-content .mobile-schedule-action-row button,
+  #tab-content .schedule-actions button,
+  #tab-content .schedule-action-row button {
+    position: static !important;
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 72px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
 }
 
-.schedule-actions,
-.schedule-action-row,
-.mobile-schedule-action-row{
-  margin-top:12px !important;
-  display:flex !important;
-  justify-content:flex-end !important;
-  gap:10px !important;
-}
 
-.schedule-body .small-btn{
-  align-self:flex-end !important;
+/* =========================================================
+   Mobile Schedule Detail No Empty Space Fix v11
+   - 일정 펼침 시 상세내용이 아래로 밀려 보이는 문제 보정
+   - 본문/상세내용/버튼영역의 강제 높이 제거
+   - textarea 수정창 높이도 내용 입력용 최소 높이만 유지
+========================================================= */
+@media (max-width: 768px) {
+  /* 일정 카드 자체가 남은 높이를 차지하지 않도록 고정 */
+  #tab-content .schedule-list .schedule-item,
+  #tab-content .selected-date-panel .schedule-item,
+  #tab-content .selected-schedule-panel .schedule-item,
+  #tab-content .daily-schedule-panel .schedule-item,
+  #tab-content .schedule-list .event-item,
+  #tab-content .selected-date-panel .event-item,
+  #tab-content .selected-schedule-panel .event-item,
+  #tab-content .daily-schedule-panel .event-item {
+    display: block !important;
+    position: relative !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+  }
+
+  /* 카드 상단은 기존처럼 유지 */
+  #tab-content .schedule-head {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    flex: 0 0 auto !important;
+  }
+
+  /* 펼쳐진 본문이 빈 공간을 먹지 않도록 강제 */
+  #tab-content .schedule-body,
+  #tab-content .schedule-item > .schedule-body,
+  #tab-content .event-item > .schedule-body {
+    display: block !important;
+    position: relative !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    flex: none !important;
+    flex-grow: 0 !important;
+    flex-shrink: 0 !important;
+    align-self: auto !important;
+    justify-content: flex-start !important;
+    padding: 12px 14px !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* 상세 텍스트가 위에서 바로 시작하고 실제 줄 수만큼만 차지 */
+  #tab-content .schedule-desc,
+  #tab-content .schedule-body .schedule-desc,
+  #tab-content .schedule-body [class*="desc"],
+  #tab-content .schedule-body [class*="detail"],
+  #tab-content .schedule-body [class*="content"],
+  #tab-content .schedule-body [class*="memo"],
+  #tab-content .schedule-body [class*="note"],
+  #tab-content .schedule-body [class*="text"] {
+    display: block !important;
+    position: static !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    flex: none !important;
+    margin: 0 0 10px 0 !important;
+    padding: 0 !important;
+    line-height: 1.55 !important;
+    white-space: pre-wrap !important;
+    overflow: visible !important;
+    transform: none !important;
+  }
+
+  /* 비어있는 상세 요소는 공간을 만들지 않음 */
+  #tab-content .schedule-body [class*="desc"]:empty,
+  #tab-content .schedule-body [class*="detail"]:empty,
+  #tab-content .schedule-body [class*="content"]:empty,
+  #tab-content .schedule-body [class*="memo"]:empty,
+  #tab-content .schedule-body [class*="note"]:empty,
+  #tab-content .schedule-body [class*="text"]:empty {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* 수정 모드 textarea가 과하게 커지지 않도록 */
+  #tab-content .schedule-body textarea,
+  #tab-content .schedule-item textarea,
+  #tab-content .event-item textarea {
+    height: auto !important;
+    min-height: 96px !important;
+    max-height: 180px !important;
+    padding: 12px !important;
+    line-height: 1.5 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 수정/삭제 버튼은 내용 바로 아래 */
+  #tab-content .mobile-schedule-action-row,
+  #tab-content .schedule-actions,
+  #tab-content .schedule-action-row {
+    display: flex !important;
+    position: static !important;
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 10px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 8px 0 0 0 !important;
+    padding: 10px 0 0 0 !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.22) !important;
+  }
+
+  #tab-content .mobile-schedule-action-row button,
+  #tab-content .schedule-actions button,
+  #tab-content .schedule-action-row button {
+    position: static !important;
+    flex: 0 0 auto !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    width: auto !important;
+    margin: 0 !important;
+  }
 }
