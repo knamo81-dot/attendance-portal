@@ -201,5 +201,435 @@
 <script src="../common/common.js"></script>
 
 
+
+<!-- =========================================================
+  Mobile Memo UI Patch
+  - PC 화면 영향 최소화
+  - 모바일에서 메모 색상 필터 / 제목형 카드 / 상세보기 UX 보강
+========================================================= -->
+<style id="portal-home-mobile-memo-ui-patch">
+@media (max-width: 768px) {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden !important;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: #f7f8fb;
+  }
+
+  .app,
+  .layout,
+  #home-page.home-root,
+  #tab-content.content {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  .app,
+  .layout {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #home-page.home-root {
+    padding: 8px 10px 16px !important;
+  }
+
+  #tab-content.content {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .mobile-memo-filter-bar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    overflow-x: auto;
+    padding: 10px 2px 10px;
+    margin: 0 0 8px;
+    background: rgba(247, 248, 251, 0.96);
+    backdrop-filter: blur(10px);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .mobile-memo-filter-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobile-memo-filter-chip {
+    flex: 0 0 auto;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: #ffffff;
+    color: #334155;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  }
+
+  .mobile-memo-filter-chip::before {
+    content: "";
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    margin-right: 6px;
+    border-radius: 999px;
+    background: var(--memo-chip-color, #cbd5e1);
+    vertical-align: 0;
+  }
+
+  .mobile-memo-filter-chip.is-active {
+    color: #0f172a;
+    border-color: rgba(59, 130, 246, 0.55);
+    background: #eef6ff;
+    box-shadow: 0 5px 16px rgba(59, 130, 246, 0.16);
+  }
+
+  .mobile-memo-filter-chip[data-filter="all"]::before {
+    background: linear-gradient(135deg, #fde68a, #bfdbfe, #fecdd3);
+  }
+
+  .mobile-memo-filter-chip[data-filter="yellow"] { --memo-chip-color: #facc15; }
+  .mobile-memo-filter-chip[data-filter="blue"] { --memo-chip-color: #60a5fa; }
+  .mobile-memo-filter-chip[data-filter="green"] { --memo-chip-color: #4ade80; }
+  .mobile-memo-filter-chip[data-filter="pink"] { --memo-chip-color: #f9a8d4; }
+  .mobile-memo-filter-chip[data-filter="purple"] { --memo-chip-color: #c084fc; }
+  .mobile-memo-filter-chip[data-filter="white"] { --memo-chip-color: #e2e8f0; }
+
+  .mobile-memo-list-mode .memo-card,
+  .mobile-memo-list-mode .memo-item,
+  .mobile-memo-list-mode .note-card,
+  .mobile-memo-list-mode [data-memo-id],
+  .mobile-memo-list-mode [data-note-id] {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    left: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    margin: 8px 0 !important;
+    padding: 13px 14px !important;
+    border-radius: 18px !important;
+    box-sizing: border-box !important;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08) !important;
+    cursor: pointer;
+    overflow: hidden !important;
+  }
+
+  .mobile-memo-list-mode .memo-card::after,
+  .mobile-memo-list-mode .memo-item::after,
+  .mobile-memo-list-mode .note-card::after,
+  .mobile-memo-list-mode [data-memo-id]::after,
+  .mobile-memo-list-mode [data-note-id]::after {
+    content: "상세보기";
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.72);
+    color: #475569;
+    font-size: 11px;
+    font-weight: 800;
+    pointer-events: none;
+  }
+
+  .mobile-memo-list-mode .mobile-memo-open::after {
+    content: "닫기";
+  }
+
+  .mobile-memo-list-mode .memo-card.mobile-memo-hidden,
+  .mobile-memo-list-mode .memo-item.mobile-memo-hidden,
+  .mobile-memo-list-mode .note-card.mobile-memo-hidden,
+  .mobile-memo-list-mode [data-memo-id].mobile-memo-hidden,
+  .mobile-memo-list-mode [data-note-id].mobile-memo-hidden {
+    display: none !important;
+  }
+
+  .mobile-memo-list-mode .memo-card:not(.mobile-memo-open) .memo-content,
+  .mobile-memo-list-mode .memo-card:not(.mobile-memo-open) .memo-body,
+  .mobile-memo-list-mode .memo-card:not(.mobile-memo-open) .memo-text,
+  .mobile-memo-list-mode .memo-card:not(.mobile-memo-open) .memo-detail,
+  .mobile-memo-list-mode .memo-card:not(.mobile-memo-open) textarea,
+  .mobile-memo-list-mode .memo-card:not(.mobile-memo-open) .memo-actions,
+  .mobile-memo-list-mode .memo-card:not(.mobile-memo-open) .actions,
+  .mobile-memo-list-mode .memo-item:not(.mobile-memo-open) .memo-content,
+  .mobile-memo-list-mode .memo-item:not(.mobile-memo-open) .memo-body,
+  .mobile-memo-list-mode .memo-item:not(.mobile-memo-open) .memo-text,
+  .mobile-memo-list-mode .memo-item:not(.mobile-memo-open) .memo-detail,
+  .mobile-memo-list-mode .memo-item:not(.mobile-memo-open) textarea,
+  .mobile-memo-list-mode .memo-item:not(.mobile-memo-open) .memo-actions,
+  .mobile-memo-list-mode .memo-item:not(.mobile-memo-open) .actions,
+  .mobile-memo-list-mode .note-card:not(.mobile-memo-open) .memo-content,
+  .mobile-memo-list-mode .note-card:not(.mobile-memo-open) .memo-body,
+  .mobile-memo-list-mode .note-card:not(.mobile-memo-open) .memo-text,
+  .mobile-memo-list-mode .note-card:not(.mobile-memo-open) .memo-detail,
+  .mobile-memo-list-mode .note-card:not(.mobile-memo-open) textarea,
+  .mobile-memo-list-mode .note-card:not(.mobile-memo-open) .memo-actions,
+  .mobile-memo-list-mode .note-card:not(.mobile-memo-open) .actions,
+  .mobile-memo-list-mode [data-memo-id]:not(.mobile-memo-open) .memo-content,
+  .mobile-memo-list-mode [data-memo-id]:not(.mobile-memo-open) .memo-body,
+  .mobile-memo-list-mode [data-memo-id]:not(.mobile-memo-open) .memo-text,
+  .mobile-memo-list-mode [data-memo-id]:not(.mobile-memo-open) .memo-detail,
+  .mobile-memo-list-mode [data-memo-id]:not(.mobile-memo-open) textarea,
+  .mobile-memo-list-mode [data-memo-id]:not(.mobile-memo-open) .memo-actions,
+  .mobile-memo-list-mode [data-memo-id]:not(.mobile-memo-open) .actions,
+  .mobile-memo-list-mode [data-note-id]:not(.mobile-memo-open) .memo-content,
+  .mobile-memo-list-mode [data-note-id]:not(.mobile-memo-open) .memo-body,
+  .mobile-memo-list-mode [data-note-id]:not(.mobile-memo-open) .memo-text,
+  .mobile-memo-list-mode [data-note-id]:not(.mobile-memo-open) .memo-detail,
+  .mobile-memo-list-mode [data-note-id]:not(.mobile-memo-open) textarea,
+  .mobile-memo-list-mode [data-note-id]:not(.mobile-memo-open) .memo-actions,
+  .mobile-memo-list-mode [data-note-id]:not(.mobile-memo-open) .actions {
+    display: none !important;
+  }
+
+  .mobile-memo-list-mode .memo-title,
+  .mobile-memo-list-mode .note-title,
+  .mobile-memo-list-mode [class*="title"] {
+    display: block !important;
+    max-width: calc(100% - 74px) !important;
+    margin: 0 !important;
+    color: #0f172a !important;
+    font-size: 15px !important;
+    font-weight: 850 !important;
+    line-height: 1.35 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .mobile-memo-list-mode .mobile-memo-open .memo-title,
+  .mobile-memo-list-mode .mobile-memo-open .note-title,
+  .mobile-memo-list-mode .mobile-memo-open [class*="title"] {
+    max-width: calc(100% - 48px) !important;
+    margin-bottom: 10px !important;
+    white-space: normal !important;
+  }
+
+  .mobile-memo-list-mode .mobile-memo-open .memo-content,
+  .mobile-memo-list-mode .mobile-memo-open .memo-body,
+  .mobile-memo-list-mode .mobile-memo-open .memo-text,
+  .mobile-memo-list-mode .mobile-memo-open .memo-detail {
+    display: block !important;
+    color: #334155 !important;
+    font-size: 14px !important;
+    line-height: 1.55 !important;
+  }
+
+  .mobile-memo-list-mode .mobile-memo-open textarea,
+  .mobile-memo-list-mode .mobile-memo-open input[type="text"] {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .mobile-memo-list-mode .mobile-memo-open .memo-actions,
+  .mobile-memo-list-mode .mobile-memo-open .actions,
+  .mobile-memo-list-mode .mobile-memo-open [class*="action"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    margin-top: 12px !important;
+  }
+
+  .mobile-memo-list-mode .mobile-memo-open button {
+    min-height: 36px;
+    border-radius: 12px;
+  }
+}
+</style>
+
+<script id="portal-home-mobile-memo-ui-patch">
+(function () {
+  'use strict';
+
+  const MOBILE_QUERY = '(max-width: 768px)';
+  const CARD_SELECTOR = '.memo-card, .memo-item, .note-card, [data-memo-id], [data-note-id]';
+  const COLOR_KEYS = [
+    { key: 'yellow', label: '노랑', tokens: ['yellow', 'memo-yellow', 'note-yellow', '#facc15', '#fde68a', '255, 243', '254, 249'] },
+    { key: 'blue', label: '파랑', tokens: ['blue', 'memo-blue', 'note-blue', '#60a5fa', '#bfdbfe', '219, 234', '239, 246'] },
+    { key: 'green', label: '초록', tokens: ['green', 'memo-green', 'note-green', '#4ade80', '#bbf7d0', '220, 252', '240, 253'] },
+    { key: 'pink', label: '분홍', tokens: ['pink', 'rose', 'memo-pink', 'note-pink', '#f9a8d4', '#fecdd3', '252, 231', '253, 242'] },
+    { key: 'purple', label: '보라', tokens: ['purple', 'violet', 'memo-purple', 'note-purple', '#c084fc', '#e9d5ff', '243, 232'] },
+    { key: 'white', label: '흰색', tokens: ['white', 'memo-white', 'note-white', '#ffffff', '255, 255, 255'] }
+  ];
+
+  let activeFilter = 'all';
+  let rafId = 0;
+
+  function isMobile() {
+    return window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  function hasMemoContext() {
+    const activeTab = document.querySelector('.workspace-tabs .pill.active[data-tab]');
+    const activeTabId = activeTab ? activeTab.getAttribute('data-tab') : 'memo';
+    return activeTabId === 'memo' || !!document.querySelector(CARD_SELECTOR);
+  }
+
+  function getContentRoot() {
+    return document.getElementById('tab-content') || document.body;
+  }
+
+  function normalizeColor(card) {
+    const raw = [
+      card.dataset ? (card.dataset.color || card.dataset.memoColor || card.dataset.noteColor || card.dataset.bg || '') : '',
+      card.className || '',
+      card.getAttribute('style') || '',
+      window.getComputedStyle(card).backgroundColor || ''
+    ].join(' ').toLowerCase();
+
+    const matched = COLOR_KEYS.find(item => item.tokens.some(token => raw.includes(token.toLowerCase())));
+    return matched ? matched.key : 'white';
+  }
+
+  function getCards() {
+    return Array.from(document.querySelectorAll(CARD_SELECTOR)).filter(card => {
+      if (!card || card.classList.contains('mobile-memo-filter-chip')) return false;
+      if (card.closest('.mobile-memo-filter-bar')) return false;
+      return true;
+    });
+  }
+
+  function ensureTitleFallback(card) {
+    const hasTitle = card.querySelector('.memo-title, .note-title, [class*="title"]');
+    if (hasTitle) return;
+
+    const text = (card.innerText || '').trim().split('\n').map(v => v.trim()).filter(Boolean)[0] || '제목 없는 메모';
+    const title = document.createElement('div');
+    title.className = 'memo-title mobile-generated-title';
+    title.textContent = text.length > 28 ? text.slice(0, 28) + '…' : text;
+    card.insertBefore(title, card.firstChild);
+  }
+
+  function ensureFilterBar(colors) {
+    const root = getContentRoot();
+    let bar = document.querySelector('.mobile-memo-filter-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'mobile-memo-filter-bar';
+      bar.setAttribute('role', 'tablist');
+      bar.setAttribute('aria-label', '메모 색상 필터');
+      root.insertBefore(bar, root.firstChild);
+    }
+
+    const items = [{ key: 'all', label: '전체' }].concat(
+      COLOR_KEYS.filter(item => colors.has(item.key)).map(item => ({ key: item.key, label: item.label }))
+    );
+
+    const currentKeys = Array.from(bar.querySelectorAll('button')).map(btn => btn.dataset.filter).join('|');
+    const nextKeys = items.map(item => item.key).join('|');
+    if (currentKeys !== nextKeys) {
+      bar.innerHTML = '';
+      items.forEach(item => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mobile-memo-filter-chip';
+        btn.dataset.filter = item.key;
+        btn.textContent = item.label;
+        btn.addEventListener('click', function () {
+          activeFilter = item.key;
+          applyMobileMemoUi();
+        });
+        bar.appendChild(btn);
+      });
+    }
+
+    Array.from(bar.querySelectorAll('button')).forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.filter === activeFilter);
+    });
+  }
+
+  function applyMobileMemoUi() {
+    rafId = 0;
+    const root = getContentRoot();
+    const cards = getCards();
+    const enabled = isMobile() && hasMemoContext() && cards.length > 0;
+
+    document.body.classList.toggle('mobile-memo-list-mode', enabled);
+
+    const bar = document.querySelector('.mobile-memo-filter-bar');
+    if (!enabled) {
+      if (bar) bar.hidden = true;
+      cards.forEach(card => {
+        card.classList.remove('mobile-memo-hidden', 'mobile-memo-open');
+      });
+      return;
+    }
+
+    const colors = new Set();
+    cards.forEach(card => {
+      const color = normalizeColor(card);
+      card.dataset.mobileMemoColor = color;
+      colors.add(color);
+      ensureTitleFallback(card);
+      card.classList.toggle('mobile-memo-hidden', activeFilter !== 'all' && color !== activeFilter);
+    });
+
+    ensureFilterBar(colors);
+    const nextBar = document.querySelector('.mobile-memo-filter-bar');
+    if (nextBar) nextBar.hidden = false;
+
+    root.classList.add('mobile-memo-ready');
+  }
+
+  function scheduleApply() {
+    if (rafId) return;
+    rafId = window.requestAnimationFrame(applyMobileMemoUi);
+  }
+
+  document.addEventListener('click', function (event) {
+    if (!isMobile() || !document.body.classList.contains('mobile-memo-list-mode')) return;
+    if (event.target.closest('.mobile-memo-filter-bar')) return;
+    if (event.target.closest('button, a, input, textarea, select, label')) return;
+
+    const card = event.target.closest(CARD_SELECTOR);
+    if (!card || card.classList.contains('mobile-memo-hidden')) return;
+
+    getCards().forEach(item => {
+      if (item !== card) item.classList.remove('mobile-memo-open');
+    });
+    card.classList.toggle('mobile-memo-open');
+  }, true);
+
+  window.addEventListener('resize', scheduleApply);
+  window.addEventListener('orientationchange', scheduleApply);
+  document.addEventListener('DOMContentLoaded', scheduleApply);
+  document.addEventListener('click', function (event) {
+    if (event.target.closest('.workspace-tabs .pill')) {
+      setTimeout(scheduleApply, 80);
+    }
+  });
+
+  const observer = new MutationObserver(scheduleApply);
+  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'data-color', 'data-memo-color', 'data-note-color'] });
+
+  setTimeout(scheduleApply, 250);
+  setTimeout(scheduleApply, 900);
+  setTimeout(scheduleApply, 1600);
+})();
+</script>
+
+
 </body>
 </html>
