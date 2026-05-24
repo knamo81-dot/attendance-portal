@@ -1275,16 +1275,16 @@ input[type="radio"]{
 
   .sidenav {
     position: fixed;
-    top: 8px;
-    left: 8px;
-    bottom: 8px;
+    top: 0;
+    left: 0;
+    bottom: 0;
     z-index: 90;
     width: 72px;
-    height: auto;
-    min-height: 0;
-    max-height: calc(100dvh - 16px);
-    border-radius: 18px;
-    padding: 8px;
+    height: 100dvh;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0 20px 20px 0;
+    padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
     overflow-y: auto;
     overflow-x: hidden;
     transform: translateX(var(--mobile-drawer-x, calc(-100% - 12px)));
@@ -1481,10 +1481,13 @@ input[type="radio"]{
   }
 
   .sidenav {
-    top: 6px;
-    left: 6px;
-    bottom: 6px;
-    max-height: calc(100dvh - 12px);
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: 100dvh;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0 18px 18px 0;
   }
 }
 
