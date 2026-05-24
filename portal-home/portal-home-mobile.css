@@ -684,7 +684,6 @@
   #tab-content .time-table,
   #tab-content [class*="reservation"][class*="page"],
   #tab-content [class*="reservation"][class*="panel"],
-  #tab-content [class*="reservation"][class*="content"],
   #tab-content [class*="time"][class*="table"] {
     width: 100% !important;
     max-width: 100% !important;
@@ -721,36 +720,22 @@
   /* 달력 안의 작은 일정 표시는 숨기되, 아래 실제 일정 카드 안 내용은 다시 표시 */
   #tab-content .selected-date-panel .schedule-item [class*="desc"],
   #tab-content .selected-date-panel .schedule-item [class*="detail"],
-  #tab-content .selected-date-panel .schedule-item [class*="content"],
-  #tab-content .selected-date-panel .schedule-item [class*="body"],
   #tab-content .selected-date-panel .schedule-item [class*="memo"],
   #tab-content .selected-date-panel .schedule-item [class*="note"],
-  #tab-content .selected-date-panel .schedule-item [class*="text"],
   #tab-content .selected-date-panel .event-item [class*="desc"],
   #tab-content .selected-date-panel .event-item [class*="detail"],
-  #tab-content .selected-date-panel .event-item [class*="content"],
-  #tab-content .selected-date-panel .event-item [class*="body"],
   #tab-content .selected-date-panel .event-item [class*="memo"],
   #tab-content .selected-date-panel .event-item [class*="note"],
-  #tab-content .selected-date-panel .event-item [class*="text"],
   #tab-content .selected-schedule-panel .schedule-item [class*="desc"],
   #tab-content .selected-schedule-panel .schedule-item [class*="detail"],
-  #tab-content .selected-schedule-panel .schedule-item [class*="content"],
-  #tab-content .selected-schedule-panel .schedule-item [class*="body"],
   #tab-content .selected-schedule-panel .schedule-item [class*="memo"],
   #tab-content .selected-schedule-panel .schedule-item [class*="note"],
-  #tab-content .selected-schedule-panel .schedule-item [class*="text"],
   #tab-content .daily-schedule-panel .schedule-item [class*="desc"],
   #tab-content .daily-schedule-panel .schedule-item [class*="detail"],
-  #tab-content .daily-schedule-panel .schedule-item [class*="content"],
-  #tab-content .daily-schedule-panel .schedule-item [class*="body"],
   #tab-content .daily-schedule-panel .schedule-item [class*="memo"],
   #tab-content .daily-schedule-panel .schedule-item [class*="note"],
-  #tab-content .daily-schedule-panel .schedule-item [class*="text"],
   #tab-content .schedule-list .schedule-item [class*="desc"],
   #tab-content .schedule-list .schedule-item [class*="detail"],
-  #tab-content .schedule-list .schedule-item [class*="content"],
-  #tab-content .schedule-list .schedule-item [class*="body"],
   #tab-content .schedule-list .schedule-item [class*="memo"],
   #tab-content .schedule-list .schedule-item [class*="note"],
   #tab-content .schedule-list .schedule-item [class*="text"] {
@@ -788,14 +773,12 @@
   #tab-content .selected-date-panel .event-item,
   #tab-content .selected-schedule-panel .event-item,
   #tab-content .daily-schedule-panel .event-item {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
+    display: block !important;
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
-    overflow: visible !important;
-  }
+    overflow: hidden !important;
+}
 
   #tab-content .mobile-schedule-action-row {
     display: flex !important;
@@ -842,173 +825,81 @@
 
 
 /* =========================================================
-   Mobile Schedule Reservation Header Wrap Fix v13
-   - 스케줄/예약 상단 이전달·년월·다음달 잘림 방지
-   - 가로 스크롤 방식 제거
-   - 모바일에서는 탭/월 이동 버튼을 줄바꿈 배치
+   Mobile Schedule Detail Compact Final Fix v12
+   - 상세내용 빈 wrapper 표시 제거
+   - 한 줄 내용이면 카드도 짧게 표시
+   - 수정/삭제 버튼은 내용 바로 아래 우측 정렬
 ========================================================= */
 @media (max-width: 768px) {
-  /* 카드 내부가 오른쪽으로 넘치지 않게 고정 */
-  #tab-content .card,
-  #tab-content .schedule-grid,
-  #tab-content .calendar-side-fixed,
-  #tab-content .reservation-panel,
-  #tab-content .reservation-header-main,
-  #tab-content .calendar-section,
-  #tab-content .calendar-panel,
-  #tab-content .schedule-wrap,
-  #tab-content .schedule-container,
-  #tab-content .reservation-page,
-  #tab-content .reservation-content {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    box-sizing: border-box !important;
-    overflow-x: hidden !important;
+  #tab-content .schedule-item,
+  #tab-content .event-item {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
   }
 
-  /* 스케줄/예약 상단 전체 컨트롤은 여러 줄 허용 */
-  #tab-content .schedule-top,
-  #tab-content .schedule-header,
-  #tab-content .calendar-header,
-  #tab-content .calendar-nav,
-  #tab-content .reservation-header,
-  #tab-content .reservation-nav,
-  #tab-content [class*="schedule"][class*="top"],
-  #tab-content [class*="schedule"][class*="header"],
-  #tab-content [class*="calendar"][class*="header"],
-  #tab-content [class*="calendar"][class*="nav"],
-  #tab-content [class*="reservation"][class*="header"],
-  #tab-content [class*="reservation"][class*="nav"] {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 8px !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
+  #tab-content .schedule-body {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 12px 14px !important;
+    margin: 0 !important;
     overflow: visible !important;
-    overflow-x: visible !important;
-    white-space: normal !important;
-    scrollbar-width: none !important;
   }
 
-  /* 상단 스케줄/예약 전환 스위치는 한 줄 안에서 먼저 표시 */
-  #tab-content .planner-switch-wrap {
-    width: 100% !important;
-    max-width: 100% !important;
-    justify-content: flex-start !important;
-    margin: 0 0 8px 0 !important;
-  }
-
-  #tab-content .planner-switch {
-    flex: 0 0 auto !important;
-    width: auto !important;
-    max-width: 100% !important;
-  }
-
-  /* 이전달 / 년월 / 다음달 버튼은 한 줄 3개 배치 */
-  #tab-content .calendar-nav button,
-  #tab-content .schedule-header button,
-  #tab-content .calendar-header button,
-  #tab-content .reservation-header button,
-  #tab-content .reservation-nav button,
-  #tab-content [class*="calendar"][class*="nav"] button,
-  #tab-content [class*="calendar"][class*="header"] button,
-  #tab-content [class*="reservation"][class*="header"] button,
-  #tab-content [class*="reservation"][class*="nav"] button {
-    flex: 1 1 0 !important;
-    min-width: 0 !important;
-    max-width: none !important;
-    width: auto !important;
-    height: 44px !important;
-    min-height: 44px !important;
-    padding: 0 8px !important;
-    border-radius: 14px !important;
-    font-size: 15px !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-  }
-
-  /* 년월 타이틀은 버튼보다 조금 넓게 */
-  #tab-content .month-title,
-  #tab-content .current-month,
-  #tab-content .calendar-title,
-  #tab-content [class*="month"][class*="title"],
-  #tab-content [class*="calendar"][class*="title"] {
-    flex: 1.35 1 0 !important;
-    min-width: 0 !important;
-    max-width: none !important;
-    width: auto !important;
-    height: 44px !important;
-    min-height: 44px !important;
-    padding: 0 8px !important;
-    border-radius: 14px !important;
-    font-size: 15px !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    box-sizing: border-box !important;
-  }
-
-  /* 버튼이 4개 이상이면 첫 줄에서 자연스럽게 줄바꿈 */
-  #tab-content .schedule-top > *,
-  #tab-content .schedule-header > *,
-  #tab-content .calendar-header > *,
-  #tab-content .calendar-nav > *,
-  #tab-content .reservation-header > *,
-  #tab-content .reservation-nav > * {
-    min-width: 0 !important;
-    box-sizing: border-box !important;
-  }
-
-  /* 설명 문구 때문에 오른쪽이 밀리지 않게 */
   #tab-content .schedule-desc,
-  #tab-content .calendar-desc,
-  #tab-content .help-text {
+  #tab-content .schedule-detail,
+  #tab-content .schedule-note,
+  #tab-content .schedule-memo {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 0 10px 0 !important;
+    padding: 0 !important;
+    line-height: 1.55 !important;
+    white-space: pre-wrap !important;
+    overflow: visible !important;
+  }
+
+  #tab-content .schedule-desc:empty,
+  #tab-content .schedule-detail:empty,
+  #tab-content .schedule-note:empty,
+  #tab-content .schedule-memo:empty {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #tab-content .schedule-body textarea {
+    height: auto !important;
+    min-height: 96px !important;
+    max-height: 180px !important;
+  }
+
+  #tab-content .mobile-schedule-action-row {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 10px !important;
     width: 100% !important;
-    max-width: 100% !important;
-    white-space: normal !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 8px 0 0 0 !important;
+    padding: 10px 0 0 0 !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.22) !important;
+    box-sizing: border-box !important;
   }
 
-  /* 공개범위 버튼은 현재처럼 가로 유지하되 넘치면 카드 내부에서만 스크롤 */
-  #tab-content .month-scope-filter-row,
-  #tab-content .scope-check-grid,
-  #tab-content .schedule-scope-filter,
-  #tab-content .calendar-filter,
-  #tab-content .scope-filter,
-  #tab-content .filter-row,
-  #tab-content .filter-group {
-    max-width: 100% !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    -webkit-overflow-scrolling: touch !important;
-  }
-}
-
-/* 더 좁은 iPhone 폭에서는 월 이동 버튼을 2줄로 안정 배치 */
-@media (max-width: 430px) {
-  #tab-content .calendar-nav button,
-  #tab-content .schedule-header button,
-  #tab-content .calendar-header button,
-  #tab-content .reservation-header button,
-  #tab-content .reservation-nav button,
-  #tab-content [class*="calendar"][class*="nav"] button,
-  #tab-content [class*="calendar"][class*="header"] button,
-  #tab-content [class*="reservation"][class*="header"] button,
-  #tab-content [class*="reservation"][class*="nav"] button {
-    flex: 1 1 calc(33.333% - 6px) !important;
-    font-size: 14px !important;
-  }
-
-  #tab-content .month-title,
-  #tab-content .current-month,
-  #tab-content .calendar-title,
-  #tab-content [class*="month"][class*="title"],
-  #tab-content [class*="calendar"][class*="title"] {
-    flex: 1 1 calc(40% - 6px) !important;
-    font-size: 14px !important;
+  #tab-content .mobile-schedule-action-row button {
+    position: static !important;
+    flex: 0 0 auto !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    margin: 0 !important;
   }
 }
