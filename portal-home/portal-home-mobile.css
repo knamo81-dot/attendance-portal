@@ -1176,3 +1176,254 @@
   }
 }
 
+
+
+/* =========================================================
+   Mobile Memo Scroll Modal Fix v20
+   - 메모 영역만 내부 스크롤
+   - 메모 카드는 펼치지 않고 고정 높이 요약 카드로 표시
+   - 메모 클릭 시 JS 전체화면 상세 모달 사용
+========================================================= */
+@media (max-width: 768px) {
+  /* 메모 화면에서 iframe 전체가 아니라 메모 카드 영역 중심으로 스크롤 */
+  body.mobile-memo-list-mode #tab-content,
+  body.mobile-memo-list-mode #tab-content.content {
+    height: calc(100dvh - 170px) !important;
+    max-height: calc(100dvh - 170px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+    box-sizing: border-box !important;
+  }
+
+  body.mobile-memo-list-mode #tab-content > .card,
+  body.mobile-memo-list-mode #tab-content .memo-panel,
+  body.mobile-memo-list-mode #tab-content .memo-list,
+  body.mobile-memo-list-mode #tab-content [class*="memo"][class*="list"],
+  body.mobile-memo-list-mode #tab-content [class*="memo"][class*="panel"] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* 모바일 메모 카드는 요약형 고정 카드 */
+  body.mobile-memo-list-mode .memo-card,
+  body.mobile-memo-list-mode .memo-item,
+  body.mobile-memo-list-mode .note-card,
+  body.mobile-memo-list-mode [data-memo-id],
+  body.mobile-memo-list-mode [data-note-id] {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 128px !important;
+    height: 128px !important;
+    max-height: 128px !important;
+    margin: 10px 0 !important;
+    padding: 18px 18px 14px !important;
+    border-radius: 20px !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    cursor: pointer !important;
+  }
+
+  /* 기존 상세보기 배지는 유지하되 위치 안정화 */
+  body.mobile-memo-list-mode .memo-card::after,
+  body.mobile-memo-list-mode .memo-item::after,
+  body.mobile-memo-list-mode .note-card::after,
+  body.mobile-memo-list-mode [data-memo-id]::after,
+  body.mobile-memo-list-mode [data-note-id]::after {
+    content: "열기" !important;
+    top: 14px !important;
+    right: 14px !important;
+    z-index: 2 !important;
+  }
+
+  /* 기존 펼치기 상태 무력화 */
+  body.mobile-memo-list-mode .mobile-memo-open {
+    height: 128px !important;
+    max-height: 128px !important;
+  }
+
+  body.mobile-memo-list-mode .mobile-memo-open::after {
+    content: "열기" !important;
+  }
+
+  body.mobile-memo-list-mode .memo-title,
+  body.mobile-memo-list-mode .note-title,
+  body.mobile-memo-list-mode [class*="title"] {
+    max-width: calc(100% - 72px) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  body.mobile-memo-list-mode .memo-content,
+  body.mobile-memo-list-mode .memo-body,
+  body.mobile-memo-list-mode .memo-text,
+  body.mobile-memo-list-mode .memo-detail,
+  body.mobile-memo-list-mode [class*="content"],
+  body.mobile-memo-list-mode [class*="body"],
+  body.mobile-memo-list-mode [class*="text"],
+  body.mobile-memo-list-mode [class*="detail"] {
+    max-height: 52px !important;
+    overflow: hidden !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+  }
+
+  body.mobile-memo-list-mode .memo-actions,
+  body.mobile-memo-list-mode .actions,
+  body.mobile-memo-list-mode textarea,
+  body.mobile-memo-list-mode input[type="text"] {
+    display: none !important;
+  }
+
+  /* 전체화면 메모 상세 모달 */
+  .mobile-memo-fullscreen-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 99999 !important;
+    display: none;
+    background: #f7f8fb;
+    color: #0f172a;
+    box-sizing: border-box;
+  }
+
+  .mobile-memo-fullscreen-modal.is-open {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .mobile-memo-modal-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 12px;
+    background: rgba(247, 248, 251, 0.96);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+    backdrop-filter: blur(10px);
+    box-sizing: border-box;
+  }
+
+  .mobile-memo-modal-title {
+    min-width: 0;
+    flex: 1 1 auto;
+    font-size: 18px;
+    font-weight: 900;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-memo-modal-close {
+    flex: 0 0 auto;
+    height: 40px;
+    min-width: 64px;
+    border: 1px solid rgba(148, 163, 184, 0.42);
+    border-radius: 14px;
+    background: #ffffff;
+    color: #334155;
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  .mobile-memo-modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+
+  .mobile-memo-modal-field {
+    margin-bottom: 12px;
+  }
+
+  .mobile-memo-modal-field label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #64748b;
+  }
+
+  .mobile-memo-modal-input,
+  .mobile-memo-modal-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid rgba(148, 163, 184, 0.42);
+    border-radius: 16px;
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 16px !important;
+    line-height: 1.5;
+    outline: none;
+  }
+
+  .mobile-memo-modal-input {
+    min-height: 48px;
+    padding: 0 14px;
+    font-weight: 800;
+  }
+
+  .mobile-memo-modal-textarea {
+    min-height: 260px;
+    padding: 14px;
+    resize: none;
+  }
+
+  .mobile-memo-modal-meta {
+    margin: 10px 0 14px;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .mobile-memo-modal-actions {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 10px;
+    padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 14px);
+    background: rgba(247, 248, 251, 0.96);
+    border-top: 1px solid rgba(148, 163, 184, 0.24);
+    box-sizing: border-box;
+  }
+
+  .mobile-memo-modal-actions button {
+    flex: 1 1 0;
+    height: 48px;
+    min-height: 48px;
+    border-radius: 16px;
+    font-size: 16px;
+    font-weight: 900;
+  }
+
+  .mobile-memo-modal-save {
+    border: 0;
+    background: #0f172a;
+    color: #ffffff;
+  }
+
+  .mobile-memo-modal-delete {
+    border: 1px solid #fecaca;
+    background: #fff5f5;
+    color: #b91c1c;
+  }
+
+  .mobile-memo-modal-cancel {
+    border: 1px solid rgba(148, 163, 184, 0.42);
+    background: #ffffff;
+    color: #334155;
+  }
+
+  body.mobile-memo-modal-lock {
+    overflow: hidden !important;
+  }
+}
+
