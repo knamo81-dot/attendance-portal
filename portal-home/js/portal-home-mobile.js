@@ -442,11 +442,12 @@
       var buttons = Array.prototype.slice.call(card.querySelectorAll('button')).filter(isEditDeleteButton);
       if (buttons.length === 0) return;
 
-      var row = card.querySelector(':scope > .mobile-schedule-action-row');
+      var body = card.querySelector('.schedule-body') || card;
+      var row = body.querySelector(':scope > .mobile-schedule-action-row');
       if (!row) {
         row = document.createElement('div');
         row.className = 'mobile-schedule-action-row';
-        card.appendChild(row);
+        body.appendChild(row);
       }
 
       buttons.forEach(function (button) {
@@ -485,11 +486,10 @@
 })();
 
 
-
 /* =========================================================
-   Mobile Calendar Swipe Month Move v17
+   Mobile Calendar Swipe Month Move v19
    - 모바일 달력 영역 좌우 스와이프로 이전/다음달 이동
-   - 기존 버튼 로직을 그대로 사용: 버튼은 CSS에서 숨김
+   - 기존 버튼 click 로직 재사용
 ========================================================= */
 (function () {
   'use strict';
