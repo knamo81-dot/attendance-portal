@@ -907,62 +907,152 @@
 
 
 /* =========================================================
-   Mobile Final Two Issues Fix v16
-   1) 이전달 / 년월 / 다음달 모바일 화면 안 배치
-   2) 일정 펼침 박스를 내용 높이에 맞게 축소
-   - JS 수정 없음
+   Mobile Schedule Swipe Header Detail Fix v17
+   - 모바일에서 이전달/다음달 버튼 숨김
+   - 년월은 스케줄/예약 스위치 오른쪽 끝에 배치
+   - 일정 펼침 박스는 내용 높이에 맞게 축소
+   - 달력 compact 크기 유지
 ========================================================= */
 @media (max-width: 768px) {
-  /* ===== 1. 월 이동 버튼 영역: 화면 안에 3분할로 배치 ===== */
-  #tab-content .calendar-side-fixed > div:first-child,
-  #tab-content .calendar-side-fixed > div:first-child > div:last-child {
+  /* ===== 상단: 스케줄/예약 + 년월 한 줄 배치 ===== */
+  #tab-content .calendar-side-fixed > div:first-child {
+    position: relative !important;
+    display: block !important;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
+    padding: 0 !important;
+    margin-bottom: 12px !important;
+    overflow: visible !important;
     box-sizing: border-box !important;
   }
 
-  #tab-content .calendar-side-fixed > div:first-child {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    align-items: flex-start !important;
-    gap: 10px !important;
-    overflow: visible !important;
-  }
-
   #tab-content .calendar-side-fixed > div:first-child > div:first-child {
-    flex: 1 1 100% !important;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
+    padding-right: 118px !important;
+    box-sizing: border-box !important;
   }
 
   #tab-content .calendar-side-fixed > div:first-child > div:last-child {
-    flex: 1 1 100% !important;
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr) !important;
-    gap: 8px !important;
+    position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    width: 108px !important;
+    max-width: 108px !important;
+    min-width: 0 !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
     overflow: visible !important;
+    z-index: 5 !important;
   }
 
   #tab-content #calendar-prev-month,
-  #tab-content #calendar-current-month,
   #tab-content #calendar-next-month {
-    width: 100% !important;
+    display: none !important;
+  }
+
+  #tab-content #calendar-current-month {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 108px !important;
+    max-width: 108px !important;
     min-width: 0 !important;
-    max-width: none !important;
-    height: 42px !important;
-    min-height: 42px !important;
+    height: 38px !important;
+    min-height: 38px !important;
     padding: 0 6px !important;
-    font-size: 13px !important;
+    margin: 0 !important;
     border-radius: 14px !important;
+    font-size: 13px !important;
+    line-height: 1 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     box-sizing: border-box !important;
   }
 
-  /* ===== 2. 일정 펼침 박스: 내용 높이만큼만 사용 ===== */
+  #tab-content .planner-switch {
+    max-width: calc(100vw - 146px) !important;
+  }
+
+  #tab-content .planner-switch button {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+
+  /* 안내문/필터는 다음 줄로 자연스럽게 */
+  #tab-content .calendar-side-fixed > div:first-child > div:first-child > div:not(.planner-switch):not(.month-scope-filter-row) {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* ===== 달력 compact 크기 유지 ===== */
+  #tab-content .calendar-grid,
+  #tab-content .schedule-calendar-grid,
+  #tab-content .month-grid,
+  #tab-content [class*="calendar"][class*="grid"],
+  #tab-content [class*="month"][class*="grid"] {
+    display: grid !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    grid-auto-rows: 34px !important;
+    gap: 6px !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  #tab-content .calendar-grid > .day-cell,
+  #tab-content .schedule-calendar-grid > .day-cell,
+  #tab-content .month-grid > .day-cell,
+  #tab-content .calendar-grid > [data-date],
+  #tab-content .schedule-calendar-grid > [data-date],
+  #tab-content .month-grid > [data-date],
+  #tab-content .calendar-grid > div,
+  #tab-content .schedule-calendar-grid > div,
+  #tab-content .month-grid > div {
+    min-height: 34px !important;
+    height: 34px !important;
+    max-height: 34px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  #tab-content .calendar-grid .day-num,
+  #tab-content .schedule-calendar-grid .day-num,
+  #tab-content .month-grid .day-num {
+    display: flex !important;
+    width: 100% !important;
+    height: 100% !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #tab-content .calendar-grid .day-count,
+  #tab-content .calendar-grid .scope-badge,
+  #tab-content .calendar-grid .reservation-badge,
+  #tab-content .calendar-grid .muted-mini,
+  #tab-content .schedule-calendar-grid .day-count,
+  #tab-content .schedule-calendar-grid .scope-badge,
+  #tab-content .schedule-calendar-grid .reservation-badge,
+  #tab-content .schedule-calendar-grid .muted-mini,
+  #tab-content .month-grid .day-count,
+  #tab-content .month-grid .scope-badge,
+  #tab-content .month-grid .reservation-badge,
+  #tab-content .month-grid .muted-mini {
+    display: none !important;
+  }
+
+  /* ===== 일정 펼침 박스: 내용 높이에 맞춤 ===== */
   #tab-content .schedule-list .schedule-item {
     display: block !important;
     height: auto !important;
@@ -976,7 +1066,7 @@
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
-    padding: 10px 12px 10px !important;
+    padding: 10px 12px !important;
     margin: 0 !important;
     overflow: visible !important;
     background: #ffffff !important;
@@ -999,8 +1089,9 @@
     display: none !important;
   }
 
-  /* 기존 memo-actions가 상세본문 내부에 있을 때: 내용 바로 아래 붙임 */
-  #tab-content .schedule-list .schedule-item .schedule-body > .memo-actions {
+  #tab-content .schedule-list .schedule-item .schedule-body > .memo-actions,
+  #tab-content .schedule-list .schedule-item .schedule-body > .mobile-schedule-action-row,
+  #tab-content .schedule-list .schedule-item > .mobile-schedule-action-row {
     display: flex !important;
     justify-content: flex-end !important;
     align-items: center !important;
@@ -1014,42 +1105,41 @@
     box-sizing: border-box !important;
   }
 
-  #tab-content .schedule-list .schedule-item .schedule-body > .memo-actions button {
+  #tab-content .schedule-list .schedule-item > .mobile-schedule-action-row {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  #tab-content .schedule-list .schedule-item .memo-actions button,
+  #tab-content .schedule-list .schedule-item .mobile-schedule-action-row button {
     height: 40px !important;
     min-height: 40px !important;
     margin: 0 !important;
   }
 
-  /* 모바일 JS가 만든 action-row가 있어도 과한 여백 제거 */
-  #tab-content .schedule-list .schedule-item > .mobile-schedule-action-row,
-  #tab-content .schedule-list .schedule-item .schedule-body > .mobile-schedule-action-row {
-    display: flex !important;
-    justify-content: flex-end !important;
-    align-items: center !important;
-    gap: 8px !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    margin: 8px 0 0 0 !important;
-    padding: 8px 12px 0 !important;
-    border-top: 1px solid rgba(148, 163, 184, 0.18) !important;
-    box-sizing: border-box !important;
-  }
-
-  #tab-content .schedule-list .schedule-item > .mobile-schedule-action-row button,
-  #tab-content .schedule-list .schedule-item .schedule-body > .mobile-schedule-action-row button {
-    height: 40px !important;
-    min-height: 40px !important;
-    margin: 0 !important;
+  /* 스와이프 가능한 영역 표시용: 기능 영향 없음 */
+  #tab-content .calendar-grid {
+    touch-action: pan-y !important;
   }
 }
 
 @media (max-width: 390px) {
-  #tab-content #calendar-prev-month,
-  #tab-content #calendar-current-month,
-  #tab-content #calendar-next-month {
+  #tab-content .calendar-side-fixed > div:first-child > div:first-child {
+    padding-right: 104px !important;
+  }
+
+  #tab-content .calendar-side-fixed > div:first-child > div:last-child,
+  #tab-content #calendar-current-month {
+    width: 96px !important;
+    max-width: 96px !important;
+  }
+
+  #tab-content #calendar-current-month {
     font-size: 12px !important;
-    padding-left: 4px !important;
-    padding-right: 4px !important;
+  }
+
+  #tab-content .planner-switch button {
+    padding-left: 11px !important;
+    padding-right: 11px !important;
   }
 }
