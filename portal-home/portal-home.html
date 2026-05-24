@@ -190,42 +190,42 @@
 
 <style id="portal-home-mobile-schedule-compact-patch">
 /* =========================================================
-   Mobile Schedule Compact Patch v2
-   - PC 화면 영향 없음
-   - 모바일 일정/예약 달력을 "날짜만 보이는 미니 달력"로 축소
-   - 기존 v1처럼 달력 전체 wrapper가 날짜 1개로 바뀌는 문제 방지
+   Mobile Schedule Compact Patch v3
+   - 빈 날짜칸 세로 늘어남 수정
+   - 클릭 시 PC 달력이 먼저 보이는 깜빡임 최소화
+   - JS 후처리 전에 CSS가 먼저 미니 달력 크기를 잡도록 변경
 ========================================================= */
 @media (max-width: 768px) {
-  body.mobile-schedule-compact #tab-content,
-  body.mobile-schedule-compact .content {
+  #tab-content,
+  #tab-content.content {
     width: 100% !important;
     max-width: 100% !important;
     overflow-x: hidden !important;
   }
 
-  /* 일정/예약 전체 카드 높이 과다 방지 */
-  body.mobile-schedule-compact .schedule-page,
-  body.mobile-schedule-compact .schedule-wrap,
-  body.mobile-schedule-compact .schedule-container,
-  body.mobile-schedule-compact .calendar-section,
-  body.mobile-schedule-compact .calendar-panel,
-  body.mobile-schedule-compact .reservation-page,
-  body.mobile-schedule-compact [class*="schedule"][class*="page"],
-  body.mobile-schedule-compact [class*="calendar"][class*="section"],
-  body.mobile-schedule-compact [class*="calendar"][class*="panel"] {
+  /* 일정/예약 화면 카드 및 wrapper 높이 초기화 */
+  #tab-content .schedule-page,
+  #tab-content .schedule-wrap,
+  #tab-content .schedule-container,
+  #tab-content .calendar-section,
+  #tab-content .calendar-panel,
+  #tab-content .reservation-page,
+  #tab-content [class*="schedule"][class*="page"],
+  #tab-content [class*="calendar"][class*="section"],
+  #tab-content [class*="calendar"][class*="panel"] {
     min-height: 0 !important;
     height: auto !important;
     max-height: none !important;
     overflow: visible !important;
   }
 
-  /* 상단 스케줄/예약, 이전달/다음달 영역은 한 줄 유지 */
-  body.mobile-schedule-compact .schedule-top,
-  body.mobile-schedule-compact .schedule-header,
-  body.mobile-schedule-compact .calendar-header,
-  body.mobile-schedule-compact .calendar-nav,
-  body.mobile-schedule-compact [class*="calendar"][class*="header"],
-  body.mobile-schedule-compact [class*="calendar"][class*="nav"] {
+  /* 상단 버튼 영역: 한 줄 유지 */
+  #tab-content .schedule-top,
+  #tab-content .schedule-header,
+  #tab-content .calendar-header,
+  #tab-content .calendar-nav,
+  #tab-content [class*="calendar"][class*="header"],
+  #tab-content [class*="calendar"][class*="nav"] {
     display: flex !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
@@ -235,12 +235,20 @@
     overflow-x: auto !important;
     overflow-y: hidden !important;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
 
-  body.mobile-schedule-compact .schedule-top button,
-  body.mobile-schedule-compact .schedule-header button,
-  body.mobile-schedule-compact .calendar-header button,
-  body.mobile-schedule-compact .calendar-nav button {
+  #tab-content .schedule-top::-webkit-scrollbar,
+  #tab-content .schedule-header::-webkit-scrollbar,
+  #tab-content .calendar-header::-webkit-scrollbar,
+  #tab-content .calendar-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  #tab-content .schedule-top button,
+  #tab-content .schedule-header button,
+  #tab-content .calendar-header button,
+  #tab-content .calendar-nav button {
     flex: 0 0 auto !important;
     min-height: 38px !important;
     padding: 0 14px !important;
@@ -249,25 +257,25 @@
     white-space: nowrap !important;
   }
 
-  /* 설명문은 모바일에서 공간만 차지하므로 숨김 */
-  body.mobile-schedule-compact .schedule-desc,
-  body.mobile-schedule-compact .calendar-desc,
-  body.mobile-schedule-compact .help-text,
-  body.mobile-schedule-compact [class*="desc"],
-  body.mobile-schedule-compact [class*="helper"] {
+  /* 설명문은 모바일에서 숨김 */
+  #tab-content .schedule-desc,
+  #tab-content .calendar-desc,
+  #tab-content .help-text,
+  #tab-content [class*="desc"],
+  #tab-content [class*="helper"] {
     display: none !important;
   }
 
   /* 공개범위 필터: 전체/연구소/팀/개인 가로 배치 */
-  body.mobile-schedule-compact .schedule-scope-filter,
-  body.mobile-schedule-compact .schedule-filter,
-  body.mobile-schedule-compact .calendar-filter,
-  body.mobile-schedule-compact .scope-filter,
-  body.mobile-schedule-compact .filter-row,
-  body.mobile-schedule-compact .filter-group,
-  body.mobile-schedule-compact [class*="scope"][class*="filter"],
-  body.mobile-schedule-compact [class*="filter"][class*="row"],
-  body.mobile-schedule-compact [class*="filter"][class*="group"] {
+  #tab-content .schedule-scope-filter,
+  #tab-content .schedule-filter,
+  #tab-content .calendar-filter,
+  #tab-content .scope-filter,
+  #tab-content .filter-row,
+  #tab-content .filter-group,
+  #tab-content [class*="scope"][class*="filter"],
+  #tab-content [class*="filter"][class*="row"],
+  #tab-content [class*="filter"][class*="group"] {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
@@ -278,39 +286,54 @@
     white-space: nowrap !important;
     margin: 8px 0 10px !important;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
 
-  body.mobile-schedule-compact .schedule-scope-filter > *,
-  body.mobile-schedule-compact .schedule-filter > *,
-  body.mobile-schedule-compact .calendar-filter > *,
-  body.mobile-schedule-compact .scope-filter > *,
-  body.mobile-schedule-compact .filter-row > *,
-  body.mobile-schedule-compact .filter-group > * {
+  #tab-content .schedule-scope-filter::-webkit-scrollbar,
+  #tab-content .schedule-filter::-webkit-scrollbar,
+  #tab-content .calendar-filter::-webkit-scrollbar,
+  #tab-content .scope-filter::-webkit-scrollbar,
+  #tab-content .filter-row::-webkit-scrollbar,
+  #tab-content .filter-group::-webkit-scrollbar {
+    display: none;
+  }
+
+  #tab-content .schedule-scope-filter > *,
+  #tab-content .schedule-filter > *,
+  #tab-content .calendar-filter > *,
+  #tab-content .scope-filter > *,
+  #tab-content .filter-row > *,
+  #tab-content .filter-group > * {
     flex: 0 0 auto !important;
   }
 
-  /* 달력 grid 자체를 미니 달력으로 */
-  body.mobile-schedule-compact .calendar-grid,
-  body.mobile-schedule-compact .schedule-calendar-grid,
-  body.mobile-schedule-compact .month-grid,
-  body.mobile-schedule-compact [class*="calendar"][class*="grid"],
-  body.mobile-schedule-compact [class*="month"][class*="grid"] {
+  /* 달력 grid: 처음 렌더링되는 순간부터 작게 고정해 깜빡임 방지 */
+  #tab-content .calendar-grid,
+  #tab-content .schedule-calendar-grid,
+  #tab-content .month-grid,
+  #tab-content [class*="calendar"][class*="grid"],
+  #tab-content [class*="month"][class*="grid"] {
     display: grid !important;
     grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    grid-auto-rows: 34px !important;
     gap: 6px !important;
     width: 100% !important;
     min-height: 0 !important;
     height: auto !important;
     max-height: none !important;
+    align-items: stretch !important;
     overflow: visible !important;
   }
 
-  body.mobile-schedule-compact .weekday,
-  body.mobile-schedule-compact .calendar-weekday,
-  body.mobile-schedule-compact [class*="weekday"] {
+  /* 요일 */
+  #tab-content .weekday,
+  #tab-content .calendar-weekday,
+  #tab-content [class*="weekday"] {
     height: 22px !important;
     min-height: 22px !important;
+    max-height: 22px !important;
     padding: 0 !important;
+    margin: 0 !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -321,8 +344,16 @@
     color: #64748b !important;
   }
 
-  /* 실제 날짜 셀: 날짜 숫자만 */
-  body.mobile-schedule-compact .mobile-calendar-date-only {
+  /* 원본 날짜 셀도 먼저 축소: JS 적용 전 깜빡임 방지 핵심 */
+  #tab-content .calendar-day,
+  #tab-content .calendar-cell,
+  #tab-content .day-cell,
+  #tab-content .month-day,
+  #tab-content .schedule-day,
+  #tab-content [data-date],
+  #tab-content [data-day],
+  #tab-content .mobile-calendar-date-only,
+  #tab-content .mobile-calendar-empty-cell {
     position: relative !important;
     display: flex !important;
     align-items: center !important;
@@ -332,6 +363,8 @@
     min-height: 34px !important;
     height: 34px !important;
     max-height: 34px !important;
+    aspect-ratio: auto !important;
+    flex: 0 0 auto !important;
     padding: 0 !important;
     margin: 0 !important;
     border-radius: 12px !important;
@@ -340,11 +373,24 @@
     text-align: center !important;
   }
 
-  body.mobile-schedule-compact .mobile-calendar-date-only.is-empty {
+  /* 빈 날짜칸도 날짜칸과 동일 높이로 고정 */
+  #tab-content .mobile-calendar-date-only.is-empty,
+  #tab-content .mobile-calendar-empty-cell,
+  #tab-content .calendar-day.is-empty,
+  #tab-content .calendar-cell.is-empty,
+  #tab-content .day-cell.is-empty,
+  #tab-content .month-day.is-empty,
+  #tab-content .schedule-day.is-empty,
+  #tab-content [class*="empty"][class*="day"],
+  #tab-content [class*="blank"][class*="day"] {
+    min-height: 34px !important;
+    height: 34px !important;
+    max-height: 34px !important;
+    aspect-ratio: auto !important;
     opacity: .28 !important;
   }
 
-  body.mobile-schedule-compact .mobile-calendar-date-number {
+  #tab-content .mobile-calendar-date-number {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -357,11 +403,11 @@
   }
 
   /* 일정이 있는 날짜는 작은 점만 */
-  body.mobile-schedule-compact .mobile-calendar-date-only.has-event::after {
+  #tab-content .mobile-calendar-date-only.has-event::after {
     content: "" !important;
     position: absolute !important;
     left: 50% !important;
-    bottom: 5px !important;
+    bottom: 4px !important;
     width: 4px !important;
     height: 4px !important;
     transform: translateX(-50%) !important;
@@ -369,29 +415,29 @@
     background: #2563eb !important;
   }
 
-  body.mobile-schedule-compact .mobile-calendar-date-only > *:not(.mobile-calendar-date-number) {
+  #tab-content .mobile-calendar-date-only > *:not(.mobile-calendar-date-number) {
     display: none !important;
   }
 
   /* 날짜 셀 내부의 건수/일정 없음/목록은 숨김 */
-  body.mobile-schedule-compact .event-count,
-  body.mobile-schedule-compact .schedule-count,
-  body.mobile-schedule-compact .day-count,
-  body.mobile-schedule-compact .calendar-count,
-  body.mobile-schedule-compact .events-count,
-  body.mobile-schedule-compact .day-events,
-  body.mobile-schedule-compact .calendar-events,
-  body.mobile-schedule-compact .calendar-item,
-  body.mobile-schedule-compact .empty-text {
+  #tab-content .event-count,
+  #tab-content .schedule-count,
+  #tab-content .day-count,
+  #tab-content .calendar-count,
+  #tab-content .events-count,
+  #tab-content .day-events,
+  #tab-content .calendar-events,
+  #tab-content .calendar-item,
+  #tab-content .empty-text {
     display: none !important;
   }
 
-  /* 달력 아래 선택 날짜 일정 영역은 달력 아래로 붙여 표시 */
-  body.mobile-schedule-compact .selected-date-panel,
-  body.mobile-schedule-compact .selected-schedule-panel,
-  body.mobile-schedule-compact .daily-schedule-panel,
-  body.mobile-schedule-compact [class*="selected"][class*="schedule"],
-  body.mobile-schedule-compact [class*="daily"][class*="schedule"] {
+  /* 달력 아래 선택 날짜 일정 영역 */
+  #tab-content .selected-date-panel,
+  #tab-content .selected-schedule-panel,
+  #tab-content .daily-schedule-panel,
+  #tab-content [class*="selected"][class*="schedule"],
+  #tab-content [class*="daily"][class*="schedule"] {
     margin-top: 12px !important;
     min-height: 0 !important;
     height: auto !important;
@@ -436,24 +482,28 @@
     return text.includes('스케줄') || text.includes('예약') || text.includes('이전달') || text.includes('다음달');
   }
 
+  function isCalendarGrid(el) {
+    if (!el || !el.classList) return false;
+    const cls = el.className || '';
+    return /calendar.*grid|grid.*calendar|month.*grid|grid.*month/.test(cls);
+  }
+
+  function getCalendarGrid(el) {
+    return el && el.closest ? el.closest('.calendar-grid, .schedule-calendar-grid, .month-grid, [class*="calendar"][class*="grid"], [class*="month"][class*="grid"]') : null;
+  }
+
   function isCalendarContainer(el) {
     if (!el) return true;
+    if (isCalendarGrid(el)) return true;
 
-    /* v1 오류 방지: 날짜 셀 후보가 자식으로 여러 개 있으면 wrapper로 보고 제외 */
-    const nestedCandidates = el.querySelectorAll(CELL_SELECTOR);
+    const nestedCandidates = el.querySelectorAll ? el.querySelectorAll(CELL_SELECTOR) : [];
     if (nestedCandidates.length >= 3) return true;
-
-    const nestedDayTexts = Array.from(el.children || []).filter(function (child) {
-      const t = (child.innerText || '').trim();
-      return /^([1-9]|[12][0-9]|3[01])(\s|$)/.test(t);
-    });
-    if (nestedDayTexts.length >= 3) return true;
 
     const rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
     if (rect) {
       const viewportW = window.innerWidth || document.documentElement.clientWidth || 390;
-      if (rect.width > viewportW * 0.92 && rect.height > 160) return true;
-      if (rect.height > 220) return true;
+      if (rect.width > viewportW * 0.92 && rect.height > 120 && !getCalendarGrid(el.parentElement)) return true;
+      if (rect.height > 180 && !getCalendarGrid(el)) return true;
     }
 
     return false;
@@ -469,8 +519,7 @@
     m = text.match(/^([1-9]|[12][0-9]|3[01])(?=\s|건|일정|$)/);
     if (m) return String(Number(m[1]));
 
-    /* 날짜 숫자를 별도 span/div에 넣는 경우 */
-    const first = Array.from(el.querySelectorAll('span, div, strong, b')).find(function (node) {
+    const first = Array.from(el.querySelectorAll ? el.querySelectorAll('span, div, strong, b') : []).find(function (node) {
       const t = (node.innerText || '').trim();
       return /^([1-9]|[12][0-9]|3[01])$/.test(t);
     });
@@ -480,7 +529,7 @@
   function hasEvent(el) {
     const text = (el.innerText || '').trim();
     if (/([1-9][0-9]*건)/.test(text) && !/0건/.test(text)) return true;
-    if (el.querySelector('.event, .schedule-item, .calendar-item, [class*="event"], [class*="schedule-item"]')) return true;
+    if (el.querySelector && el.querySelector('.event, .schedule-item, .calendar-item, [class*="event"], [class*="schedule-item"]')) return true;
     return false;
   }
 
@@ -498,12 +547,31 @@
       if (!el || !el.closest) return false;
       if (el.closest('.mobile-memo-filter-bar')) return false;
       if (el.closest('.workspace-tabs')) return false;
+      if (!getCalendarGrid(el) && !extractDay(el)) return false;
       if (isCalendarContainer(el)) return false;
-
-      const day = extractDay(el);
-      if (!day) return false;
-
       return true;
+    });
+  }
+
+  function normalizeGridBlankCells() {
+    const root = getRoot();
+    const grids = Array.from(root.querySelectorAll('.calendar-grid, .schedule-calendar-grid, .month-grid, [class*="calendar"][class*="grid"], [class*="month"][class*="grid"]'));
+
+    grids.forEach(function (grid) {
+      Array.from(grid.children || []).forEach(function (child) {
+        if (!child || !child.classList) return;
+        if (/^(일|월|화|수|목|금|토)$/.test((child.innerText || '').trim())) return;
+        if (isCalendarContainer(child)) return;
+
+        const day = extractDay(child);
+        const hasVisibleText = (child.innerText || '').trim().length > 0;
+        const looksLikeBlank = !day && !hasVisibleText;
+
+        if (looksLikeBlank) {
+          child.classList.add('mobile-calendar-date-only', 'mobile-calendar-empty-cell', 'is-empty');
+          child.innerHTML = '';
+        }
+      });
     });
   }
 
@@ -513,7 +581,7 @@
         cell.innerHTML = cell.dataset.mobileOriginalHtml;
         delete cell.dataset.mobileOriginalHtml;
       }
-      cell.classList.remove('mobile-calendar-date-only', 'is-empty', 'has-event');
+      cell.classList.remove('mobile-calendar-date-only', 'mobile-calendar-empty-cell', 'is-empty', 'has-event');
     });
   }
 
@@ -535,36 +603,47 @@
       }
 
       cell.classList.add('mobile-calendar-date-only');
+      cell.classList.toggle('mobile-calendar-empty-cell', !day);
       cell.classList.toggle('is-empty', !day);
-      cell.classList.toggle('has-event', hasEvent(cell));
+      cell.classList.toggle('has-event', !!day && hasEvent(cell));
       cell.innerHTML = day ? '<span class="mobile-calendar-date-number">' + day + '</span>' : '';
     });
+
+    normalizeGridBlankCells();
   }
 
+  let raf = 0;
   let timer = 0;
   function scheduleCompact(delay) {
     clearTimeout(timer);
-    timer = setTimeout(compactCalendar, delay || 80);
+    timer = setTimeout(function () {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(function () {
+        raf = 0;
+        compactCalendar();
+      });
+    }, delay || 16);
   }
 
+  /* 클릭 직후 바로 1회, 렌더 완료 후 1회만 보정 */
   document.addEventListener('click', function () {
-    scheduleCompact(80);
-    setTimeout(compactCalendar, 260);
+    compactCalendar();
+    scheduleCompact(60);
   }, true);
 
-  window.addEventListener('resize', function () { scheduleCompact(80); });
-  window.addEventListener('orientationchange', function () { scheduleCompact(120); });
-  window.addEventListener('message', function () { scheduleCompact(80); });
+  window.addEventListener('resize', function () { scheduleCompact(60); });
+  window.addEventListener('orientationchange', function () { scheduleCompact(100); });
+  window.addEventListener('message', function () { scheduleCompact(40); });
 
   const observer = new MutationObserver(function () {
-    scheduleCompact(120);
+    scheduleCompact(40);
   });
 
   function init() {
     observer.observe(getRoot(), { childList: true, subtree: true });
     compactCalendar();
-    setTimeout(compactCalendar, 400);
-    setTimeout(compactCalendar, 1000);
+    scheduleCompact(80);
+    scheduleCompact(300);
   }
 
   if (document.readyState === 'loading') {
