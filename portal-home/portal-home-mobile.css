@@ -1179,16 +1179,18 @@
 
 
 /* =========================================================
-   Mobile Memo Layout Clean Fix v24
-   - v23의 고정 높이/overflow hidden 충돌 제거
-   - 흰색 카드 전체는 화면 하단까지 사용
-   - 메모 리스트 영역만 내부 스크롤
-   - 초록 메모카드 중간 잘림 방지
-   - 모달 textarea/버튼은 숨김 규칙에서 제외
+   Mobile Memo Height Fill Fix v25
+   - 메모가 표시되는 영역이 모바일 화면보다 짧게 끝나는 문제 해결
+   - 흰색 메모 박스는 남은 화면 높이를 전부 사용
+   - 실제 초록 메모 리스트 박스만 내부 스크롤
+   - 초록 카드 중간 잘림 방지
 ========================================================= */
 @media (max-width: 768px) {
-  /* 메모 화면에서 본문은 화면 안에서 안정화 */
-  body.mobile-memo-list-mode,
+  /* 모바일 메모 화면 전체 높이 기준 */
+  body.mobile-memo-list-mode {
+    overflow: hidden !important;
+  }
+
   body.mobile-memo-list-mode .app,
   body.mobile-memo-list-mode .layout,
   body.mobile-memo-list-mode #home-page.home-root {
@@ -1198,39 +1200,45 @@
     box-sizing: border-box !important;
   }
 
+  /* 포털 상단/탭을 제외한 실제 콘텐츠 영역 */
   body.mobile-memo-list-mode #tab-content,
   body.mobile-memo-list-mode #tab-content.content {
-    height: calc(100dvh - 150px) !important;
-    max-height: calc(100dvh - 150px) !important;
+    height: calc(100dvh - 154px) !important;
+    max-height: calc(100dvh - 154px) !important;
+    min-height: 0 !important;
     overflow: hidden !important;
     box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
 
-  /* 메모 필터는 위에 고정 높이만 사용 */
+  /* 색상 필터는 콘텐츠 상단에 고정 */
   body.mobile-memo-list-mode .mobile-memo-filter-bar {
-    flex: 0 0 auto !important;
     position: relative !important;
     top: auto !important;
+    flex: 0 0 auto !important;
+    min-height: 48px !important;
+    margin: 0 0 10px 0 !important;
     z-index: 5 !important;
-    margin-bottom: 10px !important;
   }
 
-  /* 메모를 담는 흰색 카드: 화면 남은 높이를 모두 사용 */
+  /* 개인 메모 흰색 박스: 남은 높이 전체 사용 */
   body.mobile-memo-list-mode #tab-content > .card,
   body.mobile-memo-list-mode #tab-content .card:has(.memo-card),
   body.mobile-memo-list-mode #tab-content .card:has(.memo-item),
   body.mobile-memo-list-mode #tab-content .card:has([data-memo-id]),
   body.mobile-memo-list-mode #tab-content .card:has([data-note-id]) {
-    height: calc(100% - 76px) !important;
+    flex: 1 1 auto !important;
     min-height: 0 !important;
-    max-height: calc(100% - 76px) !important;
+    height: auto !important;
+    max-height: none !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
     box-sizing: border-box !important;
   }
 
-  /* 카드 상단 제목/버튼 영역은 스크롤하지 않음 */
+  /* 흰색 박스 상단 제목/버튼 영역 */
   body.mobile-memo-list-mode #tab-content .card:has(.memo-card) > *:first-child,
   body.mobile-memo-list-mode #tab-content .card:has(.memo-item) > *:first-child,
   body.mobile-memo-list-mode #tab-content .card:has([data-memo-id]) > *:first-child,
@@ -1238,18 +1246,19 @@
     flex: 0 0 auto !important;
   }
 
-  /* 실제 메모 리스트 영역만 스크롤 */
+  /* 메모 카드들을 직접 담고 있는 실제 리스트 박스 */
   body.mobile-memo-list-mode #tab-content .memo-list,
   body.mobile-memo-list-mode #tab-content .memo-panel,
   body.mobile-memo-list-mode #tab-content [class*="memo"][class*="list"],
   body.mobile-memo-list-mode #tab-content [class*="memo"][class*="panel"],
-  body.mobile-memo-list-mode #tab-content .card:has(.memo-card) > *:last-child,
-  body.mobile-memo-list-mode #tab-content .card:has(.memo-item) > *:last-child,
-  body.mobile-memo-list-mode #tab-content .card:has([data-memo-id]) > *:last-child,
-  body.mobile-memo-list-mode #tab-content .card:has([data-note-id]) > *:last-child {
+  body.mobile-memo-list-mode #tab-content *:has(> .memo-card),
+  body.mobile-memo-list-mode #tab-content *:has(> .memo-item),
+  body.mobile-memo-list-mode #tab-content *:has(> .note-card),
+  body.mobile-memo-list-mode #tab-content *:has(> [data-memo-id]),
+  body.mobile-memo-list-mode #tab-content *:has(> [data-note-id]) {
     flex: 1 1 auto !important;
     min-height: 0 !important;
-    height: 100% !important;
+    height: auto !important;
     max-height: none !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
@@ -1259,7 +1268,16 @@
     padding-bottom: 18px !important;
   }
 
-  /* 메모 카드 자체는 잘리지 않게 auto */
+  /* 흰색 카드 전체가 스크롤 대상이 되지 않게 재고정 */
+  body.mobile-memo-list-mode #tab-content > .card,
+  body.mobile-memo-list-mode #tab-content .card:has(.memo-card),
+  body.mobile-memo-list-mode #tab-content .card:has(.memo-item),
+  body.mobile-memo-list-mode #tab-content .card:has([data-memo-id]),
+  body.mobile-memo-list-mode #tab-content .card:has([data-note-id]) {
+    overflow: hidden !important;
+  }
+
+  /* 초록 메모 카드 자체는 중간에서 잘리지 않도록 */
   body.mobile-memo-list-mode .memo-card,
   body.mobile-memo-list-mode .memo-item,
   body.mobile-memo-list-mode .note-card,
@@ -1282,7 +1300,7 @@
     overflow: visible !important;
   }
 
-  /* 열기 글자 겹침 방지 */
+  /* 기존 상세보기/버튼 겹침 완화 */
   body.mobile-memo-list-mode .memo-card::after,
   body.mobile-memo-list-mode .memo-item::after,
   body.mobile-memo-list-mode .note-card::after,
@@ -1295,7 +1313,6 @@
     background: rgba(255, 255, 255, .86) !important;
   }
 
-  /* 리스트 안 기존 버튼만 숨김. 모달 버튼은 제외 */
   body.mobile-memo-list-mode #tab-content .memo-card button:not(.mobile-memo-filter-chip),
   body.mobile-memo-list-mode #tab-content .memo-item button:not(.mobile-memo-filter-chip),
   body.mobile-memo-list-mode #tab-content .note-card button:not(.mobile-memo-filter-chip),
@@ -1303,20 +1320,5 @@
   body.mobile-memo-list-mode #tab-content [data-note-id] button:not(.mobile-memo-filter-chip) {
     opacity: 0 !important;
     pointer-events: none !important;
-  }
-
-  /* 모달은 위 숨김 규칙과 무관하게 항상 사용 가능 */
-  body.mobile-memo-list-mode .mobile-memo-fullscreen-modal,
-  body.mobile-memo-list-mode .mobile-memo-fullscreen-modal * {
-    pointer-events: auto !important;
-  }
-
-  body.mobile-memo-list-mode .mobile-memo-fullscreen-modal textarea,
-  body.mobile-memo-list-mode .mobile-memo-fullscreen-modal input,
-  body.mobile-memo-list-mode .mobile-memo-fullscreen-modal button {
-    display: block !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    pointer-events: auto !important;
   }
 }
