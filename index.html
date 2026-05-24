@@ -1131,8 +1131,8 @@ input[type="radio"]{
    - iframe 좌우 잘림/전체 가로스크롤 방지
    - 앱 내부 레이아웃은 건드리지 않음
 ========================================================= */
-.mobile-menu-btn,
-.mobile-drawer-backdrop {
+.mobile-drawer-backdrop,
+.mobile-edge-swipe-zone {
   display: none;
 }
 
@@ -1190,7 +1190,7 @@ input[type="radio"]{
     min-width: 0;
     min-height: 58px !important;
     border-radius: 16px;
-    padding: 10px 12px 10px 48px;
+    padding: 10px 12px;
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -1233,30 +1233,6 @@ input[type="radio"]{
     display: none;
   }
 
-  .mobile-menu-btn {
-    display: inline-flex;
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 31px;
-    height: 31px;
-    border: 0;
-    border-radius: 10px;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255,255,255,.2);
-    color: #fff;
-    cursor: pointer;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .mobile-menu-btn svg {
-    width: 19px;
-    height: 19px;
-    display: block;
-  }
 
   .mobile-drawer-backdrop {
     display: block;
@@ -1267,6 +1243,29 @@ input[type="radio"]{
     opacity: 0;
     pointer-events: none;
     transition: opacity .18s ease;
+  }
+
+  .mobile-edge-swipe-zone {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 22px;
+    height: 100dvh;
+    z-index: 75;
+    background: transparent;
+    touch-action: pan-y;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body.mobile-drawer-open .mobile-edge-swipe-zone {
+    pointer-events: none;
+  }
+
+  body.mobile-drawer-dragging .mobile-drawer-backdrop {
+    transition: none;
+    opacity: var(--mobile-drawer-progress, 0);
+    pointer-events: auto;
   }
 
   body.mobile-drawer-open .mobile-drawer-backdrop {
@@ -1288,14 +1287,19 @@ input[type="radio"]{
     padding: 8px;
     overflow-y: auto;
     overflow-x: hidden;
-    transform: translateX(calc(-100% - 12px));
+    transform: translateX(var(--mobile-drawer-x, calc(-100% - 12px)));
     transition: transform .22s ease;
+    will-change: transform;
     box-shadow: 0 24px 60px rgba(15,23,42,.28);
     -webkit-overflow-scrolling: touch;
   }
 
   body.mobile-drawer-open .sidenav {
-    transform: translateX(0);
+    --mobile-drawer-x: 0px;
+  }
+
+  body.mobile-drawer-dragging .sidenav {
+    transition: none;
   }
 
   .sidenav .nav-group {
@@ -1455,14 +1459,9 @@ input[type="radio"]{
   .portal-common-header {
     min-height: 54px !important;
     border-radius: 14px;
-    padding: 9px 10px 9px 44px;
+    padding: 9px 10px;
   }
 
-  .mobile-menu-btn {
-    left: 8px;
-    width: 29px;
-    height: 29px;
-  }
 
   .portal-common-header .header-title {
     font-size: 16px;
@@ -1612,13 +1611,9 @@ input[type="radio"]{
         </div>
       </div>
       <div id="mobileDrawerBackdrop" class="mobile-drawer-backdrop" aria-hidden="true"></div>
+      <div id="mobileEdgeSwipeZone" class="mobile-edge-swipe-zone" aria-hidden="true"></div>
       <div class="portal-main">
         <div id="portalCommonHeader" class="portal-common-header">
-          <button type="button" id="mobileMenuBtn" class="mobile-menu-btn" aria-label="메뉴 열기" aria-controls="portalSideNav" aria-expanded="false">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
-            </svg>
-          </button>
           <div class="header-left">
             <div id="portalHeaderTop" class="header-top">Integrated Operations Platform</div>
             <div id="portalHeaderTitle" class="header-title">통합 운영 플랫폼</div>
@@ -1767,6 +1762,7 @@ input[type="radio"]{
     personalSettingsIconBtn: document.getElementById('personalSettingsIconBtn'),
     mobileMenuBtn: document.getElementById('mobileMenuBtn'),
     mobileDrawerBackdrop: document.getElementById('mobileDrawerBackdrop'),
+    mobileEdgeSwipeZone: document.getElementById('mobileEdgeSwipeZone'),
     portalSideNav: document.getElementById('portalSideNav'),
     serviceAdminBtn: document.getElementById('serviceAdminBtn'),
     portalSubtabsWrap: document.getElementById('portalSubtabsWrap'),
@@ -2260,11 +2256,10 @@ input[type="radio"]{
 
   function setMobileDrawer(open) {
     const shouldOpen = !!open && isMobilePortalView();
+    document.body.classList.remove('mobile-drawer-dragging');
+    document.body.style.removeProperty('--mobile-drawer-x');
+    document.body.style.removeProperty('--mobile-drawer-progress');
     document.body.classList.toggle('mobile-drawer-open', shouldOpen);
-    if (els.mobileMenuBtn) {
-      els.mobileMenuBtn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
-      els.mobileMenuBtn.setAttribute('aria-label', shouldOpen ? '메뉴 닫기' : '메뉴 열기');
-    }
     if (els.mobileDrawerBackdrop) {
       els.mobileDrawerBackdrop.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
     }
@@ -3003,11 +2998,6 @@ input[type="radio"]{
       });
     });
 
-    els.mobileMenuBtn?.addEventListener('click', function (event) {
-      event.preventDefault();
-      toggleMobileDrawer();
-    });
-
     els.mobileDrawerBackdrop?.addEventListener('click', function () {
       closeMobileDrawer();
     });
@@ -3020,30 +3010,86 @@ input[type="radio"]{
       if (!isMobilePortalView()) closeMobileDrawer();
     });
 
+    const MOBILE_DRAWER_WIDTH = 88;
+    const MOBILE_DRAWER_CLOSED_X = -96;
     let mobileDrawerTouchStartX = null;
     let mobileDrawerTouchStartY = null;
+    let mobileDrawerTracking = false;
+    let mobileDrawerMode = '';
 
-    document.addEventListener('touchstart', function (event) {
+    function setMobileDrawerDrag(x) {
+      const clampedX = Math.max(MOBILE_DRAWER_CLOSED_X, Math.min(0, x));
+      const progress = Math.max(0, Math.min(1, (clampedX - MOBILE_DRAWER_CLOSED_X) / Math.abs(MOBILE_DRAWER_CLOSED_X)));
+      document.body.classList.add('mobile-drawer-dragging');
+      document.body.style.setProperty('--mobile-drawer-x', clampedX + 'px');
+      document.body.style.setProperty('--mobile-drawer-progress', String(progress * 0.45));
+      if (els.mobileDrawerBackdrop) {
+        els.mobileDrawerBackdrop.setAttribute('aria-hidden', progress > 0.05 ? 'false' : 'true');
+      }
+    }
+
+    function finishMobileDrawerDrag(shouldOpen) {
+      mobileDrawerTracking = false;
+      mobileDrawerMode = '';
+      mobileDrawerTouchStartX = null;
+      mobileDrawerTouchStartY = null;
+      setMobileDrawer(shouldOpen);
+    }
+
+    function startMobileDrawerGesture(event, mode) {
       if (!isMobilePortalView() || !event.touches || !event.touches.length) return;
-      mobileDrawerTouchStartX = event.touches[0].clientX;
-      mobileDrawerTouchStartY = event.touches[0].clientY;
+      const touch = event.touches[0];
+      mobileDrawerTouchStartX = touch.clientX;
+      mobileDrawerTouchStartY = touch.clientY;
+      mobileDrawerTracking = true;
+      mobileDrawerMode = mode;
+      if (mode === 'open') setMobileDrawerDrag(MOBILE_DRAWER_CLOSED_X);
+    }
+
+    els.mobileEdgeSwipeZone?.addEventListener('touchstart', function (event) {
+      if (document.body.classList.contains('mobile-drawer-open')) return;
+      startMobileDrawerGesture(event, 'open');
+    }, { passive: true });
+
+    els.portalSideNav?.addEventListener('touchstart', function (event) {
+      if (!document.body.classList.contains('mobile-drawer-open')) return;
+      startMobileDrawerGesture(event, 'close');
     }, { passive: true });
 
     document.addEventListener('touchmove', function (event) {
-      if (!isMobilePortalView() || mobileDrawerTouchStartX === null || !event.touches || !event.touches.length) return;
-      const dx = event.touches[0].clientX - mobileDrawerTouchStartX;
-      const dy = Math.abs(event.touches[0].clientY - mobileDrawerTouchStartY);
-      const drawerOpen = document.body.classList.contains('mobile-drawer-open');
+      if (!isMobilePortalView() || !mobileDrawerTracking || mobileDrawerTouchStartX === null || !event.touches || !event.touches.length) return;
+      const touch = event.touches[0];
+      const dx = touch.clientX - mobileDrawerTouchStartX;
+      const dy = Math.abs(touch.clientY - mobileDrawerTouchStartY);
 
-      if (!drawerOpen && mobileDrawerTouchStartX <= 18 && dx > 46 && dy < 42) {
-        setMobileDrawer(true);
-        mobileDrawerTouchStartX = null;
-        mobileDrawerTouchStartY = null;
-      } else if (drawerOpen && dx < -46 && dy < 42) {
-        closeMobileDrawer();
-        mobileDrawerTouchStartX = null;
-        mobileDrawerTouchStartY = null;
+      if (dy > 44 && Math.abs(dx) < 26) {
+        finishMobileDrawerDrag(document.body.classList.contains('mobile-drawer-open'));
+        return;
       }
+
+      if (mobileDrawerMode === 'open') {
+        if (dx <= 0) return;
+        event.preventDefault();
+        setMobileDrawerDrag(MOBILE_DRAWER_CLOSED_X + Math.min(dx, MOBILE_DRAWER_WIDTH + 16));
+      }
+
+      if (mobileDrawerMode === 'close') {
+        if (dx >= 0) return;
+        event.preventDefault();
+        setMobileDrawerDrag(Math.max(MOBILE_DRAWER_CLOSED_X, dx));
+      }
+    }, { passive: false });
+
+    document.addEventListener('touchend', function () {
+      if (!mobileDrawerTracking || mobileDrawerTouchStartX === null) return;
+      const currentX = parseFloat(getComputedStyle(document.body).getPropertyValue('--mobile-drawer-x')) || 0;
+      const shouldOpen = currentX > -48;
+      finishMobileDrawerDrag(shouldOpen);
+    }, { passive: true });
+
+    document.addEventListener('touchcancel', function () {
+      if (!mobileDrawerTracking) return;
+      finishMobileDrawerDrag(document.body.classList.contains('mobile-drawer-open'));
     }, { passive: true });
 
     logoutBtn?.addEventListener('click', function (event) {
