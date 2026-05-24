@@ -483,3 +483,74 @@
   setTimeout(scheduleNormalize, 250);
   setTimeout(scheduleNormalize, 900);
 })();
+
+
+
+/* =========================================================
+   Mobile Calendar Swipe Month Move v17
+   - 모바일 달력 영역 좌우 스와이프로 이전/다음달 이동
+   - 기존 버튼 로직을 그대로 사용: 버튼은 CSS에서 숨김
+========================================================= */
+(function () {
+  'use strict';
+
+  var MOBILE_QUERY = '(max-width: 768px)';
+  var startX = 0;
+  var startY = 0;
+  var startTime = 0;
+  var tracking = false;
+
+  function isMobile() {
+    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  function getCalendarGridFromTarget(target) {
+    if (!target || !target.closest) return null;
+    return target.closest('#tab-content .calendar-grid, #tab-content .schedule-calendar-grid, #tab-content .month-grid');
+  }
+
+  function moveMonth(direction) {
+    var btn = direction === 'next'
+      ? document.getElementById('calendar-next-month')
+      : document.getElementById('calendar-prev-month');
+
+    if (btn) {
+      btn.click();
+      if (navigator.vibrate) {
+        try { navigator.vibrate(8); } catch (_) {}
+      }
+    }
+  }
+
+  document.addEventListener('touchstart', function (event) {
+    if (!isMobile()) return;
+    var grid = getCalendarGridFromTarget(event.target);
+    if (!grid) return;
+    if (!event.touches || event.touches.length !== 1) return;
+
+    startX = event.touches[0].clientX;
+    startY = event.touches[0].clientY;
+    startTime = Date.now();
+    tracking = true;
+  }, { passive: true });
+
+  document.addEventListener('touchend', function (event) {
+    if (!tracking || !isMobile()) return;
+    tracking = false;
+
+    var grid = getCalendarGridFromTarget(event.target);
+    if (!grid) return;
+    if (!event.changedTouches || event.changedTouches.length !== 1) return;
+
+    var dx = event.changedTouches[0].clientX - startX;
+    var dy = event.changedTouches[0].clientY - startY;
+    var dt = Date.now() - startTime;
+
+    if (dt > 700) return;
+    if (Math.abs(dx) < 55) return;
+    if (Math.abs(dx) < Math.abs(dy) * 1.35) return;
+
+    if (dx < 0) moveMonth('next');
+    else moveMonth('prev');
+  }, { passive: true });
+})();
