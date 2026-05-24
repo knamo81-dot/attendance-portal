@@ -1123,6 +1123,372 @@ input[type="radio"]{
   gap: var(--common-modal-button-gap, 8px);
 }
 
+
+/* =========================================================
+   M-1 Portal Mobile Shell
+   - 모바일 헤더 compact
+   - 사이드바 drawer
+   - iframe 좌우 잘림/전체 가로스크롤 방지
+   - 앱 내부 레이아웃은 건드리지 않음
+========================================================= */
+.mobile-menu-btn,
+.mobile-drawer-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --portal-app-padding: 0px;
+    --portal-gap: 0px;
+    --portal-mobile-header-h: auto;
+  }
+
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    overscroll-behavior-x: none;
+  }
+
+  body.mobile-drawer-open {
+    overflow: hidden;
+  }
+
+  .app {
+    width: 100%;
+    height: 100dvh;
+    min-height: 100dvh;
+    padding: 0;
+    overflow: hidden;
+    background: #f1f5f9;
+  }
+
+  .layout {
+    width: 100%;
+    height: 100dvh;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+  }
+
+  .portal-main {
+    width: 100%;
+    height: 100dvh;
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px;
+    overflow: hidden;
+  }
+
+  .portal-common-header {
+    width: 100%;
+    min-width: 0;
+    min-height: 58px !important;
+    border-radius: 16px;
+    padding: 10px 12px 10px 48px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    overflow: hidden;
+  }
+
+  .portal-common-header .header-left {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .portal-common-header .header-top {
+    display: none;
+  }
+
+  .portal-common-header .header-title {
+    max-width: 100%;
+    margin: 0 0 2px;
+    font-size: 17px;
+    line-height: 1.2;
+    letter-spacing: -0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .portal-common-header .header-desc {
+    max-width: 100%;
+    font-size: 10.5px;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: rgba(255,255,255,.84);
+  }
+
+  .portal-common-header .header-right {
+    display: none;
+  }
+
+  .mobile-menu-btn {
+    display: inline-flex;
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 31px;
+    height: 31px;
+    border: 0;
+    border-radius: 10px;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,.2);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-menu-btn svg {
+    width: 19px;
+    height: 19px;
+    display: block;
+  }
+
+  .mobile-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    background: rgba(15,23,42,.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease;
+  }
+
+  body.mobile-drawer-open .mobile-drawer-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sidenav {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    bottom: 8px;
+    z-index: 90;
+    width: 72px;
+    height: auto;
+    min-height: 0;
+    max-height: calc(100dvh - 16px);
+    border-radius: 18px;
+    padding: 8px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    transform: translateX(calc(-100% - 12px));
+    transition: transform .22s ease;
+    box-shadow: 0 24px 60px rgba(15,23,42,.28);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body.mobile-drawer-open .sidenav {
+    transform: translateX(0);
+  }
+
+  .sidenav .nav-group {
+    gap: 7px;
+  }
+
+  .nav-btn,
+  .nav-btn.home {
+    width: 54px !important;
+    height: 42px !important;
+    min-height: 42px;
+    border-radius: 13px !important;
+    font-size: 11px;
+    touch-action: manipulation;
+  }
+
+  .nav-btn.home .home-nav-icon {
+    width: 33px !important;
+    height: 33px !important;
+  }
+
+  .service-admin-btn {
+    width: 54px !important;
+    height: 42px !important;
+  }
+
+  .service-admin-svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .portal-subtabs-wrap.show {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  .portal-subtabs {
+    width: 100%;
+    min-width: 0;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 1px 2px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .portal-subtabs::-webkit-scrollbar,
+  .portal-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .portal-subtab {
+    height: 34px;
+    border-radius: 10px;
+    padding: 0 12px;
+    font-size: 11px;
+  }
+
+  .portal-filters.show {
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .portal-filter-item {
+    height: 34px;
+    padding: 0 9px;
+    flex: 0 0 auto;
+  }
+
+  .portal-filter-control {
+    min-height: 26px;
+    font-size: 11px;
+  }
+
+  #portalFrame {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: 100%;
+    min-height: 0;
+    border-radius: 14px;
+    overflow: hidden;
+    display: block;
+  }
+
+  .top-user-bar {
+    top: 14px;
+    right: 14px;
+    max-width: calc(100vw - 76px);
+    z-index: 70;
+  }
+
+  .user-chip {
+    max-width: 124px;
+    padding: 5px 7px;
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .user-chip .role {
+    display: none;
+  }
+
+  .personal-settings-icon-btn {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+  }
+
+  .auth-overlay,
+  .personal-settings-overlay,
+  .logout-confirm-overlay {
+    padding: 14px;
+  }
+
+  .auth-card,
+  .logout-confirm-box {
+    width: min(360px, calc(100vw - 28px));
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+  .personal-settings-modal {
+    width: calc(100vw - 28px);
+    max-height: calc(100dvh - 28px);
+    border-radius: 18px;
+  }
+
+  .personal-settings-head {
+    padding: 18px 18px 14px;
+  }
+
+  .personal-settings-body {
+    padding: 16px 18px 18px;
+  }
+}
+
+@media (max-width: 420px) {
+  .portal-main {
+    padding: 6px;
+    gap: 6px;
+  }
+
+  .portal-common-header {
+    min-height: 54px !important;
+    border-radius: 14px;
+    padding: 9px 10px 9px 44px;
+  }
+
+  .mobile-menu-btn {
+    left: 8px;
+    width: 29px;
+    height: 29px;
+  }
+
+  .portal-common-header .header-title {
+    font-size: 16px;
+  }
+
+  .portal-common-header .header-desc {
+    font-size: 10px;
+  }
+
+  .top-user-bar {
+    top: 12px;
+    right: 12px;
+  }
+
+  .user-chip {
+    display: none;
+  }
+
+  .sidenav {
+    top: 6px;
+    left: 6px;
+    bottom: 6px;
+    max-height: calc(100dvh - 12px);
+  }
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1195,7 +1561,7 @@ input[type="radio"]{
 <body>
   <div class="app">
     <div class="layout">
-      <div class="sidenav">
+      <div id="portalSideNav" class="sidenav">
         <div>
           <button type="button" id="homeNavBtn" class="nav-btn home active" data-portal-src="portal-main/portal-main.html" title="홈" aria-label="홈">
             <svg class="home-nav-icon" viewBox="0 0 48 48" aria-hidden="true">
@@ -1245,8 +1611,14 @@ input[type="radio"]{
 </button>
         </div>
       </div>
+      <div id="mobileDrawerBackdrop" class="mobile-drawer-backdrop" aria-hidden="true"></div>
       <div class="portal-main">
         <div id="portalCommonHeader" class="portal-common-header">
+          <button type="button" id="mobileMenuBtn" class="mobile-menu-btn" aria-label="메뉴 열기" aria-controls="portalSideNav" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+          </button>
           <div class="header-left">
             <div id="portalHeaderTop" class="header-top">Integrated Operations Platform</div>
             <div id="portalHeaderTitle" class="header-title">통합 운영 플랫폼</div>
@@ -1393,6 +1765,9 @@ input[type="radio"]{
     topUserBar: document.getElementById('topUserBar'),
     userChip: document.getElementById('userChip'),
     personalSettingsIconBtn: document.getElementById('personalSettingsIconBtn'),
+    mobileMenuBtn: document.getElementById('mobileMenuBtn'),
+    mobileDrawerBackdrop: document.getElementById('mobileDrawerBackdrop'),
+    portalSideNav: document.getElementById('portalSideNav'),
     serviceAdminBtn: document.getElementById('serviceAdminBtn'),
     portalSubtabsWrap: document.getElementById('portalSubtabsWrap'),
     portalSubtabs: document.getElementById('portalSubtabs'),
@@ -1876,6 +2251,31 @@ input[type="radio"]{
     if (top) top.textContent = meta.top || '';
     if (title) title.textContent = meta.title || '';
     if (desc) desc.textContent = meta.desc || '';
+  }
+
+
+  function isMobilePortalView() {
+    return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  }
+
+  function setMobileDrawer(open) {
+    const shouldOpen = !!open && isMobilePortalView();
+    document.body.classList.toggle('mobile-drawer-open', shouldOpen);
+    if (els.mobileMenuBtn) {
+      els.mobileMenuBtn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+      els.mobileMenuBtn.setAttribute('aria-label', shouldOpen ? '메뉴 닫기' : '메뉴 열기');
+    }
+    if (els.mobileDrawerBackdrop) {
+      els.mobileDrawerBackdrop.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+    }
+  }
+
+  function closeMobileDrawer() {
+    setMobileDrawer(false);
+  }
+
+  function toggleMobileDrawer() {
+    setMobileDrawer(!document.body.classList.contains('mobile-drawer-open'));
   }
 
   function setActiveNav(activeBtn) {
@@ -2594,15 +2994,61 @@ input[type="radio"]{
     navButtons.forEach(function (btn) {
       btn.addEventListener('click', function (event) {
         event.preventDefault();
-        navigate(btn).catch(function (error) {
+        navigate(btn).then(function () {
+          closeMobileDrawer();
+        }).catch(function (error) {
           console.error('portal navigation failed:', error);
           alert('화면 이동 중 오류가 발생했습니다. 콘솔 오류를 확인해 주세요.');
         });
       });
     });
 
+    els.mobileMenuBtn?.addEventListener('click', function (event) {
+      event.preventDefault();
+      toggleMobileDrawer();
+    });
+
+    els.mobileDrawerBackdrop?.addEventListener('click', function () {
+      closeMobileDrawer();
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') closeMobileDrawer();
+    });
+
+    window.addEventListener('resize', function () {
+      if (!isMobilePortalView()) closeMobileDrawer();
+    });
+
+    let mobileDrawerTouchStartX = null;
+    let mobileDrawerTouchStartY = null;
+
+    document.addEventListener('touchstart', function (event) {
+      if (!isMobilePortalView() || !event.touches || !event.touches.length) return;
+      mobileDrawerTouchStartX = event.touches[0].clientX;
+      mobileDrawerTouchStartY = event.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function (event) {
+      if (!isMobilePortalView() || mobileDrawerTouchStartX === null || !event.touches || !event.touches.length) return;
+      const dx = event.touches[0].clientX - mobileDrawerTouchStartX;
+      const dy = Math.abs(event.touches[0].clientY - mobileDrawerTouchStartY);
+      const drawerOpen = document.body.classList.contains('mobile-drawer-open');
+
+      if (!drawerOpen && mobileDrawerTouchStartX <= 18 && dx > 46 && dy < 42) {
+        setMobileDrawer(true);
+        mobileDrawerTouchStartX = null;
+        mobileDrawerTouchStartY = null;
+      } else if (drawerOpen && dx < -46 && dy < 42) {
+        closeMobileDrawer();
+        mobileDrawerTouchStartX = null;
+        mobileDrawerTouchStartY = null;
+      }
+    }, { passive: true });
+
     logoutBtn?.addEventListener('click', function (event) {
       event.preventDefault();
+      closeMobileDrawer();
       els.logoutConfirmOverlay?.classList.add('show');
     });
 
