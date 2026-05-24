@@ -1338,5 +1338,86 @@
 })();
 </script>
 
+
+
+<!-- =========================================================
+  Mobile Schedule Detail Visible Patch v8
+  - 모바일 일정 카드 펼침 시 상세 내용이 숨겨지는 문제 보정
+  - 기존 달력 내부 일정 숨김 규칙은 유지하고, 선택 날짜 목록 카드 내부만 다시 표시
+========================================================= -->
+<style id="portal-home-mobile-schedule-detail-visible-v8">
+@media (max-width: 768px) {
+  /* 선택 날짜/일정 목록 영역은 잘리지 않게 유지 */
+  #tab-content .selected-date-panel,
+  #tab-content .selected-schedule-panel,
+  #tab-content .daily-schedule-panel,
+  #tab-content .schedule-list,
+  #tab-content [class*="selected"][class*="schedule"],
+  #tab-content [class*="daily"][class*="schedule"] {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* 달력 안의 작은 일정 표시는 숨기되, 아래 실제 일정 카드 안 내용은 다시 표시 */
+  #tab-content .selected-date-panel .schedule-item [class*="desc"],
+  #tab-content .selected-date-panel .schedule-item [class*="detail"],
+  #tab-content .selected-date-panel .schedule-item [class*="content"],
+  #tab-content .selected-date-panel .schedule-item [class*="body"],
+  #tab-content .selected-date-panel .schedule-item [class*="memo"],
+  #tab-content .selected-date-panel .schedule-item [class*="note"],
+  #tab-content .selected-date-panel .schedule-item [class*="text"],
+  #tab-content .selected-date-panel .event-item [class*="desc"],
+  #tab-content .selected-date-panel .event-item [class*="detail"],
+  #tab-content .selected-date-panel .event-item [class*="content"],
+  #tab-content .selected-date-panel .event-item [class*="body"],
+  #tab-content .selected-date-panel .event-item [class*="memo"],
+  #tab-content .selected-date-panel .event-item [class*="note"],
+  #tab-content .selected-date-panel .event-item [class*="text"],
+  #tab-content .selected-schedule-panel .schedule-item [class*="desc"],
+  #tab-content .selected-schedule-panel .schedule-item [class*="detail"],
+  #tab-content .selected-schedule-panel .schedule-item [class*="content"],
+  #tab-content .selected-schedule-panel .schedule-item [class*="body"],
+  #tab-content .selected-schedule-panel .schedule-item [class*="memo"],
+  #tab-content .selected-schedule-panel .schedule-item [class*="note"],
+  #tab-content .selected-schedule-panel .schedule-item [class*="text"],
+  #tab-content .daily-schedule-panel .schedule-item [class*="desc"],
+  #tab-content .daily-schedule-panel .schedule-item [class*="detail"],
+  #tab-content .daily-schedule-panel .schedule-item [class*="content"],
+  #tab-content .daily-schedule-panel .schedule-item [class*="body"],
+  #tab-content .daily-schedule-panel .schedule-item [class*="memo"],
+  #tab-content .daily-schedule-panel .schedule-item [class*="note"],
+  #tab-content .daily-schedule-panel .schedule-item [class*="text"],
+  #tab-content .schedule-list .schedule-item [class*="desc"],
+  #tab-content .schedule-list .schedule-item [class*="detail"],
+  #tab-content .schedule-list .schedule-item [class*="content"],
+  #tab-content .schedule-list .schedule-item [class*="body"],
+  #tab-content .schedule-list .schedule-item [class*="memo"],
+  #tab-content .schedule-list .schedule-item [class*="note"],
+  #tab-content .schedule-list .schedule-item [class*="text"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    white-space: pre-wrap !important;
+    -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
+  }
+
+  /* 펼쳐진 카드의 상세 내용 기본 여백 */
+  #tab-content .schedule-item [class*="desc"],
+  #tab-content .schedule-item [class*="detail"],
+  #tab-content .schedule-item [class*="memo"],
+  #tab-content .schedule-item [class*="note"] {
+    margin-top: 10px !important;
+    color: #334155 !important;
+    font-size: 15px !important;
+    line-height: 1.55 !important;
+  }
+}
+</style>
 </body>
 </html>
