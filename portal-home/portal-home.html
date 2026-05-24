@@ -188,13 +188,14 @@
 
 
 
+
 <style id="portal-home-mobile-schedule-compact-patch">
 /* =========================================================
-   Mobile Schedule Compact Patch v7
-   - 달력 grid가 교체되어도 모바일 크기가 먼저 고정되도록 CSS 우선 적용
-   - 날짜 셀 innerHTML 재작성 제거: 깜빡임 최소화
-   - 빈 날짜칸도 동일 높이 유지
-   - 일정/예약 내부 버튼 클릭 시 달력 전체 재보정 빈도 축소
+   Mobile Schedule Compact Patch v6
+   - 모바일 달력은 CSS 우선으로 항상 작은 크기 유지
+   - 빈 날짜칸 높이 고정
+   - 클릭 때마다 날짜 셀 innerHTML 재작성하지 않음
+   - 달력 grid가 실제로 교체될 때만 최소 보정
 ========================================================= */
 @media (max-width: 768px) {
   #tab-content,
@@ -251,7 +252,6 @@
   #tab-content .calendar-nav button {
     flex: 0 0 auto !important;
     min-height: 36px !important;
-    height: 36px !important;
     padding: 0 12px !important;
     border-radius: 14px !important;
     font-size: 13px !important;
@@ -342,18 +342,15 @@
     color: #64748b !important;
   }
 
-  #tab-content .calendar-grid > *,
-  #tab-content .schedule-calendar-grid > *,
-  #tab-content .month-grid > *,
-  #tab-content [class*="calendar"][class*="grid"] > *,
-  #tab-content [class*="month"][class*="grid"] > *,
   #tab-content .calendar-day,
   #tab-content .calendar-cell,
   #tab-content .day-cell,
   #tab-content .month-day,
   #tab-content .schedule-day,
   #tab-content [data-date],
-  #tab-content [data-day] {
+  #tab-content [data-day],
+  #tab-content .mobile-calendar-date-only,
+  #tab-content .mobile-calendar-empty-cell {
     position: relative !important;
     display: flex !important;
     align-items: center !important;
@@ -375,16 +372,23 @@
     animation: none !important;
   }
 
-  #tab-content .calendar-grid > * > *,
-  #tab-content .schedule-calendar-grid > * > *,
-  #tab-content .month-grid > * > *,
-  #tab-content [class*="calendar"][class*="grid"] > * > *,
-  #tab-content [class*="month"][class*="grid"] > * > * {
-    display: none !important;
+  #tab-content .mobile-calendar-date-only.is-empty,
+  #tab-content .mobile-calendar-empty-cell,
+  #tab-content .calendar-day.is-empty,
+  #tab-content .calendar-cell.is-empty,
+  #tab-content .day-cell.is-empty,
+  #tab-content .month-day.is-empty,
+  #tab-content .schedule-day.is-empty,
+  #tab-content [class*="empty"][class*="day"],
+  #tab-content [class*="blank"][class*="day"] {
+    min-height: 34px !important;
+    height: 34px !important;
+    max-height: 34px !important;
+    aspect-ratio: auto !important;
+    opacity: .28 !important;
   }
 
-  #tab-content [data-mobile-day]::before {
-    content: attr(data-mobile-day) !important;
+  #tab-content .mobile-calendar-date-number {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -396,23 +400,7 @@
     color: #1f2937 !important;
   }
 
-  #tab-content .mobile-calendar-empty-cell,
-  #tab-content .mobile-calendar-date-only.is-empty,
-  #tab-content .calendar-grid > *:empty,
-  #tab-content .schedule-calendar-grid > *:empty,
-  #tab-content .month-grid > *:empty,
-  #tab-content [class*="calendar"][class*="grid"] > *:empty,
-  #tab-content [class*="month"][class*="grid"] > *:empty,
-  #tab-content [class*="empty"][class*="day"],
-  #tab-content [class*="blank"][class*="day"] {
-    min-height: 34px !important;
-    height: 34px !important;
-    max-height: 34px !important;
-    aspect-ratio: auto !important;
-    opacity: .28 !important;
-  }
-
-  #tab-content [data-mobile-has-event="1"]::after {
+  #tab-content .mobile-calendar-date-only.has-event::after {
     content: "" !important;
     position: absolute !important;
     left: 50% !important;
@@ -422,6 +410,10 @@
     transform: translateX(-50%) !important;
     border-radius: 999px !important;
     background: #2563eb !important;
+  }
+
+  #tab-content .mobile-calendar-date-only > *:not(.mobile-calendar-date-number) {
+    display: none !important;
   }
 
   #tab-content .event-count,
@@ -453,14 +445,26 @@
   'use strict';
 
   const MOBILE_QUERY = '(max-width: 768px)';
-  const GRID_SELECTOR = '.calendar-grid, .schedule-calendar-grid, .month-grid, [class*="calendar"][class*="grid"], [class*="month"][class*="grid"]';
-  const CELL_SELECTOR = '.calendar-day, .calendar-cell, .day-cell, .month-day, .schedule-day, [data-date], [data-day]';
+  const CELL_SELECTOR = [
+    '.calendar-day',
+    '.calendar-cell',
+    '.day-cell',
+    '.month-day',
+    '.schedule-day',
+    '[data-date]',
+    '[data-day]'
+  ].join(',');
 
-  let raf = 0;
-  let lastSignature = '';
+  const GRID_SELECTOR = [
+    '.calendar-grid',
+    '.schedule-calendar-grid',
+    '.month-grid',
+    '[class*="calendar"][class*="grid"]',
+    '[class*="month"][class*="grid"]'
+  ].join(',');
 
   function isMobile() {
-    return !!(window.matchMedia && window.matchMedia(MOBILE_QUERY).matches);
+    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
   }
 
   function getRoot() {
@@ -475,101 +479,164 @@
   function isScheduleAreaVisible() {
     const activeTab = getActiveTabId();
     if (activeTab) return activeTab === 'schedule' || activeTab === 'reservation';
-    const text = (getRoot().innerText || '').replace(/\s+/g, ' ');
+
+    const root = getRoot();
+    const text = (root.innerText || '').replace(/\s+/g, ' ');
     return text.includes('스케줄') || text.includes('예약') || text.includes('이전달') || text.includes('다음달');
   }
 
+  function getCalendarGrid(el) {
+    return el && el.closest ? el.closest(GRID_SELECTOR) : null;
+  }
+
+  function isCalendarGrid(el) {
+    return !!(el && el.matches && el.matches(GRID_SELECTOR));
+  }
+
+  function isCalendarContainer(el) {
+    if (!el) return true;
+    if (isCalendarGrid(el)) return true;
+
+    const nestedCandidates = el.querySelectorAll ? el.querySelectorAll(CELL_SELECTOR) : [];
+    if (nestedCandidates.length >= 3) return true;
+
+    return false;
+  }
+
   function extractDay(el) {
-    if (!el) return '';
-    const dataDate = el.getAttribute ? (el.getAttribute('data-date') || '') : '';
-    const dataDay = el.getAttribute ? (el.getAttribute('data-day') || '') : '';
+    const dataDate = el.getAttribute('data-date') || '';
+    const dataDay = el.getAttribute('data-day') || '';
     let m = dataDate.match(/(?:^|-)0?([1-9]|[12][0-9]|3[01])$/) || dataDay.match(/^0?([1-9]|[12][0-9]|3[01])$/);
     if (m) return String(Number(m[1]));
 
-    const text = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
+    const text = (el.innerText || '').trim().replace(/\s+/g, ' ');
     m = text.match(/^([1-9]|[12][0-9]|3[01])(?=\s|건|일정|$)/);
     if (m) return String(Number(m[1]));
 
     const first = Array.from(el.querySelectorAll ? el.querySelectorAll('span, div, strong, b') : []).find(function (node) {
-      const t = (node.innerText || node.textContent || '').trim();
+      const t = (node.innerText || '').trim();
       return /^([1-9]|[12][0-9]|3[01])$/.test(t);
     });
-    return first ? String(Number((first.innerText || first.textContent || '').trim())) : '';
+    return first ? String(Number(first.innerText.trim())) : '';
   }
 
   function hasEvent(el) {
-    const text = (el.innerText || el.textContent || '').trim();
+    const text = (el.innerText || '').trim();
     if (/([1-9][0-9]*건)/.test(text) && !/0건/.test(text)) return true;
-    return !!(el.querySelector && el.querySelector('.event, .schedule-item, .calendar-item, [class*="event"], [class*="schedule-item"]'));
+    if (el.querySelector && el.querySelector('.event, .schedule-item, .calendar-item, [class*="event"], [class*="schedule-item"]')) return true;
+    return false;
   }
 
-  function prepareGrid(grid) {
-    if (!grid || !grid.children) return;
+  function collectCells() {
+    const root = getRoot();
+    const bySelector = Array.from(root.querySelectorAll(CELL_SELECTOR));
+    const byText = Array.from(root.querySelectorAll('button, div, li, td')).filter(function (el) {
+      if (!getCalendarGrid(el)) return false;
+      const text = (el.innerText || '').trim().replace(/\s+/g, ' ');
+      if (!text) return false;
+      if (/^(일|월|화|수|목|금|토)$/.test(text)) return false;
+      return /^([1-9]|[12][0-9]|3[01])(\s|건|일정|$)/.test(text);
+    });
 
-    Array.from(grid.children).forEach(function (cell) {
-      if (!cell || !cell.classList) return;
-      const text = (cell.innerText || cell.textContent || '').trim();
-      if (/^(일|월|화|수|목|금|토)$/.test(text)) return;
-      if (cell.matches && cell.matches(GRID_SELECTOR)) return;
-      if (cell.querySelectorAll && cell.querySelectorAll(CELL_SELECTOR).length >= 3) return;
+    return Array.from(new Set(bySelector.concat(byText))).filter(function (el) {
+      if (!el || !el.closest) return false;
+      if (el.closest('.mobile-memo-filter-bar')) return false;
+      if (el.closest('.workspace-tabs')) return false;
+      if (!getCalendarGrid(el)) return false;
+      if (isCalendarContainer(el)) return false;
+      return true;
+    });
+  }
 
-      const day = extractDay(cell);
-      cell.classList.add('mobile-calendar-date-only');
+  function normalizeGridBlankCells() {
+    const root = getRoot();
+    const grids = Array.from(root.querySelectorAll(GRID_SELECTOR));
 
-      if (day) {
-        cell.dataset.mobileDay = day;
-        cell.classList.remove('mobile-calendar-empty-cell', 'is-empty');
-        if (hasEvent(cell)) cell.dataset.mobileHasEvent = '1';
-        else delete cell.dataset.mobileHasEvent;
-      } else {
-        delete cell.dataset.mobileDay;
-        delete cell.dataset.mobileHasEvent;
-        cell.classList.add('mobile-calendar-empty-cell', 'is-empty');
-      }
+    grids.forEach(function (grid) {
+      Array.from(grid.children || []).forEach(function (child) {
+        if (!child || !child.classList) return;
+        if (/^(일|월|화|수|목|금|토)$/.test((child.innerText || '').trim())) return;
+        if (isCalendarContainer(child)) return;
+
+        const day = extractDay(child);
+        const hasVisibleText = (child.innerText || '').trim().length > 0;
+        const looksLikeBlank = !day && !hasVisibleText;
+
+        if (looksLikeBlank) {
+          child.classList.add('mobile-calendar-date-only', 'mobile-calendar-empty-cell', 'is-empty');
+          child.innerHTML = '';
+          child.dataset.mobileProcessedDay = '';
+        }
+      });
     });
   }
 
   function compactCalendar() {
-    raf = 0;
     const enabled = isMobile() && isScheduleAreaVisible();
     document.body.classList.toggle('mobile-schedule-compact', enabled);
+
     if (!enabled) return;
 
-    const grids = Array.from(getRoot().querySelectorAll(GRID_SELECTOR));
-    const signature = grids.map(function (grid) {
-      return String(grid.children ? grid.children.length : 0) + ':' + (grid.textContent || '').slice(0, 80);
-    }).join('|');
+    const cells = collectCells();
 
-    if (signature === lastSignature) return;
-    lastSignature = signature;
-    grids.forEach(prepareGrid);
+    cells.forEach(function (cell) {
+      const day = extractDay(cell);
+      const eventState = !!day && hasEvent(cell) ? '1' : '0';
+      const signature = day + '|' + eventState;
+
+      cell.classList.add('mobile-calendar-date-only');
+      cell.classList.toggle('mobile-calendar-empty-cell', !day);
+      cell.classList.toggle('is-empty', !day);
+      cell.classList.toggle('has-event', eventState === '1');
+
+      /* 이미 같은 날짜 상태로 처리된 셀은 다시 그리지 않음: 클릭 깜빡임 방지 */
+      if (cell.dataset.mobileProcessedSignature === signature && cell.querySelector('.mobile-calendar-date-number')) {
+        return;
+      }
+
+      cell.dataset.mobileProcessedSignature = signature;
+      cell.innerHTML = day ? '<span class="mobile-calendar-date-number">' + day + '</span>' : '';
+    });
+
+    normalizeGridBlankCells();
   }
 
-  function requestCompact() {
+  let raf = 0;
+  function scheduleCompact() {
     if (raf) return;
-    raf = requestAnimationFrame(compactCalendar);
+    raf = requestAnimationFrame(function () {
+      raf = 0;
+      compactCalendar();
+    });
   }
 
-  window.addEventListener('resize', function () { lastSignature = ''; requestCompact(); });
-  window.addEventListener('orientationchange', function () { lastSignature = ''; requestCompact(); });
-  window.addEventListener('message', function () { lastSignature = ''; requestCompact(); });
+  /* 클릭마다 달력을 다시 쓰지 않음. 실제 DOM 교체가 생길 때 observer가 1회 보정 */
+  window.addEventListener('resize', scheduleCompact);
+  window.addEventListener('orientationchange', scheduleCompact);
+  window.addEventListener('message', scheduleCompact);
 
   const observer = new MutationObserver(function (mutations) {
-    let related = false;
-    for (const m of mutations) {
-      const target = m.target;
-      if (target && target.closest && (target.closest(GRID_SELECTOR) || target.closest('#tab-content'))) {
-        related = true;
-        break;
-      }
-    }
-    if (related) requestCompact();
+    if (!isMobile()) return;
+
+    const needsCalendarPatch = mutations.some(function (mutation) {
+      const target = mutation.target;
+      if (target && target.closest && target.closest('.mobile-memo-filter-bar')) return false;
+      if (target && target.closest && target.closest(GRID_SELECTOR)) return true;
+
+      return Array.from(mutation.addedNodes || []).some(function (node) {
+        if (!node || node.nodeType !== 1) return false;
+        return (node.matches && node.matches(GRID_SELECTOR + ',' + CELL_SELECTOR)) ||
+               (node.querySelector && node.querySelector(GRID_SELECTOR + ',' + CELL_SELECTOR));
+      });
+    });
+
+    if (needsCalendarPatch) scheduleCompact();
   });
 
   function init() {
     observer.observe(getRoot(), { childList: true, subtree: true });
-    requestCompact();
-    setTimeout(function () { lastSignature = ''; requestCompact(); }, 250);
+    compactCalendar();
+    requestAnimationFrame(compactCalendar);
   }
 
   if (document.readyState === 'loading') {
@@ -1024,6 +1091,252 @@
 })();
 </script>
 
+
+
+
+<!-- =========================================================
+  Mobile Schedule/Reservation Stabilize Patch v7
+  - 이전달/월/다음달 버튼 모바일 줄바꿈 처리
+  - 스케줄 펼침/선택일 일정 목록 숨김 충돌 해제
+  - 예약 화면 상단 버튼 잘림 보정
+  - iPhone 입력 시 자동 확대 방지
+========================================================= -->
+<style id="portal-home-mobile-schedule-reservation-stabilize-v7">
+@media (max-width: 768px) {
+  html {
+    -webkit-text-size-adjust: 100% !important;
+    text-size-adjust: 100% !important;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font-size: 16px !important;
+  }
+
+  textarea,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="time"],
+  input[type="date"],
+  select {
+    min-height: 44px !important;
+  }
+
+  #tab-content .schedule-top,
+  #tab-content .schedule-header,
+  #tab-content .calendar-header,
+  #tab-content .calendar-nav,
+  #tab-content .reservation-header,
+  #tab-content .reservation-nav,
+  #tab-content [class*="schedule"][class*="header"],
+  #tab-content [class*="calendar"][class*="header"],
+  #tab-content [class*="calendar"][class*="nav"],
+  #tab-content [class*="reservation"][class*="header"],
+  #tab-content [class*="reservation"][class*="nav"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+    white-space: normal !important;
+  }
+
+  #tab-content .schedule-top > *,
+  #tab-content .schedule-header > *,
+  #tab-content .calendar-header > *,
+  #tab-content .calendar-nav > *,
+  #tab-content .reservation-header > *,
+  #tab-content .reservation-nav > *,
+  #tab-content [class*="schedule"][class*="header"] > *,
+  #tab-content [class*="calendar"][class*="header"] > *,
+  #tab-content [class*="calendar"][class*="nav"] > *,
+  #tab-content [class*="reservation"][class*="header"] > *,
+  #tab-content [class*="reservation"][class*="nav"] > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  #tab-content .schedule-top button,
+  #tab-content .schedule-header button,
+  #tab-content .calendar-header button,
+  #tab-content .calendar-nav button,
+  #tab-content .reservation-header button,
+  #tab-content .reservation-nav button,
+  #tab-content [class*="schedule"][class*="header"] button,
+  #tab-content [class*="calendar"][class*="header"] button,
+  #tab-content [class*="calendar"][class*="nav"] button,
+  #tab-content [class*="reservation"][class*="header"] button,
+  #tab-content [class*="reservation"][class*="nav"] button {
+    flex: 0 1 auto !important;
+    min-width: 72px !important;
+    max-width: calc(50vw - 24px) !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 0 12px !important;
+    border-radius: 16px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  #tab-content .month-title,
+  #tab-content .current-month,
+  #tab-content .calendar-title,
+  #tab-content [class*="month"][class*="title"],
+  #tab-content [class*="calendar"][class*="title"] {
+    flex: 1 1 128px !important;
+    min-width: 128px !important;
+    max-width: 100% !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 0 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 16px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 16px !important;
+    line-height: 1 !important;
+  }
+
+  #tab-content .selected-date-panel,
+  #tab-content .selected-schedule-panel,
+  #tab-content .daily-schedule-panel,
+  #tab-content .schedule-detail,
+  #tab-content .schedule-panel,
+  #tab-content .schedule-content,
+  #tab-content .schedule-list,
+  #tab-content .daily-list,
+  #tab-content [class*="selected"][class*="schedule"],
+  #tab-content [class*="daily"][class*="schedule"],
+  #tab-content [class*="schedule"][class*="list"],
+  #tab-content [class*="schedule"][class*="content"] {
+    display: block !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  #tab-content .selected-date-panel .day-events,
+  #tab-content .selected-date-panel .calendar-events,
+  #tab-content .selected-date-panel .calendar-item,
+  #tab-content .selected-date-panel .schedule-item,
+  #tab-content .selected-date-panel .event-item,
+  #tab-content .selected-schedule-panel .day-events,
+  #tab-content .selected-schedule-panel .calendar-events,
+  #tab-content .selected-schedule-panel .calendar-item,
+  #tab-content .selected-schedule-panel .schedule-item,
+  #tab-content .selected-schedule-panel .event-item,
+  #tab-content .daily-schedule-panel .day-events,
+  #tab-content .daily-schedule-panel .calendar-events,
+  #tab-content .daily-schedule-panel .calendar-item,
+  #tab-content .daily-schedule-panel .schedule-item,
+  #tab-content .daily-schedule-panel .event-item,
+  #tab-content .schedule-list .calendar-item,
+  #tab-content .schedule-list .schedule-item,
+  #tab-content .schedule-list .event-item,
+  #tab-content [class*="selected"][class*="schedule"] .calendar-item,
+  #tab-content [class*="selected"][class*="schedule"] .schedule-item,
+  #tab-content [class*="daily"][class*="schedule"] .calendar-item,
+  #tab-content [class*="daily"][class*="schedule"] .schedule-item {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  #tab-content .calendar-grid .calendar-item,
+  #tab-content .calendar-grid .calendar-events,
+  #tab-content .calendar-grid .day-events,
+  #tab-content .schedule-calendar-grid .calendar-item,
+  #tab-content .schedule-calendar-grid .calendar-events,
+  #tab-content .schedule-calendar-grid .day-events,
+  #tab-content .month-grid .calendar-item,
+  #tab-content .month-grid .calendar-events,
+  #tab-content .month-grid .day-events,
+  #tab-content [class*="calendar"][class*="grid"] .calendar-item,
+  #tab-content [class*="calendar"][class*="grid"] .calendar-events,
+  #tab-content [class*="calendar"][class*="grid"] .day-events,
+  #tab-content [class*="month"][class*="grid"] .calendar-item,
+  #tab-content [class*="month"][class*="grid"] .calendar-events,
+  #tab-content [class*="month"][class*="grid"] .day-events {
+    display: none !important;
+  }
+
+  #tab-content .reservation-page,
+  #tab-content .reservation-panel,
+  #tab-content .reservation-content,
+  #tab-content .reservation-timetable,
+  #tab-content .time-table,
+  #tab-content [class*="reservation"][class*="page"],
+  #tab-content [class*="reservation"][class*="panel"],
+  #tab-content [class*="reservation"][class*="content"],
+  #tab-content [class*="time"][class*="table"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #tab-content textarea:focus,
+  #tab-content input:focus,
+  #tab-content select:focus {
+    font-size: 16px !important;
+  }
+}
+</style>
+
+<script id="portal-home-mobile-focus-stabilize-v7">
+(function () {
+  'use strict';
+
+  var MOBILE_QUERY = '(max-width: 768px)';
+
+  function isMobile() {
+    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  function keepInputFontSize() {
+    if (!isMobile()) return;
+    var fields = document.querySelectorAll('input, textarea, select');
+    fields.forEach(function (field) {
+      field.style.fontSize = '16px';
+    });
+  }
+
+  document.addEventListener('focusin', keepInputFontSize, true);
+  document.addEventListener('DOMContentLoaded', keepInputFontSize);
+  window.addEventListener('resize', keepInputFontSize);
+
+  var observer = new MutationObserver(function () {
+    if (!isMobile()) return;
+    window.requestAnimationFrame(keepInputFontSize);
+  });
+
+  if (document.documentElement) {
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+})();
+</script>
 
 </body>
 </html>
