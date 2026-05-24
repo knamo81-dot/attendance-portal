@@ -1,12 +1,135 @@
 /* =========================================================
    Common Mobile
    - 모바일 공통 대응 전용 파일
-   - 현재는 기존 화면 영향 방지를 위해 최소 상태로 유지합니다.
+   - 앱별 레이아웃 강제 변경 없이 기본 모바일 정책만 담당
+   - table/grid/iframe 높이는 각 앱 또는 portal shell에서 별도 제어
 ========================================================= */
 
 @media (max-width: 760px) {
   :root {
     --common-mobile-safe-padding: 10px;
+    --common-mobile-gap: 8px;
+    --common-mobile-font-size: 12px;
+    --common-mobile-small-font-size: 11px;
+    --common-mobile-control-height: 38px;
+    --common-mobile-control-radius: 11px;
+    --common-mobile-modal-padding: 16px;
+    --common-mobile-card-radius: 14px;
+  }
+
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    touch-action: pan-y;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    max-width: 100%;
+  }
+
+  button,
+  .btn,
+  [role="button"] {
+    min-height: var(--common-mobile-control-height);
+    border-radius: var(--common-mobile-control-radius);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  input,
+  select,
+  textarea {
+    min-height: var(--common-mobile-control-height);
+    border-radius: var(--common-mobile-control-radius);
+    font-size: var(--common-mobile-font-size);
+  }
+
+  textarea {
+    min-height: 84px;
+    line-height: 1.45;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: auto;
+    width: auto;
+    height: auto;
+  }
+
+  .modal,
+  .dialog,
+  .popup,
+  .sheet,
+  [role="dialog"] {
+    max-width: calc(100vw - (var(--common-mobile-safe-padding) * 2));
+  }
+
+  .modal-body,
+  .dialog-body,
+  .popup-body,
+  .sheet-body {
+    padding: var(--common-mobile-modal-padding);
+  }
+
+  .card,
+  .panel,
+  .box,
+  .section {
+    max-width: 100%;
+    border-radius: var(--common-mobile-card-radius);
+  }
+
+  .scroll-x,
+  .table-scroll,
+  .horizontal-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .no-mobile-x-scroll {
+    overflow-x: hidden !important;
+  }
+
+  .mobile-only {
+    display: initial;
+  }
+
+  .pc-only,
+  .desktop-only {
+    display: none !important;
   }
 }
 
+@media (min-width: 761px) {
+  .mobile-only {
+    display: none !important;
+  }
+}
