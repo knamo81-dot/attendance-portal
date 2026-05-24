@@ -1,0 +1,840 @@
+/* =========================================================
+   Mobile Schedule Compact Patch v6
+   - 모바일 달력은 CSS 우선으로 항상 작은 크기 유지
+   - 빈 날짜칸 높이 고정
+   - 클릭 때마다 날짜 셀 innerHTML 재작성하지 않음
+   - 달력 grid가 실제로 교체될 때만 최소 보정
+========================================================= */
+@media (max-width: 768px) {
+  #tab-content,
+  #tab-content.content {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #tab-content .schedule-page,
+  #tab-content .schedule-wrap,
+  #tab-content .schedule-container,
+  #tab-content .calendar-section,
+  #tab-content .calendar-panel,
+  #tab-content .reservation-page,
+  #tab-content [class*="schedule"][class*="page"],
+  #tab-content [class*="calendar"][class*="section"],
+  #tab-content [class*="calendar"][class*="panel"] {
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  #tab-content .schedule-top,
+  #tab-content .schedule-header,
+  #tab-content .calendar-header,
+  #tab-content .calendar-nav,
+  #tab-content [class*="calendar"][class*="header"],
+  #tab-content [class*="calendar"][class*="nav"] {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-height: 0 !important;
+    margin-bottom: 10px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  #tab-content .schedule-top::-webkit-scrollbar,
+  #tab-content .schedule-header::-webkit-scrollbar,
+  #tab-content .calendar-header::-webkit-scrollbar,
+  #tab-content .calendar-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  #tab-content .schedule-top button,
+  #tab-content .schedule-header button,
+  #tab-content .calendar-header button,
+  #tab-content .calendar-nav button {
+    flex: 0 0 auto !important;
+    min-height: 36px !important;
+    padding: 0 12px !important;
+    border-radius: 14px !important;
+    font-size: 13px !important;
+    white-space: nowrap !important;
+  }
+
+  #tab-content .schedule-desc,
+  #tab-content .calendar-desc,
+  #tab-content .help-text,
+  #tab-content [class*="desc"],
+  #tab-content [class*="helper"] {
+    display: none !important;
+  }
+
+  #tab-content .schedule-scope-filter,
+  #tab-content .schedule-filter,
+  #tab-content .calendar-filter,
+  #tab-content .scope-filter,
+  #tab-content .filter-row,
+  #tab-content .filter-group,
+  #tab-content [class*="scope"][class*="filter"],
+  #tab-content [class*="filter"][class*="row"],
+  #tab-content [class*="filter"][class*="group"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    white-space: nowrap !important;
+    margin: 8px 0 10px !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  #tab-content .schedule-scope-filter::-webkit-scrollbar,
+  #tab-content .schedule-filter::-webkit-scrollbar,
+  #tab-content .calendar-filter::-webkit-scrollbar,
+  #tab-content .scope-filter::-webkit-scrollbar,
+  #tab-content .filter-row::-webkit-scrollbar,
+  #tab-content .filter-group::-webkit-scrollbar {
+    display: none;
+  }
+
+  #tab-content .schedule-scope-filter > *,
+  #tab-content .schedule-filter > *,
+  #tab-content .calendar-filter > *,
+  #tab-content .scope-filter > *,
+  #tab-content .filter-row > *,
+  #tab-content .filter-group > * {
+    flex: 0 0 auto !important;
+  }
+
+  #tab-content .calendar-grid,
+  #tab-content .schedule-calendar-grid,
+  #tab-content .month-grid,
+  #tab-content [class*="calendar"][class*="grid"],
+  #tab-content [class*="month"][class*="grid"] {
+    display: grid !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    grid-auto-rows: 34px !important;
+    gap: 6px !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    align-items: stretch !important;
+    overflow: visible !important;
+    contain: layout paint !important;
+  }
+
+  #tab-content .weekday,
+  #tab-content .calendar-weekday,
+  #tab-content [class*="weekday"] {
+    height: 22px !important;
+    min-height: 22px !important;
+    max-height: 22px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+    text-align: center !important;
+    color: #64748b !important;
+  }
+
+  #tab-content .calendar-day,
+  #tab-content .calendar-cell,
+  #tab-content .day-cell,
+  #tab-content .month-day,
+  #tab-content .schedule-day,
+  #tab-content [data-date],
+  #tab-content [data-day],
+  #tab-content .mobile-calendar-date-only,
+  #tab-content .mobile-calendar-empty-cell {
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    min-height: 34px !important;
+    height: 34px !important;
+    max-height: 34px !important;
+    aspect-ratio: auto !important;
+    flex: 0 0 auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 12px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    text-align: center !important;
+    transition: none !important;
+    animation: none !important;
+  }
+
+  #tab-content .mobile-calendar-date-only.is-empty,
+  #tab-content .mobile-calendar-empty-cell,
+  #tab-content .calendar-day.is-empty,
+  #tab-content .calendar-cell.is-empty,
+  #tab-content .day-cell.is-empty,
+  #tab-content .month-day.is-empty,
+  #tab-content .schedule-day.is-empty,
+  #tab-content [class*="empty"][class*="day"],
+  #tab-content [class*="blank"][class*="day"] {
+    min-height: 34px !important;
+    height: 34px !important;
+    max-height: 34px !important;
+    aspect-ratio: auto !important;
+    opacity: .28 !important;
+  }
+
+  #tab-content .mobile-calendar-date-number {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    font-size: 15px !important;
+    font-weight: 850 !important;
+    line-height: 1 !important;
+    color: #1f2937 !important;
+  }
+
+  #tab-content .mobile-calendar-date-only.has-event::after {
+    content: "" !important;
+    position: absolute !important;
+    left: 50% !important;
+    bottom: 4px !important;
+    width: 4px !important;
+    height: 4px !important;
+    transform: translateX(-50%) !important;
+    border-radius: 999px !important;
+    background: #2563eb !important;
+  }
+
+  #tab-content .mobile-calendar-date-only > *:not(.mobile-calendar-date-number) {
+    display: none !important;
+  }
+
+  #tab-content .event-count,
+  #tab-content .schedule-count,
+  #tab-content .day-count,
+  #tab-content .calendar-count,
+  #tab-content .events-count,
+  #tab-content .day-events,
+  #tab-content .calendar-events,
+  #tab-content .calendar-item,
+  #tab-content .empty-text {
+    display: none !important;
+  }
+
+  #tab-content .selected-date-panel,
+  #tab-content .selected-schedule-panel,
+  #tab-content .daily-schedule-panel,
+  #tab-content [class*="selected"][class*="schedule"],
+  #tab-content [class*="daily"][class*="schedule"] {
+    margin-top: 12px !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+}
+
+
+
+@media (max-width: 768px) {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden !important;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: #f7f8fb;
+  }
+
+  .app,
+  .layout,
+  #home-page.home-root,
+  #tab-content.content {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  .app,
+  .layout {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #home-page.home-root {
+    padding: 8px 10px 16px !important;
+  }
+
+  #tab-content.content {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .mobile-memo-filter-bar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    overflow-x: auto;
+    padding: 10px 2px 10px;
+    margin: 0 0 8px;
+    background: rgba(247, 248, 251, 0.96);
+    backdrop-filter: blur(10px);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .mobile-memo-filter-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobile-memo-filter-chip {
+    flex: 0 0 auto;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: #ffffff;
+    color: #334155;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  }
+
+  .mobile-memo-filter-chip::before {
+    content: "";
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    margin-right: 6px;
+    border-radius: 999px;
+    background: var(--memo-chip-color, #cbd5e1);
+    vertical-align: 0;
+  }
+
+  .mobile-memo-filter-chip.is-active {
+    color: #0f172a;
+    border-color: rgba(59, 130, 246, 0.55);
+    background: #eef6ff;
+    box-shadow: 0 5px 16px rgba(59, 130, 246, 0.16);
+  }
+
+  .mobile-memo-filter-chip[data-filter="all"]::before {
+    background: linear-gradient(135deg, #fde68a, #bfdbfe, #fecdd3);
+  }
+
+  .mobile-memo-filter-chip[data-filter="yellow"] { --memo-chip-color: #facc15; }
+  .mobile-memo-filter-chip[data-filter="blue"] { --memo-chip-color: #60a5fa; }
+  .mobile-memo-filter-chip[data-filter="green"] { --memo-chip-color: #4ade80; }
+  .mobile-memo-filter-chip[data-filter="pink"] { --memo-chip-color: #f9a8d4; }
+  .mobile-memo-filter-chip[data-filter="purple"] { --memo-chip-color: #c084fc; }
+  .mobile-memo-filter-chip[data-filter="white"] { --memo-chip-color: #e2e8f0; }
+
+  .mobile-memo-list-mode .memo-card,
+  .mobile-memo-list-mode .memo-item,
+  .mobile-memo-list-mode .note-card,
+  .mobile-memo-list-mode [data-memo-id],
+  .mobile-memo-list-mode [data-note-id] {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    left: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    margin: 8px 0 !important;
+    padding: 13px 14px !important;
+    border-radius: 18px !important;
+    box-sizing: border-box !important;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08) !important;
+    cursor: pointer;
+    overflow: hidden !important;
+  }
+
+  .mobile-memo-list-mode .memo-card::after,
+  .mobile-memo-list-mode .memo-item::after,
+  .mobile-memo-list-mode .note-card::after,
+  .mobile-memo-list-mode [data-memo-id]::after,
+  .mobile-memo-list-mode [data-note-id]::after {
+    content: "상세보기";
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.72);
+    color: #475569;
+    font-size: 11px;
+    font-weight: 800;
+    pointer-events: none;
+  }
+
+  .mobile-memo-list-mode .mobile-memo-open::after {
+    content: "닫기";
+  }
+
+  .mobile-memo-list-mode .memo-card.mobile-memo-hidden,
+  .mobile-memo-list-mode .memo-item.mobile-memo-hidden,
+  .mobile-memo-list-mode .note-card.mobile-memo-hidden,
+  .mobile-memo-list-mode [data-memo-id].mobile-memo-hidden,
+  .mobile-memo-list-mode [data-note-id].mobile-memo-hidden {
+    display: none !important;
+  }
+
+  .mobile-memo-list-mode .memo-card:not(.mobile-memo-open) .memo-content,
+  .mobile-memo-list-mode .memo-card:not(.mobile-memo-open) .memo-body,
+  .mobile-memo-list-mode .memo-card:not(.mobile-memo-open) .memo-text,
+  .mobile-memo-list-mode .memo-card:not(.mobile-memo-open) .memo-detail,
+  .mobile-memo-list-mode .memo-card:not(.mobile-memo-open) textarea,
+  .mobile-memo-list-mode .memo-card:not(.mobile-memo-open) .memo-actions,
+  .mobile-memo-list-mode .memo-card:not(.mobile-memo-open) .actions,
+  .mobile-memo-list-mode .memo-item:not(.mobile-memo-open) .memo-content,
+  .mobile-memo-list-mode .memo-item:not(.mobile-memo-open) .memo-body,
+  .mobile-memo-list-mode .memo-item:not(.mobile-memo-open) .memo-text,
+  .mobile-memo-list-mode .memo-item:not(.mobile-memo-open) .memo-detail,
+  .mobile-memo-list-mode .memo-item:not(.mobile-memo-open) textarea,
+  .mobile-memo-list-mode .memo-item:not(.mobile-memo-open) .memo-actions,
+  .mobile-memo-list-mode .memo-item:not(.mobile-memo-open) .actions,
+  .mobile-memo-list-mode .note-card:not(.mobile-memo-open) .memo-content,
+  .mobile-memo-list-mode .note-card:not(.mobile-memo-open) .memo-body,
+  .mobile-memo-list-mode .note-card:not(.mobile-memo-open) .memo-text,
+  .mobile-memo-list-mode .note-card:not(.mobile-memo-open) .memo-detail,
+  .mobile-memo-list-mode .note-card:not(.mobile-memo-open) textarea,
+  .mobile-memo-list-mode .note-card:not(.mobile-memo-open) .memo-actions,
+  .mobile-memo-list-mode .note-card:not(.mobile-memo-open) .actions,
+  .mobile-memo-list-mode [data-memo-id]:not(.mobile-memo-open) .memo-content,
+  .mobile-memo-list-mode [data-memo-id]:not(.mobile-memo-open) .memo-body,
+  .mobile-memo-list-mode [data-memo-id]:not(.mobile-memo-open) .memo-text,
+  .mobile-memo-list-mode [data-memo-id]:not(.mobile-memo-open) .memo-detail,
+  .mobile-memo-list-mode [data-memo-id]:not(.mobile-memo-open) textarea,
+  .mobile-memo-list-mode [data-memo-id]:not(.mobile-memo-open) .memo-actions,
+  .mobile-memo-list-mode [data-memo-id]:not(.mobile-memo-open) .actions,
+  .mobile-memo-list-mode [data-note-id]:not(.mobile-memo-open) .memo-content,
+  .mobile-memo-list-mode [data-note-id]:not(.mobile-memo-open) .memo-body,
+  .mobile-memo-list-mode [data-note-id]:not(.mobile-memo-open) .memo-text,
+  .mobile-memo-list-mode [data-note-id]:not(.mobile-memo-open) .memo-detail,
+  .mobile-memo-list-mode [data-note-id]:not(.mobile-memo-open) textarea,
+  .mobile-memo-list-mode [data-note-id]:not(.mobile-memo-open) .memo-actions,
+  .mobile-memo-list-mode [data-note-id]:not(.mobile-memo-open) .actions {
+    display: none !important;
+  }
+
+  .mobile-memo-list-mode .memo-title,
+  .mobile-memo-list-mode .note-title,
+  .mobile-memo-list-mode [class*="title"] {
+    display: block !important;
+    max-width: calc(100% - 74px) !important;
+    margin: 0 !important;
+    color: #0f172a !important;
+    font-size: 15px !important;
+    font-weight: 850 !important;
+    line-height: 1.35 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .mobile-memo-list-mode .mobile-memo-open .memo-title,
+  .mobile-memo-list-mode .mobile-memo-open .note-title,
+  .mobile-memo-list-mode .mobile-memo-open [class*="title"] {
+    max-width: calc(100% - 48px) !important;
+    margin-bottom: 10px !important;
+    white-space: normal !important;
+  }
+
+  .mobile-memo-list-mode .mobile-memo-open .memo-content,
+  .mobile-memo-list-mode .mobile-memo-open .memo-body,
+  .mobile-memo-list-mode .mobile-memo-open .memo-text,
+  .mobile-memo-list-mode .mobile-memo-open .memo-detail {
+    display: block !important;
+    color: #334155 !important;
+    font-size: 14px !important;
+    line-height: 1.55 !important;
+  }
+
+  .mobile-memo-list-mode .mobile-memo-open textarea,
+  .mobile-memo-list-mode .mobile-memo-open input[type="text"] {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .mobile-memo-list-mode .mobile-memo-open .memo-actions,
+  .mobile-memo-list-mode .mobile-memo-open .actions,
+  .mobile-memo-list-mode .mobile-memo-open [class*="action"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    margin-top: 12px !important;
+  }
+
+  .mobile-memo-list-mode .mobile-memo-open button {
+    min-height: 36px;
+    border-radius: 12px;
+  }
+}
+
+
+
+@media (max-width: 768px) {
+  html {
+    -webkit-text-size-adjust: 100% !important;
+    text-size-adjust: 100% !important;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font-size: 16px !important;
+  }
+
+  textarea,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="time"],
+  input[type="date"],
+  select {
+    min-height: 44px !important;
+  }
+
+  #tab-content .schedule-top,
+  #tab-content .schedule-header,
+  #tab-content .calendar-header,
+  #tab-content .calendar-nav,
+  #tab-content .reservation-header,
+  #tab-content .reservation-nav,
+  #tab-content [class*="schedule"][class*="header"],
+  #tab-content [class*="calendar"][class*="header"],
+  #tab-content [class*="calendar"][class*="nav"],
+  #tab-content [class*="reservation"][class*="header"],
+  #tab-content [class*="reservation"][class*="nav"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+    white-space: normal !important;
+  }
+
+  #tab-content .schedule-top > *,
+  #tab-content .schedule-header > *,
+  #tab-content .calendar-header > *,
+  #tab-content .calendar-nav > *,
+  #tab-content .reservation-header > *,
+  #tab-content .reservation-nav > *,
+  #tab-content [class*="schedule"][class*="header"] > *,
+  #tab-content [class*="calendar"][class*="header"] > *,
+  #tab-content [class*="calendar"][class*="nav"] > *,
+  #tab-content [class*="reservation"][class*="header"] > *,
+  #tab-content [class*="reservation"][class*="nav"] > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  #tab-content .schedule-top button,
+  #tab-content .schedule-header button,
+  #tab-content .calendar-header button,
+  #tab-content .calendar-nav button,
+  #tab-content .reservation-header button,
+  #tab-content .reservation-nav button,
+  #tab-content [class*="schedule"][class*="header"] button,
+  #tab-content [class*="calendar"][class*="header"] button,
+  #tab-content [class*="calendar"][class*="nav"] button,
+  #tab-content [class*="reservation"][class*="header"] button,
+  #tab-content [class*="reservation"][class*="nav"] button {
+    flex: 0 1 auto !important;
+    min-width: 72px !important;
+    max-width: calc(50vw - 24px) !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 0 12px !important;
+    border-radius: 16px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  #tab-content .month-title,
+  #tab-content .current-month,
+  #tab-content .calendar-title,
+  #tab-content [class*="month"][class*="title"],
+  #tab-content [class*="calendar"][class*="title"] {
+    flex: 1 1 128px !important;
+    min-width: 128px !important;
+    max-width: 100% !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 0 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 16px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 16px !important;
+    line-height: 1 !important;
+  }
+
+  #tab-content .selected-date-panel,
+  #tab-content .selected-schedule-panel,
+  #tab-content .daily-schedule-panel,
+  #tab-content .schedule-detail,
+  #tab-content .schedule-panel,
+  #tab-content .schedule-content,
+  #tab-content .schedule-list,
+  #tab-content .daily-list,
+  #tab-content [class*="selected"][class*="schedule"],
+  #tab-content [class*="daily"][class*="schedule"],
+  #tab-content [class*="schedule"][class*="list"],
+  #tab-content [class*="schedule"][class*="content"] {
+    display: block !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  #tab-content .selected-date-panel .day-events,
+  #tab-content .selected-date-panel .calendar-events,
+  #tab-content .selected-date-panel .calendar-item,
+  #tab-content .selected-date-panel .schedule-item,
+  #tab-content .selected-date-panel .event-item,
+  #tab-content .selected-schedule-panel .day-events,
+  #tab-content .selected-schedule-panel .calendar-events,
+  #tab-content .selected-schedule-panel .calendar-item,
+  #tab-content .selected-schedule-panel .schedule-item,
+  #tab-content .selected-schedule-panel .event-item,
+  #tab-content .daily-schedule-panel .day-events,
+  #tab-content .daily-schedule-panel .calendar-events,
+  #tab-content .daily-schedule-panel .calendar-item,
+  #tab-content .daily-schedule-panel .schedule-item,
+  #tab-content .daily-schedule-panel .event-item,
+  #tab-content .schedule-list .calendar-item,
+  #tab-content .schedule-list .schedule-item,
+  #tab-content .schedule-list .event-item,
+  #tab-content [class*="selected"][class*="schedule"] .calendar-item,
+  #tab-content [class*="selected"][class*="schedule"] .schedule-item,
+  #tab-content [class*="daily"][class*="schedule"] .calendar-item,
+  #tab-content [class*="daily"][class*="schedule"] .schedule-item {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  #tab-content .calendar-grid .calendar-item,
+  #tab-content .calendar-grid .calendar-events,
+  #tab-content .calendar-grid .day-events,
+  #tab-content .schedule-calendar-grid .calendar-item,
+  #tab-content .schedule-calendar-grid .calendar-events,
+  #tab-content .schedule-calendar-grid .day-events,
+  #tab-content .month-grid .calendar-item,
+  #tab-content .month-grid .calendar-events,
+  #tab-content .month-grid .day-events,
+  #tab-content [class*="calendar"][class*="grid"] .calendar-item,
+  #tab-content [class*="calendar"][class*="grid"] .calendar-events,
+  #tab-content [class*="calendar"][class*="grid"] .day-events,
+  #tab-content [class*="month"][class*="grid"] .calendar-item,
+  #tab-content [class*="month"][class*="grid"] .calendar-events,
+  #tab-content [class*="month"][class*="grid"] .day-events {
+    display: none !important;
+  }
+
+  #tab-content .reservation-page,
+  #tab-content .reservation-panel,
+  #tab-content .reservation-content,
+  #tab-content .reservation-timetable,
+  #tab-content .time-table,
+  #tab-content [class*="reservation"][class*="page"],
+  #tab-content [class*="reservation"][class*="panel"],
+  #tab-content [class*="reservation"][class*="content"],
+  #tab-content [class*="time"][class*="table"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #tab-content textarea:focus,
+  #tab-content input:focus,
+  #tab-content select:focus {
+    font-size: 16px !important;
+  }
+}
+
+
+
+@media (max-width: 768px) {
+  /* 선택 날짜/일정 목록 영역은 잘리지 않게 유지 */
+  #tab-content .selected-date-panel,
+  #tab-content .selected-schedule-panel,
+  #tab-content .daily-schedule-panel,
+  #tab-content .schedule-list,
+  #tab-content [class*="selected"][class*="schedule"],
+  #tab-content [class*="daily"][class*="schedule"] {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* 달력 안의 작은 일정 표시는 숨기되, 아래 실제 일정 카드 안 내용은 다시 표시 */
+  #tab-content .selected-date-panel .schedule-item [class*="desc"],
+  #tab-content .selected-date-panel .schedule-item [class*="detail"],
+  #tab-content .selected-date-panel .schedule-item [class*="content"],
+  #tab-content .selected-date-panel .schedule-item [class*="body"],
+  #tab-content .selected-date-panel .schedule-item [class*="memo"],
+  #tab-content .selected-date-panel .schedule-item [class*="note"],
+  #tab-content .selected-date-panel .schedule-item [class*="text"],
+  #tab-content .selected-date-panel .event-item [class*="desc"],
+  #tab-content .selected-date-panel .event-item [class*="detail"],
+  #tab-content .selected-date-panel .event-item [class*="content"],
+  #tab-content .selected-date-panel .event-item [class*="body"],
+  #tab-content .selected-date-panel .event-item [class*="memo"],
+  #tab-content .selected-date-panel .event-item [class*="note"],
+  #tab-content .selected-date-panel .event-item [class*="text"],
+  #tab-content .selected-schedule-panel .schedule-item [class*="desc"],
+  #tab-content .selected-schedule-panel .schedule-item [class*="detail"],
+  #tab-content .selected-schedule-panel .schedule-item [class*="content"],
+  #tab-content .selected-schedule-panel .schedule-item [class*="body"],
+  #tab-content .selected-schedule-panel .schedule-item [class*="memo"],
+  #tab-content .selected-schedule-panel .schedule-item [class*="note"],
+  #tab-content .selected-schedule-panel .schedule-item [class*="text"],
+  #tab-content .daily-schedule-panel .schedule-item [class*="desc"],
+  #tab-content .daily-schedule-panel .schedule-item [class*="detail"],
+  #tab-content .daily-schedule-panel .schedule-item [class*="content"],
+  #tab-content .daily-schedule-panel .schedule-item [class*="body"],
+  #tab-content .daily-schedule-panel .schedule-item [class*="memo"],
+  #tab-content .daily-schedule-panel .schedule-item [class*="note"],
+  #tab-content .daily-schedule-panel .schedule-item [class*="text"],
+  #tab-content .schedule-list .schedule-item [class*="desc"],
+  #tab-content .schedule-list .schedule-item [class*="detail"],
+  #tab-content .schedule-list .schedule-item [class*="content"],
+  #tab-content .schedule-list .schedule-item [class*="body"],
+  #tab-content .schedule-list .schedule-item [class*="memo"],
+  #tab-content .schedule-list .schedule-item [class*="note"],
+  #tab-content .schedule-list .schedule-item [class*="text"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    white-space: pre-wrap !important;
+    -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
+  }
+
+  /* 펼쳐진 카드의 상세 내용 기본 여백 */
+  #tab-content .schedule-item [class*="desc"],
+  #tab-content .schedule-item [class*="detail"],
+  #tab-content .schedule-item [class*="memo"],
+  #tab-content .schedule-item [class*="note"] {
+    margin-top: 10px !important;
+    color: #334155 !important;
+    font-size: 15px !important;
+    line-height: 1.55 !important;
+  }
+}
+
+
+
+@media (max-width: 768px) {
+  #tab-content .selected-date-panel .schedule-item,
+  #tab-content .selected-schedule-panel .schedule-item,
+  #tab-content .daily-schedule-panel .schedule-item,
+  #tab-content .schedule-list .schedule-item,
+  #tab-content .selected-date-panel .event-item,
+  #tab-content .selected-schedule-panel .event-item,
+  #tab-content .daily-schedule-panel .event-item {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  #tab-content .mobile-schedule-action-row {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 10px !important;
+    width: 100% !important;
+    margin: 18px 0 0 !important;
+    padding: 12px 12px 0 !important;
+    box-sizing: border-box !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.22) !important;
+  }
+
+  #tab-content .mobile-schedule-action-row button {
+    position: static !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 auto !important;
+    min-width: 72px !important;
+    min-height: 42px !important;
+    height: 42px !important;
+    margin: 0 !important;
+    padding: 0 16px !important;
+    border-radius: 14px !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+    transform: none !important;
+  }
+
+  #tab-content .selected-date-panel .schedule-item button,
+  #tab-content .selected-schedule-panel .schedule-item button,
+  #tab-content .daily-schedule-panel .schedule-item button,
+  #tab-content .schedule-list .schedule-item button,
+  #tab-content .selected-date-panel .event-item button,
+  #tab-content .selected-schedule-panel .event-item button,
+  #tab-content .daily-schedule-panel .event-item button {
+    max-width: 100% !important;
+  }
+}
