@@ -1450,6 +1450,51 @@ input[type="radio"]{
   }
 }
 
+
+
+/* =========================================================
+   M-1 Patch: Mobile Browser Horizontal Swipe Guard
+   - 브라우저 뒤로/앞으로 스와이프 및 본문/iframe 좌우 밀림 방지
+   - 사이드바 drawer만 좌우 이동 허용
+========================================================= */
+@media (max-width: 768px) {
+  html,
+  body,
+  .app,
+  .layout,
+  .portal-main {
+    overscroll-behavior: none;
+    overscroll-behavior-x: none;
+    max-width: 100vw;
+    touch-action: pan-y;
+  }
+
+  .mobile-edge-swipe-zone {
+    width: 28px;
+    touch-action: none;
+  }
+
+  .mobile-drawer-backdrop {
+    touch-action: none;
+  }
+
+  .sidenav {
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+    overscroll-behavior-x: none;
+  }
+
+  body.mobile-drawer-open #portalFrame,
+  body.mobile-drawer-dragging #portalFrame {
+    pointer-events: none;
+  }
+
+  #portalFrame {
+    overscroll-behavior: none;
+    overscroll-behavior-x: none;
+  }
+}
+
 @media (max-width: 420px) {
   .portal-main {
     padding: 6px;
@@ -3051,8 +3096,9 @@ input[type="radio"]{
 
     els.mobileEdgeSwipeZone?.addEventListener('touchstart', function (event) {
       if (document.body.classList.contains('mobile-drawer-open')) return;
+      event.preventDefault();
       startMobileDrawerGesture(event, 'open');
-    }, { passive: true });
+    }, { passive: false });
 
     els.portalSideNav?.addEventListener('touchstart', function (event) {
       if (!document.body.classList.contains('mobile-drawer-open')) return;
@@ -3077,8 +3123,11 @@ input[type="radio"]{
       }
 
       if (mobileDrawerMode === 'close') {
-        if (dx >= 0) return;
-        event.preventDefault();
+        if (Math.abs(dx) > 6) event.preventDefault();
+        if (dx >= 0) {
+          setMobileDrawerDrag(0);
+          return;
+        }
         setMobileDrawerDrag(Math.max(MOBILE_DRAWER_CLOSED_X, dx));
       }
     }, { passive: false });
@@ -3094,6 +3143,37 @@ input[type="radio"]{
       if (!mobileDrawerTracking) return;
       finishMobileDrawerDrag(document.body.classList.contains('mobile-drawer-open'));
     }, { passive: true });
+
+    let mobilePageGuardStartX = 0;
+    let mobilePageGuardStartY = 0;
+
+    document.addEventListener('touchstart', function (event) {
+      if (!isMobilePortalView() || !event.touches || !event.touches.length) return;
+      const touch = event.touches[0];
+      mobilePageGuardStartX = touch.clientX;
+      mobilePageGuardStartY = touch.clientY;
+    }, { passive: true, capture: true });
+
+    document.addEventListener('touchmove', function (event) {
+      if (!isMobilePortalView() || !event.touches || !event.touches.length) return;
+      const touch = event.touches[0];
+      const dx = touch.clientX - mobilePageGuardStartX;
+      const dy = touch.clientY - mobilePageGuardStartY;
+      const isHorizontalSwipe = Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.15;
+      const drawerIsOpen = document.body.classList.contains('mobile-drawer-open');
+      const drawerIsDragging = document.body.classList.contains('mobile-drawer-dragging');
+      const fromLeftBrowserEdge = mobilePageGuardStartX <= 28;
+      const fromRightBrowserEdge = mobilePageGuardStartX >= (window.innerWidth - 28);
+
+      if ((drawerIsOpen || drawerIsDragging) && isHorizontalSwipe) {
+        event.preventDefault();
+        return;
+      }
+
+      if ((fromLeftBrowserEdge || fromRightBrowserEdge) && isHorizontalSwipe) {
+        event.preventDefault();
+      }
+    }, { passive: false, capture: true });
 
     logoutBtn?.addEventListener('click', function (event) {
       event.preventDefault();
