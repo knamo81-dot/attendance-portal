@@ -635,6 +635,9 @@
       border-top: 1px solid #e2e8f0;
       padding: 12px;
       background: var(--common-card, #fff);
+      display: block !important;
+      height: auto !important;
+      min-height: 0 !important;
     }
     .schedule-desc {
       font-size: 13px;
@@ -642,6 +645,8 @@
       line-height: 1.6;
       white-space: pre-wrap;
       margin-bottom: 12px;
+      height: auto !important;
+      min-height: 0 !important;
     }
     .tips {
       font-size: 13px;
@@ -2315,3 +2320,21 @@ input[type="radio"],
   border: 1px solid var(--common-alert-success-line, #bbf7d0);
 }
 
+
+/* ===== mobile schedule detail compact fix ===== */
+.schedule-body > *{
+  flex:0 0 auto !important;
+}
+
+.schedule-actions,
+.schedule-action-row,
+.mobile-schedule-action-row{
+  margin-top:12px !important;
+  display:flex !important;
+  justify-content:flex-end !important;
+  gap:10px !important;
+}
+
+.schedule-body .small-btn{
+  align-self:flex-end !important;
+}
