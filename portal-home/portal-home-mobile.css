@@ -903,3 +903,153 @@
     margin: 0 !important;
   }
 }
+
+
+
+/* =========================================================
+   Mobile Final Two Issues Fix v16
+   1) 이전달 / 년월 / 다음달 모바일 화면 안 배치
+   2) 일정 펼침 박스를 내용 높이에 맞게 축소
+   - JS 수정 없음
+========================================================= */
+@media (max-width: 768px) {
+  /* ===== 1. 월 이동 버튼 영역: 화면 안에 3분할로 배치 ===== */
+  #tab-content .calendar-side-fixed > div:first-child,
+  #tab-content .calendar-side-fixed > div:first-child > div:last-child {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  #tab-content .calendar-side-fixed > div:first-child {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    overflow: visible !important;
+  }
+
+  #tab-content .calendar-side-fixed > div:first-child > div:first-child {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  #tab-content .calendar-side-fixed > div:first-child > div:last-child {
+    flex: 1 1 100% !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr) !important;
+    gap: 8px !important;
+    overflow: visible !important;
+  }
+
+  #tab-content #calendar-prev-month,
+  #tab-content #calendar-current-month,
+  #tab-content #calendar-next-month {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    padding: 0 6px !important;
+    font-size: 13px !important;
+    border-radius: 14px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ===== 2. 일정 펼침 박스: 내용 높이만큼만 사용 ===== */
+  #tab-content .schedule-list .schedule-item {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+  }
+
+  #tab-content .schedule-list .schedule-item .schedule-body {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 10px 12px 10px !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  #tab-content .schedule-list .schedule-item .schedule-desc {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 15px !important;
+    line-height: 1.45 !important;
+    white-space: pre-wrap !important;
+    overflow: visible !important;
+  }
+
+  #tab-content .schedule-list .schedule-item .schedule-desc:empty {
+    display: none !important;
+  }
+
+  /* 기존 memo-actions가 상세본문 내부에 있을 때: 내용 바로 아래 붙임 */
+  #tab-content .schedule-list .schedule-item .schedule-body > .memo-actions {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 8px 0 0 0 !important;
+    padding: 8px 0 0 0 !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.18) !important;
+    box-sizing: border-box !important;
+  }
+
+  #tab-content .schedule-list .schedule-item .schedule-body > .memo-actions button {
+    height: 40px !important;
+    min-height: 40px !important;
+    margin: 0 !important;
+  }
+
+  /* 모바일 JS가 만든 action-row가 있어도 과한 여백 제거 */
+  #tab-content .schedule-list .schedule-item > .mobile-schedule-action-row,
+  #tab-content .schedule-list .schedule-item .schedule-body > .mobile-schedule-action-row {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 8px 0 0 0 !important;
+    padding: 8px 12px 0 !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.18) !important;
+    box-sizing: border-box !important;
+  }
+
+  #tab-content .schedule-list .schedule-item > .mobile-schedule-action-row button,
+  #tab-content .schedule-list .schedule-item .schedule-body > .mobile-schedule-action-row button {
+    height: 40px !important;
+    min-height: 40px !important;
+    margin: 0 !important;
+  }
+}
+
+@media (max-width: 390px) {
+  #tab-content #calendar-prev-month,
+  #tab-content #calendar-current-month,
+  #tab-content #calendar-next-month {
+    font-size: 12px !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+  }
+}
