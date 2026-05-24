@@ -558,10 +558,10 @@
 
 
 /* =========================================================
-   Mobile Memo Fullscreen Modal Improve v21
+   Mobile Memo Fullscreen Modal Improve v22
    - 메모 클릭 시 전체화면 내용 수정 모달
-   - 제목 중복 제거, 본문 textarea 중심
-   - 닫기 버튼이 있으므로 취소 대신 수정 버튼 사용
+   - textarea 활성화
+   - 삭제/수정/저장 버튼 동작 보정
 ========================================================= */
 (function () {
   'use strict';
@@ -687,6 +687,7 @@
 
     currentCard = card;
     var m = ensureModal();
+
     var title = getMemoTitle(card);
     var content = getMemoContent(card);
     var meta = getMemoMeta(card);
@@ -710,8 +711,12 @@
     if (!modal) return;
     var ta = modal.querySelector('.mobile-memo-modal-textarea');
     if (ta) {
+      ta.disabled = false;
+      ta.readOnly = false;
       ta.focus();
-      ta.setSelectionRange(ta.value.length, ta.value.length);
+      try {
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+      } catch (_) {}
     }
   }
 
@@ -789,4 +794,3 @@
     if (!isMobile()) closeModal();
   });
 })();
-
