@@ -1179,41 +1179,58 @@
 
 
 /* =========================================================
-   Mobile Memo List Clip Fix v23
-   - 메모 리스트 카드가 중간에서 잘리는 문제만 우선 해결
-   - 흰색 외곽 박스는 화면 안에서 크게 사용
-   - 초록 메모 카드 높이 강제 제거
-   - 내부 스크롤은 메모 리스트 영역에서만 동작
+   Mobile Memo Layout Clean Fix v24
+   - v23의 고정 높이/overflow hidden 충돌 제거
+   - 흰색 카드 전체는 화면 하단까지 사용
+   - 메모 리스트 영역만 내부 스크롤
+   - 초록 메모카드 중간 잘림 방지
+   - 모달 textarea/버튼은 숨김 규칙에서 제외
 ========================================================= */
 @media (max-width: 768px) {
-  /* 메모 화면에서는 전체 가로/세로 넘침 방지 */
-  body.mobile-memo-list-mode {
+  /* 메모 화면에서 본문은 화면 안에서 안정화 */
+  body.mobile-memo-list-mode,
+  body.mobile-memo-list-mode .app,
+  body.mobile-memo-list-mode .layout,
+  body.mobile-memo-list-mode #home-page.home-root {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
     overflow: hidden !important;
+    box-sizing: border-box !important;
   }
 
   body.mobile-memo-list-mode #tab-content,
   body.mobile-memo-list-mode #tab-content.content {
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
+    height: calc(100dvh - 150px) !important;
+    max-height: calc(100dvh - 150px) !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
   }
 
-  /* 흰색 메모 카드 영역을 모바일 화면에서 크게 확보 */
+  /* 메모 필터는 위에 고정 높이만 사용 */
+  body.mobile-memo-list-mode .mobile-memo-filter-bar {
+    flex: 0 0 auto !important;
+    position: relative !important;
+    top: auto !important;
+    z-index: 5 !important;
+    margin-bottom: 10px !important;
+  }
+
+  /* 메모를 담는 흰색 카드: 화면 남은 높이를 모두 사용 */
   body.mobile-memo-list-mode #tab-content > .card,
   body.mobile-memo-list-mode #tab-content .card:has(.memo-card),
   body.mobile-memo-list-mode #tab-content .card:has(.memo-item),
   body.mobile-memo-list-mode #tab-content .card:has([data-memo-id]),
   body.mobile-memo-list-mode #tab-content .card:has([data-note-id]) {
-    height: calc(100dvh - 250px) !important;
+    height: calc(100% - 76px) !important;
     min-height: 0 !important;
-    max-height: calc(100dvh - 250px) !important;
+    max-height: calc(100% - 76px) !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
     box-sizing: border-box !important;
   }
 
-  /* 제목/버튼 영역은 고정 */
+  /* 카드 상단 제목/버튼 영역은 스크롤하지 않음 */
   body.mobile-memo-list-mode #tab-content .card:has(.memo-card) > *:first-child,
   body.mobile-memo-list-mode #tab-content .card:has(.memo-item) > *:first-child,
   body.mobile-memo-list-mode #tab-content .card:has([data-memo-id]) > *:first-child,
@@ -1221,7 +1238,7 @@
     flex: 0 0 auto !important;
   }
 
-  /* 실제 메모 리스트가 들어있는 영역만 스크롤 */
+  /* 실제 메모 리스트 영역만 스크롤 */
   body.mobile-memo-list-mode #tab-content .memo-list,
   body.mobile-memo-list-mode #tab-content .memo-panel,
   body.mobile-memo-list-mode #tab-content [class*="memo"][class*="list"],
@@ -1232,24 +1249,24 @@
   body.mobile-memo-list-mode #tab-content .card:has([data-note-id]) > *:last-child {
     flex: 1 1 auto !important;
     min-height: 0 !important;
-    height: auto !important;
+    height: 100% !important;
     max-height: none !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch !important;
     overscroll-behavior: contain !important;
-    padding-bottom: 18px !important;
     box-sizing: border-box !important;
+    padding-bottom: 18px !important;
   }
 
-  /* 메모 카드 자체는 내용이 잘리지 않도록 auto 높이 */
+  /* 메모 카드 자체는 잘리지 않게 auto */
   body.mobile-memo-list-mode .memo-card,
   body.mobile-memo-list-mode .memo-item,
   body.mobile-memo-list-mode .note-card,
   body.mobile-memo-list-mode [data-memo-id],
   body.mobile-memo-list-mode [data-note-id] {
     height: auto !important;
-    min-height: 132px !important;
+    min-height: 136px !important;
     max-height: none !important;
     overflow: visible !important;
     margin: 10px 0 !important;
@@ -1258,15 +1275,14 @@
     box-sizing: border-box !important;
   }
 
-  /* 기존 mobile-open 강제 높이도 제거 */
   body.mobile-memo-list-mode .mobile-memo-open {
     height: auto !important;
-    min-height: 132px !important;
+    min-height: 136px !important;
     max-height: none !important;
     overflow: visible !important;
   }
 
-  /* 열기 텍스트 겹침 방지 */
+  /* 열기 글자 겹침 방지 */
   body.mobile-memo-list-mode .memo-card::after,
   body.mobile-memo-list-mode .memo-item::after,
   body.mobile-memo-list-mode .note-card::after,
@@ -1276,10 +1292,10 @@
     top: 14px !important;
     right: 14px !important;
     z-index: 3 !important;
-    background: rgba(255,255,255,.82) !important;
+    background: rgba(255, 255, 255, .86) !important;
   }
 
-  /* 카드 안 기존 버튼/액션이 카드 오른쪽에서 겹쳐 보이지 않도록 */
+  /* 리스트 안 기존 버튼만 숨김. 모달 버튼은 제외 */
   body.mobile-memo-list-mode #tab-content .memo-card button:not(.mobile-memo-filter-chip),
   body.mobile-memo-list-mode #tab-content .memo-item button:not(.mobile-memo-filter-chip),
   body.mobile-memo-list-mode #tab-content .note-card button:not(.mobile-memo-filter-chip),
@@ -1287,5 +1303,20 @@
   body.mobile-memo-list-mode #tab-content [data-note-id] button:not(.mobile-memo-filter-chip) {
     opacity: 0 !important;
     pointer-events: none !important;
+  }
+
+  /* 모달은 위 숨김 규칙과 무관하게 항상 사용 가능 */
+  body.mobile-memo-list-mode .mobile-memo-fullscreen-modal,
+  body.mobile-memo-list-mode .mobile-memo-fullscreen-modal * {
+    pointer-events: auto !important;
+  }
+
+  body.mobile-memo-list-mode .mobile-memo-fullscreen-modal textarea,
+  body.mobile-memo-list-mode .mobile-memo-fullscreen-modal input,
+  body.mobile-memo-list-mode .mobile-memo-fullscreen-modal button {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
   }
 }
