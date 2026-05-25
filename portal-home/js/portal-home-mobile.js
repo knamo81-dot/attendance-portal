@@ -1475,129 +1475,77 @@
 
 
 
+
+
+
 /* =========================================================
-   Mobile Memo Filter Minimal Click Fix JS v46
-   - v45 제거 후 색상 필터 클릭만 최소 보강
-   - 기존 디자인/레이아웃/PC 자유배치 복구 로직은 건드리지 않음
-   - 기존 mobileMemoFilterController가 있으면 그 컨트롤러를 우선 사용
+   Mobile Memo Filter Final Restore JS v47
 ========================================================= */
-(function () {
+(function(){
   'use strict';
 
-  var MOBILE_QUERY = '(max-width: 768px)';
-  var CARD_SELECTOR = '.memo-note, .memo-card, .memo-item, .note-card, [data-memo-id], [data-note-id]';
-  var touchStartX = 0;
-  var touchStartY = 0;
-  var moved = false;
+  if(window.__mobileMemoFilterFinalRestore) return;
+  window.__mobileMemoFilterFinalRestore = true;
 
-  function isMobile() {
-    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
+  var MOBILE_QUERY='(max-width:768px)';
+
+  function isMobile(){
+    return window.matchMedia(MOBILE_QUERY).matches;
   }
 
-  function getCards() {
-    return Array.prototype.slice.call(document.querySelectorAll(CARD_SELECTOR)).filter(function (card) {
-      if (!card) return false;
-      if (card.closest && card.closest('.mobile-memo-filter-bar')) return false;
-      if (card.closest && card.closest('.mobile-memo-unified-modal')) return false;
-      return true;
+  function getCards(){
+    return Array.prototype.slice.call(
+      document.querySelectorAll('.memo-note,.memo-card,.memo-item,.note-card,[data-note-id],[data-memo-id]')
+    ).filter(function(card){
+      return !card.closest('.mobile-memo-filter-bar');
     });
   }
 
-  function detectColor(card) {
-    var raw = [
-      card.dataset ? (card.dataset.mobileMemoColor || card.dataset.color || card.dataset.memoColor || card.dataset.noteColor || card.dataset.bg || '') : '',
-      card.className || '',
-      card.getAttribute('style') || '',
-      window.getComputedStyle ? window.getComputedStyle(card).backgroundColor : ''
-    ].join(' ').toLowerCase();
+  function detectColor(card){
+    var raw = (
+      (card.className || '') + ' ' +
+      (card.getAttribute('style') || '') + ' ' +
+      (card.dataset.mobileMemoColor || '') + ' ' +
+      (window.getComputedStyle(card).backgroundColor || '')
+    ).toLowerCase();
 
-    if (raw.indexOf('blue') >= 0 || raw.indexOf('60a5fa') >= 0 || raw.indexOf('bfdbfe') >= 0 || raw.indexOf('dbeafe') >= 0 || raw.indexOf('219, 234') >= 0) return 'blue';
-    if (raw.indexOf('green') >= 0 || raw.indexOf('4ade80') >= 0 || raw.indexOf('bbf7d0') >= 0 || raw.indexOf('dcfce7') >= 0 || raw.indexOf('220, 252') >= 0) return 'green';
-    if (raw.indexOf('pink') >= 0 || raw.indexOf('rose') >= 0 || raw.indexOf('f9a8d4') >= 0 || raw.indexOf('fecdd3') >= 0 || raw.indexOf('fce7f3') >= 0 || raw.indexOf('252, 231') >= 0) return 'pink';
-    if (raw.indexOf('purple') >= 0 || raw.indexOf('violet') >= 0 || raw.indexOf('c084fc') >= 0 || raw.indexOf('e9d5ff') >= 0 || raw.indexOf('f3e8ff') >= 0 || raw.indexOf('243, 232') >= 0) return 'purple';
-    if (raw.indexOf('yellow') >= 0 || raw.indexOf('facc15') >= 0 || raw.indexOf('fde68a') >= 0 || raw.indexOf('fef3c7') >= 0 || raw.indexOf('255, 243') >= 0) return 'yellow';
-    if (raw.indexOf('white') >= 0 || raw.indexOf('ffffff') >= 0 || raw.indexOf('255, 255, 255') >= 0) return 'white';
+    if(raw.indexOf('blue')>-1 || raw.indexOf('219, 234')>-1) return 'blue';
+    if(raw.indexOf('green')>-1 || raw.indexOf('220, 252')>-1) return 'green';
+    if(raw.indexOf('pink')>-1 || raw.indexOf('252, 231')>-1) return 'pink';
+    if(raw.indexOf('purple')>-1 || raw.indexOf('243, 232')>-1) return 'purple';
+    if(raw.indexOf('yellow')>-1 || raw.indexOf('255, 243')>-1) return 'yellow';
 
-    return card.dataset && card.dataset.mobileMemoColor ? card.dataset.mobileMemoColor : 'white';
+    return 'white';
   }
 
-  function fallbackApply(filterKey) {
-    filterKey = filterKey || 'all';
+  function applyFilter(filter){
+    getCards().forEach(function(card){
 
-    Array.prototype.slice.call(document.querySelectorAll('.mobile-memo-filter-bar button[data-filter], .mobile-memo-filter-chip')).forEach(function (btn) {
-      var key = btn.dataset ? btn.dataset.filter : '';
-      btn.classList.toggle('is-active', key === filterKey);
-      btn.setAttribute('aria-selected', key === filterKey ? 'true' : 'false');
-    });
-
-    getCards().forEach(function (card) {
       var color = detectColor(card);
-      if (card.dataset) card.dataset.mobileMemoColor = color;
 
-      var hidden = filterKey !== 'all' && color !== filterKey;
+      var hidden = filter !== 'all' && color !== filter;
+
       card.classList.toggle('mobile-memo-hidden', hidden);
-      card.hidden = hidden;
-      card.style.display = hidden ? 'none' : '';
     });
 
-    if (window.mobileMemoViewportWidthClamp && typeof window.mobileMemoViewportWidthClamp.schedule === 'function') {
-      window.mobileMemoViewportWidthClamp.schedule();
-    }
-    if (window.mobileMemoLayoutReset && typeof window.mobileMemoLayoutReset.schedule === 'function') {
-      window.mobileMemoLayoutReset.schedule();
-    }
+    document.querySelectorAll('.mobile-memo-filter-chip').forEach(function(btn){
+      btn.classList.toggle('is-active', btn.dataset.filter === filter);
+    });
   }
 
-  function applyFilter(filterKey) {
-    if (window.mobileMemoFilterController && typeof window.mobileMemoFilterController.apply === 'function') {
-      window.mobileMemoFilterController.apply(filterKey);
-      setTimeout(function () { fallbackApply(filterKey); }, 60);
-      setTimeout(function () { fallbackApply(filterKey); }, 180);
-      return;
-    }
+  document.addEventListener('click', function(e){
 
-    fallbackApply(filterKey);
-  }
+    if(!isMobile()) return;
 
-  document.addEventListener('touchstart', function (event) {
-    if (!isMobile()) return;
-    if (!event.target.closest || !event.target.closest('.mobile-memo-filter-bar')) return;
-    if (!event.touches || event.touches.length !== 1) return;
+    var btn = e.target.closest('.mobile-memo-filter-chip');
 
-    touchStartX = event.touches[0].clientX;
-    touchStartY = event.touches[0].clientY;
-    moved = false;
-  }, { passive: true });
+    if(!btn) return;
 
-  document.addEventListener('touchmove', function (event) {
-    if (!isMobile()) return;
-    if (!event.target.closest || !event.target.closest('.mobile-memo-filter-bar')) return;
-    if (!event.touches || event.touches.length !== 1) return;
+    e.preventDefault();
+    e.stopPropagation();
 
-    var dx = Math.abs(event.touches[0].clientX - touchStartX);
-    var dy = Math.abs(event.touches[0].clientY - touchStartY);
-    if (dx > 12 || dy > 12) moved = true;
-  }, { passive: true });
+    applyFilter(btn.dataset.filter || 'all');
 
-  document.addEventListener('click', function (event) {
-    if (!isMobile()) return;
-
-    var btn = event.target.closest && event.target.closest('.mobile-memo-filter-bar button[data-filter], .mobile-memo-filter-chip');
-    if (!btn || !btn.dataset || !btn.dataset.filter) return;
-
-    if (moved) {
-      moved = false;
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    applyFilter(btn.dataset.filter);
   }, true);
 
-  window.mobileMemoFilterMinimalFix = {
-    apply: applyFilter,
-    fallbackApply: fallbackApply
-  };
 })();
