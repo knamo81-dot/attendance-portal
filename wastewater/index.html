@@ -1779,6 +1779,39 @@ tr.over-row td {
   }
 }
 
+
+/* =========================================================
+   Mobile Date Input Width Recovery Patch v1
+   - 줌 방지(16px)는 유지
+   - 날짜/수거일 input 폭이 카드 밖으로 늘어나는 문제 복구
+========================================================= */
+@media (max-width:720px){
+
+  input[type="date"],
+  .input[type="date"]{
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
+    display:block !important;
+    flex:1 1 auto !important;
+    overflow:hidden !important;
+    font-size:16px !important;
+  }
+
+  .field,
+  .field > div,
+  .type-box,
+  .form-card,
+  .main-grid > *,
+  .tab-panel.active{
+    min-width:0 !important;
+    max-width:100% !important;
+    overflow-x:hidden !important;
+    box-sizing:border-box !important;
+  }
+}
+
 </style>
 </head>
 <body>
