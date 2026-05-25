@@ -315,10 +315,21 @@
       card.dataset.mobileMemoColor = color;
 
       const shouldHide = activeFilter !== 'all' && color !== activeFilter;
+
       card.classList.toggle('mobile-memo-hidden', shouldHide);
-      card.hidden = shouldHide;
-      card.style.display = shouldHide ? 'none' : '';
-      if (shouldHide) card.classList.remove('mobile-memo-open');
+
+      if (shouldHide) {
+        card.hidden = true;
+        card.style.setProperty('display', 'none', 'important');
+        card.style.setProperty('visibility', 'hidden', 'important');
+        card.style.setProperty('opacity', '0', 'important');
+        card.classList.remove('mobile-memo-open');
+      } else {
+        card.hidden = false;
+        card.style.removeProperty('display');
+        card.style.removeProperty('visibility');
+        card.style.removeProperty('opacity');
+      }
     });
   }
 
