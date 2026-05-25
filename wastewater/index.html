@@ -1873,6 +1873,118 @@ tr.over-row td {
   }
 }
 
+
+/* =========================================================
+   Mobile Pickup/Ledger Table Readability Patch v1
+   - 수거내역/운영일지 테이블은 좌우 스크롤 전제로 가독성 우선
+   - 날짜/숫자/단위/업체명/확인서번호가 과도하게 줄바꿈되지 않도록 폭 복원
+   - 입력폼/KPI/버튼 compact 스타일은 유지
+========================================================= */
+@media (max-width:720px){
+
+  /* 수거내역 테이블 */
+  .preview-card .table-wrap,
+  .ledger-card .table-wrap{
+    width:100% !important;
+    max-width:100% !important;
+    overflow-x:auto !important;
+    overflow-y:visible !important;
+    -webkit-overflow-scrolling:touch !important;
+  }
+
+  .preview-card .table-wrap table{
+    width:max-content !important;
+    min-width:760px !important;
+    table-layout:auto !important;
+  }
+
+  .ledger-card .table-wrap table{
+    width:max-content !important;
+    min-width:1120px !important;
+    table-layout:auto !important;
+  }
+
+  .preview-card .table-wrap th,
+  .preview-card .table-wrap td,
+  .ledger-card .table-wrap th,
+  .ledger-card .table-wrap td{
+    padding:11px 14px !important;
+    font-size:14px !important;
+    line-height:1.45 !important;
+    vertical-align:middle !important;
+    white-space:nowrap !important;
+    word-break:keep-all !important;
+    overflow-wrap:normal !important;
+  }
+
+  .preview-card .table-wrap th,
+  .ledger-card .table-wrap th{
+    font-size:13px !important;
+    font-weight:900 !important;
+  }
+
+  /* 긴 설명/비고 컬럼만 적당히 줄바꿈 허용 */
+  .preview-card .table-wrap th:nth-child(3),
+  .preview-card .table-wrap td:nth-child(3){
+    min-width:180px !important;
+    white-space:normal !important;
+    word-break:keep-all !important;
+    overflow-wrap:break-word !important;
+  }
+
+  .preview-card .table-wrap th:nth-child(6),
+  .preview-card .table-wrap td:nth-child(6),
+  .ledger-card .table-wrap th.col-pickup,
+  .ledger-card .table-wrap td.col-pickup,
+  .ledger-card .table-wrap th.col-note,
+  .ledger-card .table-wrap td.col-note{
+    min-width:160px !important;
+    white-space:normal !important;
+    word-break:keep-all !important;
+    overflow-wrap:break-word !important;
+    text-align:left !important;
+  }
+
+  /* 날짜/번호/수치 컬럼 최소 폭 확보 */
+  .preview-card .table-wrap th:nth-child(1),
+  .preview-card .table-wrap td:nth-child(1){
+    min-width:104px !important;
+  }
+
+  .preview-card .table-wrap th:nth-child(4),
+  .preview-card .table-wrap td:nth-child(4){
+    min-width:150px !important;
+  }
+
+  .ledger-card .table-wrap th:nth-child(1),
+  .ledger-card .table-wrap td:nth-child(1){
+    min-width:104px !important;
+  }
+
+  .ledger-card .table-wrap th:nth-child(2),
+  .ledger-card .table-wrap td:nth-child(2),
+  .ledger-card .table-wrap th:nth-child(3),
+  .ledger-card .table-wrap td:nth-child(3),
+  .ledger-card .table-wrap th:nth-child(4),
+  .ledger-card .table-wrap td:nth-child(4),
+  .ledger-card .table-wrap th:nth-child(6),
+  .ledger-card .table-wrap td:nth-child(6),
+  .ledger-card .table-wrap th:nth-child(7),
+  .ledger-card .table-wrap td:nth-child(7){
+    min-width:96px !important;
+  }
+
+  .ledger-card .table-wrap th:nth-child(8),
+  .ledger-card .table-wrap td:nth-child(8){
+    min-width:120px !important;
+  }
+
+  .ledger-card .table-wrap th:nth-child(9),
+  .ledger-card .table-wrap td:nth-child(9){
+    min-width:150px !important;
+  }
+}
+
 </style>
 </head>
 <body>
