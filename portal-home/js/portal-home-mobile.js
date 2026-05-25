@@ -558,18 +558,30 @@
 
 
 /* =========================================================
-   Mobile Memo Fullscreen Modal Improve v22
-   - 메모 클릭 시 전체화면 내용 수정 모달
-   - textarea 활성화
-   - 삭제/수정/저장 버튼 동작 보정
+   Mobile Unified Memo Modal v30
+   - 메모 클릭/메모 추가를 같은 fullscreen UI로 통일
+   - 기존 메모 추가 폼 이동 방식(v28/v29) 사용 안 함
+   - 추가 저장은 기존 숨은 입력폼에 값을 넣고 기존 추가 버튼 클릭
 ========================================================= */
 (function () {
   'use strict';
 
   var MOBILE_QUERY = '(max-width: 768px)';
   var CARD_SELECTOR = '.memo-card, .memo-item, .note-card, [data-memo-id], [data-note-id]';
+
   var modal = null;
+  var mode = 'add';
   var currentCard = null;
+  var hiddenAddForm = null;
+
+  var colorMap = [
+    { key: 'yellow', label: '노랑', color: '#facc15' },
+    { key: 'blue', label: '파랑', color: '#60a5fa' },
+    { key: 'green', label: '초록', color: '#4ade80' },
+    { key: 'pink', label: '분홍', color: '#f9a8d4' },
+    { key: 'purple', label: '보라', color: '#c084fc' },
+    { key: 'white', label: '흰색', color: '#e2e8f0' }
+  ];
 
   function isMobile() {
     return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
@@ -579,44 +591,50 @@
     return (el && (el.innerText || el.textContent) || '').trim();
   }
 
-  function q(card, selectors) {
+  function normText(el) {
+    return textOf(el).replace(/\s+/g, '');
+  }
+
+  function setNativeValue(el, value) {
+    if (!el) return;
+    el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function q(root, selectors) {
+    if (!root || !root.querySelector) return null;
     for (var i = 0; i < selectors.length; i++) {
-      var found = card.querySelector(selectors[i]);
+      var found = root.querySelector(selectors[i]);
       if (found) return found;
     }
     return null;
   }
 
-  function findButton(card, names) {
-    var buttons = Array.prototype.slice.call(card.querySelectorAll('button'));
+  function findButton(root, names) {
+    if (!root || !root.querySelectorAll) return null;
+    var buttons = Array.prototype.slice.call(root.querySelectorAll('button'));
     return buttons.find(function (btn) {
-      var t = textOf(btn).replace(/\s+/g, '');
-      return names.indexOf(t) >= 0;
+      return names.indexOf(normText(btn)) >= 0;
     }) || null;
   }
 
   function getMemoTitle(card) {
     var el = q(card, ['.memo-title', '.note-title', '[class*="title"]']);
     var txt = textOf(el);
-    if (txt && txt !== '상세보기' && txt !== '열기') return txt;
+    if (txt && txt !== '상세보기' && txt !== '열기' && txt !== '닫기') return txt;
 
     var lines = textOf(card).split('\n').map(function (v) { return v.trim(); }).filter(Boolean);
     lines = lines.filter(function (v) {
-      return v !== '상세보기' && v !== '열기' && v !== '닫기' && v !== '수정' && v !== '삭제';
+      return ['상세보기', '열기', '닫기', '수정', '삭제', '저장'].indexOf(v) < 0;
     });
     return lines[0] || '메모';
   }
 
   function getMemoContent(card) {
     var el = q(card, [
-      '.memo-content',
-      '.memo-body',
-      '.memo-text',
-      '.memo-detail',
-      '.note-content',
-      '.note-body',
-      '.note-text',
-      '.note-detail',
+      '.memo-content', '.memo-body', '.memo-text', '.memo-detail',
+      '.note-content', '.note-body', '.note-text', '.note-detail',
       'textarea'
     ]);
 
@@ -627,20 +645,15 @@
 
     var title = getMemoTitle(card);
     var lines = textOf(card).split('\n').map(function (v) { return v.trim(); }).filter(Boolean);
-    var filtered = lines.filter(function (v) {
+
+    return lines.filter(function (v) {
       return v !== title &&
-        v !== '상세보기' &&
-        v !== '열기' &&
-        v !== '닫기' &&
-        v !== '수정' &&
-        v !== '삭제' &&
+        ['상세보기', '열기', '닫기', '수정', '삭제', '저장'].indexOf(v) < 0 &&
         !/^#?메모$/.test(v) &&
-        !/^최근 메모$/.test(v) &&
+        !/^최근메모$/.test(v.replace(/\s+/g, '')) &&
         !/^작성:/.test(v) &&
         !/^수정:/.test(v);
-    });
-
-    return filtered.join('\n').trim();
+    }).join('\n').trim();
   }
 
   function getMemoMeta(card) {
@@ -650,54 +663,139 @@
     }).join('\n');
   }
 
+  function detectColor(card) {
+    if (!card) return 'yellow';
+    var raw = [
+      card.dataset ? (card.dataset.color || card.dataset.memoColor || card.dataset.noteColor || card.dataset.mobileMemoColor || '') : '',
+      card.className || '',
+      card.getAttribute('style') || '',
+      window.getComputedStyle(card).backgroundColor || ''
+    ].join(' ').toLowerCase();
+
+    if (raw.indexOf('blue') >= 0 || raw.indexOf('60a5fa') >= 0 || raw.indexOf('191, 219, 254') >= 0) return 'blue';
+    if (raw.indexOf('green') >= 0 || raw.indexOf('4ade80') >= 0 || raw.indexOf('187, 247, 208') >= 0) return 'green';
+    if (raw.indexOf('pink') >= 0 || raw.indexOf('rose') >= 0 || raw.indexOf('f9a8d4') >= 0) return 'pink';
+    if (raw.indexOf('purple') >= 0 || raw.indexOf('violet') >= 0 || raw.indexOf('c084fc') >= 0) return 'purple';
+    if (raw.indexOf('white') >= 0 || raw.indexOf('255, 255, 255') >= 0) return 'white';
+    return 'yellow';
+  }
+
   function ensureModal() {
     if (modal) return modal;
 
     modal = document.createElement('div');
-    modal.className = 'mobile-memo-fullscreen-modal';
+    modal.className = 'mobile-memo-unified-modal';
     modal.innerHTML = [
-      '<div class="mobile-memo-modal-header">',
-      '  <div class="mobile-memo-modal-title">메모</div>',
-      '  <button type="button" class="mobile-memo-modal-close">닫기</button>',
+      '<div class="mobile-memo-unified-header">',
+      '  <div class="mobile-memo-unified-title">메모</div>',
+      '  <button type="button" class="mobile-memo-unified-close">닫기</button>',
       '</div>',
-      '<div class="mobile-memo-modal-body">',
-      '  <div class="mobile-memo-modal-content-label">내용</div>',
-      '  <textarea class="mobile-memo-modal-textarea" placeholder="메모 내용을 입력하세요"></textarea>',
+      '<div class="mobile-memo-unified-body">',
+      '  <div class="mobile-memo-field mobile-memo-color-field">',
+      '    <div class="mobile-memo-field-title">색상 선택</div>',
+      '    <div class="mobile-memo-color-row"></div>',
+      '  </div>',
+      '  <div class="mobile-memo-field">',
+      '    <label>제목</label>',
+      '    <input class="mobile-memo-input mobile-memo-title-input" type="text" placeholder="제목을 입력하세요">',
+      '  </div>',
+      '  <div class="mobile-memo-field">',
+      '    <label>태그</label>',
+      '    <input class="mobile-memo-input mobile-memo-tag-input" type="text" placeholder="태그를 입력하세요">',
+      '  </div>',
+      '  <div class="mobile-memo-field">',
+      '    <label>이미지 업로드</label>',
+      '    <div class="mobile-memo-file-row">이미지는 기존 입력폼에서 처리됩니다</div>',
+      '  </div>',
+      '  <div class="mobile-memo-field">',
+      '    <label>내용</label>',
+      '    <textarea class="mobile-memo-textarea mobile-memo-content-input" placeholder="메모 내용을 입력하세요"></textarea>',
+      '  </div>',
+      '  <label class="mobile-memo-checkbox-row">',
+      '    <input class="mobile-memo-pin-input" type="checkbox">',
+      '    <span>상단 고정 메모로 추가</span>',
+      '  </label>',
       '  <div class="mobile-memo-modal-meta"></div>',
       '</div>',
-      '<div class="mobile-memo-modal-actions">',
-      '  <button type="button" class="mobile-memo-modal-delete">삭제</button>',
-      '  <button type="button" class="mobile-memo-modal-edit">수정</button>',
-      '  <button type="button" class="mobile-memo-modal-save">저장</button>',
+      '<div class="mobile-memo-unified-actions">',
+      '  <button type="button" class="mobile-memo-btn-delete">삭제</button>',
+      '  <button type="button" class="mobile-memo-btn-secondary">수정</button>',
+      '  <button type="button" class="mobile-memo-btn-primary">저장</button>',
       '</div>'
     ].join('');
 
     document.body.appendChild(modal);
 
-    modal.querySelector('.mobile-memo-modal-close').addEventListener('click', closeModal);
-    modal.querySelector('.mobile-memo-modal-delete').addEventListener('click', deleteMemo);
-    modal.querySelector('.mobile-memo-modal-edit').addEventListener('click', focusContent);
-    modal.querySelector('.mobile-memo-modal-save').addEventListener('click', saveModal);
+    modal.querySelector('.mobile-memo-unified-close').addEventListener('click', closeModal);
+    modal.querySelector('.mobile-memo-btn-secondary').addEventListener('click', function () {
+      var ta = modal.querySelector('.mobile-memo-content-input');
+      if (ta) {
+        ta.focus();
+        try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {}
+      }
+    });
+    modal.querySelector('.mobile-memo-btn-primary').addEventListener('click', saveModal);
+    modal.querySelector('.mobile-memo-btn-delete').addEventListener('click', deleteMemo);
+
+    var row = modal.querySelector('.mobile-memo-color-row');
+    colorMap.forEach(function (item) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mobile-memo-color-chip';
+      btn.dataset.color = item.key;
+      btn.style.setProperty('--mobile-memo-color', item.color);
+      btn.textContent = item.label;
+      btn.addEventListener('click', function () {
+        setColor(item.key);
+      });
+      row.appendChild(btn);
+    });
 
     return modal;
   }
 
-  function openModal(card) {
-    if (!card || !isMobile()) return;
+  function setColor(color) {
+    if (!modal) return;
+    modal.dataset.color = color;
+    Array.prototype.slice.call(modal.querySelectorAll('.mobile-memo-color-chip')).forEach(function (btn) {
+      btn.classList.toggle('is-active', btn.dataset.color === color);
+    });
+  }
 
-    currentCard = card;
+  function openModal(nextMode, card) {
+    if (!isMobile()) return;
+
+    mode = nextMode || 'add';
+    currentCard = card || null;
     var m = ensureModal();
 
-    var title = getMemoTitle(card);
-    var content = getMemoContent(card);
-    var meta = getMemoMeta(card);
+    var isAdd = mode === 'add';
+    var title = isAdd ? '' : getMemoTitle(card);
+    var content = isAdd ? '' : getMemoContent(card);
+    var meta = isAdd ? '' : getMemoMeta(card);
+    var color = isAdd ? 'yellow' : detectColor(card);
 
-    m.querySelector('.mobile-memo-modal-title').textContent = title || '메모';
-    m.querySelector('.mobile-memo-modal-textarea').value = content || '';
+    m.querySelector('.mobile-memo-unified-title').textContent = isAdd ? '메모 추가' : (title || '메모');
+    m.querySelector('.mobile-memo-title-input').value = title || '';
+    m.querySelector('.mobile-memo-tag-input').value = '';
+    m.querySelector('.mobile-memo-content-input').value = content || '';
+    m.querySelector('.mobile-memo-pin-input').checked = false;
     m.querySelector('.mobile-memo-modal-meta').textContent = meta || '';
+    m.querySelector('.mobile-memo-btn-delete').style.display = isAdd ? 'none' : '';
+    m.querySelector('.mobile-memo-btn-secondary').textContent = isAdd ? '취소' : '수정';
+    m.querySelector('.mobile-memo-btn-primary').textContent = isAdd ? '추가' : '저장';
+
+    setColor(color);
 
     m.classList.add('is-open');
     document.body.classList.add('mobile-memo-modal-lock');
+
+    setTimeout(function () {
+      var first = isAdd ? m.querySelector('.mobile-memo-title-input') : m.querySelector('.mobile-memo-content-input');
+      if (first) {
+        try { first.focus({ preventScroll: true }); } catch (_) {}
+      }
+    }, 120);
   }
 
   function closeModal() {
@@ -707,42 +805,92 @@
     currentCard = null;
   }
 
-  function focusContent() {
-    if (!modal) return;
-    var ta = modal.querySelector('.mobile-memo-modal-textarea');
-    if (ta) {
-      ta.disabled = false;
-      ta.readOnly = false;
-      ta.focus();
-      try {
-        ta.setSelectionRange(ta.value.length, ta.value.length);
-      } catch (_) {}
+  function findExistingAddForm() {
+    if (hiddenAddForm && document.documentElement.contains(hiddenAddForm)) return hiddenAddForm;
+
+    var candidates = Array.prototype.slice.call(document.querySelectorAll(
+      '#tab-content form, #tab-content .card, #tab-content [class*="form"], #tab-content [class*="memo"], #tab-content div'
+    )).filter(function (el) {
+      if (!el || !el.querySelectorAll) return false;
+      if (el.closest && el.closest('.mobile-memo-unified-modal')) return false;
+      var text = normText(el);
+      var hasTextarea = !!el.querySelector('textarea');
+      var hasInput = !!el.querySelector('input');
+      var hasAdd = Array.prototype.slice.call(el.querySelectorAll('button')).some(function (btn) {
+        return ['추가', '저장'].indexOf(normText(btn)) >= 0;
+      });
+      return hasTextarea && hasInput && hasAdd &&
+        (text.indexOf('메모추가') >= 0 || text.indexOf('색상선택') >= 0 || text.indexOf('이미지업로드') >= 0 || text.indexOf('상단고정') >= 0);
+    });
+
+    candidates.sort(function (a, b) {
+      return a.getBoundingClientRect().height - b.getBoundingClientRect().height;
+    });
+
+    hiddenAddForm = candidates[0] || null;
+    if (hiddenAddForm) hiddenAddForm.classList.add('mobile-memo-hidden-original-form');
+
+    return hiddenAddForm;
+  }
+
+  function fillAddFormAndSubmit() {
+    var form = findExistingAddForm();
+    if (!form || !modal) return false;
+
+    var title = modal.querySelector('.mobile-memo-title-input').value || '';
+    var tag = modal.querySelector('.mobile-memo-tag-input').value || '';
+    var content = modal.querySelector('.mobile-memo-content-input').value || '';
+    var pin = modal.querySelector('.mobile-memo-pin-input').checked;
+    var color = modal.dataset.color || 'yellow';
+
+    var textInputs = Array.prototype.slice.call(form.querySelectorAll('input[type="text"], input:not([type])'));
+    if (textInputs[0]) setNativeValue(textInputs[0], title);
+    if (textInputs[1]) setNativeValue(textInputs[1], tag);
+
+    var textarea = form.querySelector('textarea');
+    if (textarea) setNativeValue(textarea, content);
+
+    var select = form.querySelector('select');
+    if (select) setNativeValue(select, color);
+
+    var colorInput = form.querySelector('input[type="color"]');
+    if (colorInput) {
+      var found = colorMap.find(function (item) { return item.key === color; });
+      setNativeValue(colorInput, found ? found.color : '#facc15');
     }
+
+    var checkboxes = Array.prototype.slice.call(form.querySelectorAll('input[type="checkbox"]'));
+    if (checkboxes[0]) {
+      checkboxes[0].checked = !!pin;
+      checkboxes[0].dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    var addBtn = findButton(form, ['추가', '저장']);
+    if (addBtn) {
+      addBtn.click();
+      return true;
+    }
+
+    return false;
   }
 
-  function setNativeValue(el, value) {
-    if (!el) return;
-    el.value = value;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-
-  function saveModal() {
+  function saveExistingMemo() {
     if (!currentCard || !modal) return;
 
-    var content = modal.querySelector('.mobile-memo-modal-textarea').value || '';
+    var title = modal.querySelector('.mobile-memo-title-input').value || '';
+    var content = modal.querySelector('.mobile-memo-content-input').value || '';
 
+    var titleEl = q(currentCard, ['.memo-title', '.note-title', '[class*="title"]']);
     var contentEl = q(currentCard, [
-      '.memo-content',
-      '.memo-body',
-      '.memo-text',
-      '.memo-detail',
-      '.note-content',
-      '.note-body',
-      '.note-text',
-      '.note-detail',
+      '.memo-content', '.memo-body', '.memo-text', '.memo-detail',
+      '.note-content', '.note-body', '.note-text', '.note-detail',
       'textarea'
     ]);
+
+    if (titleEl) {
+      if (titleEl.tagName === 'INPUT' || titleEl.tagName === 'TEXTAREA') setNativeValue(titleEl, title);
+      else titleEl.textContent = title;
+    }
 
     if (contentEl) {
       if (contentEl.tagName === 'INPUT' || contentEl.tagName === 'TEXTAREA') setNativeValue(contentEl, content);
@@ -750,29 +898,49 @@
     }
 
     var editBtn = findButton(currentCard, ['수정', '저장', '수정저장']);
-    closeModal();
+    if (editBtn) setTimeout(function () { try { editBtn.click(); } catch (_) {} }, 30);
+  }
 
-    if (editBtn) {
-      setTimeout(function () {
-        try { editBtn.click(); } catch (_) {}
-      }, 30);
+  function saveModal() {
+    if (mode === 'add') {
+      var ok = fillAddFormAndSubmit();
+      if (ok) closeModal();
+      return;
     }
+
+    saveExistingMemo();
+    closeModal();
   }
 
   function deleteMemo() {
+    if (mode === 'add') {
+      closeModal();
+      return;
+    }
+
     if (!currentCard) return;
     var btn = findButton(currentCard, ['삭제', '휴지통']);
-    if (btn) {
-      closeModal();
-      setTimeout(function () {
-        try { btn.click(); } catch (_) {}
-      }, 30);
-    }
+    closeModal();
+    if (btn) setTimeout(function () { try { btn.click(); } catch (_) {} }, 30);
   }
 
   document.addEventListener('click', function (event) {
     if (!isMobile()) return;
-    if (event.target.closest('.mobile-memo-fullscreen-modal')) return;
+
+    if (event.target.closest('.mobile-memo-unified-modal')) return;
+
+    var control = event.target.closest('button, a, [role="button"]');
+    if (control && normText(control) === '메모추가') {
+      event.preventDefault();
+      event.stopPropagation();
+
+      /* 기존 폼이 필요한 경우를 대비해 원래 버튼 클릭으로 폼 생성 */
+      try { control.click(); } catch (_) {}
+      setTimeout(function () { openModal('add'); }, 80);
+      setTimeout(function () { if (!modal || !modal.classList.contains('is-open')) openModal('add'); }, 220);
+      return;
+    }
+
     if (event.target.closest('.mobile-memo-filter-bar')) return;
     if (event.target.closest('button, a, input, textarea, select, label')) return;
 
@@ -787,243 +955,10 @@
       item.classList.remove('mobile-memo-open');
     });
 
-    openModal(card);
+    openModal('edit', card);
   }, true);
 
   window.addEventListener('resize', function () {
     if (!isMobile()) closeModal();
-  });
-})();
-
-
-
-/* =========================================================
-   Mobile Memo Add Screen v29
-   - 모바일에서 메모 추가 폼을 body 직속 전체화면으로 이동
-   - 기존 추가/취소 버튼 로직 재사용
-========================================================= */
-(function () {
-  'use strict';
-
-  var MOBILE_QUERY = '(max-width: 768px)';
-  var activeForm = null;
-  var placeholder = null;
-  var originalParent = null;
-  var originalNext = null;
-
-  function isMobile() {
-    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
-  }
-
-  function normText(el) {
-    return (el && (el.innerText || el.textContent) || '').replace(/\s+/g, '').trim();
-  }
-
-  function isVisible(el) {
-    if (!el || !el.getBoundingClientRect) return false;
-    var rect = el.getBoundingClientRect();
-    var style = window.getComputedStyle(el);
-    return rect.width > 40 && rect.height > 40 && style.display !== 'none' && style.visibility !== 'hidden';
-  }
-
-  function hasMemoAddSignals(el) {
-    if (!el || !el.querySelectorAll || !isVisible(el)) return false;
-
-    var text = normText(el);
-    var hasTextarea = !!el.querySelector('textarea');
-    var hasFile = !!el.querySelector('input[type="file"]');
-    var hasInput = !!el.querySelector('input');
-    var hasCancel = Array.prototype.slice.call(el.querySelectorAll('button')).some(function (btn) {
-      return normText(btn) === '취소';
-    });
-    var hasAdd = Array.prototype.slice.call(el.querySelectorAll('button')).some(function (btn) {
-      var t = normText(btn);
-      return t === '추가' || t === '저장';
-    });
-
-    var keyword =
-      text.indexOf('메모추가') >= 0 ||
-      text.indexOf('색상선택') >= 0 ||
-      text.indexOf('이미지업로드') >= 0 ||
-      text.indexOf('상단고정') >= 0 ||
-      text.indexOf('파일없음') >= 0;
-
-    return hasTextarea && hasInput && hasAdd && (hasCancel || hasFile || keyword);
-  }
-
-  function scoreForm(el) {
-    var rect = el.getBoundingClientRect();
-    var text = normText(el);
-    var score = 0;
-    if (el.matches && el.matches('form')) score += 20;
-    if (text.indexOf('메모추가') >= 0) score += 20;
-    if (text.indexOf('색상선택') >= 0) score += 20;
-    if (text.indexOf('이미지업로드') >= 0) score += 15;
-    if (text.indexOf('상단고정') >= 0) score += 15;
-    if (el.querySelector('textarea')) score += 15;
-    if (el.querySelector('input[type="file"]')) score += 10;
-    score += Math.min(30, rect.height / 20);
-    return score;
-  }
-
-  function findMemoAddForm() {
-    var selectors = [
-      '#tab-content form',
-      '#tab-content .card',
-      '#tab-content .modal',
-      '#tab-content [class*="modal"]',
-      '#tab-content [class*="form"]',
-      '#tab-content [class*="memo"]',
-      '#tab-content div',
-      'body > form',
-      'body > .modal',
-      'body > [class*="modal"]',
-      'body > [class*="form"]'
-    ].join(',');
-
-    var candidates = Array.prototype.slice.call(document.querySelectorAll(selectors))
-      .filter(function (el) {
-        if (el.classList && el.classList.contains('mobile-memo-add-screen')) return false;
-        if (el.closest && el.closest('.mobile-memo-add-screen')) return false;
-        return hasMemoAddSignals(el);
-      });
-
-    if (!candidates.length) return null;
-
-    candidates.sort(function (a, b) {
-      return scoreForm(b) - scoreForm(a);
-    });
-
-    var chosen = candidates[0];
-
-    /* 너무 큰 wrapper가 잡히면 내부에서 더 정확한 폼 후보를 한 번 더 탐색 */
-    var inner = Array.prototype.slice.call(chosen.querySelectorAll('form, .card, [class*="form"], [class*="modal"], div'))
-      .filter(hasMemoAddSignals)
-      .sort(function (a, b) { return scoreForm(b) - scoreForm(a); })[0];
-
-    return inner || chosen;
-  }
-
-  function collectActionButtons(form) {
-    var buttons = Array.prototype.slice.call(form.querySelectorAll('button')).filter(function (btn) {
-      var t = normText(btn);
-      return t === '취소' || t === '추가' || t === '저장';
-    });
-
-    if (!buttons.length) return;
-
-    var row = form.querySelector(':scope > .mobile-memo-add-actions');
-    if (!row) {
-      row = document.createElement('div');
-      row.className = 'mobile-memo-add-actions';
-      form.appendChild(row);
-    }
-
-    buttons.forEach(function (btn) {
-      if (btn.parentElement !== row) row.appendChild(btn);
-    });
-  }
-
-  function wrapScrollableContent(form) {
-    if (form.querySelector(':scope > .mobile-memo-add-scroll')) return;
-
-    var scroll = document.createElement('div');
-    scroll.className = 'mobile-memo-add-scroll';
-
-    Array.prototype.slice.call(form.childNodes).forEach(function (node) {
-      if (node.nodeType === 1 && node.classList.contains('mobile-memo-add-actions')) return;
-      scroll.appendChild(node);
-    });
-
-    form.insertBefore(scroll, form.firstChild);
-  }
-
-  function openAddScreen() {
-    if (!isMobile() || activeForm) return;
-
-    var form = findMemoAddForm();
-    if (!form) return;
-
-    activeForm = form;
-    originalParent = form.parentNode;
-    originalNext = form.nextSibling;
-
-    placeholder = document.createComment('mobile memo add placeholder');
-    if (originalParent) originalParent.insertBefore(placeholder, form);
-
-    document.body.appendChild(form);
-    form.classList.add('mobile-memo-add-screen');
-    document.body.classList.add('mobile-memo-add-lock');
-
-    collectActionButtons(form);
-    wrapScrollableContent(form);
-
-    var first = form.querySelector('input[type="text"], input:not([type]), textarea');
-    if (first) {
-      setTimeout(function () {
-        try { first.focus({ preventScroll: true }); } catch (_) {}
-      }, 120);
-    }
-  }
-
-  function closeAddScreen() {
-    if (!activeForm) {
-      document.body.classList.remove('mobile-memo-add-lock');
-      return;
-    }
-
-    activeForm.classList.remove('mobile-memo-add-screen');
-
-    if (placeholder && placeholder.parentNode) {
-      placeholder.parentNode.insertBefore(activeForm, placeholder);
-      placeholder.parentNode.removeChild(placeholder);
-    } else if (originalParent) {
-      originalParent.insertBefore(activeForm, originalNext);
-    }
-
-    activeForm = null;
-    placeholder = null;
-    originalParent = null;
-    originalNext = null;
-    document.body.classList.remove('mobile-memo-add-lock');
-  }
-
-  function isMemoAddButton(el) {
-    if (!el || !el.matches || !el.matches('button, a, [role="button"]')) return false;
-    var t = normText(el);
-    return t === '메모추가';
-  }
-
-  document.addEventListener('click', function (event) {
-    if (!isMobile()) return;
-
-    var target = event.target && event.target.closest ? event.target.closest('button, a, [role="button"]') : null;
-
-    if (target && isMemoAddButton(target)) {
-      setTimeout(openAddScreen, 60);
-      setTimeout(openAddScreen, 180);
-      setTimeout(openAddScreen, 360);
-      return;
-    }
-
-    if (target && target.closest('.mobile-memo-add-screen')) {
-      var t = normText(target);
-      if (t === '취소' || t === '추가' || t === '저장') {
-        setTimeout(closeAddScreen, 180);
-      }
-    }
-  }, true);
-
-  var observer = new MutationObserver(function () {
-    if (!isMobile()) return;
-    if (activeForm) return;
-    var form = findMemoAddForm();
-    if (form) openAddScreen();
-  });
-
-  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
-
-  window.addEventListener('resize', function () {
-    if (!isMobile()) closeAddScreen();
   });
 })();
