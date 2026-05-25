@@ -1726,3 +1726,184 @@
     border-radius: 999px;
   }
 }
+
+
+
+/* =========================================================
+   Mobile Memo Board Horizontal Align Fix v38
+   - 메모 리스트 오른쪽 쏠림/우측 잘림 보정
+   - PC 자유배치 보드 기준을 모바일 리스트 기준으로 완전 초기화
+   - memo-board 내부 스크롤 유지
+========================================================= */
+@media (max-width: 768px) {
+  body.mobile-memo-list-mode,
+  body.mobile-memo-list-mode * {
+    box-sizing: border-box !important;
+  }
+
+  body.mobile-memo-list-mode #tab-content,
+  body.mobile-memo-list-mode #tab-content.content {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  body.mobile-memo-list-mode .memo-wrap,
+  body.mobile-memo-list-mode #tab-content .memo-wrap,
+  body.mobile-memo-list-mode #tab-content .card.memo-wrap {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+    translate: none !important;
+    float: none !important;
+    clear: both !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  body.mobile-memo-list-mode .memo-top {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  body.mobile-memo-list-mode #memo-board,
+  body.mobile-memo-list-mode .memo-board {
+    position: relative !important;
+    left: 0 !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    translate: none !important;
+    float: none !important;
+    clear: both !important;
+    flex: 1 1 auto !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+    box-sizing: border-box !important;
+  }
+
+  body.mobile-memo-list-mode #memo-board-notes,
+  body.mobile-memo-list-mode .memo-board-notes,
+  body.mobile-memo-list-mode #memo-board .memo-board-notes {
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    translate: none !important;
+    float: none !important;
+    clear: both !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+  }
+
+  body.mobile-memo-list-mode #memo-board .memo-note,
+  body.mobile-memo-list-mode #memo-board-notes .memo-note,
+  body.mobile-memo-list-mode .memo-board .memo-note,
+  body.mobile-memo-list-mode .memo-board-notes .memo-note,
+  body.mobile-memo-list-mode #memo-board .memo-card,
+  body.mobile-memo-list-mode #memo-board .memo-item,
+  body.mobile-memo-list-mode #memo-board .note-card,
+  body.mobile-memo-list-mode #memo-board [data-note-id],
+  body.mobile-memo-list-mode #memo-board [data-memo-id],
+  body.mobile-memo-list-mode .memo-wrap [data-note-id],
+  body.mobile-memo-list-mode .memo-wrap [data-memo-id] {
+    position: relative !important;
+    inset: auto !important;
+    left: 0 !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    translate: none !important;
+    float: none !important;
+    clear: both !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 132px !important;
+    max-height: none !important;
+    margin: 0 0 10px 0 !important;
+    padding: 16px 16px 14px !important;
+    border-radius: 20px !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  body.mobile-memo-list-mode #memo-board .memo-note *,
+  body.mobile-memo-list-mode #memo-board-notes .memo-note *,
+  body.mobile-memo-list-mode .memo-board .memo-note *,
+  body.mobile-memo-list-mode .memo-board-notes .memo-note * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  body.mobile-memo-list-mode .memo-note::after,
+  body.mobile-memo-list-mode .memo-card::after,
+  body.mobile-memo-list-mode .memo-item::after,
+  body.mobile-memo-list-mode .note-card::after,
+  body.mobile-memo-list-mode [data-note-id]::after,
+  body.mobile-memo-list-mode [data-memo-id]::after {
+    right: 12px !important;
+    max-width: calc(100% - 24px) !important;
+    box-sizing: border-box !important;
+  }
+
+  body.mobile-memo-list-mode .memo-board-bg,
+  body.mobile-memo-list-mode .memo-board-resize-handle,
+  body.mobile-memo-list-mode #memo-board-resize-handle {
+    display: none !important;
+  }
+}
+
+@media (max-width: 390px) {
+  body.mobile-memo-list-mode .memo-wrap,
+  body.mobile-memo-list-mode #tab-content .memo-wrap,
+  body.mobile-memo-list-mode #tab-content .card.memo-wrap {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+}
