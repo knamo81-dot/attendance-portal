@@ -1232,3 +1232,151 @@
     schedule: scheduleMultiApply
   };
 })();
+
+
+
+/* =========================================================
+   Mobile Memo Viewport Width Clamp JS v40
+   - 실제 #tab-content / home-root 폭을 측정해 memo-wrap 폭 CSS 변수 주입
+   - 메모 상단 버튼 줄 때문에 viewport보다 넓어지는 현상 방지
+   - 색상 필터 바도 같은 폭 기준 사용
+========================================================= */
+(function () {
+  'use strict';
+
+  var MOBILE_QUERY = '(max-width: 768px)';
+  var raf = 0;
+
+  function isMobile() {
+    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  function isMemoMode() {
+    return document.body && document.body.classList.contains('mobile-memo-list-mode');
+  }
+
+  function getRootWidth() {
+    var root = document.querySelector('#tab-content.content') ||
+               document.querySelector('#tab-content') ||
+               document.querySelector('#home-page.home-root') ||
+               document.body;
+
+    var rect = root.getBoundingClientRect();
+    var viewportW = window.innerWidth || document.documentElement.clientWidth || 0;
+    var width = Math.floor(Math.min(rect.width || viewportW, viewportW));
+
+    if (width >= viewportW - 1) width = viewportW - 20;
+    return Math.max(280, width);
+  }
+
+  function clampInlineWidth(el) {
+    if (!el) return;
+    el.style.maxWidth = '100%';
+    el.style.minWidth = '0';
+    el.style.left = '0px';
+    el.style.right = 'auto';
+    el.style.transform = 'none';
+    el.style.translate = 'none';
+    el.style.boxSizing = 'border-box';
+  }
+
+  function applyFilterScroll(bar, width) {
+    if (!bar) return;
+    bar.style.width = width + 'px';
+    bar.style.maxWidth = width + 'px';
+    bar.style.minWidth = '0';
+    bar.style.overflowX = 'auto';
+    bar.style.overflowY = 'hidden';
+    bar.style.whiteSpace = 'nowrap';
+    bar.style.display = 'flex';
+    bar.style.flexWrap = 'nowrap';
+    bar.style.boxSizing = 'border-box';
+    bar.style.webkitOverflowScrolling = 'touch';
+
+    Array.prototype.slice.call(bar.querySelectorAll('.mobile-memo-filter-chip, button')).forEach(function (chip) {
+      chip.style.flex = '0 0 auto';
+      chip.style.whiteSpace = 'nowrap';
+      chip.style.maxWidth = 'none';
+      chip.style.minWidth = 'max-content';
+    });
+  }
+
+  function applyWidthClamp() {
+    raf = 0;
+
+    if (!isMobile() || !isMemoMode()) {
+      document.documentElement.style.removeProperty('--mobile-memo-wrap-width');
+      return;
+    }
+
+    var width = getRootWidth();
+    document.documentElement.style.setProperty('--mobile-memo-wrap-width', width + 'px');
+
+    [
+      '.memo-wrap',
+      '#memo-board',
+      '.memo-board',
+      '#memo-board-notes',
+      '.memo-board-notes'
+    ].forEach(function (selector) {
+      Array.prototype.slice.call(document.querySelectorAll(selector)).forEach(clampInlineWidth);
+    });
+
+    Array.prototype.slice.call(document.querySelectorAll('#memo-board .memo-note, #memo-board-notes .memo-note, .memo-wrap [data-note-id], .memo-wrap [data-memo-id]')).forEach(function (note) {
+      clampInlineWidth(note);
+      note.style.width = '100%';
+    });
+
+    Array.prototype.slice.call(document.querySelectorAll('.mobile-memo-filter-bar')).forEach(function (bar) {
+      applyFilterScroll(bar, width);
+    });
+  }
+
+  function scheduleApply() {
+    if (raf) return;
+    raf = window.requestAnimationFrame(applyWidthClamp);
+  }
+
+  function scheduleMultiApply() {
+    scheduleApply();
+    setTimeout(scheduleApply, 80);
+    setTimeout(scheduleApply, 220);
+    setTimeout(scheduleApply, 520);
+  }
+
+  window.addEventListener('resize', scheduleMultiApply);
+  window.addEventListener('orientationchange', scheduleMultiApply);
+  document.addEventListener('DOMContentLoaded', scheduleMultiApply);
+  document.addEventListener('click', function () {
+    setTimeout(scheduleApply, 30);
+    setTimeout(scheduleApply, 160);
+  }, true);
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', scheduleMultiApply);
+    window.visualViewport.addEventListener('scroll', scheduleApply);
+  }
+
+  var observer = new MutationObserver(function () {
+    if (!isMobile()) return;
+    scheduleApply();
+  });
+
+  if (document.documentElement) {
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    });
+  }
+
+  setTimeout(scheduleMultiApply, 250);
+  setTimeout(scheduleMultiApply, 900);
+  setTimeout(scheduleMultiApply, 1600);
+
+  window.mobileMemoViewportWidthClamp = {
+    apply: applyWidthClamp,
+    schedule: scheduleMultiApply
+  };
+})();
