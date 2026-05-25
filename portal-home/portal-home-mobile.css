@@ -1565,26 +1565,26 @@
 
 
 /* =========================================================
-   Mobile Memo Inner Board Scroll Fix v36
-   - v35의 강제 tab-content 높이 고정 제거
-   - 메모 박스 오른쪽 쏠림 방지
-   - 흰색 memo-wrap 내부 memo-board만 스크롤
-   - 화면 하단까지 자연스럽게 사용
+   Mobile Memo Dynamic Height Fix v37
+   - memo-wrap 높이는 JS 실측값(--mobile-memo-wrap-height)을 우선 사용
+   - CSS calc 고정값 의존 최소화
+   - 흰색 메모 박스는 화면 하단까지 확장
+   - memo-board 내부만 스크롤
+   - 오른쪽 쏠림 방지
 ========================================================= */
 @media (max-width: 768px) {
   body.mobile-memo-list-mode {
     overflow-x: hidden !important;
   }
 
-  /* v35에서 문제였던 tab-content 강제 높이 제거 */
   body.mobile-memo-list-mode #tab-content,
   body.mobile-memo-list-mode #tab-content.content {
     display: block !important;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
-    min-height: 0 !important;
     height: auto !important;
+    min-height: 0 !important;
     max-height: none !important;
     overflow-x: hidden !important;
     overflow-y: visible !important;
@@ -1603,7 +1603,6 @@
     box-sizing: border-box !important;
   }
 
-  /* 흰색 메모 박스: 폭/중앙 정렬 복구 */
   body.mobile-memo-list-mode .memo-wrap,
   body.mobile-memo-list-mode #tab-content .memo-wrap,
   body.mobile-memo-list-mode #tab-content .card.memo-wrap {
@@ -1612,9 +1611,9 @@
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
-    min-height: calc(100dvh - 300px) !important;
-    height: calc(100dvh - 300px) !important;
-    max-height: calc(100dvh - 300px) !important;
+    height: var(--mobile-memo-wrap-height, auto) !important;
+    min-height: var(--mobile-memo-wrap-height, 420px) !important;
+    max-height: var(--mobile-memo-wrap-height, none) !important;
     margin-left: auto !important;
     margin-right: auto !important;
     overflow: hidden !important;
@@ -1631,7 +1630,6 @@
     box-sizing: border-box !important;
   }
 
-  /* 실제 스크롤 대상 */
   body.mobile-memo-list-mode #memo-board,
   body.mobile-memo-list-mode .memo-board {
     flex: 1 1 auto !important;
@@ -1668,7 +1666,6 @@
     box-sizing: border-box !important;
   }
 
-  /* PC 자유배치 제거 + 모바일 카드 폭 복구 */
   body.mobile-memo-list-mode #memo-board .memo-note,
   body.mobile-memo-list-mode #memo-board-notes .memo-note,
   body.mobile-memo-list-mode .memo-board .memo-note,
@@ -1701,14 +1698,6 @@
     cursor: pointer !important;
   }
 
-  body.mobile-memo-list-mode #memo-board .memo-note:last-child,
-  body.mobile-memo-list-mode #memo-board-notes .memo-note:last-child,
-  body.mobile-memo-list-mode .memo-board .memo-note:last-child,
-  body.mobile-memo-list-mode .memo-board-notes .memo-note:last-child {
-    margin-bottom: 0 !important;
-  }
-
-  /* PC용 배경/리사이즈 핸들은 모바일에서 숨김 */
   body.mobile-memo-list-mode #memo-board .memo-board-bg,
   body.mobile-memo-list-mode #memo-board .memo-board-resize-handle,
   body.mobile-memo-list-mode #memo-board-resize-handle {
@@ -1735,15 +1724,5 @@
   body.mobile-memo-list-mode .memo-board::-webkit-scrollbar-thumb {
     background: rgba(100, 116, 139, .38);
     border-radius: 999px;
-  }
-}
-
-@media (max-width: 390px) {
-  body.mobile-memo-list-mode .memo-wrap,
-  body.mobile-memo-list-mode #tab-content .memo-wrap,
-  body.mobile-memo-list-mode #tab-content .card.memo-wrap {
-    min-height: calc(100dvh - 286px) !important;
-    height: calc(100dvh - 286px) !important;
-    max-height: calc(100dvh - 286px) !important;
   }
 }
