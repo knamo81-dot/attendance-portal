@@ -1179,128 +1179,42 @@
 
 
 /* =========================================================
-   Mobile Memo Inner Scroll Fix v27
-   - 바깥 전체 스크롤 제거
-   - 흰색 메모 박스는 화면 하단까지 고정
-   - 흰색 박스 안 마지막 리스트 영역만 스크롤
-   - 초록 메모카드 중간 잘림 방지
-   - v26의 너무 넓은 *:has() 선택자 제거
+   Mobile Memo Add Screen Fix v28
+   - 모바일 메모 추가 폼을 전체화면 입력 화면처럼 표시
+   - 폼 가로 삐져나감 방지
+   - 기존 메모 리스트는 바깥 스크롤이 아닌 리스트 영역 중심
 ========================================================= */
 @media (max-width: 768px) {
-  /* 바깥 스크롤 제거 */
-  html,
+  /* 기본 메모 목록 안정화 */
   body.mobile-memo-list-mode {
-    height: 100% !important;
-    overflow: hidden !important;
+    overflow-x: hidden !important;
   }
 
-  body.mobile-memo-list-mode .app,
-  body.mobile-memo-list-mode .layout,
-  body.mobile-memo-list-mode #home-page.home-root {
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-    overflow: hidden !important;
-    box-sizing: border-box !important;
-  }
-
-  /* tab-content 안에서만 화면 구성 */
   body.mobile-memo-list-mode #tab-content,
   body.mobile-memo-list-mode #tab-content.content {
-    height: 100% !important;
-    max-height: 100% !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    display: flex !important;
-    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
     box-sizing: border-box !important;
   }
 
-  /* 상단 필터는 고정 높이 */
   body.mobile-memo-list-mode .mobile-memo-filter-bar {
     position: relative !important;
     top: auto !important;
-    flex: 0 0 auto !important;
-    min-height: 48px !important;
-    margin: 0 0 10px 0 !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
     z-index: 5 !important;
   }
 
-  /* 메모 흰색 박스: 남은 화면 전부 사용 */
-  body.mobile-memo-list-mode #tab-content > .card:has(.memo-card),
-  body.mobile-memo-list-mode #tab-content > .card:has(.memo-item),
-  body.mobile-memo-list-mode #tab-content > .card:has(.note-card),
-  body.mobile-memo-list-mode #tab-content > .card:has([data-memo-id]),
-  body.mobile-memo-list-mode #tab-content > .card:has([data-note-id]),
-  body.mobile-memo-list-mode #tab-content .card:has(.memo-card),
-  body.mobile-memo-list-mode #tab-content .card:has(.memo-item),
-  body.mobile-memo-list-mode #tab-content .card:has(.note-card),
-  body.mobile-memo-list-mode #tab-content .card:has([data-memo-id]),
-  body.mobile-memo-list-mode #tab-content .card:has([data-note-id]) {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    height: auto !important;
-    max-height: none !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-    box-sizing: border-box !important;
-  }
-
-  /* 흰색 박스 상단 제목/버튼 영역은 고정 */
-  body.mobile-memo-list-mode #tab-content .card:has(.memo-card) > *:first-child,
-  body.mobile-memo-list-mode #tab-content .card:has(.memo-item) > *:first-child,
-  body.mobile-memo-list-mode #tab-content .card:has(.note-card) > *:first-child,
-  body.mobile-memo-list-mode #tab-content .card:has([data-memo-id]) > *:first-child,
-  body.mobile-memo-list-mode #tab-content .card:has([data-note-id]) > *:first-child {
-    flex: 0 0 auto !important;
-  }
-
-  /* 실제 메모 리스트 영역만 내부 스크롤 */
-  body.mobile-memo-list-mode #tab-content .card:has(.memo-card) > *:last-child,
-  body.mobile-memo-list-mode #tab-content .card:has(.memo-item) > *:last-child,
-  body.mobile-memo-list-mode #tab-content .card:has(.note-card) > *:last-child,
-  body.mobile-memo-list-mode #tab-content .card:has([data-memo-id]) > *:last-child,
-  body.mobile-memo-list-mode #tab-content .card:has([data-note-id]) > *:last-child,
-  body.mobile-memo-list-mode #tab-content .memo-list,
-  body.mobile-memo-list-mode #tab-content .memo-panel,
-  body.mobile-memo-list-mode #tab-content [class*="memo"][class*="list"],
-  body.mobile-memo-list-mode #tab-content [class*="memo"][class*="panel"] {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    height: auto !important;
-    max-height: none !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    -webkit-overflow-scrolling: touch !important;
-    overscroll-behavior: contain !important;
-    box-sizing: border-box !important;
-    padding-bottom: 18px !important;
-  }
-
-  /* 메모 카드 자체는 스크롤 컨테이너가 아니며 잘리지 않음 */
   body.mobile-memo-list-mode #tab-content .memo-card,
   body.mobile-memo-list-mode #tab-content .memo-item,
   body.mobile-memo-list-mode #tab-content .note-card,
   body.mobile-memo-list-mode #tab-content [data-memo-id],
   body.mobile-memo-list-mode #tab-content [data-note-id] {
-    flex: 0 0 auto !important;
     height: auto !important;
-    min-height: 136px !important;
+    min-height: 132px !important;
     max-height: none !important;
     overflow: visible !important;
-    margin: 10px 0 !important;
-    padding: 18px 18px 16px !important;
-    border-radius: 20px !important;
     box-sizing: border-box !important;
-  }
-
-  body.mobile-memo-list-mode .mobile-memo-open {
-    height: auto !important;
-    min-height: 136px !important;
-    max-height: none !important;
-    overflow: visible !important;
   }
 
   body.mobile-memo-list-mode .memo-card::after,
@@ -1315,12 +1229,160 @@
     background: rgba(255, 255, 255, .86) !important;
   }
 
-  body.mobile-memo-list-mode #tab-content .memo-card button:not(.mobile-memo-filter-chip),
-  body.mobile-memo-list-mode #tab-content .memo-item button:not(.mobile-memo-filter-chip),
-  body.mobile-memo-list-mode #tab-content .note-card button:not(.mobile-memo-filter-chip),
-  body.mobile-memo-list-mode #tab-content [data-memo-id] button:not(.mobile-memo-filter-chip),
-  body.mobile-memo-list-mode #tab-content [data-note-id] button:not(.mobile-memo-filter-chip) {
-    opacity: 0 !important;
-    pointer-events: none !important;
+  /* 모바일 메모 추가 전체화면 */
+  .mobile-memo-add-screen {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 99998 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-width: 100vw !important;
+    max-height: 100dvh !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px calc(env(safe-area-inset-bottom, 0px) + 14px) !important;
+    border-radius: 0 !important;
+    background: #f7f8fb !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    box-sizing: border-box !important;
+    transform: none !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: auto !important;
+    bottom: auto !important;
+    display: block !important;
+  }
+
+  .mobile-memo-add-screen::before {
+    content: "메모 추가";
+    display: block;
+    margin: 2px 2px 14px;
+    color: #0f172a;
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1.2;
+  }
+
+  .mobile-memo-add-screen,
+  .mobile-memo-add-screen * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .mobile-memo-add-screen h1,
+  .mobile-memo-add-screen h2,
+  .mobile-memo-add-screen h3,
+  .mobile-memo-add-screen .title,
+  .mobile-memo-add-screen [class*="title"] {
+    font-size: 18px !important;
+    line-height: 1.3 !important;
+    margin: 0 0 12px !important;
+  }
+
+  .mobile-memo-add-screen label,
+  .mobile-memo-add-screen .label {
+    display: block !important;
+    margin: 12px 0 6px !important;
+    color: #334155 !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+  }
+
+  .mobile-memo-add-screen input[type="text"],
+  .mobile-memo-add-screen input[type="search"],
+  .mobile-memo-add-screen input[type="email"],
+  .mobile-memo-add-screen input:not([type]),
+  .mobile-memo-add-screen select,
+  .mobile-memo-add-screen textarea {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    border: 1px solid rgba(148, 163, 184, .42) !important;
+    border-radius: 14px !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+    outline: none !important;
+  }
+
+  .mobile-memo-add-screen input[type="text"],
+  .mobile-memo-add-screen input[type="search"],
+  .mobile-memo-add-screen input[type="email"],
+  .mobile-memo-add-screen input:not([type]),
+  .mobile-memo-add-screen select {
+    height: 46px !important;
+    min-height: 46px !important;
+    padding: 0 12px !important;
+  }
+
+  .mobile-memo-add-screen textarea {
+    min-height: 220px !important;
+    height: 32dvh !important;
+    padding: 12px !important;
+    resize: vertical !important;
+  }
+
+  .mobile-memo-add-screen input[type="file"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    font-size: 14px !important;
+  }
+
+  .mobile-memo-add-screen input[type="checkbox"] {
+    width: 18px !important;
+    height: 18px !important;
+    min-height: 18px !important;
+    vertical-align: middle !important;
+  }
+
+  .mobile-memo-add-screen button {
+    min-height: 44px !important;
+    border-radius: 14px !important;
+    font-size: 16px !important;
+    font-weight: 900 !important;
+    white-space: nowrap !important;
+  }
+
+  /* 색상 버튼/칩 */
+  .mobile-memo-add-screen input[type="color"],
+  .mobile-memo-add-screen [class*="color"] button,
+  .mobile-memo-add-screen [class*="color"] span,
+  .mobile-memo-add-screen [class*="swatch"] {
+    flex: 0 0 auto !important;
+  }
+
+  /* 하단 버튼 영역 */
+  .mobile-memo-add-screen .mobile-memo-add-actions {
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 10 !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin: 18px -14px calc(env(safe-area-inset-bottom, 0px) * -1) !important;
+    padding: 12px 14px calc(env(safe-area-inset-bottom, 0px) + 12px) !important;
+    background: rgba(247, 248, 251, .96) !important;
+    border-top: 1px solid rgba(148, 163, 184, .24) !important;
+    backdrop-filter: blur(10px) !important;
+  }
+
+  .mobile-memo-add-screen .mobile-memo-add-actions button {
+    flex: 0 0 auto !important;
+    min-width: 76px !important;
+    padding: 0 16px !important;
+  }
+
+  .mobile-memo-add-screen .mobile-memo-add-actions button:last-child {
+    background: #0f172a !important;
+    color: #ffffff !important;
+  }
+
+  body.mobile-memo-add-lock {
+    overflow: hidden !important;
   }
 }
