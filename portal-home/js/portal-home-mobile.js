@@ -267,8 +267,7 @@
     const hasTitle = card.querySelector('.memo-title, .note-title, [class*="title"]');
     if (hasTitle) return;
 
-    const text = (card.innerText || '').trim().split('
-').map(v => v.trim()).filter(Boolean)[0] || '제목 없는 메모';
+    const text = (card.innerText || '').trim().split('\n').map(v => v.trim()).filter(Boolean)[0] || '제목 없는 메모';
     const title = document.createElement('div');
     title.className = 'memo-title mobile-generated-title';
     title.textContent = text.length > 28 ? text.slice(0, 28) + '…' : text;
@@ -1471,5 +1470,234 @@
   window.mobileMemoViewportWidthClamp = {
     apply: applyWidthClamp,
     schedule: scheduleMultiApply
+  };
+})();
+
+
+
+/* =========================================================
+   Mobile Memo Final List Stabilizer JS v45
+   - v44 필터는 유지
+   - 모바일에서 PC 자유배치 inline style(left/top/transform/rotate/width)을 최종 정리
+   - 필터 변경 후에도 세로 리스트 정렬 재적용
+========================================================= */
+(function () {
+  'use strict';
+
+  var MOBILE_QUERY = '(max-width: 768px)';
+  var CARD_SELECTOR = '.memo-note, .memo-card, .memo-item, .note-card, [data-note-id], [data-memo-id]';
+  var BOARD_SELECTOR = '#memo-board, .memo-board, #memo-board-notes, .memo-board-notes';
+  var raf = 0;
+
+  function isMobile() {
+    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  function isMemoMode() {
+    return document.body && document.body.classList.contains('mobile-memo-list-mode');
+  }
+
+  function getViewportHeight() {
+    return (window.visualViewport && window.visualViewport.height) ||
+      window.innerHeight ||
+      document.documentElement.clientHeight ||
+      0;
+  }
+
+  function getRootWidth() {
+    var root = document.querySelector('#tab-content.content') ||
+      document.querySelector('#tab-content') ||
+      document.querySelector('#home-page.home-root') ||
+      document.body;
+
+    var rect = root.getBoundingClientRect();
+    var viewportW = window.innerWidth || document.documentElement.clientWidth || 0;
+    var width = Math.floor(Math.min(rect.width || viewportW, viewportW));
+
+    if (width >= viewportW - 1) width = viewportW - 20;
+    return Math.max(280, width);
+  }
+
+  function applyHeight() {
+    var wrap = document.querySelector('#tab-content .memo-wrap, #tab-content .card.memo-wrap, .memo-wrap');
+    if (!wrap || !isMobile() || !isMemoMode()) {
+      document.documentElement.style.removeProperty('--mobile-memo-wrap-height');
+      return;
+    }
+
+    var rect = wrap.getBoundingClientRect();
+    var viewportH = getViewportHeight();
+    var available = Math.floor(viewportH - rect.top - 12);
+    var minHeight = Math.min(540, Math.max(380, Math.floor(viewportH * 0.58)));
+    var maxHeight = Math.max(360, Math.floor(viewportH - 90));
+
+    if (!available || available < minHeight) available = minHeight;
+    if (available > maxHeight) available = maxHeight;
+
+    document.documentElement.style.setProperty('--mobile-memo-wrap-height', available + 'px');
+  }
+
+  function resetBoard(el) {
+    if (!el) return;
+
+    if (el.matches && (el.matches('#memo-board-notes') || el.matches('.memo-board-notes'))) {
+      el.style.position = 'static';
+      el.style.display = 'block';
+      el.style.left = 'auto';
+      el.style.top = 'auto';
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+      el.style.width = '100%';
+      el.style.maxWidth = '100%';
+      el.style.minWidth = '0';
+      el.style.height = 'auto';
+      el.style.maxHeight = 'none';
+      el.style.transform = 'none';
+      el.style.translate = 'none';
+      el.style.overflow = 'visible';
+      el.style.pointerEvents = 'auto';
+      el.style.boxSizing = 'border-box';
+      return;
+    }
+
+    el.style.position = 'relative';
+    el.style.display = 'block';
+    el.style.left = '0px';
+    el.style.top = 'auto';
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+    el.style.width = '100%';
+    el.style.maxWidth = '100%';
+    el.style.minWidth = '0';
+    el.style.transform = 'none';
+    el.style.translate = 'none';
+    el.style.overflowX = 'hidden';
+    el.style.overflowY = 'auto';
+    el.style.boxSizing = 'border-box';
+  }
+
+  function resetCard(card) {
+    if (!card) return;
+    if (card.closest && card.closest('.mobile-memo-filter-bar')) return;
+    if (card.closest && card.closest('.mobile-memo-unified-modal')) return;
+
+    var hidden = card.classList && card.classList.contains('mobile-memo-hidden');
+
+    card.style.position = 'relative';
+    card.style.display = hidden ? 'none' : 'block';
+    card.style.left = '0px';
+    card.style.top = 'auto';
+    card.style.right = 'auto';
+    card.style.bottom = 'auto';
+    card.style.width = '100%';
+    card.style.maxWidth = '100%';
+    card.style.minWidth = '0';
+    card.style.height = 'auto';
+    card.style.maxHeight = 'none';
+    card.style.transform = 'none';
+    card.style.translate = 'none';
+    card.style.rotate = '0deg';
+    card.style.margin = hidden ? '0' : '0 0 10px 0';
+    card.style.boxSizing = 'border-box';
+
+    if (card.hidden && !hidden) card.hidden = false;
+  }
+
+  function applyFilterBarWidth() {
+    Array.prototype.slice.call(document.querySelectorAll('.mobile-memo-filter-bar')).forEach(function (bar) {
+      bar.style.width = '100%';
+      bar.style.maxWidth = '100%';
+      bar.style.minWidth = '0';
+      bar.style.display = 'flex';
+      bar.style.flexWrap = 'nowrap';
+      bar.style.overflowX = 'auto';
+      bar.style.overflowY = 'hidden';
+      bar.style.whiteSpace = 'nowrap';
+      bar.style.boxSizing = 'border-box';
+      bar.style.webkitOverflowScrolling = 'touch';
+
+      Array.prototype.slice.call(bar.querySelectorAll('.mobile-memo-filter-chip, button[data-filter]')).forEach(function (chip) {
+        chip.style.flex = '0 0 auto';
+        chip.style.whiteSpace = 'nowrap';
+        chip.style.maxWidth = 'none';
+        chip.style.minWidth = 'max-content';
+      });
+    });
+  }
+
+  function stabilize() {
+    raf = 0;
+
+    if (!isMobile() || !isMemoMode()) return;
+
+    var width = getRootWidth();
+    document.documentElement.style.setProperty('--mobile-memo-wrap-width', width + 'px');
+
+    Array.prototype.slice.call(document.querySelectorAll('#tab-content .memo-wrap, #tab-content .card.memo-wrap, .memo-wrap')).forEach(function (wrap) {
+      wrap.style.width = '100%';
+      wrap.style.maxWidth = '100%';
+      wrap.style.minWidth = '0';
+      wrap.style.left = 'auto';
+      wrap.style.right = 'auto';
+      wrap.style.transform = 'none';
+      wrap.style.translate = 'none';
+      wrap.style.overflow = 'hidden';
+      wrap.style.boxSizing = 'border-box';
+    });
+
+    Array.prototype.slice.call(document.querySelectorAll(BOARD_SELECTOR)).forEach(resetBoard);
+    Array.prototype.slice.call(document.querySelectorAll(CARD_SELECTOR)).forEach(resetCard);
+
+    applyFilterBarWidth();
+    applyHeight();
+  }
+
+  function schedule() {
+    if (raf) return;
+    raf = window.requestAnimationFrame(stabilize);
+  }
+
+  function scheduleMulti() {
+    schedule();
+    setTimeout(schedule, 80);
+    setTimeout(schedule, 220);
+    setTimeout(schedule, 520);
+  }
+
+  document.addEventListener('DOMContentLoaded', scheduleMulti);
+  window.addEventListener('resize', scheduleMulti);
+  window.addEventListener('orientationchange', scheduleMulti);
+  document.addEventListener('click', function () {
+    setTimeout(schedule, 20);
+    setTimeout(schedule, 140);
+    setTimeout(schedule, 320);
+  }, true);
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', scheduleMulti);
+    window.visualViewport.addEventListener('scroll', schedule);
+  }
+
+  var observer = new MutationObserver(function () {
+    if (!isMobile()) return;
+    schedule();
+  });
+
+  if (document.documentElement) {
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style', 'hidden', 'data-mobile-memo-color']
+    });
+  }
+
+  setTimeout(scheduleMulti, 250);
+  setTimeout(scheduleMulti, 900);
+  setTimeout(scheduleMulti, 1600);
+
+  window.mobileMemoFinalListStabilizer = {
+    apply: stabilize,
+    schedule: scheduleMulti
   };
 })();
