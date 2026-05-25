@@ -1985,6 +1985,123 @@ tr.over-row td {
   }
 }
 
+
+/* =========================================================
+   Mobile Related Docs Card List v1
+   - 관련서류는 모바일에서 테이블 대신 카드형 목록으로 표시
+   - PC는 기존 테이블 유지
+========================================================= */
+.related-doc-mobile-list{
+  display:none;
+}
+
+@media (max-width:720px){
+  .related-doc-table-wrap{
+    display:none !important;
+  }
+
+  .related-doc-mobile-list{
+    display:flex !important;
+    flex-direction:column;
+    gap:12px;
+    width:100%;
+    max-width:100%;
+  }
+
+  .related-doc-mobile-empty{
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:#fff;
+    padding:20px;
+    color:var(--muted);
+    text-align:center;
+    font-weight:800;
+  }
+
+  .related-doc-mobile-card{
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:#fff;
+    padding:16px;
+    box-shadow:0 5px 14px rgba(15,23,42,.05);
+  }
+
+  .related-doc-mobile-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+  }
+
+  .related-doc-mobile-no{
+    font-size:12px;
+    font-weight:900;
+    color:var(--muted);
+  }
+
+  .related-doc-mobile-badges{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+
+  .related-doc-mobile-title{
+    width:100%;
+    border:0;
+    background:transparent;
+    padding:0;
+    margin:0 0 12px;
+    color:var(--navy);
+    font-size:16px;
+    font-weight:900;
+    line-height:1.45;
+    text-align:left;
+    white-space:normal;
+    word-break:keep-all;
+    overflow-wrap:break-word;
+    cursor:pointer;
+  }
+
+  .related-doc-mobile-meta{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:6px;
+    padding:12px;
+    border-radius:14px;
+    background:#f8fafc;
+    color:#344054;
+    font-size:13px;
+    line-height:1.45;
+  }
+
+  .related-doc-mobile-meta div{
+    display:flex;
+    gap:8px;
+    min-width:0;
+    word-break:break-all;
+  }
+
+  .related-doc-mobile-meta span{
+    flex:0 0 52px;
+    color:var(--muted);
+    font-weight:900;
+  }
+
+  .related-doc-mobile-actions{
+    display:flex;
+    gap:8px;
+    justify-content:flex-end;
+    margin-top:12px;
+  }
+
+  .related-doc-mobile-actions .small-btn{
+    min-height:34px;
+    padding:0 12px;
+  }
+}
+
 </style>
 </head>
 <body>
