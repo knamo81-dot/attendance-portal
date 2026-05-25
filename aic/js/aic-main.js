@@ -1627,6 +1627,26 @@
     ));
   }
 
+  function isMobileAicView() {
+    return window.matchMedia && window.matchMedia('(max-width: 760px)').matches;
+  }
+
+  function syncMobileAicView() {
+    if (!els.root) return;
+
+    var hasOpenRoom = state.openSlots && state.openSlots.length > 0;
+
+    els.root.classList.toggle('aic-mobile-list-view', isMobileAicView() && !hasOpenRoom);
+    els.root.classList.toggle('aic-mobile-chat-view', isMobileAicView() && hasOpenRoom);
+  }
+
+  function backToMobileRoomList() {
+    if (!isMobileAicView()) return;
+    state.openSlots = [];
+    state.activeSlotIndex = 0;
+    render(false);
+  }
+
   function ensureSlots(fill) {
     state.visibleSlotCount = normalizeSlotCount();
 
@@ -1727,6 +1747,7 @@
   }
 
   function renderRoomList() {
+    syncMobileAicView();
     if (!els.roomList) return;
 
     if (!state.rooms.length) {
@@ -1833,6 +1854,7 @@
       html += [
         '<section class="aic-chat-window', i === state.activeSlotIndex ? ' active' : '', '" data-slot-index="', i, '">',
         '  <div class="aic-chat-head">',
+        '    <button class="aic-mobile-back-btn" data-mobile-back="1" type="button">← 목록</button>',
         '    <div class="aic-chat-title-box">',
         '      <div class="aic-chat-title">', esc(room.name), '</div>',
         '      <div class="aic-chat-meta">', esc(room.members), ' · ', i + 1, tr('aic.slotNumberSuffix', '번 슬롯') + '</div>',
@@ -1881,6 +1903,13 @@
         control.addEventListener(eventName, function (event) {
           event.stopPropagation();
         });
+      });
+    });
+
+    Array.from(els.slots.querySelectorAll('[data-mobile-back]')).forEach(function (btn) {
+      btn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        backToMobileRoomList();
       });
     });
 
@@ -2517,6 +2546,7 @@
     renderSlotButtons();
     renderRoomList();
     renderChatSlots();
+    syncMobileAicView();
   }
 
   function scheduleRender() {
