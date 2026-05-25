@@ -1798,3 +1798,76 @@
     padding: 10px !important;
   }
 }
+
+
+
+/* =========================================================
+   Mobile Memo Filter Horizontal Scroll Fix v41
+   - 메모 카드/박스 폭은 그대로 유지
+   - 색상 필터 버튼 줄만 좌우 스크롤 가능
+   - 화면 밖 버튼도 스와이프로 선택 가능
+========================================================= */
+@media (max-width: 768px) {
+  body.mobile-memo-list-mode .mobile-memo-filter-bar,
+  #tab-content .mobile-memo-filter-bar,
+  .mobile-memo-filter-bar {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+
+    margin: 0 0 8px 0 !important;
+    padding: 10px 2px 10px !important;
+
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-x: contain !important;
+    touch-action: pan-x !important;
+    scrollbar-width: none !important;
+  }
+
+  body.mobile-memo-list-mode .mobile-memo-filter-bar::-webkit-scrollbar,
+  #tab-content .mobile-memo-filter-bar::-webkit-scrollbar,
+  .mobile-memo-filter-bar::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  body.mobile-memo-list-mode .mobile-memo-filter-chip,
+  #tab-content .mobile-memo-filter-chip,
+  .mobile-memo-filter-chip {
+    flex: 0 0 auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    width: auto !important;
+    min-width: max-content !important;
+    max-width: none !important;
+
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 필터 줄이 부모 폭을 넓히지 않도록 차단 */
+  body.mobile-memo-list-mode #tab-content,
+  body.mobile-memo-list-mode #tab-content.content,
+  body.mobile-memo-list-mode .memo-wrap,
+  body.mobile-memo-list-mode .memo-board {
+    overflow-x: hidden !important;
+  }
+}
