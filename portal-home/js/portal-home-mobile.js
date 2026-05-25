@@ -1045,15 +1045,20 @@
 
 
 /* =========================================================
-   Mobile Memo Dynamic Height JS v37
-   - 실제 viewport와 memo-wrap 위치를 측정해 남은 높이를 CSS 변수로 주입
-   - iPhone/Android 주소창 변화, 회전, 렌더링 후 재측정 대응
+   Mobile Memo Layout Reset JS v39
+   - 모바일에서 PC 자유배치 inline style(left/top/width/transform 등)을 직접 초기화
+   - PC 화면에서는 원래 inline style을 data 속성에 보관 후 복구
+   - CSS만으로 안 잡히는 오른쪽 쏠림/좌표 잔상 방지
 ========================================================= */
 (function () {
   'use strict';
 
   var MOBILE_QUERY = '(max-width: 768px)';
+  var NOTE_SELECTOR = '#memo-board .memo-note, #memo-board-notes .memo-note, .memo-board .memo-note, .memo-board-notes .memo-note, [data-note-id], [data-memo-id]';
+  var BOARD_SELECTOR = '#memo-board, .memo-board, #memo-board-notes, .memo-board-notes';
+
   var raf = 0;
+  var resizeTimer = 0;
 
   function isMobile() {
     return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
@@ -1064,45 +1069,95 @@
   }
 
   function getViewportHeight() {
-    if (window.visualViewport && window.visualViewport.height) {
-      return window.visualViewport.height;
+    return (window.visualViewport && window.visualViewport.height) || window.innerHeight || document.documentElement.clientHeight || 0;
+  }
+
+  function saveOriginalInline(el) {
+    if (!el || el.dataset.mobileMemoOriginalStyleSaved === '1') return;
+    el.dataset.mobileMemoOriginalStyleSaved = '1';
+    el.dataset.mobileMemoOriginalStyle = el.getAttribute('style') || '';
+  }
+
+  function restoreOriginalInline(el) {
+    if (!el || el.dataset.mobileMemoOriginalStyleSaved !== '1') return;
+    var original = el.dataset.mobileMemoOriginalStyle || '';
+    if (original) el.setAttribute('style', original);
+    else el.removeAttribute('style');
+    delete el.dataset.mobileMemoOriginalStyleSaved;
+    delete el.dataset.mobileMemoOriginalStyle;
+  }
+
+  function resetInlineForMobile(el) {
+    if (!el) return;
+    saveOriginalInline(el);
+
+    el.style.position = 'relative';
+    el.style.left = '0px';
+    el.style.top = 'auto';
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+    el.style.width = '100%';
+    el.style.maxWidth = '100%';
+    el.style.minWidth = '0';
+    el.style.height = 'auto';
+    el.style.maxHeight = 'none';
+    el.style.transform = 'none';
+    el.style.translate = 'none';
+    el.style.rotate = '0deg';
+    el.style.margin = '0 0 10px 0';
+    el.style.boxSizing = 'border-box';
+  }
+
+  function resetBoardInlineForMobile(el) {
+    if (!el) return;
+    saveOriginalInline(el);
+
+    if (el.matches && (el.matches('#memo-board-notes') || el.matches('.memo-board-notes'))) {
+      el.style.position = 'static';
+      el.style.left = 'auto';
+      el.style.top = 'auto';
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+      el.style.width = '100%';
+      el.style.maxWidth = '100%';
+      el.style.minWidth = '0';
+      el.style.height = 'auto';
+      el.style.maxHeight = 'none';
+      el.style.transform = 'none';
+      el.style.pointerEvents = 'auto';
+      el.style.overflow = 'visible';
+      el.style.boxSizing = 'border-box';
+      return;
     }
-    return window.innerHeight || document.documentElement.clientHeight || 0;
+
+    el.style.position = 'relative';
+    el.style.left = '0px';
+    el.style.top = 'auto';
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+    el.style.width = '100%';
+    el.style.maxWidth = '100%';
+    el.style.minWidth = '0';
+    el.style.transform = 'none';
+    el.style.overflowX = 'hidden';
+    el.style.overflowY = 'auto';
+    el.style.boxSizing = 'border-box';
   }
 
-  function getMemoWrap() {
-    return document.querySelector('#tab-content .memo-wrap, #tab-content .card.memo-wrap, .memo-wrap');
-  }
-
-  function applyMemoDynamicHeight() {
-    raf = 0;
-
-    if (!isMobile() || !isMemoMode()) {
+  function applyHeight() {
+    var wrap = document.querySelector('#tab-content .memo-wrap, #tab-content .card.memo-wrap, .memo-wrap');
+    if (!wrap || !isMobile() || !isMemoMode()) {
       document.documentElement.style.removeProperty('--mobile-memo-wrap-height');
       return;
     }
 
-    var wrap = getMemoWrap();
-    if (!wrap) return;
-
     var rect = wrap.getBoundingClientRect();
     var viewportH = getViewportHeight();
-
-    /*
-      하단 여백:
-      - iOS safe area / 화면 아래 여백 고려
-      - 너무 꽉 차면 카드 그림자와 스크롤이 답답해져서 14px 남김
-    */
-    var bottomGap = 14;
+    var bottomGap = 12;
     var available = Math.floor(viewportH - rect.top - bottomGap);
 
-    /*
-      최소/최대 안전값:
-      - 너무 작게 계산되면 기존처럼 짧아지는 문제 발생
-      - 화면보다 넘치면 외부 스크롤이 생김
-    */
-    var minHeight = Math.min(520, Math.max(360, Math.floor(viewportH * 0.55)));
-    var maxHeight = Math.max(360, Math.floor(viewportH - 120));
+    var minHeight = Math.min(540, Math.max(380, Math.floor(viewportH * 0.58)));
+    var maxHeight = Math.max(360, Math.floor(viewportH - 90));
 
     if (!available || available < minHeight) available = minHeight;
     if (available > maxHeight) available = maxHeight;
@@ -1110,24 +1165,43 @@
     document.documentElement.style.setProperty('--mobile-memo-wrap-height', available + 'px');
   }
 
+  function applyMobileLayout() {
+    raf = 0;
+
+    var notes = Array.prototype.slice.call(document.querySelectorAll(NOTE_SELECTOR));
+    var boards = Array.prototype.slice.call(document.querySelectorAll(BOARD_SELECTOR));
+
+    if (!isMobile() || !isMemoMode()) {
+      notes.forEach(restoreOriginalInline);
+      boards.forEach(restoreOriginalInline);
+      document.documentElement.style.removeProperty('--mobile-memo-wrap-height');
+      return;
+    }
+
+    boards.forEach(resetBoardInlineForMobile);
+    notes.forEach(resetInlineForMobile);
+    applyHeight();
+  }
+
   function scheduleApply() {
     if (raf) return;
-    raf = window.requestAnimationFrame(applyMemoDynamicHeight);
+    raf = window.requestAnimationFrame(applyMobileLayout);
   }
 
   function scheduleMultiApply() {
     scheduleApply();
-    setTimeout(scheduleApply, 80);
-    setTimeout(scheduleApply, 220);
-    setTimeout(scheduleApply, 520);
+    window.clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(scheduleApply, 80);
+    window.setTimeout(scheduleApply, 220);
+    window.setTimeout(scheduleApply, 520);
   }
 
   window.addEventListener('resize', scheduleMultiApply);
   window.addEventListener('orientationchange', scheduleMultiApply);
   document.addEventListener('DOMContentLoaded', scheduleMultiApply);
   document.addEventListener('click', function () {
-    setTimeout(scheduleApply, 60);
-    setTimeout(scheduleApply, 180);
+    window.setTimeout(scheduleApply, 30);
+    window.setTimeout(scheduleApply, 140);
   }, true);
 
   if (window.visualViewport) {
@@ -1145,7 +1219,7 @@
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'style', 'hidden']
+      attributeFilter: ['class', 'style', 'data-note-id', 'data-memo-id']
     });
   }
 
@@ -1153,8 +1227,8 @@
   setTimeout(scheduleMultiApply, 900);
   setTimeout(scheduleMultiApply, 1600);
 
-  window.mobileMemoDynamicHeight = {
-    apply: applyMemoDynamicHeight,
+  window.mobileMemoLayoutReset = {
+    apply: applyMobileLayout,
     schedule: scheduleMultiApply
   };
 })();
