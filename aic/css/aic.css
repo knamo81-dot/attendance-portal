@@ -1256,3 +1256,31 @@ input[type="radio"],
     font-size:14px !important;
   }
 }
+
+
+/* =========================================================
+   Mobile Modal Input Zoom Prevent Patch v1
+   - 회의방 생성/참석자 검색 모달 입력창 확대 방지
+   - 모바일 modal input/select/textarea 16px 유지
+========================================================= */
+@media (max-width:760px){
+
+  .aic-modal input,
+  .aic-modal select,
+  .aic-modal textarea,
+  .aic-modal .module-input,
+  .aic-modal .module-select,
+  .aic-field input,
+  .aic-field select,
+  .aic-field textarea{
+    font-size:16px !important;
+    line-height:1.4 !important;
+    transform:none !important;
+    zoom:1 !important;
+  }
+
+  .aic-modal .module-btn,
+  .aic-modal button{
+    font-size:14px !important;
+  }
+}
