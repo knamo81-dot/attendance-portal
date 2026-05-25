@@ -1179,95 +1179,74 @@
 
 
 /* =========================================================
-   Mobile Memo Add Screen Fix v28
-   - 모바일 메모 추가 폼을 전체화면 입력 화면처럼 표시
-   - 폼 가로 삐져나감 방지
-   - 기존 메모 리스트는 바깥 스크롤이 아닌 리스트 영역 중심
+   Mobile Memo Add Screen Fix v29
+   - 모바일 메모 추가 폼을 body 직속 전체화면으로 표시
+   - 기존 카드 안에서 잘리는 문제 해결
+   - 폼 내부 가로 삐져나감 방지
 ========================================================= */
 @media (max-width: 768px) {
-  /* 기본 메모 목록 안정화 */
-  body.mobile-memo-list-mode {
-    overflow-x: hidden !important;
+  body.mobile-memo-add-lock {
+    overflow: hidden !important;
+    touch-action: none !important;
   }
 
-  body.mobile-memo-list-mode #tab-content,
-  body.mobile-memo-list-mode #tab-content.content {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    overflow-x: hidden !important;
-    box-sizing: border-box !important;
-  }
-
-  body.mobile-memo-list-mode .mobile-memo-filter-bar {
-    position: relative !important;
-    top: auto !important;
-    z-index: 5 !important;
-  }
-
-  body.mobile-memo-list-mode #tab-content .memo-card,
-  body.mobile-memo-list-mode #tab-content .memo-item,
-  body.mobile-memo-list-mode #tab-content .note-card,
-  body.mobile-memo-list-mode #tab-content [data-memo-id],
-  body.mobile-memo-list-mode #tab-content [data-note-id] {
-    height: auto !important;
-    min-height: 132px !important;
-    max-height: none !important;
-    overflow: visible !important;
-    box-sizing: border-box !important;
-  }
-
-  body.mobile-memo-list-mode .memo-card::after,
-  body.mobile-memo-list-mode .memo-item::after,
-  body.mobile-memo-list-mode .note-card::after,
-  body.mobile-memo-list-mode [data-memo-id]::after,
-  body.mobile-memo-list-mode [data-note-id]::after {
-    content: "열기" !important;
-    top: 14px !important;
-    right: 14px !important;
-    z-index: 3 !important;
-    background: rgba(255, 255, 255, .86) !important;
-  }
-
-  /* 모바일 메모 추가 전체화면 */
   .mobile-memo-add-screen {
     position: fixed !important;
     inset: 0 !important;
-    z-index: 99998 !important;
+    z-index: 2147483000 !important;
+    display: flex !important;
+    flex-direction: column !important;
     width: 100vw !important;
     height: 100dvh !important;
-    max-width: 100vw !important;
-    max-height: 100dvh !important;
     min-width: 0 !important;
+    max-width: 100vw !important;
+    min-height: 0 !important;
+    max-height: 100dvh !important;
     margin: 0 !important;
-    padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px calc(env(safe-area-inset-bottom, 0px) + 14px) !important;
+    padding: 0 !important;
+    border: 0 !important;
     border-radius: 0 !important;
     background: #f7f8fb !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    -webkit-overflow-scrolling: touch !important;
-    box-sizing: border-box !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
     transform: none !important;
     left: 0 !important;
     top: 0 !important;
     right: auto !important;
     bottom: auto !important;
-    display: block !important;
+    box-sizing: border-box !important;
+  }
+
+  .mobile-memo-add-screen,
+  .mobile-memo-add-screen * {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
   }
 
   .mobile-memo-add-screen::before {
     content: "메모 추가";
-    display: block;
-    margin: 2px 2px 14px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    height: calc(env(safe-area-inset-top, 0px) + 58px);
+    padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px;
+    border-bottom: 1px solid rgba(148, 163, 184, .24);
+    background: rgba(247, 248, 251, .96);
     color: #0f172a;
     font-size: 20px;
     font-weight: 900;
     line-height: 1.2;
   }
 
-  .mobile-memo-add-screen,
-  .mobile-memo-add-screen * {
-    max-width: 100% !important;
+  .mobile-memo-add-screen .mobile-memo-add-scroll {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 14px 14px 18px !important;
     box-sizing: border-box !important;
   }
 
@@ -1307,6 +1286,8 @@
     font-size: 16px !important;
     line-height: 1.5 !important;
     outline: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
   }
 
   .mobile-memo-add-screen input[type="text"],
@@ -1321,12 +1302,13 @@
 
   .mobile-memo-add-screen textarea {
     min-height: 220px !important;
-    height: 32dvh !important;
+    height: 34dvh !important;
     padding: 12px !important;
-    resize: vertical !important;
+    resize: none !important;
   }
 
   .mobile-memo-add-screen input[type="file"] {
+    display: block !important;
     width: 100% !important;
     max-width: 100% !important;
     font-size: 14px !important;
@@ -1347,28 +1329,20 @@
     white-space: nowrap !important;
   }
 
-  /* 색상 버튼/칩 */
-  .mobile-memo-add-screen input[type="color"],
-  .mobile-memo-add-screen [class*="color"] button,
-  .mobile-memo-add-screen [class*="color"] span,
-  .mobile-memo-add-screen [class*="swatch"] {
-    flex: 0 0 auto !important;
-  }
-
-  /* 하단 버튼 영역 */
   .mobile-memo-add-screen .mobile-memo-add-actions {
-    position: sticky !important;
-    bottom: 0 !important;
-    z-index: 10 !important;
+    flex: 0 0 auto !important;
     display: flex !important;
     justify-content: flex-end !important;
     align-items: center !important;
     gap: 10px !important;
-    margin: 18px -14px calc(env(safe-area-inset-bottom, 0px) * -1) !important;
+    width: 100% !important;
+    min-height: calc(env(safe-area-inset-bottom, 0px) + 68px) !important;
+    margin: 0 !important;
     padding: 12px 14px calc(env(safe-area-inset-bottom, 0px) + 12px) !important;
     background: rgba(247, 248, 251, .96) !important;
     border-top: 1px solid rgba(148, 163, 184, .24) !important;
     backdrop-filter: blur(10px) !important;
+    box-sizing: border-box !important;
   }
 
   .mobile-memo-add-screen .mobile-memo-add-actions button {
@@ -1380,9 +1354,5 @@
   .mobile-memo-add-screen .mobile-memo-add-actions button:last-child {
     background: #0f172a !important;
     color: #ffffff !important;
-  }
-
-  body.mobile-memo-add-lock {
-    overflow: hidden !important;
   }
 }
