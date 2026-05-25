@@ -1,4 +1,4 @@
- #tab-content .calendar-panel,
+  #tab-content .calendar-panel,
   #tab-content .reservation-page,
   #tab-content [class*="schedule"][class*="page"],
   #tab-content [class*="calendar"][class*="section"],
@@ -1999,38 +1999,37 @@
 
 
 
+
+
+
 /* =========================================================
-   Mobile Memo Restore Minimal CSS v46
-   - v45 강제 리스트 스타일 제거 후 기존 모바일 메모 디자인 유지
-   - 색상 필터 버튼 디자인/가로 스크롤 유지
-   - 필터로 숨긴 메모만 확실히 미표시
+   Mobile Memo Filter Final Restore v47
 ========================================================= */
 @media (max-width: 768px) {
-  body.mobile-memo-list-mode .mobile-memo-filter-bar {
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    -webkit-overflow-scrolling: touch !important;
-    scrollbar-width: none !important;
-    touch-action: pan-x !important;
+
+  .mobile-memo-filter-bar{
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    overflow-x:auto !important;
+    overflow-y:hidden !important;
+    gap:8px !important;
+    padding-bottom:4px !important;
+    -webkit-overflow-scrolling:touch !important;
+    scrollbar-width:none !important;
   }
 
-  body.mobile-memo-list-mode .mobile-memo-filter-bar::-webkit-scrollbar {
-    display: none !important;
+  .mobile-memo-filter-bar::-webkit-scrollbar{
+    display:none !important;
   }
 
-  body.mobile-memo-list-mode .mobile-memo-filter-chip {
-    flex: 0 0 auto !important;
-    white-space: nowrap !important;
-    cursor: pointer !important;
-    pointer-events: auto !important;
+  .mobile-memo-filter-chip{
+    flex:0 0 auto !important;
+    pointer-events:auto !important;
+    cursor:pointer !important;
+    touch-action:manipulation !important;
   }
 
-  body.mobile-memo-list-mode .memo-note.mobile-memo-hidden,
-  body.mobile-memo-list-mode .memo-card.mobile-memo-hidden,
-  body.mobile-memo-list-mode .memo-item.mobile-memo-hidden,
-  body.mobile-memo-list-mode .note-card.mobile-memo-hidden,
-  body.mobile-memo-list-mode [data-note-id].mobile-memo-hidden,
-  body.mobile-memo-list-mode [data-memo-id].mobile-memo-hidden {
-    display: none !important;
+  .mobile-memo-hidden{
+    display:none !important;
   }
 }
