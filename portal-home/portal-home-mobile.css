@@ -1,4 +1,4 @@
-  #tab-content .calendar-panel,
+#tab-content .calendar-panel,
   #tab-content .reservation-page,
   #tab-content [class*="schedule"][class*="page"],
   #tab-content [class*="calendar"][class*="section"],
@@ -2031,5 +2031,210 @@
 
   .mobile-memo-hidden{
     display:none !important;
+  }
+}
+
+/* =========================================================
+   Mobile Memo Stable List Override v40
+   - 기존 메모 카드 원본 DOM은 모바일에서 숨김
+   - 모바일 전용 카드만 새로 렌더링하여 내용 섞임/내용 노출 방지
+   - 색상 필터 버튼 터치 영역과 디자인 고정
+========================================================= */
+@media (max-width: 768px) {
+  body.mobile-memo-stable-active .mobile-memo-source-hidden {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  .mobile-memo-stable-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 12px 0 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .mobile-memo-stable-card {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 124px !important;
+    margin: 0 !important;
+    padding: 20px 20px 18px !important;
+    border: 1px solid rgba(148, 163, 184, .16) !important;
+    border-radius: 24px !important;
+    background: var(--mobile-memo-card-bg, #ffffff) !important;
+    color: #0f172a !important;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, .08) !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    cursor: pointer !important;
+    transform: none !important;
+    left: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+  }
+
+  .mobile-memo-stable-card::after {
+    content: "MEMO" !important;
+    position: absolute !important;
+    top: 20px !important;
+    right: 20px !important;
+    color: #64748b !important;
+    font-size: 17px !important;
+    font-weight: 750 !important;
+    letter-spacing: .02em !important;
+    pointer-events: none !important;
+  }
+
+  .mobile-memo-stable-tag {
+    display: block !important;
+    max-width: calc(100% - 88px) !important;
+    margin: 0 0 12px !important;
+    color: #334155 !important;
+    font-size: 15px !important;
+    font-weight: 900 !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .mobile-memo-stable-title {
+    display: block !important;
+    max-width: calc(100% - 88px) !important;
+    margin: 0 0 22px !important;
+    color: #0f172a !important;
+    font-size: 20px !important;
+    font-weight: 950 !important;
+    line-height: 1.25 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .mobile-memo-stable-meta {
+    display: block !important;
+    margin: 0 !important;
+    color: #64748b !important;
+    font-size: 15px !important;
+    font-weight: 650 !important;
+    line-height: 1.55 !important;
+    white-space: pre-line !important;
+  }
+
+  .mobile-memo-stable-empty {
+    width: 100% !important;
+    padding: 28px 16px !important;
+    border: 1px dashed rgba(148, 163, 184, .45) !important;
+    border-radius: 22px !important;
+    background: rgba(255, 255, 255, .74) !important;
+    color: #64748b !important;
+    text-align: center !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+  }
+
+  body.mobile-memo-stable-active .mobile-memo-filter-bar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 50 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 10px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 0 14px !important;
+    padding: 10px 0 10px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    background: rgba(247, 248, 251, .94) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+
+  body.mobile-memo-stable-active .mobile-memo-filter-bar::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  body.mobile-memo-stable-active .mobile-memo-filter-chip {
+    position: relative !important;
+    flex: 0 0 auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 58px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    margin: 0 !important;
+    padding: 0 16px !important;
+    border: 1px solid rgba(255, 255, 255, .78) !important;
+    border-radius: 18px !important;
+    background: #eef2f7 !important;
+    color: #0284c7 !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 7px 16px rgba(15,23,42,.06) !important;
+    font-size: 18px !important;
+    font-weight: 900 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    cursor: pointer !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+  }
+
+  body.mobile-memo-stable-active .mobile-memo-filter-chip::before {
+    content: none !important;
+    display: none !important;
+  }
+
+  body.mobile-memo-stable-active .mobile-memo-filter-chip.is-active {
+    background: #0ea5e9 !important;
+    border-color: rgba(14, 165, 233, .9) !important;
+    color: #ffffff !important;
+    box-shadow: 0 10px 22px rgba(14, 165, 233, .24) !important;
+  }
+
+  body.mobile-memo-stable-active .mobile-memo-unified-modal .mobile-memo-color-chip {
+    min-width: auto !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    padding: 0 14px !important;
+    border-radius: 999px !important;
+    background: #ffffff !important;
+    color: #334155 !important;
+    font-size: 15px !important;
+    font-weight: 900 !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+  }
+
+  body.mobile-memo-stable-active .mobile-memo-unified-modal .mobile-memo-color-chip::before {
+    content: "" !important;
+    display: inline-block !important;
+    flex: 0 0 auto !important;
+    width: 13px !important;
+    height: 13px !important;
+    margin: 0 7px 0 0 !important;
+    border-radius: 999px !important;
+    background: var(--mobile-memo-color, #e2e8f0) !important;
+  }
+
+  body.mobile-memo-stable-active .mobile-memo-unified-modal .mobile-memo-color-chip.is-active {
+    border-color: rgba(59, 130, 246, .75) !important;
+    background: #eef6ff !important;
+    color: #0f172a !important;
   }
 }
