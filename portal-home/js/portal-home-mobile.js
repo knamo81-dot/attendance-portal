@@ -558,33 +558,36 @@
 
 
 /* =========================================================
-   Mobile Unified Memo Modal v30
-   - 메모 클릭/메모 추가를 같은 fullscreen UI로 통일
-   - 기존 메모 추가 폼 이동 방식(v28/v29) 사용 안 함
-   - 추가 저장은 기존 숨은 입력폼에 값을 넣고 기존 추가 버튼 클릭
+   Mobile Unified Memo State Bridge v33
+   - 메모 클릭/추가/수정/삭제를 원본 state.notes + 서버 함수에 직접 연결
+   - 내용은 note.content에서 직접 불러옴
+   - 저장은 updateMemoOnServer/createMemoOnServer API를 통해 서버 반영
 ========================================================= */
 (function () {
   'use strict';
 
   var MOBILE_QUERY = '(max-width: 768px)';
-  var CARD_SELECTOR = '.memo-card, .memo-item, .note-card, [data-memo-id], [data-note-id]';
+  var CARD_SELECTOR = '.memo-note, .memo-card, .memo-item, .note-card, [data-note-id], [data-memo-id]';
 
   var modal = null;
   var mode = 'add';
-  var currentCard = null;
-  var hiddenAddForm = null;
+  var currentNoteId = null;
 
   var colorMap = [
-    { key: 'yellow', label: '노랑', color: '#facc15' },
-    { key: 'blue', label: '파랑', color: '#60a5fa' },
-    { key: 'green', label: '초록', color: '#4ade80' },
-    { key: 'pink', label: '분홍', color: '#f9a8d4' },
-    { key: 'purple', label: '보라', color: '#c084fc' },
-    { key: 'white', label: '흰색', color: '#e2e8f0' }
+    { key: 'yellow', label: '노랑', color: '#fef3c7' },
+    { key: 'blue', label: '파랑', color: '#dbeafe' },
+    { key: 'green', label: '초록', color: '#dcfce7' },
+    { key: 'pink', label: '분홍', color: '#fce7f3' },
+    { key: 'purple', label: '보라', color: '#f3e8ff' },
+    { key: 'white', label: '흰색', color: '#ffffff' }
   ];
 
   function isMobile() {
     return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  function api() {
+    return window.portalMemoMobileApi || null;
   }
 
   function textOf(el) {
@@ -595,157 +598,45 @@
     return textOf(el).replace(/\s+/g, '');
   }
 
-  function setNativeValue(el, value) {
-    if (!el) return;
-    el.value = value;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
+  function getCardId(card) {
+    if (!card) return '';
+    return card.dataset.noteId || card.dataset.memoId || card.dataset.memoServerId || card.getAttribute('data-note-id') || card.getAttribute('data-memo-id') || '';
   }
 
-  function q(root, selectors) {
-    if (!root || !root.querySelector) return null;
-    for (var i = 0; i < selectors.length; i++) {
-      var found = root.querySelector(selectors[i]);
+  function getNoteByCard(card) {
+    var id = getCardId(card);
+    var memoApi = api();
+    if (memoApi && typeof memoApi.getNoteById === 'function') {
+      var found = memoApi.getNoteById(id);
       if (found) return found;
     }
-    return null;
+
+    return {
+      id: id,
+      serverId: card.dataset.memoServerId || id,
+      title: card.dataset.memoTitle || '',
+      tag: card.dataset.memoTag || '메모',
+      content: card.dataset.memoContent || '',
+      pinned: card.dataset.memoPinned === 'true',
+      layout: { color: card.dataset.memoColor || '' },
+      createdAt: '',
+      updatedAt: ''
+    };
   }
 
-  function findButton(root, names) {
-    if (!root || !root.querySelectorAll) return null;
-    var buttons = Array.prototype.slice.call(root.querySelectorAll('button'));
-    return buttons.find(function (btn) {
-      return names.indexOf(normText(btn)) >= 0;
-    }) || null;
-  }
-
-  function getMemoTitle(card) {
-    var el = q(card, ['.memo-title', '.note-title', '[class*="title"]']);
-    var txt = textOf(el);
-    if (txt && txt !== '상세보기' && txt !== '열기' && txt !== '닫기') return txt;
-
-    var lines = textOf(card).split('\n').map(function (v) { return v.trim(); }).filter(Boolean);
-    lines = lines.filter(function (v) {
-      return ['상세보기', '열기', '닫기', '수정', '삭제', '저장'].indexOf(v) < 0;
-    });
-    return lines[0] || '메모';
-  }
-
-  function getMemoContent(card) {
-    /*
-      v32 본문 추출 보강
-      1) data-* 속성에서 본문 후보 우선 확인
-      2) 명시적 content/body/detail/textarea 후보 확인
-      3) 카드 전체 텍스트에서 라벨/메타 제거
-      4) 후보가 없으면 빈 값
-    */
-    var title = getMemoTitle(card);
-    var blockedExact = [
-      '상세보기', '열기', '닫기', '수정', '삭제', '저장',
-      '#메모', '메모', 'MEMO', 'memo', '최근 메모', '최근메모',
-      '개인 메모', '휴지통', '메모 추가'
-    ];
-
-    function cleanLine(v) {
-      return (v || '').replace(/\u00a0/g, ' ').trim();
-    }
-
-    function isBlockedLine(v) {
-      var raw = cleanLine(v);
-      var compact = raw.replace(/\s+/g, '');
-      if (!raw) return true;
-      if (raw === title) return true;
-      if (blockedExact.indexOf(raw) >= 0) return true;
-      if (['#메모', '메모', 'MEMO', 'memo', '최근메모', '개인메모'].indexOf(compact) >= 0) return true;
-      if (/^작성\s*:/.test(raw)) return true;
-      if (/^수정\s*:/.test(raw)) return true;
-      if (/^작성일\s*:/.test(raw)) return true;
-      if (/^수정일\s*:/.test(raw)) return true;
-      if (/^\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.?$/.test(raw)) return true;
-      return false;
-    }
-
-    function normalizeText(value) {
-      return (value || '')
-        .split('\n')
-        .map(cleanLine)
-        .filter(function (line) { return !isBlockedLine(line); })
-        .join('\n')
-        .trim();
-    }
-
-    function getDatasetText(el) {
-      if (!el || !el.dataset) return '';
-      var keys = [
-        'content', 'memoContent', 'noteContent', 'body', 'memoBody', 'noteBody',
-        'text', 'memoText', 'noteText', 'detail', 'memoDetail', 'noteDetail',
-        'description', 'desc', 'memo', 'note'
-      ];
-
-      for (var i = 0; i < keys.length; i++) {
-        if (el.dataset[keys[i]]) {
-          var cleaned = normalizeText(el.dataset[keys[i]]);
-          if (cleaned) return cleaned;
-        }
-      }
-      return '';
-    }
-
-    var fromCardDataset = getDatasetText(card);
-    if (fromCardDataset) return fromCardDataset;
-
-    var selectors = [
-      '[data-content]', '[data-memo-content]', '[data-note-content]',
-      '[data-body]', '[data-memo-body]', '[data-note-body]',
-      '[data-text]', '[data-memo-text]', '[data-note-text]',
-      '[data-detail]', '[data-memo-detail]', '[data-note-detail]',
-      '[data-description]', '[data-desc]',
-      '.memo-content', '.memo-body', '.memo-text', '.memo-detail',
-      '.note-content', '.note-body', '.note-text', '.note-detail',
-      '[class*="content"]', '[class*="body"]', '[class*="text"]', '[class*="detail"]',
-      'textarea'
-    ];
-
-    for (var i = 0; i < selectors.length; i++) {
-      var nodes = Array.prototype.slice.call(card.querySelectorAll(selectors[i]));
-      for (var j = 0; j < nodes.length; j++) {
-        var node = nodes[j];
-        if (!node) continue;
-
-        var datasetValue = getDatasetText(node);
-        if (datasetValue) return datasetValue;
-
-        var value = (node.tagName === 'TEXTAREA' || node.tagName === 'INPUT') ? (node.value || '') : textOf(node);
-        var cleaned = normalizeText(value);
-        if (cleaned) return cleaned;
-      }
-    }
-
-    return normalizeText(textOf(card));
-  }
-
-  function getMemoMeta(card) {
-    var lines = textOf(card).split('\n').map(function (v) { return v.trim(); }).filter(Boolean);
-    return lines.filter(function (v) {
-      return /^작성:/.test(v) || /^수정:/.test(v);
-    }).join('\n');
-  }
-
-  function detectColor(card) {
-    if (!card) return 'yellow';
-    var raw = [
-      card.dataset ? (card.dataset.color || card.dataset.memoColor || card.dataset.noteColor || card.dataset.mobileMemoColor || '') : '',
-      card.className || '',
-      card.getAttribute('style') || '',
-      window.getComputedStyle(card).backgroundColor || ''
-    ].join(' ').toLowerCase();
-
-    if (raw.indexOf('blue') >= 0 || raw.indexOf('60a5fa') >= 0 || raw.indexOf('191, 219, 254') >= 0) return 'blue';
-    if (raw.indexOf('green') >= 0 || raw.indexOf('4ade80') >= 0 || raw.indexOf('187, 247, 208') >= 0) return 'green';
-    if (raw.indexOf('pink') >= 0 || raw.indexOf('rose') >= 0 || raw.indexOf('f9a8d4') >= 0) return 'pink';
-    if (raw.indexOf('purple') >= 0 || raw.indexOf('violet') >= 0 || raw.indexOf('c084fc') >= 0) return 'purple';
-    if (raw.indexOf('white') >= 0 || raw.indexOf('255, 255, 255') >= 0) return 'white';
+  function colorKeyFromColor(value) {
+    var raw = String(value || '').toLowerCase();
+    if (raw.indexOf('blue') >= 0 || raw.indexOf('dbeafe') >= 0 || raw.indexOf('60a5fa') >= 0) return 'blue';
+    if (raw.indexOf('green') >= 0 || raw.indexOf('dcfce7') >= 0 || raw.indexOf('4ade80') >= 0) return 'green';
+    if (raw.indexOf('pink') >= 0 || raw.indexOf('rose') >= 0 || raw.indexOf('fce7f3') >= 0 || raw.indexOf('f9a8d4') >= 0) return 'pink';
+    if (raw.indexOf('purple') >= 0 || raw.indexOf('violet') >= 0 || raw.indexOf('f3e8ff') >= 0 || raw.indexOf('c084fc') >= 0) return 'purple';
+    if (raw.indexOf('white') >= 0 || raw.indexOf('ffffff') >= 0 || raw.indexOf('255, 255, 255') >= 0) return 'white';
     return 'yellow';
+  }
+
+  function colorValueFromKey(key) {
+    var found = colorMap.find(function (item) { return item.key === key; });
+    return found ? found.color : '#fef3c7';
   }
 
   function ensureModal() {
@@ -773,7 +664,7 @@
       '  </div>',
       '  <div class="mobile-memo-field">',
       '    <label>이미지 업로드</label>',
-      '    <div class="mobile-memo-file-row">이미지는 기존 입력폼에서 처리됩니다</div>',
+      '    <div class="mobile-memo-file-row">이미지는 PC 화면 또는 기존 입력폼에서 처리됩니다</div>',
       '  </div>',
       '  <div class="mobile-memo-field">',
       '    <label>내용</label>',
@@ -787,7 +678,7 @@
       '</div>',
       '<div class="mobile-memo-unified-actions">',
       '  <button type="button" class="mobile-memo-btn-delete">삭제</button>',
-      '  <button type="button" class="mobile-memo-btn-secondary">수정</button>',
+      '  <button type="button" class="mobile-memo-btn-secondary">취소</button>',
       '  <button type="button" class="mobile-memo-btn-primary">저장</button>',
       '</div>'
     ].join('');
@@ -795,13 +686,7 @@
     document.body.appendChild(modal);
 
     modal.querySelector('.mobile-memo-unified-close').addEventListener('click', closeModal);
-    modal.querySelector('.mobile-memo-btn-secondary').addEventListener('click', function () {
-      var ta = modal.querySelector('.mobile-memo-content-input');
-      if (ta) {
-        ta.focus();
-        try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {}
-      }
-    });
+    modal.querySelector('.mobile-memo-btn-secondary').addEventListener('click', closeModal);
     modal.querySelector('.mobile-memo-btn-primary').addEventListener('click', saveModal);
     modal.querySelector('.mobile-memo-btn-delete').addEventListener('click', deleteMemo);
 
@@ -822,113 +707,65 @@
     return modal;
   }
 
-  function setColor(color) {
-    if (!modal) return;
-    modal.dataset.color = color;
-    Array.prototype.slice.call(modal.querySelectorAll('.mobile-memo-color-chip')).forEach(function (btn) {
-      btn.classList.toggle('is-active', btn.dataset.color === color);
+  function setColor(colorKey) {
+    var m = ensureModal();
+    m.dataset.color = colorKey || 'yellow';
+    Array.prototype.slice.call(m.querySelectorAll('.mobile-memo-color-chip')).forEach(function (btn) {
+      btn.classList.toggle('is-active', btn.dataset.color === m.dataset.color);
     });
   }
 
+  function setBusy(isBusy) {
+    if (!modal) return;
+    Array.prototype.slice.call(modal.querySelectorAll('button, input, textarea')).forEach(function (el) {
+      el.disabled = !!isBusy;
+    });
+    modal.classList.toggle('is-busy', !!isBusy);
+  }
 
-  function findRelatedTextareaAfterEdit(card) {
-    if (!card) return null;
+  function fillModalFromNote(note) {
+    var m = ensureModal();
 
-    var selectors = [
-      'textarea',
-      '.memo-content textarea',
-      '.memo-body textarea',
-      '.memo-detail textarea',
-      '.note-content textarea',
-      '.note-body textarea',
-      '.note-detail textarea'
-    ];
+    var title = note && note.title ? String(note.title) : '';
+    var tag = note && note.tag ? String(note.tag) : '메모';
+    var content = note && note.content ? String(note.content) : '';
+    var pinned = !!(note && note.pinned);
+    var colorKey = colorKeyFromColor((note && note.layout && note.layout.color) || note.color || '');
 
-    for (var i = 0; i < selectors.length; i++) {
-      var found = card.querySelector(selectors[i]);
-      if (found && found.value !== undefined) return found;
+    m.querySelector('.mobile-memo-unified-title').textContent = mode === 'add' ? '메모 추가' : (title || '메모');
+    m.querySelector('.mobile-memo-title-input').value = title;
+    m.querySelector('.mobile-memo-tag-input').value = tag;
+    m.querySelector('.mobile-memo-content-input').value = content;
+    m.querySelector('.mobile-memo-pin-input').checked = pinned;
+
+    var meta = [];
+    if (note && note.createdAt) {
+      try { meta.push('작성: ' + new Date(note.createdAt).toLocaleDateString()); } catch (_) {}
     }
+    if (note && note.updatedAt) {
+      try { meta.push('수정: ' + new Date(note.updatedAt).toLocaleDateString()); } catch (_) {}
+    }
+    m.querySelector('.mobile-memo-modal-meta').textContent = meta.join('\n');
 
-    var nearby = card.parentElement ? card.parentElement.querySelector('textarea') : null;
-    if (nearby && nearby.value !== undefined) return nearby;
-
-    return null;
+    m.querySelector('.mobile-memo-btn-delete').style.display = mode === 'add' ? 'none' : '';
+    m.querySelector('.mobile-memo-btn-primary').textContent = mode === 'add' ? '추가' : '저장';
+    setColor(colorKey);
   }
 
-  function hydrateMemoContentFromOriginal(card) {
-    /*
-      카드 DOM에 본문이 없는 경우:
-      기존 PC용 수정/상세 버튼을 잠깐 눌러 textarea가 생성되면 그 값을 가져온다.
-      화면은 모바일 모달이 덮고 있으므로 사용자는 기존 폼을 거의 보지 않음.
-    */
-    if (!card || !modal) return;
-
-    var textarea = modal.querySelector('.mobile-memo-content-input');
-    if (!textarea) return;
-
-    var firstValue = (textarea.value || '').trim();
-    if (firstValue) return;
-
-    var editBtn = findButton(card, ['수정', '상세보기', '열기']);
-    if (!editBtn) return;
-
-    setTimeout(function () {
-      try { editBtn.click(); } catch (_) {}
-
-      setTimeout(function () {
-        var originalTextarea = findRelatedTextareaAfterEdit(card);
-        if (!originalTextarea) return;
-
-        var value = (originalTextarea.value || '').trim();
-        var compact = value.replace(/\s+/g, '');
-        if (!value) return;
-        if (compact === 'MEMO' || compact === 'memo' || compact === '#메모' || compact === '메모' || compact === '최근메모') return;
-
-        var target = modal.querySelector('.mobile-memo-content-input');
-        if (target && !(target.value || '').trim()) {
-          target.value = value;
-          target.dispatchEvent(new Event('input', { bubbles: true }));
-          target.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-      }, 120);
-    }, 30);
-  }
-
-
-  function openModal(nextMode, card) {
+  function openMemoModal(nextMode, note) {
     if (!isMobile()) return;
 
     mode = nextMode || 'add';
-    currentCard = card || null;
-    var m = ensureModal();
+    currentNoteId = note ? (note.serverId || note.id) : null;
 
-    var isAdd = mode === 'add';
-    var title = isAdd ? '' : getMemoTitle(card);
-    var content = isAdd ? '' : getMemoContent(card);
-    var meta = isAdd ? '' : getMemoMeta(card);
-    var color = isAdd ? 'yellow' : detectColor(card);
+    ensureModal();
+    fillModalFromNote(note || { title: '', tag: '메모', content: '', pinned: false, layout: { color: '#fef3c7' } });
 
-    m.querySelector('.mobile-memo-unified-title').textContent = isAdd ? '메모 추가' : (title || '메모');
-    m.querySelector('.mobile-memo-title-input').value = title || '';
-    m.querySelector('.mobile-memo-tag-input').value = '';
-    m.querySelector('.mobile-memo-content-input').value = content || '';
-
-    if (!isAdd) {
-      hydrateMemoContentFromOriginal(card);
-    }
-    m.querySelector('.mobile-memo-pin-input').checked = false;
-    m.querySelector('.mobile-memo-modal-meta').textContent = meta || '';
-    m.querySelector('.mobile-memo-btn-delete').style.display = isAdd ? 'none' : '';
-    m.querySelector('.mobile-memo-btn-secondary').textContent = isAdd ? '취소' : '수정';
-    m.querySelector('.mobile-memo-btn-primary').textContent = isAdd ? '추가' : '저장';
-
-    setColor(color);
-
-    m.classList.add('is-open');
+    modal.classList.add('is-open');
     document.body.classList.add('mobile-memo-modal-lock');
 
     setTimeout(function () {
-      var first = isAdd ? m.querySelector('.mobile-memo-title-input') : m.querySelector('.mobile-memo-content-input');
+      var first = mode === 'add' ? modal.querySelector('.mobile-memo-title-input') : modal.querySelector('.mobile-memo-content-input');
       if (first) {
         try { first.focus({ preventScroll: true }); } catch (_) {}
       }
@@ -939,157 +776,98 @@
     if (!modal) return;
     modal.classList.remove('is-open');
     document.body.classList.remove('mobile-memo-modal-lock');
-    currentCard = null;
+    currentNoteId = null;
+    setBusy(false);
   }
 
-  function findExistingAddForm() {
-    if (hiddenAddForm && document.documentElement.contains(hiddenAddForm)) return hiddenAddForm;
-
-    var candidates = Array.prototype.slice.call(document.querySelectorAll(
-      '#tab-content form, #tab-content .card, #tab-content [class*="form"], #tab-content [class*="memo"], #tab-content div'
-    )).filter(function (el) {
-      if (!el || !el.querySelectorAll) return false;
-      if (el.closest && el.closest('.mobile-memo-unified-modal')) return false;
-      var text = normText(el);
-      var hasTextarea = !!el.querySelector('textarea');
-      var hasInput = !!el.querySelector('input');
-      var hasAdd = Array.prototype.slice.call(el.querySelectorAll('button')).some(function (btn) {
-        return ['추가', '저장'].indexOf(normText(btn)) >= 0;
-      });
-      return hasTextarea && hasInput && hasAdd &&
-        (text.indexOf('메모추가') >= 0 || text.indexOf('색상선택') >= 0 || text.indexOf('이미지업로드') >= 0 || text.indexOf('상단고정') >= 0);
-    });
-
-    candidates.sort(function (a, b) {
-      return a.getBoundingClientRect().height - b.getBoundingClientRect().height;
-    });
-
-    hiddenAddForm = candidates[0] || null;
-    if (hiddenAddForm) hiddenAddForm.classList.add('mobile-memo-hidden-original-form');
-
-    return hiddenAddForm;
+  function modalPayload() {
+    var colorKey = modal.dataset.color || 'yellow';
+    return {
+      title: modal.querySelector('.mobile-memo-title-input').value || '',
+      tag: modal.querySelector('.mobile-memo-tag-input').value || '메모',
+      content: modal.querySelector('.mobile-memo-content-input').value || '',
+      pinned: !!modal.querySelector('.mobile-memo-pin-input').checked,
+      layout: {
+        color: colorValueFromKey(colorKey)
+      },
+      color: colorValueFromKey(colorKey)
+    };
   }
 
-  function fillAddFormAndSubmit() {
-    var form = findExistingAddForm();
-    if (!form || !modal) return false;
-
-    var title = modal.querySelector('.mobile-memo-title-input').value || '';
-    var tag = modal.querySelector('.mobile-memo-tag-input').value || '';
-    var content = modal.querySelector('.mobile-memo-content-input').value || '';
-    var pin = modal.querySelector('.mobile-memo-pin-input').checked;
-    var color = modal.dataset.color || 'yellow';
-
-    var textInputs = Array.prototype.slice.call(form.querySelectorAll('input[type="text"], input:not([type])'));
-    if (textInputs[0]) setNativeValue(textInputs[0], title);
-    if (textInputs[1]) setNativeValue(textInputs[1], tag);
-
-    var textarea = form.querySelector('textarea');
-    if (textarea) setNativeValue(textarea, content);
-
-    var select = form.querySelector('select');
-    if (select) setNativeValue(select, color);
-
-    var colorInput = form.querySelector('input[type="color"]');
-    if (colorInput) {
-      var found = colorMap.find(function (item) { return item.key === color; });
-      setNativeValue(colorInput, found ? found.color : '#facc15');
-    }
-
-    var checkboxes = Array.prototype.slice.call(form.querySelectorAll('input[type="checkbox"]'));
-    if (checkboxes[0]) {
-      checkboxes[0].checked = !!pin;
-      checkboxes[0].dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-    var addBtn = findButton(form, ['추가', '저장']);
-    if (addBtn) {
-      addBtn.click();
-      return true;
-    }
-
-    return false;
-  }
-
-  function saveExistingMemo() {
-    if (!currentCard || !modal) return;
-
-    var title = modal.querySelector('.mobile-memo-title-input').value || '';
-    var content = modal.querySelector('.mobile-memo-content-input').value || '';
-
-    var titleEl = q(currentCard, ['.memo-title', '.note-title', '[class*="title"]']);
-    var contentEl = q(currentCard, [
-      '.memo-content', '.memo-body', '.memo-text', '.memo-detail',
-      '.note-content', '.note-body', '.note-text', '.note-detail',
-      'textarea'
-    ]);
-
-    if (titleEl) {
-      if (titleEl.tagName === 'INPUT' || titleEl.tagName === 'TEXTAREA') setNativeValue(titleEl, title);
-      else titleEl.textContent = title;
-    }
-
-    if (contentEl) {
-      if (contentEl.tagName === 'INPUT' || contentEl.tagName === 'TEXTAREA') setNativeValue(contentEl, content);
-      else contentEl.textContent = content;
-    }
-
-    var editBtn = findButton(currentCard, ['수정', '저장', '수정저장']);
-
-    if (!contentEl && editBtn) {
-      try { editBtn.click(); } catch (_) {}
-      setTimeout(function () {
-        var originalTextarea = findRelatedTextareaAfterEdit(currentCard);
-        if (originalTextarea) setNativeValue(originalTextarea, content);
-
-        var saveBtn = findButton(currentCard, ['저장', '수정저장']);
-        if (saveBtn) {
-          try { saveBtn.click(); } catch (_) {}
-        }
-      }, 120);
+  async function saveModal() {
+    var memoApi = api();
+    if (!memoApi) {
+      alert('모바일 메모 저장 연결을 찾지 못했습니다.');
       return;
     }
 
-    if (editBtn) setTimeout(function () { try { editBtn.click(); } catch (_) {} }, 30);
-  }
+    setBusy(true);
+    try {
+      var payload = modalPayload();
 
-  function saveModal() {
-    if (mode === 'add') {
-      var ok = fillAddFormAndSubmit();
-      if (ok) closeModal();
-      return;
+      if (mode === 'add') {
+        var newMemo = typeof memoApi.getNewMemo === 'function' ? (memoApi.getNewMemo() || {}) : {};
+        var createPayload = Object.assign({}, newMemo, payload, {
+          layout: Object.assign({}, newMemo.layout || {}, payload.layout || {}, {
+            x: newMemo.layout?.x ?? 40,
+            y: newMemo.layout?.y ?? 40,
+            w: newMemo.layout?.w ?? 260,
+            h: newMemo.layout?.h ?? 170,
+            rotate: newMemo.layout?.rotate ?? 0
+          }),
+          boardType: newMemo.boardType || 'personal',
+          memoDate: newMemo.memoDate,
+          imageOnly: !!newMemo.imageOnly,
+          image: newMemo.image || ''
+        });
+        await memoApi.createMemo(createPayload);
+      } else {
+        var note = typeof memoApi.getNoteById === 'function' ? memoApi.getNoteById(currentNoteId) : null;
+        var updatePayload = Object.assign({}, payload, {
+          layout: Object.assign({}, note?.layout || {}, payload.layout || {})
+        });
+        await memoApi.updateMemo(currentNoteId, updatePayload);
+      }
+
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      alert(err && err.message ? err.message : '메모 저장 중 오류가 발생했습니다.');
+      setBusy(false);
     }
-
-    saveExistingMemo();
-    closeModal();
   }
 
-  function deleteMemo() {
+  async function deleteMemo() {
     if (mode === 'add') {
       closeModal();
       return;
     }
 
-    if (!currentCard) return;
-    var btn = findButton(currentCard, ['삭제', '휴지통']);
-    closeModal();
-    if (btn) setTimeout(function () { try { btn.click(); } catch (_) {} }, 30);
+    var memoApi = api();
+    if (!memoApi || !currentNoteId) return;
+
+    if (!confirm('이 메모를 삭제할까요?')) return;
+
+    setBusy(true);
+    try {
+      await memoApi.deleteMemo(currentNoteId);
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      alert(err && err.message ? err.message : '메모 삭제 중 오류가 발생했습니다.');
+      setBusy(false);
+    }
   }
 
   document.addEventListener('click', function (event) {
     if (!isMobile()) return;
-
     if (event.target.closest('.mobile-memo-unified-modal')) return;
 
     var control = event.target.closest('button, a, [role="button"]');
     if (control && normText(control) === '메모추가') {
       event.preventDefault();
       event.stopPropagation();
-
-      /* 기존 폼이 필요한 경우를 대비해 원래 버튼 클릭으로 폼 생성 */
-      try { control.click(); } catch (_) {}
-      setTimeout(function () { openModal('add'); }, 80);
-      setTimeout(function () { if (!modal || !modal.classList.contains('is-open')) openModal('add'); }, 220);
+      openMemoModal('add', null);
       return;
     }
 
@@ -1100,80 +878,16 @@
     if (!card || card.classList.contains('mobile-memo-hidden')) return;
     if (!document.body.classList.contains('mobile-memo-list-mode')) return;
 
+    var note = getNoteByCard(card);
+    if (!note) return;
+
     event.preventDefault();
     event.stopPropagation();
 
-    Array.prototype.slice.call(document.querySelectorAll(CARD_SELECTOR)).forEach(function (item) {
-      item.classList.remove('mobile-memo-open');
-    });
-
-    openModal('edit', card);
+    openMemoModal('edit', note);
   }, true);
 
   window.addEventListener('resize', function () {
     if (!isMobile()) closeModal();
   });
 })();
-
-
-
-/* =========================================================
-   Mobile Memo Content Extract Fix v31
-   - v30 메모 상세에서 MEMO/#메모/최근 메모가 본문으로 들어가는 현상 보정
-========================================================= */
-(function () {
-  'use strict';
-
-  function cleanOpenedMemoTextarea() {
-    var modal = document.querySelector('.mobile-memo-unified-modal.is-open');
-    if (!modal) return;
-
-    var textarea = modal.querySelector('.mobile-memo-content-input');
-    if (!textarea) return;
-
-    var compact = (textarea.value || '').replace(/\s+/g, '').trim();
-    if (compact === 'MEMO' || compact === 'memo' || compact === '#메모' || compact === '메모' || compact === '최근메모') {
-      textarea.value = '';
-      textarea.dispatchEvent(new Event('input', { bubbles: true }));
-      textarea.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-  }
-
-  document.addEventListener('click', function () {
-    setTimeout(cleanOpenedMemoTextarea, 120);
-    setTimeout(cleanOpenedMemoTextarea, 260);
-  }, true);
-
-  window.addEventListener('resize', cleanOpenedMemoTextarea);
-})();
-
-
-
-/* =========================================================
-   Mobile Memo Existing Detail Bridge Fix v32
-   - 카드 DOM에 본문이 없을 때 기존 수정/상세 textarea에서 본문을 가져오기 위한 보정
-   - 제목 수정은 유지, 본문만 추가 연결
-========================================================= */
-(function () {
-  'use strict';
-
-  function cleanMemoModalPlaceholderLikeText() {
-    var modal = document.querySelector('.mobile-memo-unified-modal.is-open');
-    if (!modal) return;
-    var textarea = modal.querySelector('.mobile-memo-content-input');
-    if (!textarea) return;
-
-    var compact = (textarea.value || '').replace(/\s+/g, '').trim();
-    if (compact === 'MEMO' || compact === 'memo' || compact === '#메모' || compact === '메모' || compact === '최근메모') {
-      textarea.value = '';
-      textarea.dispatchEvent(new Event('input', { bubbles: true }));
-      textarea.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-  }
-
-  document.addEventListener('click', function () {
-    setTimeout(cleanMemoModalPlaceholderLikeText, 180);
-    setTimeout(cleanMemoModalPlaceholderLikeText, 420);
-  }, true);
-})();
-
