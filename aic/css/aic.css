@@ -1136,3 +1136,93 @@ input[type="radio"],
   border-color: var(--common-line, var(--aic-line));
   border-radius: var(--common-control-radius, 12px);
 }
+
+
+/* =========================================================
+   Mobile List-to-Chat View Patch v1
+   - 모바일에서는 기본 회의방 목록만 표시
+   - 회의방 선택 후 채팅창만 전체 폭/높이로 표시
+   - 상단 '목록' 버튼으로 회의방 목록 복귀
+========================================================= */
+.aic-mobile-back-btn{
+  display:none;
+}
+
+@media (max-width:760px){
+  .aic-root{
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+
+  .aic-root.aic-mobile-list-view{
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+
+  .aic-root.aic-mobile-list-view .aic-sidebar{
+    display:grid !important;
+    height:100% !important;
+    min-height:0 !important;
+  }
+
+  .aic-root.aic-mobile-list-view .aic-main{
+    display:none !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-sidebar{
+    display:none !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-main{
+    display:grid !important;
+    height:100% !important;
+    min-height:0 !important;
+    grid-template-rows:auto minmax(0, 1fr) !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-toolbar{
+    display:none !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-slots{
+    height:100% !important;
+    min-height:0 !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-chat-window{
+    height:100% !important;
+    min-height:0 !important;
+    grid-template-rows:auto minmax(0, 1fr) auto !important;
+  }
+
+  .aic-mobile-back-btn{
+    display:inline-flex !important;
+    height:32px !important;
+    min-height:32px !important;
+    padding:0 10px !important;
+    border:1px solid #cbd5e1 !important;
+    border-radius:10px !important;
+    background:#ffffff !important;
+    color:#334155 !important;
+    font-size:12px !important;
+    font-weight:900 !important;
+    align-items:center !important;
+    justify-content:center !important;
+    cursor:pointer !important;
+    flex:0 0 auto !important;
+  }
+
+  .aic-chat-head{
+    align-items:center !important;
+  }
+
+  .aic-chat-title-box{
+    flex:1 1 auto;
+  }
+
+  .aic-chat-actions{
+    flex:0 0 auto;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-message{
+    max-width:88% !important;
+  }
+}
