@@ -2016,3 +2016,11 @@
     overflow-x: hidden !important;
   }
 }
+
+@media (max-width: 768px) {
+  .mobile-memo-hidden {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+}
