@@ -1424,31 +1424,93 @@ function renderRelatedDocCard(doc){
 
 
 function renderRelatedDocTable(rows=[]){
-  const body = rows.length
-    ? rows.map((doc,index)=>{
-        const title = doc.title || '제목 없음';
-        const writer = doc.updated_by || doc.created_by || '-';
-        const date = doc.updated_at || doc.created_at
-          ? new Date(doc.updated_at || doc.created_at).toLocaleDateString('ko-KR')
-          : '-';
-        const hasImage = /<img\s/i.test(String(doc.content || doc.body || ''));
-        const fileName = doc.file_name || doc.source || '';
-        const attachments = getRelatedDocAttachments(doc);
-        return `<tr>
-          <td style="width:70px;">${index+1}</td>
-          <td style="width:150px;">${escapeHtml(date)}</td>
-          <td class="col-note" style="font-weight:800;">
-            <button type="button" class="related-doc-title-link" onclick="openRelatedDocDetail('${doc.id}')">${escapeHtml(title)}</button>
-            ${hasImage?` <span class="inline-badge wastewater">이미지</span>`:''}
-            ${(fileName||attachments.length)?` <span class="inline-badge partial">첨부</span>`:''}
-          </td>
-          <td style="width:170px;">${escapeHtml(writer)}</td>
-          <td style="width:90px;">${canManageRelatedDocs()?`<button class="small-btn danger" onclick="deleteRelatedDoc('${doc.id}')">삭제</button>`:'-'}</td>
-        </tr>`;
-      }).join('')
-    : `<tr><td colspan="5">이 게시판에 등록된 글이 없습니다.</td></tr>`;
+  if(!rows.length){
+    return `
+      <div class="related-doc-mobile-list">
+        <div class="related-doc-mobile-empty">이 게시판에 등록된 글이 없습니다.</div>
+      </div>
+      <div class="table-wrap related-doc-table-wrap">
+        <table class="related-doc-table" style="min-width:760px;">
+          <thead>
+            <tr>
+              <th style="width:70px;">순번</th>
+              <th style="width:150px;">작성일</th>
+              <th>제목</th>
+              <th style="width:170px;">작성자</th>
+              <th style="width:90px;">작업</th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="5">이 게시판에 등록된 글이 없습니다.</td></tr></tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  const tableBody = rows.map((doc,index)=>{
+    const title = doc.title || '제목 없음';
+    const writer = doc.updated_by || doc.created_by || '-';
+    const date = doc.updated_at || doc.created_at
+      ? new Date(doc.updated_at || doc.created_at).toLocaleDateString('ko-KR')
+      : '-';
+    const hasImage = /<img\s/i.test(String(doc.content || doc.body || ''));
+    const fileName = doc.file_name || doc.source || '';
+    const attachments = getRelatedDocAttachments(doc);
+    return `<tr>
+      <td style="width:70px;">${index+1}</td>
+      <td style="width:150px;">${escapeHtml(date)}</td>
+      <td class="col-note" style="font-weight:800;">
+        <button type="button" class="related-doc-title-link" onclick="openRelatedDocDetail('${doc.id}')">${escapeHtml(title)}</button>
+        ${hasImage?` <span class="inline-badge wastewater">이미지</span>`:''}
+        ${(fileName||attachments.length)?` <span class="inline-badge partial">첨부</span>`:''}
+      </td>
+      <td style="width:170px;">${escapeHtml(writer)}</td>
+      <td style="width:90px;">${canManageRelatedDocs()?`<button class="small-btn danger" onclick="deleteRelatedDoc('${doc.id}')">삭제</button>`:'-'}</td>
+    </tr>`;
+  }).join('');
+
+  const mobileCards = rows.map((doc,index)=>{
+    const title = doc.title || '제목 없음';
+    const writer = doc.updated_by || doc.created_by || '-';
+    const date = doc.updated_at || doc.created_at
+      ? new Date(doc.updated_at || doc.created_at).toLocaleDateString('ko-KR')
+      : '-';
+    const hasImage = /<img\s/i.test(String(doc.content || doc.body || ''));
+    const fileName = doc.file_name || doc.source || '';
+    const attachments = getRelatedDocAttachments(doc);
+    const hasAttachment = !!(fileName || attachments.length);
+
+    return `
+      <div class="related-doc-mobile-card">
+        <div class="related-doc-mobile-top">
+          <div class="related-doc-mobile-no">#${index+1}</div>
+          <div class="related-doc-mobile-badges">
+            ${hasImage?`<span class="inline-badge wastewater">이미지</span>`:''}
+            ${hasAttachment?`<span class="inline-badge partial">첨부</span>`:''}
+          </div>
+        </div>
+
+        <button type="button" class="related-doc-mobile-title" onclick="openRelatedDocDetail('${doc.id}')">
+          ${escapeHtml(title)}
+        </button>
+
+        <div class="related-doc-mobile-meta">
+          <div><span>작성일</span>${escapeHtml(date)}</div>
+          <div><span>작성자</span>${escapeHtml(writer)}</div>
+        </div>
+
+        <div class="related-doc-mobile-actions">
+          <button type="button" class="small-btn" onclick="openRelatedDocDetail('${doc.id}')">보기</button>
+          ${canManageRelatedDocs()?`<button type="button" class="small-btn danger" onclick="deleteRelatedDoc('${doc.id}')">삭제</button>`:''}
+        </div>
+      </div>
+    `;
+  }).join('');
 
   return `
+    <div class="related-doc-mobile-list">
+      ${mobileCards}
+    </div>
+
     <div class="table-wrap related-doc-table-wrap">
       <table class="related-doc-table" style="min-width:760px;">
         <thead>
@@ -1460,7 +1522,7 @@ function renderRelatedDocTable(rows=[]){
             <th style="width:90px;">작업</th>
           </tr>
         </thead>
-        <tbody>${body}</tbody>
+        <tbody>${tableBody}</tbody>
       </table>
     </div>
   `;
