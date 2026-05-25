@@ -1781,34 +1781,95 @@ tr.over-row td {
 
 
 /* =========================================================
-   Mobile Date Input Width Recovery Patch v1
-   - 줌 방지(16px)는 유지
-   - 날짜/수거일 input 폭이 카드 밖으로 늘어나는 문제 복구
+   Mobile Date Input Hard Clamp Patch v2
+   - 날짜/수거일 date input이 모바일 화면 밖으로 나가는 문제 강제 보정
+   - iOS/Android date 기본 표시 영역까지 같이 축소
+   - 입력창 줌 방지 16px는 유지
 ========================================================= */
 @media (max-width:720px){
 
-  input[type="date"],
-  .input[type="date"]{
+  .app-shell,
+  #app,
+  .tab-panel,
+  .tab-panel.active,
+  .main-grid,
+  .main-grid > *,
+  .form-card,
+  .field,
+  .field > *,
+  .type-box,
+  .type-box > *,
+  .form-chip-row,
+  .checkbox-row{
     width:100% !important;
     max-width:100% !important;
     min-width:0 !important;
     box-sizing:border-box !important;
-    display:block !important;
-    flex:1 1 auto !important;
-    overflow:hidden !important;
-    font-size:16px !important;
+    overflow-x:hidden !important;
   }
 
-  .field,
-  .field > div,
-  .type-box,
-  .form-card,
-  .main-grid > *,
-  .tab-panel.active{
+  .input,
+  .select,
+  .textarea,
+  input,
+  select,
+  textarea{
+    max-width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
+  }
+
+  input[type="date"],
+  input.input[type="date"],
+  .input[type="date"]{
+    display:block !important;
+    width:100% !important;
+    inline-size:100% !important;
+    max-width:100% !important;
+    max-inline-size:100% !important;
+    min-width:0 !important;
+    min-inline-size:0 !important;
+    height:40px !important;
+    min-height:40px !important;
+    padding:0 8px !important;
+    margin:0 !important;
+    box-sizing:border-box !important;
+    font-size:16px !important;
+    line-height:40px !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+    white-space:nowrap !important;
+    -webkit-appearance:none !important;
+    appearance:none !important;
+  }
+
+  input[type="date"]::-webkit-date-and-time-value{
     min-width:0 !important;
     max-width:100% !important;
-    overflow-x:hidden !important;
-    box-sizing:border-box !important;
+    width:100% !important;
+    text-align:left !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+  }
+
+  input[type="date"]::-webkit-datetime-edit{
+    min-width:0 !important;
+    max-width:100% !important;
+    width:100% !important;
+    overflow:hidden !important;
+  }
+
+  input[type="date"]::-webkit-datetime-edit-fields-wrapper{
+    min-width:0 !important;
+    max-width:100% !important;
+    overflow:hidden !important;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator{
+    flex:0 0 auto !important;
+    width:18px !important;
+    height:18px !important;
+    margin-left:2px !important;
   }
 }
 
