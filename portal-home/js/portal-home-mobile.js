@@ -1476,228 +1476,128 @@
 
 
 /* =========================================================
-   Mobile Memo Final List Stabilizer JS v45
-   - v44 필터는 유지
-   - 모바일에서 PC 자유배치 inline style(left/top/transform/rotate/width)을 최종 정리
-   - 필터 변경 후에도 세로 리스트 정렬 재적용
+   Mobile Memo Filter Minimal Click Fix JS v46
+   - v45 제거 후 색상 필터 클릭만 최소 보강
+   - 기존 디자인/레이아웃/PC 자유배치 복구 로직은 건드리지 않음
+   - 기존 mobileMemoFilterController가 있으면 그 컨트롤러를 우선 사용
 ========================================================= */
 (function () {
   'use strict';
 
   var MOBILE_QUERY = '(max-width: 768px)';
-  var CARD_SELECTOR = '.memo-note, .memo-card, .memo-item, .note-card, [data-note-id], [data-memo-id]';
-  var BOARD_SELECTOR = '#memo-board, .memo-board, #memo-board-notes, .memo-board-notes';
-  var raf = 0;
+  var CARD_SELECTOR = '.memo-note, .memo-card, .memo-item, .note-card, [data-memo-id], [data-note-id]';
+  var touchStartX = 0;
+  var touchStartY = 0;
+  var moved = false;
 
   function isMobile() {
     return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
   }
 
-  function isMemoMode() {
-    return document.body && document.body.classList.contains('mobile-memo-list-mode');
-  }
-
-  function getViewportHeight() {
-    return (window.visualViewport && window.visualViewport.height) ||
-      window.innerHeight ||
-      document.documentElement.clientHeight ||
-      0;
-  }
-
-  function getRootWidth() {
-    var root = document.querySelector('#tab-content.content') ||
-      document.querySelector('#tab-content') ||
-      document.querySelector('#home-page.home-root') ||
-      document.body;
-
-    var rect = root.getBoundingClientRect();
-    var viewportW = window.innerWidth || document.documentElement.clientWidth || 0;
-    var width = Math.floor(Math.min(rect.width || viewportW, viewportW));
-
-    if (width >= viewportW - 1) width = viewportW - 20;
-    return Math.max(280, width);
-  }
-
-  function applyHeight() {
-    var wrap = document.querySelector('#tab-content .memo-wrap, #tab-content .card.memo-wrap, .memo-wrap');
-    if (!wrap || !isMobile() || !isMemoMode()) {
-      document.documentElement.style.removeProperty('--mobile-memo-wrap-height');
-      return;
-    }
-
-    var rect = wrap.getBoundingClientRect();
-    var viewportH = getViewportHeight();
-    var available = Math.floor(viewportH - rect.top - 12);
-    var minHeight = Math.min(540, Math.max(380, Math.floor(viewportH * 0.58)));
-    var maxHeight = Math.max(360, Math.floor(viewportH - 90));
-
-    if (!available || available < minHeight) available = minHeight;
-    if (available > maxHeight) available = maxHeight;
-
-    document.documentElement.style.setProperty('--mobile-memo-wrap-height', available + 'px');
-  }
-
-  function resetBoard(el) {
-    if (!el) return;
-
-    if (el.matches && (el.matches('#memo-board-notes') || el.matches('.memo-board-notes'))) {
-      el.style.position = 'static';
-      el.style.display = 'block';
-      el.style.left = 'auto';
-      el.style.top = 'auto';
-      el.style.right = 'auto';
-      el.style.bottom = 'auto';
-      el.style.width = '100%';
-      el.style.maxWidth = '100%';
-      el.style.minWidth = '0';
-      el.style.height = 'auto';
-      el.style.maxHeight = 'none';
-      el.style.transform = 'none';
-      el.style.translate = 'none';
-      el.style.overflow = 'visible';
-      el.style.pointerEvents = 'auto';
-      el.style.boxSizing = 'border-box';
-      return;
-    }
-
-    el.style.position = 'relative';
-    el.style.display = 'block';
-    el.style.left = '0px';
-    el.style.top = 'auto';
-    el.style.right = 'auto';
-    el.style.bottom = 'auto';
-    el.style.width = '100%';
-    el.style.maxWidth = '100%';
-    el.style.minWidth = '0';
-    el.style.transform = 'none';
-    el.style.translate = 'none';
-    el.style.overflowX = 'hidden';
-    el.style.overflowY = 'auto';
-    el.style.boxSizing = 'border-box';
-  }
-
-  function resetCard(card) {
-    if (!card) return;
-    if (card.closest && card.closest('.mobile-memo-filter-bar')) return;
-    if (card.closest && card.closest('.mobile-memo-unified-modal')) return;
-
-    var hidden = card.classList && card.classList.contains('mobile-memo-hidden');
-
-    card.style.position = 'relative';
-    card.style.display = hidden ? 'none' : 'block';
-    card.style.left = '0px';
-    card.style.top = 'auto';
-    card.style.right = 'auto';
-    card.style.bottom = 'auto';
-    card.style.width = '100%';
-    card.style.maxWidth = '100%';
-    card.style.minWidth = '0';
-    card.style.height = 'auto';
-    card.style.maxHeight = 'none';
-    card.style.transform = 'none';
-    card.style.translate = 'none';
-    card.style.rotate = '0deg';
-    card.style.margin = hidden ? '0' : '0 0 10px 0';
-    card.style.boxSizing = 'border-box';
-
-    if (card.hidden && !hidden) card.hidden = false;
-  }
-
-  function applyFilterBarWidth() {
-    Array.prototype.slice.call(document.querySelectorAll('.mobile-memo-filter-bar')).forEach(function (bar) {
-      bar.style.width = '100%';
-      bar.style.maxWidth = '100%';
-      bar.style.minWidth = '0';
-      bar.style.display = 'flex';
-      bar.style.flexWrap = 'nowrap';
-      bar.style.overflowX = 'auto';
-      bar.style.overflowY = 'hidden';
-      bar.style.whiteSpace = 'nowrap';
-      bar.style.boxSizing = 'border-box';
-      bar.style.webkitOverflowScrolling = 'touch';
-
-      Array.prototype.slice.call(bar.querySelectorAll('.mobile-memo-filter-chip, button[data-filter]')).forEach(function (chip) {
-        chip.style.flex = '0 0 auto';
-        chip.style.whiteSpace = 'nowrap';
-        chip.style.maxWidth = 'none';
-        chip.style.minWidth = 'max-content';
-      });
+  function getCards() {
+    return Array.prototype.slice.call(document.querySelectorAll(CARD_SELECTOR)).filter(function (card) {
+      if (!card) return false;
+      if (card.closest && card.closest('.mobile-memo-filter-bar')) return false;
+      if (card.closest && card.closest('.mobile-memo-unified-modal')) return false;
+      return true;
     });
   }
 
-  function stabilize() {
-    raf = 0;
+  function detectColor(card) {
+    var raw = [
+      card.dataset ? (card.dataset.mobileMemoColor || card.dataset.color || card.dataset.memoColor || card.dataset.noteColor || card.dataset.bg || '') : '',
+      card.className || '',
+      card.getAttribute('style') || '',
+      window.getComputedStyle ? window.getComputedStyle(card).backgroundColor : ''
+    ].join(' ').toLowerCase();
 
-    if (!isMobile() || !isMemoMode()) return;
+    if (raw.indexOf('blue') >= 0 || raw.indexOf('60a5fa') >= 0 || raw.indexOf('bfdbfe') >= 0 || raw.indexOf('dbeafe') >= 0 || raw.indexOf('219, 234') >= 0) return 'blue';
+    if (raw.indexOf('green') >= 0 || raw.indexOf('4ade80') >= 0 || raw.indexOf('bbf7d0') >= 0 || raw.indexOf('dcfce7') >= 0 || raw.indexOf('220, 252') >= 0) return 'green';
+    if (raw.indexOf('pink') >= 0 || raw.indexOf('rose') >= 0 || raw.indexOf('f9a8d4') >= 0 || raw.indexOf('fecdd3') >= 0 || raw.indexOf('fce7f3') >= 0 || raw.indexOf('252, 231') >= 0) return 'pink';
+    if (raw.indexOf('purple') >= 0 || raw.indexOf('violet') >= 0 || raw.indexOf('c084fc') >= 0 || raw.indexOf('e9d5ff') >= 0 || raw.indexOf('f3e8ff') >= 0 || raw.indexOf('243, 232') >= 0) return 'purple';
+    if (raw.indexOf('yellow') >= 0 || raw.indexOf('facc15') >= 0 || raw.indexOf('fde68a') >= 0 || raw.indexOf('fef3c7') >= 0 || raw.indexOf('255, 243') >= 0) return 'yellow';
+    if (raw.indexOf('white') >= 0 || raw.indexOf('ffffff') >= 0 || raw.indexOf('255, 255, 255') >= 0) return 'white';
 
-    var width = getRootWidth();
-    document.documentElement.style.setProperty('--mobile-memo-wrap-width', width + 'px');
+    return card.dataset && card.dataset.mobileMemoColor ? card.dataset.mobileMemoColor : 'white';
+  }
 
-    Array.prototype.slice.call(document.querySelectorAll('#tab-content .memo-wrap, #tab-content .card.memo-wrap, .memo-wrap')).forEach(function (wrap) {
-      wrap.style.width = '100%';
-      wrap.style.maxWidth = '100%';
-      wrap.style.minWidth = '0';
-      wrap.style.left = 'auto';
-      wrap.style.right = 'auto';
-      wrap.style.transform = 'none';
-      wrap.style.translate = 'none';
-      wrap.style.overflow = 'hidden';
-      wrap.style.boxSizing = 'border-box';
+  function fallbackApply(filterKey) {
+    filterKey = filterKey || 'all';
+
+    Array.prototype.slice.call(document.querySelectorAll('.mobile-memo-filter-bar button[data-filter], .mobile-memo-filter-chip')).forEach(function (btn) {
+      var key = btn.dataset ? btn.dataset.filter : '';
+      btn.classList.toggle('is-active', key === filterKey);
+      btn.setAttribute('aria-selected', key === filterKey ? 'true' : 'false');
     });
 
-    Array.prototype.slice.call(document.querySelectorAll(BOARD_SELECTOR)).forEach(resetBoard);
-    Array.prototype.slice.call(document.querySelectorAll(CARD_SELECTOR)).forEach(resetCard);
+    getCards().forEach(function (card) {
+      var color = detectColor(card);
+      if (card.dataset) card.dataset.mobileMemoColor = color;
 
-    applyFilterBarWidth();
-    applyHeight();
+      var hidden = filterKey !== 'all' && color !== filterKey;
+      card.classList.toggle('mobile-memo-hidden', hidden);
+      card.hidden = hidden;
+      card.style.display = hidden ? 'none' : '';
+    });
+
+    if (window.mobileMemoViewportWidthClamp && typeof window.mobileMemoViewportWidthClamp.schedule === 'function') {
+      window.mobileMemoViewportWidthClamp.schedule();
+    }
+    if (window.mobileMemoLayoutReset && typeof window.mobileMemoLayoutReset.schedule === 'function') {
+      window.mobileMemoLayoutReset.schedule();
+    }
   }
 
-  function schedule() {
-    if (raf) return;
-    raf = window.requestAnimationFrame(stabilize);
+  function applyFilter(filterKey) {
+    if (window.mobileMemoFilterController && typeof window.mobileMemoFilterController.apply === 'function') {
+      window.mobileMemoFilterController.apply(filterKey);
+      setTimeout(function () { fallbackApply(filterKey); }, 60);
+      setTimeout(function () { fallbackApply(filterKey); }, 180);
+      return;
+    }
+
+    fallbackApply(filterKey);
   }
 
-  function scheduleMulti() {
-    schedule();
-    setTimeout(schedule, 80);
-    setTimeout(schedule, 220);
-    setTimeout(schedule, 520);
-  }
+  document.addEventListener('touchstart', function (event) {
+    if (!isMobile()) return;
+    if (!event.target.closest || !event.target.closest('.mobile-memo-filter-bar')) return;
+    if (!event.touches || event.touches.length !== 1) return;
 
-  document.addEventListener('DOMContentLoaded', scheduleMulti);
-  window.addEventListener('resize', scheduleMulti);
-  window.addEventListener('orientationchange', scheduleMulti);
-  document.addEventListener('click', function () {
-    setTimeout(schedule, 20);
-    setTimeout(schedule, 140);
-    setTimeout(schedule, 320);
+    touchStartX = event.touches[0].clientX;
+    touchStartY = event.touches[0].clientY;
+    moved = false;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function (event) {
+    if (!isMobile()) return;
+    if (!event.target.closest || !event.target.closest('.mobile-memo-filter-bar')) return;
+    if (!event.touches || event.touches.length !== 1) return;
+
+    var dx = Math.abs(event.touches[0].clientX - touchStartX);
+    var dy = Math.abs(event.touches[0].clientY - touchStartY);
+    if (dx > 12 || dy > 12) moved = true;
+  }, { passive: true });
+
+  document.addEventListener('click', function (event) {
+    if (!isMobile()) return;
+
+    var btn = event.target.closest && event.target.closest('.mobile-memo-filter-bar button[data-filter], .mobile-memo-filter-chip');
+    if (!btn || !btn.dataset || !btn.dataset.filter) return;
+
+    if (moved) {
+      moved = false;
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    applyFilter(btn.dataset.filter);
   }, true);
 
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', scheduleMulti);
-    window.visualViewport.addEventListener('scroll', schedule);
-  }
-
-  var observer = new MutationObserver(function () {
-    if (!isMobile()) return;
-    schedule();
-  });
-
-  if (document.documentElement) {
-    observer.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['class', 'style', 'hidden', 'data-mobile-memo-color']
-    });
-  }
-
-  setTimeout(scheduleMulti, 250);
-  setTimeout(scheduleMulti, 900);
-  setTimeout(scheduleMulti, 1600);
-
-  window.mobileMemoFinalListStabilizer = {
-    apply: stabilize,
-    schedule: scheduleMulti
+  window.mobileMemoFilterMinimalFix = {
+    apply: applyFilter,
+    fallbackApply: fallbackApply
   };
 })();
