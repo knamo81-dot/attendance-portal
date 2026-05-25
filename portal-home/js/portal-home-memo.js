@@ -442,6 +442,12 @@ function renderMemoTab() {
                 <div
                   class="memo-note ${item.imageOnly ? 'image-only' : ''} ${isExpanded || isEditing ? 'expanded' : ''} ${state.memoDraggingId === item.id ? 'dragging' : ''}"
                   data-note-id="${item.id}"
+                  data-memo-server-id="${escapeAttr(item.serverId || item.id)}"
+                  data-memo-title="${escapeAttr(item.title || '')}"
+                  data-memo-tag="${escapeAttr(item.tag || '메모')}"
+                  data-memo-content="${escapeAttr(item.content || '')}"
+                  data-memo-color="${escapeAttr(item.layout?.color || '#fef3c7')}"
+                  data-memo-pinned="${item.pinned ? 'true' : 'false'}"
                   draggable="${memoCanDrag ? 'true' : 'false'}"
                   style="
                     left:${pos.x}px;
@@ -1049,3 +1055,94 @@ ${item.imageOnly ? '이미지 메모' : (item.pinned ? '중요 메모' : '최근
         state.editMemo.pinned = e.target.checked;
       });
     }
+
+
+
+/* =========================================================
+   Mobile Memo Data Bridge API v33
+   - 모바일 전용 모달이 DOM이 아닌 원본 state.notes와 서버 저장 함수에 직접 접근하도록 제공
+========================================================= */
+(function () {
+  'use strict';
+
+  window.portalMemoMobileApi = {
+    getNotes: function () {
+      try {
+        return Array.isArray(state.notes) ? state.notes : [];
+      } catch (_) {
+        return [];
+      }
+    },
+    getNoteById: function (id) {
+      try {
+        const sid = String(id || '');
+        return (Array.isArray(state.notes) ? state.notes : []).find(function (n) {
+          return String(n.id) === sid || String(n.serverId) === sid;
+        }) || null;
+      } catch (_) {
+        return null;
+      }
+    },
+    getNewMemo: function () {
+      try {
+        return state.newMemo || null;
+      } catch (_) {
+        return null;
+      }
+    },
+    setNewMemoOpen: function (open) {
+      try {
+        state.newMemoOpen = !!open;
+      } catch (_) {}
+    },
+    setNewMemo: function (patch) {
+      try {
+        state.newMemo = Object.assign({}, state.newMemo || {}, patch || {});
+      } catch (_) {}
+    },
+    updateMemo: async function (id, patch) {
+      if (typeof updateMemoOnServer !== 'function') throw new Error('updateMemoOnServer 함수를 찾지 못했습니다.');
+      const note = this.getNoteById(id);
+      const serverId = note ? (note.serverId || note.id) : id;
+      const row = await updateMemoOnServer(serverId, patch || {});
+      const mapped = (typeof mapMemoRowToState === 'function') ? mapMemoRowToState(row) : row;
+      try {
+        state.notes = (Array.isArray(state.notes) ? state.notes : []).map(function (n) {
+          return String(n.id) === String(id) || String(n.serverId) === String(serverId) ? mapped : n;
+        });
+      } catch (_) {}
+      if (typeof renderMemoTab === 'function') renderMemoTab();
+      return mapped;
+    },
+    createMemo: async function (patch) {
+      if (typeof createMemoOnServer !== 'function') throw new Error('createMemoOnServer 함수를 찾지 못했습니다.');
+      const row = await createMemoOnServer(patch || {});
+      const mapped = (typeof mapMemoRowToState === 'function') ? mapMemoRowToState(row) : row;
+      try {
+        state.notes = [mapped].concat(Array.isArray(state.notes) ? state.notes : []);
+        state.newMemoOpen = false;
+      } catch (_) {}
+      if (typeof renderMemoTab === 'function') renderMemoTab();
+      return mapped;
+    },
+    deleteMemo: async function (id) {
+      if (typeof softDeleteMemoOnServer !== 'function') throw new Error('softDeleteMemoOnServer 함수를 찾지 못했습니다.');
+      const note = this.getNoteById(id);
+      const serverId = note ? (note.serverId || note.id) : id;
+      await softDeleteMemoOnServer(serverId);
+      try {
+        state.notes = (Array.isArray(state.notes) ? state.notes : []).filter(function (n) {
+          return String(n.id) !== String(id) && String(n.serverId) !== String(serverId);
+        });
+      } catch (_) {}
+      if (typeof renderMemoTab === 'function') renderMemoTab();
+    },
+    reload: async function () {
+      if (typeof loadMemosFromServer === 'function') await loadMemosFromServer();
+      if (typeof renderMemoTab === 'function') renderMemoTab();
+    },
+    render: function () {
+      if (typeof renderMemoTab === 'function') renderMemoTab();
+    }
+  };
+})();
