@@ -1380,3 +1380,154 @@
     schedule: scheduleMultiApply
   };
 })();
+
+
+
+/* =========================================================
+   Mobile Memo Filter Delegated Click Fix v43
+   - 색상 필터 버튼 클릭이 안 먹는 문제 보정
+   - 기존 생성 시점 addEventListener에 의존하지 않고 document 위임으로 처리
+   - 스크롤 보정/레이아웃 보정 JS와 충돌 방지
+========================================================= */
+(function () {
+  'use strict';
+
+  var MOBILE_QUERY = '(max-width: 768px)';
+  var CARD_SELECTOR = '.memo-note, .memo-card, .memo-item, .note-card, [data-memo-id], [data-note-id]';
+  var currentFilter = 'all';
+  var touchStartX = 0;
+  var touchStartY = 0;
+  var didMove = false;
+
+  function isMobile() {
+    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  function getCards() {
+    return Array.prototype.slice.call(document.querySelectorAll(CARD_SELECTOR)).filter(function (card) {
+      if (!card) return false;
+      if (card.classList && card.classList.contains('mobile-memo-filter-chip')) return false;
+      if (card.closest && card.closest('.mobile-memo-filter-bar')) return false;
+      if (card.closest && card.closest('.mobile-memo-unified-modal')) return false;
+      return true;
+    });
+  }
+
+  function normalizeColorFromCard(card) {
+    if (!card) return 'white';
+
+    var raw = [
+      card.dataset ? (card.dataset.mobileMemoColor || card.dataset.color || card.dataset.memoColor || card.dataset.noteColor || card.dataset.bg || '') : '',
+      card.className || '',
+      card.getAttribute('style') || '',
+      (window.getComputedStyle ? window.getComputedStyle(card).backgroundColor : '') || ''
+    ].join(' ').toLowerCase();
+
+    if (raw.indexOf('blue') >= 0 || raw.indexOf('60a5fa') >= 0 || raw.indexOf('bfdbfe') >= 0 || raw.indexOf('dbeafe') >= 0 || raw.indexOf('219, 234') >= 0) return 'blue';
+    if (raw.indexOf('green') >= 0 || raw.indexOf('4ade80') >= 0 || raw.indexOf('bbf7d0') >= 0 || raw.indexOf('dcfce7') >= 0 || raw.indexOf('220, 252') >= 0) return 'green';
+    if (raw.indexOf('pink') >= 0 || raw.indexOf('rose') >= 0 || raw.indexOf('f9a8d4') >= 0 || raw.indexOf('fecdd3') >= 0 || raw.indexOf('fce7f3') >= 0 || raw.indexOf('252, 231') >= 0) return 'pink';
+    if (raw.indexOf('purple') >= 0 || raw.indexOf('violet') >= 0 || raw.indexOf('c084fc') >= 0 || raw.indexOf('e9d5ff') >= 0 || raw.indexOf('f3e8ff') >= 0 || raw.indexOf('243, 232') >= 0) return 'purple';
+    if (raw.indexOf('yellow') >= 0 || raw.indexOf('facc15') >= 0 || raw.indexOf('fde68a') >= 0 || raw.indexOf('fef3c7') >= 0 || raw.indexOf('255, 243') >= 0) return 'yellow';
+    if (raw.indexOf('white') >= 0 || raw.indexOf('ffffff') >= 0 || raw.indexOf('255, 255, 255') >= 0) return 'white';
+
+    return card.dataset && card.dataset.mobileMemoColor ? card.dataset.mobileMemoColor : 'white';
+  }
+
+  function applyFilter(filterKey) {
+    if (!isMobile()) return;
+
+    currentFilter = filterKey || 'all';
+
+    var bars = Array.prototype.slice.call(document.querySelectorAll('.mobile-memo-filter-bar'));
+    bars.forEach(function (bar) {
+      Array.prototype.slice.call(bar.querySelectorAll('.mobile-memo-filter-chip, button[data-filter]')).forEach(function (btn) {
+        var key = btn.dataset ? btn.dataset.filter : '';
+        btn.classList.toggle('is-active', key === currentFilter);
+        btn.setAttribute('aria-selected', key === currentFilter ? 'true' : 'false');
+      });
+    });
+
+    getCards().forEach(function (card) {
+      var color = normalizeColorFromCard(card);
+      if (card.dataset) card.dataset.mobileMemoColor = color;
+
+      var hidden = currentFilter !== 'all' && color !== currentFilter;
+      card.classList.toggle('mobile-memo-hidden', hidden);
+      card.hidden = hidden;
+      card.style.display = hidden ? 'none' : '';
+    });
+
+    if (window.mobileMemoViewportWidthClamp && typeof window.mobileMemoViewportWidthClamp.schedule === 'function') {
+      window.mobileMemoViewportWidthClamp.schedule();
+    }
+    if (window.mobileMemoLayoutReset && typeof window.mobileMemoLayoutReset.schedule === 'function') {
+      window.mobileMemoLayoutReset.schedule();
+    }
+  }
+
+  function getFilterButton(target) {
+    if (!target || !target.closest) return null;
+    return target.closest('.mobile-memo-filter-chip, .mobile-memo-filter-bar button[data-filter]');
+  }
+
+  document.addEventListener('touchstart', function (event) {
+    if (!isMobile()) return;
+    if (!event.target.closest || !event.target.closest('.mobile-memo-filter-bar')) return;
+    if (!event.touches || event.touches.length !== 1) return;
+
+    touchStartX = event.touches[0].clientX;
+    touchStartY = event.touches[0].clientY;
+    didMove = false;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function (event) {
+    if (!isMobile()) return;
+    if (!event.target.closest || !event.target.closest('.mobile-memo-filter-bar')) return;
+    if (!event.touches || event.touches.length !== 1) return;
+
+    var dx = Math.abs(event.touches[0].clientX - touchStartX);
+    var dy = Math.abs(event.touches[0].clientY - touchStartY);
+    if (dx > 8 || dy > 8) didMove = true;
+  }, { passive: true });
+
+  document.addEventListener('click', function (event) {
+    if (!isMobile()) return;
+
+    var btn = getFilterButton(event.target);
+    if (!btn) return;
+
+    /*
+      가로 스크롤을 한 경우에는 클릭으로 처리하지 않음.
+      살짝 탭한 경우만 필터 적용.
+    */
+    if (didMove) {
+      didMove = false;
+      return;
+    }
+
+    var filterKey = btn.dataset ? btn.dataset.filter : '';
+    if (!filterKey) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') {
+      event.stopImmediatePropagation();
+    }
+
+    applyFilter(filterKey);
+  }, true);
+
+  document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(function () { applyFilter(currentFilter); }, 250);
+  });
+
+  window.addEventListener('resize', function () {
+    if (!isMobile()) return;
+    setTimeout(function () { applyFilter(currentFilter); }, 120);
+  });
+
+  window.mobileMemoFilterFix = {
+    apply: applyFilter,
+    getCurrentFilter: function () { return currentFilter; }
+  };
+})();
