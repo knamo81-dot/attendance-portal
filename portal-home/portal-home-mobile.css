@@ -2024,3 +2024,96 @@
     opacity: 0 !important;
   }
 }
+
+
+/* =========================================================
+   Mobile Schedule Scope Filter 4 Buttons Fix v21
+   - 전체/연구소/팀/개인 4개 버튼을 모바일에서 한 줄에 모두 표시
+   - 오른쪽으로 밀려 개인 버튼이 잘리는 문제 보정
+========================================================= */
+@media (max-width: 768px) {
+  #tab-content .month-scope-filter-row,
+  #tab-content .schedule-scope-filter,
+  #tab-content .schedule-filter,
+  #tab-content .calendar-filter,
+  #tab-content .scope-filter,
+  #tab-content [class*="scope"][class*="filter"] {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    box-sizing: border-box !important;
+  }
+
+  #tab-content .month-scope-filter-row > *,
+  #tab-content .schedule-scope-filter > *,
+  #tab-content .schedule-filter > *,
+  #tab-content .calendar-filter > *,
+  #tab-content .scope-filter > *,
+  #tab-content [class*="scope"][class*="filter"] > * {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 auto !important;
+    box-sizing: border-box !important;
+  }
+
+  #tab-content .month-scope-filter-row button,
+  #tab-content .schedule-scope-filter button,
+  #tab-content .schedule-filter button,
+  #tab-content .calendar-filter button,
+  #tab-content .scope-filter button,
+  #tab-content [class*="scope"][class*="filter"] button,
+  #tab-content .month-scope-filter-row label,
+  #tab-content .schedule-scope-filter label,
+  #tab-content .schedule-filter label,
+  #tab-content .calendar-filter label,
+  #tab-content .scope-filter label,
+  #tab-content [class*="scope"][class*="filter"] label {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    padding: 0 6px !important;
+    font-size: 13px !important;
+    border-radius: 15px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-width: 390px) {
+  #tab-content .month-scope-filter-row,
+  #tab-content .schedule-scope-filter,
+  #tab-content .schedule-filter,
+  #tab-content .calendar-filter,
+  #tab-content .scope-filter,
+  #tab-content [class*="scope"][class*="filter"] {
+    gap: 6px !important;
+  }
+
+  #tab-content .month-scope-filter-row button,
+  #tab-content .schedule-scope-filter button,
+  #tab-content .schedule-filter button,
+  #tab-content .calendar-filter button,
+  #tab-content .scope-filter button,
+  #tab-content [class*="scope"][class*="filter"] button,
+  #tab-content .month-scope-filter-row label,
+  #tab-content .schedule-scope-filter label,
+  #tab-content .schedule-filter label,
+  #tab-content .calendar-filter label,
+  #tab-content .scope-filter label,
+  #tab-content [class*="scope"][class*="filter"] label {
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 4px !important;
+    font-size: 12px !important;
+  }
+}
