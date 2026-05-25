@@ -632,28 +632,66 @@
   }
 
   function getMemoContent(card) {
-    var el = q(card, [
-      '.memo-content', '.memo-body', '.memo-text', '.memo-detail',
-      '.note-content', '.note-body', '.note-text', '.note-detail',
-      'textarea'
-    ]);
+    /*
+      모바일 상세 모달 본문 추출 보정
+      - 카드 요약 라벨(#메모, MEMO, 최근 메모) 제외
+      - 작성/수정일 제외
+      - 제목과 동일한 줄 제외
+      - 실제 본문 후보가 없으면 빈 값
+    */
+    var title = getMemoTitle(card);
+    var blockedExact = [
+      '상세보기', '열기', '닫기', '수정', '삭제', '저장',
+      '#메모', '메모', 'MEMO', 'memo', '최근 메모', '최근메모'
+    ];
 
-    if (el) {
-      if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') return el.value || '';
-      return textOf(el);
+    function cleanLine(v) {
+      return (v || '').replace(/\u00a0/g, ' ').trim();
     }
 
-    var title = getMemoTitle(card);
-    var lines = textOf(card).split('\n').map(function (v) { return v.trim(); }).filter(Boolean);
+    function isBlockedLine(v) {
+      var raw = cleanLine(v);
+      var compact = raw.replace(/\s+/g, '');
+      if (!raw) return true;
+      if (raw === title) return true;
+      if (blockedExact.indexOf(raw) >= 0) return true;
+      if (['#메모', '메모', 'MEMO', 'memo', '최근메모'].indexOf(compact) >= 0) return true;
+      if (/^작성\s*:/.test(raw)) return true;
+      if (/^수정\s*:/.test(raw)) return true;
+      if (/^작성일\s*:/.test(raw)) return true;
+      if (/^수정일\s*:/.test(raw)) return true;
+      if (/^\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.?$/.test(raw)) return true;
+      return false;
+    }
 
-    return lines.filter(function (v) {
-      return v !== title &&
-        ['상세보기', '열기', '닫기', '수정', '삭제', '저장'].indexOf(v) < 0 &&
-        !/^#?메모$/.test(v) &&
-        !/^최근메모$/.test(v.replace(/\s+/g, '')) &&
-        !/^작성:/.test(v) &&
-        !/^수정:/.test(v);
-    }).join('\n').trim();
+    function normalizeText(value) {
+      return (value || '')
+        .split('\n')
+        .map(cleanLine)
+        .filter(function (line) { return !isBlockedLine(line); })
+        .join('\n')
+        .trim();
+    }
+
+    var selectors = [
+      '.memo-content', '.memo-body', '.memo-text', '.memo-detail',
+      '.note-content', '.note-body', '.note-text', '.note-detail',
+      '[class*="content"]', '[class*="body"]', '[class*="text"]', '[class*="detail"]',
+      'textarea'
+    ];
+
+    for (var i = 0; i < selectors.length; i++) {
+      var nodes = Array.prototype.slice.call(card.querySelectorAll(selectors[i]));
+      for (var j = 0; j < nodes.length; j++) {
+        var node = nodes[j];
+        if (!node) continue;
+        var value = (node.tagName === 'TEXTAREA' || node.tagName === 'INPUT') ? (node.value || '') : textOf(node);
+        var cleaned = normalizeText(value);
+        if (cleaned) return cleaned;
+      }
+    }
+
+    return normalizeText(textOf(card));
   }
 
   function getMemoMeta(card) {
@@ -962,3 +1000,36 @@
     if (!isMobile()) closeModal();
   });
 })();
+
+
+
+/* =========================================================
+   Mobile Memo Content Extract Fix v31
+   - v30 메모 상세에서 MEMO/#메모/최근 메모가 본문으로 들어가는 현상 보정
+========================================================= */
+(function () {
+  'use strict';
+
+  function cleanOpenedMemoTextarea() {
+    var modal = document.querySelector('.mobile-memo-unified-modal.is-open');
+    if (!modal) return;
+
+    var textarea = modal.querySelector('.mobile-memo-content-input');
+    if (!textarea) return;
+
+    var compact = (textarea.value || '').replace(/\s+/g, '').trim();
+    if (compact === 'MEMO' || compact === 'memo' || compact === '#메모' || compact === '메모' || compact === '최근메모') {
+      textarea.value = '';
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+
+  document.addEventListener('click', function () {
+    setTimeout(cleanOpenedMemoTextarea, 120);
+    setTimeout(cleanOpenedMemoTextarea, 260);
+  }, true);
+
+  window.addEventListener('resize', cleanOpenedMemoTextarea);
+})();
+
