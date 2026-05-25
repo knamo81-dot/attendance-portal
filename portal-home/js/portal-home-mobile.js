@@ -209,21 +209,21 @@
   'use strict';
 
   const MOBILE_QUERY = '(max-width: 768px)';
-  const CARD_SELECTOR = '.memo-card, .memo-item, .note-card, [data-memo-id], [data-note-id]';
+  const CARD_SELECTOR = '.memo-note, .memo-card, .memo-item, .note-card, [data-memo-id], [data-note-id]';
   const COLOR_KEYS = [
-    { key: 'yellow', label: '노랑', tokens: ['yellow', 'memo-yellow', 'note-yellow', '#facc15', '#fde68a', '255, 243', '254, 249'] },
-    { key: 'blue', label: '파랑', tokens: ['blue', 'memo-blue', 'note-blue', '#60a5fa', '#bfdbfe', '219, 234', '239, 246'] },
-    { key: 'green', label: '초록', tokens: ['green', 'memo-green', 'note-green', '#4ade80', '#bbf7d0', '220, 252', '240, 253'] },
-    { key: 'pink', label: '분홍', tokens: ['pink', 'rose', 'memo-pink', 'note-pink', '#f9a8d4', '#fecdd3', '252, 231', '253, 242'] },
-    { key: 'purple', label: '보라', tokens: ['purple', 'violet', 'memo-purple', 'note-purple', '#c084fc', '#e9d5ff', '243, 232'] },
-    { key: 'white', label: '흰색', tokens: ['white', 'memo-white', 'note-white', '#ffffff', '255, 255, 255'] }
+    { key: 'yellow', label: '노랑', tokens: ['yellow', 'memo-yellow', 'note-yellow', '#facc15', '#fde68a', '#fef3c7', 'rgb(254, 243', '254, 243', '255, 243', '254, 249'] },
+    { key: 'blue', label: '파랑', tokens: ['blue', 'memo-blue', 'note-blue', '#60a5fa', '#bfdbfe', '#dbeafe', 'rgb(219, 234', '219, 234', '239, 246'] },
+    { key: 'green', label: '초록', tokens: ['green', 'memo-green', 'note-green', '#4ade80', '#bbf7d0', '#dcfce7', 'rgb(220, 252', '220, 252', '240, 253'] },
+    { key: 'pink', label: '분홍', tokens: ['pink', 'rose', 'memo-pink', 'note-pink', '#f9a8d4', '#fecdd3', '#fce7f3', 'rgb(252, 231', '252, 231', '253, 242'] },
+    { key: 'purple', label: '보라', tokens: ['purple', 'violet', 'memo-purple', 'note-purple', '#c084fc', '#e9d5ff', '#f3e8ff', 'rgb(243, 232', '243, 232'] },
+    { key: 'white', label: '흰색', tokens: ['white', 'memo-white', 'note-white', '#ffffff', 'rgb(255, 255, 255', '255, 255, 255'] }
   ];
 
   let activeFilter = 'all';
   let rafId = 0;
 
   function isMobile() {
-    return window.matchMedia(MOBILE_QUERY).matches;
+    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
   }
 
   function hasMemoContext() {
@@ -237,8 +237,10 @@
   }
 
   function normalizeColor(card) {
+    if (!card) return 'white';
+
     const raw = [
-      card.dataset ? (card.dataset.color || card.dataset.memoColor || card.dataset.noteColor || card.dataset.bg || '') : '',
+      card.dataset ? (card.dataset.mobileMemoColor || card.dataset.color || card.dataset.memoColor || card.dataset.noteColor || card.dataset.bg || '') : '',
       card.className || '',
       card.getAttribute('style') || '',
       window.getComputedStyle(card).backgroundColor || ''
@@ -250,8 +252,10 @@
 
   function getCards() {
     return Array.from(document.querySelectorAll(CARD_SELECTOR)).filter(card => {
-      if (!card || card.classList.contains('mobile-memo-filter-chip')) return false;
-      if (card.closest('.mobile-memo-filter-bar')) return false;
+      if (!card) return false;
+      if (card.classList && card.classList.contains('mobile-memo-filter-chip')) return false;
+      if (card.closest && card.closest('.mobile-memo-filter-bar')) return false;
+      if (card.closest && card.closest('.mobile-memo-unified-modal')) return false;
       return true;
     });
   }
@@ -282,7 +286,7 @@
       COLOR_KEYS.filter(item => colors.has(item.key)).map(item => ({ key: item.key, label: item.label }))
     );
 
-    const currentKeys = Array.from(bar.querySelectorAll('button')).map(btn => btn.dataset.filter).join('|');
+    const currentKeys = Array.from(bar.querySelectorAll('button[data-filter]')).map(btn => btn.dataset.filter).join('|');
     const nextKeys = items.map(item => item.key).join('|');
     if (currentKeys !== nextKeys) {
       bar.innerHTML = '';
@@ -292,16 +296,37 @@
         btn.className = 'mobile-memo-filter-chip';
         btn.dataset.filter = item.key;
         btn.textContent = item.label;
-        btn.addEventListener('click', function () {
-          activeFilter = item.key;
-          applyMobileMemoUi();
-        });
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('aria-selected', item.key === activeFilter ? 'true' : 'false');
         bar.appendChild(btn);
       });
     }
 
-    Array.from(bar.querySelectorAll('button')).forEach(btn => {
-      btn.classList.toggle('is-active', btn.dataset.filter === activeFilter);
+    Array.from(bar.querySelectorAll('button[data-filter]')).forEach(btn => {
+      const isActive = btn.dataset.filter === activeFilter;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+  }
+
+  function applyFilterToCards(cards) {
+    cards.forEach(card => {
+      const color = normalizeColor(card);
+      card.dataset.mobileMemoColor = color;
+
+      const shouldHide = activeFilter !== 'all' && color !== activeFilter;
+      card.classList.toggle('mobile-memo-hidden', shouldHide);
+      card.hidden = shouldHide;
+      card.style.display = shouldHide ? 'none' : '';
+      if (shouldHide) card.classList.remove('mobile-memo-open');
+    });
+  }
+
+  function resetCards(cards) {
+    cards.forEach(card => {
+      card.classList.remove('mobile-memo-hidden', 'mobile-memo-open');
+      card.hidden = false;
+      card.style.display = '';
     });
   }
 
@@ -316,9 +341,7 @@
     const bar = document.querySelector('.mobile-memo-filter-bar');
     if (!enabled) {
       if (bar) bar.hidden = true;
-      cards.forEach(card => {
-        card.classList.remove('mobile-memo-hidden', 'mobile-memo-open');
-      });
+      resetCards(cards);
       return;
     }
 
@@ -328,10 +351,11 @@
       card.dataset.mobileMemoColor = color;
       colors.add(color);
       ensureTitleFallback(card);
-      card.classList.toggle('mobile-memo-hidden', activeFilter !== 'all' && color !== activeFilter);
     });
 
     ensureFilterBar(colors);
+    applyFilterToCards(cards);
+
     const nextBar = document.querySelector('.mobile-memo-filter-bar');
     if (nextBar) nextBar.hidden = false;
 
@@ -344,12 +368,25 @@
   }
 
   document.addEventListener('click', function (event) {
+    const filterBtn = event.target && event.target.closest
+      ? event.target.closest('.mobile-memo-filter-chip, .mobile-memo-filter-bar button[data-filter]')
+      : null;
+
+    if (filterBtn && filterBtn.dataset && filterBtn.dataset.filter) {
+      if (!isMobile()) return;
+      event.preventDefault();
+      event.stopPropagation();
+      activeFilter = filterBtn.dataset.filter || 'all';
+      applyMobileMemoUi();
+      return;
+    }
+
     if (!isMobile() || !document.body.classList.contains('mobile-memo-list-mode')) return;
     if (event.target.closest('.mobile-memo-filter-bar')) return;
     if (event.target.closest('button, a, input, textarea, select, label')) return;
 
     const card = event.target.closest(CARD_SELECTOR);
-    if (!card || card.classList.contains('mobile-memo-hidden')) return;
+    if (!card || card.classList.contains('mobile-memo-hidden') || card.hidden) return;
 
     getCards().forEach(item => {
       if (item !== card) item.classList.remove('mobile-memo-open');
@@ -361,13 +398,28 @@
   window.addEventListener('orientationchange', scheduleApply);
   document.addEventListener('DOMContentLoaded', scheduleApply);
   document.addEventListener('click', function (event) {
-    if (event.target.closest('.workspace-tabs .pill')) {
+    if (event.target.closest && event.target.closest('.workspace-tabs .pill')) {
       setTimeout(scheduleApply, 80);
     }
   });
 
-  const observer = new MutationObserver(scheduleApply);
-  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'data-color', 'data-memo-color', 'data-note-color'] });
+  const observer = new MutationObserver(function (mutations) {
+    if (!isMobile()) return;
+    const shouldApply = mutations.some(function (mutation) {
+      const target = mutation.target;
+      if (target && target.closest && target.closest('.mobile-memo-filter-bar')) return false;
+      if (target && target.closest && target.closest('.mobile-memo-unified-modal')) return false;
+      return true;
+    });
+    if (shouldApply) scheduleApply();
+  });
+
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'style', 'hidden', 'data-color', 'data-memo-color', 'data-note-color', 'data-mobile-memo-color']
+  });
 
   setTimeout(scheduleApply, 250);
   setTimeout(scheduleApply, 900);
