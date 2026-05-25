@@ -1744,61 +1744,38 @@ tr.over-row td {
 
 
 /* =========================================================
-   Mobile Form Width Fit Patch v2
-   - 모바일/iframe 환경에서 date input 등 입력폼이 카드 밖으로 넘치는 문제 보정
-   - 각 기기 화면 폭에 맞춰 자동 축소
+   Mobile Input Auto Zoom Prevent Patch v1
+   - iPhone/Safari 입력 포커스 시 화면 확대 방지
+   - 모바일 입력창 폰트 최소 16px 유지
 ========================================================= */
 @media (max-width:720px){
-  .tab-panel,
-  .tab-panel.active,
-  .main-grid,
-  .main-grid > *,
-  .form-card,
-  .preview-card,
-  .ledger-card,
-  .admin-card,
-  .log-card,
-  .ref-card,
-  .field,
-  .type-box,
-  .checkbox-row,
-  .form-chip-row {
-    width:100% !important;
-    max-width:100% !important;
-    min-width:0 !important;
-    box-sizing:border-box !important;
-    overflow-x:hidden !important;
+
+  html,
+  body{
+    -webkit-text-size-adjust:100% !important;
+    text-size-adjust:100% !important;
   }
 
-  .input,
-  .select,
-  .textarea,
   input,
   select,
   textarea,
+  .input,
+  .select,
+  .textarea{
+    font-size:16px !important;
+    line-height:1.45 !important;
+    transform:none !important;
+    zoom:1 !important;
+  }
+
   input[type="date"],
   input[type="number"],
   input[type="text"],
   input[type="email"],
-  input[type="password"] {
-    width:100% !important;
-    max-width:100% !important;
-    min-width:0 !important;
-    box-sizing:border-box !important;
-  }
-
-  input[type="date"],
-  input[type="number"],
-  input[type="text"] {
-    -webkit-appearance:none;
-    appearance:none;
-  }
-
-  .form-card .field,
-  .form-card .input,
-  .form-card .select,
-  .form-card .textarea {
-    display:block !important;
+  input[type="password"],
+  textarea,
+  select{
+    font-size:16px !important;
   }
 }
 
