@@ -773,6 +773,7 @@
   }
 
   function closeModal() {
+    if (window.mobileMemoInputZoomGuard) window.mobileMemoInputZoomGuard.closeKeyboardAndRestore();
     if (!modal) return;
     modal.classList.remove('is-open');
     document.body.classList.remove('mobile-memo-modal-lock');
@@ -795,6 +796,8 @@
   }
 
   async function saveModal() {
+    /* v34: blur before memo save */
+    if (window.mobileMemoInputZoomGuard) window.mobileMemoInputZoomGuard.closeKeyboardAndRestore();
     var memoApi = api();
     if (!memoApi) {
       alert('모바일 메모 저장 연결을 찾지 못했습니다.');
@@ -838,6 +841,7 @@
   }
 
   async function deleteMemo() {
+    if (window.mobileMemoInputZoomGuard) window.mobileMemoInputZoomGuard.closeKeyboardAndRestore();
     if (mode === 'add') {
       closeModal();
       return;
@@ -890,4 +894,150 @@
   window.addEventListener('resize', function () {
     if (!isMobile()) closeModal();
   });
+})();
+
+
+
+/* =========================================================
+   Mobile Input Zoom Guard JS v34
+   - iPhone/Android 입력창 포커스 확대 잔상 방지
+   - 저장/닫기/취소/삭제 시 activeElement blur
+   - visualViewport 변화 후 scroll/scale 잔상 정리
+========================================================= */
+(function () {
+  'use strict';
+
+  var MOBILE_QUERY = '(max-width: 768px)';
+  var lastScrollY = 0;
+  var restoreTimer = 0;
+
+  function isMobile() {
+    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  function isMemoModalOpen() {
+    return !!document.querySelector('.mobile-memo-unified-modal.is-open');
+  }
+
+  function blurActiveElement() {
+    try {
+      var active = document.activeElement;
+      if (active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) {
+        active.blur();
+      }
+    } catch (_) {}
+  }
+
+  function rememberScroll() {
+    if (!isMobile()) return;
+    lastScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  }
+
+  function restoreViewport() {
+    if (!isMobile()) return;
+
+    document.body.classList.add('mobile-input-zoom-guard');
+
+    try {
+      document.documentElement.style.webkitTextSizeAdjust = '100%';
+      document.documentElement.style.textSizeAdjust = '100%';
+      document.body.style.webkitTextSizeAdjust = '100%';
+      document.body.style.textSizeAdjust = '100%';
+    } catch (_) {}
+
+    window.clearTimeout(restoreTimer);
+    restoreTimer = window.setTimeout(function () {
+      try {
+        if (!isMemoModalOpen()) {
+          window.scrollTo(0, lastScrollY || 0);
+        }
+      } catch (_) {}
+
+      window.setTimeout(function () {
+        document.body.classList.remove('mobile-input-zoom-guard');
+      }, 120);
+    }, 80);
+  }
+
+  function closeKeyboardAndRestore() {
+    if (!isMobile()) return;
+    blurActiveElement();
+    restoreViewport();
+  }
+
+  document.addEventListener('focusin', function (event) {
+    if (!isMobile()) return;
+
+    var field = event.target;
+    if (!field || !/^(INPUT|TEXTAREA|SELECT)$/.test(field.tagName)) return;
+
+    rememberScroll();
+
+    try {
+      field.style.fontSize = '16px';
+      field.style.lineHeight = field.tagName === 'TEXTAREA' ? '1.55' : '1.5';
+      field.style.transform = 'none';
+      field.style.zoom = '1';
+    } catch (_) {}
+
+    document.body.classList.add('mobile-input-zoom-guard');
+  }, true);
+
+  document.addEventListener('focusout', function () {
+    if (!isMobile()) return;
+    restoreViewport();
+  }, true);
+
+  document.addEventListener('click', function (event) {
+    if (!isMobile()) return;
+
+    var btn = event.target && event.target.closest
+      ? event.target.closest('.mobile-memo-unified-close, .mobile-memo-btn-secondary, .mobile-memo-btn-primary, .mobile-memo-btn-delete')
+      : null;
+
+    if (btn) {
+      closeKeyboardAndRestore();
+      window.setTimeout(restoreViewport, 180);
+      window.setTimeout(restoreViewport, 420);
+    }
+  }, true);
+
+  document.addEventListener('keydown', function (event) {
+    if (!isMobile()) return;
+    if (event.key === 'Escape') {
+      closeKeyboardAndRestore();
+    }
+  }, true);
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', function () {
+      if (!isMobile()) return;
+      window.clearTimeout(restoreTimer);
+      restoreTimer = window.setTimeout(function () {
+        if (!isMemoModalOpen()) restoreViewport();
+      }, 120);
+    });
+
+    window.visualViewport.addEventListener('scroll', function () {
+      if (!isMobile()) return;
+      if (!isMemoModalOpen()) restoreViewport();
+    });
+  }
+
+  window.addEventListener('orientationchange', function () {
+    if (!isMobile()) return;
+    closeKeyboardAndRestore();
+    window.setTimeout(restoreViewport, 300);
+  });
+
+  window.addEventListener('resize', function () {
+    if (!isMobile()) return;
+    if (!isMemoModalOpen()) restoreViewport();
+  });
+
+  window.mobileMemoInputZoomGuard = {
+    blur: blurActiveElement,
+    restore: restoreViewport,
+    closeKeyboardAndRestore: closeKeyboardAndRestore
+  };
 })();
