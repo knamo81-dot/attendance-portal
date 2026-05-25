@@ -1681,6 +1681,67 @@ tr.over-row td {
   color: var(--common-muted, var(--muted));
 }
 
+
+/* =========================================================
+   Mobile Top KPI Compact Cards v1
+   - 모바일에서 상단 4개 요약 카드를 2x2 압축 배치
+   - 일일 입력 폼이 바로 보이도록 카드 높이/여백 축소
+========================================================= */
+@media (max-width:720px){
+  .stats{
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:8px !important;
+    margin:0 0 12px !important;
+  }
+
+  .stat-box{
+    min-height:78px !important;
+    padding:14px 12px !important;
+    border-radius:18px !important;
+    box-shadow:0 6px 14px rgba(15,23,42,.06) !important;
+  }
+
+  .stat-label{
+    margin-bottom:7px !important;
+    font-size:12px !important;
+    line-height:1.25 !important;
+    letter-spacing:-.02em !important;
+  }
+
+  .stat-value{
+    font-size:22px !important;
+    line-height:1.15 !important;
+    letter-spacing:-.03em !important;
+    word-break:keep-all !important;
+  }
+
+  .stat-value .inline-badge{
+    padding:6px 9px !important;
+    font-size:12px !important;
+    line-height:1 !important;
+  }
+}
+
+@media (max-width:390px){
+  .stats{
+    gap:7px !important;
+  }
+
+  .stat-box{
+    min-height:74px !important;
+    padding:12px 10px !important;
+  }
+
+  .stat-label{
+    font-size:11px !important;
+  }
+
+  .stat-value{
+    font-size:20px !important;
+  }
+}
+
 </style>
 </head>
 <body>
