@@ -1802,6 +1802,152 @@
 
 
 /* =========================================================
+   Mobile Memo Viewport Width Clamp v40
+   - 메모 화면 전체가 오른쪽으로 밀리는 문제 보정
+   - memo-wrap / memo-board를 실제 모바일 화면 폭 안으로 강제
+   - 상단 휴지통/메모추가 버튼이 화면 밖으로 나가지 않게 축소
+========================================================= */
+@media (max-width: 768px) {
+  body.mobile-memo-list-mode {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  body.mobile-memo-list-mode .app,
+  body.mobile-memo-list-mode .layout,
+  body.mobile-memo-list-mode #home-page.home-root,
+  body.mobile-memo-list-mode #tab-content,
+  body.mobile-memo-list-mode #tab-content.content {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  body.mobile-memo-list-mode #home-page.home-root {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+
+  body.mobile-memo-list-mode .memo-wrap,
+  body.mobile-memo-list-mode #tab-content .memo-wrap,
+  body.mobile-memo-list-mode #tab-content .card.memo-wrap {
+    width: var(--mobile-memo-wrap-width, 100%) !important;
+    max-width: var(--mobile-memo-wrap-width, 100%) !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+    left: 0 !important;
+    right: auto !important;
+    transform: none !important;
+    translate: none !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  body.mobile-memo-list-mode .memo-top {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto auto !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  body.mobile-memo-list-mode .memo-top h1,
+  body.mobile-memo-list-mode .memo-top h2,
+  body.mobile-memo-list-mode .memo-top h3,
+  body.mobile-memo-list-mode .memo-top .title,
+  body.mobile-memo-list-mode .memo-top [class*="title"] {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  body.mobile-memo-list-mode .memo-top button,
+  body.mobile-memo-list-mode .memo-top .small-btn {
+    min-width: 72px !important;
+    max-width: 98px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    box-sizing: border-box !important;
+  }
+
+  body.mobile-memo-list-mode #memo-board,
+  body.mobile-memo-list-mode .memo-board,
+  body.mobile-memo-list-mode #memo-board-notes,
+  body.mobile-memo-list-mode .memo-board-notes {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    left: 0 !important;
+    right: auto !important;
+    transform: none !important;
+    translate: none !important;
+    box-sizing: border-box !important;
+  }
+
+  body.mobile-memo-list-mode #memo-board .memo-note,
+  body.mobile-memo-list-mode #memo-board-notes .memo-note,
+  body.mobile-memo-list-mode .memo-board .memo-note,
+  body.mobile-memo-list-mode .memo-board-notes .memo-note,
+  body.mobile-memo-list-mode .memo-wrap [data-note-id],
+  body.mobile-memo-list-mode .memo-wrap [data-memo-id] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    left: 0 !important;
+    right: auto !important;
+    transform: none !important;
+    translate: none !important;
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-width: 390px) {
+  body.mobile-memo-list-mode .memo-wrap,
+  body.mobile-memo-list-mode #tab-content .memo-wrap,
+  body.mobile-memo-list-mode #tab-content .card.memo-wrap {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  body.mobile-memo-list-mode .memo-top {
+    gap: 6px !important;
+  }
+
+  body.mobile-memo-list-mode .memo-top button,
+  body.mobile-memo-list-mode .memo-top .small-btn {
+    min-width: 66px !important;
+    max-width: 88px !important;
+    font-size: 14px !important;
+  }
+}
+
+
+/* =========================================================
    Mobile Memo Filter Horizontal Scroll Fix v41
    - 메모 카드/박스 폭은 그대로 유지
    - 색상 필터 버튼 줄만 좌우 스크롤 가능
@@ -1819,8 +1965,8 @@
     justify-content: flex-start !important;
     gap: 8px !important;
 
-    width: 100% !important;
-    max-width: 100% !important;
+    width: var(--mobile-memo-wrap-width, 100%) !important;
+    max-width: var(--mobile-memo-wrap-width, 100%) !important;
     min-width: 0 !important;
 
     margin: 0 0 8px 0 !important;
@@ -1863,7 +2009,6 @@
     box-sizing: border-box !important;
   }
 
-  /* 필터 줄이 부모 폭을 넓히지 않도록 차단 */
   body.mobile-memo-list-mode #tab-content,
   body.mobile-memo-list-mode #tab-content.content,
   body.mobile-memo-list-mode .memo-wrap,
