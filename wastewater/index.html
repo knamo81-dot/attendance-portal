@@ -1742,6 +1742,66 @@ tr.over-row td {
   }
 }
 
+
+/* =========================================================
+   Mobile Form Width Fit Patch v2
+   - 모바일/iframe 환경에서 date input 등 입력폼이 카드 밖으로 넘치는 문제 보정
+   - 각 기기 화면 폭에 맞춰 자동 축소
+========================================================= */
+@media (max-width:720px){
+  .tab-panel,
+  .tab-panel.active,
+  .main-grid,
+  .main-grid > *,
+  .form-card,
+  .preview-card,
+  .ledger-card,
+  .admin-card,
+  .log-card,
+  .ref-card,
+  .field,
+  .type-box,
+  .checkbox-row,
+  .form-chip-row {
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
+    overflow-x:hidden !important;
+  }
+
+  .input,
+  .select,
+  .textarea,
+  input,
+  select,
+  textarea,
+  input[type="date"],
+  input[type="number"],
+  input[type="text"],
+  input[type="email"],
+  input[type="password"] {
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
+  }
+
+  input[type="date"],
+  input[type="number"],
+  input[type="text"] {
+    -webkit-appearance:none;
+    appearance:none;
+  }
+
+  .form-card .field,
+  .form-card .input,
+  .form-card .select,
+  .form-card .textarea {
+    display:block !important;
+  }
+}
+
 </style>
 </head>
 <body>
