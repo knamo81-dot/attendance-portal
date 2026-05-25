@@ -1226,3 +1226,68 @@ input[type="radio"],
     max-width:88% !important;
   }
 }
+
+
+/* =========================================================
+   Mobile Chat Full Height Fix v2
+   - 채팅 화면에서 채팅창을 모바일 남은 높이에 맞게 고정
+   - 메시지 영역만 위아래 스크롤
+   - 입력창은 하단 유지
+========================================================= */
+@media (max-width:760px){
+  .aic-root.aic-mobile-chat-view{
+    height:100dvh !important;
+    min-height:100dvh !important;
+    max-height:100dvh !important;
+    overflow:hidden !important;
+    grid-template-rows:minmax(0, 1fr) !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-main{
+    height:100% !important;
+    min-height:0 !important;
+    max-height:100% !important;
+    overflow:hidden !important;
+    padding:8px !important;
+    grid-template-rows:minmax(0, 1fr) !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-slots{
+    height:100% !important;
+    min-height:0 !important;
+    max-height:100% !important;
+    overflow:hidden !important;
+    display:grid !important;
+    grid-template-rows:minmax(0, 1fr) !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-chat-window{
+    height:100% !important;
+    min-height:0 !important;
+    max-height:100% !important;
+    overflow:hidden !important;
+    display:grid !important;
+    grid-template-rows:auto minmax(0, 1fr) auto !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-chat-head{
+    flex:0 0 auto !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-messages{
+    min-height:0 !important;
+    height:100% !important;
+    max-height:100% !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    -webkit-overflow-scrolling:touch !important;
+    overscroll-behavior:contain !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-chat-input{
+    flex:0 0 auto !important;
+    position:relative !important;
+    bottom:auto !important;
+  }
+}
+
