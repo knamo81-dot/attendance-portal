@@ -794,3 +794,144 @@
     if (!isMobile()) closeModal();
   });
 })();
+
+
+
+/* =========================================================
+   Mobile Memo Add Screen v28
+   - 모바일에서 메모 추가 폼을 전체화면 입력 화면으로 전환
+   - 기존 추가/취소 버튼 로직은 그대로 재사용
+========================================================= */
+(function () {
+  'use strict';
+
+  var MOBILE_QUERY = '(max-width: 768px)';
+  var activeForm = null;
+
+  function isMobile() {
+    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  function normText(el) {
+    return (el && (el.innerText || el.textContent) || '').replace(/\s+/g, '').trim();
+  }
+
+  function isMemoAddButton(el) {
+    if (!el || !el.matches || !el.matches('button, a, [role="button"]')) return false;
+    var t = normText(el);
+    return t === '메모추가' || t === '추가';
+  }
+
+  function looksLikeMemoAddForm(el) {
+    if (!el || !el.querySelectorAll) return false;
+    var text = normText(el);
+    var hasTextarea = !!el.querySelector('textarea');
+    var hasInput = !!el.querySelector('input');
+    var hasAdd = Array.prototype.slice.call(el.querySelectorAll('button')).some(function (btn) {
+      var t = normText(btn);
+      return t === '추가' || t === '저장';
+    });
+    var hasCancel = Array.prototype.slice.call(el.querySelectorAll('button')).some(function (btn) {
+      return normText(btn) === '취소';
+    });
+
+    return hasTextarea && hasInput && hasAdd && (hasCancel || text.indexOf('메모추가') >= 0 || text.indexOf('색상선택') >= 0);
+  }
+
+  function findMemoAddForm() {
+    var candidates = Array.prototype.slice.call(document.querySelectorAll(
+      '#tab-content form, #tab-content .card, #tab-content .modal, #tab-content [class*="modal"], #tab-content [class*="form"], #tab-content [class*="memo"]'
+    ));
+
+    var matched = candidates.filter(looksLikeMemoAddForm);
+    if (matched.length === 0) return null;
+
+    matched.sort(function (a, b) {
+      return a.getBoundingClientRect().width * a.getBoundingClientRect().height -
+             b.getBoundingClientRect().width * b.getBoundingClientRect().height;
+    });
+
+    return matched[0];
+  }
+
+  function collectActionButtons(form) {
+    var buttons = Array.prototype.slice.call(form.querySelectorAll('button')).filter(function (btn) {
+      var t = normText(btn);
+      return t === '취소' || t === '추가' || t === '저장';
+    });
+
+    if (buttons.length === 0) return;
+
+    var row = form.querySelector(':scope > .mobile-memo-add-actions');
+    if (!row) {
+      row = document.createElement('div');
+      row.className = 'mobile-memo-add-actions';
+      form.appendChild(row);
+    }
+
+    buttons.forEach(function (btn) {
+      if (btn.parentElement !== row) row.appendChild(btn);
+    });
+  }
+
+  function openAddScreen() {
+    if (!isMobile()) return;
+
+    var form = findMemoAddForm();
+    if (!form) return;
+
+    activeForm = form;
+    form.classList.add('mobile-memo-add-screen');
+    document.body.classList.add('mobile-memo-add-lock');
+
+    collectActionButtons(form);
+
+    var first = form.querySelector('input[type="text"], input:not([type]), textarea');
+    if (first) {
+      setTimeout(function () {
+        try { first.focus({ preventScroll: true }); } catch (_) {}
+      }, 120);
+    }
+  }
+
+  function closeAddScreen() {
+    if (activeForm) {
+      activeForm.classList.remove('mobile-memo-add-screen');
+      activeForm = null;
+    }
+    document.body.classList.remove('mobile-memo-add-lock');
+  }
+
+  document.addEventListener('click', function (event) {
+    if (!isMobile()) return;
+
+    var target = event.target && event.target.closest ? event.target.closest('button, a, [role="button"]') : null;
+
+    if (target && isMemoAddButton(target) && !target.closest('.mobile-memo-add-screen')) {
+      setTimeout(openAddScreen, 80);
+      setTimeout(openAddScreen, 220);
+      return;
+    }
+
+    if (target && target.closest('.mobile-memo-add-screen')) {
+      var t = normText(target);
+      if (t === '취소' || t === '추가' || t === '저장') {
+        setTimeout(closeAddScreen, 120);
+      }
+    }
+  }, true);
+
+  var observer = new MutationObserver(function () {
+    if (!isMobile()) return;
+    if (activeForm) return;
+    setTimeout(openAddScreen, 40);
+  });
+
+  if (document.getElementById('tab-content')) {
+    observer.observe(document.getElementById('tab-content'), { childList: true, subtree: true });
+  }
+
+  window.addEventListener('resize', function () {
+    if (!isMobile()) closeAddScreen();
+  });
+})();
