@@ -1549,3 +1549,343 @@
   }, true);
 
 })();
+
+/* =========================================================
+   Mobile Memo Stable Renderer v40
+   - 기존 메모 카드를 모바일에서 직접 사용하지 않고 별도 목록으로 재구성
+   - 제목/태그/날짜만 카드에 표시하여 내용 섞임과 본문 노출 방지
+   - 색상 필터는 렌더 결과에만 적용하고 원본 데이터는 변경하지 않음
+========================================================= */
+(function () {
+  'use strict';
+
+  var MOBILE_QUERY = '(max-width: 768px)';
+  var SOURCE_CARD_SELECTOR = '.memo-note, .memo-card, .memo-item, .note-card, [data-note-id], [data-memo-id]';
+  var STABLE_LIST_CLASS = 'mobile-memo-stable-list';
+  var activeFilter = 'all';
+  var raf = 0;
+
+  var COLOR_ITEMS = [
+    { key: 'blue', label: '파랑', color: '#dbeafe' },
+    { key: 'green', label: '초록', color: '#dcfce7' },
+    { key: 'pink', label: '분홍', color: '#fce7f3' },
+    { key: 'purple', label: '보라', color: '#f3e8ff' },
+    { key: 'yellow', label: '노랑', color: '#fef3c7' },
+    { key: 'white', label: '흰색', color: '#ffffff' }
+  ];
+
+  function isMobile() {
+    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  function root() {
+    return document.getElementById('tab-content') || document.body;
+  }
+
+  function text(el) {
+    return (el && (el.innerText || el.textContent) || '').trim();
+  }
+
+  function compactText(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+    });
+  }
+
+  function isInsideStable(el) {
+    return !!(el && el.closest && el.closest('.' + STABLE_LIST_CLASS));
+  }
+
+  function sourceCards() {
+    return Array.prototype.slice.call(document.querySelectorAll(SOURCE_CARD_SELECTOR)).filter(function (card) {
+      if (!card || isInsideStable(card)) return false;
+      if (card.closest && (card.closest('.mobile-memo-filter-bar') || card.closest('.mobile-memo-unified-modal'))) return false;
+      return true;
+    });
+  }
+
+  function getId(card, index) {
+    return (card.dataset && (card.dataset.noteId || card.dataset.memoId || card.dataset.memoServerId)) ||
+      card.getAttribute('data-note-id') ||
+      card.getAttribute('data-memo-id') ||
+      ('mobile-source-' + index);
+  }
+
+  function apiNote(id) {
+    var memoApi = window.portalMemoMobileApi || null;
+    if (memoApi && typeof memoApi.getNoteById === 'function') {
+      try {
+        return memoApi.getNoteById(id) || null;
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  function readDate(value) {
+    if (!value) return '';
+    try {
+      var d = new Date(value);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric' }).replace(/\.$/, '.');
+      }
+    } catch (_) {}
+    return String(value || '');
+  }
+
+  function detectColorFromRaw(raw) {
+    raw = String(raw || '').toLowerCase();
+    if (raw.indexOf('blue') >= 0 || raw.indexOf('dbeafe') >= 0 || raw.indexOf('bfdbfe') >= 0 || raw.indexOf('60a5fa') >= 0 || raw.indexOf('219, 234') >= 0) return 'blue';
+    if (raw.indexOf('green') >= 0 || raw.indexOf('dcfce7') >= 0 || raw.indexOf('bbf7d0') >= 0 || raw.indexOf('4ade80') >= 0 || raw.indexOf('220, 252') >= 0) return 'green';
+    if (raw.indexOf('pink') >= 0 || raw.indexOf('rose') >= 0 || raw.indexOf('fce7f3') >= 0 || raw.indexOf('fecdd3') >= 0 || raw.indexOf('f9a8d4') >= 0 || raw.indexOf('252, 231') >= 0) return 'pink';
+    if (raw.indexOf('purple') >= 0 || raw.indexOf('violet') >= 0 || raw.indexOf('f3e8ff') >= 0 || raw.indexOf('e9d5ff') >= 0 || raw.indexOf('c084fc') >= 0 || raw.indexOf('243, 232') >= 0) return 'purple';
+    if (raw.indexOf('yellow') >= 0 || raw.indexOf('fef3c7') >= 0 || raw.indexOf('fde68a') >= 0 || raw.indexOf('facc15') >= 0) return 'yellow';
+    if (raw.indexOf('white') >= 0 || raw.indexOf('ffffff') >= 0 || raw.indexOf('255, 255, 255') >= 0) return 'white';
+    return 'white';
+  }
+
+  function colorInfo(key) {
+    return COLOR_ITEMS.find(function (item) { return item.key === key; }) || COLOR_ITEMS[0];
+  }
+
+  function noteFromCard(card, index) {
+    var id = getId(card, index);
+    var note = apiNote(id) || {};
+
+    var style = '';
+    try { style = window.getComputedStyle(card).backgroundColor || ''; } catch (_) {}
+
+    var rawColor = [
+      note.color || '',
+      note.layout && note.layout.color || '',
+      card.dataset && (card.dataset.mobileMemoColor || card.dataset.memoColor || card.dataset.color || card.dataset.noteColor || card.dataset.bg || ''),
+      card.className || '',
+      card.getAttribute('style') || '',
+      style
+    ].join(' ');
+
+    var titleNode = card.querySelector && card.querySelector('.memo-title, .note-title, [class*="title"], strong, b');
+    var tagNode = card.querySelector && card.querySelector('.memo-tag, .note-tag, [class*="tag"]');
+
+    var fullText = text(card);
+    var lines = fullText.split('\n').map(compactText).filter(Boolean).filter(function (line) {
+      return line !== 'MEMO' && line !== '상세보기' && line !== '닫기';
+    });
+
+    var title = compactText(note.title || (titleNode && text(titleNode)) || card.dataset.memoTitle || '');
+    if (!title) {
+      title = lines.find(function (line) {
+        return !/^#/.test(line) && !/^작성[:：]/.test(line) && !/^수정[:：]/.test(line) && line !== '최근 메모';
+      }) || '제목 없는 메모';
+    }
+
+    var tag = compactText(note.tag || (tagNode && text(tagNode)) || card.dataset.memoTag || '');
+    if (!tag) {
+      var tagLine = lines.find(function (line) { return /^#/.test(line); });
+      tag = tagLine ? tagLine.replace(/^#/, '') : '메모';
+    }
+    tag = tag.replace(/^#/, '') || '메모';
+
+    var created = readDate(note.createdAt || note.created_at || card.dataset.createdAt || '');
+    var updated = readDate(note.updatedAt || note.updated_at || card.dataset.updatedAt || '');
+
+    if (!created || !updated) {
+      var createdLine = lines.find(function (line) { return /^작성[:：]/.test(line); });
+      var updatedLine = lines.find(function (line) { return /^수정[:：]/.test(line); });
+      if (!created && createdLine) created = createdLine.replace(/^작성[:：]\s*/, '');
+      if (!updated && updatedLine) updated = updatedLine.replace(/^수정[:：]\s*/, '');
+    }
+
+    return {
+      id: id,
+      color: detectColorFromRaw(rawColor),
+      title: title,
+      tag: tag,
+      created: created,
+      updated: updated,
+      source: card
+    };
+  }
+
+  function ensureFilterBar(colors) {
+    var r = root();
+    var bar = document.querySelector('.mobile-memo-filter-bar');
+
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'mobile-memo-filter-bar';
+      bar.setAttribute('role', 'tablist');
+      bar.setAttribute('aria-label', '메모 색상 필터');
+      r.insertBefore(bar, r.firstChild);
+    }
+
+    var items = [{ key: 'all', label: '전체' }].concat(COLOR_ITEMS.filter(function (item) {
+      return colors.has(item.key);
+    }));
+
+    if (activeFilter !== 'all' && !items.some(function (item) { return item.key === activeFilter; })) {
+      activeFilter = 'all';
+    }
+
+    bar.innerHTML = items.map(function (item) {
+      return '<button type="button" class="mobile-memo-filter-chip' + (item.key === activeFilter ? ' is-active' : '') + '" data-filter="' + item.key + '" role="tab" aria-selected="' + (item.key === activeFilter ? 'true' : 'false') + '">' + escapeHtml(item.label) + '</button>';
+    }).join('');
+
+    bar.hidden = false;
+    return bar;
+  }
+
+  function ensureList(anchorCard) {
+    var list = document.querySelector('.' + STABLE_LIST_CLASS);
+    if (!list) {
+      list = document.createElement('div');
+      list.className = STABLE_LIST_CLASS;
+    }
+
+    var parent = anchorCard && anchorCard.parentElement ? anchorCard.parentElement : root();
+    if (list.parentElement !== parent) {
+      parent.insertBefore(list, anchorCard || parent.firstChild);
+    } else if (anchorCard && list.nextSibling !== anchorCard && list.compareDocumentPosition(anchorCard) & Node.DOCUMENT_POSITION_PRECEDING) {
+      parent.insertBefore(list, anchorCard);
+    }
+
+    return list;
+  }
+
+  function render() {
+    raf = 0;
+
+    var cards = sourceCards();
+    var enabled = isMobile() && cards.length > 0;
+    document.body.classList.toggle('mobile-memo-stable-active', enabled);
+
+    var existingList = document.querySelector('.' + STABLE_LIST_CLASS);
+    if (!enabled) {
+      if (existingList) existingList.remove();
+      cards.forEach(function (card) {
+        card.classList.remove('mobile-memo-source-hidden');
+        card.hidden = false;
+        if (card.dataset) delete card.dataset.mobileStableSource;
+      });
+      return;
+    }
+
+    var notes = cards.map(noteFromCard).filter(function (note) { return !!note.id; });
+    var colors = new Set(notes.map(function (note) { return note.color; }));
+    ensureFilterBar(colors);
+
+    var list = ensureList(cards[0]);
+
+    cards.forEach(function (card) {
+      card.classList.add('mobile-memo-source-hidden');
+      card.hidden = true;
+      if (card.dataset) card.dataset.mobileStableSource = '1';
+    });
+
+    var visibleNotes = notes.filter(function (note) {
+      return activeFilter === 'all' || note.color === activeFilter;
+    });
+
+    if (!visibleNotes.length) {
+      list.innerHTML = '<div class="mobile-memo-stable-empty">표시할 메모가 없습니다.</div>';
+      return;
+    }
+
+    list.innerHTML = visibleNotes.map(function (note) {
+      var info = colorInfo(note.color);
+      var meta = ['최근 메모'];
+      if (note.created) meta.push('작성: ' + note.created);
+      if (note.updated) meta.push('수정: ' + note.updated);
+
+      return [
+        '<article class="mobile-memo-stable-card" data-note-id="' + escapeHtml(note.id) + '" data-memo-id="' + escapeHtml(note.id) + '" data-mobile-memo-color="' + escapeHtml(note.color) + '" style="--mobile-memo-card-bg:' + info.color + '">',
+        '  <div class="mobile-memo-stable-tag">#' + escapeHtml(note.tag) + '</div>',
+        '  <div class="mobile-memo-stable-title">' + escapeHtml(note.title) + '</div>',
+        '  <div class="mobile-memo-stable-meta">' + escapeHtml(meta.join('\n')) + '</div>',
+        '</article>'
+      ].join('');
+    }).join('');
+  }
+
+  function schedule() {
+    if (raf) return;
+    raf = window.requestAnimationFrame(render);
+  }
+
+  document.addEventListener('click', function (event) {
+    if (!isMobile()) return;
+
+    var filterBtn = event.target.closest && event.target.closest('.mobile-memo-filter-chip[data-filter]');
+    if (filterBtn) {
+      activeFilter = filterBtn.dataset.filter || 'all';
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+      render();
+      return;
+    }
+
+    var stableCard = event.target.closest && event.target.closest('.mobile-memo-stable-card');
+    if (stableCard) {
+      event.preventDefault();
+      event.stopPropagation();
+      schedule();
+    }
+  }, true);
+
+  document.addEventListener('DOMContentLoaded', schedule);
+  window.addEventListener('resize', schedule);
+  window.addEventListener('orientationchange', schedule);
+  document.addEventListener('click', function (event) {
+    if (event.target.closest && (
+      event.target.closest('.workspace-tabs .pill') ||
+      event.target.closest('.mobile-memo-btn-primary') ||
+      event.target.closest('.mobile-memo-btn-delete') ||
+      event.target.closest('.mobile-memo-btn-secondary') ||
+      event.target.closest('.mobile-memo-unified-close')
+    )) {
+      setTimeout(schedule, 120);
+      setTimeout(schedule, 500);
+    }
+  }, true);
+
+  var observer = new MutationObserver(function (mutations) {
+    if (!isMobile()) return;
+
+    var needed = mutations.some(function (m) {
+      if (m.target && m.target.closest && (
+        m.target.closest('.' + STABLE_LIST_CLASS) ||
+        m.target.closest('.mobile-memo-filter-bar') ||
+        m.target.closest('.mobile-memo-unified-modal')
+      )) return false;
+
+      return true;
+    });
+
+    if (needed) schedule();
+  });
+
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'style', 'data-color', 'data-memo-color', 'data-note-color', 'data-mobile-memo-color', 'data-note-id', 'data-memo-id']
+  });
+
+  setTimeout(schedule, 100);
+  setTimeout(schedule, 500);
+  setTimeout(schedule, 1200);
+
+  window.mobileMemoStableRenderer = {
+    refresh: render,
+    setFilter: function (key) {
+      activeFilter = key || 'all';
+      render();
+    }
+  };
+})();
