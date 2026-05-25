@@ -374,9 +374,6 @@
 
   function applyFilter(filterKey) {
     activeFilter = filterKey || 'all';
-    getCards().forEach(function (card) {
-      card.classList.remove('mobile-memo-open');
-    });
     applyMobileMemoUi();
   }
 
@@ -417,9 +414,7 @@
       return;
     }
 
-    /* v42: 카드 클릭은 아래 Mobile Unified Memo State Bridge에서만 처리합니다.
-       여기서 .mobile-memo-open을 토글하면 색상 필터 후 모달 대신 카드가 펼쳐지는 충돌이 생깁니다. */
-    return;
+    /* v43: 카드 펼침 토글 제거 - 메모 클릭은 아래 통합 모달 처리만 사용 */
   }, true);
 
   window.addEventListener('resize', scheduleApply);
@@ -1465,5 +1460,189 @@
   window.mobileMemoViewportWidthClamp = {
     apply: applyWidthClamp,
     schedule: scheduleMultiApply
+  };
+})();
+
+/* =========================================================
+   Mobile Memo Color Filter Hard Fix v43
+   - 색상 버튼 클릭 시 해당 색상 메모만 표시
+   - 원본 데이터/PC 화면 영향 없음
+   - 기존 mobile-memo-open 펼침 방식과 분리
+========================================================= */
+(function () {
+  'use strict';
+
+  var MOBILE_QUERY = '(max-width: 768px)';
+  var CARD_SELECTOR = '.memo-note, .memo-card, .memo-item, .note-card, [data-note-id], [data-memo-id]';
+  var activeFilter = 'all';
+  var applying = false;
+
+  var colorRules = [
+    { key: 'yellow', tokens: ['yellow', '노랑', '#fef3c7', '#fde68a', '#facc15', '254, 243, 199', '253, 230, 138', '250, 204, 21'] },
+    { key: 'blue', tokens: ['blue', '파랑', '#dbeafe', '#bfdbfe', '#60a5fa', '219, 234, 254', '191, 219, 254', '96, 165, 250'] },
+    { key: 'green', tokens: ['green', '초록', '#dcfce7', '#bbf7d0', '#4ade80', '220, 252, 231', '187, 247, 208', '74, 222, 128'] },
+    { key: 'pink', tokens: ['pink', 'rose', '분홍', '#fce7f3', '#fecdd3', '#f9a8d4', '252, 231, 243', '254, 205, 211', '249, 168, 212'] },
+    { key: 'purple', tokens: ['purple', 'violet', '보라', '#f3e8ff', '#e9d5ff', '#c084fc', '243, 232, 255', '233, 213, 255', '192, 132, 252'] },
+    { key: 'white', tokens: ['white', '흰색', '#ffffff', '255, 255, 255'] }
+  ];
+
+  function isMobile() {
+    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  function getMemoApi() {
+    return window.portalMemoMobileApi || null;
+  }
+
+  function getCardId(card) {
+    if (!card) return '';
+    return card.dataset.noteId || card.dataset.memoId || card.dataset.memoServerId || card.getAttribute('data-note-id') || card.getAttribute('data-memo-id') || '';
+  }
+
+  function normalizeColorValue(value) {
+    var raw = String(value || '').toLowerCase();
+    for (var i = 0; i < colorRules.length; i += 1) {
+      var rule = colorRules[i];
+      for (var j = 0; j < rule.tokens.length; j += 1) {
+        if (raw.indexOf(String(rule.tokens[j]).toLowerCase()) >= 0) return rule.key;
+      }
+    }
+    return '';
+  }
+
+  function colorFromApi(card) {
+    var api = getMemoApi();
+    if (!api || typeof api.getNoteById !== 'function') return '';
+    var id = getCardId(card);
+    if (!id) return '';
+    var note = api.getNoteById(id);
+    if (!note) return '';
+
+    return normalizeColorValue([
+      note.color,
+      note.bg,
+      note.background,
+      note.layout && note.layout.color,
+      note.layout && note.layout.background,
+      note.layout && note.layout.bg,
+      note.memoColor,
+      note.noteColor
+    ].join(' '));
+  }
+
+  function detectCardColor(card) {
+    if (!card) return 'white';
+
+    var fromApi = colorFromApi(card);
+    if (fromApi) return fromApi;
+
+    var style = window.getComputedStyle ? window.getComputedStyle(card) : null;
+    var raw = [
+      card.dataset ? (card.dataset.color || card.dataset.memoColor || card.dataset.noteColor || card.dataset.bg || '') : '',
+      card.className || '',
+      card.getAttribute('style') || '',
+      style ? (style.backgroundColor || '') : '',
+      style ? (style.background || '') : ''
+    ].join(' ').toLowerCase();
+
+    return normalizeColorValue(raw) || 'white';
+  }
+
+  function getCards() {
+    return Array.prototype.slice.call(document.querySelectorAll(CARD_SELECTOR)).filter(function (card) {
+      if (!card || !card.closest) return false;
+      if (card.closest('.mobile-memo-filter-bar')) return false;
+      if (card.closest('.mobile-memo-unified-modal')) return false;
+      if (card.closest('.workspace-tabs')) return false;
+      return !!card.closest('#tab-content');
+    });
+  }
+
+  function setCardVisible(card, visible) {
+    card.hidden = !visible;
+    card.classList.toggle('mobile-memo-hidden', !visible);
+    if (visible) {
+      card.style.removeProperty('display');
+      card.style.removeProperty('visibility');
+      card.style.removeProperty('opacity');
+    } else {
+      card.style.setProperty('display', 'none', 'important');
+      card.style.setProperty('visibility', 'hidden', 'important');
+      card.style.setProperty('opacity', '0', 'important');
+      card.classList.remove('mobile-memo-open');
+    }
+  }
+
+  function syncButtons() {
+    var buttons = document.querySelectorAll('.mobile-memo-filter-bar button[data-filter], .mobile-memo-filter-chip[data-filter]');
+    Array.prototype.forEach.call(buttons, function (btn) {
+      var on = (btn.dataset.filter || 'all') === activeFilter;
+      btn.classList.toggle('is-active', on);
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
+
+  function applyFilter() {
+    if (!isMobile()) return;
+    if (applying) return;
+    applying = true;
+
+    try {
+      var cards = getCards();
+      cards.forEach(function (card) {
+        var color = detectCardColor(card);
+        card.dataset.mobileMemoColor = color;
+        setCardVisible(card, activeFilter === 'all' || color === activeFilter);
+      });
+      syncButtons();
+    } finally {
+      applying = false;
+    }
+  }
+
+  function delayedApply() {
+    applyFilter();
+    setTimeout(applyFilter, 40);
+    setTimeout(applyFilter, 120);
+    setTimeout(applyFilter, 300);
+  }
+
+  document.addEventListener('click', function (event) {
+    if (!isMobile()) return;
+    var btn = event.target && event.target.closest ? event.target.closest('.mobile-memo-filter-bar button[data-filter], .mobile-memo-filter-chip[data-filter]') : null;
+    if (!btn) return;
+
+    activeFilter = btn.dataset.filter || 'all';
+    event.preventDefault();
+    event.stopPropagation();
+    delayedApply();
+  }, true);
+
+  window.addEventListener('resize', delayedApply);
+  window.addEventListener('orientationchange', delayedApply);
+  document.addEventListener('DOMContentLoaded', delayedApply);
+  document.addEventListener('click', function (event) {
+    if (event.target && event.target.closest && event.target.closest('.workspace-tabs .pill')) {
+      setTimeout(delayedApply, 80);
+    }
+  }, true);
+
+  var observer = new MutationObserver(function (mutations) {
+    if (!isMobile() || activeFilter === 'all') return;
+    var needs = mutations.some(function (m) {
+      var target = m.target;
+      if (target && target.closest && target.closest('.mobile-memo-filter-bar')) return false;
+      return true;
+    });
+    if (needs) delayedApply();
+  });
+
+  if (document.documentElement) {
+    observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'hidden', 'data-color', 'data-memo-color', 'data-note-color'] });
+  }
+
+  window.mobileMemoColorFilterV43 = {
+    apply: function (filter) { activeFilter = filter || activeFilter || 'all'; delayedApply(); },
+    current: function () { return activeFilter; }
   };
 })();
