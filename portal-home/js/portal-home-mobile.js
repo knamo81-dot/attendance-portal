@@ -633,16 +633,17 @@
 
   function getMemoContent(card) {
     /*
-      모바일 상세 모달 본문 추출 보정
-      - 카드 요약 라벨(#메모, MEMO, 최근 메모) 제외
-      - 작성/수정일 제외
-      - 제목과 동일한 줄 제외
-      - 실제 본문 후보가 없으면 빈 값
+      v32 본문 추출 보강
+      1) data-* 속성에서 본문 후보 우선 확인
+      2) 명시적 content/body/detail/textarea 후보 확인
+      3) 카드 전체 텍스트에서 라벨/메타 제거
+      4) 후보가 없으면 빈 값
     */
     var title = getMemoTitle(card);
     var blockedExact = [
       '상세보기', '열기', '닫기', '수정', '삭제', '저장',
-      '#메모', '메모', 'MEMO', 'memo', '최근 메모', '최근메모'
+      '#메모', '메모', 'MEMO', 'memo', '최근 메모', '최근메모',
+      '개인 메모', '휴지통', '메모 추가'
     ];
 
     function cleanLine(v) {
@@ -655,7 +656,7 @@
       if (!raw) return true;
       if (raw === title) return true;
       if (blockedExact.indexOf(raw) >= 0) return true;
-      if (['#메모', '메모', 'MEMO', 'memo', '최근메모'].indexOf(compact) >= 0) return true;
+      if (['#메모', '메모', 'MEMO', 'memo', '최근메모', '개인메모'].indexOf(compact) >= 0) return true;
       if (/^작성\s*:/.test(raw)) return true;
       if (/^수정\s*:/.test(raw)) return true;
       if (/^작성일\s*:/.test(raw)) return true;
@@ -673,7 +674,32 @@
         .trim();
     }
 
+    function getDatasetText(el) {
+      if (!el || !el.dataset) return '';
+      var keys = [
+        'content', 'memoContent', 'noteContent', 'body', 'memoBody', 'noteBody',
+        'text', 'memoText', 'noteText', 'detail', 'memoDetail', 'noteDetail',
+        'description', 'desc', 'memo', 'note'
+      ];
+
+      for (var i = 0; i < keys.length; i++) {
+        if (el.dataset[keys[i]]) {
+          var cleaned = normalizeText(el.dataset[keys[i]]);
+          if (cleaned) return cleaned;
+        }
+      }
+      return '';
+    }
+
+    var fromCardDataset = getDatasetText(card);
+    if (fromCardDataset) return fromCardDataset;
+
     var selectors = [
+      '[data-content]', '[data-memo-content]', '[data-note-content]',
+      '[data-body]', '[data-memo-body]', '[data-note-body]',
+      '[data-text]', '[data-memo-text]', '[data-note-text]',
+      '[data-detail]', '[data-memo-detail]', '[data-note-detail]',
+      '[data-description]', '[data-desc]',
       '.memo-content', '.memo-body', '.memo-text', '.memo-detail',
       '.note-content', '.note-body', '.note-text', '.note-detail',
       '[class*="content"]', '[class*="body"]', '[class*="text"]', '[class*="detail"]',
@@ -685,6 +711,10 @@
       for (var j = 0; j < nodes.length; j++) {
         var node = nodes[j];
         if (!node) continue;
+
+        var datasetValue = getDatasetText(node);
+        if (datasetValue) return datasetValue;
+
         var value = (node.tagName === 'TEXTAREA' || node.tagName === 'INPUT') ? (node.value || '') : textOf(node);
         var cleaned = normalizeText(value);
         if (cleaned) return cleaned;
@@ -800,6 +830,71 @@
     });
   }
 
+
+  function findRelatedTextareaAfterEdit(card) {
+    if (!card) return null;
+
+    var selectors = [
+      'textarea',
+      '.memo-content textarea',
+      '.memo-body textarea',
+      '.memo-detail textarea',
+      '.note-content textarea',
+      '.note-body textarea',
+      '.note-detail textarea'
+    ];
+
+    for (var i = 0; i < selectors.length; i++) {
+      var found = card.querySelector(selectors[i]);
+      if (found && found.value !== undefined) return found;
+    }
+
+    var nearby = card.parentElement ? card.parentElement.querySelector('textarea') : null;
+    if (nearby && nearby.value !== undefined) return nearby;
+
+    return null;
+  }
+
+  function hydrateMemoContentFromOriginal(card) {
+    /*
+      카드 DOM에 본문이 없는 경우:
+      기존 PC용 수정/상세 버튼을 잠깐 눌러 textarea가 생성되면 그 값을 가져온다.
+      화면은 모바일 모달이 덮고 있으므로 사용자는 기존 폼을 거의 보지 않음.
+    */
+    if (!card || !modal) return;
+
+    var textarea = modal.querySelector('.mobile-memo-content-input');
+    if (!textarea) return;
+
+    var firstValue = (textarea.value || '').trim();
+    if (firstValue) return;
+
+    var editBtn = findButton(card, ['수정', '상세보기', '열기']);
+    if (!editBtn) return;
+
+    setTimeout(function () {
+      try { editBtn.click(); } catch (_) {}
+
+      setTimeout(function () {
+        var originalTextarea = findRelatedTextareaAfterEdit(card);
+        if (!originalTextarea) return;
+
+        var value = (originalTextarea.value || '').trim();
+        var compact = value.replace(/\s+/g, '');
+        if (!value) return;
+        if (compact === 'MEMO' || compact === 'memo' || compact === '#메모' || compact === '메모' || compact === '최근메모') return;
+
+        var target = modal.querySelector('.mobile-memo-content-input');
+        if (target && !(target.value || '').trim()) {
+          target.value = value;
+          target.dispatchEvent(new Event('input', { bubbles: true }));
+          target.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }, 120);
+    }, 30);
+  }
+
+
   function openModal(nextMode, card) {
     if (!isMobile()) return;
 
@@ -817,6 +912,10 @@
     m.querySelector('.mobile-memo-title-input').value = title || '';
     m.querySelector('.mobile-memo-tag-input').value = '';
     m.querySelector('.mobile-memo-content-input').value = content || '';
+
+    if (!isAdd) {
+      hydrateMemoContentFromOriginal(card);
+    }
     m.querySelector('.mobile-memo-pin-input').checked = false;
     m.querySelector('.mobile-memo-modal-meta').textContent = meta || '';
     m.querySelector('.mobile-memo-btn-delete').style.display = isAdd ? 'none' : '';
@@ -936,6 +1035,21 @@
     }
 
     var editBtn = findButton(currentCard, ['수정', '저장', '수정저장']);
+
+    if (!contentEl && editBtn) {
+      try { editBtn.click(); } catch (_) {}
+      setTimeout(function () {
+        var originalTextarea = findRelatedTextareaAfterEdit(currentCard);
+        if (originalTextarea) setNativeValue(originalTextarea, content);
+
+        var saveBtn = findButton(currentCard, ['저장', '수정저장']);
+        if (saveBtn) {
+          try { saveBtn.click(); } catch (_) {}
+        }
+      }, 120);
+      return;
+    }
+
     if (editBtn) setTimeout(function () { try { editBtn.click(); } catch (_) {} }, 30);
   }
 
@@ -1031,5 +1145,35 @@
   }, true);
 
   window.addEventListener('resize', cleanOpenedMemoTextarea);
+})();
+
+
+
+/* =========================================================
+   Mobile Memo Existing Detail Bridge Fix v32
+   - 카드 DOM에 본문이 없을 때 기존 수정/상세 textarea에서 본문을 가져오기 위한 보정
+   - 제목 수정은 유지, 본문만 추가 연결
+========================================================= */
+(function () {
+  'use strict';
+
+  function cleanMemoModalPlaceholderLikeText() {
+    var modal = document.querySelector('.mobile-memo-unified-modal.is-open');
+    if (!modal) return;
+    var textarea = modal.querySelector('.mobile-memo-content-input');
+    if (!textarea) return;
+
+    var compact = (textarea.value || '').replace(/\s+/g, '').trim();
+    if (compact === 'MEMO' || compact === 'memo' || compact === '#메모' || compact === '메모' || compact === '최근메모') {
+      textarea.value = '';
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+
+  document.addEventListener('click', function () {
+    setTimeout(cleanMemoModalPlaceholderLikeText, 180);
+    setTimeout(cleanMemoModalPlaceholderLikeText, 420);
+  }, true);
 })();
 
