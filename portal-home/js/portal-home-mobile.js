@@ -209,24 +209,21 @@
   'use strict';
 
   const MOBILE_QUERY = '(max-width: 768px)';
-  const CARD_SELECTOR = '.memo-note, .memo-card, .memo-item, .note-card, [data-memo-id], [data-note-id]';
+  const CARD_SELECTOR = '.memo-card, .memo-item, .note-card, [data-memo-id], [data-note-id]';
   const COLOR_KEYS = [
-    { key: 'yellow', label: '노랑', tokens: ['yellow', 'memo-yellow', 'note-yellow', '#facc15', '#fde68a', '#fef3c7', '255, 243', '254, 249'] },
-    { key: 'blue', label: '파랑', tokens: ['blue', 'memo-blue', 'note-blue', '#60a5fa', '#bfdbfe', '#dbeafe', '219, 234', '239, 246'] },
-    { key: 'green', label: '초록', tokens: ['green', 'memo-green', 'note-green', '#4ade80', '#bbf7d0', '#dcfce7', '220, 252', '240, 253'] },
-    { key: 'pink', label: '분홍', tokens: ['pink', 'rose', 'memo-pink', 'note-pink', '#f9a8d4', '#fecdd3', '#fce7f3', '252, 231', '253, 242'] },
-    { key: 'purple', label: '보라', tokens: ['purple', 'violet', 'memo-purple', 'note-purple', '#c084fc', '#e9d5ff', '#f3e8ff', '243, 232'] },
+    { key: 'yellow', label: '노랑', tokens: ['yellow', 'memo-yellow', 'note-yellow', '#facc15', '#fde68a', '255, 243', '254, 249'] },
+    { key: 'blue', label: '파랑', tokens: ['blue', 'memo-blue', 'note-blue', '#60a5fa', '#bfdbfe', '219, 234', '239, 246'] },
+    { key: 'green', label: '초록', tokens: ['green', 'memo-green', 'note-green', '#4ade80', '#bbf7d0', '220, 252', '240, 253'] },
+    { key: 'pink', label: '분홍', tokens: ['pink', 'rose', 'memo-pink', 'note-pink', '#f9a8d4', '#fecdd3', '252, 231', '253, 242'] },
+    { key: 'purple', label: '보라', tokens: ['purple', 'violet', 'memo-purple', 'note-purple', '#c084fc', '#e9d5ff', '243, 232'] },
     { key: 'white', label: '흰색', tokens: ['white', 'memo-white', 'note-white', '#ffffff', '255, 255, 255'] }
   ];
 
   let activeFilter = 'all';
   let rafId = 0;
-  let touchStartX = 0;
-  let touchStartY = 0;
-  let filterTouchMoved = false;
 
   function isMobile() {
-    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
+    return window.matchMedia(MOBILE_QUERY).matches;
   }
 
   function hasMemoContext() {
@@ -240,10 +237,8 @@
   }
 
   function normalizeColor(card) {
-    if (!card) return 'white';
-
     const raw = [
-      card.dataset ? (card.dataset.mobileMemoColor || card.dataset.color || card.dataset.memoColor || card.dataset.noteColor || card.dataset.bg || '') : '',
+      card.dataset ? (card.dataset.color || card.dataset.memoColor || card.dataset.noteColor || card.dataset.bg || '') : '',
       card.className || '',
       card.getAttribute('style') || '',
       window.getComputedStyle(card).backgroundColor || ''
@@ -255,10 +250,8 @@
 
   function getCards() {
     return Array.from(document.querySelectorAll(CARD_SELECTOR)).filter(card => {
-      if (!card) return false;
-      if (card.classList && card.classList.contains('mobile-memo-filter-chip')) return false;
-      if (card.closest && card.closest('.mobile-memo-filter-bar')) return false;
-      if (card.closest && card.closest('.mobile-memo-unified-modal')) return false;
+      if (!card || card.classList.contains('mobile-memo-filter-chip')) return false;
+      if (card.closest('.mobile-memo-filter-bar')) return false;
       return true;
     });
   }
@@ -277,7 +270,6 @@
   function ensureFilterBar(colors) {
     const root = getContentRoot();
     let bar = document.querySelector('.mobile-memo-filter-bar');
-
     if (!bar) {
       bar = document.createElement('div');
       bar.className = 'mobile-memo-filter-bar';
@@ -290,9 +282,8 @@
       COLOR_KEYS.filter(item => colors.has(item.key)).map(item => ({ key: item.key, label: item.label }))
     );
 
-    const currentKeys = Array.from(bar.querySelectorAll('button[data-filter]')).map(btn => btn.dataset.filter).join('|');
+    const currentKeys = Array.from(bar.querySelectorAll('button')).map(btn => btn.dataset.filter).join('|');
     const nextKeys = items.map(item => item.key).join('|');
-
     if (currentKeys !== nextKeys) {
       bar.innerHTML = '';
       items.forEach(item => {
@@ -301,34 +292,21 @@
         btn.className = 'mobile-memo-filter-chip';
         btn.dataset.filter = item.key;
         btn.textContent = item.label;
-        btn.setAttribute('role', 'tab');
-        btn.setAttribute('aria-selected', item.key === activeFilter ? 'true' : 'false');
+        btn.addEventListener('click', function () {
+          activeFilter = item.key;
+          applyMobileMemoUi();
+        });
         bar.appendChild(btn);
       });
     }
 
-    Array.from(bar.querySelectorAll('button[data-filter]')).forEach(btn => {
-      const isActive = btn.dataset.filter === activeFilter;
-      btn.classList.toggle('is-active', isActive);
-      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
-    });
-  }
-
-  function applyFilterToCards(cards) {
-    cards.forEach(card => {
-      const color = normalizeColor(card);
-      card.dataset.mobileMemoColor = color;
-
-      const hidden = activeFilter !== 'all' && color !== activeFilter;
-      card.classList.toggle('mobile-memo-hidden', hidden);
-      card.hidden = hidden;
-      card.style.display = hidden ? 'none' : '';
+    Array.from(bar.querySelectorAll('button')).forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.filter === activeFilter);
     });
   }
 
   function applyMobileMemoUi() {
     rafId = 0;
-
     const root = getContentRoot();
     const cards = getCards();
     const enabled = isMobile() && hasMemoContext() && cards.length > 0;
@@ -340,8 +318,6 @@
       if (bar) bar.hidden = true;
       cards.forEach(card => {
         card.classList.remove('mobile-memo-hidden', 'mobile-memo-open');
-        card.hidden = false;
-        card.style.display = '';
       });
       return;
     }
@@ -352,19 +328,14 @@
       card.dataset.mobileMemoColor = color;
       colors.add(color);
       ensureTitleFallback(card);
+      card.classList.toggle('mobile-memo-hidden', activeFilter !== 'all' && color !== activeFilter);
     });
 
     ensureFilterBar(colors);
-    applyFilterToCards(cards);
-
     const nextBar = document.querySelector('.mobile-memo-filter-bar');
     if (nextBar) nextBar.hidden = false;
 
     root.classList.add('mobile-memo-ready');
-
-    if (window.mobileMemoViewportWidthClamp && typeof window.mobileMemoViewportWidthClamp.schedule === 'function') {
-      window.mobileMemoViewportWidthClamp.schedule();
-    }
   }
 
   function scheduleApply() {
@@ -372,89 +343,35 @@
     rafId = window.requestAnimationFrame(applyMobileMemoUi);
   }
 
-  function applyFilter(filterKey) {
-    activeFilter = filterKey || 'all';
-    applyMobileMemoUi();
-  }
-
-  document.addEventListener('touchstart', function (event) {
-    if (!isMobile()) return;
-    if (!event.target.closest || !event.target.closest('.mobile-memo-filter-bar')) return;
-    if (!event.touches || event.touches.length !== 1) return;
-
-    touchStartX = event.touches[0].clientX;
-    touchStartY = event.touches[0].clientY;
-    filterTouchMoved = false;
-  }, { passive: true });
-
-  document.addEventListener('touchmove', function (event) {
-    if (!isMobile()) return;
-    if (!event.target.closest || !event.target.closest('.mobile-memo-filter-bar')) return;
-    if (!event.touches || event.touches.length !== 1) return;
-
-    const dx = Math.abs(event.touches[0].clientX - touchStartX);
-    const dy = Math.abs(event.touches[0].clientY - touchStartY);
-    if (dx > 10 || dy > 10) filterTouchMoved = true;
-  }, { passive: true });
-
   document.addEventListener('click', function (event) {
-    if (!isMobile()) return;
+    if (!isMobile() || !document.body.classList.contains('mobile-memo-list-mode')) return;
+    if (event.target.closest('.mobile-memo-filter-bar')) return;
+    if (event.target.closest('button, a, input, textarea, select, label')) return;
 
-    const filterBtn = event.target.closest && event.target.closest('.mobile-memo-filter-chip, .mobile-memo-filter-bar button[data-filter]');
-    if (filterBtn && filterBtn.dataset && filterBtn.dataset.filter) {
-      if (filterTouchMoved) {
-        filterTouchMoved = false;
-        return;
-      }
+    const card = event.target.closest(CARD_SELECTOR);
+    if (!card || card.classList.contains('mobile-memo-hidden')) return;
 
-      event.preventDefault();
-      event.stopPropagation();
-
-      applyFilter(filterBtn.dataset.filter);
-      return;
-    }
-
-    /* v43: 카드 펼침 토글 제거 - 메모 클릭은 아래 통합 모달 처리만 사용 */
+    getCards().forEach(item => {
+      if (item !== card) item.classList.remove('mobile-memo-open');
+    });
+    card.classList.toggle('mobile-memo-open');
   }, true);
 
   window.addEventListener('resize', scheduleApply);
   window.addEventListener('orientationchange', scheduleApply);
   document.addEventListener('DOMContentLoaded', scheduleApply);
   document.addEventListener('click', function (event) {
-    if (event.target.closest && event.target.closest('.workspace-tabs .pill')) {
+    if (event.target.closest('.workspace-tabs .pill')) {
       setTimeout(scheduleApply, 80);
     }
   });
 
-  const observer = new MutationObserver(function (mutations) {
-    if (!isMobile()) return;
-
-    const shouldApply = mutations.some(function (mutation) {
-      const target = mutation.target;
-      if (target && target.closest && target.closest('.mobile-memo-filter-bar')) return false;
-
-      return true;
-    });
-
-    if (shouldApply) scheduleApply();
-  });
-
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['class', 'style', 'data-color', 'data-memo-color', 'data-note-color', 'data-mobile-memo-color']
-  });
+  const observer = new MutationObserver(scheduleApply);
+  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'data-color', 'data-memo-color', 'data-note-color'] });
 
   setTimeout(scheduleApply, 250);
   setTimeout(scheduleApply, 900);
   setTimeout(scheduleApply, 1600);
-
-  window.mobileMemoFilterController = {
-    apply: applyFilter,
-    refresh: applyMobileMemoUi,
-    getCurrentFilter: function () { return activeFilter; }
-  };
 })();
 
 
@@ -463,6 +380,7 @@
   'use strict';
 
   var MOBILE_QUERY = '(max-width: 768px)';
+
   function isMobile() {
     return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
   }
@@ -1460,189 +1378,5 @@
   window.mobileMemoViewportWidthClamp = {
     apply: applyWidthClamp,
     schedule: scheduleMultiApply
-  };
-})();
-
-/* =========================================================
-   Mobile Memo Color Filter Hard Fix v43
-   - 색상 버튼 클릭 시 해당 색상 메모만 표시
-   - 원본 데이터/PC 화면 영향 없음
-   - 기존 mobile-memo-open 펼침 방식과 분리
-========================================================= */
-(function () {
-  'use strict';
-
-  var MOBILE_QUERY = '(max-width: 768px)';
-  var CARD_SELECTOR = '.memo-note, .memo-card, .memo-item, .note-card, [data-note-id], [data-memo-id]';
-  var activeFilter = 'all';
-  var applying = false;
-
-  var colorRules = [
-    { key: 'yellow', tokens: ['yellow', '노랑', '#fef3c7', '#fde68a', '#facc15', '254, 243, 199', '253, 230, 138', '250, 204, 21'] },
-    { key: 'blue', tokens: ['blue', '파랑', '#dbeafe', '#bfdbfe', '#60a5fa', '219, 234, 254', '191, 219, 254', '96, 165, 250'] },
-    { key: 'green', tokens: ['green', '초록', '#dcfce7', '#bbf7d0', '#4ade80', '220, 252, 231', '187, 247, 208', '74, 222, 128'] },
-    { key: 'pink', tokens: ['pink', 'rose', '분홍', '#fce7f3', '#fecdd3', '#f9a8d4', '252, 231, 243', '254, 205, 211', '249, 168, 212'] },
-    { key: 'purple', tokens: ['purple', 'violet', '보라', '#f3e8ff', '#e9d5ff', '#c084fc', '243, 232, 255', '233, 213, 255', '192, 132, 252'] },
-    { key: 'white', tokens: ['white', '흰색', '#ffffff', '255, 255, 255'] }
-  ];
-
-  function isMobile() {
-    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
-  }
-
-  function getMemoApi() {
-    return window.portalMemoMobileApi || null;
-  }
-
-  function getCardId(card) {
-    if (!card) return '';
-    return card.dataset.noteId || card.dataset.memoId || card.dataset.memoServerId || card.getAttribute('data-note-id') || card.getAttribute('data-memo-id') || '';
-  }
-
-  function normalizeColorValue(value) {
-    var raw = String(value || '').toLowerCase();
-    for (var i = 0; i < colorRules.length; i += 1) {
-      var rule = colorRules[i];
-      for (var j = 0; j < rule.tokens.length; j += 1) {
-        if (raw.indexOf(String(rule.tokens[j]).toLowerCase()) >= 0) return rule.key;
-      }
-    }
-    return '';
-  }
-
-  function colorFromApi(card) {
-    var api = getMemoApi();
-    if (!api || typeof api.getNoteById !== 'function') return '';
-    var id = getCardId(card);
-    if (!id) return '';
-    var note = api.getNoteById(id);
-    if (!note) return '';
-
-    return normalizeColorValue([
-      note.color,
-      note.bg,
-      note.background,
-      note.layout && note.layout.color,
-      note.layout && note.layout.background,
-      note.layout && note.layout.bg,
-      note.memoColor,
-      note.noteColor
-    ].join(' '));
-  }
-
-  function detectCardColor(card) {
-    if (!card) return 'white';
-
-    var fromApi = colorFromApi(card);
-    if (fromApi) return fromApi;
-
-    var style = window.getComputedStyle ? window.getComputedStyle(card) : null;
-    var raw = [
-      card.dataset ? (card.dataset.color || card.dataset.memoColor || card.dataset.noteColor || card.dataset.bg || '') : '',
-      card.className || '',
-      card.getAttribute('style') || '',
-      style ? (style.backgroundColor || '') : '',
-      style ? (style.background || '') : ''
-    ].join(' ').toLowerCase();
-
-    return normalizeColorValue(raw) || 'white';
-  }
-
-  function getCards() {
-    return Array.prototype.slice.call(document.querySelectorAll(CARD_SELECTOR)).filter(function (card) {
-      if (!card || !card.closest) return false;
-      if (card.closest('.mobile-memo-filter-bar')) return false;
-      if (card.closest('.mobile-memo-unified-modal')) return false;
-      if (card.closest('.workspace-tabs')) return false;
-      return !!card.closest('#tab-content');
-    });
-  }
-
-  function setCardVisible(card, visible) {
-    card.hidden = !visible;
-    card.classList.toggle('mobile-memo-hidden', !visible);
-    if (visible) {
-      card.style.removeProperty('display');
-      card.style.removeProperty('visibility');
-      card.style.removeProperty('opacity');
-    } else {
-      card.style.setProperty('display', 'none', 'important');
-      card.style.setProperty('visibility', 'hidden', 'important');
-      card.style.setProperty('opacity', '0', 'important');
-      card.classList.remove('mobile-memo-open');
-    }
-  }
-
-  function syncButtons() {
-    var buttons = document.querySelectorAll('.mobile-memo-filter-bar button[data-filter], .mobile-memo-filter-chip[data-filter]');
-    Array.prototype.forEach.call(buttons, function (btn) {
-      var on = (btn.dataset.filter || 'all') === activeFilter;
-      btn.classList.toggle('is-active', on);
-      btn.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
-  }
-
-  function applyFilter() {
-    if (!isMobile()) return;
-    if (applying) return;
-    applying = true;
-
-    try {
-      var cards = getCards();
-      cards.forEach(function (card) {
-        var color = detectCardColor(card);
-        card.dataset.mobileMemoColor = color;
-        setCardVisible(card, activeFilter === 'all' || color === activeFilter);
-      });
-      syncButtons();
-    } finally {
-      applying = false;
-    }
-  }
-
-  function delayedApply() {
-    applyFilter();
-    setTimeout(applyFilter, 40);
-    setTimeout(applyFilter, 120);
-    setTimeout(applyFilter, 300);
-  }
-
-  document.addEventListener('click', function (event) {
-    if (!isMobile()) return;
-    var btn = event.target && event.target.closest ? event.target.closest('.mobile-memo-filter-bar button[data-filter], .mobile-memo-filter-chip[data-filter]') : null;
-    if (!btn) return;
-
-    activeFilter = btn.dataset.filter || 'all';
-    event.preventDefault();
-    event.stopPropagation();
-    delayedApply();
-  }, true);
-
-  window.addEventListener('resize', delayedApply);
-  window.addEventListener('orientationchange', delayedApply);
-  document.addEventListener('DOMContentLoaded', delayedApply);
-  document.addEventListener('click', function (event) {
-    if (event.target && event.target.closest && event.target.closest('.workspace-tabs .pill')) {
-      setTimeout(delayedApply, 80);
-    }
-  }, true);
-
-  var observer = new MutationObserver(function (mutations) {
-    if (!isMobile() || activeFilter === 'all') return;
-    var needs = mutations.some(function (m) {
-      var target = m.target;
-      if (target && target.closest && target.closest('.mobile-memo-filter-bar')) return false;
-      return true;
-    });
-    if (needs) delayedApply();
-  });
-
-  if (document.documentElement) {
-    observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'hidden', 'data-color', 'data-memo-color', 'data-note-color'] });
-  }
-
-  window.mobileMemoColorFilterV43 = {
-    apply: function (filter) { activeFilter = filter || activeFilter || 'all'; delayedApply(); },
-    current: function () { return activeFilter; }
   };
 })();
