@@ -1179,28 +1179,27 @@
 
 
 /* =========================================================
-   Mobile Memo Add Screen Fix v29
-   - 모바일 메모 추가 폼을 body 직속 전체화면으로 표시
-   - 기존 카드 안에서 잘리는 문제 해결
-   - 폼 내부 가로 삐져나감 방지
+   Mobile Unified Memo Modal Fix v30
+   - 메모 클릭/메모 추가를 같은 fullscreen 모달 UI로 통일
+   - 기존 메모 추가 폼 이동 방식(v28/v29) 제거
+   - body 최상단 fixed 레이어 사용
+   - 외부 스크롤 잠금, 모달 내부만 스크롤
 ========================================================= */
 @media (max-width: 768px) {
-  body.mobile-memo-add-lock {
+  body.mobile-memo-modal-lock {
     overflow: hidden !important;
     touch-action: none !important;
   }
 
-  .mobile-memo-add-screen {
+  .mobile-memo-unified-modal {
     position: fixed !important;
     inset: 0 !important;
     z-index: 2147483000 !important;
-    display: flex !important;
+    display: none;
     flex-direction: column !important;
     width: 100vw !important;
     height: 100dvh !important;
-    min-width: 0 !important;
     max-width: 100vw !important;
-    min-height: 0 !important;
     max-height: 100dvh !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -1208,79 +1207,90 @@
     border-radius: 0 !important;
     background: #f7f8fb !important;
     color: #0f172a !important;
-    box-shadow: none !important;
     overflow: hidden !important;
-    transform: none !important;
-    left: 0 !important;
-    top: 0 !important;
-    right: auto !important;
-    bottom: auto !important;
     box-sizing: border-box !important;
   }
 
-  .mobile-memo-add-screen,
-  .mobile-memo-add-screen * {
+  .mobile-memo-unified-modal.is-open {
+    display: flex !important;
+  }
+
+  .mobile-memo-unified-modal,
+  .mobile-memo-unified-modal * {
     box-sizing: border-box !important;
     max-width: 100% !important;
   }
 
-  .mobile-memo-add-screen::before {
-    content: "메모 추가";
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    height: calc(env(safe-area-inset-top, 0px) + 58px);
-    padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px;
-    border-bottom: 1px solid rgba(148, 163, 184, .24);
-    background: rgba(247, 248, 251, .96);
-    color: #0f172a;
-    font-size: 20px;
-    font-weight: 900;
-    line-height: 1.2;
+  .mobile-memo-unified-header {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    min-height: calc(env(safe-area-inset-top, 0px) + 58px) !important;
+    padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px !important;
+    border-bottom: 1px solid rgba(148, 163, 184, .24) !important;
+    background: rgba(247, 248, 251, .96) !important;
+    backdrop-filter: blur(10px) !important;
   }
 
-  .mobile-memo-add-screen .mobile-memo-add-scroll {
+  .mobile-memo-unified-title {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    color: #0f172a !important;
+    font-size: 20px !important;
+    font-weight: 900 !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .mobile-memo-unified-close {
+    flex: 0 0 auto !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    min-width: 70px !important;
+    border: 1px solid rgba(148, 163, 184, .42) !important;
+    border-radius: 15px !important;
+    background: #ffffff !important;
+    color: #334155 !important;
+    font-size: 16px !important;
+    font-weight: 900 !important;
+  }
+
+  .mobile-memo-unified-body {
     flex: 1 1 auto !important;
     min-height: 0 !important;
-    width: 100% !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch !important;
-    padding: 14px 14px 18px !important;
-    box-sizing: border-box !important;
+    padding: 14px 16px 18px !important;
   }
 
-  .mobile-memo-add-screen h1,
-  .mobile-memo-add-screen h2,
-  .mobile-memo-add-screen h3,
-  .mobile-memo-add-screen .title,
-  .mobile-memo-add-screen [class*="title"] {
-    font-size: 18px !important;
-    line-height: 1.3 !important;
-    margin: 0 0 12px !important;
+  .mobile-memo-field {
+    margin: 0 0 13px !important;
   }
 
-  .mobile-memo-add-screen label,
-  .mobile-memo-add-screen .label {
+  .mobile-memo-field label,
+  .mobile-memo-field-title {
     display: block !important;
-    margin: 12px 0 6px !important;
+    margin: 0 0 6px !important;
     color: #334155 !important;
     font-size: 13px !important;
-    font-weight: 800 !important;
+    font-weight: 900 !important;
+    line-height: 1.2 !important;
   }
 
-  .mobile-memo-add-screen input[type="text"],
-  .mobile-memo-add-screen input[type="search"],
-  .mobile-memo-add-screen input[type="email"],
-  .mobile-memo-add-screen input:not([type]),
-  .mobile-memo-add-screen select,
-  .mobile-memo-add-screen textarea {
+  .mobile-memo-input,
+  .mobile-memo-textarea,
+  .mobile-memo-select {
     display: block !important;
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
     border: 1px solid rgba(148, 163, 184, .42) !important;
-    border-radius: 14px !important;
+    border-radius: 15px !important;
     background: #ffffff !important;
     color: #0f172a !important;
     font-size: 16px !important;
@@ -1288,71 +1298,147 @@
     outline: none !important;
     opacity: 1 !important;
     visibility: visible !important;
+    pointer-events: auto !important;
   }
 
-  .mobile-memo-add-screen input[type="text"],
-  .mobile-memo-add-screen input[type="search"],
-  .mobile-memo-add-screen input[type="email"],
-  .mobile-memo-add-screen input:not([type]),
-  .mobile-memo-add-screen select {
+  .mobile-memo-input,
+  .mobile-memo-select {
     height: 46px !important;
     min-height: 46px !important;
     padding: 0 12px !important;
   }
 
-  .mobile-memo-add-screen textarea {
-    min-height: 220px !important;
-    height: 34dvh !important;
+  .mobile-memo-textarea {
+    min-height: 240px !important;
+    height: 36dvh !important;
     padding: 12px !important;
     resize: none !important;
   }
 
-  .mobile-memo-add-screen input[type="file"] {
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    font-size: 14px !important;
+  .mobile-memo-color-row {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 9px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 2px 0 4px !important;
+    scrollbar-width: none !important;
   }
 
-  .mobile-memo-add-screen input[type="checkbox"] {
+  .mobile-memo-color-row::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .mobile-memo-color-chip {
+    flex: 0 0 auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    height: 38px !important;
+    padding: 0 12px !important;
+    border: 1px solid rgba(148, 163, 184, .38) !important;
+    border-radius: 999px !important;
+    background: #ffffff !important;
+    color: #334155 !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+  }
+
+  .mobile-memo-color-chip::before {
+    content: "";
+    width: 12px !important;
+    height: 12px !important;
+    border-radius: 999px !important;
+    background: var(--mobile-memo-color, #e2e8f0) !important;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .1) !important;
+  }
+
+  .mobile-memo-color-chip.is-active {
+    border-color: rgba(59, 130, 246, .72) !important;
+    background: #eef6ff !important;
+    color: #0f172a !important;
+  }
+
+  .mobile-memo-file-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-height: 44px !important;
+    padding: 10px 12px !important;
+    border: 1px dashed rgba(148, 163, 184, .58) !important;
+    border-radius: 15px !important;
+    background: #ffffff !important;
+    color: #64748b !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+  }
+
+  .mobile-memo-checkbox-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 9px !important;
+    min-height: 42px !important;
+    color: #334155 !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+  }
+
+  .mobile-memo-checkbox-row input {
     width: 18px !important;
     height: 18px !important;
     min-height: 18px !important;
-    vertical-align: middle !important;
   }
 
-  .mobile-memo-add-screen button {
-    min-height: 44px !important;
-    border-radius: 14px !important;
-    font-size: 16px !important;
-    font-weight: 900 !important;
-    white-space: nowrap !important;
+  .mobile-memo-modal-meta {
+    margin: 4px 0 0 !important;
+    color: #64748b !important;
+    font-size: 13px !important;
+    line-height: 1.55 !important;
+    white-space: pre-line !important;
   }
 
-  .mobile-memo-add-screen .mobile-memo-add-actions {
+  .mobile-memo-unified-actions {
     flex: 0 0 auto !important;
     display: flex !important;
-    justify-content: flex-end !important;
-    align-items: center !important;
     gap: 10px !important;
     width: 100% !important;
     min-height: calc(env(safe-area-inset-bottom, 0px) + 68px) !important;
-    margin: 0 !important;
-    padding: 12px 14px calc(env(safe-area-inset-bottom, 0px) + 12px) !important;
-    background: rgba(247, 248, 251, .96) !important;
+    padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px) !important;
     border-top: 1px solid rgba(148, 163, 184, .24) !important;
+    background: rgba(247, 248, 251, .96) !important;
     backdrop-filter: blur(10px) !important;
-    box-sizing: border-box !important;
   }
 
-  .mobile-memo-add-screen .mobile-memo-add-actions button {
-    flex: 0 0 auto !important;
-    min-width: 76px !important;
-    padding: 0 16px !important;
+  .mobile-memo-unified-actions button {
+    flex: 1 1 0 !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    border-radius: 16px !important;
+    font-size: 16px !important;
+    font-weight: 900 !important;
+    pointer-events: auto !important;
   }
 
-  .mobile-memo-add-screen .mobile-memo-add-actions button:last-child {
+  .mobile-memo-btn-delete {
+    border: 1px solid #fecaca !important;
+    background: #fff5f5 !important;
+    color: #b91c1c !important;
+  }
+
+  .mobile-memo-btn-secondary {
+    border: 1px solid rgba(148, 163, 184, .42) !important;
+    background: #ffffff !important;
+    color: #334155 !important;
+  }
+
+  .mobile-memo-btn-primary {
+    border: 0 !important;
     background: #0f172a !important;
     color: #ffffff !important;
+  }
+
+  .mobile-memo-hidden-original-form {
+    display: none !important;
   }
 }
