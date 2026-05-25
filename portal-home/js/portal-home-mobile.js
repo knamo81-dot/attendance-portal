@@ -1041,3 +1041,120 @@
     closeKeyboardAndRestore: closeKeyboardAndRestore
   };
 })();
+
+
+
+/* =========================================================
+   Mobile Memo Dynamic Height JS v37
+   - 실제 viewport와 memo-wrap 위치를 측정해 남은 높이를 CSS 변수로 주입
+   - iPhone/Android 주소창 변화, 회전, 렌더링 후 재측정 대응
+========================================================= */
+(function () {
+  'use strict';
+
+  var MOBILE_QUERY = '(max-width: 768px)';
+  var raf = 0;
+
+  function isMobile() {
+    return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  function isMemoMode() {
+    return document.body && document.body.classList.contains('mobile-memo-list-mode');
+  }
+
+  function getViewportHeight() {
+    if (window.visualViewport && window.visualViewport.height) {
+      return window.visualViewport.height;
+    }
+    return window.innerHeight || document.documentElement.clientHeight || 0;
+  }
+
+  function getMemoWrap() {
+    return document.querySelector('#tab-content .memo-wrap, #tab-content .card.memo-wrap, .memo-wrap');
+  }
+
+  function applyMemoDynamicHeight() {
+    raf = 0;
+
+    if (!isMobile() || !isMemoMode()) {
+      document.documentElement.style.removeProperty('--mobile-memo-wrap-height');
+      return;
+    }
+
+    var wrap = getMemoWrap();
+    if (!wrap) return;
+
+    var rect = wrap.getBoundingClientRect();
+    var viewportH = getViewportHeight();
+
+    /*
+      하단 여백:
+      - iOS safe area / 화면 아래 여백 고려
+      - 너무 꽉 차면 카드 그림자와 스크롤이 답답해져서 14px 남김
+    */
+    var bottomGap = 14;
+    var available = Math.floor(viewportH - rect.top - bottomGap);
+
+    /*
+      최소/최대 안전값:
+      - 너무 작게 계산되면 기존처럼 짧아지는 문제 발생
+      - 화면보다 넘치면 외부 스크롤이 생김
+    */
+    var minHeight = Math.min(520, Math.max(360, Math.floor(viewportH * 0.55)));
+    var maxHeight = Math.max(360, Math.floor(viewportH - 120));
+
+    if (!available || available < minHeight) available = minHeight;
+    if (available > maxHeight) available = maxHeight;
+
+    document.documentElement.style.setProperty('--mobile-memo-wrap-height', available + 'px');
+  }
+
+  function scheduleApply() {
+    if (raf) return;
+    raf = window.requestAnimationFrame(applyMemoDynamicHeight);
+  }
+
+  function scheduleMultiApply() {
+    scheduleApply();
+    setTimeout(scheduleApply, 80);
+    setTimeout(scheduleApply, 220);
+    setTimeout(scheduleApply, 520);
+  }
+
+  window.addEventListener('resize', scheduleMultiApply);
+  window.addEventListener('orientationchange', scheduleMultiApply);
+  document.addEventListener('DOMContentLoaded', scheduleMultiApply);
+  document.addEventListener('click', function () {
+    setTimeout(scheduleApply, 60);
+    setTimeout(scheduleApply, 180);
+  }, true);
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', scheduleMultiApply);
+    window.visualViewport.addEventListener('scroll', scheduleApply);
+  }
+
+  var observer = new MutationObserver(function () {
+    if (!isMobile()) return;
+    scheduleApply();
+  });
+
+  if (document.documentElement) {
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style', 'hidden']
+    });
+  }
+
+  setTimeout(scheduleMultiApply, 250);
+  setTimeout(scheduleMultiApply, 900);
+  setTimeout(scheduleMultiApply, 1600);
+
+  window.mobileMemoDynamicHeight = {
+    apply: applyMemoDynamicHeight,
+    schedule: scheduleMultiApply
+  };
+})();
