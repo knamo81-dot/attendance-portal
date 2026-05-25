@@ -798,15 +798,18 @@
 
 
 /* =========================================================
-   Mobile Memo Add Screen v28
-   - 모바일에서 메모 추가 폼을 전체화면 입력 화면으로 전환
-   - 기존 추가/취소 버튼 로직은 그대로 재사용
+   Mobile Memo Add Screen v29
+   - 모바일에서 메모 추가 폼을 body 직속 전체화면으로 이동
+   - 기존 추가/취소 버튼 로직 재사용
 ========================================================= */
 (function () {
   'use strict';
 
   var MOBILE_QUERY = '(max-width: 768px)';
   var activeForm = null;
+  var placeholder = null;
+  var originalParent = null;
+  var originalNext = null;
 
   function isMobile() {
     return window.matchMedia && window.matchMedia(MOBILE_QUERY).matches;
@@ -816,42 +819,89 @@
     return (el && (el.innerText || el.textContent) || '').replace(/\s+/g, '').trim();
   }
 
-  function isMemoAddButton(el) {
-    if (!el || !el.matches || !el.matches('button, a, [role="button"]')) return false;
-    var t = normText(el);
-    return t === '메모추가' || t === '추가';
+  function isVisible(el) {
+    if (!el || !el.getBoundingClientRect) return false;
+    var rect = el.getBoundingClientRect();
+    var style = window.getComputedStyle(el);
+    return rect.width > 40 && rect.height > 40 && style.display !== 'none' && style.visibility !== 'hidden';
   }
 
-  function looksLikeMemoAddForm(el) {
-    if (!el || !el.querySelectorAll) return false;
+  function hasMemoAddSignals(el) {
+    if (!el || !el.querySelectorAll || !isVisible(el)) return false;
+
     var text = normText(el);
     var hasTextarea = !!el.querySelector('textarea');
+    var hasFile = !!el.querySelector('input[type="file"]');
     var hasInput = !!el.querySelector('input');
+    var hasCancel = Array.prototype.slice.call(el.querySelectorAll('button')).some(function (btn) {
+      return normText(btn) === '취소';
+    });
     var hasAdd = Array.prototype.slice.call(el.querySelectorAll('button')).some(function (btn) {
       var t = normText(btn);
       return t === '추가' || t === '저장';
     });
-    var hasCancel = Array.prototype.slice.call(el.querySelectorAll('button')).some(function (btn) {
-      return normText(btn) === '취소';
-    });
 
-    return hasTextarea && hasInput && hasAdd && (hasCancel || text.indexOf('메모추가') >= 0 || text.indexOf('색상선택') >= 0);
+    var keyword =
+      text.indexOf('메모추가') >= 0 ||
+      text.indexOf('색상선택') >= 0 ||
+      text.indexOf('이미지업로드') >= 0 ||
+      text.indexOf('상단고정') >= 0 ||
+      text.indexOf('파일없음') >= 0;
+
+    return hasTextarea && hasInput && hasAdd && (hasCancel || hasFile || keyword);
+  }
+
+  function scoreForm(el) {
+    var rect = el.getBoundingClientRect();
+    var text = normText(el);
+    var score = 0;
+    if (el.matches && el.matches('form')) score += 20;
+    if (text.indexOf('메모추가') >= 0) score += 20;
+    if (text.indexOf('색상선택') >= 0) score += 20;
+    if (text.indexOf('이미지업로드') >= 0) score += 15;
+    if (text.indexOf('상단고정') >= 0) score += 15;
+    if (el.querySelector('textarea')) score += 15;
+    if (el.querySelector('input[type="file"]')) score += 10;
+    score += Math.min(30, rect.height / 20);
+    return score;
   }
 
   function findMemoAddForm() {
-    var candidates = Array.prototype.slice.call(document.querySelectorAll(
-      '#tab-content form, #tab-content .card, #tab-content .modal, #tab-content [class*="modal"], #tab-content [class*="form"], #tab-content [class*="memo"]'
-    ));
+    var selectors = [
+      '#tab-content form',
+      '#tab-content .card',
+      '#tab-content .modal',
+      '#tab-content [class*="modal"]',
+      '#tab-content [class*="form"]',
+      '#tab-content [class*="memo"]',
+      '#tab-content div',
+      'body > form',
+      'body > .modal',
+      'body > [class*="modal"]',
+      'body > [class*="form"]'
+    ].join(',');
 
-    var matched = candidates.filter(looksLikeMemoAddForm);
-    if (matched.length === 0) return null;
+    var candidates = Array.prototype.slice.call(document.querySelectorAll(selectors))
+      .filter(function (el) {
+        if (el.classList && el.classList.contains('mobile-memo-add-screen')) return false;
+        if (el.closest && el.closest('.mobile-memo-add-screen')) return false;
+        return hasMemoAddSignals(el);
+      });
 
-    matched.sort(function (a, b) {
-      return a.getBoundingClientRect().width * a.getBoundingClientRect().height -
-             b.getBoundingClientRect().width * b.getBoundingClientRect().height;
+    if (!candidates.length) return null;
+
+    candidates.sort(function (a, b) {
+      return scoreForm(b) - scoreForm(a);
     });
 
-    return matched[0];
+    var chosen = candidates[0];
+
+    /* 너무 큰 wrapper가 잡히면 내부에서 더 정확한 폼 후보를 한 번 더 탐색 */
+    var inner = Array.prototype.slice.call(chosen.querySelectorAll('form, .card, [class*="form"], [class*="modal"], div'))
+      .filter(hasMemoAddSignals)
+      .sort(function (a, b) { return scoreForm(b) - scoreForm(a); })[0];
+
+    return inner || chosen;
   }
 
   function collectActionButtons(form) {
@@ -860,7 +910,7 @@
       return t === '취소' || t === '추가' || t === '저장';
     });
 
-    if (buttons.length === 0) return;
+    if (!buttons.length) return;
 
     var row = form.querySelector(':scope > .mobile-memo-add-actions');
     if (!row) {
@@ -874,17 +924,39 @@
     });
   }
 
+  function wrapScrollableContent(form) {
+    if (form.querySelector(':scope > .mobile-memo-add-scroll')) return;
+
+    var scroll = document.createElement('div');
+    scroll.className = 'mobile-memo-add-scroll';
+
+    Array.prototype.slice.call(form.childNodes).forEach(function (node) {
+      if (node.nodeType === 1 && node.classList.contains('mobile-memo-add-actions')) return;
+      scroll.appendChild(node);
+    });
+
+    form.insertBefore(scroll, form.firstChild);
+  }
+
   function openAddScreen() {
-    if (!isMobile()) return;
+    if (!isMobile() || activeForm) return;
 
     var form = findMemoAddForm();
     if (!form) return;
 
     activeForm = form;
+    originalParent = form.parentNode;
+    originalNext = form.nextSibling;
+
+    placeholder = document.createComment('mobile memo add placeholder');
+    if (originalParent) originalParent.insertBefore(placeholder, form);
+
+    document.body.appendChild(form);
     form.classList.add('mobile-memo-add-screen');
     document.body.classList.add('mobile-memo-add-lock');
 
     collectActionButtons(form);
+    wrapScrollableContent(form);
 
     var first = form.querySelector('input[type="text"], input:not([type]), textarea');
     if (first) {
@@ -895,11 +967,31 @@
   }
 
   function closeAddScreen() {
-    if (activeForm) {
-      activeForm.classList.remove('mobile-memo-add-screen');
-      activeForm = null;
+    if (!activeForm) {
+      document.body.classList.remove('mobile-memo-add-lock');
+      return;
     }
+
+    activeForm.classList.remove('mobile-memo-add-screen');
+
+    if (placeholder && placeholder.parentNode) {
+      placeholder.parentNode.insertBefore(activeForm, placeholder);
+      placeholder.parentNode.removeChild(placeholder);
+    } else if (originalParent) {
+      originalParent.insertBefore(activeForm, originalNext);
+    }
+
+    activeForm = null;
+    placeholder = null;
+    originalParent = null;
+    originalNext = null;
     document.body.classList.remove('mobile-memo-add-lock');
+  }
+
+  function isMemoAddButton(el) {
+    if (!el || !el.matches || !el.matches('button, a, [role="button"]')) return false;
+    var t = normText(el);
+    return t === '메모추가';
   }
 
   document.addEventListener('click', function (event) {
@@ -907,16 +999,17 @@
 
     var target = event.target && event.target.closest ? event.target.closest('button, a, [role="button"]') : null;
 
-    if (target && isMemoAddButton(target) && !target.closest('.mobile-memo-add-screen')) {
-      setTimeout(openAddScreen, 80);
-      setTimeout(openAddScreen, 220);
+    if (target && isMemoAddButton(target)) {
+      setTimeout(openAddScreen, 60);
+      setTimeout(openAddScreen, 180);
+      setTimeout(openAddScreen, 360);
       return;
     }
 
     if (target && target.closest('.mobile-memo-add-screen')) {
       var t = normText(target);
       if (t === '취소' || t === '추가' || t === '저장') {
-        setTimeout(closeAddScreen, 120);
+        setTimeout(closeAddScreen, 180);
       }
     }
   }, true);
@@ -924,12 +1017,11 @@
   var observer = new MutationObserver(function () {
     if (!isMobile()) return;
     if (activeForm) return;
-    setTimeout(openAddScreen, 40);
+    var form = findMemoAddForm();
+    if (form) openAddScreen();
   });
 
-  if (document.getElementById('tab-content')) {
-    observer.observe(document.getElementById('tab-content'), { childList: true, subtree: true });
-  }
+  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
 
   window.addEventListener('resize', function () {
     if (!isMobile()) closeAddScreen();
