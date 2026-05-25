@@ -1,5 +1,4 @@
-
-  #tab-content .calendar-panel,
+ #tab-content .calendar-panel,
   #tab-content .reservation-page,
   #tab-content [class*="schedule"][class*="page"],
   #tab-content [class*="calendar"][class*="section"],
@@ -2001,44 +2000,15 @@
 
 
 /* =========================================================
-   Mobile Memo Final List Stabilizer CSS v45
-   - 모바일 메모는 PC 스티커/자유배치가 아니라 세로 리스트로 강제
-   - 필터 클릭 후에도 회전/좌표/absolute가 되살아나는 문제 방지
-   - 색상 필터는 가로 스크롤 유지
+   Mobile Memo Restore Minimal CSS v46
+   - v45 강제 리스트 스타일 제거 후 기존 모바일 메모 디자인 유지
+   - 색상 필터 버튼 디자인/가로 스크롤 유지
+   - 필터로 숨긴 메모만 확실히 미표시
 ========================================================= */
 @media (max-width: 768px) {
-  body.mobile-memo-list-mode,
-  body.mobile-memo-list-mode * {
-    box-sizing: border-box !important;
-  }
-
-  body.mobile-memo-list-mode #tab-content,
-  body.mobile-memo-list-mode #tab-content.content,
-  body.mobile-memo-list-mode .memo-wrap,
-  body.mobile-memo-list-mode #tab-content .memo-wrap,
-  body.mobile-memo-list-mode #tab-content .card.memo-wrap {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    overflow-x: hidden !important;
-  }
-
   body.mobile-memo-list-mode .mobile-memo-filter-bar {
-    position: relative !important;
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 8px !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin: 0 0 8px 0 !important;
-    padding: 10px 2px !important;
     overflow-x: auto !important;
     overflow-y: hidden !important;
-    white-space: nowrap !important;
     -webkit-overflow-scrolling: touch !important;
     scrollbar-width: none !important;
     touch-action: pan-x !important;
@@ -2050,127 +2020,9 @@
 
   body.mobile-memo-list-mode .mobile-memo-filter-chip {
     flex: 0 0 auto !important;
-    width: auto !important;
-    min-width: max-content !important;
-    max-width: none !important;
     white-space: nowrap !important;
-  }
-
-  body.mobile-memo-list-mode .memo-wrap,
-  body.mobile-memo-list-mode #tab-content .memo-wrap,
-  body.mobile-memo-list-mode #tab-content .card.memo-wrap {
-    position: relative !important;
-    display: flex !important;
-    flex-direction: column !important;
-    height: var(--mobile-memo-wrap-height, 64dvh) !important;
-    min-height: var(--mobile-memo-wrap-height, 420px) !important;
-    max-height: var(--mobile-memo-wrap-height, 74dvh) !important;
-    margin: 0 !important;
-    padding: 0 14px 14px !important;
-    left: auto !important;
-    right: auto !important;
-    top: auto !important;
-    bottom: auto !important;
-    transform: none !important;
-    translate: none !important;
-    overflow: hidden !important;
-  }
-
-  body.mobile-memo-list-mode .memo-top {
-    flex: 0 0 auto !important;
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) auto auto !important;
-    align-items: center !important;
-    gap: 8px !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
-    overflow: hidden !important;
-  }
-
-  body.mobile-memo-list-mode #memo-board,
-  body.mobile-memo-list-mode .memo-board {
-    flex: 1 1 auto !important;
-    position: relative !important;
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    margin: 0 !important;
-    padding: 12px !important;
-    left: 0 !important;
-    right: auto !important;
-    top: auto !important;
-    bottom: auto !important;
-    transform: none !important;
-    translate: none !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    overscroll-behavior: contain !important;
-  }
-
-  body.mobile-memo-list-mode #memo-board-notes,
-  body.mobile-memo-list-mode .memo-board-notes,
-  body.mobile-memo-list-mode #memo-board .memo-board-notes {
-    position: static !important;
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    left: auto !important;
-    right: auto !important;
-    top: auto !important;
-    bottom: auto !important;
-    transform: none !important;
-    translate: none !important;
-    overflow: visible !important;
-    pointer-events: auto !important;
-  }
-
-  body.mobile-memo-list-mode #memo-board .memo-note,
-  body.mobile-memo-list-mode #memo-board-notes .memo-note,
-  body.mobile-memo-list-mode .memo-board .memo-note,
-  body.mobile-memo-list-mode .memo-board-notes .memo-note,
-  body.mobile-memo-list-mode .memo-note,
-  body.mobile-memo-list-mode .memo-card,
-  body.mobile-memo-list-mode .memo-item,
-  body.mobile-memo-list-mode .note-card,
-  body.mobile-memo-list-mode [data-note-id],
-  body.mobile-memo-list-mode [data-memo-id] {
-    position: relative !important;
-    display: block !important;
-    inset: auto !important;
-    left: 0 !important;
-    right: auto !important;
-    top: auto !important;
-    bottom: auto !important;
-    transform: none !important;
-    translate: none !important;
-    rotate: 0deg !important;
-    float: none !important;
-    clear: both !important;
-
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    height: auto !important;
-    min-height: 132px !important;
-    max-height: none !important;
-
-    margin: 0 0 10px 0 !important;
-    padding: 16px 16px 14px !important;
-    border-radius: 20px !important;
-    overflow: hidden !important;
     cursor: pointer !important;
+    pointer-events: auto !important;
   }
 
   body.mobile-memo-list-mode .memo-note.mobile-memo-hidden,
@@ -2179,14 +2031,6 @@
   body.mobile-memo-list-mode .note-card.mobile-memo-hidden,
   body.mobile-memo-list-mode [data-note-id].mobile-memo-hidden,
   body.mobile-memo-list-mode [data-memo-id].mobile-memo-hidden {
-    display: none !important;
-  }
-
-  body.mobile-memo-list-mode .memo-board-bg,
-  body.mobile-memo-list-mode .memo-board-resize-handle,
-  body.mobile-memo-list-mode #memo-board-resize-handle,
-  body.mobile-memo-list-mode .memo-grid,
-  body.mobile-memo-list-mode .board-dots {
     display: none !important;
   }
 }
