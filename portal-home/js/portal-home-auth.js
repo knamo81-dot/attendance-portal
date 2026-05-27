@@ -79,6 +79,7 @@
 
     const requestedSubdomain = getRequestedSubdomain();
     window.currentRequestedSubdomain = requestedSubdomain || null;
+    window.currentTenantSubdomain = requestedSubdomain || null;
 
     console.info('[PortalAuth] hostname:', window.location.hostname || '');
     console.info('[PortalAuth] requested subdomain:', requestedSubdomain || '(root)');
@@ -269,6 +270,12 @@
       return String(left.id || '') === String(right.id || '');
     }
 
+    window.validateCompanyAccess = function validateCompanyAccess(loginCompany, urlCompany) {
+      if (!requestedSubdomain) return true;
+      if (!urlCompany) return false;
+      return isSameCompany(loginCompany, urlCompany);
+    };
+
     async function fetchProfile(email) {
       const { data, error } = await supabaseClient
         .from('users')
@@ -285,6 +292,19 @@
       currentCompany = null;
 
       const urlCompany = await ensureRequestedCompany();
+
+      // 회사별 서브도메인으로 접속했는데 companies에서 해당 회사를 찾지 못하면
+      // 로그인 여부와 관계없이 즉시 차단합니다. 이 조건이 없으면 urlCompany가 null일 때
+      // 다른 회사 계정 로그인이 통과될 수 있습니다.
+      if (requestedSubdomain && !urlCompany) {
+        await supabaseClient.auth.signOut();
+        currentUser = null;
+        currentProfile = null;
+        currentCompany = null;
+        publishPortalSession();
+        showLogin(`등록되지 않은 접속주소입니다. (${requestedSubdomain}.ops.exelolab.com)`);
+        return;
+      }
 
       if (!user) {
         currentCompany = urlCompany || null;
@@ -309,7 +329,7 @@
               currentProfile = injectedProfile;
               currentCompany = await fetchCompany(injectedProfile.company_id);
 
-              if (urlCompany && !isSameCompany(currentCompany, urlCompany)) {
+              if (!window.validateCompanyAccess(currentCompany, urlCompany)) {
                 clearPortalSession();
                 currentCompany = urlCompany;
                 publishPortalSession();
@@ -370,7 +390,7 @@
           return;
         }
 
-        if (urlCompany && !isSameCompany(company, urlCompany)) {
+        if (!window.validateCompanyAccess(company, urlCompany)) {
           await supabaseClient.auth.signOut();
           currentProfile = null;
           currentUser = null;
