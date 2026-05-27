@@ -38,7 +38,13 @@ function bindNavigation() {
 
 
 async function initializeAuthState() {
+  if (typeof publishResearchStaffSession === "function") {
+    publishResearchStaffSession();
+  }
   AppState.currentUser = await resolvePortalUser();
+  if (typeof publishResearchStaffSession === "function") {
+    publishResearchStaffSession();
+  }
   await loadMyResearchStaffRoles();
 }
 
@@ -80,6 +86,9 @@ function canEditOperatingStaffList() {
 }
 
 async function resolvePortalUser() {
+  const parentUser = readPortalUserFromParentSession();
+  if (parentUser?.email) return parentUser;
+
   const queryUser = readPortalUserFromQuery();
   if (queryUser?.email) return queryUser;
 
@@ -97,12 +106,80 @@ async function resolvePortalUser() {
   return null;
 }
 
+function readPortalUserFromParentSession() {
+  try {
+    let session = null;
+
+    if (window.parent && window.parent !== window && typeof window.parent.getPortalSession === "function") {
+      session = window.parent.getPortalSession();
+    } else if (window.parent && window.parent !== window && window.parent.portalSession) {
+      session = window.parent.portalSession;
+    } else {
+      session = window.portalSession || window.currentPortalSession || null;
+    }
+
+    if (!session) return null;
+
+    const email = String(
+      session.user?.email ||
+      session.profile?.email ||
+      session.email ||
+      ""
+    ).trim();
+
+    if (!email) return null;
+
+    const companyId = String(
+      session.activeCompanyId ||
+      session.active_company_id ||
+      session.companyId ||
+      session.company_id ||
+      session.company?.id ||
+      session.profile?.company_id ||
+      ""
+    ).trim();
+
+    window.portalSession = {
+      ...(window.portalSession || {}),
+      ...session,
+      companyId,
+      company_id: companyId,
+      activeCompanyId: companyId,
+      active_company_id: companyId
+    };
+    window.currentPortalSession = window.portalSession;
+    window.currentCompanyId = companyId || window.currentCompanyId || "";
+
+    return {
+      email,
+      name: session.profile?.name || session.user?.user_metadata?.name || session.user?.name || session.name || "",
+      company_id: companyId
+    };
+  } catch (error) {
+    console.warn("부모 포탈 세션 확인 실패:", error);
+    return null;
+  }
+}
+
 function readPortalUserFromQuery() {
   try {
     const params = new URLSearchParams(window.location.search);
     const email = params.get("portalEmail") || params.get("portal_email") || params.get("userEmail") || params.get("email") || "";
     const name = params.get("portalName") || params.get("name") || "";
-    if (email) return { email, name };
+    const companyId = params.get("company_id") || params.get("companyId") || "";
+
+    if (companyId) {
+      window.portalSession = {
+        ...(window.portalSession || {}),
+        companyId,
+        company_id: companyId,
+        activeCompanyId: companyId,
+        active_company_id: companyId
+      };
+      window.currentCompanyId = companyId;
+    }
+
+    if (email) return { email, name, company_id: companyId };
   } catch (error) {
     console.warn("포탈 사용자 URL 확인 실패:", error);
   }
@@ -199,11 +276,39 @@ function waitForPortalUserMessage(timeout = 450) {
 
     const onMessage = (event) => {
       const data = event.data || {};
-      if (data?.type !== "portal-auth" && data?.type !== "PORTAL_AUTH_USER") return;
+      if (data?.type !== "portal-auth" && data?.type !== "PORTAL_AUTH_USER" && data?.type !== "portal-session-ready" && data?.type !== "portal-session-changed") return;
 
-      const payload = data.user || data.payload || data;
-      const email = String(payload?.email || "").trim();
-      if (email) finish({ email, name: payload?.name || "" });
+      const session = data.session || data.detail || null;
+      const payload = data.user || data.payload || session?.user || session?.profile || data;
+      const company = data.company || session?.company || payload?.company || {};
+      const email = String(payload?.email || session?.user?.email || session?.profile?.email || "").trim();
+      const companyId = String(
+        payload?.company_id ||
+        payload?.companyId ||
+        company?.id ||
+        company?.company_id ||
+        session?.activeCompanyId ||
+        session?.active_company_id ||
+        session?.companyId ||
+        session?.company_id ||
+        session?.profile?.company_id ||
+        ""
+      ).trim();
+
+      if (companyId) {
+        window.portalSession = {
+          ...(window.portalSession || {}),
+          ...(session || {}),
+          companyId,
+          company_id: companyId,
+          activeCompanyId: companyId,
+          active_company_id: companyId
+        };
+        window.currentPortalSession = window.portalSession;
+        window.currentCompanyId = companyId;
+      }
+
+      if (email) finish({ email, name: payload?.name || session?.profile?.name || "", company_id: companyId });
     };
 
     const timer = setTimeout(() => finish(null), timeout);
@@ -212,6 +317,7 @@ function waitForPortalUserMessage(timeout = 450) {
     try {
       if (window.parent && window.parent !== window) {
         window.parent.postMessage({ type: "portal-auth-request", app: "research-staff" }, "*");
+        window.parent.postMessage({ type: "portal-session-request", app: "research-staff" }, "*");
       }
     } catch (_) {}
   });

@@ -165,13 +165,17 @@ async function saveAllProfiles() {
 
     payload.is_research_staff = true;
     payload.updated_at = new Date().toISOString();
+    if (typeof getResearchStaffCompanyId === "function") {
+      const companyId = getResearchStaffCompanyId();
+      if (companyId) payload.company_id = companyId;
+    }
     return payload;
   });
 
   try {
     const { error } = await client
       .from("research_staff_profiles")
-      .upsert(payloads, { onConflict: "employee_no" });
+      .upsert(payloads, { onConflict: (typeof getResearchStaffCompanyId === "function" && getResearchStaffCompanyId()) ? "employee_no,company_id" : "employee_no" });
 
     if (error) throw error;
 
