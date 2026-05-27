@@ -1845,7 +1845,31 @@ input[type="radio"]{
   let currentUser = null;
   let currentProfile = null;
   let currentCompany = null;
+  let requestedCompany = null;
+  let requestedCompanyLoaded = false;
   let authBusy = false;
+
+  function getRequestedSubdomain() {
+    const host = String(window.location.hostname || '').toLowerCase().replace(/:\d+$/, '');
+
+    if (!host || host === 'localhost' || host === '127.0.0.1') return '';
+    if (host === 'ops.exelolab.com' || host === 'www.ops.exelolab.com') return '';
+
+    if (host.endsWith('.ops.exelolab.com')) {
+      const subdomain = host.replace('.ops.exelolab.com', '').split('.')[0];
+      const reserved = new Set(['www', 'ops', 'app', 'apps', 'admin', 'login']);
+      return reserved.has(subdomain) ? '' : subdomain;
+    }
+
+    return '';
+  }
+
+  const requestedSubdomain = getRequestedSubdomain();
+  window.currentTenantSubdomain = requestedSubdomain || null;
+  window.currentRequestedSubdomain = requestedSubdomain || null;
+
+  console.info('[PortalTenant] host:', window.location.hostname || '');
+  console.info('[PortalTenant] requested subdomain:', requestedSubdomain || '(root)');
 
   let portalBrandColor = '#c8102e';
   let portalBrandColor2 = '#e11d2e';
@@ -2521,15 +2545,17 @@ input[type="radio"]{
   }
 
   function buildPortalSession() {
-    const companyId = currentProfile?.company_id || currentCompany?.id || '';
-    const companyCode = currentCompany?.company_code || '';
-    const companyName = currentCompany?.company_name || '';
+    const companyId = currentProfile?.company_id || currentCompany?.id || requestedCompany?.id || '';
+    const companyCode = currentCompany?.company_code || requestedCompany?.company_code || '';
+    const companyName = currentCompany?.company_name || requestedCompany?.company_name || '';
+    const companySubdomain = currentCompany?.subdomain || requestedCompany?.subdomain || requestedSubdomain || '';
     const role = currentProfile?.role || 'viewer';
 
     return {
       user: currentUser,
       profile: currentProfile,
       company: currentCompany,
+      requestedCompany,
       email: currentUser?.email || '',
       companyId,
       company_id: companyId,
@@ -2537,6 +2563,10 @@ input[type="radio"]{
       company_code: companyCode,
       companyName,
       company_name: companyName,
+      companySubdomain,
+      company_subdomain: companySubdomain,
+      requestedSubdomain: requestedSubdomain || null,
+      requested_subdomain: requestedSubdomain || null,
       role,
       language: getPreferredLanguage(),
       preferred_language: getPreferredLanguage(),
@@ -2578,6 +2608,9 @@ input[type="radio"]{
     window.currentCompanyId = session.companyId;
     window.currentCompanyCode = session.companyCode;
     window.currentCompanyName = session.companyName;
+    window.currentCompanySubdomain = session.companySubdomain;
+    window.currentRequestedSubdomain = session.requestedSubdomain;
+    window.currentTenantSubdomain = session.requestedSubdomain;
     window.currentUserRole = session.role;
     window.dispatchEvent(new CustomEvent('portal-session-ready', { detail: session }));
     return session;
@@ -2593,6 +2626,9 @@ input[type="radio"]{
     window.currentCompanyId = null;
     window.currentCompanyCode = null;
     window.currentCompanyName = null;
+    window.currentCompanySubdomain = null;
+    window.currentRequestedSubdomain = requestedSubdomain || null;
+    window.currentTenantSubdomain = requestedSubdomain || null;
     window.currentUserRole = null;
     updateServiceAdminButtonVisibility();
   }
@@ -2666,15 +2702,72 @@ input[type="radio"]{
     if (!companyId) return null;
     const { data, error } = await supabaseClient
       .from('companies')
-      .select('id,company_name,company_code,is_active')
+      .select('id,company_name,company_code,subdomain,is_active')
       .eq('id', companyId)
       .maybeSingle();
     if (error) throw error;
     return data;
   }
 
+  async function fetchCompanyBySubdomain(subdomain) {
+    const clean = String(subdomain || '').trim().toLowerCase();
+    if (!clean) return null;
+
+    const { data, error } = await supabaseClient
+      .from('companies')
+      .select('id,company_name,company_code,subdomain,is_active')
+      .eq('subdomain', clean)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async function ensureRequestedCompany() {
+    if (requestedCompanyLoaded) return requestedCompany;
+    requestedCompanyLoaded = true;
+
+    if (!requestedSubdomain) {
+      requestedCompany = null;
+      return null;
+    }
+
+    requestedCompany = await fetchCompanyBySubdomain(requestedSubdomain);
+    return requestedCompany;
+  }
+
+  function isSameCompany(left, right) {
+    if (!left || !right) return false;
+    return String(left.id || '') === String(right.id || '');
+  }
+
+  window.validateCompanyAccess = function validateCompanyAccess(loginCompany, urlCompany) {
+    if (!requestedSubdomain) return true;
+    if (!urlCompany) return false;
+    return isSameCompany(loginCompany, urlCompany);
+  };
+
   async function loadUserContext(user) {
     if (!user?.email) return false;
+
+    const urlCompany = await ensureRequestedCompany();
+
+    if (requestedSubdomain && !urlCompany) {
+      await supabaseClient.auth.signOut();
+      clearPortalSession();
+      currentCompany = null;
+      publishPortalSession();
+      showLogin(`등록되지 않은 접속주소입니다. (${requestedSubdomain}.ops.exelolab.com)`);
+      return false;
+    }
+
+    if (urlCompany?.is_active === false) {
+      await supabaseClient.auth.signOut();
+      clearPortalSession();
+      currentCompany = null;
+      showLogin('비활성화된 회사 접속주소입니다. 관리자에게 문의해 주세요.');
+      return false;
+    }
 
     const profile = await fetchProfile(user.email);
     if (!profile) {
@@ -2710,6 +2803,15 @@ input[type="radio"]{
       await supabaseClient.auth.signOut();
       clearPortalSession();
       showLogin('비활성화된 회사입니다. 관리자에게 문의해 주세요.');
+      return false;
+    }
+
+    if (!window.validateCompanyAccess(company, urlCompany)) {
+      await supabaseClient.auth.signOut();
+      clearPortalSession();
+      currentCompany = urlCompany || null;
+      publishPortalSession();
+      showLogin(`${urlCompany?.company_name || '현재 회사'} 전용 접속주소입니다. 해당 회사 계정으로 로그인해 주세요.`);
       return false;
     }
 
@@ -3265,10 +3367,19 @@ input[type="radio"]{
     const sessionUser = data?.session?.user || null;
 
     if (!sessionUser) {
+      const urlCompany = await ensureRequestedCompany();
       clearPortalSession();
+      currentCompany = urlCompany || null;
+      publishPortalSession();
       replacePortalFrame(HOME_SRC);
       if (homeBtn) setActiveNav(homeBtn);
-      showLogin('');
+      if (requestedSubdomain && !urlCompany) {
+        showLogin(`등록되지 않은 접속주소입니다. (${requestedSubdomain}.ops.exelolab.com)`);
+      } else if (urlCompany?.is_active === false) {
+        showLogin('비활성화된 회사 접속주소입니다. 관리자에게 문의해 주세요.');
+      } else {
+        showLogin('');
+      }
       return;
     }
 
@@ -3308,7 +3419,9 @@ input[type="radio"]{
       lastPage: localStorage.getItem(LAST_PAGE_KEY),
       currentPortalTabs,
       currentPortalTabId,
-      currentPortalFilters
+      currentPortalFilters,
+      requestedSubdomain,
+      requestedCompany
     };
   };
 
