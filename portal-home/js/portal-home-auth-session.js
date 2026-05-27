@@ -8,7 +8,170 @@
   if (!window.portalSupabase) {
     window.portalSupabase = window.supabase.createClient(URL, KEY);
   }
-  const sb = window.portalSupabase;
+  function getParentPortalSession(){
+    try{
+      if(window.parent && window.parent !== window && typeof window.parent.getPortalSession === 'function'){
+        return window.parent.getPortalSession();
+      }
+    }catch(_){}
+    try{
+      if(window.parent && window.parent !== window && window.parent.portalSession){
+        return window.parent.portalSession;
+      }
+    }catch(_){}
+    return window.portalSession || window.currentPortalSession || null;
+  }
+
+  function getActiveCompanyId(){
+    const session = getParentPortalSession() || window.portalSession || window.currentPortalSession || {};
+    return String(
+      session.activeCompanyId ||
+      session.active_company_id ||
+      session.selectedCompanyId ||
+      session.selected_company_id ||
+      session.activeCompany?.id ||
+      session.active_company?.id ||
+      session.companyId ||
+      session.company_id ||
+      session.company?.id ||
+      session.profile?.company_id ||
+      window.currentCompanyId ||
+      ''
+    ).trim();
+  }
+
+  function getActiveCompanyName(){
+    const session = getParentPortalSession() || window.portalSession || window.currentPortalSession || {};
+    return String(
+      session.activeCompanyName ||
+      session.active_company_name ||
+      session.activeCompany?.company_name ||
+      session.active_company?.company_name ||
+      session.companyName ||
+      session.company_name ||
+      session.company?.company_name ||
+      window.currentCompanyName ||
+      ''
+    ).trim();
+  }
+
+  function publishChildTenantSession(){
+    const parent = getParentPortalSession() || {};
+    const companyId = getActiveCompanyId();
+    const companyName = getActiveCompanyName();
+    const merged = {
+      ...parent,
+      supabase: window.portalSupabase,
+      companyId,
+      company_id: companyId,
+      activeCompanyId: companyId,
+      active_company_id: companyId,
+      companyName,
+      company_name: companyName,
+      activeCompanyName: companyName,
+      active_company_name: companyName
+    };
+    window.portalSession = merged;
+    window.currentPortalSession = merged;
+    window.currentCompanyId = companyId;
+    window.currentCompanyName = companyName;
+    return merged;
+  }
+
+  function addCompanyIdToPayload(payload, companyId){
+    if(!companyId) return payload;
+    if(Array.isArray(payload)){
+      return payload.map(row => row && typeof row === 'object' ? { ...row, company_id: row.company_id || companyId } : row);
+    }
+    if(payload && typeof payload === 'object'){
+      return { ...payload, company_id: payload.company_id || companyId };
+    }
+    return payload;
+  }
+
+  const TENANT_TABLES = new Set([
+    'activity_logs','app_role_assignments','approval_logs',
+    'divisions','teams','employees','managed_teams','users',
+    'employee_special_notes','team_change_history',
+    'portal_memos','portal_schedules','portal_reservations','portal_reservation_resources',
+    'research_staff_profiles','system_settings','user_app_roles',
+    'wastewater','wastewater_approvers','wastewater_pickups',
+    'attendance_records','attendance_erp_raw','attendance_secom_raw','attendance_upload_batches','attendance_upload_logs'
+  ]);
+
+  function createScopedBuilder(initialBuilder, tableName, alreadyScoped){
+    const state = { builder: initialBuilder, scoped: !!alreadyScoped };
+    const shouldScope = () => TENANT_TABLES.has(String(tableName || ''));
+    const ensureScope = () => {
+      const companyId = getActiveCompanyId();
+      if(!shouldScope() || !companyId || state.scoped) return;
+      try{
+        if(state.builder && typeof state.builder.eq === 'function'){
+          state.builder = state.builder.eq('company_id', companyId);
+          state.scoped = true;
+        }
+      }catch(error){
+        console.warn('[portal-home-auth-session] company scope failed:', tableName, error);
+      }
+    };
+
+    return new Proxy({}, {
+      get(_target, prop){
+        if(prop === 'then'){
+          ensureScope();
+          return state.builder.then.bind(state.builder);
+        }
+        if(prop === 'catch'){
+          ensureScope();
+          return state.builder.catch.bind(state.builder);
+        }
+        if(prop === 'finally'){
+          ensureScope();
+          return state.builder.finally.bind(state.builder);
+        }
+
+        const value = state.builder[prop];
+        if(typeof value !== 'function') return value;
+
+        return function(...args){
+          const companyId = getActiveCompanyId();
+
+          if((prop === 'insert' || prop === 'upsert') && shouldScope()){
+            args[0] = addCompanyIdToPayload(args[0], companyId);
+          }
+
+          if((prop === 'single' || prop === 'maybeSingle' || prop === 'csv' || prop === 'geojson' || prop === 'explain') && shouldScope()){
+            ensureScope();
+          }
+
+          const next = value.apply(state.builder, args);
+          if(next && typeof next === 'object'){
+            return createScopedBuilder(next, tableName, state.scoped);
+          }
+          return next;
+        };
+      }
+    });
+  }
+
+  function createTenantScopedClient(baseClient){
+    return new Proxy(baseClient, {
+      get(target, prop){
+        if(prop === 'from'){
+          return function(tableName){
+            const builder = target.from(tableName);
+            return createScopedBuilder(builder, tableName, false);
+          };
+        }
+        const value = target[prop];
+        return typeof value === 'function' ? value.bind(target) : value;
+      }
+    });
+  }
+
+  const rawSupabaseClient = window.portalSupabase;
+  publishChildTenantSession();
+  const sb = createTenantScopedClient(rawSupabaseClient);
 
   const dataState = {
     divisions: [],
@@ -1166,6 +1329,11 @@
   }
 
   async function initRealAdmin(){
+    publishChildTenantSession();
+    if(!getActiveCompanyId()){
+      console.warn('[portal-home-auth-session] active company_id is missing. Tenant scoped admin data loading stopped.');
+      return;
+    }
     // portal-home.html 홈 화면에는 조직/사원 관리 DOM이 없을 수 있습니다.
     // 이 경우 관리자 초기화 로직을 실행하지 않아 null.innerHTML 오류를 방지합니다.
     const hasAdminDom = Boolean(
