@@ -4407,10 +4407,67 @@ create table if not exists user_app_roles (
 (function () {
   'use strict';
 
+  /*
+    Settings Tenant Scope Patch - Step 3 final
+    - 일반 admin: 본인 회사(company_id) 기준
+    - service_admin: 포탈에서 선택한 activeCompanyId / impersonatedCompanyId 기준
+    - insert/upsert/update payload에 company_id 자동 주입
+    - select/update/delete는 company_id 자동 필터 적용
+    - Edge Function body에도 active company_id 전달
+  */
+
+  function safeString(value) {
+    var text = String(value === undefined || value === null ? '' : value).trim();
+    if (!text || text === 'null' || text === 'undefined') return '';
+    return text;
+  }
+
+  function readLocalStorage(key) {
+    try { return window.localStorage ? window.localStorage.getItem(key) : ''; } catch (_) { return ''; }
+  }
+
+  function readSessionStorage(key) {
+    try { return window.sessionStorage ? window.sessionStorage.getItem(key) : ''; } catch (_) { return ''; }
+  }
+
+  function parseMaybeJson(value) {
+    if (!value || typeof value !== 'string') return value || {};
+    try { return JSON.parse(value); } catch (_) { return {}; }
+  }
+
+  function readStoredPortalSession() {
+    var keys = [
+      'portalSession',
+      'portal_session',
+      'portal_auth_session',
+      'portalAuthSession',
+      'portal_auth_user',
+      'portalUser',
+      'attendance_portal_user'
+    ];
+
+    for (var i = 0; i < keys.length; i++) {
+      var raw = readSessionStorage(keys[i]) || readLocalStorage(keys[i]);
+      var parsed = parseMaybeJson(raw);
+      if (parsed && typeof parsed === 'object') {
+        var hasCompany =
+          parsed.activeCompanyId || parsed.active_company_id ||
+          parsed.impersonatedCompanyId || parsed.impersonated_company_id ||
+          parsed.companyId || parsed.company_id ||
+          (parsed.user && parsed.user.company_id) ||
+          (parsed.profile && parsed.profile.company_id);
+        if (hasCompany) return parsed;
+      }
+    }
+
+    return {};
+  }
+
   function readPortalSessionSafe() {
     try {
       if (window.parent && typeof window.parent.getPortalSession === 'function') {
-        return window.parent.getPortalSession() || {};
+        var fromGetter = window.parent.getPortalSession() || {};
+        if (fromGetter && typeof fromGetter === 'object') return fromGetter;
       }
     } catch (_) {}
 
@@ -4420,46 +4477,187 @@ create table if not exists user_app_roles (
       }
     } catch (_) {}
 
-    return window.portalSession || {};
+    try {
+      if (window.portalSession) return window.portalSession || {};
+    } catch (_) {}
+
+    return readStoredPortalSession();
+  }
+
+  function readPortalAuthContextSafe() {
+    try {
+      if (window.parent && typeof window.parent.getPortalAuthContext === 'function') {
+        return window.parent.getPortalAuthContext() || {};
+      }
+    } catch (_) {}
+
+    try {
+      if (typeof window.getPortalAuthContext === 'function') {
+        return window.getPortalAuthContext() || {};
+      }
+    } catch (_) {}
+
+    return {};
+  }
+
+  function getNestedCompanyIds(source) {
+    source = source || {};
+    return [
+      source.activeCompanyId,
+      source.active_company_id,
+      source.impersonatedCompanyId,
+      source.impersonated_company_id,
+      source.selectedCompanyId,
+      source.selected_company_id,
+      source.targetCompanyId,
+      source.target_company_id,
+      source.currentCompanyId,
+      source.current_company_id,
+      source.company && source.company.activeCompanyId,
+      source.company && source.company.active_company_id,
+      source.company && source.company.id,
+      source.company && source.company.company_id,
+      source.activeCompany && source.activeCompany.id,
+      source.activeCompany && source.activeCompany.company_id,
+      source.impersonatedCompany && source.impersonatedCompany.id,
+      source.impersonatedCompany && source.impersonatedCompany.company_id,
+      source.profile && source.profile.activeCompanyId,
+      source.profile && source.profile.active_company_id,
+      source.profile && source.profile.company_id,
+      source.user && source.user.activeCompanyId,
+      source.user && source.user.active_company_id,
+      source.user && source.user.company_id,
+      source.companyId,
+      source.company_id
+    ];
   }
 
   function resolveSettingsCompanyId() {
     var session = readPortalSessionSafe();
+    var ctx = readPortalAuthContextSafe();
 
-    var candidates = [
-      session.companyId,
-      session.company_id,
-      session.company && session.company.id,
-      session.company && session.company.company_id,
-      session.profile && session.profile.company_id,
-      window.currentCompanyId,
-      window.companyId,
-      localStorage.getItem('company_id'),
-      localStorage.getItem('currentCompanyId'),
-      localStorage.getItem('portal_company_id')
-    ];
+    var candidates = []
+      .concat(getNestedCompanyIds(session))
+      .concat(getNestedCompanyIds(ctx))
+      .concat([
+        window.activeCompanyId,
+        window.active_company_id,
+        window.impersonatedCompanyId,
+        window.impersonated_company_id,
+        window.selectedCompanyId,
+        window.selected_company_id,
+        window.currentCompanyId,
+        window.companyId,
+        window.company_id,
+        readSessionStorage('activeCompanyId'),
+        readSessionStorage('active_company_id'),
+        readSessionStorage('impersonatedCompanyId'),
+        readSessionStorage('impersonated_company_id'),
+        readSessionStorage('currentCompanyId'),
+        readSessionStorage('company_id'),
+        readSessionStorage('portal_company_id'),
+        readLocalStorage('activeCompanyId'),
+        readLocalStorage('active_company_id'),
+        readLocalStorage('impersonatedCompanyId'),
+        readLocalStorage('impersonated_company_id'),
+        readLocalStorage('currentCompanyId'),
+        readLocalStorage('company_id'),
+        readLocalStorage('portal_company_id')
+      ]);
 
     for (var i = 0; i < candidates.length; i++) {
-      var value = String(candidates[i] || '').trim();
-      if (value && value !== 'null' && value !== 'undefined') return value;
+      var value = safeString(candidates[i]);
+      if (value) return value;
     }
 
     return '';
   }
 
-  var originalGetCompanyId = window.getCompanyId;
-  window.getCompanyId = function () {
-    var existing = '';
-    try {
-      if (typeof originalGetCompanyId === 'function') {
-        existing = String(originalGetCompanyId() || '').trim();
-      }
-    } catch (_) {}
+  function isServiceAdminSession() {
+    var session = readPortalSessionSafe();
+    var ctx = readPortalAuthContextSafe();
+    var texts = [
+      session.role,
+      session.user && session.user.role,
+      session.profile && session.profile.role,
+      session.accountRole,
+      session.account_role,
+      ctx.role,
+      ctx.user && ctx.user.role,
+      ctx.profile && ctx.profile.role
+    ].map(function (v) { return String(v || '').trim().toLowerCase(); });
 
-    return existing || resolveSettingsCompanyId();
+    return texts.indexOf('service_admin') >= 0 || texts.indexOf('service-admin') >= 0 || texts.indexOf('super_admin') >= 0;
+  }
+
+  function getOriginalCompanyId() {
+    var session = readPortalSessionSafe();
+    var ctx = readPortalAuthContextSafe();
+    var candidates = [
+      session.originalCompanyId,
+      session.original_company_id,
+      session.homeCompanyId,
+      session.home_company_id,
+      session.user && session.user.company_id,
+      session.profile && session.profile.company_id,
+      ctx.originalCompanyId,
+      ctx.original_company_id,
+      ctx.user && ctx.user.company_id,
+      ctx.profile && ctx.profile.company_id,
+      session.companyId,
+      session.company_id,
+      ctx.companyId,
+      ctx.company_id
+    ];
+
+    for (var i = 0; i < candidates.length; i++) {
+      var value = safeString(candidates[i]);
+      if (value) return value;
+    }
+
+    return '';
+  }
+
+  function isImpersonating() {
+    var activeId = resolveSettingsCompanyId();
+    var originalId = getOriginalCompanyId();
+    var session = readPortalSessionSafe();
+
+    return Boolean(
+      isServiceAdminSession() &&
+      activeId &&
+      (
+        safeString(session.impersonating) === 'true' ||
+        safeString(session.isImpersonating) === 'true' ||
+        safeString(session.impersonatedCompanyId) ||
+        safeString(session.impersonated_company_id) ||
+        (originalId && activeId !== originalId)
+      )
+    );
+  }
+
+  var previousGetCompanyId = window.getCompanyId;
+  var previousGetPortalCompanyId = window.getPortalCompanyId;
+
+  window.__settingsResolveCompanyId = resolveSettingsCompanyId;
+  window.getCompanyId = function () {
+    return resolveSettingsCompanyId();
+  };
+  window.getPortalCompanyId = function () {
+    return resolveSettingsCompanyId();
+  };
+  window.getSettingsCompanyId = function () {
+    return resolveSettingsCompanyId();
   };
 
-  window.__settingsResolveCompanyId = window.getCompanyId;
+  window.__settingsTenantContext = function () {
+    return {
+      companyId: resolveSettingsCompanyId(),
+      originalCompanyId: getOriginalCompanyId(),
+      isServiceAdmin: isServiceAdminSession(),
+      isImpersonating: isImpersonating()
+    };
+  };
 
   var COMPANY_SCOPED_TABLES = {
     divisions: true,
@@ -4467,7 +4665,10 @@ create table if not exists user_app_roles (
     users: true,
     employees: true,
     managed_teams: true,
+    organizations: true,
     user_app_roles: true,
+    team_change_history: true,
+    employee_special_notes: true,
     portal_reservation_resources: true,
     portal_reservations: true,
     portal_schedules: true,
@@ -4482,10 +4683,8 @@ create table if not exists user_app_roles (
   function patchDbRow(row) {
     if (!row || typeof row !== 'object') return row;
 
-    var companyId = window.__settingsResolveCompanyId ? window.__settingsResolveCompanyId() : '';
-    if (companyId && !row.company_id) {
-      row.company_id = companyId;
-    }
+    var companyId = resolveSettingsCompanyId();
+    if (companyId) row.company_id = row.company_id || companyId;
 
     if (Object.prototype.hasOwnProperty.call(row, 'companyId')) {
       delete row.companyId;
@@ -4508,10 +4707,21 @@ create table if not exists user_app_roles (
     return payload;
   }
 
+  function tryScopeBuilder(builder) {
+    var companyId = resolveSettingsCompanyId();
+    if (!companyId || !builder || typeof builder.eq !== 'function') return builder;
+
+    try {
+      return builder.eq('company_id', companyId);
+    } catch (_) {
+      return builder;
+    }
+  }
+
   function patchEdgeBody(body) {
     if (!body || typeof body !== 'object') return body;
 
-    var companyId = window.__settingsResolveCompanyId ? window.__settingsResolveCompanyId() : '';
+    var companyId = resolveSettingsCompanyId();
     if (!companyId) return body;
 
     var next = Array.isArray(body) ? body.slice() : Object.assign({}, body);
@@ -4528,24 +4738,22 @@ create table if not exists user_app_roles (
 
     if (!next.company_id) next.company_id = companyId;
     if (!next.companyId) next.companyId = companyId;
+    if (!next.activeCompanyId) next.activeCompanyId = companyId;
+    if (!next.active_company_id) next.active_company_id = companyId;
 
-    if (next.employee && typeof next.employee === 'object') {
-      next.employee = Object.assign({}, next.employee);
-      if (!next.employee.company_id) next.employee.company_id = companyId;
-      if (!next.employee.companyId) next.employee.companyId = companyId;
-    }
-
-    if (next.user && typeof next.user === 'object') {
-      next.user = Object.assign({}, next.user);
-      if (!next.user.company_id) next.user.company_id = companyId;
-      if (!next.user.companyId) next.user.companyId = companyId;
-    }
+    ['employee', 'user', 'division', 'team', 'role', 'resource', 'setting'].forEach(function (key) {
+      if (next[key] && typeof next[key] === 'object') {
+        next[key] = Object.assign({}, next[key]);
+        if (!next[key].company_id) next[key].company_id = companyId;
+        if (!next[key].companyId) next[key].companyId = companyId;
+      }
+    });
 
     return next;
   }
 
   function patchSupabaseFrom(client) {
-    if (!client || client.__settingsGlobalCompanyIdFromPatch) return;
+    if (!client || client.__settingsActiveCompanyScopePatch) return;
     if (typeof client.from !== 'function') return;
 
     var originalFrom = client.from.bind(client);
@@ -4554,7 +4762,7 @@ create table if not exists user_app_roles (
       var query = originalFrom(tableName);
 
       if (shouldPatchTable(tableName)) {
-        ['insert', 'upsert', 'update'].forEach(function (method) {
+        ['insert', 'upsert'].forEach(function (method) {
           if (!query || typeof query[method] !== 'function') return;
 
           var originalMethod = query[method].bind(query);
@@ -4562,16 +4770,37 @@ create table if not exists user_app_roles (
             return originalMethod(patchDbPayload(payload));
           };
         });
+
+        if (query && typeof query.select === 'function') {
+          var originalSelect = query.select.bind(query);
+          query.select = function () {
+            return tryScopeBuilder(originalSelect.apply(query, arguments));
+          };
+        }
+
+        if (query && typeof query.update === 'function') {
+          var originalUpdate = query.update.bind(query);
+          query.update = function (payload) {
+            return tryScopeBuilder(originalUpdate(patchDbPayload(payload)));
+          };
+        }
+
+        if (query && typeof query.delete === 'function') {
+          var originalDelete = query.delete.bind(query);
+          query.delete = function () {
+            return tryScopeBuilder(originalDelete.apply(query, arguments));
+          };
+        }
       }
 
       return query;
     };
 
-    client.__settingsGlobalCompanyIdFromPatch = true;
+    client.__settingsActiveCompanyScopePatch = true;
   }
 
   function patchFunctionsInvoke(client) {
-    if (!client || client.__settingsGlobalCompanyIdInvokePatch) return;
+    if (!client || client.__settingsActiveCompanyInvokePatch) return;
     if (!client.functions || typeof client.functions.invoke !== 'function') return;
 
     var originalInvoke = client.functions.invoke.bind(client.functions);
@@ -4588,12 +4817,12 @@ create table if not exists user_app_roles (
       return originalInvoke(functionName, options);
     };
 
-    client.__settingsGlobalCompanyIdInvokePatch = true;
+    client.__settingsActiveCompanyInvokePatch = true;
   }
 
   function patchFetch() {
     var originalFetch = window.fetch;
-    if (typeof originalFetch !== 'function' || window.__settingsGlobalCompanyIdFetchPatch) return;
+    if (typeof originalFetch !== 'function' || window.__settingsActiveCompanyFetchPatch) return;
 
     window.fetch = function (input, init) {
       try {
@@ -4611,7 +4840,7 @@ create table if not exists user_app_roles (
       return originalFetch.call(this, input, init);
     };
 
-    window.__settingsGlobalCompanyIdFetchPatch = true;
+    window.__settingsActiveCompanyFetchPatch = true;
   }
 
   function patchAllSupabaseClients() {
@@ -4619,23 +4848,91 @@ create table if not exists user_app_roles (
     try { patchSupabaseFrom(window.settingsSupabase); patchFunctionsInvoke(window.settingsSupabase); } catch (_) {}
     try { patchSupabaseFrom(window.supabaseClient); patchFunctionsInvoke(window.supabaseClient); } catch (_) {}
     try { patchSupabaseFrom(window.sb); patchFunctionsInvoke(window.sb); } catch (_) {}
+    try { patchSupabaseFrom(window.supabase); patchFunctionsInvoke(window.supabase); } catch (_) {}
 
     try {
       if (window.parent) {
         patchSupabaseFrom(window.parent.portalSupabase); patchFunctionsInvoke(window.parent.portalSupabase);
         patchSupabaseFrom(window.parent.settingsSupabase); patchFunctionsInvoke(window.parent.settingsSupabase);
         patchSupabaseFrom(window.parent.supabaseClient); patchFunctionsInvoke(window.parent.supabaseClient);
+        patchSupabaseFrom(window.parent.sb); patchFunctionsInvoke(window.parent.sb);
       }
     } catch (_) {}
 
     patchFetch();
   }
 
+  function renderSettingsTenantHint() {
+    var hint = document.getElementById('settings-session-hint');
+    if (!hint) return;
+
+    var ctx = window.__settingsTenantContext();
+    if (!ctx.companyId) {
+      hint.hidden = false;
+      hint.textContent = '회사 정보(company_id)를 확인하지 못했습니다. 포탈에서 다시 접속해 주세요.';
+      return;
+    }
+
+    if (ctx.isServiceAdmin && ctx.isImpersonating) {
+      hint.hidden = false;
+      hint.textContent = '서비스 관리자 모드: 현재 선택 회사 기준으로 설정을 관리 중입니다. activeCompanyId=' + ctx.companyId;
+      return;
+    }
+
+    hint.hidden = true;
+    hint.textContent = '';
+  }
+
+  function notifyParentReady() {
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'settings-company-scope-ready',
+          source: 'settings',
+          companyId: resolveSettingsCompanyId(),
+          context: window.__settingsTenantContext()
+        }, '*');
+      }
+    } catch (_) {}
+  }
+
+  window.addEventListener('message', function (event) {
+    var data = event && event.data ? event.data : {};
+    if (!data || typeof data !== 'object') return;
+
+    if (
+      data.type === 'portal-company-changed' ||
+      data.type === 'portal-active-company-changed' ||
+      data.type === 'company-changed'
+    ) {
+      try {
+        if (data.companyId || data.company_id) {
+          window.activeCompanyId = data.companyId || data.company_id;
+        }
+        if (data.portalSession) {
+          window.portalSession = data.portalSession;
+        }
+      } catch (_) {}
+
+      renderSettingsTenantHint();
+      notifyParentReady();
+    }
+  });
+
   patchAllSupabaseClients();
-  document.addEventListener('DOMContentLoaded', patchAllSupabaseClients);
-  setTimeout(patchAllSupabaseClients, 250);
-  setTimeout(patchAllSupabaseClients, 1000);
-  setTimeout(patchAllSupabaseClients, 2500);
+  renderSettingsTenantHint();
+  notifyParentReady();
+
+  document.addEventListener('DOMContentLoaded', function () {
+    patchAllSupabaseClients();
+    renderSettingsTenantHint();
+    notifyParentReady();
+  });
+
+  setTimeout(function(){ patchAllSupabaseClients(); renderSettingsTenantHint(); notifyParentReady(); }, 250);
+  setTimeout(function(){ patchAllSupabaseClients(); renderSettingsTenantHint(); notifyParentReady(); }, 1000);
+  setTimeout(function(){ patchAllSupabaseClients(); renderSettingsTenantHint(); notifyParentReady(); }, 2500);
+  setTimeout(function(){ patchAllSupabaseClients(); renderSettingsTenantHint(); notifyParentReady(); }, 5000);
 })();
 </script>
 
