@@ -1981,6 +1981,28 @@ input[type="radio"]{
   const HOME_SRC = 'portal-main/portal-main.html';
   const LAST_PAGE_KEY = 'portalLastPage';
 
+  // Service-admin/global screens must not receive or apply tenant company_id scope.
+  // 업무 앱은 activeCompanyId 기준으로 동작하지만, 회사 등록/앱 ON-OFF 같은
+  // 서비스 관리자 화면은 companies/company_apps 전체 목록을 볼 수 있어야 합니다.
+  const GLOBAL_PORTAL_SRCS = new Set([
+    'service-admin/service-admin.html'
+  ]);
+
+  const GLOBAL_TENANT_TABLES = new Set([
+    'companies',
+    'company_apps',
+    'tenant_companies',
+    'portal_companies'
+  ]);
+
+  function isGlobalTenantTable(tableName) {
+    return GLOBAL_TENANT_TABLES.has(String(tableName || '').trim());
+  }
+
+  function isGlobalPortalSrc(src) {
+    return GLOBAL_PORTAL_SRCS.has(normalizePortalSrc(src));
+  }
+
   const frame = document.getElementById('portalFrame');
   const navButtons = Array.from(document.querySelectorAll('.nav-btn[data-portal-src]'));
   const logoutBtn = document.getElementById('logoutNavBtn');
@@ -2807,6 +2829,9 @@ input[type="radio"]{
       preferred_language: getPreferredLanguage(),
       phone: getProfilePhone(),
       supabase: supabaseClient,
+      globalSupabase: supabaseClient,
+      supabaseGlobal: supabaseClient,
+      isGlobalTenantTable,
       buildCompanyScopedPayload,
       buildCompanyScopedRows,
       scopeCompanyQuery
@@ -2825,9 +2850,13 @@ input[type="radio"]{
     return (Array.isArray(rows) ? rows : []).map((row) => buildCompanyScopedPayload(row));
   }
 
-  function scopeCompanyQuery(query) {
+  function scopeCompanyQuery(query, tableName = '', options = {}) {
+    // companies/company_apps 같은 서비스 관리자용 글로벌 테이블은
+    // service_admin이 전체 목록을 볼 수 있어야 하므로 company_id 필터를 걸지 않습니다.
+    if (options.global === true || isGlobalTenantTable(tableName)) return query;
+
     const session = buildPortalSession();
-    const companyId = session.companyId || currentProfile?.company_id || currentCompany?.id || '';
+    const companyId = session.activeCompanyId || session.companyId || currentProfile?.company_id || currentCompany?.id || '';
     return companyId ? query.eq('company_id', companyId) : query;
   }
 
@@ -2884,8 +2913,8 @@ input[type="radio"]{
 
   window.getCompanyAppUrl = function (appUrl) {
     const session = buildPortalSession();
-    if (!appUrl || !session.companyId) return appUrl;
-    return appUrl + (String(appUrl).includes('?') ? '&' : '?') + 'company_id=' + encodeURIComponent(session.companyId);
+    if (!appUrl || isGlobalPortalSrc(appUrl) || !session.activeCompanyId) return appUrl;
+    return appUrl + (String(appUrl).includes('?') ? '&' : '?') + 'company_id=' + encodeURIComponent(session.activeCompanyId);
   };
 
   function showLogin(message = '') {
@@ -3237,11 +3266,20 @@ input[type="radio"]{
     if (!src) return src;
     const session = buildPortalSession();
     const params = [];
+    const isGlobalApp = isGlobalPortalSrc(src);
 
     if (session.email) params.push('email=' + encodeURIComponent(session.email));
-    if (session.companyId) params.push('company_id=' + encodeURIComponent(session.companyId));
-    if (session.companyCode) params.push('company_code=' + encodeURIComponent(session.companyCode));
-    if (session.companyName) params.push('company_name=' + encodeURIComponent(session.companyName));
+
+    // 일반 업무 앱에는 선택 회사(activeCompanyId)를 전달합니다.
+    // 단, service-admin 화면은 회사 전체 목록을 다뤄야 하므로 company_id를 전달하지 않습니다.
+    if (!isGlobalApp) {
+      if (session.activeCompanyId) params.push('company_id=' + encodeURIComponent(session.activeCompanyId));
+      if (session.companyCode) params.push('company_code=' + encodeURIComponent(session.companyCode));
+      if (session.companyName) params.push('company_name=' + encodeURIComponent(session.companyName));
+    } else {
+      params.push('service_admin_global=1');
+    }
+
     if (session.language) params.push('lang=' + encodeURIComponent(session.language));
 
     if (src === HOME_SRC) {
@@ -3261,34 +3299,43 @@ input[type="radio"]{
   function postAuthToFrame() {
     if (!frame || !frame.contentWindow || !currentUser) return;
     const session = buildPortalSession();
+    const isGlobalApp = isGlobalPortalSrc(getCurrentFrameBaseSrc());
+    const frameCompanyId = isGlobalApp ? '' : (session.activeCompanyId || session.companyId || '');
+    const frameCompanyCode = isGlobalApp ? '' : (session.companyCode || '');
+    const frameCompanyName = isGlobalApp ? '' : (session.companyName || '');
+    const frameCompanySubdomain = isGlobalApp ? '' : (session.companySubdomain || '');
 
     frame.contentWindow.postMessage({
       type: 'portal-auth',
       user: {
         email: session.email,
-        company_id: session.companyId,
-        companyId: session.companyId,
-        company_code: session.companyCode,
-        companyCode: session.companyCode,
-        company_name: session.companyName,
-        companyName: session.companyName,
+        company_id: frameCompanyId,
+        companyId: frameCompanyId,
+        company_code: frameCompanyCode,
+        companyCode: frameCompanyCode,
+        company_name: frameCompanyName,
+        companyName: frameCompanyName,
         role: session.role,
         language: session.language,
         preferred_language: session.language,
-        phone: session.phone
+        phone: session.phone,
+        service_admin_global: isGlobalApp
       },
       company: {
-        id: session.companyId,
-        company_id: session.companyId,
-        code: session.companyCode,
-        company_code: session.companyCode,
-        name: session.companyName,
-        company_name: session.companyName
+        id: frameCompanyId,
+        company_id: frameCompanyId,
+        company_code: frameCompanyCode,
+        companyCode: frameCompanyCode,
+        company_name: frameCompanyName,
+        companyName: frameCompanyName,
+        subdomain: frameCompanySubdomain,
+        company_subdomain: frameCompanySubdomain
       },
-      settings: {
-        language: session.language,
-        lang: session.language,
-        phone: session.phone
+      profile: session.profile,
+      session: {
+        ...session,
+        serviceAdminGlobal: isGlobalApp,
+        service_admin_global: isGlobalApp
       }
     }, '*');
   }
