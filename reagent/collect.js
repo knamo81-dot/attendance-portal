@@ -35,6 +35,129 @@ window.ReagentApp.collect = {
     }
   },
 
+  getCollectMigrationFlagKey() {
+    const companyKey =
+      window.ReagentApp.currentCompanyId ||
+      window.currentCompanyId ||
+      window.ReagentApp.currentCompanyCode ||
+      window.currentCompanyCode ||
+      window.location.hostname ||
+      "default";
+
+    return `reagent_collect_meta_migrated_v2_${companyKey}`;
+  },
+
+  readLocalCollectMetaForMigration() {
+    try {
+      const raw = localStorage.getItem("reagent_collect_meta") || "{}";
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+      console.warn("기존 취합 localStorage 데이터를 읽지 못했습니다:", error);
+      return {};
+    }
+  },
+
+  hasMeaningfulCollectMeta(meta = {}) {
+    if (!meta || typeof meta !== "object") return false;
+
+    const textFields = [
+      "vendor1",
+      "vendor2",
+      "selectedVendor",
+      "confirmedAt",
+      "prepareRemark"
+    ];
+
+    const numberFields = [
+      "unit1",
+      "unit2",
+      "price1",
+      "price2",
+      "confirmedQty",
+      "pendingQty"
+    ];
+
+    const hasText = textFields.some((field) => String(meta[field] || "").trim() !== "");
+    const hasNumber = numberFields.some((field) => this.normalizeNumber ? this.normalizeNumber(meta[field]) > 0 : Number(meta[field] || 0) > 0);
+    const hasBoolean = meta.confirmed === true || meta.price1Manual === true || meta.price2Manual === true;
+
+    return hasText || hasNumber || hasBoolean;
+  },
+
+  async migrateLocalCollectMetaToServerOnce(force = false) {
+    if (this._localCollectMigrationRunning) return { skipped: true, reason: "running" };
+
+    const sb = window.ReagentApp.sb;
+    if (!sb || !window.ReagentApp.withCompanyPayload || !window.ReagentApp.scopedCompanyQuery) {
+      return { skipped: true, reason: "supabase-not-ready" };
+    }
+
+    const flagKey = this.getCollectMigrationFlagKey();
+    if (!force) {
+      try {
+        if (localStorage.getItem(flagKey) === "done") {
+          return { skipped: true, reason: "already-done" };
+        }
+      } catch (_) {}
+    }
+
+    const localMeta = this.readLocalCollectMetaForMigration();
+    const entries = Object.entries(localMeta)
+      .filter(([key, meta]) => key && this.hasMeaningfulCollectMeta(meta));
+
+    if (!entries.length) {
+      return { skipped: true, reason: "empty-local-meta" };
+    }
+
+    this._localCollectMigrationRunning = true;
+    let saved = 0;
+    let failed = 0;
+
+    try {
+      this.collectMeta = {
+        ...(this.collectMeta || {}),
+        ...localMeta
+      };
+
+      for (const [key, meta] of entries) {
+        try {
+          this.collectMeta[key] = {
+            ...this.getMeta(key),
+            ...(meta || {})
+          };
+
+          const collectedQty = this.getCollectedQtyForKey(
+            key,
+            Number(meta?.confirmedQty || meta?.collected_qty || meta?.qty || 0)
+          );
+
+          await this.upsertCollectItem(key, collectedQty);
+          saved += 1;
+        } catch (error) {
+          failed += 1;
+          console.warn("기존 취합 데이터 서버 이관 실패:", key, error);
+        }
+      }
+
+      if (saved > 0 && failed === 0) {
+        try {
+          localStorage.setItem(flagKey, "done");
+          localStorage.setItem(`${flagKey}_at`, new Date().toISOString());
+        } catch (_) {}
+      }
+
+      if (saved > 0) {
+        console.info(`기존 취합 localStorage 데이터 서버 이관 완료: ${saved}건${failed ? ` / 실패 ${failed}건` : ""}`);
+        window.ReagentApp.toast?.(`기존 취합 입력값 ${saved}건을 서버로 이관했습니다.`, failed ? "warn" : "success");
+      }
+
+      return { saved, failed };
+    } finally {
+      this._localCollectMigrationRunning = false;
+    }
+  },
+
   getCurrentUserName() {
     const user = window.ReagentApp.currentUser || {};
     return user.name || user.user_name || user.userName || user.employee_no || user.employeeNo || "";
@@ -1693,6 +1816,10 @@ if (els.count) els.count.textContent = String(rows.length);
 
     const { els, escapeHtml } = window.ReagentApp;
     const request = window.ReagentApp.request;
+
+    this.migrateLocalCollectMetaToServerOnce(false)
+      .catch((error) => console.warn("기존 취합 데이터 자동 이관 중 오류:", error));
+
     this.hydrateDefaultVendorInfoOnce();
     this.ensureCollectAllToggleHeader();
 
