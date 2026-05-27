@@ -2791,6 +2791,17 @@ input[type="radio"]{
       return false;
     }
 
+    const profileRole = String(profile.role || '').trim();
+
+    // 회사 서브도메인이 없는 루트 주소(ops.exelolab.com)는 서비스 관리자 전용입니다.
+    // el.ops.exelolab.com / scd.ops.exelolab.com 같은 회사별 주소는 아래 회사 subdomain 검증을 그대로 사용합니다.
+    if (!requestedSubdomain && profileRole !== 'service_admin') {
+      await supabaseClient.auth.signOut();
+      clearPortalSession();
+      showLogin('서비스 관리자 전용 주소입니다. 회사 사용자는 회사별 접속주소를 사용해 주세요.');
+      return false;
+    }
+
     if (!profile.company_id) {
       await supabaseClient.auth.signOut();
       clearPortalSession();
