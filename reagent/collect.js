@@ -11,6 +11,9 @@ window.ReagentApp.collect = {
   },
 
   loadCollectMeta() {
+    // 서버에서 취합 메타를 이미 불러온 경우에는 localStorage가 서버값을 덮어쓰지 않도록 합니다.
+    if (this._serverCollectMetaLoaded === true && this.collectMeta && typeof this.collectMeta === "object") return;
+
     try {
       this.collectMeta = JSON.parse(localStorage.getItem("reagent_collect_meta") || "{}");
     } catch (_) {
@@ -42,6 +45,45 @@ window.ReagentApp.collect = {
     return first || window.ReagentApp.request?.getCurrentOrderMonth?.() || "";
   },
 
+  getCollectedQtyForKey(key, fallbackQty = 0) {
+    const request = window.ReagentApp.request;
+    if (request?.collectedMeta && Object.prototype.hasOwnProperty.call(request.collectedMeta, key)) {
+      return Number(request.collectedMeta[key] || 0);
+    }
+    return Number(fallbackQty || 0);
+  },
+
+  buildCollectMetaSnapshot(key) {
+    const meta = this.getMeta(key);
+    return {
+      vendor1: meta.vendor1 || "",
+      unit1: this.normalizeNumber ? this.normalizeNumber(meta.unit1) : Number(meta.unit1 || 0),
+      price1: this.normalizeNumber ? this.normalizeNumber(meta.price1) : Number(meta.price1 || 0),
+      price1Manual: meta.price1Manual === true,
+      vendor2: meta.vendor2 || "",
+      unit2: this.normalizeNumber ? this.normalizeNumber(meta.unit2) : Number(meta.unit2 || 0),
+      price2: this.normalizeNumber ? this.normalizeNumber(meta.price2) : Number(meta.price2 || 0),
+      price2Manual: meta.price2Manual === true,
+      selectedVendor: meta.selectedVendor || "",
+      confirmed: meta.confirmed === true,
+      confirmedQty: Number(meta.confirmedQty || 0),
+      pendingQty: Number(meta.pendingQty || 0),
+      confirmedAt: meta.confirmedAt || "",
+      prepareRemark: meta.prepareRemark || "최저가 구매"
+    };
+  },
+
+  scheduleCollectItemSave(key, collectedQty = 0) {
+    if (!key) return;
+    clearTimeout(this._saveTimerMap?.[key]);
+    this._saveTimerMap = this._saveTimerMap || {};
+    this._saveTimerMap[key] = setTimeout(() => {
+      const qty = this.getCollectedQtyForKey(key, collectedQty);
+      this.upsertCollectItem(key, qty)
+        .catch((error) => console.warn("취합 입력값 서버 저장 실패:", error));
+    }, 500);
+  },
+
   async upsertCollectItem(key, collectedQty, extra = {}) {
     const sb = window.ReagentApp.sb;
     if (!sb) throw new Error("Supabase 연결 정보가 없습니다.");
@@ -51,6 +93,7 @@ window.ReagentApp.collect = {
       order_month: this.getOrderMonthFromKey(key),
       collected_qty: Number(collectedQty || 0),
       updated_by: this.getCurrentUserName(),
+      meta_json: this.buildCollectMetaSnapshot(key),
       ...extra
     });
 
@@ -406,6 +449,7 @@ window.ReagentApp.collect = {
         }
 
         this.saveCollectMeta();
+        this.scheduleCollectItemSave(key);
         this.updatePriceCells(key);
         this.updateAutoBadges(key);
       });
