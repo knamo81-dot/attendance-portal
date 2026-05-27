@@ -450,18 +450,18 @@
 
   function getPortalSession() {
     try {
-      if (window.parent && typeof window.parent.getPortalSession === 'function') {
+      if (window.parent && window.parent !== window && typeof window.parent.getPortalSession === 'function') {
         return window.parent.getPortalSession() || {};
       }
     } catch (_) {}
 
     try {
-      if (window.parent && window.parent.portalSession) {
-        return window.parent.portalSession || {};
+      if (window.parent && window.parent !== window) {
+        return window.parent.portalSession || window.parent.currentPortalSession || {};
       }
     } catch (_) {}
 
-    return window.portalSession || {};
+    return window.portalSession || window.currentPortalSession || {};
   }
 
   function getSupabaseClient() {
@@ -484,11 +484,23 @@
 
   function getCompanyId() {
     var session = getPortalSession();
+    var auth = window.aicAuth || {};
+    var user = auth.user || {};
+    var company = auth.company || session.activeCompany || session.active_company || session.company || {};
     return String(
+      session.activeCompanyId ||
+      session.active_company_id ||
+      session.selectedCompanyId ||
+      session.selected_company_id ||
       session.companyId ||
       session.company_id ||
       session.company?.id ||
       session.company?.company_id ||
+      session.profile?.company_id ||
+      company.id ||
+      company.company_id ||
+      user.company_id ||
+      user.companyId ||
       window.currentCompanyId ||
       ''
     ).trim();
@@ -501,6 +513,7 @@
 
     return String(
       user.email ||
+      user.user_email ||
       session.email ||
       session.user?.email ||
       session.profile?.email ||
@@ -2571,6 +2584,13 @@
   }
 
   window.aicRender = scheduleRender;
+  window.aicReloadFromServer = function aicReloadFromServer() {
+    return loadOrgMaps().then(function () {
+      return loadRoomsFromServer({ skipRealtime: false });
+    }).catch(function (error) {
+      console.warn('[AIC] reload skipped:', error);
+    });
+  };
 
   function bootstrap() {
     cacheEls();
