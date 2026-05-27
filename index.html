@@ -1536,6 +1536,187 @@ input[type="radio"]{
   }
 }
 
+
+
+/* ===== Service Admin Active Company Switcher ===== */
+.service-company-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 180px;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.service-company-button:hover {
+  background: rgba(255, 255, 255, 0.30);
+}
+.service-company-button .service-company-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.service-company-button .service-company-caret {
+  flex: 0 0 auto;
+  font-size: 9px;
+  opacity: .9;
+}
+.service-company-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15,23,42,.48);
+  backdrop-filter: blur(4px);
+}
+.service-company-modal-overlay.show {
+  display: flex;
+}
+.service-company-modal {
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(620px, calc(100dvh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 28px 80px rgba(15,23,42,.32);
+}
+.service-company-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 22px 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.service-company-modal-head h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: #0f172a;
+}
+.service-company-modal-head p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
+}
+.service-company-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 20px;
+  cursor: pointer;
+}
+.service-company-body {
+  padding: 16px 22px 20px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.service-company-search {
+  height: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 13px;
+  padding: 0 13px;
+  font-size: 13px;
+  outline: none;
+}
+.service-company-search:focus {
+  border-color: var(--portal-brand-color, #c8102e);
+  box-shadow: 0 0 0 3px rgba(var(--portal-brand-rgb, 200,16,46), .10);
+}
+.service-company-list {
+  min-height: 160px;
+  max-height: 360px;
+  overflow: auto;
+  display: grid;
+  gap: 8px;
+  padding-right: 2px;
+}
+.service-company-item {
+  width: 100%;
+  min-height: 54px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.service-company-item:hover {
+  border-color: var(--portal-brand-color, #c8102e);
+  background: #f8fafc;
+}
+.service-company-item.active {
+  border-color: var(--portal-brand-color, #c8102e);
+  background: rgba(var(--portal-brand-rgb, 200,16,46), .06);
+}
+.service-company-item-main {
+  min-width: 0;
+}
+.service-company-item-name {
+  font-size: 13px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.service-company-item-sub {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.service-company-item-badge {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 10px;
+  font-weight: 900;
+}
+.service-company-empty {
+  padding: 32px 16px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 12px;
+}
+@media (max-width: 768px) {
+  .service-company-button { max-width: 110px; }
+  .service-company-modal-overlay { padding: 14px; }
+  .service-company-modal { width: calc(100vw - 28px); max-height: calc(100dvh - 28px); }
+}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1687,6 +1868,25 @@ input[type="radio"]{
   </div>
 
 
+  <div id="serviceCompanyModalOverlay" class="service-company-modal-overlay" aria-hidden="true">
+    <div class="service-company-modal" role="dialog" aria-modal="true" aria-labelledby="serviceCompanyModalTitle">
+      <div class="service-company-modal-head">
+        <div>
+          <h2 id="serviceCompanyModalTitle">회사 선택</h2>
+          <p>서비스 관리자가 현재 확인할 회사를 검색해서 선택합니다.</p>
+        </div>
+        <button type="button" id="serviceCompanyModalClose" class="service-company-close" aria-label="닫기">×</button>
+      </div>
+      <div class="service-company-body">
+        <input id="serviceCompanySearchInput" class="service-company-search" type="search" placeholder="회사명, 접속주소, 회사코드 검색" autocomplete="off" />
+        <div id="serviceCompanyList" class="service-company-list">
+          <div class="service-company-empty">회사 목록을 불러오는 중입니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <div id="personalSettingsOverlay" class="personal-settings-overlay" aria-hidden="true">
     <div class="personal-settings-modal" role="dialog" aria-modal="true" aria-labelledby="personalSettingsTitle">
       <div class="personal-settings-head">
@@ -1807,6 +2007,10 @@ input[type="radio"]{
     passwordSuccess: document.getElementById('passwordSuccess'),
     topUserBar: document.getElementById('topUserBar'),
     userChip: document.getElementById('userChip'),
+    serviceCompanyModalOverlay: document.getElementById('serviceCompanyModalOverlay'),
+    serviceCompanyModalClose: document.getElementById('serviceCompanyModalClose'),
+    serviceCompanySearchInput: document.getElementById('serviceCompanySearchInput'),
+    serviceCompanyList: document.getElementById('serviceCompanyList'),
     personalSettingsIconBtn: document.getElementById('personalSettingsIconBtn'),
     mobileMenuBtn: document.getElementById('mobileMenuBtn'),
     mobileDrawerBackdrop: document.getElementById('mobileDrawerBackdrop'),
@@ -1845,6 +2049,8 @@ input[type="radio"]{
   let currentUser = null;
   let currentProfile = null;
   let currentCompany = null;
+  let activeCompany = null;
+  let serviceAdminCompanies = [];
   let requestedCompany = null;
   let requestedCompanyLoaded = false;
   let authBusy = false;
@@ -1926,7 +2132,7 @@ input[type="radio"]{
   }
 
   async function loadPortalBrandSettings() {
-    const companyId = currentProfile?.company_id || currentCompany?.id || window.currentCompanyId || '';
+    const companyId = activeCompany?.id || currentProfile?.company_id || currentCompany?.id || window.currentCompanyId || '';
     if (!companyId) {
       applyPortalBrandColor('#c8102e');
       return;
@@ -2365,6 +2571,27 @@ input[type="radio"]{
     return role === 'service_admin';
   }
 
+
+  function getEffectiveCompany() {
+    return isServiceAdminRole() && activeCompany ? activeCompany : currentCompany;
+  }
+
+  function getActiveCompanyStorageKey() {
+    const email = String(currentUser?.email || currentProfile?.email || 'service-admin').toLowerCase();
+    return 'portalActiveCompanyId:' + email;
+  }
+
+  function getCurrentFrameBaseSrc() {
+    const raw = frame?.getAttribute('src') || HOME_SRC;
+    const withoutQuery = normalizePortalSrc(raw);
+    try {
+      const url = new URL(withoutQuery, window.location.href);
+      return url.pathname.replace(/^\//, '') || HOME_SRC;
+    } catch (_) {
+      return withoutQuery.replace(/^\//, '') || HOME_SRC;
+    }
+  }
+
   function updateServiceAdminButtonVisibility() {
     if (!els.serviceAdminBtn) return;
 
@@ -2545,20 +2772,28 @@ input[type="radio"]{
   }
 
   function buildPortalSession() {
-    const companyId = currentProfile?.company_id || currentCompany?.id || requestedCompany?.id || '';
-    const companyCode = currentCompany?.company_code || requestedCompany?.company_code || '';
-    const companyName = currentCompany?.company_name || requestedCompany?.company_name || '';
-    const companySubdomain = currentCompany?.subdomain || requestedCompany?.subdomain || requestedSubdomain || '';
+    const effectiveCompany = getEffectiveCompany() || requestedCompany || null;
+    const loginCompany = currentCompany || null;
+    const companyId = effectiveCompany?.id || currentProfile?.company_id || requestedCompany?.id || '';
+    const companyCode = effectiveCompany?.company_code || requestedCompany?.company_code || '';
+    const companyName = effectiveCompany?.company_name || requestedCompany?.company_name || '';
+    const companySubdomain = effectiveCompany?.subdomain || requestedCompany?.subdomain || requestedSubdomain || '';
     const role = currentProfile?.role || 'viewer';
 
     return {
       user: currentUser,
       profile: currentProfile,
-      company: currentCompany,
+      company: effectiveCompany,
+      activeCompany: effectiveCompany,
+      active_company: effectiveCompany,
+      loginCompany,
+      login_company: loginCompany,
       requestedCompany,
       email: currentUser?.email || '',
       companyId,
       company_id: companyId,
+      activeCompanyId: companyId,
+      active_company_id: companyId,
       companyCode,
       company_code: companyCode,
       companyName,
@@ -2609,6 +2844,8 @@ input[type="radio"]{
     window.currentCompanyCode = session.companyCode;
     window.currentCompanyName = session.companyName;
     window.currentCompanySubdomain = session.companySubdomain;
+    window.activeCompanyId = session.companyId;
+    window.activeCompanyName = session.companyName;
     window.currentRequestedSubdomain = session.requestedSubdomain;
     window.currentTenantSubdomain = session.requestedSubdomain;
     window.currentUserRole = session.role;
@@ -2620,6 +2857,8 @@ input[type="radio"]{
     currentUser = null;
     currentProfile = null;
     currentCompany = null;
+    activeCompany = null;
+    serviceAdminCompanies = [];
     applyPortalBrandColor('#c8102e');
     window.portalSession = null;
     window.currentPortalSession = null;
@@ -2627,6 +2866,8 @@ input[type="radio"]{
     window.currentCompanyCode = null;
     window.currentCompanyName = null;
     window.currentCompanySubdomain = null;
+    window.activeCompanyId = null;
+    window.activeCompanyName = null;
     window.currentRequestedSubdomain = requestedSubdomain || null;
     window.currentTenantSubdomain = requestedSubdomain || null;
     window.currentUserRole = null;
@@ -2683,10 +2924,136 @@ input[type="radio"]{
     if (!els.userChip) return;
     const session = buildPortalSession();
     const name = currentProfile?.name || currentUser?.email || '사용자';
-    const company = session.companyName ? `<span class="role">${escapeHtml(session.companyName)}</span>` : '';
-    els.userChip.innerHTML = `<span>${escapeHtml(name)}</span>${company}<span class="role">${escapeHtml(roleLabel(session.role))}</span>`;
+    const roleText = roleLabel(session.role);
+    const companyName = session.companyName || '';
+    const company = companyName
+      ? (isServiceAdminRole()
+        ? `<button type="button" class="service-company-button" data-service-company-switch title="회사 선택"><span class="service-company-name">${escapeHtml(companyName)}</span><span class="service-company-caret">▼</span></button>`
+        : `<span class="role">${escapeHtml(companyName)}</span>`)
+      : '';
+    els.userChip.innerHTML = `<span>${escapeHtml(name)}</span>${company}<span class="role">${escapeHtml(roleText)}</span>`;
     updateServiceAdminButtonVisibility();
   }
+
+
+  async function loadServiceAdminCompanies(force = false) {
+    if (!isServiceAdminRole()) return [];
+    if (!force && Array.isArray(serviceAdminCompanies) && serviceAdminCompanies.length) return serviceAdminCompanies;
+
+    const { data, error } = await supabaseClient
+      .from('companies')
+      .select('id,company_name,company_code,subdomain,is_active,created_at')
+      .order('company_name', { ascending: true });
+
+    if (error) throw error;
+    serviceAdminCompanies = (data || []).filter((company) => company.is_active !== false);
+    return serviceAdminCompanies;
+  }
+
+  function renderServiceCompanyList() {
+    if (!els.serviceCompanyList) return;
+
+    const keyword = String(els.serviceCompanySearchInput?.value || '').trim().toLowerCase();
+    const rows = (serviceAdminCompanies || []).filter((company) => {
+      if (!keyword) return true;
+      return [company.company_name, company.company_code, company.subdomain, company.id]
+        .join(' ')
+        .toLowerCase()
+        .includes(keyword);
+    });
+
+    if (!rows.length) {
+      els.serviceCompanyList.innerHTML = '<div class="service-company-empty">검색 결과가 없습니다.</div>';
+      return;
+    }
+
+    const activeId = buildPortalSession().companyId || '';
+    els.serviceCompanyList.innerHTML = rows.map((company) => {
+      const isActive = String(company.id || '') === String(activeId || '');
+      const domain = company.subdomain ? `${company.subdomain}.ops.exelolab.com` : '접속주소 미설정';
+      return `
+        <button type="button" class="service-company-item ${isActive ? 'active' : ''}" data-select-service-company="${escapeHtml(company.id)}">
+          <span class="service-company-item-main">
+            <span class="service-company-item-name">${escapeHtml(company.company_name || '-')}</span>
+            <span class="service-company-item-sub">${escapeHtml(domain)} · ${escapeHtml(company.company_code || '')}</span>
+          </span>
+          ${isActive ? '<span class="service-company-item-badge">현재</span>' : ''}
+        </button>
+      `;
+    }).join('');
+  }
+
+  async function openServiceCompanyModal() {
+    if (!isServiceAdminRole()) return;
+    if (!els.serviceCompanyModalOverlay) return;
+    els.serviceCompanyModalOverlay.classList.add('show');
+    els.serviceCompanyModalOverlay.setAttribute('aria-hidden', 'false');
+    if (els.serviceCompanySearchInput) els.serviceCompanySearchInput.value = '';
+    if (els.serviceCompanyList) els.serviceCompanyList.innerHTML = '<div class="service-company-empty">회사 목록을 불러오는 중입니다.</div>';
+
+    try {
+      await loadServiceAdminCompanies(true);
+      renderServiceCompanyList();
+      setTimeout(() => els.serviceCompanySearchInput?.focus(), 0);
+    } catch (error) {
+      console.error('service company list load failed:', error);
+      if (els.serviceCompanyList) els.serviceCompanyList.innerHTML = '<div class="service-company-empty">회사 목록을 불러오지 못했습니다.</div>';
+    }
+  }
+
+  function closeServiceCompanyModal() {
+    els.serviceCompanyModalOverlay?.classList.remove('show');
+    els.serviceCompanyModalOverlay?.setAttribute('aria-hidden', 'true');
+  }
+
+  async function setActiveServiceCompany(companyId, options = {}) {
+    if (!isServiceAdminRole()) return false;
+    const companies = await loadServiceAdminCompanies(false);
+    const nextCompany = companies.find((company) => String(company.id) === String(companyId));
+    if (!nextCompany) return false;
+
+    activeCompany = nextCompany;
+    try {
+      localStorage.setItem(getActiveCompanyStorageKey(), String(nextCompany.id || ''));
+    } catch (_) {}
+
+    await loadPortalBrandSettings();
+    publishPortalSession();
+    applyRoleUI();
+    fillPersonalSettingsForm?.();
+    broadcastPortalLanguage(getPreferredLanguage());
+
+    const currentSrc = getCurrentFrameBaseSrc();
+    replacePortalFrame(buildSrcWithSession(currentSrc));
+    closeServiceCompanyModal();
+
+    if (!options.silent) {
+      console.info('[PortalTenant] active company changed:', nextCompany.company_name || nextCompany.id);
+    }
+    return true;
+  }
+
+  async function restoreServiceAdminActiveCompany(defaultCompany) {
+    if (!isServiceAdminRole()) {
+      activeCompany = null;
+      return;
+    }
+
+    try {
+      const companies = await loadServiceAdminCompanies(true);
+      const savedId = localStorage.getItem(getActiveCompanyStorageKey()) || '';
+      activeCompany = companies.find((company) => String(company.id) === String(savedId)) || defaultCompany || companies[0] || null;
+      if (activeCompany?.id) {
+        localStorage.setItem(getActiveCompanyStorageKey(), String(activeCompany.id));
+      }
+    } catch (error) {
+      console.warn('active company restore failed:', error);
+      activeCompany = defaultCompany || null;
+    }
+  }
+
+  window.portalOpenCompanySwitcher = openServiceCompanyModal;
+  window.portalSetActiveCompany = setActiveServiceCompany;
 
   async function fetchProfile(email) {
     const { data, error } = await supabaseClient
@@ -2836,6 +3203,7 @@ input[type="radio"]{
     currentUser = user;
     currentProfile = profile;
     currentCompany = company;
+    await restoreServiceAdminActiveCompany(company);
     await loadPortalBrandSettings();
     publishPortalSession();
     applyRoleUI();
@@ -3171,7 +3539,7 @@ input[type="radio"]{
     });
 
     document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape') closeMobileDrawer();
+      if (event.key === 'Escape') { closeMobileDrawer(); closeServiceCompanyModal(); }
     });
 
     window.addEventListener('resize', function () {
@@ -3336,6 +3704,28 @@ input[type="radio"]{
       event.preventDefault();
       openPersonalSettings();
     });
+
+
+    els.userChip?.addEventListener('click', function (event) {
+      const switchBtn = event.target.closest('[data-service-company-switch]');
+      if (!switchBtn) return;
+      event.preventDefault();
+      openServiceCompanyModal();
+    });
+
+    els.serviceCompanyModalClose?.addEventListener('click', closeServiceCompanyModal);
+    els.serviceCompanyModalOverlay?.addEventListener('click', function (event) {
+      if (event.target === els.serviceCompanyModalOverlay) closeServiceCompanyModal();
+    });
+    els.serviceCompanySearchInput?.addEventListener('input', renderServiceCompanyList);
+    els.serviceCompanyList?.addEventListener('click', function (event) {
+      const btn = event.target.closest('[data-select-service-company]');
+      if (!btn) return;
+      setActiveServiceCompany(btn.getAttribute('data-select-service-company')).catch(function (error) {
+        console.error('active company select failed:', error);
+        alert('회사 선택 중 오류가 발생했습니다. 콘솔 오류를 확인해 주세요.');
+      });
+    });
     window.addEventListener('message', function (event) {
       const payload = event?.data || {};
 
@@ -3437,7 +3827,8 @@ input[type="radio"]{
       currentPortalTabId,
       currentPortalFilters,
       requestedSubdomain,
-      requestedCompany
+      requestedCompany,
+      activeCompany
     };
   };
 
