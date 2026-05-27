@@ -1,6 +1,7 @@
-/* portal-home-auth.js | tenant hostname ready
-   - users.company_id 조회
-   - companies.company_code/company_name 조회
+/* portal-home-auth.js | tenant/company session ready
+   - 접속 hostname 기반 회사 자동 인식
+   - users.company_id와 접속 회사 company_id 매칭 검증
+   - companies.company_code/company_name/subdomain 조회
    - window.portalSession / window.currentCompanyId 전역 세션 제공
    - iframe 앱 전달용 querystring 생성 헬퍼 제공 */
 
@@ -58,38 +59,35 @@
     let currentProfile = null;
     let currentUser = null;
     let currentCompany = null;
-    let currentRequestedCompany = null;
-    let requestedCompanyPromise = null;
+    let requestedCompany = null;
+    let requestedCompanyLoaded = false;
     let authBusy = false;
 
-    const TENANT_BASE_DOMAIN = 'ops.exelolab.com';
-    const currentTenantSubdomain = getTenantSubdomainFromHost();
+    function getRequestedSubdomain() {
+      const host = String(window.location.hostname || '').toLowerCase();
 
-    console.log('[Portal Tenant] 현재 HOST:', window.location.hostname);
-    console.log('[Portal Tenant] 요청 회사 서브도메인:', currentTenantSubdomain || '(기본 주소)');
+      if (!host || host === 'localhost' || host === '127.0.0.1') return '';
+      if (host === 'ops.exelolab.com' || host === 'www.ops.exelolab.com') return '';
 
-    function getTenantSubdomainFromHost() {
-      const host = String(window.location.hostname || '').toLowerCase().replace(/:\d+$/, '');
+      if (host.endsWith('.ops.exelolab.com')) {
+        const subdomain = host.replace('.ops.exelolab.com', '').split('.')[0];
+        return subdomain === 'ops' ? '' : subdomain;
+      }
 
-      if (!host || host === 'localhost' || host === '127.0.0.1') return null;
-      if (host === TENANT_BASE_DOMAIN) return null;
-
-      const suffix = '.' + TENANT_BASE_DOMAIN;
-      if (!host.endsWith(suffix)) return null;
-
-      const beforeBaseDomain = host.slice(0, -suffix.length);
-      const firstLabel = beforeBaseDomain.split('.').filter(Boolean)[0] || '';
-
-      const reserved = new Set(['www', 'ops', 'app', 'apps', 'admin', 'login']);
-      if (!firstLabel || reserved.has(firstLabel)) return null;
-
-      return firstLabel;
+      return '';
     }
 
+    const requestedSubdomain = getRequestedSubdomain();
+    window.currentRequestedSubdomain = requestedSubdomain || null;
+
+    console.info('[PortalAuth] hostname:', window.location.hostname || '');
+    console.info('[PortalAuth] requested subdomain:', requestedSubdomain || '(root)');
+
     function buildPortalSession() {
-      const companyId = currentProfile?.company_id || currentCompany?.id || null;
-      const companyCode = currentCompany?.company_code || currentProfile?.company_code || null;
-      const companyName = currentCompany?.company_name || currentProfile?.company_name || null;
+      const companyId = currentProfile?.company_id || currentCompany?.id || requestedCompany?.id || null;
+      const companyCode = currentCompany?.company_code || currentProfile?.company_code || requestedCompany?.company_code || null;
+      const companyName = currentCompany?.company_name || currentProfile?.company_name || requestedCompany?.company_name || null;
+      const companySubdomain = currentCompany?.subdomain || requestedCompany?.subdomain || requestedSubdomain || null;
       const role = currentProfile?.role || 'viewer';
 
       return {
@@ -102,8 +100,10 @@
         company_code: companyCode,
         companyName,
         company_name: companyName,
-        requestedSubdomain: currentTenantSubdomain,
-        requestedCompany: currentRequestedCompany,
+        companySubdomain,
+        company_subdomain: companySubdomain,
+        requestedSubdomain: requestedSubdomain || null,
+        requested_subdomain: requestedSubdomain || null,
         role,
         supabase: supabaseClient
       };
@@ -116,6 +116,8 @@
       window.currentCompanyId = session.companyId;
       window.currentCompanyCode = session.companyCode;
       window.currentCompanyName = session.companyName;
+      window.currentCompanySubdomain = session.companySubdomain;
+      window.currentRequestedSubdomain = session.requestedSubdomain;
       window.currentUserRole = session.role;
       window.dispatchEvent(new CustomEvent('portal-session-ready', { detail: session }));
       return session;
@@ -178,6 +180,7 @@
       window.currentCompanyId = null;
       window.currentCompanyCode = null;
       window.currentCompanyName = null;
+      window.currentCompanySubdomain = null;
       window.currentUserRole = null;
     }
 
@@ -235,45 +238,35 @@
     }
 
     async function fetchCompanyBySubdomain(subdomain) {
-      if (!subdomain) return null;
+      const clean = String(subdomain || '').trim().toLowerCase();
+      if (!clean) return null;
+
       const { data, error } = await supabaseClient
         .from('companies')
         .select('id,company_name,company_code,subdomain,is_active')
-        .eq('subdomain', subdomain)
+        .eq('subdomain', clean)
         .maybeSingle();
+
       if (error) throw error;
       return data;
     }
 
-    async function loadRequestedCompany() {
-      if (!currentTenantSubdomain) {
-        currentRequestedCompany = null;
+    async function ensureRequestedCompany() {
+      if (requestedCompanyLoaded) return requestedCompany;
+      requestedCompanyLoaded = true;
+
+      if (!requestedSubdomain) {
+        requestedCompany = null;
         return null;
       }
 
-      const company = await fetchCompanyBySubdomain(currentTenantSubdomain);
-      currentRequestedCompany = company || null;
-
-      if (!company) {
-        throw new Error(`등록되지 않은 접속주소입니다: ${currentTenantSubdomain}.ops.exelolab.com`);
-      }
-
-      if (company.is_active === false) {
-        throw new Error(`비활성화된 회사 접속주소입니다: ${currentTenantSubdomain}.ops.exelolab.com`);
-      }
-
-      console.log('[Portal Tenant] 요청 회사:', company.company_name, company.id);
-      return company;
+      requestedCompany = await fetchCompanyBySubdomain(requestedSubdomain);
+      return requestedCompany;
     }
 
-    function ensureRequestedCompanyLoaded() {
-      if (!requestedCompanyPromise) {
-        requestedCompanyPromise = loadRequestedCompany().catch((error) => {
-          requestedCompanyPromise = null;
-          throw error;
-        });
-      }
-      return requestedCompanyPromise;
+    function isSameCompany(left, right) {
+      if (!left || !right) return false;
+      return String(left.id || '') === String(right.id || '');
     }
 
     async function fetchProfile(email) {
@@ -291,17 +284,22 @@
       currentProfile = null;
       currentCompany = null;
 
-      try {
-        await ensureRequestedCompanyLoaded();
-      } catch (tenantError) {
-        console.error('tenant resolve error:', tenantError);
-        await supabaseClient.auth.signOut();
-        clearPortalSession();
-        showLogin(tenantError?.message || '접속 주소의 회사 정보를 확인하지 못했습니다.');
-        return;
-      }
+      const urlCompany = await ensureRequestedCompany();
 
       if (!user) {
+        currentCompany = urlCompany || null;
+        publishPortalSession();
+
+        if (requestedSubdomain && !urlCompany) {
+          showLogin(`등록되지 않은 접속주소입니다. (${requestedSubdomain}.ops.exelolab.com)`);
+          return;
+        }
+
+        if (urlCompany?.is_active === false) {
+          showLogin('비활성화된 회사 접속주소입니다. 관리자에게 문의해 주세요.');
+          return;
+        }
+
         const injectedEmail = typeof getPortalInjectedEmail === 'function' ? getPortalInjectedEmail() : '';
         if (injectedEmail) {
           currentUser = { email: injectedEmail };
@@ -310,6 +308,15 @@
             if (injectedProfile) {
               currentProfile = injectedProfile;
               currentCompany = await fetchCompany(injectedProfile.company_id);
+
+              if (urlCompany && !isSameCompany(currentCompany, urlCompany)) {
+                clearPortalSession();
+                currentCompany = urlCompany;
+                publishPortalSession();
+                showLogin(`${urlCompany.company_name || '현재 회사'} 전용 접속주소입니다. 해당 회사 계정으로 로그인해 주세요.`);
+                return;
+              }
+
               publishPortalSession();
               applyRoleUI(injectedProfile);
             } else {
@@ -363,9 +370,13 @@
           return;
         }
 
-        if (currentRequestedCompany && String(company.id) !== String(currentRequestedCompany.id)) {
+        if (urlCompany && !isSameCompany(company, urlCompany)) {
           await supabaseClient.auth.signOut();
-          showLogin(`${currentRequestedCompany.company_name || '현재 접속 회사'} 전용 주소입니다. 해당 회사 계정으로 로그인해 주세요.`);
+          currentProfile = null;
+          currentUser = null;
+          currentCompany = urlCompany;
+          publishPortalSession();
+          showLogin(`${urlCompany.company_name || '현재 회사'} 전용 접속주소입니다. 해당 회사 계정으로 로그인해 주세요.`);
           return;
         }
 
@@ -479,6 +490,8 @@ async function logout() {
   await supabaseClient.auth.signOut();
   currentUser = null;
   clearPortalSession();
+  currentCompany = requestedCompany || null;
+  publishPortalSession();
   clearLoginInputs();
   try {
     localStorage.removeItem('portalLastPage');
@@ -511,8 +524,6 @@ window.portalLogout = logout;
       });
 
     window.portalSupabase = supabaseClient;
-    window.currentTenantSubdomain = currentTenantSubdomain;
-    window.currentRequestedCompany = currentRequestedCompany;
   }
 
   if (document.readyState === 'loading') {
