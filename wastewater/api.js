@@ -1,6 +1,188 @@
 const SUPABASE_URL="https://mbqpsovlwvedwrtbbauj.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY";
-window.sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+/* =========================================================
+   Wastewater API tenant bridge
+   - 포탈 부모 portalSession을 우선 사용
+   - iframe 내부에서 자체 로그인/회사검증을 반복하지 않음
+   - company_id 대상 테이블은 select/update/delete에 자동 스코프 적용
+   - insert/upsert payload에는 company_id 자동 주입
+========================================================= */
+function getWastewaterPortalSession(){
+  try{
+    if(window.parent && window.parent !== window && typeof window.parent.getPortalSession === 'function'){
+      return window.parent.getPortalSession();
+    }
+  }catch(e){}
+  try{
+    if(window.parent && window.parent !== window && window.parent.portalSession){
+      return window.parent.portalSession;
+    }
+  }catch(e){}
+  return window.portalSession || window.currentPortalSession || null;
+}
+
+function getWastewaterRawSupabaseClient(){
+  const session = getWastewaterPortalSession();
+  try{
+    if(session && session.supabase) return session.supabase;
+  }catch(e){}
+  try{
+    if(window.parent && window.parent !== window && window.parent.portalSupabase){
+      return window.parent.portalSupabase;
+    }
+  }catch(e){}
+  if(window.portalSupabase) return window.portalSupabase;
+  if(window.sb && window.sb.__isWastewaterTenantScoped !== true) return window.sb;
+  if(window.supabase && typeof window.supabase.createClient === 'function'){
+    window.portalSupabase = window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+    return window.portalSupabase;
+  }
+  return null;
+}
+
+function getWastewaterCompanyId(){
+  const session=getWastewaterPortalSession() || {};
+  const activeCompany=session.activeCompany || session.active_company || session.selectedCompany || session.selected_company || session.company || {};
+  const fromSession=
+    session.activeCompanyId ||
+    session.active_company_id ||
+    session.selectedCompanyId ||
+    session.selected_company_id ||
+    activeCompany.id ||
+    activeCompany.company_id ||
+    session.companyId ||
+    session.company_id ||
+    session.company?.id ||
+    session.company?.company_id ||
+    session.profile?.company_id ||
+    window.currentCompanyId ||
+    '';
+  if(fromSession) return String(fromSession).trim();
+  try{
+    const params=new URLSearchParams(location.search);
+    return String(params.get('company_id')||params.get('companyId')||'').trim();
+  }catch(e){
+    return '';
+  }
+}
+
+function publishWastewaterTenantSession(){
+  const parent=getWastewaterPortalSession() || {};
+  const companyId=getWastewaterCompanyId();
+  const merged={
+    ...parent,
+    supabase: window.portalSupabase || getWastewaterRawSupabaseClient(),
+    companyId,
+    company_id: companyId,
+    activeCompanyId: companyId,
+    active_company_id: companyId
+  };
+  window.portalSession=merged;
+  window.currentPortalSession=merged;
+  window.currentCompanyId=companyId || window.currentCompanyId || null;
+  return merged;
+}
+
+function addCompanyIdToPayload(payload, companyId){
+  if(!companyId) return payload;
+  if(Array.isArray(payload)){
+    return payload.map(row => row && typeof row === 'object' ? { ...row, company_id: row.company_id || companyId } : row);
+  }
+  if(payload && typeof payload === 'object'){
+    return { ...payload, company_id: payload.company_id || companyId };
+  }
+  return payload;
+}
+
+const WASTEWATER_TENANT_TABLES = new Set([
+  'wastewater','wastewater_pickups','monthly_approvals','approval_logs','activity_logs',
+  'reference_docs','wastewater_approvers','wastewater_operators',
+  'users','employees','user_app_roles',
+  'divisions','teams','managed_teams',
+  'attendance_records','attendance_erp_raw','attendance_secom_raw','attendance_upload_batches','attendance_upload_logs'
+]);
+
+function createWastewaterScopedBuilder(initialBuilder, tableName, alreadyScoped){
+  const state={builder:initialBuilder, scoped:!!alreadyScoped};
+  const shouldScope=()=>WASTEWATER_TENANT_TABLES.has(String(tableName||''));
+  const ensureScope=()=>{
+    const companyId=getWastewaterCompanyId();
+    if(!shouldScope() || !companyId || state.scoped) return;
+    try{
+      if(state.builder && typeof state.builder.eq === 'function'){
+        state.builder=state.builder.eq('company_id', companyId);
+        state.scoped=true;
+      }
+    }catch(error){
+      console.warn('[wastewater api] company scope failed:', tableName, error);
+    }
+  };
+
+  return new Proxy({}, {
+    get(_target, prop){
+      if(prop === 'then'){
+        ensureScope();
+        return state.builder.then.bind(state.builder);
+      }
+      if(prop === 'catch'){
+        ensureScope();
+        return state.builder.catch.bind(state.builder);
+      }
+      if(prop === 'finally'){
+        ensureScope();
+        return state.builder.finally.bind(state.builder);
+      }
+
+      const value=state.builder[prop];
+      if(typeof value !== 'function') return value;
+
+      return function(...args){
+        const companyId=getWastewaterCompanyId();
+
+        if((prop === 'insert' || prop === 'upsert') && shouldScope()){
+          args[0]=addCompanyIdToPayload(args[0], companyId);
+        }
+
+        if((prop === 'single' || prop === 'maybeSingle' || prop === 'csv' || prop === 'geojson' || prop === 'explain') && shouldScope()){
+          ensureScope();
+        }
+
+        const next=value.apply(state.builder,args);
+        if(next && typeof next === 'object'){
+          return createWastewaterScopedBuilder(next, tableName, state.scoped);
+        }
+        return next;
+      };
+    }
+  });
+}
+
+function createWastewaterTenantScopedClient(baseClient){
+  const scoped=new Proxy(baseClient, {
+    get(target, prop){
+      if(prop === 'from'){
+        return function(tableName){
+          const builder=target.from(tableName);
+          return createWastewaterScopedBuilder(builder, tableName, false);
+        };
+      }
+      const value=target[prop];
+      return typeof value === 'function' ? value.bind(target) : value;
+    }
+  });
+  Object.defineProperty(scoped,'__isWastewaterTenantScoped',{value:true});
+  return scoped;
+}
+
+const rawWastewaterSb=getWastewaterRawSupabaseClient();
+if(!rawWastewaterSb){
+  throw new Error('Supabase client를 초기화하지 못했습니다. 포탈 세션 또는 Supabase CDN 로드를 확인하세요.');
+}
+window.portalSupabase = window.portalSupabase || rawWastewaterSb;
+publishWastewaterTenantSession();
+const sb=createWastewaterTenantScopedClient(rawWastewaterSb);
+window.sb=sb;
 
 const DAILY_TABLE='wastewater';
 const DAILY_VIEW='wastewater';
@@ -20,20 +202,9 @@ const CM_LIMIT=154;
 const TON_TO_CM=22;
 const MAX_TON_M3=7;
 
-function getWastewaterPortalSession(){
-  try{ if(window.parent && typeof window.parent.getPortalSession === 'function') return window.parent.getPortalSession(); }catch(e){}
-  try{ if(window.parent && window.parent.portalSession) return window.parent.portalSession; }catch(e){}
-  return window.portalSession || window.currentPortalSession || null;
-}
-function getWastewaterCompanyId(){
-  const session=getWastewaterPortalSession();
-  const fromSession=session?.companyId||session?.company_id||session?.company?.id||session?.company?.company_id||window.currentCompanyId||'';
-  if(fromSession) return String(fromSession);
-  try{ const params=new URLSearchParams(location.search); return params.get('company_id')||params.get('companyId')||''; }catch(e){ return ''; }
-}
 function withCompanyPayload(payload){
   const companyId=getWastewaterCompanyId();
-  return companyId ? {...payload, company_id:companyId} : {...payload};
+  return addCompanyIdToPayload(payload, companyId) || {...payload};
 }
 function scopedCompanyQuery(query){
   const companyId=getWastewaterCompanyId();
@@ -414,16 +585,24 @@ function deleteRelatedDocumentById(id){
   return scopedCompanyQuery(sb.from(REFERENCE_TABLE).delete().eq('id', id));
 }
 
+function getTenantStoragePath(path){
+  const companyId=getWastewaterCompanyId();
+  const clean=String(path||'').replace(/^\/+/, '');
+  if(!companyId) return clean;
+  if(clean.startsWith(`companies/${companyId}/`)) return clean;
+  return `companies/${companyId}/${clean}`;
+}
+
 async function uploadRelatedDocFile(file,path){
-  return sb.storage.from(RELATED_DOC_BUCKET).upload(path,file,{cacheControl:'3600',upsert:true});
+  return sb.storage.from(RELATED_DOC_BUCKET).upload(getTenantStoragePath(path),file,{cacheControl:'3600',upsert:true});
 }
 
 function getRelatedDocPublicUrl(path){
-  return sb.storage.from(RELATED_DOC_BUCKET).getPublicUrl(path);
+  return sb.storage.from(RELATED_DOC_BUCKET).getPublicUrl(getTenantStoragePath(path));
 }
 
 async function deleteRelatedDocFile(path){
-  return sb.storage.from(RELATED_DOC_BUCKET).remove([path]);
+  return sb.storage.from(RELATED_DOC_BUCKET).remove([getTenantStoragePath(path)]);
 }
 
 async function logActivity(actorEmail,action,targetType,targetId,details){
