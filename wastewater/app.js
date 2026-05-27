@@ -166,14 +166,86 @@ function readPortalUserFromStorage(){
   return null;
 }
 
+function readPortalUserFromParentSession(){
+  try{
+    let session = null;
+    if(window.parent && window.parent !== window && typeof window.parent.getPortalSession === 'function'){
+      session = window.parent.getPortalSession();
+    }else if(window.parent && window.parent !== window && window.parent.portalSession){
+      session = window.parent.portalSession;
+    }else{
+      session = window.portalSession || window.currentPortalSession || null;
+    }
+
+    if(!session) return null;
+
+    const sessionUser = session.user || {};
+    const profile = session.profile || {};
+    const email = sessionUser.email || profile.email || session.email || '';
+    const name = profile.name || sessionUser.name || session.name || email || '';
+    const activeCompany = session.activeCompany || session.active_company || session.selectedCompany || session.selected_company || session.company || {};
+    const companyId =
+      session.activeCompanyId ||
+      session.active_company_id ||
+      session.selectedCompanyId ||
+      session.selected_company_id ||
+      activeCompany.id ||
+      activeCompany.company_id ||
+      session.companyId ||
+      session.company_id ||
+      session.profile?.company_id ||
+      '';
+    const companyName =
+      session.activeCompanyName ||
+      session.active_company_name ||
+      activeCompany.company_name ||
+      activeCompany.name ||
+      session.companyName ||
+      session.company_name ||
+      '';
+    const companyCode =
+      session.activeCompanyCode ||
+      session.active_company_code ||
+      activeCompany.company_code ||
+      session.companyCode ||
+      session.company_code ||
+      '';
+
+    if(email){
+      window.portalSession = {
+        ...(window.portalSession || {}),
+        ...session,
+        user: sessionUser,
+        profile,
+        email,
+        name,
+        companyId,
+        company_id: companyId,
+        activeCompanyId: companyId,
+        active_company_id: companyId,
+        companyName,
+        company_name: companyName,
+        companyCode,
+        company_code: companyCode
+      };
+      window.currentPortalSession = window.portalSession;
+      window.currentCompanyId = companyId || window.currentCompanyId || null;
+      return {email, name, company_id: companyId};
+    }
+  }catch(e){
+    console.warn('parent portal session read skipped:', e);
+  }
+  return null;
+}
+
 function readPortalUserFromQuery(){
   try{
     const params=new URLSearchParams(location.search);
     const email=params.get('portalEmail')||params.get('portal_email')||params.get('userEmail')||params.get('email')||'';
     const name=params.get('portalName')||params.get('name')||'';
-    const companyId=params.get('company_id')||params.get('companyId')||'';
-    const companyCode=params.get('company_code')||params.get('companyCode')||'';
-    const companyName=params.get('company_name')||params.get('companyName')||'';
+    const companyId=params.get('active_company_id')||params.get('activeCompanyId')||params.get('company_id')||params.get('companyId')||'';
+    const companyCode=params.get('active_company_code')||params.get('activeCompanyCode')||params.get('company_code')||params.get('companyCode')||'';
+    const companyName=params.get('active_company_name')||params.get('activeCompanyName')||params.get('company_name')||params.get('companyName')||'';
     if(email){
       window.portalSession = {
         ...(window.portalSession || {}),
@@ -206,23 +278,49 @@ function waitForPortalUserMessage(timeout=300){
     const finish=(user)=>{ if(done) return; done=true; window.removeEventListener('message', onMessage); clearTimeout(timer); resolve(user||null); };
     const onMessage=(event)=>{
       const data=event.data||{};
-      if(data?.type==='portal-auth' || data?.type==='PORTAL_AUTH_USER'){
-        const payload=data.user||data.payload||data;
-        const companyPayload=data.company||payload.company||{};
-        const email=payload?.email||'';
+      if(
+        data?.type==='portal-auth' ||
+        data?.type==='PORTAL_AUTH_USER' ||
+        data?.type==='portal-session-ready' ||
+        data?.type==='portal-session-changed' ||
+        data?.type==='portal-active-company-changed' ||
+        data?.type==='portal-company-changed'
+      ){
+        const session=data.session||data.detail||null;
+        const payload=data.user||data.payload||session?.user||session?.profile||data;
+        const companyPayload=data.company||session?.activeCompany||session?.active_company||session?.company||payload.company||{};
+        const email=payload?.email||session?.user?.email||session?.profile?.email||session?.email||'';
         if(email){
+          const companyId=
+            session?.activeCompanyId ||
+            session?.active_company_id ||
+            session?.selectedCompanyId ||
+            session?.selected_company_id ||
+            payload?.company_id ||
+            payload?.companyId ||
+            companyPayload?.id ||
+            companyPayload?.company_id ||
+            session?.companyId ||
+            session?.company_id ||
+            '';
           window.portalSession = {
             ...(window.portalSession || {}),
-            user: payload,
+            ...(session || {}),
+            user: session?.user || payload,
+            profile: session?.profile || payload,
             email,
-            name: payload?.name || '',
-            role: payload?.role || window.portalSession?.role || '',
-            companyId: payload?.company_id || payload?.companyId || companyPayload?.id || companyPayload?.company_id || '',
-            company_id: payload?.company_id || payload?.companyId || companyPayload?.id || companyPayload?.company_id || '',
-            companyCode: payload?.company_code || payload?.companyCode || companyPayload?.company_code || companyPayload?.code || '',
-            companyName: payload?.company_name || payload?.companyName || companyPayload?.company_name || companyPayload?.name || ''
+            name: payload?.name || session?.profile?.name || '',
+            role: payload?.role || session?.role || window.portalSession?.role || '',
+            companyId,
+            company_id: companyId,
+            activeCompanyId: companyId,
+            active_company_id: companyId,
+            companyCode: payload?.company_code || payload?.companyCode || companyPayload?.company_code || companyPayload?.code || session?.companyCode || session?.company_code || '',
+            companyName: payload?.company_name || payload?.companyName || companyPayload?.company_name || companyPayload?.name || session?.companyName || session?.company_name || ''
           };
-          finish({email, name: payload?.name||'', company_id: window.portalSession.companyId});
+          window.currentPortalSession = window.portalSession;
+          window.currentCompanyId = companyId || window.currentCompanyId || null;
+          finish({email, name: payload?.name||session?.profile?.name||'', company_id: window.portalSession.companyId});
         }
       }
     };
@@ -233,13 +331,17 @@ function waitForPortalUserMessage(timeout=300){
 }
 
 async function resolvePortalUser(){
+  const parentUser=readPortalUserFromParentSession();
+  if(parentUser?.email) return parentUser;
   const queryUser=readPortalUserFromQuery();
   if(queryUser?.email) return queryUser;
   const storageUser=readPortalUserFromStorage();
   if(storageUser?.email) return storageUser;
   if(window.__PORTAL_USER__?.email) return window.__PORTAL_USER__;
-  const messageUser=await waitForPortalUserMessage();
+  const messageUser=await waitForPortalUserMessage(900);
   if(messageUser?.email) return messageUser;
+  const parentRetry=readPortalUserFromParentSession();
+  if(parentRetry?.email) return parentRetry;
   return null;
 }
 
@@ -252,12 +354,18 @@ async function init(){
     if(window.parent && typeof window.parent.getPortalSession === 'function'){
       const parentSession = window.parent.getPortalSession();
       if(parentSession){
+        const activeCompany = parentSession.activeCompany || parentSession.active_company || parentSession.selectedCompany || parentSession.selected_company || parentSession.company || {};
+        const companyId = parentSession.activeCompanyId || parentSession.active_company_id || parentSession.selectedCompanyId || parentSession.selected_company_id || activeCompany.id || activeCompany.company_id || parentSession.companyId || parentSession.company_id || parentSession.profile?.company_id || '';
         window.portalSession = {
           ...(window.portalSession || {}),
           ...parentSession,
-          companyId: parentSession.companyId || parentSession.company_id || parentSession.company?.id || '',
-          company_id: parentSession.companyId || parentSession.company_id || parentSession.company?.id || ''
+          companyId,
+          company_id: companyId,
+          activeCompanyId: companyId,
+          active_company_id: companyId
         };
+        window.currentPortalSession = window.portalSession;
+        window.currentCompanyId = companyId || window.currentCompanyId || null;
       }
     }
   }catch(e){}
@@ -2322,5 +2430,42 @@ window.changeRelatedDocCategory = changeRelatedDocCategory;
 window.insertRelatedDocImage = insertRelatedDocImage;
 window.handleRelatedDocImage = handleRelatedDocImage;
 window.relatedDocCommand = relatedDocCommand;
+
+window.addEventListener('message', function(event){
+  const data = event && event.data ? event.data : {};
+  if(
+    data.type === 'portal-session-ready' ||
+    data.type === 'portal-session-changed' ||
+    data.type === 'portal-active-company-changed' ||
+    data.type === 'portal-company-changed'
+  ){
+    const beforeCompanyId = window.currentCompanyId || window.portalSession?.companyId || window.portalSession?.company_id || '';
+    const session = data.session || data.detail || null;
+    if(session){
+      const activeCompany = session.activeCompany || session.active_company || session.selectedCompany || session.selected_company || session.company || {};
+      const nextCompanyId = session.activeCompanyId || session.active_company_id || session.selectedCompanyId || session.selected_company_id || activeCompany.id || activeCompany.company_id || session.companyId || session.company_id || session.profile?.company_id || '';
+      window.portalSession = {
+        ...(window.portalSession || {}),
+        ...session,
+        companyId: nextCompanyId,
+        company_id: nextCompanyId,
+        activeCompanyId: nextCompanyId,
+        active_company_id: nextCompanyId
+      };
+      window.currentPortalSession = window.portalSession;
+      window.currentCompanyId = nextCompanyId || window.currentCompanyId || null;
+
+      if(nextCompanyId && beforeCompanyId && String(nextCompanyId) !== String(beforeCompanyId)){
+        lazyReferenceLoaded = false;
+        lazyAdminLoaded = false;
+        dailyRows = [];
+        pickupRows = [];
+        approvalRows = [];
+        referenceDocs = [];
+        loadAll('회사 정보가 변경되어 데이터를 다시 불러왔습니다.','ok').catch(err => console.error('company reload failed', err));
+      }
+    }
+  }
+});
 
 init();
