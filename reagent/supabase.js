@@ -22,11 +22,22 @@ window.ReagentApp.getPortalSession = function () {
 
 window.ReagentApp.getCompanyId = function () {
   const session = window.ReagentApp.getPortalSession?.() || {};
+
+  // 서비스관리자 회사 전환 시에는 activeCompanyId를 최우선으로 사용합니다.
+  // 일반 회사 계정은 기존 companyId/company_id를 그대로 사용합니다.
   const fromSession =
+    session.activeCompanyId ||
+    session.active_company_id ||
+    session.activeCompany?.id ||
+    session.activeCompany?.company_id ||
+    session.selectedCompanyId ||
+    session.selected_company_id ||
     session.companyId ||
     session.company_id ||
     session.company?.id ||
     session.company?.company_id ||
+    window.activeCompanyId ||
+    window.currentActiveCompanyId ||
     window.currentCompanyId ||
     "";
 
@@ -34,10 +45,29 @@ window.ReagentApp.getCompanyId = function () {
 
   try {
     const params = new URLSearchParams(location.search);
-    return params.get("company_id") || params.get("companyId") || "";
+    return params.get("active_company_id") ||
+      params.get("activeCompanyId") ||
+      params.get("company_id") ||
+      params.get("companyId") ||
+      "";
   } catch (_) {
     return "";
   }
+};
+
+window.ReagentApp.getCompanyName = function () {
+  const session = window.ReagentApp.getPortalSession?.() || {};
+  return String(
+    session.activeCompanyName ||
+    session.active_company_name ||
+    session.activeCompany?.company_name ||
+    session.activeCompany?.name ||
+    session.companyName ||
+    session.company_name ||
+    session.company?.company_name ||
+    session.company?.name ||
+    ""
+  );
 };
 
 window.ReagentApp.withCompanyPayload = function (payload = {}) {
@@ -52,4 +82,17 @@ window.ReagentApp.withCompanyRows = function (rows = []) {
 window.ReagentApp.scopedCompanyQuery = function (query) {
   const companyId = window.ReagentApp.getCompanyId?.() || "";
   return companyId ? query.eq("company_id", companyId) : query;
+};
+
+window.ReagentApp.refreshForCompanyChange = function () {
+  try {
+    window.ReagentApp.request?.loadServerRows?.();
+    window.ReagentApp.request?.loadProductMaster?.(true);
+    window.ReagentApp.collect?.loadServerCollectItems?.();
+    window.ReagentApp.request?.renderRequest?.();
+    window.ReagentApp.collect?.renderCollect?.();
+    window.ReagentApp.collect?.renderPrepare?.();
+  } catch (error) {
+    console.warn("회사 전환 후 시약 화면 갱신 실패:", error);
+  }
 };
