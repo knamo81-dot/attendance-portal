@@ -2022,7 +2022,7 @@ create table if not exists user_app_roles (
 
   function portalAuth() {
     const ctx = typeof window.getPortalAuthContext === 'function' ? window.getPortalAuthContext() : {};
-    const sb = ctx.supabase || window.portalSupabase;
+    const sb = window.settingsSupabase || ctx.supabase || null;
     const email = String(ctx.user?.email || '').trim().toLowerCase();
     const profile = ctx.profile || null;
     const name = String(profile?.name || profile?.employee_name || profile?.username || '').trim()
@@ -2088,10 +2088,10 @@ create table if not exists user_app_roles (
       return;
     }
 
-    let supabaseClient = window.portalSupabase;
+    let supabaseClient = window.settingsSupabase;
     if (!supabaseClient) {
       supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      window.portalSupabase = supabaseClient;
+      window.settingsSupabase = supabaseClient;
     }
 
     window.getPortalAuthContext = function getPortalAuthContext() {
@@ -2621,7 +2621,7 @@ create table if not exists user_app_roles (
         showLogin('인증 세션을 확인하지 못했습니다.');
       });
 
-    window.portalSupabase = supabaseClient;
+    window.settingsSupabase = supabaseClient;
   }
 
   if (document.readyState === 'loading') {
@@ -2638,10 +2638,10 @@ create table if not exists user_app_roles (
   const URL = "https://mbqpsovlwvedwrtbbauj.supabase.co";
   const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY";
   if(!window.supabase || !window.supabase.createClient) return;
-  if (!window.portalSupabase) {
-    window.portalSupabase = window.supabase.createClient(URL, KEY);
+  if (!window.settingsSupabase) {
+    window.settingsSupabase = window.supabase.createClient(URL, KEY);
   }
-  const sb = window.portalSupabase;
+  const sb = window.settingsSupabase;
 
   const dataState = {
     divisions: [],
@@ -4150,11 +4150,9 @@ create table if not exists user_app_roles (
   }
 
   function getSupabaseClient(){
-    try {
-      const ctx = typeof window.getPortalAuthContext === 'function' ? window.getPortalAuthContext() : {};
-      if (ctx && ctx.supabase) return ctx.supabase;
-    } catch(e) {}
-    return window.portalSupabase || null;
+    // settings 화면은 부모 포탈의 Supabase client를 직접 사용하지 않습니다.
+    // 부모 client를 사용/패치하면 service-admin 화면의 companies 조회가 오염될 수 있습니다.
+    return window.settingsSupabase || null;
   }
 
   function getCompanyId(){
@@ -4847,20 +4845,13 @@ create table if not exists user_app_roles (
   }
 
   function patchAllSupabaseClients() {
-    // 중요: iframe 내부 settings 화면은 부모 포탈의 portalSupabase를 직접 패치하면 안 됩니다.
-    // 부모 client를 패치하면 service-admin 화면으로 돌아갔을 때 companies 조회까지
-    // activeCompanyId scope가 걸려 회사 목록이 0개로 보이는 문제가 발생합니다.
-    // 따라서 settings iframe 내부에서 생성/사용하는 client만 패치합니다.
-    try { patchSupabaseFrom(window.portalSupabase); patchFunctionsInvoke(window.portalSupabase); } catch (_) {}
+    // 중요: settings iframe 내부 전용 client(window.settingsSupabase)만 패치합니다.
+    // 부모 포탈의 portalSupabase / parent.sb / parent.supabaseClient는 절대 패치하지 않습니다.
+    // 그래야 회사 설정 화면을 다녀온 뒤 service-admin의 companies 전체 조회가 오염되지 않습니다.
     try { patchSupabaseFrom(window.settingsSupabase); patchFunctionsInvoke(window.settingsSupabase); } catch (_) {}
-    try { patchSupabaseFrom(window.supabaseClient); patchFunctionsInvoke(window.supabaseClient); } catch (_) {}
-    try { patchSupabaseFrom(window.sb); patchFunctionsInvoke(window.sb); } catch (_) {}
 
     // window.supabase는 SDK 네임스페이스라 createClient 함수 묶음입니다.
     // 실제 Supabase client가 아니므로 from() 패치 대상에서 제외합니다.
-
-    // 부모 window.parent.portalSupabase / parent.sb 등은 절대 패치하지 않습니다.
-    // 회사 설정에서 나갔다가 서비스 관리자 화면으로 돌아갈 때 회사 목록이 유지되어야 합니다.
 
     patchFetch();
   }
