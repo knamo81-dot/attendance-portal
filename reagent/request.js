@@ -218,12 +218,16 @@ window.ReagentApp.request = {
       return this.productMasterRows;
     }
 
-    const { data, error } = await sb
+    let productMasterQuery = sb
       .from("product_master")
       .select("id, category, name, maker, code, capacity, cas, grade, default_vendor, default_vendor_reason, memo, is_active")
       .eq("is_active", true)
       .order("name", { ascending: true })
       .limit(3000);
+
+    productMasterQuery = this.scopedCompanyQuery(productMasterQuery);
+
+    const { data, error } = await productMasterQuery;
 
     if (error) {
       console.error("제품 마스터 조회 실패:", error);
