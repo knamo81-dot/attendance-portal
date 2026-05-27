@@ -3363,20 +3363,12 @@ input[type="radio"]{
   }
 
   async function restoreLastPage() {
-    const savedSrc = localStorage.getItem(LAST_PAGE_KEY);
-    if (!currentUser || !savedSrc || savedSrc === HOME_SRC) {
-      await navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
-      return;
-    }
-
-    const targetBtn = findNavBySrc(savedSrc);
-    if (!targetBtn) {
+    // 로그인 / 새로고침 / 재접속 시에는 이전 메뉴를 복원하지 않고 항상 포탈 홈에서 시작합니다.
+    try {
       localStorage.removeItem(LAST_PAGE_KEY);
-      await navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
-      return;
-    }
+    } catch (_) {}
 
-    await navigate(targetBtn, { skipSave: true });
+    await navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
   }
 
   async function login() {
@@ -3799,14 +3791,7 @@ input[type="radio"]{
       }
 
       showPortal();
-      const navEntry = performance.getEntriesByType('navigation')[0];
-      const navType = navEntry && navEntry.type ? navEntry.type : '';
-
-      if (navType === 'reload') {
-        await restoreLastPage();
-      } else {
-        await navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
-      }
+      await restoreLastPage();
     } catch (error) {
       console.error('boot failed:', error);
       await supabaseClient.auth.signOut();
