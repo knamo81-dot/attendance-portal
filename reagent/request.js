@@ -1526,14 +1526,51 @@ window.ReagentApp.request = {
 
         const collect = window.ReagentApp.collect;
         if (collect) {
+          // 기존 ops.exelolab.com localStorage 입력값을 먼저 읽고, 서버값이 있으면 서버값으로 덮어씁니다.
+          // 이렇게 해야 기존 입력값을 한 번 서버로 이관할 수 있습니다.
+          collect._serverCollectMetaLoaded = false;
+          collect.loadCollectMeta?.();
           collect.collectMeta = collect.collectMeta || {};
+
+          const migrateTargets = [];
+
           (collectData || []).forEach((row) => {
             if (!row.item_key) return;
+            const localMeta = collect.collectMeta[row.item_key] || {};
+            const serverMeta = row.meta_json && typeof row.meta_json === "object" ? row.meta_json : null;
             const meta = collect.getMeta ? collect.getMeta(row.item_key) : (collect.collectMeta[row.item_key] || {});
-            meta.confirmed = row.confirmed === true;
-            meta.confirmedQty = Number(row.collected_qty || 0);
+
+            if (serverMeta) {
+              Object.assign(meta, serverMeta);
+            } else if (localMeta && Object.keys(localMeta).length) {
+              Object.assign(meta, localMeta);
+              migrateTargets.push(row.item_key);
+            }
+
+            meta.confirmed = serverMeta?.confirmed === true || row.confirmed === true || meta.confirmed === true;
+            meta.confirmedQty = Number(serverMeta?.confirmedQty || row.collected_qty || meta.confirmedQty || 0);
+            if (serverMeta?.selectedVendor) meta.selectedVendor = serverMeta.selectedVendor;
+            if (serverMeta?.prepareRemark) meta.prepareRemark = serverMeta.prepareRemark;
+
             collect.collectMeta[row.item_key] = meta;
           });
+
+          collect._serverCollectMetaLoaded = true;
+          collect.saveCollectMeta?.();
+
+          // 서버에 meta_json이 비어 있는 기존 취합건은 localStorage 입력값을 자동 업로드합니다.
+          if (migrateTargets.length) {
+            Promise.allSettled(
+              migrateTargets.map((key) => collect.upsertCollectItem?.(key, this.collectedMeta?.[key] || 0))
+            ).then((results) => {
+              const failed = results.filter((result) => result.status === "rejected");
+              if (failed.length) {
+                console.warn("기존 견적 입력값 일부 서버 이관 실패:", failed);
+              } else {
+                console.info("기존 견적 입력값 서버 이관 완료:", migrateTargets.length);
+              }
+            });
+          }
         }
       }
     }
