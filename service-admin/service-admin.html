@@ -470,6 +470,7 @@
     }
   </style>
   <link rel="stylesheet" href="./assets/css/common-ui.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <main class="page el-page">
@@ -541,6 +542,12 @@
 (function () {
   'use strict';
 
+  // service-admin은 회사 목록(companies)과 앱 사용 설정(company_apps)을
+  // 항상 전역 기준으로 다뤄야 하므로 부모 포탈의 scoped client를 사용하지 않습니다.
+  const SUPABASE_URL = 'https://mbqpsovlwvedwrtbbauj.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
+  let serviceAdminSupabaseClient = null;
+
   const DEFAULT_APPS = [
     { app_key: 'portal-home', app_name: '워크스페이스' },
     { app_key: 'attendance', app_name: '근태' },
@@ -583,14 +590,19 @@
   }
 
   function getSupabaseClient() {
-    const session = getParentSession();
-    if (session && session.supabase) return session.supabase;
+    // 부모 포탈의 portalSupabase/session.supabase는 앱별 tenant wrapper가 적용될 수 있습니다.
+    // service-admin에서는 activeCompanyId와 무관하게 companies 전체를 조회해야 하므로
+    // iframe 내부에서 생성한 원본 Supabase client만 사용합니다.
+    if (serviceAdminSupabaseClient) return serviceAdminSupabaseClient;
 
-    try {
-      if (window.parent && window.parent.portalSupabase) return window.parent.portalSupabase;
-    } catch (_) {}
+    if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+      console.error('Supabase CDN을 불러오지 못했습니다.');
+      return null;
+    }
 
-    return window.portalSupabase || null;
+    serviceAdminSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    window.serviceAdminSupabase = serviceAdminSupabaseClient;
+    return serviceAdminSupabaseClient;
   }
 
   function isServiceAdmin() {
