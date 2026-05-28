@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Service Admin Mode Notice</title>
+<link rel="stylesheet" href="../assets/css/common-ui.css">
+<link rel="stylesheet" href="../common/mobile.css">
+<link rel="stylesheet" href="../common/theme.css">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",Arial,sans-serif;background:transparent;color:#0f172a;overflow:hidden}
+.app{width:100%;height:100%;padding:10px;overflow:hidden;background:transparent}
+.notice-frame{width:100%;height:100%;background:#fff;border:1px solid rgba(226,232,240,.95);border-radius:var(--card-radius,14px);box-shadow:var(--shadow-card,0 5px 14px rgba(15,23,42,.045));display:flex;align-items:center;justify-content:center;padding:24px;overflow:auto}
+.notice-card{width:min(760px,100%);border:1px solid #e2e8f0;border-radius:22px;background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);box-shadow:0 18px 45px rgba(15,23,42,.08);padding:30px;text-align:left}
+.badge{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:999px;background:#0f172a;color:#fff;font-size:11px;font-weight:900;margin-bottom:16px}
+h1{margin:0 0 10px;font-size:25px;letter-spacing:-.04em;color:#0f172a}
+p{margin:0;color:#475569;font-size:13px;line-height:1.7;font-weight:700}.summary{margin-top:20px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.item{border:1px solid #e2e8f0;border-radius:14px;background:#fff;padding:13px 14px}.label{font-size:10.5px;font-weight:900;color:#94a3b8;margin-bottom:5px}.value{font-size:13px;font-weight:900;color:#0f172a;word-break:break-word}.guide{margin-top:18px;border-radius:16px;background:#f1f5f9;border:1px solid #e2e8f0;padding:15px 16px}.guide strong{display:block;margin-bottom:6px;font-size:13px;color:#0f172a}.guide span{display:block;color:#64748b;font-size:12px;line-height:1.6;font-weight:700}.debug{margin-top:18px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:11px;color:#64748b;background:#fff;border:1px dashed #cbd5e1;border-radius:14px;padding:12px;white-space:pre-wrap;word-break:break-word}.actions{margin-top:20px;display:flex;gap:8px;flex-wrap:wrap}.btn{height:36px;border:0;border-radius:11px;padding:0 14px;font-size:12px;font-weight:900;cursor:pointer}.btn.primary{background:#0f172a;color:#fff}.btn.ghost{background:#e2e8f0;color:#334155}@media(max-width:700px){.app{padding:8px}.notice-frame{padding:14px}.notice-card{padding:22px}.summary{grid-template-columns:1fr}h1{font-size:21px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="notice-frame">
+    <section class="notice-card">
+      <div class="badge">SERVICE ADMIN MODE</div>
+      <h1>서비스 관리자 모드입니다.</h1>
+      <p id="noticeMessage">현재 서비스 관리자는 선택 회사의 운영 앱을 대리 관리하는 모드입니다. 개인 홈/업무/AIC 기능은 회사 업무공간 도메인에서 사용합니다.</p>
+      <div class="summary">
+        <div class="item"><div class="label">선택 회사</div><div id="companyName" class="value">-</div></div>
+        <div class="item"><div class="label">요청 기능</div><div id="blockedLabel" class="value">-</div></div>
+        <div class="item"><div class="label">현재 모드</div><div id="modeValue" class="value">service</div></div>
+        <div class="item"><div class="label">접속 안내</div><div id="workspaceUrl" class="value">회사 업무공간 도메인</div></div>
+      </div>
+      <div class="guide">
+        <strong>관리자모드 안내</strong>
+        <span>홈/업무/AIC는 개인 업무 데이터 영역이므로 service mode에서는 실제 개인 데이터 화면으로 진입하지 않습니다. 폐수·근태·인력·시약은 선택 회사의 관리자 권한으로 접근할 수 있습니다.</span>
+      </div>
+      <div id="debugBox" class="debug" hidden></div>
+      <div class="actions">
+        <button type="button" class="btn primary" id="backToServiceAdmin">서비스관리자 화면</button>
+        <button type="button" class="btn ghost" id="showDebug">세션 확인</button>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+(function(){
+  'use strict';
+  let portalSession = null;
+  const params = new URLSearchParams(location.search);
+  const blockedLabel = params.get('blocked_label') || '개인 업무 기능';
+
+  function setText(id, value){ const el=document.getElementById(id); if(el) el.textContent = value || '-'; }
+  function render(){
+    const s = portalSession || {};
+    setText('companyName', s.activeCompanyName || s.companyName || params.get('company_name') || '-');
+    setText('blockedLabel', blockedLabel);
+    setText('modeValue', s.mode || params.get('mode') || 'service');
+    const sub = s.activeCompanySubdomain || s.companySubdomain || s.requestedSubdomain || '';
+    const url = sub ? (sub + '.ops.exelolab.com') : '회사 업무공간 도메인';
+    setText('workspaceUrl', url);
+  }
+  function setSession(session){ portalSession = session || portalSession || {}; window.portalSession = portalSession; render(); }
+  window.addEventListener('message', function(event){
+    const data = event && event.data ? event.data : {};
+    if (data.type === 'PORTAL_AUTH' || data.type === 'portal-auth' || data.type === 'PORTAL_SESSION') {
+      setSession(data.session || data.portalSession || data);
+    }
+  });
+  window.addEventListener('portal-session-ready', function(event){ setSession(event?.detail || {}); });
+  document.getElementById('backToServiceAdmin')?.addEventListener('click', function(){
+    parent?.postMessage({ type:'portal-navigate-request', src:'service-admin/service-admin.html', source:'service-mode-notice' }, '*');
+  });
+  document.getElementById('showDebug')?.addEventListener('click', function(){
+    const box=document.getElementById('debugBox');
+    if(!box) return;
+    box.hidden = !box.hidden;
+    box.textContent = JSON.stringify({
+      mode: portalSession?.mode,
+      activeCompanyId: portalSession?.activeCompanyId,
+      activeCompanyName: portalSession?.activeCompanyName,
+      appRoles: portalSession?.appRoles,
+      isServiceAdmin: portalSession?.isServiceAdmin,
+      isImpersonating: portalSession?.isImpersonating
+    }, null, 2);
+  });
+  render();
+  try { parent?.postMessage({ type:'portal-session-request', source:'service-mode-notice' }, '*'); } catch(_) {}
+})();
+</script>
+</body>
+</html>
