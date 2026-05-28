@@ -1979,6 +1979,7 @@ input[type="radio"]{
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
 
   const HOME_SRC = 'portal-main/portal-main.html';
+  const SERVICE_MODE_NOTICE_SRC = 'portal-main/service-mode-notice.html';
   const LAST_PAGE_KEY = 'portalLastPage';
 
   // Service-admin/global screens must not receive or apply tenant company_id scope.
@@ -2202,6 +2203,12 @@ input[type="radio"]{
       desc: '운영 시스템과 업무 환경을 하나의 포탈에서 통합 관리합니다.',
       gradient: 'linear-gradient(135deg, #c8102e 0%, #e11d2e 100%)'
     },
+    'portal-main/service-mode-notice.html': {
+      top: 'Service Admin Mode',
+      title: '서비스 관리자 모드',
+      desc: '개인 업무 기능은 회사 업무공간에서 사용하며, 현재는 선택 회사의 운영 앱을 관리합니다.',
+      gradient: 'linear-gradient(135deg, #061f44 0%, #0f172a 55%, #158154 100%)'
+    },
     'portal-home/portal-home.html': {
       top: 'Integrated Operations Platform',
       title: '워크스페이스',
@@ -2254,6 +2261,7 @@ input[type="radio"]{
 
   const portalDefaultTabs = {
     'portal-main/portal-main.html': [],
+    'portal-main/service-mode-notice.html': [],
     'portal-home/portal-home.html': [
       { id: 'memo', label: '메모' },
       { id: 'schedule', label: '일정/예약' }
@@ -3592,6 +3600,33 @@ input[type="radio"]{
     return String(src || '').includes('reagent/index.html');
   }
 
+  function getPersonalServiceAppInfo(src) {
+    const key = normalizePortalSrc(src);
+    const map = {
+      'portal-main/portal-main.html': { appKey: 'home', label: '홈' },
+      'portal-home/portal-home.html': { appKey: 'work', label: '업무' },
+      'aic/index.html': { appKey: 'aic', label: 'AIC' }
+    };
+    return map[key] || null;
+  }
+
+  function getServiceModeNoticeSrc(src) {
+    const info = getPersonalServiceAppInfo(src);
+    if (!info || !currentUser) return '';
+
+    const session = buildPortalSession();
+    const appRole = session?.appRoles?.[info.appKey]?.role || '';
+    if (session?.mode !== 'service' || appRole !== 'blocked') return '';
+
+    const params = [
+      'blocked_app=' + encodeURIComponent(info.appKey),
+      'blocked_label=' + encodeURIComponent(info.label),
+      'target=' + encodeURIComponent(normalizePortalSrc(src)),
+      'mode=service'
+    ];
+    return SERVICE_MODE_NOTICE_SRC + '?' + params.join('&');
+  }
+
   function saveReagentUserHint() {
     const session = buildPortalSession();
     if (!session.email) return;
@@ -3819,6 +3854,16 @@ input[type="radio"]{
     }
 
     if (isServiceAdminSrc(src) && !isServiceAdminRole()) {
+      return;
+    }
+
+    const serviceModeNoticeSrc = getServiceModeNoticeSrc(src);
+    if (serviceModeNoticeSrc) {
+      // service_admin 모드에서는 개인 홈/업무/AIC 앱으로 직접 진입하지 않고
+      // 관리자 모드 안내 화면을 표시합니다. 버튼은 유지해 검증/UX 흐름은 확인할 수 있게 합니다.
+      try { localStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
+      replacePortalFrame(buildSrcWithSession(serviceModeNoticeSrc));
+      if (btn) setActiveNav(btn);
       return;
     }
 
