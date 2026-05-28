@@ -2324,6 +2324,43 @@ input[type="radio"]{
     }).filter(function (tab) { return tab.id && tab.label; });
   }
 
+  function getPortalAppRoleForTabs(appKey) {
+    const session = window.portalSession || window.currentPortalSession || {};
+    const appRoles = session.appRoles || session.app_roles || {};
+    const role =
+      appRoles?.[appKey]?.role ||
+      appRoles?.[appKey]?.role_key ||
+      session?.appRoles?.[appKey]?.role ||
+      '';
+
+    const normalized = String(role || '').trim().toLowerCase();
+    if (normalized === '관리자') return 'admin';
+    if (normalized === '운영자') return 'operator';
+    if (normalized === '조회') return 'viewer';
+    if (normalized === '일반') return 'user';
+    return normalized || 'user';
+  }
+
+  function isReagentRequestTab(tab) {
+    const id = String(tab?.id || '').trim().toLowerCase();
+    const label = String(tab?.label || '').replace(/\s+/g, '').trim();
+    return id === 'request' || id === 'product-request' || label === '제품신청' || label === '신청';
+  }
+
+  function filterPortalTabsByAppRole(tabs) {
+    const normalizedTabs = normalizePortalTabs(tabs);
+    const currentSrc = normalizePortalSrc(frame?.getAttribute('src') || frame?.src || '');
+    if (currentSrc !== 'reagent/index.html') return normalizedTabs;
+
+    const reagentRole = getPortalAppRoleForTabs('reagent');
+    const canOperate = reagentRole === 'admin' || reagentRole === 'operator';
+
+    if (canOperate) return normalizedTabs;
+
+    const requestTabs = normalizedTabs.filter(isReagentRequestTab);
+    return requestTabs.length ? requestTabs : [{ id: 'request', label: '제품신청' }];
+  }
+
   function getPortalTabSignature(tabs) {
     return normalizePortalTabs(tabs).map(function (tab) {
       return tab.id + ':' + tab.label;
@@ -2343,9 +2380,12 @@ input[type="radio"]{
   let portalSubtabSwitchTimer = null;
 
   function renderPortalSubtabs(tabs, activeId) {
-    const nextTabs = normalizePortalTabs(tabs);
+    const nextTabs = filterPortalTabsByAppRole(tabs);
     const nextSignature = getPortalTabSignature(nextTabs);
-    const nextActiveId = activeId || currentPortalTabId || nextTabs[0]?.id || '';
+    let nextActiveId = activeId || currentPortalTabId || nextTabs[0]?.id || '';
+    if (nextTabs.length && !nextTabs.some(function (tab) { return tab.id === nextActiveId; })) {
+      nextActiveId = nextTabs[0].id;
+    }
 
     if (!els.portalSubtabsWrap || !els.portalSubtabs) return;
 
@@ -4257,6 +4297,18 @@ input[type="radio"]{
         const tabs = payload.tabs || payload.portalTabs || [];
         const activeId = payload.activeTabId || payload.activeTab || payload.tabId || '';
         renderPortalSubtabs(tabs, activeId);
+        return;
+      }
+
+      if (payload.type === 'portal-tabs-refresh' || payload.type === 'PORTAL_TABS_REFRESH') {
+        try {
+          frame?.contentWindow?.postMessage({
+            type: 'portal-tabs-request',
+            source: 'portal-index-refresh'
+          }, '*');
+        } catch (_) {}
+        const currentSrc = normalizePortalSrc(frame?.getAttribute('src') || frame?.src || HOME_SRC);
+        updatePortalSubtabs(currentSrc);
         return;
       }
 
