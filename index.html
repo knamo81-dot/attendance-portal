@@ -3278,6 +3278,8 @@ input[type="radio"]{
       if (session.companyName) params.push('company_name=' + encodeURIComponent(session.companyName));
     } else {
       params.push('service_admin_global=1');
+      // 회사 선택(activeCompanyId) 변경 후에도 서비스관리자 iframe이 이전 스코프/캐시를 물고 있지 않도록 강제 새로고침합니다.
+      params.push('v=' + Date.now());
     }
 
     if (session.language) params.push('lang=' + encodeURIComponent(session.language));
