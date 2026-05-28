@@ -605,6 +605,51 @@
     return serviceAdminSupabaseClient;
   }
 
+  async function ensureServiceAdminAuthSession() {
+    const client = getSupabaseClient();
+    if (!client || !client.auth) return;
+
+    try {
+      const current = await client.auth.getSession();
+      if (current?.data?.session?.access_token) return;
+    } catch (_) {}
+
+    const candidates = [];
+
+    try {
+      if (window.parent && window.parent.portalSupabase && window.parent.portalSupabase.auth) {
+        candidates.push(window.parent.portalSupabase);
+      }
+    } catch (_) {}
+
+    try {
+      const parentSession = getParentSession();
+      if (parentSession && parentSession.supabase && parentSession.supabase.auth) {
+        candidates.push(parentSession.supabase);
+      }
+    } catch (_) {}
+
+    try {
+      if (window.parent && window.parent.supabaseClient && window.parent.supabaseClient.auth) {
+        candidates.push(window.parent.supabaseClient);
+      }
+    } catch (_) {}
+
+    for (const parentClient of candidates) {
+      try {
+        const { data } = await parentClient.auth.getSession();
+        const session = data?.session;
+        if (session?.access_token && session?.refresh_token) {
+          await client.auth.setSession({
+            access_token: session.access_token,
+            refresh_token: session.refresh_token
+          });
+          return;
+        }
+      } catch (_) {}
+    }
+  }
+
   function isServiceAdmin() {
     const session = getParentSession();
     const role = String(session?.role || session?.profile?.role || '').trim();
@@ -638,6 +683,7 @@
   }
 
   async function generateUniqueCompanyCode() {
+    await ensureServiceAdminAuthSession();
     for (let i = 0; i < 8; i += 1) {
       const code = generateCompanyCode();
       const { data, error } = await sb()
@@ -710,6 +756,7 @@
   }
 
   async function ensureCompanyApps(companyId) {
+    await ensureServiceAdminAuthSession();
     const rows = DEFAULT_APPS.map(app => ({
       company_id: companyId,
       app_key: app.app_key,
@@ -726,6 +773,7 @@
 
   async function loadCompanies() {
     assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
     setFeedback('회사 목록을 불러오는 중입니다.', '');
 
     const { data, error } = await sb()
@@ -838,6 +886,7 @@
 
   async function createCompany() {
     assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
 
     const name = String(els.companyNameInput.value || '').trim();
     const subdomain = normalizeSubdomain(els.companySubdomainInput?.value || '');
@@ -888,6 +937,7 @@
 
   async function toggleCompanyActive(companyId, nextActive) {
     assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
     setFeedback('회사 상태를 변경하는 중입니다.', '');
 
     const { error } = await sb()
@@ -903,6 +953,7 @@
 
   async function updateCompanyInfo(companyId, nextName, nextSubdomain) {
     assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
 
     const name = String(nextName || '').trim();
     const subdomain = normalizeSubdomain(nextSubdomain || '');
@@ -946,6 +997,7 @@
 
   async function deleteCompany(companyId) {
     assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
 
     const company = companies.find(item => item.id === companyId);
     const name = company?.company_name || '선택한 회사';
@@ -1040,6 +1092,7 @@
 
   async function loadCompanyApps(companyId) {
     assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
 
     if (!companyId) {
       els.appsWrap.innerHTML = '<div class="empty">회사 정보가 없습니다.</div>';
@@ -1091,6 +1144,7 @@
 
   async function saveCompanyApps() {
     assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
 
     if (!selectedCompanyId) {
       setFeedback('선택된 회사가 없습니다.', 'error');
@@ -1272,6 +1326,7 @@
   async function boot() {
     bindEvents();
     updateDomainPreview();
+    await ensureServiceAdminAuthSession();
 
     if (!isServiceAdmin()) {
       document.body.innerHTML = '<main class="page el-page"><div class="empty">서비스 관리자 권한이 필요합니다.</div></main>';
