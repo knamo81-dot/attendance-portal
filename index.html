@@ -3004,6 +3004,8 @@ input[type="radio"]{
     const email = currentUser?.email || currentProfile?.email || '';
 
     if (isServiceAdminRole()) {
+      // service mode에서는 개인 사원으로 동작하지 않습니다.
+      // 다만 각 회사 운영 앱에는 선택 회사의 대리 관리자 권한을 명확하게 내려줍니다.
       currentEmployee = null;
       currentAppRoles = buildServiceModeAppRoles();
       return;
@@ -3011,7 +3013,7 @@ input[type="radio"]{
 
     currentEmployee = await fetchEmployeeForCompany(companyId, email);
     const roleRows = await fetchUserAppRolesForSession(companyId, currentEmployee, email);
-    currentAppRoles = buildWorkspaceAppRoles(roleRows, currentEmployee, currentProfile);
+    currentAppRoles = buildWorkspaceAppRoles(roleRows, currentEmployee, currentProfile) || buildEmptyPortalAppRoles();
   }
 
   function buildPortalSession() {
@@ -3051,9 +3053,34 @@ input[type="radio"]{
     const userObject = buildPortalUserObject(activeCompanyId);
 
     return {
+      // 핵심 세션 필드는 콘솔/iframe에서 바로 확인되도록 상단에 배치합니다.
       mode: isServiceMode ? 'service' : 'workspace',
       portalMode: isServiceMode ? 'service' : 'workspace',
       portal_mode: isServiceMode ? 'service' : 'workspace',
+
+      companyId: activeCompanyId,
+      company_id: activeCompanyId,
+      activeCompanyId: activeCompanyId,
+      active_company_id: activeCompanyId,
+      activeCompanyCode: companyCode,
+      active_company_code: companyCode,
+      activeCompanyName: companyName,
+      active_company_name: companyName,
+
+      employee,
+      appRoles,
+      app_roles: appRoles,
+
+      isServiceAdmin: isServiceAdminMode,
+      is_service_admin: isServiceAdminMode,
+      isImpersonating: isServiceAdminMode && Boolean(activeCompany && loginCompany && activeCompany.id !== loginCompany.id),
+      is_impersonating: isServiceAdminMode && Boolean(activeCompany && loginCompany && activeCompany.id !== loginCompany.id),
+
+      sessionReady: true,
+      session_ready: true,
+      sessionSchemaVersion: 'portal-session-v4',
+      session_schema_version: 'portal-session-v4',
+
       user: userObject,
       authUser: currentUser,
       auth_user: currentUser,
@@ -3178,6 +3205,19 @@ input[type="radio"]{
     window.currentTenantSubdomain = publicSession.requestedSubdomain;
     window.currentUserRole = publicSession.role;
     window.dispatchEvent(new CustomEvent('portal-session-ready', { detail: publicSession }));
+
+    try {
+      console.info('[PortalSession] ready', {
+        mode: publicSession.mode,
+        activeCompanyId: publicSession.activeCompanyId,
+        activeCompanyName: publicSession.activeCompanyName,
+        employee: publicSession.employee,
+        appRoles: publicSession.appRoles,
+        isServiceAdmin: publicSession.isServiceAdmin,
+        isImpersonating: publicSession.isImpersonating
+      });
+    } catch (_) {}
+
     return publicSession;
   }
 
