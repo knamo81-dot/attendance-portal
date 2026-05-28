@@ -3597,46 +3597,109 @@ input[type="radio"]{
     return src + (src.includes('?') ? '&' : '?') + params.join('&');
   }
 
+  function sanitizePortalSessionForMessage(value) {
+    const seen = new WeakSet();
+    const blockedKeys = new Set([
+      'supabase',
+      'globalSupabase',
+      'supabaseGlobal',
+      'isGlobalTenantTable',
+      'buildCompanyScopedPayload',
+      'buildCompanyScopedRows',
+      'scopeCompanyQuery'
+    ]);
+
+    function clean(input, key) {
+      if (blockedKeys.has(key)) return undefined;
+      if (input === null) return null;
+
+      const type = typeof input;
+      if (type === 'string' || type === 'number' || type === 'boolean') return input;
+      if (type === 'undefined' || type === 'function' || type === 'symbol' || type === 'bigint') return undefined;
+
+      if (input instanceof Date) return input.toISOString();
+      if (typeof URL !== 'undefined' && input instanceof URL) return input.toString();
+
+      if (typeof Element !== 'undefined' && input instanceof Element) return undefined;
+      if (typeof Window !== 'undefined' && input instanceof Window) return undefined;
+      if (typeof Document !== 'undefined' && input instanceof Document) return undefined;
+
+      if (Array.isArray(input)) {
+        if (seen.has(input)) return undefined;
+        seen.add(input);
+        return input
+          .map(function (item) { return clean(item, ''); })
+          .filter(function (item) { return typeof item !== 'undefined'; });
+      }
+
+      if (type === 'object') {
+        if (seen.has(input)) return undefined;
+        seen.add(input);
+
+        const output = {};
+        Object.keys(input).forEach(function (itemKey) {
+          const cleaned = clean(input[itemKey], itemKey);
+          if (typeof cleaned !== 'undefined') output[itemKey] = cleaned;
+        });
+        return output;
+      }
+
+      return undefined;
+    }
+
+    return clean(value, '');
+  }
+
   function postAuthToFrame() {
     if (!frame || !frame.contentWindow || !currentUser) return;
-    const session = buildPortalSession();
+
+    const rawSession = buildPortalSession();
+    const session = sanitizePortalSessionForMessage(rawSession) || {};
     const isGlobalApp = isGlobalPortalSrc(getCurrentFrameBaseSrc());
     const frameCompanyId = isGlobalApp ? '' : (session.activeCompanyId || session.companyId || '');
     const frameCompanyCode = isGlobalApp ? '' : (session.companyCode || '');
     const frameCompanyName = isGlobalApp ? '' : (session.companyName || '');
     const frameCompanySubdomain = isGlobalApp ? '' : (session.companySubdomain || '');
+    const frameAppRoles = sanitizePortalSessionForMessage(session.appRoles || {}) || {};
+    const frameEmployee = sanitizePortalSessionForMessage(session.employee || null) || null;
+    const frameProfile = sanitizePortalSessionForMessage(session.profile || null) || null;
+    const frameSession = sanitizePortalSessionForMessage({
+      ...session,
+      serviceAdminGlobal: isGlobalApp,
+      service_admin_global: isGlobalApp
+    }) || {};
 
-    frame.contentWindow.postMessage({
+    const message = sanitizePortalSessionForMessage({
       type: 'portal-auth',
       user: {
-        email: session.email,
+        email: session.email || '',
         company_id: frameCompanyId,
         companyId: frameCompanyId,
         company_code: frameCompanyCode,
         companyCode: frameCompanyCode,
         company_name: frameCompanyName,
         companyName: frameCompanyName,
-        role: session.role,
-        accountRole: session.accountRole,
-        account_role: session.accountRole,
-        mode: session.mode,
-        portalMode: session.portalMode,
-        portal_mode: session.portalMode,
-        language: session.language,
-        preferred_language: session.language,
-        phone: session.phone,
-        employee_no: session.employee?.employee_no || '',
-        employeeNo: session.employee?.employee_no || '',
-        name: session.employee?.name || session.name || '',
-        appRoles: session.appRoles || {},
-        app_roles: session.appRoles || {},
+        role: session.role || '',
+        accountRole: session.accountRole || '',
+        account_role: session.accountRole || '',
+        mode: session.mode || '',
+        portalMode: session.portalMode || session.mode || '',
+        portal_mode: session.portalMode || session.mode || '',
+        language: session.language || '',
+        preferred_language: session.language || '',
+        phone: session.phone || '',
+        employee_no: frameEmployee?.employee_no || '',
+        employeeNo: frameEmployee?.employee_no || '',
+        name: frameEmployee?.name || session.name || '',
+        appRoles: frameAppRoles,
+        app_roles: frameAppRoles,
         service_admin_global: isGlobalApp,
         isServiceAdmin: !!session.isServiceAdmin,
         is_service_admin: !!session.is_service_admin
       },
-      employee: session.employee || null,
-      appRoles: session.appRoles || {},
-      app_roles: session.appRoles || {},
+      employee: frameEmployee,
+      appRoles: frameAppRoles,
+      app_roles: frameAppRoles,
       company: {
         id: frameCompanyId,
         company_id: frameCompanyId,
@@ -3647,13 +3710,11 @@ input[type="radio"]{
         subdomain: frameCompanySubdomain,
         company_subdomain: frameCompanySubdomain
       },
-      profile: session.profile,
-      session: {
-        ...session,
-        serviceAdminGlobal: isGlobalApp,
-        service_admin_global: isGlobalApp
-      }
-    }, '*');
+      profile: frameProfile,
+      session: frameSession
+    });
+
+    frame.contentWindow.postMessage(message, '*');
   }
 
   function replacePortalFrame(src) {
