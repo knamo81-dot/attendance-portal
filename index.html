@@ -2071,6 +2071,8 @@ input[type="radio"]{
   let currentUser = null;
   let currentProfile = null;
   let currentCompany = null;
+  let currentEmployee = null;
+  let currentAppRoles = null;
   let activeCompany = null;
   let serviceAdminCompanies = [];
   let requestedCompany = null;
@@ -2805,10 +2807,218 @@ input[type="radio"]{
     }
   }
 
+  const PORTAL_APP_KEYS = ['wastewater', 'attendance', 'reagent', 'research_staff', 'aic', 'home', 'work'];
+  const PORTAL_COMPANY_APP_KEYS = ['wastewater', 'attendance', 'reagent', 'research_staff'];
+
+  function normalizePortalRole(role, fallback = 'user') {
+    const clean = String(role || '').trim().toLowerCase();
+    if (['admin', 'administrator', '관리자'].includes(clean)) return 'admin';
+    if (['operator', 'manager', '운영자'].includes(clean)) return 'operator';
+    if (['viewer', 'readonly', 'read_only', '조회', '조회자'].includes(clean)) return 'viewer';
+    if (['blocked', 'block', 'disabled', '차단'].includes(clean)) return 'blocked';
+    if (['user', 'member', '일반', '일반사용자'].includes(clean)) return 'user';
+    return fallback;
+  }
+
+  function normalizePortalAppKey(appKey) {
+    const clean = String(appKey || '').trim().toLowerCase();
+    if (['wastewater', 'waste_water', 'waste-water', '폐수'].includes(clean)) return 'wastewater';
+    if (['attendance', 'attend', '근태'].includes(clean)) return 'attendance';
+    if (['reagent', 'reagents', 'supplies', 'glassware', 'reagent_glassware', 'reagent-glassware', '시약', '시약초자'].includes(clean)) return 'reagent';
+    if (['research_staff', 'research-staff', 'staff', 'hr', '인력', '인력운영'].includes(clean)) return 'research_staff';
+    if (['aic', 'ai_chat', 'ai-chat'].includes(clean)) return 'aic';
+    if (['home', 'portal_home', 'portal-main'].includes(clean)) return 'home';
+    if (['work', 'workspace', '업무'].includes(clean)) return 'work';
+    return clean;
+  }
+
+  function normalizeWastewaterApprovalRole(roleKey) {
+    const clean = String(roleKey || '').trim().toLowerCase();
+    if (['reviewer', 'approver', 'approval', '검토자', '결재자'].includes(clean)) return 'reviewer';
+    return null;
+  }
+
+  function buildEmptyPortalAppRoles() {
+    return {
+      wastewater: { role: 'user', approvalRole: null },
+      attendance: { role: 'user' },
+      reagent: { role: 'user' },
+      research_staff: { role: 'user' },
+      aic: { role: 'user' },
+      home: { role: 'user' },
+      work: { role: 'user' }
+    };
+  }
+
+  function buildServiceModeAppRoles() {
+    return {
+      wastewater: { role: 'admin', approvalRole: null },
+      attendance: { role: 'admin' },
+      reagent: { role: 'admin' },
+      research_staff: { role: 'admin' },
+      aic: { role: 'blocked' },
+      home: { role: 'blocked' },
+      work: { role: 'blocked' }
+    };
+  }
+
+  function buildWorkspaceAppRoles(roleRows = [], employee = null, profile = null) {
+    const roles = buildEmptyPortalAppRoles();
+    const profileRole = normalizePortalRole(profile?.role, 'user');
+    const employeeRole = normalizePortalRole(employee?.role || employee?.app_role || employee?.portal_role, 'user');
+    const workspaceRole = normalizePortalRole(
+      profile?.workspace_role || profile?.portal_role || profile?.company_role || profile?.tenant_role || profile?.user_role || employee?.role,
+      'user'
+    );
+    const isWorkspaceAdmin = profileRole === 'admin' || employeeRole === 'admin' || workspaceRole === 'admin';
+
+    if (isWorkspaceAdmin) {
+      PORTAL_COMPANY_APP_KEYS.forEach(function (appKey) {
+        if (appKey === 'wastewater') roles.wastewater.role = 'admin';
+        else roles[appKey].role = 'admin';
+      });
+      roles.aic.role = 'admin';
+    }
+
+    (Array.isArray(roleRows) ? roleRows : []).forEach(function (row) {
+      if (row?.is_active === false) return;
+      const appKey = normalizePortalAppKey(row?.app_key);
+      if (!appKey || !roles[appKey]) return;
+
+      const rawRole = String(row?.role_key || row?.role || '').trim();
+      const approvalRole = normalizeWastewaterApprovalRole(rawRole);
+
+      if (appKey === 'wastewater') {
+        if (approvalRole) {
+          roles.wastewater.approvalRole = approvalRole;
+          return;
+        }
+        roles.wastewater.role = normalizePortalRole(rawRole, roles.wastewater.role || 'user');
+        return;
+      }
+
+      roles[appKey].role = normalizePortalRole(rawRole, roles[appKey].role || 'user');
+    });
+
+    roles.home.role = 'user';
+    roles.work.role = 'user';
+    if (!roles.aic.role || roles.aic.role === 'blocked') roles.aic.role = 'user';
+    return roles;
+  }
+
+  function normalizePortalEmployee(employee) {
+    if (!employee) return null;
+    return {
+      id: employee.id || '',
+      employee_no: employee.employee_no || employee.employeeNo || '',
+      employeeNo: employee.employee_no || employee.employeeNo || '',
+      name: employee.name || '',
+      email: employee.email || '',
+      department: employee.department || employee.division || employee.division_name || employee.division_code || '',
+      division: employee.division || employee.division_name || employee.division_code || employee.department || '',
+      division_code: employee.division_code || '',
+      team: employee.team || employee.team_name || employee.team_code || '',
+      team_code: employee.team_code || '',
+      position: employee.position || '',
+      role: employee.role || employee.portal_role || employee.app_role || 'user',
+      raw: employee
+    };
+  }
+
+  function buildPortalUserObject(sessionCompanyId = '') {
+    const email = currentUser?.email || currentProfile?.email || currentEmployee?.email || '';
+    const name = currentEmployee?.name || currentProfile?.name || currentUser?.user_metadata?.name || email || '';
+    const role = currentProfile?.role || currentEmployee?.role || 'user';
+    return {
+      id: currentUser?.id || currentProfile?.id || '',
+      email,
+      name,
+      role,
+      company_id: sessionCompanyId || '',
+      companyId: sessionCompanyId || '',
+      employee_no: currentEmployee?.employee_no || '',
+      employeeNo: currentEmployee?.employee_no || '',
+      authUser: currentUser || null
+    };
+  }
+
+  async function fetchEmployeeForCompany(companyId, email) {
+    const cleanCompanyId = String(companyId || '').trim();
+    const cleanEmail = String(email || '').trim();
+    if (!cleanEmail) return null;
+
+    try {
+      let query = supabaseClient.from('employees').select('*').ilike('email', cleanEmail).limit(1);
+      if (cleanCompanyId) query = query.eq('company_id', cleanCompanyId);
+      const { data, error } = await query.maybeSingle();
+      if (error) throw error;
+      return data || null;
+    } catch (error) {
+      console.warn('[PortalSession] employee lookup with company_id failed, retrying by email only:', error);
+      try {
+        const { data, error: fallbackError } = await supabaseClient
+          .from('employees')
+          .select('*')
+          .ilike('email', cleanEmail)
+          .limit(1)
+          .maybeSingle();
+        if (fallbackError) throw fallbackError;
+        return data || null;
+      } catch (fallbackError) {
+        console.warn('[PortalSession] employee lookup skipped:', fallbackError);
+        return null;
+      }
+    }
+  }
+
+  async function fetchUserAppRolesForSession(companyId, employee, email) {
+    const cleanCompanyId = String(companyId || '').trim();
+    const employeeNo = String(employee?.employee_no || employee?.employeeNo || '').trim();
+    const cleanEmail = String(email || employee?.email || '').trim().toLowerCase();
+    if (!cleanCompanyId || (!employeeNo && !cleanEmail)) return [];
+
+    try {
+      let query = supabaseClient
+        .from('user_app_roles')
+        .select('*')
+        .eq('company_id', cleanCompanyId);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return (Array.isArray(data) ? data : []).filter(function (row) {
+        if (row?.is_active === false) return false;
+        const rowEmployeeNo = String(row?.employee_no || '').trim();
+        const rowEmail = String(row?.email || '').trim().toLowerCase();
+        return (!!employeeNo && rowEmployeeNo === employeeNo) || (!!cleanEmail && rowEmail === cleanEmail);
+      });
+    } catch (error) {
+      console.warn('[PortalSession] user_app_roles lookup skipped:', error);
+      return [];
+    }
+  }
+
+  async function refreshPortalIdentityContext() {
+    const sessionCompany = getEffectiveCompany() || requestedCompany || currentCompany || null;
+    const companyId = sessionCompany?.id || currentProfile?.company_id || '';
+    const email = currentUser?.email || currentProfile?.email || '';
+
+    if (isServiceAdminRole()) {
+      currentEmployee = null;
+      currentAppRoles = buildServiceModeAppRoles();
+      return;
+    }
+
+    currentEmployee = await fetchEmployeeForCompany(companyId, email);
+    const roleRows = await fetchUserAppRolesForSession(companyId, currentEmployee, email);
+    currentAppRoles = buildWorkspaceAppRoles(roleRows, currentEmployee, currentProfile);
+  }
+
   function buildPortalSession() {
     const effectiveCompany = getEffectiveCompany() || requestedCompany || null;
     const loginCompany = currentCompany || null;
-    const companyId = effectiveCompany?.id || currentProfile?.company_id || requestedCompany?.id || '';
+    const activeCompanyId = effectiveCompany?.id || currentProfile?.company_id || requestedCompany?.id || '';
+    const loginCompanyId = loginCompany?.id || currentProfile?.company_id || '';
     const companyCode = effectiveCompany?.company_code || requestedCompany?.company_code || '';
     const companyName = effectiveCompany?.company_name || requestedCompany?.company_name || '';
     const companySubdomain = effectiveCompany?.subdomain || requestedCompany?.subdomain || requestedSubdomain || '';
@@ -2817,26 +3027,38 @@ input[type="radio"]{
     const isServiceAccount = accountRole === 'service_admin';
     const isServiceMode = isRootOpsMode;
     const isWorkspaceMode = !isServiceMode;
+    const employee = normalizePortalEmployee(currentEmployee);
 
     // 같은 이메일이라도 root ops와 tenant workspace의 역할은 분리합니다.
-    // root ops: service_admin 유지
-    // tenant workspace: service_admin 플래그를 끄고 회사 내부 권한으로 동작
+    // root ops: service_admin 유지 / tenant workspace: employees 또는 workspace 전용 권한 기준으로 동작합니다.
     const workspaceRoleCandidate = String(
       currentProfile?.workspace_role ||
       currentProfile?.portal_role ||
       currentProfile?.company_role ||
       currentProfile?.tenant_role ||
       currentProfile?.user_role ||
+      employee?.role ||
       ''
     ).trim();
     const workspaceRole = isServiceAccount
-      ? (workspaceRoleCandidate || 'admin')
-      : (accountRole || 'viewer');
-    const role = isServiceMode ? (accountRole || 'viewer') : workspaceRole;
+      ? (workspaceRoleCandidate || 'user')
+      : (workspaceRoleCandidate || accountRole || 'user');
+    const role = isServiceMode ? (accountRole || 'viewer') : normalizePortalRole(workspaceRole, 'user');
     const isServiceAdminMode = isServiceMode && isServiceAccount;
+    const appRoles = isServiceAdminMode
+      ? buildServiceModeAppRoles()
+      : (currentAppRoles || buildWorkspaceAppRoles([], currentEmployee, currentProfile));
+    const userObject = buildPortalUserObject(activeCompanyId);
 
     return {
-      user: currentUser,
+      mode: isServiceMode ? 'service' : 'workspace',
+      portalMode: isServiceMode ? 'service' : 'workspace',
+      portal_mode: isServiceMode ? 'service' : 'workspace',
+      user: userObject,
+      authUser: currentUser,
+      auth_user: currentUser,
+      supabaseUser: currentUser,
+      supabase_user: currentUser,
       profile: currentProfile,
       company: effectiveCompany,
       activeCompany: effectiveCompany,
@@ -2844,10 +3066,11 @@ input[type="radio"]{
       loginCompany,
       login_company: loginCompany,
       requestedCompany,
-      email: currentUser?.email || '',
-      mode: isServiceMode ? 'service' : 'workspace',
-      portalMode: isServiceMode ? 'service' : 'workspace',
-      portal_mode: isServiceMode ? 'service' : 'workspace',
+      email: userObject.email || '',
+      name: userObject.name || '',
+      employee,
+      appRoles,
+      app_roles: appRoles,
       isRootOpsMode: isServiceMode,
       is_root_ops_mode: isServiceMode,
       isWorkspaceMode: isWorkspaceMode,
@@ -2856,14 +3079,18 @@ input[type="radio"]{
       account_role: accountRole,
       workspaceRole,
       workspace_role: workspaceRole,
-      companyId,
-      company_id: companyId,
-      activeCompanyId: companyId,
-      active_company_id: companyId,
+      companyId: activeCompanyId,
+      company_id: activeCompanyId,
+      activeCompanyId: activeCompanyId,
+      active_company_id: activeCompanyId,
       companyCode,
       company_code: companyCode,
+      activeCompanyCode: companyCode,
+      active_company_code: companyCode,
       companyName,
       company_name: companyName,
+      activeCompanyName: companyName,
+      active_company_name: companyName,
       companySubdomain,
       company_subdomain: companySubdomain,
       requestedSubdomain: requestedSubdomain || null,
@@ -2873,14 +3100,15 @@ input[type="radio"]{
       is_service_admin: isServiceAdminMode,
       serviceAdmin: isServiceAdminMode,
       service_admin: isServiceAdminMode,
-      originalCompanyId: loginCompany?.id || currentProfile?.company_id || '',
-      original_company_id: loginCompany?.id || currentProfile?.company_id || '',
-      homeCompanyId: loginCompany?.id || currentProfile?.company_id || '',
-      home_company_id: loginCompany?.id || currentProfile?.company_id || '',
+      originalCompanyId: loginCompanyId,
+      original_company_id: loginCompanyId,
+      homeCompanyId: loginCompanyId,
+      home_company_id: loginCompanyId,
       impersonating: isServiceAdminMode && Boolean(activeCompany && loginCompany && activeCompany.id !== loginCompany.id),
       isImpersonating: isServiceAdminMode && Boolean(activeCompany && loginCompany && activeCompany.id !== loginCompany.id),
-      impersonatedCompanyId: isServiceAdminMode ? companyId : '',
-      impersonated_company_id: isServiceAdminMode ? companyId : '',
+      is_impersonating: isServiceAdminMode && Boolean(activeCompany && loginCompany && activeCompany.id !== loginCompany.id),
+      impersonatedCompanyId: isServiceAdminMode ? activeCompanyId : '',
+      impersonated_company_id: isServiceAdminMode ? activeCompanyId : '',
       language: getPreferredLanguage(),
       preferred_language: getPreferredLanguage(),
       phone: getProfilePhone(),
@@ -2929,8 +3157,11 @@ input[type="radio"]{
     window.currentCompanyCode = session.companyCode;
     window.currentCompanyName = session.companyName;
     window.currentCompanySubdomain = session.companySubdomain;
-    window.activeCompanyId = session.companyId;
-    window.activeCompanyName = session.companyName;
+    window.activeCompanyId = session.activeCompanyId;
+    window.activeCompanyCode = session.activeCompanyCode || session.companyCode;
+    window.activeCompanyName = session.activeCompanyName || session.companyName;
+    window.currentEmployee = session.employee || null;
+    window.currentAppRoles = session.appRoles || null;
     window.currentRequestedSubdomain = session.requestedSubdomain;
     window.currentTenantSubdomain = session.requestedSubdomain;
     window.currentUserRole = session.role;
@@ -2952,7 +3183,12 @@ input[type="radio"]{
     window.currentCompanyName = null;
     window.currentCompanySubdomain = null;
     window.activeCompanyId = null;
+    window.activeCompanyCode = null;
     window.activeCompanyName = null;
+    window.currentEmployee = null;
+    window.currentAppRoles = null;
+    currentEmployee = null;
+    currentAppRoles = null;
     window.currentRequestedSubdomain = requestedSubdomain || null;
     window.currentTenantSubdomain = requestedSubdomain || null;
     window.currentUserRole = null;
@@ -3008,7 +3244,7 @@ input[type="radio"]{
   function applyRoleUI() {
     if (!els.userChip) return;
     const session = buildPortalSession();
-    const name = currentProfile?.name || currentUser?.email || '사용자';
+    const name = currentEmployee?.name || currentProfile?.name || currentUser?.email || '사용자';
     const roleText = roleLabel(session.role);
     const companyName = session.companyName || '';
     const company = companyName
@@ -3102,6 +3338,7 @@ input[type="radio"]{
       localStorage.setItem(getActiveCompanyStorageKey(), String(nextCompany.id || ''));
     } catch (_) {}
 
+    await refreshPortalIdentityContext();
     await loadPortalBrandSettings();
     publishPortalSession();
     applyRoleUI();
@@ -3289,6 +3526,7 @@ input[type="radio"]{
     currentProfile = profile;
     currentCompany = company;
     await restoreServiceAdminActiveCompany(company);
+    await refreshPortalIdentityContext();
     await loadPortalBrandSettings();
     publishPortalSession();
     applyRoleUI();
@@ -3309,11 +3547,16 @@ input[type="radio"]{
         company_id: session.companyId || '',
         company_code: session.companyCode || '',
         company_name: session.companyName || '',
+        employee_no: session.employee?.employee_no || '',
+        employeeNo: session.employee?.employee_no || '',
+        name: session.employee?.name || session.name || '',
         user_role: session.role || '',
         role: session.role || '',
-        is_global_admin: session.role === 'admin',
-        is_reagent_operator: false,
-        reagent_role: ''
+        appRoles: session.appRoles || {},
+        app_roles: session.appRoles || {},
+        is_global_admin: session.appRoles?.reagent?.role === 'admin' || session.role === 'admin',
+        is_reagent_operator: ['admin','operator'].includes(session.appRoles?.reagent?.role || ''),
+        reagent_role: session.appRoles?.reagent?.role || ''
       }));
     } catch (_) {}
   }
@@ -3382,10 +3625,18 @@ input[type="radio"]{
         language: session.language,
         preferred_language: session.language,
         phone: session.phone,
+        employee_no: session.employee?.employee_no || '',
+        employeeNo: session.employee?.employee_no || '',
+        name: session.employee?.name || session.name || '',
+        appRoles: session.appRoles || {},
+        app_roles: session.appRoles || {},
         service_admin_global: isGlobalApp,
         isServiceAdmin: !!session.isServiceAdmin,
         is_service_admin: !!session.is_service_admin
       },
+      employee: session.employee || null,
+      appRoles: session.appRoles || {},
+      app_roles: session.appRoles || {},
       company: {
         id: frameCompanyId,
         company_id: frameCompanyId,
