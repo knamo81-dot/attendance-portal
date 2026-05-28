@@ -652,8 +652,10 @@
 
   function isServiceAdmin() {
     const session = getParentSession();
-    const role = String(session?.role || session?.profile?.role || '').trim();
-    return role === 'service_admin';
+    const mode = String(session?.mode || session?.portalMode || session?.portal_mode || '').trim();
+    const role = String(session?.role || session?.accountRole || session?.account_role || session?.profile?.role || '').trim();
+    // 서비스 관리자 앱은 root ops(service mode)에서만 허용합니다.
+    return (mode === 'service' || session?.isRootOpsMode || session?.is_root_ops_mode) && role === 'service_admin';
   }
 
   function sb() {
