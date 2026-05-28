@@ -2153,12 +2153,13 @@ create table if not exists user_app_roles (
       try {
         if (window.parent && typeof window.parent.getPortalSession === 'function') {
           const session = window.parent.getPortalSession() || {};
-          return String(session.role || session.profile?.role || session.user?.role || '').trim();
+          // index.html에서 root service mode / tenant workspace mode를 이미 분리한 role을 우선 사용합니다.
+          return String(session.role || session.workspaceRole || session.workspace_role || session.profile?.role || session.user?.role || '').trim();
         }
       } catch (_) {}
       try {
         const session = window.parent?.portalSession || window.portalSession || {};
-        return String(session.role || session.profile?.role || session.user?.role || '').trim();
+        return String(session.role || session.workspaceRole || session.workspace_role || session.profile?.role || session.user?.role || '').trim();
       } catch (_) {}
       return '';
     }
@@ -4620,18 +4621,23 @@ create table if not exists user_app_roles (
   function isServiceAdminSession() {
     var session = readPortalSessionSafe();
     var ctx = readPortalAuthContextSafe();
+    var mode = safeString(session.mode || session.portalMode || session.portal_mode || ctx.mode || ctx.portalMode || ctx.portal_mode).toLowerCase();
+    var explicitServiceFlag = session.isServiceAdmin === true || session.is_service_admin === true || session.serviceAdmin === true || session.service_admin === true;
     var texts = [
       session.role,
-      session.user && session.user.role,
-      session.profile && session.profile.role,
       session.accountRole,
       session.account_role,
       ctx.role,
-      ctx.user && ctx.user.role,
-      ctx.profile && ctx.profile.role
+      ctx.accountRole,
+      ctx.account_role
     ].map(function (v) { return String(v || '').trim().toLowerCase(); });
 
-    return texts.indexOf('service_admin') >= 0 || texts.indexOf('service-admin') >= 0 || texts.indexOf('super_admin') >= 0;
+    var hasServiceRole = texts.indexOf('service_admin') >= 0 || texts.indexOf('service-admin') >= 0 || texts.indexOf('super_admin') >= 0;
+    // service_admin은 root ops(service mode)에서만 서비스 관리자 권한으로 인정합니다.
+    // tenant workspace에서는 같은 이메일이라도 회사 내부 role(session.role)만 사용합니다.
+    if (mode === 'workspace') return false;
+    if (mode === 'service') return explicitServiceFlag || hasServiceRole;
+    return explicitServiceFlag || hasServiceRole;
   }
 
   function getOriginalCompanyId() {
@@ -4695,9 +4701,11 @@ create table if not exists user_app_roles (
   };
 
   window.__settingsTenantContext = function () {
+    var session = readPortalSessionSafe();
     return {
       companyId: resolveSettingsCompanyId(),
       originalCompanyId: getOriginalCompanyId(),
+      mode: session.mode || session.portalMode || session.portal_mode || '',
       isServiceAdmin: isServiceAdminSession(),
       isImpersonating: isImpersonating()
     };
