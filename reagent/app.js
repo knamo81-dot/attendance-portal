@@ -364,6 +364,55 @@ window.ReagentApp.canAccessTab = function (target) {
   return false;
 };
 
+window.ReagentApp.getAllowedPortalTabs = function () {
+  const buttons = Array.from(document.querySelectorAll(".tab-btn, button[data-tab]"));
+  const tabs = [];
+
+  buttons.forEach((btn, index) => {
+    const id = String(btn.dataset?.tab || btn.getAttribute("data-tab") || ("tab_" + index)).trim();
+    const label = window.ReagentApp.getCleanLabel?.(btn) || String(btn.textContent || id).trim();
+    if (!id || !label) return;
+    if (window.ReagentApp.canAccessTab?.(btn) !== true) return;
+
+    tabs.push({ id, label });
+  });
+
+  return tabs.length ? tabs : [{ id: "request", label: "제품신청" }];
+};
+
+window.ReagentApp.notifyPortalTabsChanged = function () {
+  const tabs = window.ReagentApp.getAllowedPortalTabs?.() || [];
+  if (!tabs.length) return;
+
+  const activeBtn = document.querySelector(".tab-btn.active, button[data-tab].active");
+  let activeId = String(activeBtn?.dataset?.tab || activeBtn?.getAttribute?.("data-tab") || "").trim();
+  if (!tabs.some((tab) => tab.id === activeId)) activeId = tabs[0].id;
+
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({
+        type: "portal-tabs-update",
+        source: "reagent-app-permission",
+        tabs,
+        portalTabs: tabs,
+        activeTabId: activeId,
+        activeTab: activeId
+      }, "*");
+    }
+  } catch (_) {}
+};
+
+window.ReagentApp.schedulePortalTabsRefresh = function () {
+  clearTimeout(window.ReagentApp._portalTabsRefreshTimer);
+  window.ReagentApp._portalTabsRefreshTimer = setTimeout(() => {
+    window.ReagentApp.notifyPortalTabsChanged?.();
+  }, 30);
+
+  [120, 450, 1200].forEach((delay) => {
+    setTimeout(() => window.ReagentApp.notifyPortalTabsChanged?.(), delay);
+  });
+};
+
 window.ReagentApp.enforcePermissionDom = function () {
   document.querySelectorAll(".tab-btn, button[data-tab]").forEach((btn) => {
     const allowed = window.ReagentApp.canAccessTab?.(btn) === true;
@@ -393,10 +442,12 @@ window.ReagentApp.enforcePermissionDom = function () {
 window.ReagentApp.applyPermissionUI = function () {
   window.ReagentApp.syncRoleClass?.();
   window.ReagentApp.enforcePermissionDom?.();
+  window.ReagentApp.schedulePortalTabsRefresh?.();
 
   if (!window.ReagentApp._permissionObserver) {
     window.ReagentApp._permissionObserver = new MutationObserver(() => {
       window.ReagentApp.enforcePermissionDom?.();
+      window.ReagentApp.schedulePortalTabsRefresh?.();
     });
     window.ReagentApp._permissionObserver.observe(document.body, {
       childList: true,
@@ -410,6 +461,7 @@ window.ReagentApp.applyPermissionUI = function () {
   let count = 0;
   window.ReagentApp._permissionInterval = setInterval(() => {
     window.ReagentApp.enforcePermissionDom?.();
+    if (count === 0 || count === 5 || count === 15) window.ReagentApp.schedulePortalTabsRefresh?.();
     count += 1;
     if (count > 100) clearInterval(window.ReagentApp._permissionInterval);
   }, 100);
