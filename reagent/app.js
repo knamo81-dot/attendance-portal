@@ -118,7 +118,20 @@ window.ReagentApp.getReagentPortalRole = function () {
   if (normalized === "운영자") return "operator";
   if (normalized === "조회") return "viewer";
   if (normalized === "일반") return "user";
-  return normalized;
+  if (["admin", "operator", "viewer", "user", "blocked"].includes(normalized)) return normalized;
+  return "";
+};
+
+window.ReagentApp.hasExplicitReagentPortalRole = function () {
+  const session = window.ReagentApp.getPortalSession?.() || {};
+  return !!(
+    session.appRoles?.reagent?.role ||
+    session.app_roles?.reagent?.role ||
+    session.appRoles?.supplies?.role ||
+    session.app_roles?.supplies?.role ||
+    session.reagentRole ||
+    session.reagent_role
+  );
 };
 
 window.ReagentApp.getPortalEmployee = function () {
@@ -173,9 +186,14 @@ window.ReagentApp.isPortalAdminSession = function () {
   const user = session.user || {};
   const reagentRole = window.ReagentApp.getReagentPortalRole?.() || "";
 
-  if (reagentRole === "admin") return true;
-  if (session.mode === "service" && session.isServiceAdmin === true && reagentRole === "admin") return true;
+  // 포탈 표준 세션에 reagent 앱 권한이 명시되어 있으면,
+  // 시약 앱 권한은 appRoles.reagent.role만 기준으로 판단합니다.
+  // 회사 관리자/포탈 관리자 권한이 시약 관리자 권한으로 승격되지 않도록 합니다.
+  if (window.ReagentApp.hasExplicitReagentPortalRole?.() === true) {
+    return reagentRole === "admin";
+  }
 
+  // 구형 포탈/단독 실행 fallback: appRoles가 없을 때만 기존 관리자 판별 사용
   const roles = [
     session.role,
     session.user_role,
@@ -261,6 +279,14 @@ window.ReagentApp.getCleanLabel = function (el) {
 
 window.ReagentApp.isGlobalAdmin = function () {
   const user = window.ReagentApp.currentUser || {};
+  const reagentRole = window.ReagentApp.getReagentPortalRole?.() || "";
+
+  // 포탈 표준 세션에 reagent 앱 권한이 있으면 앱 권한이 최우선입니다.
+  // 포탈/회사 전체 admin이어도 reagent.role이 user/viewer면 시약 관리자 아님.
+  if (window.ReagentApp.hasExplicitReagentPortalRole?.() === true) {
+    return reagentRole === "admin";
+  }
+
   const role = String(user.user_role || user.role || "").trim().toLowerCase();
   return role === "admin" || role === "관리자" || user.is_global_admin === true || window.ReagentApp.isPortalAdminSession?.() === true;
 };
@@ -268,6 +294,11 @@ window.ReagentApp.isGlobalAdmin = function () {
 window.ReagentApp.isReagentOperator = function () {
   const user = window.ReagentApp.currentUser || {};
   const reagentRole = window.ReagentApp.getReagentPortalRole?.() || "";
+
+  if (window.ReagentApp.hasExplicitReagentPortalRole?.() === true) {
+    return reagentRole === "admin" || reagentRole === "operator";
+  }
+
   return window.ReagentApp.isGlobalAdmin?.() === true ||
     reagentRole === "admin" ||
     reagentRole === "operator" ||
