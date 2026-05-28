@@ -2093,11 +2093,21 @@ input[type="radio"]{
   }
 
   const requestedSubdomain = getRequestedSubdomain();
+  const portalHost = String(window.location.hostname || '').toLowerCase().replace(/:\d+$/, '');
+  const isLocalHost = !portalHost || portalHost === 'localhost' || portalHost === '127.0.0.1';
+  // root ops = SaaS 운영자 모드, tenant subdomain = 회사 업무공간 모드
+  const isRootOpsMode = !requestedSubdomain;
+  const portalRuntimeMode = isRootOpsMode ? 'service' : 'workspace';
+
   window.currentTenantSubdomain = requestedSubdomain || null;
   window.currentRequestedSubdomain = requestedSubdomain || null;
+  window.portalRuntimeMode = portalRuntimeMode;
+  window.portalMode = portalRuntimeMode;
+  window.isRootOpsMode = isRootOpsMode;
 
   console.info('[PortalTenant] host:', window.location.hostname || '');
   console.info('[PortalTenant] requested subdomain:', requestedSubdomain || '(root)');
+  console.info('[PortalTenant] runtime mode:', portalRuntimeMode);
 
   let portalBrandColor = '#c8102e';
   let portalBrandColor2 = '#e11d2e';
@@ -2589,8 +2599,10 @@ input[type="radio"]{
 
 
   function isServiceAdminRole() {
-    const role = String(currentProfile?.role || window.portalSession?.role || '').trim();
-    return role === 'service_admin';
+    const accountRole = String(currentProfile?.role || window.portalSession?.accountRole || window.portalSession?.account_role || '').trim();
+    // service_admin 권한은 root ops(service mode)에서만 활성화합니다.
+    // tenant workspace에서는 같은 이메일이라도 회사 내부 계정으로 동작해야 합니다.
+    return isRootOpsMode && accountRole === 'service_admin';
   }
 
 
@@ -2800,7 +2812,28 @@ input[type="radio"]{
     const companyCode = effectiveCompany?.company_code || requestedCompany?.company_code || '';
     const companyName = effectiveCompany?.company_name || requestedCompany?.company_name || '';
     const companySubdomain = effectiveCompany?.subdomain || requestedCompany?.subdomain || requestedSubdomain || '';
-    const role = currentProfile?.role || 'viewer';
+
+    const accountRole = String(currentProfile?.role || 'viewer').trim();
+    const isServiceAccount = accountRole === 'service_admin';
+    const isServiceMode = isRootOpsMode;
+    const isWorkspaceMode = !isServiceMode;
+
+    // 같은 이메일이라도 root ops와 tenant workspace의 역할은 분리합니다.
+    // root ops: service_admin 유지
+    // tenant workspace: service_admin 플래그를 끄고 회사 내부 권한으로 동작
+    const workspaceRoleCandidate = String(
+      currentProfile?.workspace_role ||
+      currentProfile?.portal_role ||
+      currentProfile?.company_role ||
+      currentProfile?.tenant_role ||
+      currentProfile?.user_role ||
+      ''
+    ).trim();
+    const workspaceRole = isServiceAccount
+      ? (workspaceRoleCandidate || 'admin')
+      : (accountRole || 'viewer');
+    const role = isServiceMode ? (accountRole || 'viewer') : workspaceRole;
+    const isServiceAdminMode = isServiceMode && isServiceAccount;
 
     return {
       user: currentUser,
@@ -2812,6 +2845,17 @@ input[type="radio"]{
       login_company: loginCompany,
       requestedCompany,
       email: currentUser?.email || '',
+      mode: isServiceMode ? 'service' : 'workspace',
+      portalMode: isServiceMode ? 'service' : 'workspace',
+      portal_mode: isServiceMode ? 'service' : 'workspace',
+      isRootOpsMode: isServiceMode,
+      is_root_ops_mode: isServiceMode,
+      isWorkspaceMode: isWorkspaceMode,
+      is_workspace_mode: isWorkspaceMode,
+      accountRole,
+      account_role: accountRole,
+      workspaceRole,
+      workspace_role: workspaceRole,
       companyId,
       company_id: companyId,
       activeCompanyId: companyId,
@@ -2825,18 +2869,18 @@ input[type="radio"]{
       requestedSubdomain: requestedSubdomain || null,
       requested_subdomain: requestedSubdomain || null,
       role,
-      isServiceAdmin: role === 'service_admin',
-      is_service_admin: role === 'service_admin',
-      serviceAdmin: role === 'service_admin',
-      service_admin: role === 'service_admin',
+      isServiceAdmin: isServiceAdminMode,
+      is_service_admin: isServiceAdminMode,
+      serviceAdmin: isServiceAdminMode,
+      service_admin: isServiceAdminMode,
       originalCompanyId: loginCompany?.id || currentProfile?.company_id || '',
       original_company_id: loginCompany?.id || currentProfile?.company_id || '',
       homeCompanyId: loginCompany?.id || currentProfile?.company_id || '',
       home_company_id: loginCompany?.id || currentProfile?.company_id || '',
-      impersonating: role === 'service_admin' && Boolean(activeCompany && loginCompany && activeCompany.id !== loginCompany.id),
-      isImpersonating: role === 'service_admin' && Boolean(activeCompany && loginCompany && activeCompany.id !== loginCompany.id),
-      impersonatedCompanyId: role === 'service_admin' ? companyId : '',
-      impersonated_company_id: role === 'service_admin' ? companyId : '',
+      impersonating: isServiceAdminMode && Boolean(activeCompany && loginCompany && activeCompany.id !== loginCompany.id),
+      isImpersonating: isServiceAdminMode && Boolean(activeCompany && loginCompany && activeCompany.id !== loginCompany.id),
+      impersonatedCompanyId: isServiceAdminMode ? companyId : '',
+      impersonated_company_id: isServiceAdminMode ? companyId : '',
       language: getPreferredLanguage(),
       preferred_language: getPreferredLanguage(),
       phone: getProfilePhone(),
@@ -3330,12 +3374,17 @@ input[type="radio"]{
         company_name: frameCompanyName,
         companyName: frameCompanyName,
         role: session.role,
+        accountRole: session.accountRole,
+        account_role: session.accountRole,
+        mode: session.mode,
+        portalMode: session.portalMode,
+        portal_mode: session.portalMode,
         language: session.language,
         preferred_language: session.language,
         phone: session.phone,
         service_admin_global: isGlobalApp,
-        isServiceAdmin: session.role === 'service_admin',
-        is_service_admin: session.role === 'service_admin'
+        isServiceAdmin: !!session.isServiceAdmin,
+        is_service_admin: !!session.is_service_admin
       },
       company: {
         id: frameCompanyId,
