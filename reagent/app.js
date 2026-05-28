@@ -82,35 +82,100 @@ window.ReagentApp.escapeHtml = function (value) {
 };
 
 window.ReagentApp.getPortalSession = function () {
+  const candidates = [];
+
   try {
-    if (window.parent && window.parent !== window && window.parent.portalSession) {
-      return window.parent.portalSession || {};
+    if (window.portalSession) candidates.push(window.portalSession);
+    if (window.currentPortalSession) candidates.push(window.currentPortalSession);
+  } catch (_) {}
+
+  try {
+    if (window.parent && window.parent !== window) {
+      if (typeof window.parent.getPortalSession === "function") {
+        candidates.push(window.parent.getPortalSession());
+      }
+      if (window.parent.portalSession) candidates.push(window.parent.portalSession);
+      if (window.parent.currentPortalSession) candidates.push(window.parent.currentPortalSession);
     }
   } catch (_) {}
 
-  return window.portalSession || {};
+  return candidates.find((session) => session && typeof session === "object") || {};
+};
+
+window.ReagentApp.getReagentPortalRole = function () {
+  const session = window.ReagentApp.getPortalSession?.() || {};
+  const role =
+    session.appRoles?.reagent?.role ||
+    session.app_roles?.reagent?.role ||
+    session.appRoles?.supplies?.role ||
+    session.app_roles?.supplies?.role ||
+    session.reagentRole ||
+    session.reagent_role ||
+    "";
+
+  const normalized = String(role || "").trim().toLowerCase();
+  if (normalized === "관리자") return "admin";
+  if (normalized === "운영자") return "operator";
+  if (normalized === "조회") return "viewer";
+  if (normalized === "일반") return "user";
+  return normalized;
+};
+
+window.ReagentApp.getPortalEmployee = function () {
+  const session = window.ReagentApp.getPortalSession?.() || {};
+  return session.employee && typeof session.employee === "object" ? session.employee : {};
 };
 
 window.ReagentApp.getCompanyId = function () {
   const session = window.ReagentApp.getPortalSession?.() || {};
   const profile = session.profile || {};
   const user = session.user || {};
+  const employee = window.ReagentApp.getPortalEmployee?.() || {};
 
-  return String(
+  const fromSession =
+    session.activeCompanyId ||
+    session.active_company_id ||
+    session.activeCompany?.id ||
+    session.activeCompany?.company_id ||
+    session.selectedCompanyId ||
+    session.selected_company_id ||
     session.companyId ||
     session.company_id ||
+    session.company?.id ||
+    session.company?.company_id ||
+    employee.company_id ||
+    employee.companyId ||
     profile.company_id ||
     profile.companyId ||
     user.company_id ||
     user.companyId ||
-    ""
-  ).trim();
+    "";
+
+  if (fromSession) return String(fromSession).trim();
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return String(
+      params.get("active_company_id") ||
+      params.get("activeCompanyId") ||
+      params.get("company_id") ||
+      params.get("companyId") ||
+      ""
+    ).trim();
+  } catch (_) {
+    return "";
+  }
 };
 
 window.ReagentApp.isPortalAdminSession = function () {
   const session = window.ReagentApp.getPortalSession?.() || {};
   const profile = session.profile || {};
   const user = session.user || {};
+  const reagentRole = window.ReagentApp.getReagentPortalRole?.() || "";
+
+  if (reagentRole === "admin") return true;
+  if (session.mode === "service" && session.isServiceAdmin === true && reagentRole === "admin") return true;
+
   const roles = [
     session.role,
     session.user_role,
@@ -131,20 +196,61 @@ window.ReagentApp.isPortalAdminSession = function () {
 
 window.ReagentApp.getPortalUserHint = function () {
   const session = window.ReagentApp.getPortalSession?.() || {};
+  const employee = window.ReagentApp.getPortalEmployee?.() || {};
   const profile = session.profile || {};
   const user = session.user || {};
+  const reagentRole = window.ReagentApp.getReagentPortalRole?.() || "";
+
+  const employeeNo =
+    employee.employee_no ||
+    employee.employeeNo ||
+    profile.employee_no ||
+    profile.employeeNo ||
+    user.employee_no ||
+    user.employeeNo ||
+    session.employee_no ||
+    session.employeeNo ||
+    "";
+
+  const divisionName =
+    employee.department ||
+    employee.division_name ||
+    employee.division ||
+    profile.division_name ||
+    profile.department ||
+    user.division_name ||
+    user.department ||
+    session.division_name ||
+    session.department ||
+    "";
+
+  const teamName =
+    employee.team ||
+    employee.team_name ||
+    profile.team_name ||
+    profile.team ||
+    user.team_name ||
+    user.team ||
+    session.team_name ||
+    session.team ||
+    "";
 
   return {
     company_id: window.ReagentApp.getCompanyId?.() || "",
-    email: profile.email || user.email || session.email || "",
-    employee_no: profile.employee_no || profile.employeeNo || user.employee_no || user.employeeNo || session.employee_no || session.employeeNo || "",
-    name: profile.name || profile.employee_name || profile.username || user.name || user.employee_name || session.name || "",
-    division_code: profile.division_code || user.division_code || session.division_code || "",
-    team_code: profile.team_code || user.team_code || session.team_code || "",
-    division_name: profile.division_name || profile.department || user.division_name || user.department || session.division_name || session.department || "",
-    team_name: profile.team_name || profile.team || user.team_name || user.team || session.team_name || session.team || "",
-    position: profile.position || user.position || session.position || "",
-    role: profile.authority || profile.role || user.authority || user.role || session.role || ""
+    email: employee.email || profile.email || user.email || session.email || "",
+    employee_no: employeeNo,
+    name: employee.name || profile.name || profile.employee_name || profile.username || user.name || user.employee_name || session.name || "",
+    division_code: employee.division_code || employee.department_code || profile.division_code || user.division_code || session.division_code || "",
+    team_code: employee.team_code || profile.team_code || user.team_code || session.team_code || "",
+    division_name: divisionName,
+    department: divisionName,
+    team_name: teamName,
+    team: teamName || divisionName,
+    position: employee.position || profile.position || user.position || session.position || "",
+    role: reagentRole || employee.role || profile.authority || profile.role || user.authority || user.role || session.role || "",
+    portal_mode: session.mode || session.portalMode || session.portal_mode || "",
+    is_service_admin: session.isServiceAdmin === true,
+    is_impersonating: session.isImpersonating === true
   };
 };
 
@@ -161,7 +267,11 @@ window.ReagentApp.isGlobalAdmin = function () {
 
 window.ReagentApp.isReagentOperator = function () {
   const user = window.ReagentApp.currentUser || {};
-  return window.ReagentApp.isGlobalAdmin?.() === true || user.is_reagent_operator === true;
+  const reagentRole = window.ReagentApp.getReagentPortalRole?.() || "";
+  return window.ReagentApp.isGlobalAdmin?.() === true ||
+    reagentRole === "admin" ||
+    reagentRole === "operator" ||
+    user.is_reagent_operator === true;
 };
 
 window.ReagentApp.hasReagentOperatorAccess = function () {
@@ -297,12 +407,31 @@ window.ReagentApp.loadReagentPermission = async function () {
 
   const companyId = window.ReagentApp.getCompanyId?.() || String(user.company_id || user.companyId || "").trim();
   const portalAdmin = window.ReagentApp.isPortalAdminSession?.() === true;
+  const portalReagentRole = window.ReagentApp.getReagentPortalRole?.() || "";
 
   user.company_id = companyId || user.company_id || user.companyId || "";
   user.user_role = portalAdmin ? "admin" : "";
-  user.reagent_role = "";
-  user.is_global_admin = portalAdmin;
-  user.is_reagent_operator = portalAdmin;
+  user.reagent_role = portalReagentRole || "";
+  user.is_global_admin = portalAdmin || portalReagentRole === "admin";
+  user.is_reagent_operator = portalAdmin || portalReagentRole === "admin" || portalReagentRole === "operator";
+
+  // 포탈 표준 세션에 앱 권한이 있으면 그 값을 최우선으로 사용합니다.
+  // 기존 users / user_app_roles 조회는 포탈 세션이 없거나 불완전할 때의 보정용 fallback으로 유지합니다.
+  if (portalReagentRole) {
+    if (portalReagentRole === "admin") user.reagent_role = "관리자";
+    else if (portalReagentRole === "operator") user.reagent_role = "운영자";
+    else if (portalReagentRole === "viewer") user.reagent_role = "조회";
+    else user.reagent_role = "일반";
+
+    window.ReagentApp.currentUser = user;
+    try {
+      localStorage.setItem("reagent_current_user", JSON.stringify(user));
+    } catch (_) {}
+
+    window.ReagentApp.syncRoleClass?.();
+    window.ReagentApp.applyRequestAdminUI?.();
+    return user;
+  }
 
   if (!sb) {
     window.ReagentApp.currentUser = user;
@@ -672,8 +801,20 @@ window.ReagentApp.loadCurrentUser = async function () {
     user_role: "",
     reagent_role: "",
     is_global_admin: false,
-    is_reagent_operator: false
+    is_reagent_operator: false,
+    portal_mode: portalHint.portal_mode || "",
+    is_service_admin: portalHint.is_service_admin === true,
+    is_impersonating: portalHint.is_impersonating === true
   };
+
+  // service_admin의 회사 대리접속은 선택 회사의 사원이 아니므로 employees 재조회로
+  // "미지정" 경고를 띄우지 않고 포탈 세션 사용자 정보를 그대로 사용합니다.
+  if (portalHint.is_service_admin === true && portalHint.is_impersonating === true) {
+    try {
+      localStorage.setItem("reagent_current_user", JSON.stringify(window.ReagentApp.currentUser));
+    } catch (_) {}
+    return window.ReagentApp.currentUser;
+  }
 
   if (!sb) {
     console.warn("Supabase client가 없어 사용자 정보를 불러오지 못했습니다.");
