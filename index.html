@@ -3150,23 +3150,35 @@ input[type="radio"]{
 
 
   function publishPortalSession() {
-    const session = buildPortalSession();
-    window.portalSession = session;
-    window.currentPortalSession = session;
-    window.currentCompanyId = session.companyId;
-    window.currentCompanyCode = session.companyCode;
-    window.currentCompanyName = session.companyName;
-    window.currentCompanySubdomain = session.companySubdomain;
-    window.activeCompanyId = session.activeCompanyId;
-    window.activeCompanyCode = session.activeCompanyCode || session.companyCode;
-    window.activeCompanyName = session.activeCompanyName || session.companyName;
-    window.currentEmployee = session.employee || null;
-    window.currentAppRoles = session.appRoles || null;
-    window.currentRequestedSubdomain = session.requestedSubdomain;
-    window.currentTenantSubdomain = session.requestedSubdomain;
-    window.currentUserRole = session.role;
-    window.dispatchEvent(new CustomEvent('portal-session-ready', { detail: session }));
-    return session;
+    const internalSession = buildPortalSession();
+    const publicSession = sanitizePortalSessionForMessage(internalSession) || {};
+
+    // 외부 앱/콘솔에서 보는 portalSession은 postMessage와 동일하게 JSON-safe 표준 세션만 노출합니다.
+    // Supabase client, 함수, URL/DOM 객체는 window.portalSessionInternal / portalSessionHelpers로 분리합니다.
+    window.portalSessionInternal = internalSession;
+    window.portalSession = publicSession;
+    window.currentPortalSession = publicSession;
+    window.portalSessionHelpers = {
+      buildCompanyScopedPayload,
+      buildCompanyScopedRows,
+      scopeCompanyQuery,
+      isGlobalTenantTable
+    };
+
+    window.currentCompanyId = publicSession.companyId;
+    window.currentCompanyCode = publicSession.companyCode;
+    window.currentCompanyName = publicSession.companyName;
+    window.currentCompanySubdomain = publicSession.companySubdomain;
+    window.activeCompanyId = publicSession.activeCompanyId;
+    window.activeCompanyCode = publicSession.activeCompanyCode || publicSession.companyCode;
+    window.activeCompanyName = publicSession.activeCompanyName || publicSession.companyName;
+    window.currentEmployee = publicSession.employee || null;
+    window.currentAppRoles = publicSession.appRoles || null;
+    window.currentRequestedSubdomain = publicSession.requestedSubdomain;
+    window.currentTenantSubdomain = publicSession.requestedSubdomain;
+    window.currentUserRole = publicSession.role;
+    window.dispatchEvent(new CustomEvent('portal-session-ready', { detail: publicSession }));
+    return publicSession;
   }
 
   function clearPortalSession() {
@@ -3176,8 +3188,10 @@ input[type="radio"]{
     activeCompany = null;
     serviceAdminCompanies = [];
     applyPortalBrandColor('#c8102e');
+    window.portalSessionInternal = null;
     window.portalSession = null;
     window.currentPortalSession = null;
+    window.portalSessionHelpers = null;
     window.currentCompanyId = null;
     window.currentCompanyCode = null;
     window.currentCompanyName = null;
@@ -3196,11 +3210,11 @@ input[type="radio"]{
   }
 
   window.getPortalSession = function () {
-    return buildPortalSession();
+    return sanitizePortalSessionForMessage(buildPortalSession()) || {};
   };
 
   window.getPortalAuthContext = function () {
-    return buildPortalSession();
+    return sanitizePortalSessionForMessage(buildPortalSession()) || {};
   };
 
   window.getCompanyAppUrl = function (appUrl) {
