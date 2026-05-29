@@ -1863,7 +1863,7 @@ html.embed-mode #settings-page .admin-section-panel > .real-card:first-child {
                 </div>
               </div>
               <div id="adminSectionPermission" class="admin-section-panel" hidden>
-                <div class="real-admin-top-note">아직 각 프로그램과 직접 연동하지 않는 검증용 화면입니다. 근태 자동 특수권한(소장/본부장·담당·팀장)만 확인하고, 프로그램별 운영자와 폐수 결재자 권한을 수동으로 저장합니다. 권한설정 테이블에 없는 사람은 각 프로그램에서 기본 일반사용자로 처리하는 구조입니다.</div>
+                <div class="real-admin-top-note">아직 각 프로그램과 직접 연동하지 않는 검증용 화면입니다. 근태 자동 특수권한(대표이사·소장/본부장·담당·팀장)만 확인하고, 프로그램별 운영자와 폐수 결재자 권한을 수동으로 저장합니다. 권한설정 테이블에 없는 사람은 각 프로그램에서 기본 일반사용자로 처리하는 구조입니다.</div>
                 <div class="permission-summary-grid">
                   <div class="permission-stat-card"><div class="permission-stat-label">근태 자동특수권한</div><div id="permissionAutoCount" class="permission-stat-value">0</div></div>
                   <div class="permission-stat-card"><div class="permission-stat-label">수동 권한</div><div id="permissionManualCount" class="permission-stat-value">0</div></div>
@@ -3914,7 +3914,7 @@ create table if not exists user_app_roles (
 
   const PERMISSION_APPS=[{key:'attendance',label:'근태'},{key:'wastewater',label:'폐수'},{key:'reagent',label:'시약초자'},{key:'research_staff',label:'인력'}];
   const PERMISSION_ROLES={attendance:[['operator','운영자']],wastewater:[['operator','운영자'],['approver','결재자']],reagent:[['operator','운영자']],research_staff:[['operator','운영자']]};
-  const ATTENDANCE_AUTO_ROLES=[['director','소장/본부장'],['manager','담당'],['team_leader','팀장']];
+  const ATTENDANCE_AUTO_ROLES=[['company_head','대표이사'],['director','소장/본부장'],['manager','담당'],['team_leader','팀장']];
   const SCOPE_LABELS={self:'본인',team:'팀',hq:'본부',all:'전체',custom:'직접입력'};
   const appLabel=k=>PERMISSION_APPS.find(a=>a.key===k)?.label||k||'-';
   const roleLabel=(app,role)=>((PERMISSION_ROLES[app]||[]).find(r=>r[0]===role)||ATTENDANCE_AUTO_ROLES.find(r=>r[0]===role))?.[1]||role||'-';
@@ -3926,7 +3926,8 @@ create table if not exists user_app_roles (
     return (dataState.employees||[]).filter(e=>String(e.status||'재직')!=='퇴사').map(e=>{
       const au=String(e.authority||''); const dn=divName(e.division_code); const tn=teamName(e.team_code);
       let role='', label='', scope='', vals=[], basis='';
-      if(au.includes('소장')||au.includes('본부장')){role='director';label='소장/본부장';scope='hq';vals=[dn||e.division_code||'소속 본부'];basis='직책: '+au;}
+      if(au.includes('대표이사')){role='company_head';label='대표이사';scope='all';vals=['회사 전체'];basis='직책: '+au;}
+      else if(au.includes('소장')||au.includes('본부장')){role='director';label='소장/본부장';scope='hq';vals=[dn||e.division_code||'소속 본부'];basis='직책: '+au;}
       else if(au.includes('담당')){role='manager';label='담당';scope='team';vals=String(e.managed_team_codes||'').split(',').map(x=>x.trim()).filter(Boolean).map(c=>teamName(c)||c); if(!vals.length) vals=[tn||e.team_code||'소속 팀']; basis='직책 담당 + 관리팀코드';}
       else if(au.includes('팀장')){role='team_leader';label='팀장';scope='team';vals=[tn||e.team_code||'소속 팀'];basis='직책: '+au;}
       if(!role) return null;
