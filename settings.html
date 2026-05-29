@@ -3382,6 +3382,39 @@ create table if not exists user_app_roles (
     updateEmpRoleHint();
   }
 
+
+  async function getEdgeFunctionMessage(error, data, fallback){
+    if(data && typeof data === 'object' && data.error) return String(data.error);
+
+    try{
+      const ctx = error && error.context;
+      if(ctx && typeof ctx.clone === 'function'){
+        const cloned = ctx.clone();
+        const contentType = String(cloned.headers?.get?.('content-type') || '').toLowerCase();
+        if(contentType.includes('application/json')){
+          const jsonBody = await cloned.json();
+          if(jsonBody && jsonBody.error) return String(jsonBody.error);
+          if(jsonBody && jsonBody.message) return String(jsonBody.message);
+        }else if(typeof cloned.text === 'function'){
+          const textBody = await cloned.text();
+          if(textBody){
+            try{
+              const parsed = JSON.parse(textBody);
+              if(parsed && parsed.error) return String(parsed.error);
+              if(parsed && parsed.message) return String(parsed.message);
+            }catch(_){
+              return String(textBody).slice(0, 300);
+            }
+          }
+        }
+      }
+    }catch(_){ }
+
+    const rawMessage = String(error?.message || '').trim();
+    if(rawMessage && rawMessage !== 'Edge Function returned a non-2xx status code') return rawMessage;
+    return fallback;
+  }
+
   async function saveEmployee(){
     const employeeNo = $('realEmpNo').value.trim();
     const employeeName = $('realEmpName').value.trim();
@@ -3442,7 +3475,7 @@ create table if not exists user_app_roles (
     const { data, error } = await sb.functions.invoke('create-employee-account', { body: edgePayload });
     const edgeData = data;
     const edgeOk = !error && data && data.ok === true;
-    const edgeMsg = (error && error.message) || (data && data.error) || '계정/사원 저장 Edge Function 호출에 실패했습니다.';
+    const edgeMsg = await getEdgeFunctionMessage(error, data, '계정/사원 저장 Edge Function 호출에 실패했습니다.');
     if(!edgeOk){
       setFeedback('realEmployeeFeedback', edgeMsg, false);
       return;
