@@ -21,13 +21,32 @@
   const SUPABASE_URL = 'https://mbqpsovlwvedwrtbbauj.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
 
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  function hasPortalAttendanceSession(){
+    try{
+      const session = (window.parent && window.parent !== window && typeof window.parent.getPortalSession === 'function')
+        ? window.parent.getPortalSession()
+        : ((window.parent && window.parent !== window && window.parent.portalSession) || window.portalSession || window.currentPortalSession || null);
+      return !!(session && (session.activeCompanyId || session.companyId || session.user?.email || session.email));
+    }catch(_e){
+      return !!(window.portalSession || window.currentPortalSession);
+    }
+  }
 
-  const { data } = await supabase.auth.getSession();
+  const isEmbedded = !!window.__ATTENDANCE_EMBED__ || window.self !== window.top || new URLSearchParams(window.location.search).get('embed') === '1';
 
-  if (!data.session) {
-    window.top.location.href = '/';
-    return;
+  try{
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data } = await supabase.auth.getSession();
+
+    // 포탈 iframe 진입에서는 Supabase auth 세션보다 portalSession을 우선 신뢰합니다.
+    if (!data.session && !hasPortalAttendanceSession() && !isEmbedded) {
+      window.top.location.href = '/';
+      return;
+    }
+  }catch(error){
+    if(!hasPortalAttendanceSession() && !isEmbedded){
+      window.top.location.href = '/';
+    }
   }
 
 })();
@@ -81,10 +100,211 @@ function hasOvertimeLikeBundle(text){
 
 /* ===== extracted inline script #4 (inline) ===== */
 
+/* =========================================================
+   Attendance portal session + tenant bridge
+   - 포탈 portalSession을 우선 사용
+   - activeCompanyId 기준으로 Supabase 쿼리 company_id 자동 적용
+   - appRoles.attendance.role을 근태 권한의 1차 기준으로 사용
+========================================================= */
+function getAttendancePortalSession(){
+  try{
+    if(window.parent && window.parent !== window && typeof window.parent.getPortalSession === 'function'){
+      return window.parent.getPortalSession();
+    }
+  }catch(_e){}
+  try{
+    if(window.parent && window.parent !== window && window.parent.portalSession){
+      return window.parent.portalSession;
+    }
+  }catch(_e){}
+  return window.portalSession || window.currentPortalSession || null;
+}
+function getAttendanceCompanyId(){
+  const session = getAttendancePortalSession() || {};
+  const activeCompany = session.activeCompany || session.active_company || session.selectedCompany || session.selected_company || session.company || {};
+  const fromSession =
+    session.activeCompanyId ||
+    session.active_company_id ||
+    session.selectedCompanyId ||
+    session.selected_company_id ||
+    activeCompany.id ||
+    activeCompany.company_id ||
+    session.companyId ||
+    session.company_id ||
+    session.profile?.company_id ||
+    window.currentCompanyId ||
+    '';
+  if(fromSession) return String(fromSession).trim();
+  try{
+    const params = new URLSearchParams(location.search);
+    return String(params.get('active_company_id') || params.get('activeCompanyId') || params.get('company_id') || params.get('companyId') || '').trim();
+  }catch(_e){ return ''; }
+}
+function getAttendanceCompanyName(){
+  const session = getAttendancePortalSession() || {};
+  const activeCompany = session.activeCompany || session.active_company || session.selectedCompany || session.selected_company || session.company || {};
+  return String(
+    session.activeCompanyName || session.active_company_name ||
+    activeCompany.company_name || activeCompany.name ||
+    session.companyName || session.company_name || ''
+  ).trim();
+}
+function getAttendancePortalUser(){
+  const session = getAttendancePortalSession() || {};
+  const user = session.user || {};
+  const employee = session.employee || session.profile || {};
+  const email = String(user.email || employee.email || session.email || '').trim().toLowerCase();
+  const name = String(employee.name || user.name || session.name || '').trim();
+  const employeeNo = String(employee.employee_no || employee.employeeNo || session.employee_no || session.employeeNo || '').trim();
+  return { email, name, employeeNo, user, employee, session };
+}
+function normalizeAttendancePortalRole(value){
+  const role = String(value || '').trim().toLowerCase().replace(/\s+/g,'_');
+  if(['admin','administrator','manager','관리자','시스템관리자'].includes(role)) return 'admin';
+  if(['operator','editor','write','writer','운영자','담당자'].includes(role)) return 'operator';
+  if(['viewer','read','reader','조회','조회자'].includes(role)) return 'viewer';
+  if(['user','general','normal','일반','사용자','일반사용자'].includes(role)) return 'user';
+  return role;
+}
+function getAttendancePortalAppRole(){
+  const session = getAttendancePortalSession() || {};
+  const raw =
+    session.appRoles?.attendance?.role ||
+    session.appRoles?.attendance ||
+    session.app_roles?.attendance?.role ||
+    session.app_roles?.attendance ||
+    '';
+  const role = normalizeAttendancePortalRole(raw);
+  if(role) return role;
+  if(session.mode === 'service' && session.isServiceAdmin === true && session.activeCompanyId){
+    return 'admin';
+  }
+  return '';
+}
+function hasAttendancePortalRole(){
+  return !!getAttendancePortalAppRole();
+}
+function isAttendancePortalAdmin(){
+  return getAttendancePortalAppRole() === 'admin';
+}
+function isAttendancePortalOperator(){
+  const role = getAttendancePortalAppRole();
+  return role === 'admin' || role === 'operator';
+}
+function publishAttendancePortalSession(){
+  const parent = getAttendancePortalSession() || {};
+  const companyId = getAttendanceCompanyId();
+  const merged = {
+    ...parent,
+    companyId,
+    company_id: companyId,
+    activeCompanyId: companyId,
+    active_company_id: companyId,
+    activeCompanyName: parent.activeCompanyName || parent.active_company_name || getAttendanceCompanyName(),
+    active_company_name: parent.active_company_name || parent.activeCompanyName || getAttendanceCompanyName()
+  };
+  window.portalSession = merged;
+  window.currentPortalSession = merged;
+  window.currentCompanyId = companyId || window.currentCompanyId || null;
+  return merged;
+}
+function addAttendanceCompanyIdToPayload(payload, companyId){
+  if(!companyId) return payload;
+  if(Array.isArray(payload)){
+    return payload.map(row => row && typeof row === 'object' ? { ...row, company_id: row.company_id || companyId } : row);
+  }
+  if(payload && typeof payload === 'object'){
+    return { ...payload, company_id: payload.company_id || companyId };
+  }
+  return payload;
+}
+const ATTENDANCE_TENANT_TABLES = new Set([
+  'users','employees','divisions','teams','managed_teams','user_app_roles',
+  'attendance_records','attendance_erp_raw','attendance_secom_raw','attendance_upload_batches','attendance_upload_logs','attendance_operators',
+  'activity_logs','system_settings'
+]);
+function createAttendanceScopedBuilder(initialBuilder, tableName, alreadyScoped){
+  const state = { builder: initialBuilder, scoped: !!alreadyScoped };
+  const shouldScope = () => ATTENDANCE_TENANT_TABLES.has(String(tableName || ''));
+  const ensureScope = () => {
+    const companyId = getAttendanceCompanyId();
+    if(!shouldScope() || !companyId || state.scoped) return;
+    try{
+      if(state.builder && typeof state.builder.eq === 'function'){
+        state.builder = state.builder.eq('company_id', companyId);
+        state.scoped = true;
+      }
+    }catch(error){
+      console.warn('[attendance tenant] company scope failed:', tableName, error);
+    }
+  };
+  return new Proxy({}, {
+    get(_target, prop){
+      if(prop === 'then'){
+        ensureScope();
+        return state.builder.then.bind(state.builder);
+      }
+      if(prop === 'catch'){
+        ensureScope();
+        return state.builder.catch.bind(state.builder);
+      }
+      if(prop === 'finally'){
+        ensureScope();
+        return state.builder.finally.bind(state.builder);
+      }
+      const value = state.builder[prop];
+      if(typeof value !== 'function') return value;
+      return function(...args){
+        const companyId = getAttendanceCompanyId();
+        if((prop === 'insert' || prop === 'upsert') && shouldScope()){
+          args[0] = addAttendanceCompanyIdToPayload(args[0], companyId);
+        }
+        if((prop === 'single' || prop === 'maybeSingle' || prop === 'csv' || prop === 'geojson' || prop === 'explain') && shouldScope()){
+          ensureScope();
+        }
+        const next = value.apply(state.builder, args);
+        if(next && typeof next === 'object') return createAttendanceScopedBuilder(next, tableName, state.scoped);
+        return next;
+      };
+    }
+  });
+}
+function createAttendanceTenantScopedClient(baseClient){
+  if(!baseClient || baseClient.__isAttendanceTenantScoped === true) return baseClient;
+  const scoped = new Proxy(baseClient, {
+    get(target, prop){
+      if(prop === 'from'){
+        return function(tableName){
+          const builder = target.from(tableName);
+          return createAttendanceScopedBuilder(builder, tableName, false);
+        };
+      }
+      const value = target[prop];
+      return typeof value === 'function' ? value.bind(target) : value;
+    }
+  });
+  Object.defineProperty(scoped, '__isAttendanceTenantScoped', { value:true });
+  return scoped;
+}
+window.getAttendancePortalSession = getAttendancePortalSession;
+window.getAttendanceCompanyId = getAttendanceCompanyId;
+window.getAttendancePortalAppRole = getAttendancePortalAppRole;
+window.hasAttendancePortalRole = hasAttendancePortalRole;
+window.isAttendancePortalAdmin = isAttendancePortalAdmin;
+window.isAttendancePortalOperator = isAttendancePortalOperator;
+window.publishAttendancePortalSession = publishAttendancePortalSession;
+
 const SUPABASE_URL = "https://mbqpsovlwvedwrtbbauj.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY";
-  if(!window.__attendanceSupabaseClient && window.supabase){
-    window.__attendanceSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  if(!window.__attendanceRawSupabaseClient && window.__attendanceSupabaseClient && window.__attendanceSupabaseClient.__isAttendanceTenantScoped !== true){
+    window.__attendanceRawSupabaseClient = window.__attendanceSupabaseClient;
+  }
+  if(!window.__attendanceRawSupabaseClient && window.supabase){
+    window.__attendanceRawSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }
+  if(window.__attendanceRawSupabaseClient){
+    window.__attendanceSupabaseClient = createAttendanceTenantScopedClient(window.__attendanceRawSupabaseClient);
+    publishAttendancePortalSession();
   }
   const supabaseClient = window.__attendanceSupabaseClient || null;
 
@@ -2396,6 +2616,13 @@ function readAttendanceStoredUsers(){
   const rows = [];
   const keys = ['portal_auth_user','portalUser','attendance_portal_user','currentUser','__portalCurrentUser'];
   try{
+    const portalSession = (typeof getAttendancePortalSession === 'function') ? getAttendancePortalSession() : (window.portalSession || window.currentPortalSession || null);
+    if(portalSession && typeof portalSession === 'object'){
+      rows.push(portalSession);
+      if(portalSession.user && typeof portalSession.user === 'object') rows.push(portalSession.user);
+      if(portalSession.employee && typeof portalSession.employee === 'object') rows.push(portalSession.employee);
+      if(portalSession.profile && typeof portalSession.profile === 'object') rows.push(portalSession.profile);
+    }
     if(window.__portalCurrentUser && typeof window.__portalCurrentUser === 'object') rows.push(window.__portalCurrentUser);
     if(window.currentUser && typeof window.currentUser === 'object') rows.push(window.currentUser);
   }catch(e){}
@@ -2415,7 +2642,8 @@ function readAttendanceStoredUsers(){
 }
 function getAttendanceRoleFromIdentity(obj){
   if(!obj || typeof obj !== 'object') return '';
-  return obj.role || obj.primaryRole || obj.system_role || obj.systemRole || obj.user_role || obj.userRole || obj.portal_role || obj.portalRole || obj.access_role || obj.accessRole || obj.auth_role || obj.authRole ||
+  const portalRole = obj?.appRoles?.attendance?.role || obj?.app_roles?.attendance?.role || obj?.appRoles?.attendance || obj?.app_roles?.attendance || '';
+  return portalRole || obj.role || obj.primaryRole || obj.system_role || obj.systemRole || obj.user_role || obj.userRole || obj.portal_role || obj.portalRole || obj.access_role || obj.accessRole || obj.auth_role || obj.authRole ||
     obj?.user?.role || obj?.user?.primaryRole || obj?.user?.user_role || obj?.user?.systemRole ||
     obj?.profile?.role || obj?.profile?.primaryRole || obj?.profile?.user_role || obj?.profile?.systemRole || '';
 }
@@ -2441,8 +2669,10 @@ function getAttendanceNameFromIdentity(obj){
   return String(obj.name || obj.user_name || obj.userName || obj.employee_name || obj.employeeName || obj.displayName || obj.display_name || obj?.user?.name || obj?.profile?.name || obj?.profile?.employee_name || '').trim();
 }
 function getAttendanceCurrentIdentitySummary(){
+  const portalUser = (typeof getAttendancePortalUser === 'function') ? getAttendancePortalUser() : null;
+  const portalRole = (typeof getAttendancePortalAppRole === 'function') ? getAttendancePortalAppRole() : '';
   const identities = readAttendanceStoredUsers();
-  let email = '', employeeNo = '', name = '', role = '';
+  let email = portalUser?.email || '', employeeNo = portalUser?.employeeNo || '', name = portalUser?.name || '', role = portalRole || '';
   for(const item of identities){
     if(!email) email = getAttendanceEmailFromIdentity(item);
     if(!employeeNo && typeof getAttendanceEmployeeNoFromIdentity === 'function') employeeNo = getAttendanceEmployeeNoFromIdentity(item);
@@ -2805,6 +3035,15 @@ async function resolveAttendanceAdminAccess(force){
   if(ATTENDANCE_ADMIN_ACCESS_STATE.resolved && !force) return ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin;
   ATTENDANCE_ADMIN_ACCESS_STATE.loading = true;
   try{
+    if(typeof hasAttendancePortalRole === 'function' && hasAttendancePortalRole()){
+      const isPortalAdmin = typeof isAttendancePortalAdmin === 'function' && isAttendancePortalAdmin();
+      ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin = !!isPortalAdmin;
+      ATTENDANCE_ADMIN_ACCESS_STATE.reason = isPortalAdmin ? 'portalSession appRoles.attendance.role admin' : 'portalSession non-admin';
+      ATTENDANCE_ADMIN_ACCESS_STATE.email = (typeof getAttendancePortalUser === 'function' ? getAttendancePortalUser()?.email : '') || '';
+      ATTENDANCE_ADMIN_ACCESS_STATE.resolved = true;
+      applyAttendanceAdminVisibility(ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin);
+      return ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin;
+    }
     if(getAttendanceFallbackAdminByStorage()){
       ATTENDANCE_ADMIN_ACCESS_STATE.isAdmin = true;
       ATTENDANCE_ADMIN_ACCESS_STATE.reason = 'local role admin';
@@ -2907,6 +3146,15 @@ async function resolveAttendanceManualEditAccess(force){
       ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.resolved = true;
       applyAttendanceManualEditControls();
       return true;
+    }
+
+    if(typeof hasAttendancePortalRole === 'function' && hasAttendancePortalRole()){
+      const canPortalOperate = typeof isAttendancePortalOperator === 'function' && isAttendancePortalOperator();
+      ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.isOperator = !!canPortalOperate && !(typeof isAttendancePortalAdmin === 'function' && isAttendancePortalAdmin());
+      ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.reason = canPortalOperate ? 'portalSession attendance operator/admin' : 'portalSession no edit role';
+      ATTENDANCE_MANUAL_EDIT_ACCESS_STATE.resolved = true;
+      applyAttendanceManualEditControls();
+      return canEditAttendanceManualChecks();
     }
 
     const client = window.__attendanceSupabaseClient || (window.supabase && typeof SUPABASE_URL !== 'undefined' && typeof SUPABASE_KEY !== 'undefined' ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null);
@@ -3013,8 +3261,10 @@ function buildEffectiveAccess(options){
   const emp = options.employee || findAttendanceEmployeeForCurrentUser(summary) || null;
   const authority = String(getAttendanceEmployeeAuthority(emp) || summary.role || '').trim();
   const normalizedRole = normalizeAttendanceGeneralRole(summary.role);
-  const isAdmin = options.isAdmin === true || isCurrentAttendanceAdmin() || normalizedRole === 'admin';
-  const isOperator = !isAdmin && (options.isOperator === true || (typeof isCurrentAttendanceOperator === 'function' && isCurrentAttendanceOperator()) || normalizedRole === 'operator');
+  const portalRole = (typeof getAttendancePortalAppRole === 'function') ? getAttendancePortalAppRole() : '';
+  const portalHasRole = (typeof hasAttendancePortalRole === 'function') ? hasAttendancePortalRole() : false;
+  const isAdmin = portalHasRole ? portalRole === 'admin' : (options.isAdmin === true || isCurrentAttendanceAdmin() || normalizedRole === 'admin');
+  const isOperator = portalHasRole ? (!isAdmin && portalRole === 'operator') : (!isAdmin && (options.isOperator === true || (typeof isCurrentAttendanceOperator === 'function' && isCurrentAttendanceOperator()) || normalizedRole === 'operator'));
   const isDirector = !isAdmin && !isOperator && ['소장','본부장'].includes(authority);
   const isManager = !isAdmin && !isOperator && authority === '담당';
   const isTeamLeader = !isAdmin && !isOperator && authority === '팀장';
