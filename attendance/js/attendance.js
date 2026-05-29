@@ -158,6 +158,49 @@ function getAttendancePortalUser(){
   const employeeNo = String(employee.employee_no || employee.employeeNo || session.employee_no || session.employeeNo || '').trim();
   return { email, name, employeeNo, user, employee, session };
 }
+function getAttendancePortalEmployeeForAccess(){
+  const session = getAttendancePortalSession() || {};
+  const employee = session.employee || session.profile || {};
+  if(!employee || typeof employee !== 'object') return null;
+
+  const employeeNo = String(employee.employee_no || employee.employeeNo || employee.id || session.employee_no || session.employeeNo || '').trim();
+  const email = String(employee.email || session.user?.email || session.email || '').trim().toLowerCase();
+  const name = String(employee.name || employee.employee_name || employee.employeeName || session.user?.name || session.name || '').trim();
+  const divisionCode = String(employee.divisionCode || employee.division_code || employee.department_code || employee.departmentCode || employee.department || employee.division || '').trim();
+  const divisionName = String(employee.division || employee.divisionName || employee.department || employee.department_name || employee.departmentName || divisionCode || '').trim();
+  const teamCode = String(employee.teamCode || employee.team_code || employee.team || employee.team_name || employee.teamName || '').trim();
+  const teamName = String(employee.team || employee.teamName || employee.team_name || teamCode || '').trim();
+  const authority = String(
+    employee.authority || employee.access_authority || employee.accessAuthority || employee.duty ||
+    employee.position_role || employee.positionRole || employee.job_role || employee.jobRole ||
+    employee.responsibility || employee.responsibility_role || employee.responsibilityRole ||
+    employee.attendanceAuthority || employee.attendance_authority || ''
+  ).trim();
+  const managedTeams = employee.managedTeams || employee.managed_teams || employee.managedTeamCodes || employee.managed_team_codes || employee.manageTeamCode || employee.manage_team_code || employee.managementTeamCode || employee.management_team_code || '';
+
+  if(!employeeNo && !email && !name) return null;
+
+  return {
+    ...employee,
+    id: employeeNo || employee.id || name,
+    employee_no: employeeNo,
+    employeeNo,
+    email,
+    name,
+    divisionCode,
+    division_code: divisionCode,
+    division: divisionName,
+    divisionName,
+    teamCode,
+    team_code: teamCode,
+    team: teamName,
+    teamName,
+    authority,
+    managedTeams,
+    managed_teams: managedTeams,
+    status: employee.status || '재직'
+  };
+}
 function normalizeAttendancePortalRole(value){
   const role = String(value || '').trim().toLowerCase().replace(/\s+/g,'_');
   if(['admin','administrator','manager','관리자','시스템관리자'].includes(role)) return 'admin';
@@ -2681,11 +2724,25 @@ function getAttendanceCurrentIdentitySummary(){
     if(!role) role = getAttendanceRoleFromIdentity(item);
     if(email && employeeNo && name && role) break;
   }
-  return { email, employeeNo, name, role };
+  let accessAuthority = '';
+  try{
+    const portalEmployee = (typeof getAttendancePortalEmployeeForAccess === 'function') ? getAttendancePortalEmployeeForAccess() : null;
+    accessAuthority = getAttendanceEmployeeAuthority(portalEmployee);
+    if(!employeeNo && portalEmployee) employeeNo = getAttendanceEmployeeNo(portalEmployee);
+    if(!email && portalEmployee) email = getAttendanceEmployeeEmail(portalEmployee);
+    if(!name && portalEmployee) name = getAttendanceEmployeeName(portalEmployee);
+  }catch(_e){}
+  return { email, employeeNo, name, role, accessAuthority };
 }
 function getAttendanceEmployeeAuthority(emp){
   if(!emp || typeof emp !== 'object') return '';
-  return String(emp.authority || emp.access_authority || emp.accessAuthority || emp.duty || emp.position_role || emp.positionRole || '').trim();
+  return String(
+    emp.authority || emp.access_authority || emp.accessAuthority || emp.duty ||
+    emp.position_role || emp.positionRole || emp.job_role || emp.jobRole ||
+    emp.responsibility || emp.responsibility_role || emp.responsibilityRole ||
+    emp.attendanceAuthority || emp.attendance_authority || emp.attendance_scope_role ||
+    ''
+  ).trim();
 }
 function isAttendanceAutoAuthorityEmployee(emp){
   const authority = normalizeAttendanceGeneralRole(getAttendanceEmployeeAuthority(emp));
@@ -2724,13 +2781,31 @@ function findAttendanceEmployeeForCurrentUser(summary){
   const no = String(summary?.employeeNo || '').trim();
   const name = String(summary?.name || '').trim();
   const normName = (typeof normalizeEmployeeName === 'function') ? normalizeEmployeeName(name) : name;
-  return employees.find(emp => {
+  const matched = employees.find(emp => {
     const empEmail = String(emp?.email || emp?.mail || emp?.user_email || '').trim().toLowerCase();
     const empNo = String(emp?.employee_no || emp?.employeeNo || emp?.id || '').trim();
     const empName = String(emp?.name || emp?.employee_name || '').trim();
     const empNormName = (typeof normalizeEmployeeName === 'function') ? normalizeEmployeeName(empName) : empName;
     return (email && empEmail && email === empEmail) || (no && empNo && no === empNo) || (normName && empNormName && normName === empNormName);
   }) || null;
+  if(matched) return matched;
+
+  // 포탈 표준 세션에 사원정보가 내려온 경우, 근태 사원마스터 로딩 전에도
+  // 소장/본부장·담당·팀장·일반사용자 조회범위 계산이 가능하도록 fallback으로 사용합니다.
+  try{
+    const portalEmployee = (typeof getAttendancePortalEmployeeForAccess === 'function') ? getAttendancePortalEmployeeForAccess() : null;
+    if(portalEmployee){
+      const pEmail = String(portalEmployee.email || '').trim().toLowerCase();
+      const pNo = String(portalEmployee.employee_no || portalEmployee.employeeNo || portalEmployee.id || '').trim();
+      const pName = String(portalEmployee.name || '').trim();
+      const pNormName = (typeof normalizeEmployeeName === 'function') ? normalizeEmployeeName(pName) : pName;
+      if((email && pEmail && email === pEmail) || (no && pNo && no === pNo) || (normName && pNormName && normName === pNormName) || (!email && !no && !normName)){
+        return portalEmployee;
+      }
+    }
+  }catch(_e){}
+
+  return null;
 }
 function isCurrentAttendanceGeneralUser(){
   const access = (window.currentAccess || (typeof ATTENDANCE_EFFECTIVE_ACCESS_STATE !== 'undefined' ? ATTENDANCE_EFFECTIVE_ACCESS_STATE.access : null) || {});
@@ -3259,7 +3334,7 @@ function buildEffectiveAccess(options){
   options = options || {};
   const summary = options.summary || getAttendanceCurrentIdentitySummary();
   const emp = options.employee || findAttendanceEmployeeForCurrentUser(summary) || null;
-  const authority = String(getAttendanceEmployeeAuthority(emp) || summary.role || '').trim();
+  const authority = String(getAttendanceEmployeeAuthority(emp) || summary.accessAuthority || '').trim();
   const normalizedRole = normalizeAttendanceGeneralRole(summary.role);
   const portalRole = (typeof getAttendancePortalAppRole === 'function') ? getAttendancePortalAppRole() : '';
   const portalHasRole = (typeof hasAttendancePortalRole === 'function') ? hasAttendancePortalRole() : false;
