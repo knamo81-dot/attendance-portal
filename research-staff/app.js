@@ -651,6 +651,10 @@ function buildOrgAccess() {
   const division = getEmployeeDivisionScopeValue(employee);
   const team = getRowTeamValue(employee);
 
+  if (isCompanyLevelUser(employee)) {
+    return { scope: "all", division: "", team: "", reason: "대표이사/사장" };
+  }
+
   if (isDivisionLevelUser(employee) || isVirtualTeamRow(employee)) {
     return { scope: "division", division, team: "", reason: "소장/본부장" };
   }
@@ -662,19 +666,30 @@ function getOrgAccess() {
   return AppState.orgAccess || { scope: "all", division: "", team: "", reason: "" };
 }
 
-function isDivisionLevelUser(row) {
-  if (!row) return false;
-  const text = [
+function getEmployeeAuthorityText(row) {
+  if (!row) return "";
+
+  return [
+    row.authority,
     row.duty,
     row.role,
     row.job_role,
     row.job_title,
     row.position,
+    row.grade,
     row.title,
     row.rank,
     row.employee_role
   ].map(value => String(value || "").trim()).join(" ");
+}
 
+function isCompanyLevelUser(row) {
+  const text = getEmployeeAuthorityText(row);
+  return /대표이사|사장/.test(text);
+}
+
+function isDivisionLevelUser(row) {
+  const text = getEmployeeAuthorityText(row);
   return /소장|본부장|부문장|센터장/.test(text);
 }
 
