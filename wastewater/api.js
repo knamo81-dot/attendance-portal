@@ -67,6 +67,91 @@ function getWastewaterCompanyId(){
   }
 }
 
+
+function normalizeWastewaterRoleKey(value){
+  const normalized=String(value || '').trim().toLowerCase();
+  if(normalized==='관리자') return 'admin';
+  if(normalized==='운영자' || normalized==='담당자') return 'operator';
+  if(normalized==='검토자' || normalized==='결재자' || normalized==='승인자' || normalized==='approver' || normalized==='reviewer') return 'reviewer';
+  if(normalized==='조회' || normalized==='조회자') return 'viewer';
+  if(normalized==='일반') return 'user';
+  if(['admin','operator','viewer','user','blocked','reviewer'].includes(normalized)) return normalized;
+  return normalized;
+}
+
+function getWastewaterPortalAppRole(){
+  const session=getWastewaterPortalSession() || {};
+  const roleSource =
+    session.appRoles?.wastewater ||
+    session.app_roles?.wastewater ||
+    session.wastewaterRole ||
+    session.wastewater_role ||
+    null;
+
+  let rawRole='';
+  let rawApprovalRole='';
+  let explicit=false;
+
+  if(roleSource && typeof roleSource === 'object'){
+    rawRole = roleSource.role || roleSource.role_key || roleSource.roleKey || '';
+    rawApprovalRole =
+      roleSource.approvalRole ||
+      roleSource.approval_role ||
+      roleSource.approverRole ||
+      roleSource.approver_role ||
+      roleSource.reviewerRole ||
+      roleSource.reviewer_role ||
+      '';
+    explicit = true;
+  }else if(roleSource){
+    rawRole = roleSource;
+    explicit = true;
+  }
+
+  if(session.wastewaterRole || session.wastewater_role){
+    rawRole = rawRole || session.wastewaterRole || session.wastewater_role;
+    explicit = true;
+  }
+
+  return {
+    role: normalizeWastewaterRoleKey(rawRole),
+    approvalRole: normalizeWastewaterRoleKey(rawApprovalRole),
+    explicit
+  };
+}
+
+function getWastewaterRolesFromPortalSession(){
+  const session=getWastewaterPortalSession() || {};
+  const appRole=getWastewaterPortalAppRole();
+  const roles=[];
+
+  const pushRole=(role)=>{
+    if(role && !roles.includes(role)) roles.push(role);
+  };
+
+  // 포탈 표준 세션에 폐수 앱 권한이 명시되어 있으면 그 값을 최우선으로 사용합니다.
+  // users.role/admin 또는 같은 이메일의 다른 mode 권한이 폐수 권한으로 섞이지 않도록 하기 위함입니다.
+  if(appRole.explicit){
+    if(appRole.role === 'admin') pushRole('wastewater_admin');
+    else if(appRole.role === 'operator') pushRole('wastewater_operator');
+
+    if(appRole.approvalRole === 'reviewer' || appRole.approvalRole === 'approver') {
+      pushRole('wastewater_approver');
+    }
+
+    return { roles, explicit:true, role:appRole.role, approvalRole:appRole.approvalRole };
+  }
+
+  // service mode의 대리 관리자 세션은 선택 회사 업무 앱에서 관리자 권한으로 동작합니다.
+  if(session.mode === 'service' && session.isServiceAdmin === true && session.isImpersonating === true){
+    pushRole('wastewater_admin');
+    return { roles, explicit:true, role:'admin', approvalRole:null };
+  }
+
+  return { roles, explicit:false, role:'', approvalRole:'' };
+}
+
+
 function publishWastewaterTenantSession(){
   const parent=getWastewaterPortalSession() || {};
   const companyId=getWastewaterCompanyId();
@@ -213,6 +298,11 @@ function scopedCompanyQuery(query){
 
 
 async function getMyRoles(email){
+  const portalRoleResult = getWastewaterRolesFromPortalSession();
+  if(portalRoleResult.explicit){
+    return portalRoleResult.roles || [];
+  }
+
   const roles = [];
   const targetEmail = String(email || '').trim();
   const targetEmailLower = targetEmail.toLowerCase();
@@ -616,6 +706,8 @@ async function logApprovalAction(actorEmail,monthKey,action,reason=''){
 window.WastewaterApi={
   getCompanyId:getWastewaterCompanyId,
   getPortalSession:getWastewaterPortalSession,
+  getPortalAppRole:getWastewaterPortalAppRole,
+  getPortalRoles:getWastewaterRolesFromPortalSession,
   SUPABASE_URL,SUPABASE_KEY,
   DAILY_TABLE,DAILY_VIEW,PICKUP_TABLE,USERS_TABLE,EMPLOYEES_TABLE,WASTEWATER_ROLE_VIEW,WASTEWATER_OPERATORS_TABLE,WASTEWATER_APPROVERS_TABLE,USER_APP_ROLES_TABLE,LOG_TABLE,APPROVAL_TABLE,APPROVAL_LOG_TABLE,REFERENCE_TABLE,RELATED_DOC_BUCKET,CM_LIMIT,TON_TO_CM,MAX_TON_M3,
   getMyRoles,loadCoreData,loadAdminData,loadReferenceData,loadAllData,saveReferenceDoc,deleteReferenceDocById,saveRelatedDocument,deleteRelatedDocumentById,uploadRelatedDocFile,getRelatedDocPublicUrl,deleteRelatedDocFile,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,getUserSignature,searchEmployees,loadWastewaterManagers,addWastewaterOperator,removeWastewaterOperator,addWastewaterApprover,removeWastewaterApprover,logActivity,logApprovalAction
