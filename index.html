@@ -2976,7 +2976,17 @@ input[type="radio"]{
   function buildPortalUserObject(sessionCompanyId = '') {
     const email = currentUser?.email || currentProfile?.email || currentEmployee?.email || '';
     const name = currentEmployee?.name || currentProfile?.name || currentUser?.user_metadata?.name || email || '';
-    const role = currentProfile?.role || currentEmployee?.role || 'user';
+    const role = normalizePortalRole(
+      currentProfile?.workspace_role ||
+      currentProfile?.portal_role ||
+      currentProfile?.company_role ||
+      currentProfile?.tenant_role ||
+      currentProfile?.user_role ||
+      currentProfile?.role ||
+      currentEmployee?.role ||
+      'user',
+      'user'
+    );
     return {
       id: currentUser?.id || currentProfile?.id || '',
       email,
@@ -3087,6 +3097,9 @@ input[type="radio"]{
       currentProfile?.company_role ||
       currentProfile?.tenant_role ||
       currentProfile?.user_role ||
+      // 회사 주소에서는 users.role(admin/user/operator 등)을 회사 권한으로 사용합니다.
+      // employees.role이 없으면 normalizePortalEmployee가 user로 내려가므로 users.role을 반드시 포함해야 합니다.
+      currentProfile?.role ||
       employee?.role ||
       ''
     ).trim();
@@ -3479,14 +3492,25 @@ input[type="radio"]{
   window.portalOpenCompanySwitcher = openServiceCompanyModal;
   window.portalSetActiveCompany = setActiveServiceCompany;
 
-  async function fetchProfile(email) {
-    const { data, error } = await supabaseClient
+  async function fetchProfile(email, companyId = '') {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanCompanyId = String(companyId || '').trim();
+    if (!cleanEmail) return null;
+
+    let query = supabaseClient
       .from('users')
       .select('*')
-      .eq('email', email)
-      .maybeSingle();
+      .ilike('email', cleanEmail);
+
+    // 회사별 접속주소(xll/scd 등)에서는 반드시 해당 회사의 users 행만 사용합니다.
+    // 같은 이메일이 여러 회사에 존재할 수 있으므로 email 단독 조회는 권한 오인식의 원인이 됩니다.
+    if (cleanCompanyId) {
+      query = query.eq('company_id', cleanCompanyId);
+    }
+
+    const { data, error } = await query.limit(1).maybeSingle();
     if (error) throw error;
-    return data;
+    return data || null;
   }
 
   async function fetchCompany(companyId) {
@@ -3567,7 +3591,7 @@ input[type="radio"]{
       return false;
     }
 
-    const profile = await fetchProfile(user.email);
+    const profile = await fetchProfile(user.email, urlCompany?.id || '');
     if (!profile) {
       await supabaseClient.auth.signOut();
       clearPortalSession();
