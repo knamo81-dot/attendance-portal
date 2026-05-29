@@ -3330,6 +3330,93 @@ function getAttendanceEmployeeManagedTeamCodes(emp){
   const normalized = attendanceUniqueArray(list.map(v => String(v || '').trim()).filter(Boolean));
   return normalized.length ? normalized : (fallback ? [fallback] : []);
 }
+
+
+/* portal/server employee resolver for attendance special scope
+   - 설정 화면의 근태 자동 특수권한은 employees 기준으로 계산됩니다.
+   - 근태 본화면에서도 같은 employee_no/email 기준으로 employees를 다시 확인해
+     duty/authority/managed_teams가 누락된 portalSession 또는 오래된 localStorage 값을 보정합니다. */
+function normalizeAttendanceServerEmployeeForAccess(row){
+  if(!row || typeof row !== 'object') return null;
+  const employeeNo = String(row.employee_no || row.employeeNo || row.emp_no || row.empNo || row.id || '').trim();
+  const email = String(row.email || row.user_email || row.userEmail || row.mail || '').trim().toLowerCase();
+  const name = String(row.name || row.employee_name || row.employeeName || row.user_name || '').trim();
+  const divisionCode = String(row.division_code || row.divisionCode || row.department_code || row.departmentCode || row.department || row.division || '').trim();
+  const divisionName = String(row.division || row.division_name || row.divisionName || row.department || row.department_name || row.departmentName || divisionCode || '').trim();
+  const teamCode = String(row.team_code || row.teamCode || row.team || row.team_name || row.teamName || '').trim();
+  const teamName = String(row.team || row.team_name || row.teamName || teamCode || '').trim();
+  const authority = String(
+    row.authority || row.duty || row.job_title || row.jobTitle || row.responsibility ||
+    row.position_role || row.positionRole || row.job_role || row.jobRole ||
+    row.attendance_authority || row.attendanceAuthority || row.attendance_scope_role || ''
+  ).trim();
+  const managedTeams = row.managed_teams || row.managedTeams || row.managed_team_codes || row.managedTeamCodes || row.manage_team_code || row.manageTeamCode || row.management_team_code || row.managementTeamCode || '';
+
+  if(!employeeNo && !email && !name) return null;
+  return {
+    ...row,
+    id: employeeNo || row.id || name,
+    employee_no: employeeNo,
+    employeeNo,
+    email,
+    name,
+    divisionCode,
+    division_code: divisionCode,
+    division: divisionName,
+    divisionName,
+    teamCode,
+    team_code: teamCode,
+    team: teamName,
+    teamName,
+    authority,
+    duty: authority || row.duty || '',
+    managedTeams,
+    managed_teams: managedTeams,
+    status: row.status || row.employment_status || '재직'
+  };
+}
+async function findAttendanceServerEmployeeForAccess(client, summary){
+  if(!client || typeof client.from !== 'function') return null;
+  const employeeNo = String(summary?.employeeNo || '').trim();
+  const email = String(summary?.email || '').trim().toLowerCase();
+  const name = String(summary?.name || '').trim();
+  const tryQueries = [];
+  if(employeeNo) tryQueries.push({ column:'employee_no', value:employeeNo });
+  if(email) tryQueries.push({ column:'email', value:email });
+  if(name) tryQueries.push({ column:'name', value:name });
+
+  for(const q of tryQueries){
+    try{
+      const res = await client.from('employees').select('*').eq(q.column, q.value).maybeSingle();
+      if(!res?.error && res?.data){
+        const emp = normalizeAttendanceServerEmployeeForAccess(res.data);
+        if(emp) return emp;
+      }
+    }catch(_e){}
+  }
+  return null;
+}
+function mergeAttendanceEmployeeAccessRecord(localEmp, serverEmp){
+  if(!localEmp && !serverEmp) return null;
+  if(!serverEmp) return localEmp;
+  if(!localEmp) return serverEmp;
+  const serverAuthority = getAttendanceEmployeeAuthority(serverEmp);
+  const localAuthority = getAttendanceEmployeeAuthority(localEmp);
+  return {
+    ...localEmp,
+    ...serverEmp,
+    authority: serverAuthority || localAuthority || '',
+    duty: serverAuthority || serverEmp.duty || localEmp.duty || '',
+    managedTeams: serverEmp.managedTeams || serverEmp.managed_teams || localEmp.managedTeams || localEmp.managed_teams || '',
+    managed_teams: serverEmp.managed_teams || serverEmp.managedTeams || localEmp.managed_teams || localEmp.managedTeams || '',
+    divisionCode: serverEmp.divisionCode || localEmp.divisionCode || localEmp.division_code || '',
+    division_code: serverEmp.division_code || serverEmp.divisionCode || localEmp.division_code || localEmp.divisionCode || '',
+    division: serverEmp.division || localEmp.division || '',
+    teamCode: serverEmp.teamCode || localEmp.teamCode || localEmp.team_code || '',
+    team_code: serverEmp.team_code || serverEmp.teamCode || localEmp.team_code || localEmp.teamCode || '',
+    team: serverEmp.team || localEmp.team || ''
+  };
+}
 function buildEffectiveAccess(options){
   options = options || {};
   const summary = options.summary || getAttendanceCurrentIdentitySummary();
@@ -3450,10 +3537,24 @@ async function resolveAttendanceEffectiveAccess(force){
         }
       }catch(e){}
     }
-    const emp = findAttendanceEmployeeForCurrentUser(summary);
+    const localEmp = findAttendanceEmployeeForCurrentUser(summary);
+    let serverEmp = null;
+    try{
+      serverEmp = await findAttendanceServerEmployeeForAccess(client, {
+        ...summary,
+        employeeNo: summary.employeeNo || getAttendanceEmployeeNo(localEmp),
+        email: summary.email || getAttendanceEmployeeEmail(localEmp),
+        name: summary.name || getAttendanceEmployeeName(localEmp)
+      });
+    }catch(e){
+      console.warn('[ATTENDANCE EFFECTIVE ACCESS] employees 특수권한 조회 실패:', e);
+    }
+    const emp = mergeAttendanceEmployeeAccessRecord(localEmp, serverEmp);
     if(emp){
       summary.name = summary.name || getAttendanceEmployeeName(emp);
       summary.employeeNo = summary.employeeNo || getAttendanceEmployeeNo(emp);
+      summary.email = summary.email || getAttendanceEmployeeEmail(emp);
+      summary.accessAuthority = summary.accessAuthority || getAttendanceEmployeeAuthority(emp) || '';
       summary.role = summary.role || getAttendanceEmployeeAuthority(emp) || String(emp.role || '').trim();
     }
     const access = buildEffectiveAccess({ summary, employee: emp, isAdmin:isCurrentAttendanceAdmin(), isOperator:isCurrentAttendanceOperator() });
