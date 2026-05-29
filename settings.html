@@ -2705,7 +2705,8 @@ create table if not exists user_app_roles (
     selectedTeamChangeNos: new Set(),
     editingIssueId: null,
     editingDivisionCode: null,
-    editingTeamCode: null
+    editingTeamCode: null,
+    employeeFormMode: 'create'
   };
 
   const $ = (id)=>document.getElementById(id);
@@ -3338,6 +3339,9 @@ create table if not exists user_app_roles (
     setFeedback('realEmployeeFeedback','');
     populateEmployeeModalSelectOptions();
     const row = dataState.employees.find(e=>e.employee_no===employeeNo);
+    dataState.employeeFormMode = row ? 'update' : 'create';
+    const empNoInput = $('realEmpNo');
+    if(empNoInput) empNoInput.disabled = !!row;
     if(!row){
       setEmployeeModalSummary(null);
       $('realEmpNo').value=''; $('realEmpName').value=''; $('realEmpSort').value='1'; $('realEmpEmail').value='';
@@ -3424,65 +3428,34 @@ create table if not exists user_app_roles (
       role: document.getElementById('realEmpRole')?.value || 'viewer',
     };
 
-    const isExistingEmployee = dataState.employees.some(e => String(e.employee_no) === String(employeeNo));
-    const isNewEmployee = !isExistingEmployee;
+    const formMode = dataState.employeeFormMode === 'update' ? 'update' : 'create';
 
     const fbPre = $('realEmployeeFeedback');
     if(fbPre){ fbPre.classList.remove('ok'); }
     setFeedback('realEmployeeFeedback','사원정보와 로그인 계정을 저장하는 중입니다...', 'loading');
 
-    let edgeData = null;
-    let edgeOk = false;
-    if(isNewEmployee){
-      const edgePayload = {
-        ...payload,
-        company_id: (typeof getCompanyId === 'function' ? getCompanyId() : '') || undefined
-      };
-      const { data, error } = await sb.functions.invoke('create-employee-account', { body: edgePayload });
-      edgeData = data;
-      edgeOk = !error && data && data.ok === true;
-      const edgeMsg = (error && error.message) || (data && data.error) || '계정/사원 저장 Edge Function 호출에 실패했습니다.';
-      if(!edgeOk){
-        setFeedback('realEmployeeFeedback', edgeMsg, false);
-        return;
-      }
-    }else{
-      const empUpdate = {
-        name: payload.name,
-        sort_order: payload.sort_order,
-        division_code: payload.division_code,
-        team_code: payload.team_code,
-        grade: payload.grade,
-        authority: payload.authority,
-        email: payload.email,
-        attendance_target: payload.attendance_target,
-        status: payload.status,
-        join_date: payload.join_date,
-        leave_date: payload.leave_date,
-        leave_reason: payload.leave_reason,
-        memo: payload.memo,
-        is_active: payload.is_active
-      };
-      const empRes = await sb.from('employees').update(empUpdate).eq('employee_no', payload.employee_no);
-      if(empRes.error){
-        setFeedback('realEmployeeFeedback', empRes.error.message, false);
-        return;
-      }
-      edgeOk = true;
-    }
-
-    const userSync = await ensurePortalUserRow(payload);
-    if(!userSync.ok){
-      const syncMsg = userSync.error?.message || 'users 동기화에 실패했습니다.';
-      setFeedback('realEmployeeFeedback', syncMsg, false);
+    const edgePayload = {
+      ...payload,
+      mode: formMode,
+      company_id: (typeof getCompanyId === 'function' ? getCompanyId() : '') || undefined
+    };
+    const { data, error } = await sb.functions.invoke('create-employee-account', { body: edgePayload });
+    const edgeData = data;
+    const edgeOk = !error && data && data.ok === true;
+    const edgeMsg = (error && error.message) || (data && data.error) || '계정/사원 저장 Edge Function 호출에 실패했습니다.';
+    if(!edgeOk){
+      setFeedback('realEmployeeFeedback', edgeMsg, false);
       return;
     }
 
     const managedCodes = ($('realEmpManagedTeams').value || '').split(',').map(v=>v.trim()).filter(Boolean);
-    const managedDelete = await sb.from('managed_teams').delete().eq('manager_employee_no', employeeNo);
+    const companyIdForManaged = (typeof getCompanyId === 'function' ? String(getCompanyId() || '').trim() : '');
+    let managedDeleteQuery = sb.from('managed_teams').delete().eq('manager_employee_no', employeeNo);
+    if(companyIdForManaged) managedDeleteQuery = managedDeleteQuery.eq('company_id', companyIdForManaged);
+    const managedDelete = await managedDeleteQuery;
     if(managedDelete.error){ setFeedback('realEmployeeFeedback', managedDelete.error.message); return; }
     if(managedCodes.length){
-      const rows = managedCodes.map(code => ({ manager_employee_no: employeeNo, team_code: code }));
+      const rows = managedCodes.map(code => ({ manager_employee_no: employeeNo, team_code: code, ...(companyIdForManaged ? { company_id: companyIdForManaged } : {}) }));
       const managedInsert = await sb.from('managed_teams').insert(rows);
       if(managedInsert.error){ setFeedback('realEmployeeFeedback', managedInsert.error.message); return; }
     }
@@ -3490,17 +3463,22 @@ create table if not exists user_app_roles (
     syncLocalEmployeeRow(payload);
     await Promise.allSettled([loadEmployees(), loadUsers()]);
     const emailKey = String(payload.email || '').trim().toLowerCase();
-    const uRow = (dataState.users || []).find(x => String(x.email || '').trim().toLowerCase() === emailKey);
+    const currentCompanyId = (typeof getCompanyId === 'function' ? String(getCompanyId() || '').trim() : '');
+    const uRow = (dataState.users || []).find(x => {
+      const sameEmail = String(x.email || '').trim().toLowerCase() === emailKey;
+      const sameCompany = !currentCompanyId || !x.company_id || String(x.company_id) === currentCompanyId;
+      return sameEmail && sameCompany;
+    });
     const wantRole = String(payload.role || 'viewer');
     const gotRole = uRow ? String(uRow.role || 'viewer') : '';
     if(!uRow || gotRole !== wantRole){
       setFeedback('realEmployeeFeedback', `저장 후 public.users.role 확인: 기대 ${wantRole}, 실제 ${uRow ? gotRole : 'users 행 없음'}`, false);
       return;
     }
-    if(isNewEmployee){
-      setFeedback('realEmployeeFeedback', (edgeData && edgeData.message) || '사원정보와 로그인 계정을 저장했습니다.', true);
+    if(formMode === 'create'){
+      setFeedback('realEmployeeFeedback', (edgeData && edgeData.message) || '사원정보와 로그인 계정을 신규 등록했습니다.', true);
     }else{
-      setFeedback('realEmployeeFeedback', '사원정보와 사용자 권한(public.users)을 저장했습니다.', true);
+      setFeedback('realEmployeeFeedback', (edgeData && edgeData.message) || '사원정보와 사용자 권한을 수정했습니다.', true);
     }
     if(window.__empSaveCloseTimer) clearTimeout(window.__empSaveCloseTimer);
     window.__empSaveCloseTimer = setTimeout(()=>{
@@ -3516,16 +3494,27 @@ create table if not exists user_app_roles (
 포털 기준정보와 users 프로필에서 제거되며, 기존 Auth 계정은 남을 수 있습니다.`)) return;
 
     setFeedback('realEmployeeFeedback', '사원정보를 삭제하는 중입니다...', 'loading');
-    const managedRes = await sb.from('managed_teams').delete().eq('manager_employee_no', employeeNo);
+    const deleteCompanyId = (typeof getCompanyId === 'function' ? String(getCompanyId() || '').trim() : '');
+    let managedDeleteForEmployee = sb.from('managed_teams').delete().eq('manager_employee_no', employeeNo);
+    if(deleteCompanyId) managedDeleteForEmployee = managedDeleteForEmployee.eq('company_id', deleteCompanyId);
+    const managedRes = await managedDeleteForEmployee;
     if(managedRes.error){ setFeedback('realEmployeeFeedback', managedRes.error.message); return; }
 
     if(row.email){
-      const userDelete = await sb.from('users').delete().eq('email', row.email);
+      let userDeleteQuery = sb.from('users').delete().eq('email', row.email);
+      if(deleteCompanyId) userDeleteQuery = userDeleteQuery.eq('company_id', deleteCompanyId);
+      const userDelete = await userDeleteQuery;
       if(userDelete.error){ setFeedback('realEmployeeFeedback', userDelete.error.message); return; }
-      dataState.users = dataState.users.filter(u => String(u.email||'').toLowerCase() !== String(row.email||'').toLowerCase());
+      dataState.users = dataState.users.filter(u => {
+        const sameEmail = String(u.email||'').toLowerCase() === String(row.email||'').toLowerCase();
+        const sameCompany = !deleteCompanyId || !u.company_id || String(u.company_id) === deleteCompanyId;
+        return !(sameEmail && sameCompany);
+      });
     }
 
-    const empDelete = await sb.from('employees').delete().eq('employee_no', employeeNo);
+    let empDeleteQuery = sb.from('employees').delete().eq('employee_no', employeeNo);
+    if(deleteCompanyId) empDeleteQuery = empDeleteQuery.eq('company_id', deleteCompanyId);
+    const empDelete = await empDeleteQuery;
     if(empDelete.error){ setFeedback('realEmployeeFeedback', empDelete.error.message); return; }
 
     dataState.employees = dataState.employees.filter(e => String(e.employee_no) !== String(employeeNo));
@@ -3570,16 +3559,12 @@ create table if not exists user_app_roles (
       };
       const edgePayload = {
         ...payload,
+        mode: 'update',
         company_id: (typeof getCompanyId === 'function' ? getCompanyId() : '') || undefined
       };
       const { data, error } = await sb.functions.invoke('create-employee-account', { body: edgePayload });
       if(error || !data?.ok){
         failed.push(`${emp.name || emp.employee_no}: ${(error && error.message) || data?.error || '등록 실패'}`);
-        continue;
-      }
-      const userSync = await ensurePortalUserRow(payload);
-      if(!userSync.ok){
-        failed.push(`${emp.name || emp.employee_no}: ${(userSync.error && userSync.error.message) || 'users 동기화 실패'}`);
         continue;
       }
       success += 1;
@@ -3598,7 +3583,10 @@ create table if not exists user_app_roles (
     if(!row) return;
     const nextStatus = row.status==='퇴사' ? '재직' : '퇴사';
     const payload = { status: nextStatus, is_active: nextStatus!=='퇴사', leave_date: nextStatus==='퇴사' ? new Date().toISOString().slice(0,10) : null, leave_reason: nextStatus==='퇴사' ? '퇴사 처리' : null };
-    const {error}=await sb.from('employees').update(payload).eq('employee_no', employeeNo);
+    const toggleCompanyId = (typeof getCompanyId === 'function' ? String(getCompanyId() || '').trim() : '');
+    let toggleQuery = sb.from('employees').update(payload).eq('employee_no', employeeNo);
+    if(toggleCompanyId) toggleQuery = toggleQuery.eq('company_id', toggleCompanyId);
+    const {error}=await toggleQuery;
     if(error){ setFeedback('realEmployeeFeedback', error.message); return; }
     await loadEmployees();
   }
