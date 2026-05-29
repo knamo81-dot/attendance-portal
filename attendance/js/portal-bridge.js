@@ -19,6 +19,41 @@
 
   const ADMIN_TAB = { id: 'admin', label: '관리자 기능' };
 
+  function getPortalSession(){
+    try{
+      if(window.parent && window.parent !== window && typeof window.parent.getPortalSession === 'function'){
+        return window.parent.getPortalSession();
+      }
+    }catch(_e){}
+    try{
+      if(window.parent && window.parent !== window && window.parent.portalSession) return window.parent.portalSession;
+    }catch(_e){}
+    return window.portalSession || window.currentPortalSession || null;
+  }
+
+  function normalizePortalAttendanceRole(value){
+    const role = String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
+    if(['admin','administrator','manager','관리자','시스템관리자'].includes(role)) return 'admin';
+    if(['operator','editor','write','writer','운영자','담당자'].includes(role)) return 'operator';
+    if(['viewer','read','reader','조회','조회자'].includes(role)) return 'viewer';
+    if(['user','general','normal','일반','사용자','일반사용자'].includes(role)) return 'user';
+    return role;
+  }
+
+  function getPortalAttendanceRole(){
+    const session = getPortalSession() || {};
+    const raw = session.appRoles?.attendance?.role || session.appRoles?.attendance || session.app_roles?.attendance?.role || session.app_roles?.attendance || '';
+    const role = normalizePortalAttendanceRole(raw);
+    if(role) return role;
+    if(session.mode === 'service' && session.isServiceAdmin === true && session.activeCompanyId) return 'admin';
+    return '';
+  }
+
+  function hasPortalAttendanceRole(){
+    return !!getPortalAttendanceRole();
+  }
+
+
   function isAdminOperatorRoleText(value) {
     const text = compact(value).toLowerCase();
     return text.includes('관리자') || text.includes('운영자') || text.includes('admin') || text.includes('operator');
@@ -48,6 +83,9 @@
 
   function hasAdminOperatorRoleInState() {
     try {
+      if(hasPortalAttendanceRole()){
+        return ['admin','operator'].includes(getPortalAttendanceRole());
+      }
       const sources = [
         window.currentAccess,
         window.ATTENDANCE_EFFECTIVE_ACCESS,
@@ -111,6 +149,9 @@
   }
 
   function canShowAdminTab() {
+    if(hasPortalAttendanceRole()){
+      return getPortalAttendanceRole() === 'admin';
+    }
     return isInternalAdminTabAllowed() || hasAdminOperatorRoleInState() || hasAdminOperatorRoleInDom();
   }
 
