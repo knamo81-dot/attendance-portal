@@ -2703,7 +2703,7 @@ function normalizeAttendanceGeneralRole(value){
   if(!s) return '';
   if(['admin','administrator','관리자','시스템관리자'].includes(s)) return 'admin';
   if(['operator','운영자'].includes(s)) return 'operator';
-  if(['director','소장','본부장','담당','팀장','manager','leader','supervisor','책임자'].includes(s)) return 'privileged';
+  if(['director','소장','본부장','담당','팀장','대표이사','사장','manager','leader','supervisor','책임자','companyhead','company_head'].includes(s)) return 'privileged';
   if(['user','general','normal','일반','일반사용자','일반유저','사용자','팀원','일반권한'].includes(s)) return 'general';
   return s;
 }
@@ -2810,9 +2810,9 @@ function findAttendanceEmployeeForCurrentUser(summary){
 function isCurrentAttendanceGeneralUser(){
   const access = (window.currentAccess || (typeof ATTENDANCE_EFFECTIVE_ACCESS_STATE !== 'undefined' ? ATTENDANCE_EFFECTIVE_ACCESS_STATE.access : null) || {});
   const effectivePrivileged = !!(
-    access.isAdmin || access.isOperator || access.isDirector || access.isManager || access.isTeamLeader || access.isLeader ||
-    access.canViewAll || access.canViewDivision || access.canViewManagedTeams || access.canViewTeam ||
-    ['admin','operator','director','manager','teamLeader','teamleader','leader'].includes(String(access.role || access.primaryRole || '').trim())
+    access.isAdmin || access.isOperator || access.isCompanyHead || access.isDirector || access.isManager || access.isTeamLeader || access.isLeader ||
+    access.canViewAll || access.canViewCompany || access.canViewDivision || access.canViewManagedTeams || access.canViewTeam ||
+    ['admin','operator','companyHead','company_head','director','manager','teamLeader','teamleader','leader'].includes(String(access.role || access.primaryRole || '').trim())
   );
   if(effectivePrivileged) return false;
   return ATTENDANCE_GENERAL_USER_ACCESS_STATE.isGeneral === true;
@@ -2896,7 +2896,7 @@ function attendanceTokenIntersects(left, right){
 }
 function isAttendanceAllAccess(access){
   const a = access || (typeof getAttendanceEffectiveAccess === 'function' ? getAttendanceEffectiveAccess() : window.currentAccess) || {};
-  return !!(a.isAdmin || a.isOperator || a.canViewAll || ['admin','operator'].includes(String(a.role || a.primaryRole || '').trim()));
+  return !!(a.isAdmin || a.isOperator || a.isCompanyHead || a.canViewAll || a.canViewCompany || ['admin','operator','companyHead','company_head'].includes(String(a.role || a.primaryRole || '').trim()));
 }
 function rowMatchesEffectiveAccessScope(row){
   const access = (typeof getAttendanceEffectiveAccess === 'function') ? getAttendanceEffectiveAccess() : (window.currentAccess || {});
@@ -3037,11 +3037,11 @@ async function resolveAttendanceGeneralUserAccess(force){
     const effectiveRoleForGeneralCheck = String(effectiveAccessForGeneralCheck.role || effectiveAccessForGeneralCheck.primaryRole || '').trim();
     const effectivePrivileged = !!(
       effectiveAccessForGeneralCheck.isAdmin || effectiveAccessForGeneralCheck.isOperator ||
-      effectiveAccessForGeneralCheck.isDirector || effectiveAccessForGeneralCheck.isManager ||
+      effectiveAccessForGeneralCheck.isCompanyHead || effectiveAccessForGeneralCheck.isDirector || effectiveAccessForGeneralCheck.isManager ||
       effectiveAccessForGeneralCheck.isTeamLeader || effectiveAccessForGeneralCheck.isLeader ||
-      effectiveAccessForGeneralCheck.canViewAll || effectiveAccessForGeneralCheck.canViewDivision ||
+      effectiveAccessForGeneralCheck.canViewAll || effectiveAccessForGeneralCheck.canViewCompany || effectiveAccessForGeneralCheck.canViewDivision ||
       effectiveAccessForGeneralCheck.canViewManagedTeams || effectiveAccessForGeneralCheck.canViewTeam ||
-      ['admin','operator','director','manager','teamLeader','teamleader','leader'].includes(effectiveRoleForGeneralCheck)
+      ['admin','operator','companyHead','company_head','director','manager','teamLeader','teamleader','leader'].includes(effectiveRoleForGeneralCheck)
     );
     const privileged = effectivePrivileged || normalizedRole === 'admin' || normalizedRole === 'operator' || normalizedRole === 'privileged' || normalizedAuthority === 'admin' || normalizedAuthority === 'operator' || normalizedAuthority === 'privileged';
     // 일반사용자 기준 고정:
@@ -3427,11 +3427,12 @@ function buildEffectiveAccess(options){
   const portalHasRole = (typeof hasAttendancePortalRole === 'function') ? hasAttendancePortalRole() : false;
   const isAdmin = portalHasRole ? portalRole === 'admin' : (options.isAdmin === true || isCurrentAttendanceAdmin() || normalizedRole === 'admin');
   const isOperator = portalHasRole ? (!isAdmin && portalRole === 'operator') : (!isAdmin && (options.isOperator === true || (typeof isCurrentAttendanceOperator === 'function' && isCurrentAttendanceOperator()) || normalizedRole === 'operator'));
-  const isDirector = !isAdmin && !isOperator && ['소장','본부장'].includes(authority);
-  const isManager = !isAdmin && !isOperator && authority === '담당';
-  const isTeamLeader = !isAdmin && !isOperator && authority === '팀장';
+  const isCompanyHead = !isAdmin && !isOperator && ['대표이사','사장'].includes(authority);
+  const isDirector = !isAdmin && !isOperator && !isCompanyHead && ['소장','본부장'].includes(authority);
+  const isManager = !isAdmin && !isOperator && !isCompanyHead && authority === '담당';
+  const isTeamLeader = !isAdmin && !isOperator && !isCompanyHead && authority === '팀장';
   const hasIdentity = !!(summary.email || summary.employeeNo || summary.name || emp);
-  const isGeneral = hasIdentity && !isAdmin && !isOperator && !isDirector && !isManager && !isTeamLeader;
+  const isGeneral = hasIdentity && !isAdmin && !isOperator && !isCompanyHead && !isDirector && !isManager && !isTeamLeader;
   const employeeNo = String(summary.employeeNo || getAttendanceEmployeeNo(emp) || '').trim();
   const email = String(summary.email || getAttendanceEmployeeEmail(emp) || '').trim().toLowerCase();
   const name = String(summary.name || getAttendanceEmployeeName(emp) || '').trim();
@@ -3449,6 +3450,9 @@ function buildEffectiveAccess(options){
   }else if(isOperator){
     scopeLevel = 'all';
     scopeLabel = '운영자 전체 조회';
+  }else if(isCompanyHead){
+    scopeLevel = 'all';
+    scopeLabel = '대표이사 전체 조회';
   }else if(isDirector){
     scopeLevel = 'division';
     divisionCodes = attendanceUniqueArray([divisionCode]);
@@ -3470,8 +3474,8 @@ function buildEffectiveAccess(options){
     employeeNos = attendanceUniqueArray([employeeNo]);
     scopeLabel = '본인 데이터';
   }
-  const primaryRole = isAdmin ? 'admin' : isOperator ? 'operator' : isDirector ? 'director' : isManager ? 'manager' : isTeamLeader ? 'teamLeader' : isGeneral ? 'general' : 'unknown';
-  const primaryRoleLabel = isAdmin ? '관리자' : isOperator ? '운영자' : isDirector ? '소장/본부장' : isManager ? '담당' : isTeamLeader ? '팀장' : isGeneral ? '일반사용자' : '미확인';
+  const primaryRole = isAdmin ? 'admin' : isOperator ? 'operator' : isCompanyHead ? 'companyHead' : isDirector ? 'director' : isManager ? 'manager' : isTeamLeader ? 'teamLeader' : isGeneral ? 'general' : 'unknown';
+  const primaryRoleLabel = isAdmin ? '관리자' : isOperator ? '운영자' : isCompanyHead ? '대표이사' : isDirector ? '소장/본부장' : isManager ? '담당' : isTeamLeader ? '팀장' : isGeneral ? '일반사용자' : '미확인';
   return {
     resolvedAt: new Date().toISOString(),
     primaryRole,
@@ -3481,6 +3485,7 @@ function buildEffectiveAccess(options){
     authority,
     isAdmin,
     isOperator,
+    isCompanyHead,
     isDirector,
     isManager,
     isTeamLeader,
@@ -3488,7 +3493,8 @@ function buildEffectiveAccess(options){
     isGeneral,
     canAccessAdmin: isAdmin,
     canEditManualChecks: isAdmin || isOperator,
-    canViewAll: isAdmin || isOperator,
+    canViewAll: isAdmin || isOperator || isCompanyHead,
+    canViewCompany: isCompanyHead,
     canViewDivision: isDirector,
     canViewManagedTeams: isManager,
     canViewTeam: isTeamLeader,
@@ -13034,17 +13040,20 @@ document.addEventListener('DOMContentLoaded',bindReport);setTimeout(bindReport,5
     var rows = getCurrentAdminRows();
     employees.filter(function(emp){ return normalizeAccessStatus(emp) === '재직'; }).forEach(function(emp){
       var authority = normalizeAccessAuthority(emp);
+      var isCompanyHead = ['대표이사','사장'].includes(authority);
       var isDirector = ['소장','본부장'].includes(authority);
       var isManager = authority === '담당';
       var isLeader = authority === '팀장';
-      if(!isDirector && !isManager && !isLeader) return;
-      var type = isDirector ? '소장/본부장' : (isManager ? '담당' : '팀장');
-      var badge = isDirector ? 'director' : (isManager ? 'manager' : 'leader');
-      var basis = isDirector
-        ? '본부코드: ' + accessEsc(emp.divisionCode || emp.division_code || '-') + ' · 하위 팀 전체'
-        : (isManager
-          ? '관리팀코드: ' + accessEsc(getAccessManagedTeams(emp) || '-')
-          : '팀코드: ' + accessEsc(emp.teamCode || emp.team_code || '-'));
+      if(!isCompanyHead && !isDirector && !isManager && !isLeader) return;
+      var type = isCompanyHead ? '대표이사' : (isDirector ? '소장/본부장' : (isManager ? '담당' : '팀장'));
+      var badge = isCompanyHead ? 'companyHead' : (isDirector ? 'director' : (isManager ? 'manager' : 'leader'));
+      var basis = isCompanyHead
+        ? '회사 전체 조회'
+        : (isDirector
+          ? '본부코드: ' + accessEsc(emp.divisionCode || emp.division_code || '-') + ' · 하위 팀 전체'
+          : (isManager
+            ? '관리팀코드: ' + accessEsc(getAccessManagedTeams(emp) || '-')
+            : '팀코드: ' + accessEsc(emp.teamCode || emp.team_code || '-')));
       rows.push({
         type:type,
         badge:badge,
