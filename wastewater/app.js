@@ -144,6 +144,18 @@ async function getMyRoles(email){
 }
 async function loadMyRoles(){
   currentRoles = await getMyRoles(user.email);
+
+  // 포탈 표준 세션에서 내려온 폐수 앱 권한을 최우선으로 반영합니다.
+  // 특히 service_admin이 선택 회사에 대리접속한 경우 DB 재조회 결과와 무관하게 관리자 권한으로 동작해야 합니다.
+  try{
+    const portalRoles = api.getPortalRoles ? api.getPortalRoles() : null;
+    if(portalRoles?.explicit){
+      currentRoles = portalRoles.roles || [];
+    }
+  }catch(e){
+    console.warn('portal wastewater role sync skipped:', e);
+  }
+
   syncCurrentRole();
 }
 
