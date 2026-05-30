@@ -197,6 +197,11 @@
     }
 
 
+    body.portal-restoring #portalFrame {
+      visibility: hidden;
+    }
+
+
     body.auth-loading .layout {
       filter: blur(1px);
       pointer-events: none;
@@ -1786,7 +1791,7 @@ input[type="radio"]{
   @media (max-width: 700px) { .personal-settings-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
-<body>
+<body class="portal-restoring">
   <div class="app">
     <div class="layout">
       <div id="portalSideNav" class="sidenav">
@@ -2010,6 +2015,8 @@ input[type="radio"]{
   const homeBtn = document.getElementById('homeNavBtn');
   if (frame) {
     frame.addEventListener('load', function () {
+      const currentFrameSrc = normalizePortalSrc(frame?.getAttribute('src') || '');
+      if (!currentFrameSrc || currentFrameSrc === 'about:blank') return;
       setTimeout(syncCurrentPortalTabToFrame, 80);
       setTimeout(syncCurrentPortalTabToFrame, 350);
     });
@@ -2666,13 +2673,14 @@ input[type="radio"]{
   }
 
   function getCurrentFrameBaseSrc() {
-    const raw = frame?.getAttribute('src') || HOME_SRC;
+    const raw = frame?.getAttribute('src') || '';
     const withoutQuery = normalizePortalSrc(raw);
+    if (!withoutQuery || withoutQuery === 'about:blank') return '';
     try {
       const url = new URL(withoutQuery, window.location.href);
-      return url.pathname.replace(/^\//, '') || HOME_SRC;
+      return url.pathname.replace(/^\//, '') || '';
     } catch (_) {
-      return withoutQuery.replace(/^\//, '') || HOME_SRC;
+      return withoutQuery.replace(/^\//, '') || '';
     }
   }
 
@@ -3872,6 +3880,7 @@ input[type="radio"]{
 
   function clearPortalFrame() {
     if (!frame) return;
+    document.body.classList.add('portal-restoring');
     frame.onload = null;
     frame.src = 'about:blank';
     updatePortalSubtabs('');
@@ -3879,9 +3888,11 @@ input[type="radio"]{
 
   function replacePortalFrame(src) {
     if (!frame || !src) return;
+    document.body.classList.add('portal-restoring');
     updatePortalHeader(src);
     updatePortalSubtabs(src);
     frame.onload = function () {
+      document.body.classList.remove('portal-restoring');
       postAuthToFrame();
       broadcastPortalLanguage(getPreferredLanguage());
 
@@ -4089,7 +4100,7 @@ input[type="radio"]{
     clearPortalSession();
     clearLoginInputs();
     clearPortalFrame();
-    if (homeBtn) setActiveNav(homeBtn);
+    setActiveNav(null);
     showLogin('로그아웃되었습니다.');
     setTimeout(() => clearLoginInputs(), 80);
     setTimeout(() => clearLoginInputs(), 350);
@@ -4394,8 +4405,7 @@ input[type="radio"]{
   async function boot() {
     installUserAppRolesCompanyGuard();
     bindEvents();
-    // 초기에는 홈 화면/헤더를 먼저 그리지 않습니다.
-    // 로그인/세션 확인 후 역할별 기본 화면 또는 sessionStorage의 마지막 화면을 로드합니다.
+    updatePortalHeader(HOME_SRC);
 
     const { data } = await supabaseClient.auth.getSession();
     const sessionUser = data?.session?.user || null;
@@ -4406,7 +4416,7 @@ input[type="radio"]{
       currentCompany = urlCompany || null;
       publishPortalSession();
       clearPortalFrame();
-      if (homeBtn) setActiveNav(homeBtn);
+      setActiveNav(null);
       if (urlCompany?.is_active === false) {
         showLogin('비활성화된 회사 접속주소입니다. 관리자에게 문의해 주세요.');
       } else {
