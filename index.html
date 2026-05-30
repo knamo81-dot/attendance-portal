@@ -2601,16 +2601,30 @@ body.auth-loading .top-user-bar {
     applyPortalLoginAssets();
   }
 
+  function cssUrl(value) {
+    return 'url("' + String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '%22') + '")';
+  }
+
   function applyPortalLoginAssets() {
     const bg = normalizeDataUrl(portalLoginBackgroundDataUrl);
     const logo = normalizeDataUrl(portalLoginLogoDataUrl);
 
     if (els.overlay) {
       if (bg) {
-        els.overlay.style.setProperty('--portal-login-bg-image', 'url("' + bg.replace(/"/g, '%22') + '")');
+        const bgUrl = cssUrl(bg);
+        els.overlay.style.setProperty('--portal-login-bg-image', bgUrl);
+        els.overlay.style.backgroundImage =
+          'linear-gradient(90deg, rgba(15,23,42,.30) 0%, rgba(15,23,42,.12) 48%, rgba(15,23,42,.52) 100%), ' + bgUrl;
+        els.overlay.style.backgroundPosition = 'center center';
+        els.overlay.style.backgroundSize = 'cover';
+        els.overlay.style.backgroundRepeat = 'no-repeat';
         els.overlay.classList.add('auth-has-background');
       } else {
         els.overlay.style.removeProperty('--portal-login-bg-image');
+        els.overlay.style.removeProperty('background-image');
+        els.overlay.style.removeProperty('background-position');
+        els.overlay.style.removeProperty('background-size');
+        els.overlay.style.removeProperty('background-repeat');
         els.overlay.classList.remove('auth-has-background');
       }
     }
@@ -2627,7 +2641,7 @@ body.auth-loading .top-user-bar {
   }
 
   async function loadPortalBrandSettings() {
-    const companyId = activeCompany?.id || currentProfile?.company_id || currentCompany?.id || window.currentCompanyId || '';
+    const companyId = activeCompany?.id || currentProfile?.company_id || currentCompany?.id || requestedCompany?.id || window.currentCompanyId || '';
     if (!companyId) {
       applyPortalBrandColor('#c8102e');
       portalLoginBackgroundDataUrl = '';
