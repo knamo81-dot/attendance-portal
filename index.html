@@ -4980,6 +4980,11 @@ body.auth-loading .top-user-bar {
       publishPortalSession();
       clearPortalFrame();
       setActiveNav(null);
+
+      // 로그인 화면을 표시하기 전에 회사별 브랜드 설정을 먼저 불러옵니다.
+      // 처음 접속/새로고침 시 기본 그라데이션이 잠깐 보였다가 배경 이미지로 바뀌는 현상을 방지합니다.
+      await loadPortalBrandSettings();
+
       if (urlCompany?.is_active === false) {
         showLogin('현재 접속한 회사 포털은 사용이 중지된 상태입니다. 관리자에게 문의해 주세요.');
       } else if (requestedSubdomain && !urlCompany) {
