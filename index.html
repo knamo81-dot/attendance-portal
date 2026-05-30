@@ -3744,7 +3744,7 @@ input[type="radio"]{
       await supabaseClient.auth.signOut();
       clearPortalSession();
       currentCompany = null;
-      showLogin('비활성화된 회사 접속주소입니다. 관리자에게 문의해 주세요.');
+      showLogin('현재 접속한 회사 포털은 사용이 중지된 상태입니다. 관리자에게 문의해 주세요.');
       return false;
     }
 
@@ -3752,14 +3752,14 @@ input[type="radio"]{
     if (!profile) {
       await supabaseClient.auth.signOut();
       clearPortalSession();
-      showLogin('users 테이블에 등록되지 않은 이메일입니다. 관리자에게 계정 등록을 요청해 주세요.');
+      showLogin('입력하신 이메일로 등록된 계정을 찾을 수 없습니다. 현재 접속한 회사 포털이 맞는지 확인해 주세요. 계정 등록이 필요하다면 관리자에게 요청해 주세요.');
       return false;
     }
 
     if (profile.is_active === false) {
       await supabaseClient.auth.signOut();
       clearPortalSession();
-      showLogin('비활성화된 계정입니다. 관리자에게 문의해 주세요.');
+      showLogin('현재 계정은 사용이 중지된 상태입니다. 관리자에게 문의해 주세요.');
       return false;
     }
 
@@ -3779,14 +3779,14 @@ input[type="radio"]{
     if (!requestedSubdomain && profileRole !== 'service_admin') {
       await supabaseClient.auth.signOut();
       clearPortalSession();
-      showLogin('서비스 관리자 전용 주소입니다. 회사 사용자는 회사별 접속주소를 사용해 주세요.');
+      showLogin('서비스 관리자 전용 주소입니다. 회사 사용자는 회사별 접속 주소를 이용해 주세요.');
       return false;
     }
 
     if (!profile.company_id) {
       await supabaseClient.auth.signOut();
       clearPortalSession();
-      showLogin('회사 정보가 연결되지 않은 계정입니다. users.company_id를 확인해 주세요.');
+      showLogin('계정에 회사 정보가 연결되어 있지 않습니다. 관리자에게 계정 설정 확인을 요청해 주세요.');
       return false;
     }
 
@@ -3794,14 +3794,14 @@ input[type="radio"]{
     if (!company) {
       await supabaseClient.auth.signOut();
       clearPortalSession();
-      showLogin('회사 정보를 찾지 못했습니다. companies 테이블과 users.company_id 연결을 확인해 주세요.');
+      showLogin('계정에 연결된 회사 정보를 찾을 수 없습니다. 관리자에게 회사 연결 정보를 확인해 달라고 요청해 주세요.');
       return false;
     }
 
     if (company.is_active === false) {
       await supabaseClient.auth.signOut();
       clearPortalSession();
-      showLogin('비활성화된 회사입니다. 관리자에게 문의해 주세요.');
+      showLogin('소속 회사 포털은 현재 사용이 중지된 상태입니다. 관리자에게 문의해 주세요.');
       return false;
     }
 
@@ -3810,7 +3810,7 @@ input[type="radio"]{
       clearPortalSession();
       currentCompany = urlCompany || null;
       publishPortalSession();
-      showLogin(`${urlCompany?.company_name || '현재 회사'} 전용 접속주소입니다. 해당 회사 계정으로 로그인해 주세요.`);
+      showLogin(`현재 회사 포털에서는 사용할 수 없는 계정입니다. ${urlCompany?.company_name || '소속 회사'} 전용 접속 주소가 맞는지 확인해 주세요.`);
       return false;
     }
 
@@ -4580,9 +4580,9 @@ input[type="radio"]{
       clearPortalFrame();
       setActiveNav(null);
       if (urlCompany?.is_active === false) {
-        showLogin('비활성화된 회사 접속주소입니다. 관리자에게 문의해 주세요.');
+        showLogin('현재 접속한 회사 포털은 사용이 중지된 상태입니다. 관리자에게 문의해 주세요.');
       } else if (requestedSubdomain && !urlCompany) {
-        showLogin('등록되지 않은 회사 접속주소입니다. 관리자에게 문의해 주세요.');
+        showLogin('등록되지 않은 회사 접속 주소입니다. 접속 주소를 다시 확인하거나 관리자에게 문의해 주세요.');
       } else {
         showLogin('');
       }
@@ -4604,7 +4604,7 @@ input[type="radio"]{
       console.error('boot failed:', error);
       await supabaseClient.auth.signOut();
       clearPortalSession();
-      showLogin('사용자 권한 정보를 확인하지 못했습니다. users와 companies 정보를 확인해 주세요.');
+      showLogin('로그인 정보를 확인하는 중 문제가 발생했습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.');
     }
   }
 
