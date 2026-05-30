@@ -1868,9 +1868,9 @@ input[type="radio"]{
 <body class="portal-restoring">
   <div id="portalBootOverlay" class="portal-boot-overlay" aria-live="polite" aria-label="포탈 불러오는 중">
     <div class="portal-boot-card">
-      <div class="portal-boot-logo">EL</div>
-      <div class="portal-boot-title">ExeloLab Ops</div>
-      <div class="portal-boot-desc">포탈 화면을 불러오는 중입니다.</div>
+      <div id="portalBootLogo" class="portal-boot-logo">EL</div>
+      <div id="portalBootTitle" class="portal-boot-title">ExeloLab Ops</div>
+      <div id="portalBootDesc" class="portal-boot-desc">포탈 화면을 불러오는 중입니다.</div>
       <div class="portal-boot-spinner" aria-hidden="true"></div>
     </div>
   </div>
@@ -2013,8 +2013,8 @@ input[type="radio"]{
 
   <div id="authOverlay" class="auth-overlay" hidden>
     <div id="loginCard" class="auth-card">
-      <h1>포탈 로그인</h1>
-      <p>연구소 통합 운영 포탈에 접속하려면 계정으로 로그인해 주세요.</p>
+      <h1 id="loginPortalTitle">포탈 로그인</h1>
+      <p id="loginPortalDesc">연구소 통합 운영 포탈에 접속하려면 계정으로 로그인해 주세요.</p>
       <div class="auth-field">
         <label for="loginEmail">이메일</label>
         <input id="loginEmail" type="email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="email@example.com" />
@@ -2106,6 +2106,11 @@ input[type="radio"]{
 
   const els = {
     bootOverlay: document.getElementById('portalBootOverlay'),
+    bootLogo: document.getElementById('portalBootLogo'),
+    bootTitle: document.getElementById('portalBootTitle'),
+    bootDesc: document.getElementById('portalBootDesc'),
+    loginPortalTitle: document.getElementById('loginPortalTitle'),
+    loginPortalDesc: document.getElementById('loginPortalDesc'),
     overlay: document.getElementById('authOverlay'),
     loginCard: document.getElementById('loginCard'),
     passwordCard: document.getElementById('passwordCard'),
@@ -2735,6 +2740,51 @@ input[type="radio"]{
     if (!target) return;
     target.textContent = message || '';
     target.classList.toggle('show', !!message);
+  }
+
+
+  function getPortalLoginBrand() {
+    if (!requestedSubdomain) {
+      return {
+        title: '서비스 관리자 포털',
+        desc: 'ExeloLab 서비스 운영 계정으로 로그인해 주세요.',
+        bootTitle: 'Service Admin',
+        bootDesc: '서비스 관리자 포털을 불러오는 중입니다.',
+        logo: 'EL'
+      };
+    }
+
+    if (requestedCompany) {
+      const companyName = requestedCompany.company_name || '회사';
+      return {
+        title: companyName + ' Portal',
+        desc: companyName + ' 전용 통합 운영 포털입니다. 해당 회사 계정으로 로그인해 주세요.',
+        bootTitle: companyName + ' Portal',
+        bootDesc: companyName + ' 포털 화면을 불러오는 중입니다.',
+        logo: String(companyName || 'P').trim().slice(0, 2).toUpperCase()
+      };
+    }
+
+    return {
+      title: '회사 포털',
+      desc: requestedSubdomain + '.ops.exelolab.com 접속주소를 확인하는 중입니다.',
+      bootTitle: 'Company Portal',
+      bootDesc: '회사 정보를 확인하는 중입니다.',
+      logo: 'EL'
+    };
+  }
+
+  function applyPortalLoginBrand(message = '') {
+    const brand = getPortalLoginBrand();
+
+    if (els.loginPortalTitle) els.loginPortalTitle.textContent = brand.title;
+    if (els.loginPortalDesc) els.loginPortalDesc.textContent = brand.desc;
+
+    if (els.bootLogo) els.bootLogo.textContent = brand.logo || 'EL';
+    if (els.bootTitle) els.bootTitle.textContent = brand.bootTitle || brand.title;
+    if (els.bootDesc) els.bootDesc.textContent = brand.bootDesc || '포탈 화면을 불러오는 중입니다.';
+
+    if (message) setBoxMessage(els.loginError, message);
   }
 
 
@@ -3426,6 +3476,7 @@ input[type="radio"]{
   }
 
   function showLogin(message = '') {
+    applyPortalLoginBrand(message);
     hidePortalBootOverlay();
     document.body.classList.add('auth-loading');
     clearLoginInputs();
@@ -3647,14 +3698,17 @@ input[type="radio"]{
 
     if (!requestedSubdomain) {
       requestedCompany = null;
+      applyPortalLoginBrand();
       return null;
     }
 
     try {
       requestedCompany = await fetchCompanyBySubdomain(requestedSubdomain);
+      applyPortalLoginBrand();
     } catch (error) {
       console.warn('[PortalTenant] requested company lookup failed:', error);
       requestedCompany = null;
+      applyPortalLoginBrand();
     }
 
     return requestedCompany;
@@ -3710,6 +3764,15 @@ input[type="radio"]{
     }
 
     const profileRole = String(profile.role || '').trim();
+
+    if (requestedSubdomain && profileRole === 'service_admin') {
+      await supabaseClient.auth.signOut();
+      clearPortalSession();
+      currentCompany = urlCompany || null;
+      publishPortalSession();
+      showLogin('서비스관리자 계정은 ops.exelolab.com 서비스 관리자 포털에서 로그인해 주세요.');
+      return false;
+    }
 
     // 회사 서브도메인이 없는 루트 주소(ops.exelolab.com)는 서비스 관리자 전용입니다.
     // el.ops.exelolab.com / scd.ops.exelolab.com 같은 회사별 주소는 아래 회사 subdomain 검증을 그대로 사용합니다.
@@ -4518,6 +4581,8 @@ input[type="radio"]{
       setActiveNav(null);
       if (urlCompany?.is_active === false) {
         showLogin('비활성화된 회사 접속주소입니다. 관리자에게 문의해 주세요.');
+      } else if (requestedSubdomain && !urlCompany) {
+        showLogin('등록되지 않은 회사 접속주소입니다. 관리자에게 문의해 주세요.');
       } else {
         showLogin('');
       }
