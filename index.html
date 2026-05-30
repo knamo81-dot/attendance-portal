@@ -1979,6 +1979,7 @@ input[type="radio"]{
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
 
   const HOME_SRC = 'portal-main/portal-main.html';
+  const BLANK_SRC = 'about:blank';
   const SERVICE_MODE_NOTICE_SRC = 'portal-main/service-mode-notice.html';
   const LAST_PAGE_KEY = 'portalLastPage';
 
@@ -3870,6 +3871,13 @@ input[type="radio"]{
     frame.contentWindow.postMessage(message, '*');
   }
 
+  function clearPortalFrame() {
+    if (!frame) return;
+    frame.onload = null;
+    frame.src = BLANK_SRC;
+    updatePortalSubtabs(BLANK_SRC);
+  }
+
   function replacePortalFrame(src) {
     if (!frame || !src) return;
     updatePortalHeader(src);
@@ -4081,7 +4089,7 @@ input[type="radio"]{
     try { localStorage.removeItem('reagent_current_user'); } catch (_) {}
     clearPortalSession();
     clearLoginInputs();
-    replacePortalFrame(HOME_SRC);
+    clearPortalFrame();
     if (homeBtn) setActiveNav(homeBtn);
     showLogin('로그아웃되었습니다.');
     setTimeout(() => clearLoginInputs(), 80);
@@ -4397,7 +4405,7 @@ input[type="radio"]{
       clearPortalSession();
       currentCompany = urlCompany || null;
       publishPortalSession();
-      replacePortalFrame(HOME_SRC);
+      clearPortalFrame();
       if (homeBtn) setActiveNav(homeBtn);
       if (urlCompany?.is_active === false) {
         showLogin('비활성화된 회사 접속주소입니다. 관리자에게 문의해 주세요.');
