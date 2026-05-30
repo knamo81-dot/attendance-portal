@@ -1318,9 +1318,13 @@ html.embed-mode #settings-page .real-form-card{
 <style id="portal-settings-brand-ui">
 #settings-page .portal-setting-layout{
   display:grid;
-  grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);
+  grid-template-columns:minmax(0,1.05fr) minmax(420px,.95fr);
   gap:10px;
   margin-top:10px;
+}
+#settings-page .portal-brand-card,
+#settings-page .portal-login-preview-card{
+  min-width:0;
 }
 #settings-page .portal-preview-header{
   min-height:92px;
@@ -1425,6 +1429,134 @@ html.embed-mode #settings-page .real-form-card{
   font-weight:900;
   font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
 }
+#settings-page .portal-upload-section{
+  margin-top:14px;
+  padding-top:12px;
+  border-top:1px solid #e2e8f0;
+}
+#settings-page .portal-upload-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:8px;
+}
+#settings-page .portal-file-input{
+  width:100%;
+  min-height:34px;
+  padding:6px 8px;
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  background:#fff;
+  color:#334155;
+  font-size:12px;
+}
+#settings-page .portal-upload-help{
+  margin-top:5px;
+  color:#64748b;
+  font-size:11px;
+  line-height:1.45;
+}
+#settings-page .portal-login-preview-shell{
+  position:relative;
+  min-height:330px;
+  border:1px solid #e2e8f0;
+  border-radius:18px;
+  overflow:hidden;
+  background:linear-gradient(135deg,#111827 0%,#334155 50%,#64748b 100%);
+  box-shadow:0 8px 24px rgba(15,23,42,.08);
+}
+#settings-page .portal-login-preview-bg{
+  position:absolute;
+  inset:0;
+  background:linear-gradient(135deg,#111827 0%,#334155 50%,#64748b 100%);
+  background-size:cover;
+  background-position:center;
+}
+#settings-page .portal-login-preview-bg::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(90deg, rgba(15,23,42,.34), rgba(15,23,42,.08) 45%, rgba(15,23,42,.42));
+}
+#settings-page .portal-login-preview-card-box{
+  position:absolute;
+  top:50%;
+  right:24px;
+  transform:translateY(-50%);
+  width:min(310px, calc(100% - 48px));
+  min-height:255px;
+  padding:22px;
+  border-radius:20px;
+  background:rgba(255,255,255,.96);
+  box-shadow:0 24px 70px rgba(15,23,42,.28);
+  color:#0f172a;
+}
+#settings-page .portal-login-preview-logo{
+  width:46px;
+  height:46px;
+  border-radius:14px;
+  margin-bottom:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(135deg,#c8102e,#e11d2e);
+  color:#fff;
+  font-size:15px;
+  font-weight:900;
+  overflow:hidden;
+}
+#settings-page .portal-login-preview-logo img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  background:#fff;
+}
+#settings-page .portal-login-preview-title{
+  font-size:22px;
+  font-weight:900;
+  letter-spacing:-.05em;
+  margin-bottom:6px;
+}
+#settings-page .portal-login-preview-desc{
+  font-size:11px;
+  line-height:1.5;
+  color:#64748b;
+  margin-bottom:16px;
+}
+#settings-page .portal-login-preview-input{
+  height:34px;
+  border:1px solid #cbd5e1;
+  border-radius:11px;
+  display:flex;
+  align-items:center;
+  padding:0 11px;
+  color:#94a3b8;
+  font-size:11px;
+  margin-bottom:9px;
+  background:#fff;
+}
+#settings-page .portal-login-preview-button{
+  height:38px;
+  border-radius:12px;
+  background:linear-gradient(135deg,#c8102e 0%,#e11d2e 100%);
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:12px;
+  font-weight:900;
+  margin-top:11px;
+}
+#settings-page .portal-login-preview-caption{
+  margin-top:10px;
+  padding:10px 12px;
+  border:1px solid #e2e8f0;
+  border-radius:14px;
+  background:#f8fafc;
+  font-size:11px;
+  line-height:1.55;
+  color:#64748b;
+}
 #settings-page .portal-apply-list{
   display:grid;
   gap:8px;
@@ -1451,6 +1583,19 @@ html.embed-mode #settings-page .real-form-card{
 @media (max-width:1250px){
   #settings-page .portal-setting-layout{
     grid-template-columns:1fr;
+  }
+}
+@media (max-width:760px){
+  #settings-page .portal-upload-grid{
+    grid-template-columns:1fr;
+  }
+  #settings-page .portal-login-preview-card-box{
+    position:relative;
+    top:auto;
+    right:auto;
+    transform:none;
+    width:calc(100% - 28px);
+    margin:36px 14px;
   }
 }
 </style>
@@ -1921,16 +2066,16 @@ create table if not exists user_app_roles (
 
               <div id="adminSectionPortal" class="admin-section-panel" hidden>
                 <div class="real-admin-top-note">
-                  포탈 공통 화면의 브랜드 색상을 설정하는 영역입니다. 선택한 색상은 system_settings 테이블에 저장하고,
-                  포탈 index.html에서 company_id 기준으로 불러와 실제 헤더와 홈 버튼에 적용할 수 있습니다.
+                  포탈 공통 화면의 브랜드 설정 영역입니다. 브랜드 색상은 system_settings 테이블에 저장하고,
+                  로그인 배경 이미지와 로그인 로고는 로그인 페이지 미리보기에서 함께 확인할 수 있습니다.
                 </div>
 
                 <div class="portal-setting-layout">
                   <div class="real-card portal-brand-card">
                     <div class="real-box-head">
                       <div>
-                        <div class="real-box-title">브랜드 컬러 설정</div>
-                        <div class="real-box-sub">홈 헤더, 홈 버튼, 공통 강조색에 사용할 대표 색상을 선택합니다.</div>
+                        <div class="real-box-title">브랜드 설정</div>
+                        <div class="real-box-sub">브랜드 컬러, 로그인 배경 이미지, 로그인 로고를 한 화면에서 설정합니다.</div>
                       </div>
                       <div id="portalColorPreviewChip" class="portal-color-preview-chip">#c8102e</div>
                     </div>
@@ -1990,21 +2135,54 @@ create table if not exists user_app_roles (
                       </div>
                     </div>
 
+                    <div class="portal-upload-section">
+                      <div class="real-box-title">로그인 화면 이미지</div>
+                      <div class="real-box-sub">배경과 로고는 둘 다 없어도 됩니다. 선택한 항목만 기본값과 조합해 로그인 페이지 미리보기로 확인합니다.</div>
+                      <div class="portal-upload-grid">
+                        <div class="real-field">
+                          <label>로그인 배경 이미지</label>
+                          <input id="portalLoginBackgroundInput" class="portal-file-input" type="file" accept="image/*">
+                          <div class="portal-upload-help">권장: 1920×1080, 1.5MB 이하</div>
+                        </div>
+                        <div class="real-field">
+                          <label>로그인 로고</label>
+                          <input id="portalLoginLogoInput" class="portal-file-input" type="file" accept="image/*">
+                          <div class="portal-upload-help">권장: PNG, 정사각형 또는 가로형</div>
+                        </div>
+                      </div>
+                    </div>
+
                     <div class="real-actions left">
                       <button id="portalApplyPreviewBtn" type="button" class="real-btn">미리보기 적용</button>
                       <button id="portalResetColorBtn" type="button" class="real-btn ghost">기본값</button>
+                      <button id="portalClearBackgroundBtn" type="button" class="real-btn ghost">배경 제거</button>
+                      <button id="portalClearLogoBtn" type="button" class="real-btn ghost">로고 제거</button>
                       <button id="portalSaveColorBtn" type="button" class="real-btn soft">저장</button>
                     </div>
                     <div id="portalSettingFeedback" class="real-feedback loading">현재 company_id의 저장값을 확인하는 중입니다.</div>
                   </div>
 
-                  <div class="real-card portal-help-card">
-                    <div class="real-box-title">적용 예정 위치</div>
-                    <div class="portal-apply-list">
-                      <div><strong>포탈 홈 헤더</strong><span>회사 대표 색상으로 홈 화면을 브랜딩합니다.</span></div>
-                      <div><strong>홈 버튼</strong><span>사이드바 홈 아이콘 테두리와 강조색에 반영합니다.</span></div>
-                      <div><strong>상단 앱 프레임</strong><span>PWA/manifest theme_color와 연동하면 창 상단 색상까지 맞출 수 있습니다.</span></div>
-                      <div><strong>회사별 설정</strong><span>company_id 기준으로 저장하면 회사마다 다른 색상을 사용할 수 있습니다.</span></div>
+                  <div class="real-card portal-login-preview-card">
+                    <div class="real-box-head">
+                      <div>
+                        <div class="real-box-title">로그인 페이지 미리보기</div>
+                        <div class="real-box-sub">브랜드 컬러, 배경 이미지, 로고가 함께 적용된 로그인 화면입니다.</div>
+                      </div>
+                    </div>
+                    <div class="portal-login-preview-shell" id="portalLoginPreviewShell">
+                      <div class="portal-login-preview-bg" id="portalLoginPreviewBg"></div>
+                      <div class="portal-login-preview-card-box">
+                        <div class="portal-login-preview-logo" id="portalLoginPreviewLogo">EL</div>
+                        <div class="portal-login-preview-title" id="portalLoginPreviewTitle">회사명 Portal</div>
+                        <div class="portal-login-preview-desc">해당 회사 계정으로 로그인해 주세요.</div>
+                        <div class="portal-login-preview-input">email@example.com</div>
+                        <div class="portal-login-preview-input">비밀번호</div>
+                        <div class="portal-login-preview-button" id="portalLoginPreviewButton">로그인</div>
+                      </div>
+                    </div>
+                    <div class="portal-login-preview-caption">
+                      배경 이미지 또는 로고가 없으면 기본 배경과 기본 EL 표시로 미리보기가 유지됩니다.
+                      저장 후 실제 로그인 화면 반영은 index.html에서 해당 설정값을 읽도록 연결하면 됩니다.
                     </div>
                   </div>
                 </div>
@@ -4202,6 +4380,13 @@ create table if not exists user_app_roles (
 (function(){
   const DEFAULT_COLOR = '#c8102e';
   const SETTING_KEY = 'portal_brand';
+  const MAX_IMAGE_BYTES = 1536 * 1024;
+
+  const state = {
+    brandColor: DEFAULT_COLOR,
+    loginBackgroundDataUrl: '',
+    loginLogoDataUrl: ''
+  };
 
   function $(id){ return document.getElementById(id); }
 
@@ -4225,8 +4410,6 @@ create table if not exists user_app_roles (
   }
 
   function getSupabaseClient(){
-    // settings 화면은 부모 포탈의 Supabase client를 직접 사용하지 않습니다.
-    // 부모 client를 사용/패치하면 service-admin 화면의 companies 조회가 오염될 수 있습니다.
     return window.settingsSupabase || null;
   }
 
@@ -4259,11 +4442,76 @@ create table if not exists user_app_roles (
     return value === undefined || value === null ? '' : String(value).trim();
   }
 
+  function getCompanyName(){
+    const candidates = [];
+    try {
+      candidates.push(window.parent?.portalSession?.companyName);
+      candidates.push(window.parent?.portalSession?.company_name);
+      candidates.push(window.parent?.portalSession?.company?.company_name);
+      candidates.push(window.parent?.portalSession?.company?.name);
+    } catch(e) {}
+    try {
+      candidates.push(window.portalSession?.companyName);
+      candidates.push(window.portalSession?.company_name);
+      candidates.push(window.portalSession?.company?.company_name);
+      candidates.push(window.portalSession?.company?.name);
+    } catch(e) {}
+    try {
+      const ctx = typeof window.getPortalAuthContext === 'function' ? window.getPortalAuthContext() : {};
+      candidates.push(ctx.companyName);
+      candidates.push(ctx.company_name);
+      candidates.push(ctx.company?.company_name);
+      candidates.push(ctx.company?.name);
+      candidates.push(ctx.profile?.company_name);
+    } catch(e) {}
+    const value = candidates.find(v => v !== undefined && v !== null && String(v).trim() !== '');
+    return value === undefined || value === null ? '회사명' : String(value).trim();
+  }
+
   function setFeedback(message, cls){
     const el = $('portalSettingFeedback');
     if (!el) return;
     el.className = 'real-feedback ' + (cls || 'loading');
     el.textContent = message || '';
+  }
+
+  function setLogoPreview(dataUrl){
+    const logo = $('portalLoginPreviewLogo');
+    if (!logo) return;
+    logo.innerHTML = '';
+    if (dataUrl) {
+      const img = document.createElement('img');
+      img.alt = '로그인 로고 미리보기';
+      img.src = dataUrl;
+      logo.appendChild(img);
+    } else {
+      logo.textContent = 'EL';
+    }
+  }
+
+  function applyLoginPreview(){
+    const color = normalizeHex(state.brandColor || DEFAULT_COLOR) || DEFAULT_COLOR;
+    const h2 = lighter(color);
+    const bg = $('portalLoginPreviewBg');
+    const logo = $('portalLoginPreviewLogo');
+    const button = $('portalLoginPreviewButton');
+    const title = $('portalLoginPreviewTitle');
+
+    if (bg) {
+      if (state.loginBackgroundDataUrl) {
+        bg.style.backgroundImage = 'url("' + state.loginBackgroundDataUrl + '")';
+        bg.style.backgroundSize = 'cover';
+        bg.style.backgroundPosition = 'center';
+      } else {
+        bg.style.backgroundImage = 'linear-gradient(135deg,#111827 0%,#334155 50%,#64748b 100%)';
+      }
+    }
+    if (logo && !state.loginLogoDataUrl) {
+      logo.style.background = 'linear-gradient(135deg, ' + color + ' 0%, ' + h2 + ' 100%)';
+    }
+    if (button) button.style.background = 'linear-gradient(135deg, ' + color + ' 0%, ' + h2 + ' 100%)';
+    if (title) title.textContent = getCompanyName() + ' Portal';
+    setLogoPreview(state.loginLogoDataUrl);
   }
 
   function applyPortalColor(hex){
@@ -4287,8 +4535,28 @@ create table if not exists user_app_roles (
       btn.classList.toggle('active', String(btn.dataset.color || '').toLowerCase() === hex);
     });
 
+    state.brandColor = hex;
     window.__PORTAL_SELECTED_BRAND_COLOR__ = hex;
+    applyLoginPreview();
     return true;
+  }
+
+  function readFileAsDataUrl(file, label){
+    return new Promise((resolve, reject) => {
+      if (!file) { resolve(''); return; }
+      if (!String(file.type || '').startsWith('image/')) {
+        reject(new Error(label + '는 이미지 파일만 사용할 수 있습니다.'));
+        return;
+      }
+      if (file.size > MAX_IMAGE_BYTES) {
+        reject(new Error(label + '는 1.5MB 이하 이미지를 권장합니다.'));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error(label + ' 파일을 읽지 못했습니다.'));
+      reader.readAsDataURL(file);
+    });
   }
 
   async function loadPortalBrandSettings(){
@@ -4296,6 +4564,7 @@ create table if not exists user_app_roles (
     const companyId = getCompanyId();
 
     applyPortalColor(window.__PORTAL_SELECTED_BRAND_COLOR__ || DEFAULT_COLOR);
+    applyLoginPreview();
 
     if (!sb) {
       setFeedback('Supabase 연결을 찾지 못했습니다. 포탈 세션 연결 후 다시 확인해 주세요.', 'error');
@@ -4307,7 +4576,7 @@ create table if not exists user_app_roles (
       return;
     }
 
-    setFeedback('저장된 브랜드 색상을 불러오는 중입니다.', 'loading');
+    setFeedback('저장된 브랜드 설정을 불러오는 중입니다.', 'loading');
 
     const { data, error } = await sb
       .from('system_settings')
@@ -4321,19 +4590,26 @@ create table if not exists user_app_roles (
       return;
     }
 
-    const savedColor = normalizeHex(data?.setting_value?.brandColor || data?.setting_value?.brand_color || data?.setting_value?.color);
-    if (savedColor) {
-      applyPortalColor(savedColor);
-      setFeedback('저장된 브랜드 색상을 불러왔습니다.', 'ok');
+    const value = data?.setting_value || {};
+    const savedColor = normalizeHex(value.brandColor || value.brand_color || value.color);
+    state.loginBackgroundDataUrl = String(value.loginBackgroundDataUrl || value.login_background_data_url || value.loginBackgroundUrl || value.login_background_url || '');
+    state.loginLogoDataUrl = String(value.loginLogoDataUrl || value.login_logo_data_url || value.loginLogoUrl || value.login_logo_url || '');
+
+    if (savedColor) applyPortalColor(savedColor);
+    else applyPortalColor(DEFAULT_COLOR);
+    applyLoginPreview();
+
+    if (savedColor || state.loginBackgroundDataUrl || state.loginLogoDataUrl) {
+      setFeedback('저장된 브랜드 설정을 불러왔습니다.', 'ok');
     } else {
-      setFeedback('저장된 색상이 없어 기본 색상으로 표시 중입니다.', 'loading');
+      setFeedback('저장된 설정이 없어 기본값으로 표시 중입니다.', 'loading');
     }
   }
 
   async function savePortalBrandSettings(){
     const sb = getSupabaseClient();
     const companyId = getCompanyId();
-    const color = normalizeHex($('portalBrandHexInput')?.value || window.__PORTAL_SELECTED_BRAND_COLOR__ || DEFAULT_COLOR);
+    const color = normalizeHex($('portalBrandHexInput')?.value || state.brandColor || DEFAULT_COLOR);
 
     if (!color) {
       setFeedback('HEX 색상은 #c8102e 형식으로 입력해 주세요.', 'error');
@@ -4350,13 +4626,15 @@ create table if not exists user_app_roles (
       return;
     }
 
-    setFeedback('브랜드 색상을 저장하는 중입니다.', 'loading');
+    setFeedback('브랜드 설정을 저장하는 중입니다.', 'loading');
 
     const payload = {
       company_id: companyId,
       setting_key: SETTING_KEY,
       setting_value: {
         brandColor: color,
+        loginBackgroundDataUrl: state.loginBackgroundDataUrl || '',
+        loginLogoDataUrl: state.loginLogoDataUrl || '',
         updatedFrom: 'settings.html'
       },
       updated_at: new Date().toISOString()
@@ -4372,7 +4650,8 @@ create table if not exists user_app_roles (
     }
 
     applyPortalColor(color);
-    setFeedback('브랜드 색상을 저장했습니다. 포탈 index.html에서 이 값을 불러오면 실제 화면에 적용됩니다.', 'ok');
+    applyLoginPreview();
+    setFeedback('브랜드 설정을 저장했습니다. 실제 로그인 화면 반영은 index.html 연동 단계에서 적용됩니다.', 'ok');
   }
 
   function initPortalSetting(){
@@ -4392,19 +4671,62 @@ create table if not exists user_app_roles (
       if (!ok) setFeedback('HEX 색상은 #c8102e 형식으로 입력해 주세요.', 'error');
     });
 
+    $('portalLoginBackgroundInput')?.addEventListener('change', async e => {
+      try {
+        state.loginBackgroundDataUrl = await readFileAsDataUrl(e.target.files?.[0], '로그인 배경 이미지');
+        applyLoginPreview();
+        setFeedback('로그인 배경 이미지 미리보기가 적용되었습니다.', 'ok');
+      } catch (err) {
+        e.target.value = '';
+        setFeedback(err.message || '로그인 배경 이미지를 읽지 못했습니다.', 'error');
+      }
+    });
+
+    $('portalLoginLogoInput')?.addEventListener('change', async e => {
+      try {
+        state.loginLogoDataUrl = await readFileAsDataUrl(e.target.files?.[0], '로그인 로고');
+        applyLoginPreview();
+        setFeedback('로그인 로고 미리보기가 적용되었습니다.', 'ok');
+      } catch (err) {
+        e.target.value = '';
+        setFeedback(err.message || '로그인 로고를 읽지 못했습니다.', 'error');
+      }
+    });
+
     $('portalApplyPreviewBtn')?.addEventListener('click', () => {
       const ok = applyPortalColor($('portalBrandHexInput')?.value || $('portalBrandColorInput')?.value);
-      setFeedback(ok ? '미리보기를 적용했습니다.' : '색상 형식을 확인해 주세요.', ok ? 'ok' : 'error');
+      applyLoginPreview();
+      setFeedback(ok ? '로그인 페이지 미리보기를 적용했습니다.' : '색상 형식을 확인해 주세요.', ok ? 'ok' : 'error');
     });
 
     $('portalResetColorBtn')?.addEventListener('click', () => {
       applyPortalColor(DEFAULT_COLOR);
-      setFeedback('기본 Crimson 색상으로 되돌렸습니다. 저장하려면 저장 버튼을 눌러주세요.', 'ok');
+      state.loginBackgroundDataUrl = '';
+      state.loginLogoDataUrl = '';
+      if ($('portalLoginBackgroundInput')) $('portalLoginBackgroundInput').value = '';
+      if ($('portalLoginLogoInput')) $('portalLoginLogoInput').value = '';
+      applyLoginPreview();
+      setFeedback('브랜드 설정을 기본값으로 되돌렸습니다. 저장하려면 저장 버튼을 눌러주세요.', 'ok');
+    });
+
+    $('portalClearBackgroundBtn')?.addEventListener('click', () => {
+      state.loginBackgroundDataUrl = '';
+      if ($('portalLoginBackgroundInput')) $('portalLoginBackgroundInput').value = '';
+      applyLoginPreview();
+      setFeedback('로그인 배경 이미지를 기본 배경으로 되돌렸습니다.', 'ok');
+    });
+
+    $('portalClearLogoBtn')?.addEventListener('click', () => {
+      state.loginLogoDataUrl = '';
+      if ($('portalLoginLogoInput')) $('portalLoginLogoInput').value = '';
+      applyLoginPreview();
+      setFeedback('로그인 로고를 기본 EL 표시로 되돌렸습니다.', 'ok');
     });
 
     $('portalSaveColorBtn')?.addEventListener('click', savePortalBrandSettings);
 
     applyPortalColor(DEFAULT_COLOR);
+    applyLoginPreview();
   }
 
   window.loadPortalBrandSettings = loadPortalBrandSettings;
