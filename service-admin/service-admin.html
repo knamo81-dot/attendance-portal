@@ -1,4 +1,4 @@
-<!DOCTYPE html><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
@@ -1730,13 +1730,37 @@
           <td><span class="badge el-badge ${active ? 'active' : 'inactive'}">${active ? '사용중' : '미사용'}</span></td>
           <td>
             <div class="service-admin-actions">
-              <button type="button" class="btn el-btn ${active ? 'el-btn-danger danger' : 'el-btn-primary primary'}" data-toggle-service-admin="${escapeHtml(admin.id)}" data-next-active="${active ? 'false' : 'true'}">${active ? '미사용' : '재사용'}</button>
+              <button type="button" class="btn el-btn ${active ? 'el-btn-danger danger' : 'el-btn-primary primary'}" data-toggle-service-admin="${escapeHtml(admin.id)}" data-next-active="${active ? 'false' : 'true'}" data-admin-email="${escapeHtml(adminEmail)}">${active ? '미사용' : '재사용'}</button>
               <button type="button" class="btn el-btn-danger danger" data-delete-service-admin="${escapeHtml(admin.id)}" data-admin-email="${escapeHtml(adminEmail)}">삭제</button>
             </div>
           </td>
         </tr>
       `;
     }).join('');
+  }
+
+
+  async function callManageServiceAdmin(payload) {
+    await ensureServiceAdminAuthSession();
+
+    const client = sb();
+    const { data, error } = await client.functions.invoke('manage-service-admin', {
+      body: payload
+    });
+
+    if (error) {
+      console.error('manage-service-admin invoke error:', error);
+      throw new Error(error.message || '서비스관리자 서버 함수 호출 중 오류가 발생했습니다.');
+    }
+
+    if (!data || data.ok === false) {
+      const message = data?.error || data?.message || '서비스관리자 처리 중 오류가 발생했습니다.';
+      const err = new Error(message);
+      err.code = data?.code || '';
+      throw err;
+    }
+
+    return data;
   }
 
   async function createServiceAdmin() {
@@ -1761,55 +1785,19 @@
     setFeedback('서비스관리자 계정을 생성하는 중입니다.', '');
 
     try {
-      const { data: exists, error: checkError } = await sb()
-        .from('users')
-        .select('id')
-        .eq('email', adminEmail)
-        .eq('role', 'service_admin')
-        .maybeSingle();
-
-      if (checkError) throw checkError;
-      if (exists) {
-        setFeedback('이미 등록된 서비스관리자 계정입니다.', 'error');
-        return;
-      }
-
-      const insertPayload = {
+      const result = await callManageServiceAdmin({
+        action: 'create',
         email: adminEmail,
         name: emp.name || employeeEmail,
-        role: 'service_admin',
-        is_active: true,
-        employee_no: emp.employee_no || null,
-        company_id: emp.company_id || exeloLabCompanyId || null,
-        must_change_password: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      let { error } = await sb()
-        .from('users')
-        .insert(insertPayload);
-
-      if (error && String(error.message || '').includes('must_change_password')) {
-        const retryPayload = { ...insertPayload };
-        delete retryPayload.must_change_password;
-        const retry = await sb().from('users').insert(retryPayload);
-        error = retry.error;
-      }
-
-      if (error && String(error.message || '').includes('employee_no')) {
-        const retryPayload = { ...insertPayload };
-        delete retryPayload.employee_no;
-        delete retryPayload.must_change_password;
-        const retry = await sb().from('users').insert(retryPayload);
-        error = retry.error;
-      }
-
-      if (error) throw error;
+        employee_no: emp.employee_no || '',
+        company_id: emp.company_id || exeloLabCompanyId || ''
+      });
 
       await loadServiceAdmins();
       closeServiceAdminCreateModal();
-      setFeedback(`${emp.name || employeeEmail} 서비스관리자 계정을 생성했습니다.`, 'ok');
+
+      const passwordHint = result?.initial_password_hint ? ` ${result.initial_password_hint}` : '';
+      setFeedback(`${emp.name || employeeEmail} 서비스관리자 계정을 생성했습니다.${passwordHint}`, 'ok');
     } catch (error) {
       console.error(error);
       setFeedback(error.message || '서비스관리자 생성 중 오류가 발생했습니다.', 'error');
@@ -1818,42 +1806,52 @@
     }
   }
 
-  async function toggleServiceAdmin(adminId, nextActive) {
+  async function toggleServiceAdmin(adminId, nextActive, adminEmail) {
     assertServiceAdmin();
     await ensureServiceAdminAuthSession();
-    setFeedback('서비스관리자 상태를 변경하는 중입니다.', '');
 
-    const { error } = await sb()
-      .from('users')
-      .update({ is_active: nextActive })
-      .eq('id', adminId)
-      .eq('role', 'service_admin');
+    const email = normalizeEmail(adminEmail || '');
+    if (!email) {
+      setFeedback('서비스관리자 이메일을 찾지 못했습니다. 새로고침 후 다시 시도해 주세요.', 'error');
+      return;
+    }
 
-    if (error) throw error;
+    setFeedback(nextActive ? '서비스관리자 계정을 재사용 처리하는 중입니다.' : '서비스관리자 계정을 미사용 처리하는 중입니다.', '');
+
+    await callManageServiceAdmin({
+      action: nextActive ? 'activate' : 'deactivate',
+      email
+    });
 
     await loadServiceAdmins();
-    setFeedback('서비스관리자 상태를 변경했습니다.', 'ok');
+    setFeedback(nextActive ? '서비스관리자 계정을 재사용 처리했습니다.' : '서비스관리자 계정을 미사용 처리했습니다. 해당 계정은 로그인할 수 없습니다.', 'ok');
   }
 
   async function deleteServiceAdmin(adminId, adminEmail) {
     assertServiceAdmin();
     await ensureServiceAdminAuthSession();
 
-    const ok = confirm(`${adminEmail || '선택한 서비스관리자 계정'}을 삭제하시겠습니까?\n\nemployees 사원정보는 삭제되지 않습니다.`);
+    const email = normalizeEmail(adminEmail || '');
+    if (!email) {
+      setFeedback('서비스관리자 이메일을 찾지 못했습니다. 새로고침 후 다시 시도해 주세요.', 'error');
+      return;
+    }
+
+    const ok = confirm(`${email} 계정을 삭제하시겠습니까?
+
+Authentication Users와 public.users의 서비스관리자 계정만 삭제됩니다.
+employees 사원정보는 삭제되지 않습니다.`);
     if (!ok) return;
 
     setFeedback('서비스관리자 계정을 삭제하는 중입니다.', '');
 
-    const { error } = await sb()
-      .from('users')
-      .delete()
-      .eq('id', adminId)
-      .eq('role', 'service_admin');
-
-    if (error) throw error;
+    await callManageServiceAdmin({
+      action: 'delete',
+      email
+    });
 
     await loadServiceAdmins();
-    setFeedback('서비스관리자 계정을 삭제했습니다.', 'ok');
+    setFeedback('서비스관리자 계정을 삭제했습니다. Authentication Users에서도 함께 삭제되었습니다.', 'ok');
   }
 
   function bindEvents() {
@@ -1980,8 +1978,9 @@
       if (toggleServiceAdminBtn) {
         const id = toggleServiceAdminBtn.getAttribute('data-toggle-service-admin');
         const next = toggleServiceAdminBtn.getAttribute('data-next-active') === 'true';
+        const email = toggleServiceAdminBtn.getAttribute('data-admin-email');
         try {
-          await toggleServiceAdmin(id, next);
+          await toggleServiceAdmin(id, next, email);
         } catch (error) {
           console.error(error);
           setFeedback(error.message || '서비스관리자 상태 변경 중 오류가 발생했습니다.', 'error');
