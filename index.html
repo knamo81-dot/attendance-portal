@@ -748,7 +748,7 @@ body:not(.service-admin-enabled) .service-admin-btn{
 }
 
 .portal-common-header {
-  background: linear-gradient(135deg, var(--portal-brand-color) 0%, var(--portal-brand-color-2) 100%);
+  background: var(--portal-brand-gradient, linear-gradient(135deg, var(--portal-brand-color) 0%, var(--portal-brand-color-2) 100%));
 }
 
 .nav-btn.home {
@@ -2507,6 +2507,9 @@ body.auth-loading .top-user-bar {
 
   let portalBrandColor = '#c8102e';
   let portalBrandColor2 = '#e11d2e';
+  let portalUseGradient = false;
+  let portalGradientStart = '#c8102e';
+  let portalGradientEnd = '#e11d2e';
   let portalLoginBackgroundDataUrl = '';
   let portalLoginLogoDataUrl = '';
 
@@ -2536,17 +2539,24 @@ body.auth-loading .top-user-bar {
     return rgbToHex(rgb.r + amount, rgb.g + amount, rgb.b + amount);
   }
 
-  function applyPortalBrandColor(color) {
+  function applyPortalBrandColor(color, options = {}) {
     const safeColor = isValidHexColor(color) ? String(color).trim() : '#c8102e';
-    const accentColor = adjustHexColor(safeColor, 22);
+    const useGradient = options.useGradient === true;
+    const startColor = isValidHexColor(options.gradientStart) ? String(options.gradientStart).trim() : safeColor;
+    const endColor = isValidHexColor(options.gradientEnd) ? String(options.gradientEnd).trim() : adjustHexColor(startColor, 22);
+    const accentColor = useGradient ? endColor : adjustHexColor(safeColor, 22);
     const rgb = hexToRgb(safeColor);
 
     portalBrandColor = safeColor;
     portalBrandColor2 = accentColor;
+    portalUseGradient = useGradient;
+    portalGradientStart = startColor;
+    portalGradientEnd = endColor;
 
-    document.documentElement.style.setProperty('--portal-brand-color', safeColor);
-    document.documentElement.style.setProperty('--portal-brand-color-2', accentColor);
+    document.documentElement.style.setProperty('--portal-brand-color', useGradient ? startColor : safeColor);
+    document.documentElement.style.setProperty('--portal-brand-color-2', useGradient ? endColor : accentColor);
     document.documentElement.style.setProperty('--portal-brand-rgb', `${rgb.r}, ${rgb.g}, ${rgb.b}`);
+    document.documentElement.style.setProperty('--portal-brand-gradient', getPortalBrandGradient());
 
     let themeMeta = document.querySelector('meta[name="theme-color"]');
     if (!themeMeta) {
@@ -2554,10 +2564,13 @@ body.auth-loading .top-user-bar {
       themeMeta.setAttribute('name', 'theme-color');
       document.head.appendChild(themeMeta);
     }
-    themeMeta.setAttribute('content', safeColor);
+    themeMeta.setAttribute('content', useGradient ? startColor : safeColor);
   }
 
   function getPortalBrandGradient() {
+    if (portalUseGradient) {
+      return `linear-gradient(135deg, ${portalGradientStart} 0%, ${portalGradientEnd} 100%)`;
+    }
     return `linear-gradient(135deg, ${portalBrandColor} 0%, ${portalBrandColor2} 100%)`;
   }
 
@@ -2577,6 +2590,23 @@ body.auth-loading .top-user-bar {
         src.brand_color ||
         src.color ||
         '#c8102e',
+      useGradient: src.useGradient === true || src.use_gradient === true || src.gradientEnabled === true || src.gradient_enabled === true || src.useGradient === 'true' || src.use_gradient === 'true',
+      gradientStart:
+        src.gradientStart ||
+        src.gradient_start ||
+        src.gradient_start_color ||
+        src.brandGradientStart ||
+        src.brandColor ||
+        src.brand_color ||
+        '#c8102e',
+      gradientEnd:
+        src.gradientEnd ||
+        src.gradient_end ||
+        src.gradient_end_color ||
+        src.brandGradientEnd ||
+        src.brandColor2 ||
+        src.brand_color_2 ||
+        '',
       loginBackgroundDataUrl: normalizeDataUrl(
         src.loginBackgroundDataUrl ||
         src.login_background_data_url ||
@@ -2633,7 +2663,11 @@ body.auth-loading .top-user-bar {
     const normalized = normalizePortalBrandSettingValue(value);
     portalLoginBackgroundDataUrl = normalized.loginBackgroundDataUrl;
     portalLoginLogoDataUrl = normalized.loginLogoDataUrl;
-    applyPortalBrandColor(normalized.brandColor);
+    applyPortalBrandColor(normalized.brandColor, {
+      useGradient: !!normalized.useGradient,
+      gradientStart: normalized.gradientStart,
+      gradientEnd: normalized.gradientEnd
+    });
     applyPortalLoginAssets();
   }
 
