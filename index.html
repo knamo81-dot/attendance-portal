@@ -2094,6 +2094,34 @@ body.auth-loading .top-user-bar {
 }
 </style>
 
+
+<style id="login-screen-polish-final">
+/* ===== Login Screen Polish Final ===== */
+/* 워터마크는 브랜드 분위기만 남기고 시선 방해를 줄입니다. */
+.auth-overlay::after {
+  color: rgba(255,255,255,.10) !important;
+  font-size: clamp(18px, 2.6vw, 38px) !important;
+  left: clamp(24px, 4.5vw, 72px) !important;
+  bottom: clamp(24px, 4.5vw, 58px) !important;
+  letter-spacing: -0.055em !important;
+}
+
+/* 로그인 카드는 살짝만 떠 보이도록 그림자를 정리합니다. */
+.auth-card {
+  box-shadow: 0 20px 60px rgba(0,0,0,.22) !important;
+}
+
+/* 배경 이미지가 있을 때도 워터마크가 과하게 보이지 않도록 고정합니다. */
+.auth-overlay.auth-has-background::after {
+  color: rgba(255,255,255,.10) !important;
+}
+
+/* 로그아웃 후 로그인 화면으로 돌아올 때 안내 박스가 기본 노출되지 않게 유지합니다. */
+.auth-message:not(.show) {
+  display: none !important;
+}
+</style>
+
 </head>
 <body class="portal-restoring">
   <div id="portalBootOverlay" class="portal-boot-overlay" aria-live="polite" aria-label="포탈 불러오는 중">
@@ -4637,7 +4665,7 @@ body.auth-loading .top-user-bar {
     clearLoginInputs();
     clearPortalFrame();
     setActiveNav(null);
-    showLogin('로그아웃되었습니다.');
+    showLogin('');
     setTimeout(() => clearLoginInputs(), 80);
     setTimeout(() => clearLoginInputs(), 350);
     setTimeout(() => clearLoginInputs(), 800);
