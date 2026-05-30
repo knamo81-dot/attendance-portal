@@ -1398,28 +1398,22 @@
     await ensureServiceAdminAuthSession();
     if (exeloLabCompanyId) return exeloLabCompanyId;
 
-    // ExeloLab은 서비스관리자 사원정보 기준 회사입니다.
-    // 현재 운영 DB 기준 company_code가 가장 안정적인 고유값입니다.
-    const EXELOLAB_COMPANY_CODE = 'COMP-20260501-ELAB';
-    const EXELOLAB_SUBDOMAIN = 'xll';
-
     const { data, error } = await sb()
       .from('companies')
       .select('id, company_name, company_code, subdomain')
-      .or(`company_code.eq.${EXELOLAB_COMPANY_CODE},subdomain.eq.${EXELOLAB_SUBDOMAIN},company_name.eq.ExeloLab,company_name.ilike.%ExeloLab%`)
-      .limit(10);
+      .or('company_name.eq.ExeloLab,company_code.eq.COMP-20260501-ELAB,subdomain.eq.xll,company_name.ilike.%ExeloLab%')
+      .limit(5);
 
     if (error) throw error;
 
     const rows = data || [];
-    const exact = rows.find(row => String(row.company_code || '').trim() === EXELOLAB_COMPANY_CODE)
-      || rows.find(row => normalizeSubdomain(row.subdomain) === EXELOLAB_SUBDOMAIN)
-      || rows.find(row => normalizeEmail(row.company_name) === 'exelolab')
+    const exact = rows.find(row => normalizeEmail(row.company_name) === 'exelolab')
+      || rows.find(row => normalizeEmail(row.subdomain) === 'exelolab')
       || rows.find(row => String(row.company_name || '').toLowerCase().includes('exelolab'))
       || rows[0];
 
     if (!exact?.id) {
-      throw new Error('ExeloLab 회사 정보를 찾지 못했습니다. companies.company_code = COMP-20260501-ELAB 기준 회사를 확인해 주세요.');
+      throw new Error('ExeloLab 회사 정보를 찾지 못했습니다. 먼저 회사관리에서 ExeloLab 회사를 등록해 주세요.');
     }
 
     exeloLabCompanyId = exact.id;
@@ -1430,14 +1424,14 @@
     const companyId = await findExeloLabCompanyId();
     let { data, error } = await sb()
       .from('employees')
-      .select('id, company_id, employee_no, name, position, grade, authority, email, status, sort_order')
+      .select('company_id, employee_no, name, position, grade, authority, email, status, sort_order')
       .eq('company_id', companyId)
       .order('sort_order', { ascending: true });
 
     if (error && String(error.message || '').toLowerCase().includes('company_id')) {
       const fallback = await sb()
         .from('employees')
-        .select('id, employee_no, name, position, grade, authority, email, status, sort_order')
+        .select('employee_no, name, position, grade, authority, email, status, sort_order')
         .order('sort_order', { ascending: true });
       data = fallback.data;
       error = fallback.error;
