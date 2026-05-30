@@ -72,6 +72,13 @@
       padding: 0;
     }
     .nav-btn.home { background: rgba(255,255,255,0.18); margin-bottom: 12px; }
+
+    /* 권한에 따라 숨긴 사이드바 버튼은 CSS display:flex 규칙보다 우선해서 완전히 숨김 */
+    .nav-btn[hidden],
+    #settingsNavBtn[hidden] {
+      display: none !important;
+    }
+
     .nav-btn.active {
       background: #ffffff;
       color: #0f172a;
@@ -2857,16 +2864,38 @@ input[type="radio"]{
   }
 
   function canUseSettingsMenu() {
+    // 서비스관리자(root ops)는 설정 메뉴를 사용할 수 있습니다.
     if (isServiceAdminRole()) return true;
-    const session = buildPortalSession();
-    const role = normalizePortalRole(session?.role || currentProfile?.role || currentEmployee?.role || '', 'user');
-    return role === 'admin';
+
+    // 회사 포털에서는 회사 관리자만 설정 메뉴를 사용할 수 있습니다.
+    // appRoles의 개별 앱 admin 권한은 설정 메뉴 권한으로 보지 않습니다.
+    const profileRole = normalizePortalRole(
+      currentProfile?.workspace_role ||
+      currentProfile?.portal_role ||
+      currentProfile?.company_role ||
+      currentProfile?.tenant_role ||
+      currentProfile?.user_role ||
+      currentProfile?.role ||
+      '',
+      'user'
+    );
+    const employeeRole = normalizePortalRole(
+      currentEmployee?.role ||
+      currentEmployee?.app_role ||
+      currentEmployee?.portal_role ||
+      '',
+      'user'
+    );
+
+    return profileRole === 'admin' || employeeRole === 'admin';
   }
 
   function updateSettingsButtonVisibility() {
     if (!els.settingsNavBtn) return;
     const allowed = Boolean(currentUser && canUseSettingsMenu());
+
     els.settingsNavBtn.hidden = !allowed;
+    els.settingsNavBtn.style.display = allowed ? '' : 'none';
     els.settingsNavBtn.setAttribute('aria-hidden', allowed ? 'false' : 'true');
     els.settingsNavBtn.tabIndex = allowed ? 0 : -1;
   }
