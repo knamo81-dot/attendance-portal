@@ -3950,10 +3950,15 @@ input[type="radio"]{
   }
 
   async function restoreLastPage() {
-    // 로그인 / 새로고침 / 재접속 시에는 이전 메뉴를 복원하지 않고 항상 포탈 홈에서 시작합니다.
+    // 로그인 / 새로고침 / 재접속 시에는 이전 메뉴를 복원하지 않고 기본 진입 화면을 역할별로 지정합니다.
     try {
       localStorage.removeItem(LAST_PAGE_KEY);
     } catch (_) {}
+
+    if (isServiceAdminRole()) {
+      await navigateBySrc('service-admin/service-admin.html', els.serviceAdminBtn, { skipSave: true });
+      return;
+    }
 
     await navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
   }
