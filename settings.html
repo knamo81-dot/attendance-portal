@@ -1598,6 +1598,71 @@ html.embed-mode #settings-page .real-form-card{
     margin:36px 14px;
   }
 }
+
+#settings-page .portal-theme-mode-box{
+  margin-top:12px;
+  padding:12px;
+  border:1px solid #e2e8f0;
+  border-radius:14px;
+  background:#f8fafc;
+}
+#settings-page .portal-theme-mode-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+#settings-page .portal-theme-mode-title{
+  font-size:12px;
+  font-weight:900;
+  color:#0f172a;
+}
+#settings-page .portal-theme-mode-desc{
+  margin-top:3px;
+  font-size:11px;
+  line-height:1.45;
+  color:#64748b;
+}
+#settings-page .portal-theme-mode-select{
+  width:150px;
+  min-height:34px;
+  height:34px;
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  padding:0 10px;
+  background:#fff;
+  color:#0f172a;
+  font-size:12px;
+  font-weight:800;
+}
+#settings-page .portal-gradient-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+#settings-page .portal-gradient-pair{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 42px;
+  gap:7px;
+  align-items:end;
+}
+#settings-page .portal-gradient-pair input[type="color"]{
+  width:42px;
+  min-width:42px;
+  height:34px;
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  padding:3px;
+  background:#fff;
+  cursor:pointer;
+}
+@media (max-width:760px){
+  #settings-page .portal-gradient-grid{ grid-template-columns:1fr; }
+  #settings-page .portal-theme-mode-row{ align-items:flex-start; flex-direction:column; }
+  #settings-page .portal-theme-mode-select{ width:100%; }
+}
+
 </style>
 
 
@@ -2132,6 +2197,35 @@ create table if not exists user_app_roles (
                       <div class="real-field">
                         <label>사용자 지정 색</label>
                         <input id="portalBrandColorInput" class="portal-native-color" type="color" value="#c8102e">
+                      </div>
+                    </div>
+
+                    <div class="portal-theme-mode-box">
+                      <div class="portal-theme-mode-row">
+                        <div>
+                          <div class="portal-theme-mode-title">브랜드 테마 방식</div>
+                          <div class="portal-theme-mode-desc">단색 또는 두 가지 색상의 그라데이션으로 포탈 헤더와 로그인 화면을 표현합니다.</div>
+                        </div>
+                        <select id="portalBrandModeSelect" class="portal-theme-mode-select">
+                          <option value="solid">단색</option>
+                          <option value="gradient">그라데이션</option>
+                        </select>
+                      </div>
+                      <div class="portal-gradient-grid">
+                        <div class="real-field">
+                          <label>그라데이션 시작 색상</label>
+                          <div class="portal-gradient-pair">
+                            <input id="portalGradientStartInput" class="real-input" value="#c8102e" maxlength="7" placeholder="#c8102e">
+                            <input id="portalGradientStartPicker" type="color" value="#c8102e" aria-label="그라데이션 시작 색상 선택">
+                          </div>
+                        </div>
+                        <div class="real-field">
+                          <label>그라데이션 끝 색상</label>
+                          <div class="portal-gradient-pair">
+                            <input id="portalGradientEndInput" class="real-input" value="#e11d2e" maxlength="7" placeholder="#e11d2e">
+                            <input id="portalGradientEndPicker" type="color" value="#e11d2e" aria-label="그라데이션 끝 색상 선택">
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -4384,6 +4478,9 @@ create table if not exists user_app_roles (
 
   const state = {
     brandColor: DEFAULT_COLOR,
+    useGradient: false,
+    gradientStart: DEFAULT_COLOR,
+    gradientEnd: '',
     loginBackgroundDataUrl: '',
     loginLogoDataUrl: '',
     loginBackgroundCleared: false,
@@ -4409,6 +4506,46 @@ create table if not exists user_app_roles (
     g = Math.min(255, Math.round(g + (255-g)*0.18));
     b = Math.min(255, Math.round(b + (255-b)*0.18));
     return '#' + [r,g,b].map(n => n.toString(16).padStart(2,'0')).join('');
+  }
+
+  function parseBoolean(value){
+    if (value === true || value === 'true' || value === 1 || value === '1') return true;
+    return false;
+  }
+
+  function getGradientStart(){
+    return normalizeHex(state.gradientStart || state.brandColor || DEFAULT_COLOR) || DEFAULT_COLOR;
+  }
+
+  function getGradientEnd(){
+    return normalizeHex(state.gradientEnd || lighter(getGradientStart())) || lighter(getGradientStart());
+  }
+
+  function getThemeEndColor(){
+    return state.useGradient ? getGradientEnd() : lighter(state.brandColor || DEFAULT_COLOR);
+  }
+
+  function getThemeStartColor(){
+    return state.useGradient ? getGradientStart() : (normalizeHex(state.brandColor || DEFAULT_COLOR) || DEFAULT_COLOR);
+  }
+
+  function getBrandGradient(){
+    return 'linear-gradient(135deg, ' + getThemeStartColor() + ' 0%, ' + getThemeEndColor() + ' 100%)';
+  }
+
+  function syncGradientInputs(){
+    const mode = $('portalBrandModeSelect');
+    const startInput = $('portalGradientStartInput');
+    const endInput = $('portalGradientEndInput');
+    const startPicker = $('portalGradientStartPicker');
+    const endPicker = $('portalGradientEndPicker');
+    const start = getGradientStart();
+    const end = getGradientEnd();
+    if (mode) mode.value = state.useGradient ? 'gradient' : 'solid';
+    if (startInput) startInput.value = start;
+    if (endInput) endInput.value = end;
+    if (startPicker) startPicker.value = start;
+    if (endPicker) endPicker.value = end;
   }
 
   function getSupabaseClient(){
@@ -4503,7 +4640,9 @@ create table if not exists user_app_roles (
 
   function applyLoginPreview(){
     const color = normalizeHex(state.brandColor || DEFAULT_COLOR) || DEFAULT_COLOR;
-    const h2 = lighter(color);
+    const themeStart = getThemeStartColor();
+    const themeEnd = getThemeEndColor();
+    const gradient = getBrandGradient();
     const bg = $('portalLoginPreviewBg');
     const logo = $('portalLoginPreviewLogo');
     const button = $('portalLoginPreviewButton');
@@ -4519,38 +4658,56 @@ create table if not exists user_app_roles (
       }
     }
     if (logo && !state.loginLogoDataUrl) {
-      logo.style.background = 'linear-gradient(135deg, ' + color + ' 0%, ' + h2 + ' 100%)';
+      logo.style.background = gradient;
     }
-    if (button) button.style.background = 'linear-gradient(135deg, ' + color + ' 0%, ' + h2 + ' 100%)';
+    if (button) button.style.background = gradient;
     if (title) title.textContent = getCompanyName() + ' Portal';
     setLogoPreview(state.loginLogoDataUrl);
   }
 
-  function applyPortalColor(hex){
+  function applyPortalColor(hex, options = {}){
     hex = normalizeHex(hex);
     if (!hex) return false;
 
-    const h2 = lighter(hex);
+    state.brandColor = hex;
+    if (options.updateGradient !== false) {
+      state.gradientStart = normalizeHex(options.gradientStart || hex) || hex;
+      state.gradientEnd = normalizeHex(options.gradientEnd || state.gradientEnd || lighter(state.gradientStart)) || lighter(state.gradientStart);
+    }
+
     const preview = $('portalPreviewHeader');
     const home = document.querySelector('#settings-page .portal-preview-home-btn');
     const chip = $('portalColorPreviewChip');
     const hexInput = $('portalBrandHexInput');
     const colorInput = $('portalBrandColorInput');
 
-    if (preview) preview.style.background = 'linear-gradient(135deg, ' + hex + ' 0%, ' + h2 + ' 100%)';
+    if (preview) preview.style.background = getBrandGradient();
     if (home) home.style.color = hex;
-    if (chip) chip.textContent = hex;
+    if (chip) chip.textContent = state.useGradient ? (getThemeStartColor() + ' → ' + getThemeEndColor()) : hex;
     if (hexInput) hexInput.value = hex;
     if (colorInput) colorInput.value = hex;
+
+    syncGradientInputs();
 
     document.querySelectorAll('#settings-page .portal-color-swatch').forEach(btn => {
       btn.classList.toggle('active', String(btn.dataset.color || '').toLowerCase() === hex);
     });
 
-    state.brandColor = hex;
     window.__PORTAL_SELECTED_BRAND_COLOR__ = hex;
     applyLoginPreview();
     return true;
+  }
+
+  function applyPortalThemeFromControls(){
+    const mode = $('portalBrandModeSelect')?.value || 'solid';
+    const main = normalizeHex($('portalBrandHexInput')?.value || $('portalBrandColorInput')?.value || state.brandColor || DEFAULT_COLOR);
+    const start = normalizeHex($('portalGradientStartInput')?.value || state.gradientStart || main || DEFAULT_COLOR);
+    const end = normalizeHex($('portalGradientEndInput')?.value || state.gradientEnd || lighter(start || main || DEFAULT_COLOR));
+    if (!main || !start || !end) return false;
+    state.useGradient = mode === 'gradient';
+    state.gradientStart = start;
+    state.gradientEnd = end;
+    return applyPortalColor(main, { gradientStart: start, gradientEnd: end, updateGradient: true });
   }
 
   function readFileAsDataUrl(file, label){
@@ -4604,6 +4761,11 @@ create table if not exists user_app_roles (
 
     const value = data?.setting_value || {};
     const savedColor = normalizeHex(value.brandColor || value.brand_color || value.color);
+    const savedGradientStart = normalizeHex(value.gradientStart || value.gradient_start || value.gradient_start_color || value.brandGradientStart);
+    const savedGradientEnd = normalizeHex(value.gradientEnd || value.gradient_end || value.gradient_end_color || value.brandGradientEnd);
+    state.useGradient = parseBoolean(value.useGradient ?? value.use_gradient ?? value.gradientEnabled ?? value.gradient_enabled);
+    state.gradientStart = savedGradientStart || savedColor || DEFAULT_COLOR;
+    state.gradientEnd = savedGradientEnd || lighter(state.gradientStart);
     state.loginBackgroundDataUrl = getSettingAssetValue(value, [
       'loginBackgroundDataUrl',
       'login_background_data_url',
@@ -4623,8 +4785,8 @@ create table if not exists user_app_roles (
     state.loginBackgroundCleared = false;
     state.loginLogoCleared = false;
 
-    if (savedColor) applyPortalColor(savedColor);
-    else applyPortalColor(DEFAULT_COLOR);
+    if (savedColor) applyPortalColor(savedColor, { gradientStart: state.gradientStart, gradientEnd: state.gradientEnd, updateGradient: true });
+    else applyPortalColor(DEFAULT_COLOR, { gradientStart: state.gradientStart, gradientEnd: state.gradientEnd, updateGradient: true });
     applyLoginPreview();
 
     if (savedColor || state.loginBackgroundDataUrl || state.loginLogoDataUrl) {
@@ -4637,7 +4799,11 @@ create table if not exists user_app_roles (
   async function savePortalBrandSettings(){
     const sb = getSupabaseClient();
     const companyId = getCompanyId();
+    applyPortalThemeFromControls();
     const color = normalizeHex($('portalBrandHexInput')?.value || state.brandColor || DEFAULT_COLOR);
+    const gradientStart = getGradientStart();
+    const gradientEnd = getGradientEnd();
+    const useGradient = !!state.useGradient;
 
     if (!color) {
       setFeedback('HEX 색상은 #c8102e 형식으로 입력해 주세요.', 'error');
@@ -4725,6 +4891,12 @@ create table if not exists user_app_roles (
       ...existingValue,
       brandColor: color,
       brand_color: color,
+      useGradient: useGradient,
+      use_gradient: useGradient,
+      gradientStart: gradientStart,
+      gradient_start: gradientStart,
+      gradientEnd: gradientEnd,
+      gradient_end: gradientEnd,
       loginBackgroundDataUrl: finalBackground,
       loginLogoDataUrl: finalLogo,
       updatedFrom: 'settings.html',
@@ -4797,7 +4969,10 @@ create table if not exists user_app_roles (
         source: 'settings.html',
         companyId: companyId,
         settingValue: settingValue,
-        brandColor: color
+        brandColor: color,
+        useGradient: useGradient,
+        gradientStart: gradientStart,
+        gradientEnd: gradientEnd
       };
       if (window.parent && window.parent !== window) {
         window.parent.postMessage(message, '*');
@@ -4805,7 +4980,7 @@ create table if not exists user_app_roles (
       window.postMessage(message, '*');
     } catch (_) {}
 
-    applyPortalColor(color);
+    applyPortalColor(color, { gradientStart: gradientStart, gradientEnd: gradientEnd, updateGradient: true });
     applyLoginPreview();
     setFeedback('브랜드 설정을 저장했습니다. 로그인 배경/로고는 실제 로그인 화면과 새로고침 캐시에 반영됩니다.', 'ok');
   }
@@ -4826,6 +5001,31 @@ create table if not exists user_app_roles (
       const ok = applyPortalColor(e.target.value);
       if (!ok) setFeedback('HEX 색상은 #c8102e 형식으로 입력해 주세요.', 'error');
     });
+
+    $('portalBrandModeSelect')?.addEventListener('change', e => {
+      state.useGradient = e.target.value === 'gradient';
+      applyPortalThemeFromControls();
+      setFeedback(state.useGradient ? '그라데이션 테마 미리보기가 적용되었습니다.' : '단색 테마 미리보기가 적용되었습니다.', 'ok');
+    });
+
+    function bindGradientControl(inputId, pickerId, key){
+      const input = $(inputId);
+      const picker = $(pickerId);
+      function update(value){
+        const hex = normalizeHex(value);
+        if (!hex) { setFeedback('HEX 색상은 #c8102e 형식으로 입력해 주세요.', 'error'); return; }
+        state[key] = hex;
+        if (input) input.value = hex;
+        if (picker) picker.value = hex;
+        if (key === 'gradientStart') applyPortalColor(hex, { gradientStart: state.gradientStart, gradientEnd: state.gradientEnd, updateGradient: true });
+        else applyPortalColor(state.brandColor || DEFAULT_COLOR, { gradientStart: state.gradientStart, gradientEnd: state.gradientEnd, updateGradient: true });
+      }
+      input?.addEventListener('input', e => update(e.target.value));
+      picker?.addEventListener('input', e => update(e.target.value));
+    }
+
+    bindGradientControl('portalGradientStartInput', 'portalGradientStartPicker', 'gradientStart');
+    bindGradientControl('portalGradientEndInput', 'portalGradientEndPicker', 'gradientEnd');
 
     $('portalLoginBackgroundInput')?.addEventListener('change', async e => {
       try {
@@ -4858,7 +5058,10 @@ create table if not exists user_app_roles (
     });
 
     $('portalResetColorBtn')?.addEventListener('click', () => {
-      applyPortalColor(DEFAULT_COLOR);
+      state.useGradient = false;
+      state.gradientStart = DEFAULT_COLOR;
+      state.gradientEnd = lighter(DEFAULT_COLOR);
+      applyPortalColor(DEFAULT_COLOR, { gradientStart: state.gradientStart, gradientEnd: state.gradientEnd, updateGradient: true });
       state.loginBackgroundDataUrl = '';
       state.loginLogoDataUrl = '';
       state.loginBackgroundCleared = true;
@@ -4887,7 +5090,9 @@ create table if not exists user_app_roles (
 
     $('portalSaveColorBtn')?.addEventListener('click', savePortalBrandSettings);
 
-    applyPortalColor(DEFAULT_COLOR);
+    state.gradientStart = DEFAULT_COLOR;
+    state.gradientEnd = lighter(DEFAULT_COLOR);
+    applyPortalColor(DEFAULT_COLOR, { gradientStart: state.gradientStart, gradientEnd: state.gradientEnd, updateGradient: true });
     applyLoginPreview();
   }
 
