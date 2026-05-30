@@ -4806,6 +4806,17 @@ body.auth-loading .top-user-bar {
   }
 
   async function logout() {
+    // 로그아웃 직후에는 Supabase 세션이 없어도 현재 접속 주소의 회사 브랜드는 유지되어야 합니다.
+    // 기존 흐름은 clearPortalSession()에서 기본 빨간색으로 초기화한 뒤 바로 showLogin()을 호출해서,
+    // 새로고침 전까지 로그인 버튼이 기본 색상으로 보이는 문제가 있었습니다.
+    let urlCompany = null;
+    try {
+      urlCompany = await ensureRequestedCompany();
+    } catch (error) {
+      console.warn('requested company lookup before logout failed:', error);
+      urlCompany = requestedSubdomain ? getFallbackCompanyBySubdomain(requestedSubdomain) : null;
+    }
+
     try {
       await supabaseClient.auth.signOut();
     } catch (error) {
@@ -4814,6 +4825,20 @@ body.auth-loading .top-user-bar {
     sessionStorage.removeItem(LAST_PAGE_KEY);
     try { localStorage.removeItem('reagent_current_user'); } catch (_) {}
     clearPortalSession();
+
+    // 회사 정보는 세션과 별개로 접속 주소 기준으로 다시 세팅합니다.
+    currentCompany = urlCompany || null;
+    activeCompany = null;
+    window.currentCompanyId = currentCompany?.id || null;
+    window.currentCompanyCode = currentCompany?.company_code || currentCompany?.companyCode || null;
+    window.currentCompanyName = currentCompany?.company_name || currentCompany?.companyName || null;
+    window.currentCompanySubdomain = currentCompany?.subdomain || requestedSubdomain || null;
+    publishPortalSession();
+
+    // 로그인 화면을 띄우기 전에 브랜드 설정을 먼저 재적용합니다.
+    await loadPortalBrandSettings();
+    applyPortalLoginBrand();
+
     clearLoginInputs();
     clearPortalFrame();
     setActiveNav(null);
