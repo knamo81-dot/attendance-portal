@@ -1871,6 +1871,187 @@ input[type="radio"]{
   .personal-settings-msg.warn { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
   @media (max-width: 700px) { .personal-settings-grid { grid-template-columns: 1fr; } }
 </style>
+
+<style id="login-screen-redesign-final">
+/* ===== Login Screen Redesign Final ===== */
+/* 기존 중앙 모달 로그인 → 로그인 전용 전체 화면 + 우측 로그인 카드 */
+body.auth-loading .layout {
+  filter: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+body.auth-loading .top-user-bar {
+  display: none !important;
+}
+
+.auth-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  padding: clamp(24px, 5vw, 80px) clamp(28px, 7vw, 120px) !important;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(var(--portal-brand-rgb, 200,16,46), .22) 0%, rgba(var(--portal-brand-rgb, 200,16,46), 0) 34%),
+    linear-gradient(135deg, rgba(15,23,42,.96) 0%, rgba(30,41,59,.92) 45%, rgba(15,23,42,.98) 100%) !important;
+  backdrop-filter: none !important;
+  overflow: hidden !important;
+}
+
+.auth-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(15,23,42,.20) 0%, rgba(15,23,42,.08) 46%, rgba(15,23,42,.36) 100%),
+    repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 1px, transparent 1px 18px);
+  pointer-events: none;
+}
+
+.auth-overlay::after {
+  content: "Integrated Operations Platform";
+  position: absolute;
+  left: clamp(28px, 6vw, 96px);
+  bottom: clamp(28px, 6vw, 78px);
+  color: rgba(255,255,255,.20);
+  font-size: clamp(26px, 4vw, 58px);
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.auth-overlay[hidden] {
+  display: none !important;
+}
+
+.auth-card {
+  position: relative !important;
+  z-index: 1 !important;
+  width: min(380px, 100%) !important;
+  min-height: auto !important;
+  border-radius: 22px !important;
+  padding: 28px 28px 26px !important;
+  background: rgba(255,255,255,.96) !important;
+  border: 1px solid rgba(255,255,255,.72) !important;
+  box-shadow: 0 32px 90px rgba(0,0,0,.34) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.auth-card::before {
+  content: "EL";
+  width: 44px;
+  height: 44px;
+  margin-bottom: 18px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--portal-brand-color, #c8102e) 0%, var(--portal-brand-color-2, #e11d2e) 100%);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  box-shadow: 0 12px 26px rgba(var(--portal-brand-rgb, 200,16,46), .24);
+}
+
+.auth-card[hidden] {
+  display: none !important;
+}
+
+.auth-card h1 {
+  margin: 0 0 8px !important;
+  font-size: 24px !important;
+  line-height: 1.2 !important;
+  letter-spacing: -0.05em !important;
+  color: #0f172a !important;
+}
+
+.auth-card p {
+  margin: 0 0 22px !important;
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+  color: #64748b !important;
+}
+
+.auth-field {
+  gap: 7px !important;
+  margin-bottom: 13px !important;
+}
+
+.auth-field label {
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  color: #334155 !important;
+}
+
+.auth-field input {
+  height: 40px !important;
+  border-radius: 12px !important;
+  border: 1px solid #cbd5e1 !important;
+  padding: 0 13px !important;
+  font-size: 12px !important;
+  background: #ffffff !important;
+}
+
+.auth-field input:focus {
+  border-color: var(--portal-brand-color, #c8102e) !important;
+  box-shadow: 0 0 0 3px rgba(var(--portal-brand-rgb, 200,16,46), .12) !important;
+}
+
+.auth-button {
+  height: 44px !important;
+  border-radius: 13px !important;
+  margin-top: 8px !important;
+  background: linear-gradient(135deg, var(--portal-brand-color, #c8102e) 0%, var(--portal-brand-color-2, #e11d2e) 100%) !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  box-shadow: 0 10px 22px rgba(var(--portal-brand-rgb, 200,16,46), .18) !important;
+}
+
+.auth-message {
+  margin-top: 14px !important;
+  padding: 12px 13px !important;
+  border-radius: 14px !important;
+  font-size: 11.5px !important;
+  line-height: 1.5 !important;
+}
+
+@media (max-width: 900px) {
+  .auth-overlay {
+    justify-content: center !important;
+    padding: 22px !important;
+  }
+
+  .auth-overlay::after {
+    display: none !important;
+  }
+
+  .auth-card {
+    width: min(380px, 100%) !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .auth-overlay {
+    padding: 16px !important;
+  }
+
+  .auth-card {
+    padding: 24px 22px 22px !important;
+    border-radius: 20px !important;
+  }
+
+  .auth-card h1 {
+    font-size: 22px !important;
+  }
+}
+</style>
+
 </head>
 <body class="portal-restoring">
   <div id="portalBootOverlay" class="portal-boot-overlay" aria-live="polite" aria-label="포탈 불러오는 중">
