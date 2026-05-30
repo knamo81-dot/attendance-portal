@@ -4385,7 +4385,9 @@ create table if not exists user_app_roles (
   const state = {
     brandColor: DEFAULT_COLOR,
     loginBackgroundDataUrl: '',
-    loginLogoDataUrl: ''
+    loginLogoDataUrl: '',
+    loginBackgroundCleared: false,
+    loginLogoCleared: false
   };
 
   function $(id){ return document.getElementById(id); }
@@ -4480,13 +4482,23 @@ create table if not exists user_app_roles (
     if (!logo) return;
     logo.innerHTML = '';
     if (dataUrl) {
+      logo.hidden = false;
       const img = document.createElement('img');
       img.alt = '로그인 로고 미리보기';
       img.src = dataUrl;
       logo.appendChild(img);
     } else {
-      logo.textContent = 'EL';
+      logo.hidden = true;
     }
+  }
+
+  function getSettingAssetValue(value, names){
+    if (!value || typeof value !== 'object') return '';
+    for (const name of names) {
+      const v = value[name];
+      if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
+    }
+    return '';
   }
 
   function applyLoginPreview(){
@@ -4592,8 +4604,24 @@ create table if not exists user_app_roles (
 
     const value = data?.setting_value || {};
     const savedColor = normalizeHex(value.brandColor || value.brand_color || value.color);
-    state.loginBackgroundDataUrl = String(value.loginBackgroundDataUrl || value.login_background_data_url || value.loginBackgroundUrl || value.login_background_url || '');
-    state.loginLogoDataUrl = String(value.loginLogoDataUrl || value.login_logo_data_url || value.loginLogoUrl || value.login_logo_url || '');
+    state.loginBackgroundDataUrl = getSettingAssetValue(value, [
+      'loginBackgroundDataUrl',
+      'login_background_data_url',
+      'loginBackgroundUrl',
+      'login_background_url',
+      'backgroundImage',
+      'background_image'
+    ]);
+    state.loginLogoDataUrl = getSettingAssetValue(value, [
+      'loginLogoDataUrl',
+      'login_logo_data_url',
+      'loginLogoUrl',
+      'login_logo_url',
+      'logoImage',
+      'logo_image'
+    ]);
+    state.loginBackgroundCleared = false;
+    state.loginLogoCleared = false;
 
     if (savedColor) applyPortalColor(savedColor);
     else applyPortalColor(DEFAULT_COLOR);
@@ -4628,14 +4656,92 @@ create table if not exists user_app_roles (
 
     setFeedback('브랜드 설정을 저장하는 중입니다.', 'loading');
 
-    const settingValue = {
-      brandColor: color,
-      loginBackgroundDataUrl: state.loginBackgroundDataUrl || '',
-      loginLogoDataUrl: state.loginLogoDataUrl || '',
-      updatedFrom: 'settings.html'
-    };
+    let selectedBackgroundDataUrl = state.loginBackgroundDataUrl || '';
+    let selectedLogoDataUrl = state.loginLogoDataUrl || '';
+
+    try {
+      const bgFile = $('portalLoginBackgroundInput')?.files?.[0];
+      const logoFile = $('portalLoginLogoInput')?.files?.[0];
+
+      if (bgFile) {
+        selectedBackgroundDataUrl = await readFileAsDataUrl(bgFile, '로그인 배경 이미지');
+        state.loginBackgroundDataUrl = selectedBackgroundDataUrl;
+        state.loginBackgroundCleared = false;
+      }
+
+      if (logoFile) {
+        selectedLogoDataUrl = await readFileAsDataUrl(logoFile, '로그인 로고');
+        state.loginLogoDataUrl = selectedLogoDataUrl;
+        state.loginLogoCleared = false;
+      }
+    } catch (err) {
+      setFeedback(err.message || '이미지 파일을 읽지 못해 저장하지 못했습니다.', 'error');
+      return;
+    }
 
     const now = new Date().toISOString();
+
+    const { data: existingSetting, error: checkError } = await sb
+      .from('system_settings')
+      .select('id, setting_value')
+      .eq('company_id', companyId)
+      .eq('setting_key', SETTING_KEY)
+      .maybeSingle();
+
+    if (checkError) {
+      setFeedback('저장 전 기존 설정 확인 실패: ' + checkError.message, 'error');
+      return;
+    }
+
+    const existingValue = existingSetting?.setting_value && typeof existingSetting.setting_value === 'object'
+      ? existingSetting.setting_value
+      : {};
+
+    const existingBackground = getSettingAssetValue(existingValue, [
+      'loginBackgroundDataUrl',
+      'login_background_data_url',
+      'loginBackgroundUrl',
+      'login_background_url',
+      'backgroundImage',
+      'background_image'
+    ]);
+
+    const existingLogo = getSettingAssetValue(existingValue, [
+      'loginLogoDataUrl',
+      'login_logo_data_url',
+      'loginLogoUrl',
+      'login_logo_url',
+      'logoImage',
+      'logo_image'
+    ]);
+
+    const finalBackground = state.loginBackgroundCleared ? '' : (selectedBackgroundDataUrl || existingBackground || '');
+    const finalLogo = state.loginLogoCleared ? '' : (selectedLogoDataUrl || existingLogo || '');
+
+    state.loginBackgroundDataUrl = finalBackground;
+    state.loginLogoDataUrl = finalLogo;
+
+    const settingValue = {
+      ...existingValue,
+      brandColor: color,
+      brand_color: color,
+      loginBackgroundDataUrl: finalBackground,
+      loginLogoDataUrl: finalLogo,
+      updatedFrom: 'settings.html',
+      updatedAt: now
+    };
+
+    // 예전 키로 저장된 값이 있더라도, 최신 키를 기준으로 정리합니다.
+    delete settingValue.login_background_data_url;
+    delete settingValue.loginBackgroundUrl;
+    delete settingValue.login_background_url;
+    delete settingValue.backgroundImage;
+    delete settingValue.background_image;
+    delete settingValue.login_logo_data_url;
+    delete settingValue.loginLogoUrl;
+    delete settingValue.login_logo_url;
+    delete settingValue.logoImage;
+    delete settingValue.logo_image;
 
     async function updateExistingSetting(){
       return await sb
@@ -4646,18 +4752,6 @@ create table if not exists user_app_roles (
         })
         .eq('company_id', companyId)
         .eq('setting_key', SETTING_KEY);
-    }
-
-    const { data: existingSetting, error: checkError } = await sb
-      .from('system_settings')
-      .select('id')
-      .eq('company_id', companyId)
-      .eq('setting_key', SETTING_KEY)
-      .maybeSingle();
-
-    if (checkError) {
-      setFeedback('저장 전 기존 설정 확인 실패: ' + checkError.message, 'error');
-      return;
     }
 
     let saveError = null;
@@ -4691,7 +4785,7 @@ create table if not exists user_app_roles (
 
     applyPortalColor(color);
     applyLoginPreview();
-    setFeedback('브랜드 설정을 저장했습니다. 실제 로그인 화면 반영은 index.html 연동 단계에서 적용됩니다.', 'ok');
+    setFeedback('브랜드 설정을 저장했습니다. 로그인 배경/로고는 실제 로그인 화면에 반영됩니다.', 'ok');
   }
 
   function initPortalSetting(){
@@ -4714,6 +4808,7 @@ create table if not exists user_app_roles (
     $('portalLoginBackgroundInput')?.addEventListener('change', async e => {
       try {
         state.loginBackgroundDataUrl = await readFileAsDataUrl(e.target.files?.[0], '로그인 배경 이미지');
+        state.loginBackgroundCleared = false;
         applyLoginPreview();
         setFeedback('로그인 배경 이미지 미리보기가 적용되었습니다.', 'ok');
       } catch (err) {
@@ -4725,6 +4820,7 @@ create table if not exists user_app_roles (
     $('portalLoginLogoInput')?.addEventListener('change', async e => {
       try {
         state.loginLogoDataUrl = await readFileAsDataUrl(e.target.files?.[0], '로그인 로고');
+        state.loginLogoCleared = false;
         applyLoginPreview();
         setFeedback('로그인 로고 미리보기가 적용되었습니다.', 'ok');
       } catch (err) {
@@ -4743,6 +4839,8 @@ create table if not exists user_app_roles (
       applyPortalColor(DEFAULT_COLOR);
       state.loginBackgroundDataUrl = '';
       state.loginLogoDataUrl = '';
+      state.loginBackgroundCleared = true;
+      state.loginLogoCleared = true;
       if ($('portalLoginBackgroundInput')) $('portalLoginBackgroundInput').value = '';
       if ($('portalLoginLogoInput')) $('portalLoginLogoInput').value = '';
       applyLoginPreview();
@@ -4751,6 +4849,7 @@ create table if not exists user_app_roles (
 
     $('portalClearBackgroundBtn')?.addEventListener('click', () => {
       state.loginBackgroundDataUrl = '';
+      state.loginBackgroundCleared = true;
       if ($('portalLoginBackgroundInput')) $('portalLoginBackgroundInput').value = '';
       applyLoginPreview();
       setFeedback('로그인 배경 이미지를 기본 배경으로 되돌렸습니다.', 'ok');
@@ -4758,9 +4857,10 @@ create table if not exists user_app_roles (
 
     $('portalClearLogoBtn')?.addEventListener('click', () => {
       state.loginLogoDataUrl = '';
+      state.loginLogoCleared = true;
       if ($('portalLoginLogoInput')) $('portalLoginLogoInput').value = '';
       applyLoginPreview();
-      setFeedback('로그인 로고를 기본 EL 표시로 되돌렸습니다.', 'ok');
+      setFeedback('로그인 로고를 제거했습니다. 저장하면 로그인 화면에서는 로고 영역이 숨겨집니다.', 'ok');
     });
 
     $('portalSaveColorBtn')?.addEventListener('click', savePortalBrandSettings);
