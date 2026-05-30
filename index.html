@@ -1897,7 +1897,7 @@ input[type="radio"]{
           </div>
         </div>
         <div class="nav-group">
-          <button type="button" id="settingsNavBtn" class="nav-btn" data-portal-src="settings.html" title="설정">설정</button>
+          <button type="button" id="settingsNavBtn" class="nav-btn" data-portal-src="settings.html" title="설정" hidden>설정</button>
           <button type="button" id="logoutNavBtn" class="nav-btn" title="로그아웃 안내">종료</button>
           <button type="button" id="serviceAdminBtn" class="nav-btn service-admin-btn" data-portal-src="service-admin/service-admin.html" title="ExeloLab" aria-label="ExeloLab">
 <svg
@@ -2134,6 +2134,7 @@ input[type="radio"]{
     mobileDrawerBackdrop: document.getElementById('mobileDrawerBackdrop'),
     mobileEdgeSwipeZone: document.getElementById('mobileEdgeSwipeZone'),
     portalSideNav: document.getElementById('portalSideNav'),
+    settingsNavBtn: document.getElementById('settingsNavBtn'),
     serviceAdminBtn: document.getElementById('serviceAdminBtn'),
     portalSubtabsWrap: document.getElementById('portalSubtabsWrap'),
     portalSubtabs: document.getElementById('portalSubtabs'),
@@ -2855,6 +2856,25 @@ input[type="radio"]{
     els.serviceAdminBtn.setAttribute('aria-label', 'ExeloLab');
   }
 
+  function canUseSettingsMenu() {
+    if (isServiceAdminRole()) return true;
+    const session = buildPortalSession();
+    const role = normalizePortalRole(session?.role || currentProfile?.role || currentEmployee?.role || '', 'user');
+    return role === 'admin';
+  }
+
+  function updateSettingsButtonVisibility() {
+    if (!els.settingsNavBtn) return;
+    const allowed = Boolean(currentUser && canUseSettingsMenu());
+    els.settingsNavBtn.hidden = !allowed;
+    els.settingsNavBtn.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+    els.settingsNavBtn.tabIndex = allowed ? 0 : -1;
+  }
+
+  function isSettingsSrc(src) {
+    return normalizePortalSrc(src) === 'settings.html';
+  }
+
   function isServiceAdminSrc(src) {
     return normalizePortalSrc(src) === 'service-admin/service-admin.html';
   }
@@ -3471,6 +3491,7 @@ input[type="radio"]{
     window.currentTenantSubdomain = requestedSubdomain || null;
     window.currentUserRole = null;
     updateServiceAdminButtonVisibility();
+    updateSettingsButtonVisibility();
   }
 
   window.getPortalSession = function () {
@@ -3545,6 +3566,7 @@ input[type="radio"]{
       : '';
     els.userChip.innerHTML = `<span>${escapeHtml(name)}</span>${company}<span class="role">${escapeHtml(roleText)}</span>`;
     updateServiceAdminButtonVisibility();
+    updateSettingsButtonVisibility();
   }
 
 
@@ -4120,6 +4142,10 @@ input[type="radio"]{
       return;
     }
 
+    if (isSettingsSrc(src) && !canUseSettingsMenu()) {
+      return;
+    }
+
     if (isServiceAdminSrc(src) && !isServiceAdminRole()) {
       return;
     }
@@ -4175,6 +4201,11 @@ input[type="radio"]{
     try {
       lastSrc = normalizePortalSrc(sessionStorage.getItem(LAST_PAGE_KEY) || '');
     } catch (_) {
+      lastSrc = '';
+    }
+
+    if (lastSrc && isSettingsSrc(lastSrc) && !canUseSettingsMenu()) {
+      try { sessionStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
       lastSrc = '';
     }
 
