@@ -4628,24 +4628,64 @@ create table if not exists user_app_roles (
 
     setFeedback('브랜드 설정을 저장하는 중입니다.', 'loading');
 
-    const payload = {
-      company_id: companyId,
-      setting_key: SETTING_KEY,
-      setting_value: {
-        brandColor: color,
-        loginBackgroundDataUrl: state.loginBackgroundDataUrl || '',
-        loginLogoDataUrl: state.loginLogoDataUrl || '',
-        updatedFrom: 'settings.html'
-      },
-      updated_at: new Date().toISOString()
+    const settingValue = {
+      brandColor: color,
+      loginBackgroundDataUrl: state.loginBackgroundDataUrl || '',
+      loginLogoDataUrl: state.loginLogoDataUrl || '',
+      updatedFrom: 'settings.html'
     };
 
-    const { error } = await sb
-      .from('system_settings')
-      .upsert(payload, { onConflict: 'company_id,setting_key' });
+    const now = new Date().toISOString();
 
-    if (error) {
-      setFeedback('저장 실패: ' + error.message + ' / system_settings 테이블과 unique(company_id, setting_key)를 확인해 주세요.', 'error');
+    async function updateExistingSetting(){
+      return await sb
+        .from('system_settings')
+        .update({
+          setting_value: settingValue,
+          updated_at: now
+        })
+        .eq('company_id', companyId)
+        .eq('setting_key', SETTING_KEY);
+    }
+
+    const { data: existingSetting, error: checkError } = await sb
+      .from('system_settings')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('setting_key', SETTING_KEY)
+      .maybeSingle();
+
+    if (checkError) {
+      setFeedback('저장 전 기존 설정 확인 실패: ' + checkError.message, 'error');
+      return;
+    }
+
+    let saveError = null;
+
+    if (existingSetting?.id) {
+      const { error } = await updateExistingSetting();
+      saveError = error || null;
+    } else {
+      const { error } = await sb
+        .from('system_settings')
+        .insert([{
+          company_id: companyId,
+          setting_key: SETTING_KEY,
+          setting_value: settingValue,
+          created_at: now,
+          updated_at: now
+        }]);
+
+      if (error && /duplicate key|unique constraint/i.test(String(error.message || ''))) {
+        const retry = await updateExistingSetting();
+        saveError = retry.error || null;
+      } else {
+        saveError = error || null;
+      }
+    }
+
+    if (saveError) {
+      setFeedback('저장 실패: ' + saveError.message + ' / system_settings 저장 권한 또는 company_id + setting_key 값을 확인해 주세요.', 'error');
       return;
     }
 
