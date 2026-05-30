@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
@@ -1774,13 +1774,36 @@
         return;
       }
 
-      const { error } = await sb()
+      const insertPayload = {
+        email: adminEmail,
+        name: emp.name || employeeEmail,
+        role: 'service_admin',
+        is_active: true,
+        employee_no: emp.employee_no || null,
+        company_id: emp.company_id || exeloLabCompanyId || null,
+        must_change_password: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      let { error } = await sb()
         .from('users')
-        .insert({
-          email: adminEmail,
-          role: 'service_admin',
-          is_active: true
-        });
+        .insert(insertPayload);
+
+      if (error && String(error.message || '').includes('must_change_password')) {
+        const retryPayload = { ...insertPayload };
+        delete retryPayload.must_change_password;
+        const retry = await sb().from('users').insert(retryPayload);
+        error = retry.error;
+      }
+
+      if (error && String(error.message || '').includes('employee_no')) {
+        const retryPayload = { ...insertPayload };
+        delete retryPayload.employee_no;
+        delete retryPayload.must_change_password;
+        const retry = await sb().from('users').insert(retryPayload);
+        error = retry.error;
+      }
 
       if (error) throw error;
 
