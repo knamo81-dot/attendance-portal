@@ -1791,7 +1791,7 @@ input[type="radio"]{
     <div class="layout">
       <div id="portalSideNav" class="sidenav">
         <div>
-          <button type="button" id="homeNavBtn" class="nav-btn home active" data-portal-src="portal-main/portal-main.html" title="홈" aria-label="홈">
+          <button type="button" id="homeNavBtn" class="nav-btn home" data-portal-src="portal-main/portal-main.html" title="홈" aria-label="홈">
             <svg class="home-nav-icon" viewBox="0 0 48 48" aria-hidden="true">
               <path d="M8.5 22 L24 8.5 L39.5 22" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M13 20 V38 H35 V20" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -3932,7 +3932,7 @@ input[type="radio"]{
     if (serviceModeNoticeSrc) {
       // service_admin 모드에서는 개인 홈/업무/AIC 앱으로 직접 진입하지 않고
       // 관리자 모드 안내 화면을 표시합니다. 버튼은 유지해 검증/UX 흐름은 확인할 수 있게 합니다.
-      try { localStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
+      try { sessionStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
       replacePortalFrame(buildSrcWithSession(serviceModeNoticeSrc));
       if (btn) setActiveNav(btn);
       return;
@@ -3942,9 +3942,9 @@ input[type="radio"]{
 
     if (isHome) {
       await loadPortalBrandSettings();
-      localStorage.removeItem(LAST_PAGE_KEY);
+      sessionStorage.removeItem(LAST_PAGE_KEY);
     } else if (!options.skipSave) {
-      localStorage.setItem(LAST_PAGE_KEY, src);
+      sessionStorage.setItem(LAST_PAGE_KEY, src);
     }
 
     replacePortalFrame(buildSrcWithSession(src));
@@ -3964,7 +3964,7 @@ input[type="radio"]{
     // 명시적인 로그인 직후에는 항상 역할별 기본 시작 화면으로 진입합니다.
     // 일반 회사계정: 홈 / 서비스관리자: 서비스관리자 설정
     try {
-      localStorage.removeItem(LAST_PAGE_KEY);
+      sessionStorage.removeItem(LAST_PAGE_KEY);
     } catch (_) {}
 
     const startSrc = getDefaultPortalStartSrc();
@@ -3977,13 +3977,13 @@ input[type="radio"]{
     // 저장된 마지막 화면이 없거나 현재 권한에서 허용되지 않으면 역할별 기본 화면으로 이동합니다.
     let lastSrc = '';
     try {
-      lastSrc = normalizePortalSrc(localStorage.getItem(LAST_PAGE_KEY) || '');
+      lastSrc = normalizePortalSrc(sessionStorage.getItem(LAST_PAGE_KEY) || '');
     } catch (_) {
       lastSrc = '';
     }
 
     if (lastSrc && isServiceAdminSrc(lastSrc) && !isServiceAdminRole()) {
-      try { localStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
+      try { sessionStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
       lastSrc = '';
     }
 
@@ -4084,11 +4084,11 @@ input[type="radio"]{
     } catch (error) {
       console.warn('signOut warning:', error);
     }
-    localStorage.removeItem(LAST_PAGE_KEY);
+    sessionStorage.removeItem(LAST_PAGE_KEY);
     try { localStorage.removeItem('reagent_current_user'); } catch (_) {}
     clearPortalSession();
     clearLoginInputs();
-    replacePortalFrame(HOME_SRC);
+    clearPortalFrame();
     if (homeBtn) setActiveNav(homeBtn);
     showLogin('로그아웃되었습니다.');
     setTimeout(() => clearLoginInputs(), 80);
@@ -4394,7 +4394,8 @@ input[type="radio"]{
   async function boot() {
     installUserAppRolesCompanyGuard();
     bindEvents();
-    updatePortalHeader(HOME_SRC);
+    // 초기에는 홈 화면/헤더를 먼저 그리지 않습니다.
+    // 로그인/세션 확인 후 역할별 기본 화면 또는 sessionStorage의 마지막 화면을 로드합니다.
 
     const { data } = await supabaseClient.auth.getSession();
     const sessionUser = data?.session?.user || null;
@@ -4440,7 +4441,7 @@ input[type="radio"]{
       frameSrc: document.getElementById('portalFrame')?.src || '',
       navButtonCount: navButtons.length,
       portalSession: window.portalSession || null,
-      lastPage: localStorage.getItem(LAST_PAGE_KEY),
+      lastPage: sessionStorage.getItem(LAST_PAGE_KEY),
       currentPortalTabs,
       currentPortalTabId,
       currentPortalFilters,
