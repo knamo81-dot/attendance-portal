@@ -2681,6 +2681,22 @@ input[type="radio"]{
     }, '*');
   }
 
+  function getWorkspacePortalHeaderTitle() {
+    // 회사 포털 홈 배너의 2번째 줄만 회사명 기반으로 표시합니다.
+    // 서비스관리자 모드는 회사 포털이 아니므로 기존 서비스관리자 문구를 유지합니다.
+    if (typeof isServiceAdminRole === 'function' && isServiceAdminRole()) return '';
+
+    const effectiveCompany = (typeof getEffectiveCompany === 'function' && getEffectiveCompany()) || currentCompany || requestedCompany || null;
+    let companyName = String(effectiveCompany?.company_name || '').trim();
+
+    if (!companyName && typeof getRequestedCompanyDisplayName === 'function') {
+      companyName = String(getRequestedCompanyDisplayName() || '').trim();
+    }
+
+    if (!companyName || companyName === '회사') return '';
+    return companyName + ' Portal';
+  }
+
   function updatePortalHeader(src) {
     const key = normalizePortalSrc(src);
     const meta = portalHeaderMeta[key] || portalHeaderMeta[HOME_SRC];
@@ -2699,8 +2715,13 @@ input[type="radio"]{
     }
     document.documentElement.style.setProperty('--current-header-accent', currentAccent);
 
+    let headerTitle = meta.title || '';
+    if (key === HOME_SRC) {
+      headerTitle = getWorkspacePortalHeaderTitle() || headerTitle;
+    }
+
     if (top) top.textContent = meta.top || '';
-    if (title) title.textContent = meta.title || '';
+    if (title) title.textContent = headerTitle;
     if (desc) desc.textContent = meta.desc || '';
   }
 
