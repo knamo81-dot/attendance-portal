@@ -2533,6 +2533,74 @@ body.auth-loading .top-user-bar {
     return '';
   }
 
+  function normalizePortalBrandSettingValue(value) {
+    const src = value && typeof value === 'object' ? value : {};
+    return {
+      brandColor:
+        src.brandColor ||
+        src.brand_color ||
+        src.color ||
+        '#c8102e',
+      loginBackgroundDataUrl: normalizeDataUrl(
+        src.loginBackgroundDataUrl ||
+        src.login_background_data_url ||
+        src.loginBackgroundUrl ||
+        src.login_background_url ||
+        src.backgroundImage ||
+        src.background_image ||
+        ''
+      ),
+      loginLogoDataUrl: normalizeDataUrl(
+        src.loginLogoDataUrl ||
+        src.login_logo_data_url ||
+        src.loginLogoUrl ||
+        src.login_logo_url ||
+        src.logoImage ||
+        src.logo_image ||
+        ''
+      )
+    };
+  }
+
+  function getPortalBrandCacheKey(companyId) {
+    const cleanCompanyId = String(companyId || '').trim();
+    return cleanCompanyId ? 'portalBrandSettings:' + cleanCompanyId : '';
+  }
+
+  function readPortalBrandCache(companyId) {
+    const key = getPortalBrandCacheKey(companyId);
+    if (!key) return null;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writePortalBrandCache(companyId, value) {
+    const key = getPortalBrandCacheKey(companyId);
+    if (!key || !value || typeof value !== 'object') return;
+    try {
+      localStorage.setItem(key, JSON.stringify({
+        ...value,
+        cachedAt: new Date().toISOString()
+      }));
+    } catch (error) {
+      console.warn('portal brand cache write failed:', error);
+    }
+  }
+
+  function applyPortalBrandSettingValue(value) {
+    const normalized = normalizePortalBrandSettingValue(value);
+    portalLoginBackgroundDataUrl = normalized.loginBackgroundDataUrl;
+    portalLoginLogoDataUrl = normalized.loginLogoDataUrl;
+    applyPortalBrandColor(normalized.brandColor);
+    applyPortalLoginAssets();
+  }
+
   function applyPortalLoginAssets() {
     const bg = normalizeDataUrl(portalLoginBackgroundDataUrl);
     const logo = normalizeDataUrl(portalLoginLogoDataUrl);
@@ -2568,6 +2636,11 @@ body.auth-loading .top-user-bar {
       return;
     }
 
+    const cachedValue = readPortalBrandCache(companyId);
+    if (cachedValue) {
+      applyPortalBrandSettingValue(cachedValue);
+    }
+
     try {
       const { data, error } = await supabaseClient
         .from('system_settings')
@@ -2579,36 +2652,22 @@ body.auth-loading .top-user-bar {
       if (error) throw error;
 
       const value = data?.setting_value || {};
-      const savedColor =
-        value.brandColor ||
-        value.brand_color ||
-        value.color ||
-        '#c8102e';
-
-      portalLoginBackgroundDataUrl = normalizeDataUrl(
-        value.loginBackgroundDataUrl ||
-        value.login_background_data_url ||
-        value.loginBackgroundUrl ||
-        value.login_background_url ||
-        value.backgroundImage ||
-        value.background_image ||
-        ''
-      );
-
-      portalLoginLogoDataUrl = normalizeDataUrl(
-        value.loginLogoDataUrl ||
-        value.login_logo_data_url ||
-        value.loginLogoUrl ||
-        value.login_logo_url ||
-        value.logoImage ||
-        value.logo_image ||
-        ''
-      );
-
-      applyPortalBrandColor(savedColor);
-      applyPortalLoginAssets();
+      applyPortalBrandSettingValue(value);
+      writePortalBrandCache(companyId, {
+        ...value,
+        companyId
+      });
     } catch (error) {
       console.warn('portal brand setting load failed:', error);
+
+      // 로그인 전 상태에서는 RLS 정책 때문에 system_settings를 읽지 못할 수 있습니다.
+      // 이 경우 직전 저장/로그인 시 로컬에 캐시한 브랜드 값을 유지해 새로고침 시에도 같은 로그인 배경을 보여줍니다.
+      const fallbackValue = cachedValue || readPortalBrandCache(companyId);
+      if (fallbackValue) {
+        applyPortalBrandSettingValue(fallbackValue);
+        return;
+      }
+
       applyPortalBrandColor('#c8102e');
       portalLoginBackgroundDataUrl = '';
       portalLoginLogoDataUrl = '';
@@ -4918,9 +4977,20 @@ body.auth-loading .top-user-bar {
       const payload = event?.data || {};
 
       if (payload.type === 'portal-brand-updated') {
-        const nextColor = payload.brandColor || payload.brand_color || payload.color;
-        if (!isValidHexColor(nextColor)) return;
-        applyPortalBrandColor(nextColor);
+        const brandValue = payload.settingValue || payload.setting_value || payload;
+        const nextColor = brandValue.brandColor || brandValue.brand_color || brandValue.color;
+        const targetCompanyId = payload.companyId || payload.company_id || activeCompany?.id || currentCompany?.id || currentProfile?.company_id || '';
+        if (targetCompanyId && brandValue && typeof brandValue === 'object') {
+          writePortalBrandCache(targetCompanyId, {
+            ...brandValue,
+            companyId: targetCompanyId
+          });
+        }
+        if (isValidHexColor(nextColor)) {
+          applyPortalBrandSettingValue(brandValue);
+        } else {
+          applyPortalLoginAssets();
+        }
         const currentSrc = normalizePortalSrc(frame?.getAttribute('src') || frame?.src || HOME_SRC);
         updatePortalHeader(currentSrc);
         return;
