@@ -201,6 +201,80 @@
       visibility: hidden;
     }
 
+    .portal-boot-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: #f1f5f9;
+      color: #0f172a;
+      transition: opacity .18s ease, visibility .18s ease;
+    }
+
+    .portal-boot-card {
+      width: min(320px, calc(100vw - 40px));
+      min-height: 160px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 22px;
+      background: #ffffff;
+      box-shadow: 0 24px 70px rgba(15, 23, 42, 0.16);
+      text-align: center;
+    }
+
+    .portal-boot-logo {
+      width: 54px;
+      height: 54px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 17px;
+      background: linear-gradient(135deg, var(--portal-brand-color, #c8102e) 0%, var(--portal-brand-color-2, #e11d2e) 100%);
+      color: #ffffff;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: -0.05em;
+      box-shadow: 0 10px 24px rgba(200, 16, 46, 0.22);
+    }
+
+    .portal-boot-title {
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+    }
+
+    .portal-boot-desc {
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748b;
+    }
+
+    .portal-boot-spinner {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      border: 3px solid #e2e8f0;
+      border-top-color: var(--portal-brand-color, #c8102e);
+      animation: portalBootSpin .8s linear infinite;
+    }
+
+    @keyframes portalBootSpin {
+      to { transform: rotate(360deg); }
+    }
+
+    body.portal-boot-done .portal-boot-overlay {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
 
     body.auth-loading .layout {
       filter: blur(1px);
@@ -1792,6 +1866,14 @@ input[type="radio"]{
 </style>
 </head>
 <body class="portal-restoring">
+  <div id="portalBootOverlay" class="portal-boot-overlay" aria-live="polite" aria-label="포탈 불러오는 중">
+    <div class="portal-boot-card">
+      <div class="portal-boot-logo">EL</div>
+      <div class="portal-boot-title">ExeloLab Ops</div>
+      <div class="portal-boot-desc">포탈 화면을 불러오는 중입니다.</div>
+      <div class="portal-boot-spinner" aria-hidden="true"></div>
+    </div>
+  </div>
   <div class="app">
     <div class="layout">
       <div id="portalSideNav" class="sidenav">
@@ -2023,6 +2105,7 @@ input[type="radio"]{
   }
 
   const els = {
+    bootOverlay: document.getElementById('portalBootOverlay'),
     overlay: document.getElementById('authOverlay'),
     loginCard: document.getElementById('loginCard'),
     passwordCard: document.getElementById('passwordCard'),
@@ -3332,7 +3415,18 @@ input[type="radio"]{
     return appUrl + (String(appUrl).includes('?') ? '&' : '?') + 'company_id=' + encodeURIComponent(session.activeCompanyId);
   };
 
+  function showPortalBootOverlay() {
+    document.body.classList.add('portal-restoring');
+    document.body.classList.remove('portal-boot-done');
+  }
+
+  function hidePortalBootOverlay() {
+    document.body.classList.remove('portal-restoring');
+    document.body.classList.add('portal-boot-done');
+  }
+
   function showLogin(message = '') {
+    hidePortalBootOverlay();
     document.body.classList.add('auth-loading');
     clearLoginInputs();
     setTimeout(() => clearLoginInputs(), 80);
@@ -3348,6 +3442,7 @@ input[type="radio"]{
   }
 
   function showPasswordChange(message = '') {
+    hidePortalBootOverlay();
     document.body.classList.add('auth-loading');
     if (els.overlay) els.overlay.hidden = false;
     if (els.loginCard) els.loginCard.hidden = true;
@@ -3888,11 +3983,13 @@ input[type="radio"]{
 
   function replacePortalFrame(src) {
     if (!frame || !src) return;
-    document.body.classList.add('portal-restoring');
+    showPortalBootOverlay();
+    let restoreSafetyTimer = null;
     updatePortalHeader(src);
     updatePortalSubtabs(src);
     frame.onload = function () {
-      document.body.classList.remove('portal-restoring');
+      if (restoreSafetyTimer) clearTimeout(restoreSafetyTimer);
+      hidePortalBootOverlay();
       postAuthToFrame();
       broadcastPortalLanguage(getPreferredLanguage());
 
@@ -3923,6 +4020,9 @@ input[type="radio"]{
         });
       }
     };
+    restoreSafetyTimer = setTimeout(function () {
+      hidePortalBootOverlay();
+    }, 5000);
     frame.src = src;
   }
 
@@ -4405,7 +4505,6 @@ input[type="radio"]{
   async function boot() {
     installUserAppRolesCompanyGuard();
     bindEvents();
-    updatePortalHeader(HOME_SRC);
 
     const { data } = await supabaseClient.auth.getSession();
     const sessionUser = data?.session?.user || null;
