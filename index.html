@@ -3949,18 +3949,40 @@ input[type="radio"]{
     await navigateBySrc(btn.getAttribute('data-portal-src'), btn, options);
   }
 
-  async function restoreLastPage() {
-    // 로그인 / 새로고침 / 재접속 시에는 이전 메뉴를 복원하지 않고 기본 진입 화면을 역할별로 지정합니다.
+  function getDefaultPortalStartSrc() {
+    return isServiceAdminRole() ? 'service-admin/service-admin.html' : HOME_SRC;
+  }
+
+  async function navigateToDefaultAfterLogin() {
+    // 명시적인 로그인 직후에는 항상 역할별 기본 시작 화면으로 진입합니다.
+    // 일반 회사계정: 홈 / 서비스관리자: 서비스관리자 설정
     try {
       localStorage.removeItem(LAST_PAGE_KEY);
     } catch (_) {}
 
-    if (isServiceAdminRole()) {
-      await navigateBySrc('service-admin/service-admin.html', els.serviceAdminBtn, { skipSave: true });
-      return;
+    const startSrc = getDefaultPortalStartSrc();
+    const startBtn = findNavBySrc(startSrc) || (startSrc === HOME_SRC ? homeBtn : els.serviceAdminBtn);
+    await navigateBySrc(startSrc, startBtn, { skipSave: true });
+  }
+
+  async function restoreLastPage() {
+    // 새로고침 / 세션 복원 시에는 작업 중이던 프로그램을 우선 복원합니다.
+    // 저장된 마지막 화면이 없거나 현재 권한에서 허용되지 않으면 역할별 기본 화면으로 이동합니다.
+    let lastSrc = '';
+    try {
+      lastSrc = normalizePortalSrc(localStorage.getItem(LAST_PAGE_KEY) || '');
+    } catch (_) {
+      lastSrc = '';
     }
 
-    await navigateBySrc(HOME_SRC, homeBtn, { skipSave: true });
+    if (lastSrc && isServiceAdminSrc(lastSrc) && !isServiceAdminRole()) {
+      try { localStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
+      lastSrc = '';
+    }
+
+    const targetSrc = lastSrc || getDefaultPortalStartSrc();
+    const targetBtn = findNavBySrc(targetSrc) || (targetSrc === HOME_SRC ? homeBtn : els.serviceAdminBtn);
+    await navigateBySrc(targetSrc, targetBtn, { skipSave: true });
   }
 
   async function login() {
@@ -3991,7 +4013,7 @@ input[type="radio"]{
       }
 
       showPortal();
-      await restoreLastPage();
+      await navigateToDefaultAfterLogin();
     } catch (error) {
       console.error('login error:', error);
       let msg = error?.message || '로그인에 실패했습니다.';
@@ -4039,7 +4061,7 @@ input[type="radio"]{
       setBoxMessage(els.passwordSuccess, '비밀번호가 변경되었습니다. 포털로 이동합니다.');
       setTimeout(async () => {
         showPortal();
-        await restoreLastPage();
+        await navigateToDefaultAfterLogin();
       }, 650);
     } catch (error) {
       console.error('changePassword error:', error);
