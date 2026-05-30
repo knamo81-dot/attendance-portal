@@ -2743,6 +2743,17 @@ input[type="radio"]{
   }
 
 
+  function getRequestedCompanyDisplayName() {
+    if (requestedCompany?.company_name) return requestedCompany.company_name;
+
+    const fallbackNames = {
+      xll: 'ExeloLab',
+      scd: '삼천당제약'
+    };
+    const key = String(requestedSubdomain || '').trim().toLowerCase();
+    return fallbackNames[key] || (key ? key.toUpperCase() : '회사');
+  }
+
   function getPortalLoginBrand() {
     if (!requestedSubdomain) {
       return {
@@ -2754,23 +2765,13 @@ input[type="radio"]{
       };
     }
 
-    if (requestedCompany) {
-      const companyName = requestedCompany.company_name || '회사';
-      return {
-        title: companyName + ' Portal',
-        desc: companyName + ' 전용 통합 운영 포털입니다. 해당 회사 계정으로 로그인해 주세요.',
-        bootTitle: companyName + ' Portal',
-        bootDesc: companyName + ' 포털 화면을 불러오는 중입니다.',
-        logo: String(companyName || 'P').trim().slice(0, 2).toUpperCase()
-      };
-    }
-
+    const companyName = getRequestedCompanyDisplayName();
     return {
-      title: '회사 포털',
-      desc: requestedSubdomain + '.ops.exelolab.com 접속주소를 확인하는 중입니다.',
-      bootTitle: 'Company Portal',
-      bootDesc: '회사 정보를 확인하는 중입니다.',
-      logo: 'EL'
+      title: companyName + ' Portal',
+      desc: companyName + ' 전용 통합 운영 포털입니다. 해당 회사 계정으로 로그인해 주세요.',
+      bootTitle: companyName + ' Portal',
+      bootDesc: companyName + ' 포털 화면을 불러오는 중입니다.',
+      logo: String(companyName || 'P').trim().slice(0, 2).toUpperCase()
     };
   }
 
@@ -3810,7 +3811,7 @@ input[type="radio"]{
       clearPortalSession();
       currentCompany = urlCompany || null;
       publishPortalSession();
-      showLogin(`현재 회사 포털에서는 사용할 수 없는 계정입니다. ${urlCompany?.company_name || '소속 회사'} 전용 접속 주소가 맞는지 확인해 주세요.`);
+      showLogin('현재 접속한 회사 포털에서는 사용할 수 없는 계정입니다. 소속 회사의 접속 주소를 확인해 주세요.');
       return false;
     }
 
