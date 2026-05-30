@@ -251,6 +251,33 @@
       box-shadow: 0 10px 24px rgba(200, 16, 46, 0.22);
     }
 
+
+    .portal-boot-logo[hidden] {
+      display: none !important;
+    }
+
+    .portal-boot-logo.has-image {
+      width: auto;
+      min-width: 0;
+      max-width: 190px;
+      height: auto;
+      min-height: 0;
+      padding: 0;
+      border-radius: 0;
+      background: transparent !important;
+      color: inherit;
+      box-shadow: none;
+    }
+
+    .portal-boot-logo.has-image img {
+      display: block;
+      max-width: 190px;
+      max-height: 58px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+    }
+
     .portal-boot-title {
       font-size: 15px;
       font-weight: 900;
@@ -2129,7 +2156,7 @@ body.auth-loading .top-user-bar {
 <body class="portal-restoring">
   <div id="portalBootOverlay" class="portal-boot-overlay" aria-live="polite" aria-label="포탈 불러오는 중">
     <div class="portal-boot-card">
-      <div id="portalBootLogo" class="portal-boot-logo">EL</div>
+      <div id="portalBootLogo" class="portal-boot-logo" hidden></div>
       <div id="portalBootTitle" class="portal-boot-title">ExeloLab Ops</div>
       <div id="portalBootDesc" class="portal-boot-desc">포탈 화면을 불러오는 중입니다.</div>
       <div class="portal-boot-spinner" aria-hidden="true"></div>
@@ -2678,8 +2705,7 @@ body.auth-loading .top-user-bar {
       if (bg) {
         const bgUrl = cssUrl(bg);
         els.overlay.style.setProperty('--portal-login-bg-image', bgUrl);
-        els.overlay.style.backgroundImage =
-          'linear-gradient(90deg, rgba(15,23,42,.30) 0%, rgba(15,23,42,.12) 48%, rgba(15,23,42,.52) 100%), ' + bgUrl;
+        els.overlay.style.backgroundImage = bgUrl;
         els.overlay.style.backgroundPosition = 'center center';
         els.overlay.style.backgroundSize = 'cover';
         els.overlay.style.backgroundRepeat = 'no-repeat';
@@ -2701,6 +2727,18 @@ body.auth-loading .top-user-bar {
       } else {
         els.loginLogoImg.removeAttribute('src');
         els.loginLogoWrap.hidden = true;
+      }
+    }
+
+    if (els.bootLogo) {
+      if (logo) {
+        els.bootLogo.innerHTML = '<img src="' + String(logo).replace(/"/g, '&quot;') + '" alt="로딩 로고" />';
+        els.bootLogo.classList.add('has-image');
+        els.bootLogo.hidden = false;
+      } else {
+        els.bootLogo.innerHTML = '';
+        els.bootLogo.classList.remove('has-image');
+        els.bootLogo.hidden = true;
       }
     }
   }
@@ -3266,7 +3304,7 @@ body.auth-loading .top-user-bar {
     if (els.loginPortalTitle) els.loginPortalTitle.textContent = brand.title;
     if (els.loginPortalDesc) els.loginPortalDesc.textContent = brand.desc;
 
-    if (els.bootLogo) els.bootLogo.textContent = brand.logo || 'EL';
+    // 로딩 로고는 로그인 로고 업로드가 있을 때만 applyPortalLoginAssets()에서 표시합니다.
     if (els.bootTitle) els.bootTitle.textContent = brand.bootTitle || brand.title;
     if (els.bootDesc) els.bootDesc.textContent = brand.bootDesc || '포탈 화면을 불러오는 중입니다.';
 
