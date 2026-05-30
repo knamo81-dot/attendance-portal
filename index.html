@@ -2083,18 +2083,13 @@ body.auth-loading .top-user-bar {
 
 .auth-overlay.auth-has-background {
   background:
-    linear-gradient(90deg, rgba(15,23,42,.30) 0%, rgba(15,23,42,.12) 48%, rgba(15,23,42,.52) 100%),
-    var(--portal-login-bg-image) center / cover no-repeat !important;
+    var(--portal-login-bg-image) center center / cover no-repeat !important;
 }
 
 .auth-overlay.auth-has-background::before {
-  background:
-    linear-gradient(
-      90deg,
-      rgba(15,23,42,.10) 0%,
-      rgba(15,23,42,.04) 46%,
-      rgba(15,23,42,.24) 100%
-    ) !important;
+  display: none !important;
+  content: none !important;
+  background: none !important;
 }
 
 .auth-overlay.auth-has-background::after {
