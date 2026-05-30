@@ -2050,6 +2050,48 @@ body.auth-loading .top-user-bar {
     font-size: 22px !important;
   }
 }
+
+
+/* ===== Login Brand Assets Runtime Final ===== */
+.auth-card::before {
+  display: none !important;
+  content: none !important;
+}
+
+.auth-login-logo {
+  width: auto;
+  max-width: 172px;
+  min-height: 0;
+  margin: 0 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.auth-login-logo[hidden] {
+  display: none !important;
+}
+
+.auth-login-logo img {
+  display: block;
+  max-width: 172px;
+  max-height: 58px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.auth-overlay.auth-has-background {
+  background:
+    linear-gradient(90deg, rgba(15,23,42,.30) 0%, rgba(15,23,42,.12) 48%, rgba(15,23,42,.52) 100%),
+    var(--portal-login-bg-image) center / cover no-repeat !important;
+}
+
+.auth-overlay.auth-has-background::before {
+  background:
+    linear-gradient(90deg, rgba(15,23,42,.10) 0%, rgba(15,23,42,.04) 46%, rgba(15,23,42,.24) 100%),
+    repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 1px, transparent 1px 18px) !important;
+}
 </style>
 
 </head>
@@ -2201,6 +2243,7 @@ body.auth-loading .top-user-bar {
 
   <div id="authOverlay" class="auth-overlay" hidden>
     <div id="loginCard" class="auth-card">
+      <div id="loginLogoWrap" class="auth-login-logo" hidden><img id="loginLogoImg" alt="로그인 로고" /></div>
       <h1 id="loginPortalTitle">포탈 로그인</h1>
       <p id="loginPortalDesc">연구소 통합 운영 포탈에 접속하려면 계정으로 로그인해 주세요.</p>
       <div class="auth-field">
@@ -2299,6 +2342,8 @@ body.auth-loading .top-user-bar {
     bootDesc: document.getElementById('portalBootDesc'),
     loginPortalTitle: document.getElementById('loginPortalTitle'),
     loginPortalDesc: document.getElementById('loginPortalDesc'),
+    loginLogoWrap: document.getElementById('loginLogoWrap'),
+    loginLogoImg: document.getElementById('loginLogoImg'),
     overlay: document.getElementById('authOverlay'),
     loginCard: document.getElementById('loginCard'),
     passwordCard: document.getElementById('passwordCard'),
@@ -2398,6 +2443,8 @@ body.auth-loading .top-user-bar {
 
   let portalBrandColor = '#c8102e';
   let portalBrandColor2 = '#e11d2e';
+  let portalLoginBackgroundDataUrl = '';
+  let portalLoginLogoDataUrl = '';
 
   function isValidHexColor(value) {
     return /^#[0-9a-fA-F]{6}$/.test(String(value || '').trim());
@@ -2450,10 +2497,46 @@ body.auth-loading .top-user-bar {
     return `linear-gradient(135deg, ${portalBrandColor} 0%, ${portalBrandColor2} 100%)`;
   }
 
+  function normalizeDataUrl(value) {
+    const v = String(value || '').trim();
+    if (!v) return '';
+    if (/^data:image\/(png|jpe?g|webp|gif|svg\+xml);base64,/i.test(v)) return v;
+    if (/^https?:\/\//i.test(v) || v.startsWith('/')) return v;
+    return '';
+  }
+
+  function applyPortalLoginAssets() {
+    const bg = normalizeDataUrl(portalLoginBackgroundDataUrl);
+    const logo = normalizeDataUrl(portalLoginLogoDataUrl);
+
+    if (els.overlay) {
+      if (bg) {
+        els.overlay.style.setProperty('--portal-login-bg-image', 'url("' + bg.replace(/"/g, '%22') + '")');
+        els.overlay.classList.add('auth-has-background');
+      } else {
+        els.overlay.style.removeProperty('--portal-login-bg-image');
+        els.overlay.classList.remove('auth-has-background');
+      }
+    }
+
+    if (els.loginLogoWrap && els.loginLogoImg) {
+      if (logo) {
+        els.loginLogoImg.src = logo;
+        els.loginLogoWrap.hidden = false;
+      } else {
+        els.loginLogoImg.removeAttribute('src');
+        els.loginLogoWrap.hidden = true;
+      }
+    }
+  }
+
   async function loadPortalBrandSettings() {
     const companyId = activeCompany?.id || currentProfile?.company_id || currentCompany?.id || window.currentCompanyId || '';
     if (!companyId) {
       applyPortalBrandColor('#c8102e');
+      portalLoginBackgroundDataUrl = '';
+      portalLoginLogoDataUrl = '';
+      applyPortalLoginAssets();
       return;
     }
 
@@ -2467,16 +2550,41 @@ body.auth-loading .top-user-bar {
 
       if (error) throw error;
 
+      const value = data?.setting_value || {};
       const savedColor =
-        data?.setting_value?.brandColor ||
-        data?.setting_value?.brand_color ||
-        data?.setting_value?.color ||
+        value.brandColor ||
+        value.brand_color ||
+        value.color ||
         '#c8102e';
 
+      portalLoginBackgroundDataUrl = normalizeDataUrl(
+        value.loginBackgroundDataUrl ||
+        value.login_background_data_url ||
+        value.loginBackgroundUrl ||
+        value.login_background_url ||
+        value.backgroundImage ||
+        value.background_image ||
+        ''
+      );
+
+      portalLoginLogoDataUrl = normalizeDataUrl(
+        value.loginLogoDataUrl ||
+        value.login_logo_data_url ||
+        value.loginLogoUrl ||
+        value.login_logo_url ||
+        value.logoImage ||
+        value.logo_image ||
+        ''
+      );
+
       applyPortalBrandColor(savedColor);
+      applyPortalLoginAssets();
     } catch (error) {
       console.warn('portal brand setting load failed:', error);
       applyPortalBrandColor('#c8102e');
+      portalLoginBackgroundDataUrl = '';
+      portalLoginLogoDataUrl = '';
+      applyPortalLoginAssets();
     }
   }
 
@@ -2994,6 +3102,8 @@ body.auth-loading .top-user-bar {
     if (els.bootLogo) els.bootLogo.textContent = brand.logo || 'EL';
     if (els.bootTitle) els.bootTitle.textContent = brand.bootTitle || brand.title;
     if (els.bootDesc) els.bootDesc.textContent = brand.bootDesc || '포탈 화면을 불러오는 중입니다.';
+
+    applyPortalLoginAssets();
 
     if (message) setBoxMessage(els.loginError, message);
   }
