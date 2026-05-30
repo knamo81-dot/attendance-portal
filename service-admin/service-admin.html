@@ -424,12 +424,107 @@
     }
     .company-code-hidden { display: none; }
 
+
+    .admin-tabs {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 0 12px;
+      padding: 4px;
+      border: 1px solid #e2e8f0;
+      border-radius: 999px;
+      background: #fff;
+      box-shadow: var(--shadow-card, 0 5px 14px rgba(15, 23, 42, 0.045));
+    }
+    .admin-tab-btn {
+      height: 28px;
+      border: 0;
+      border-radius: 999px;
+      padding: 0 12px;
+      background: transparent;
+      color: #64748b;
+      font-size: var(--font-base, 11px);
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .admin-tab-btn.active {
+      background: #0f172a;
+      color: #fff;
+    }
+    .service-admin-layout {
+      display: grid;
+      gap: 12px;
+      width: min(980px, 100%);
+    }
+    .service-admin-create {
+      display: grid;
+      grid-template-columns: minmax(180px, 280px) minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: end;
+      margin-top: 10px;
+    }
+    .readonly-box {
+      min-height: var(--control-height, 28px);
+      border: 1px solid #e2e8f0;
+      border-radius: var(--control-radius, 8px);
+      padding: 7px 8px;
+      background: #f8fafc;
+      color: #334155;
+      font-size: var(--font-base, 11px);
+      font-weight: 800;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+    .service-admin-table-wrap {
+      margin-top: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 11px;
+      overflow: auto;
+      background: #fff;
+      width: 100%;
+    }
+    .service-admin-table {
+      width: 100%;
+      min-width: 820px;
+      border-collapse: collapse;
+      font-size: var(--font-base, 11px);
+    }
+    .service-admin-table th,
+    .service-admin-table td {
+      padding: 9px 8px;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .service-admin-table th {
+      background: #f8fafc;
+      color: #475569;
+      font-size: var(--font-small, 10px);
+      font-weight: 900;
+    }
+    .service-admin-table tr:last-child td { border-bottom: 0; }
+    .service-admin-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: nowrap;
+    }
+    .muted-text {
+      color: #94a3b8;
+      font-weight: 700;
+    }
+
     @media (max-width: 1100px) {
       .page { padding: 18px; }
       .card { width: 100%; }
       .form {
         grid-template-columns: 1fr;
         width: 100%;
+      }
+      .service-admin-create {
+        grid-template-columns: 1fr;
       }
       .form-fields {
         width: 100%;
@@ -474,6 +569,11 @@
 </head>
 <body>
   <main class="page el-page">
+    <nav class="admin-tabs" aria-label="서비스 관리자 메뉴">
+      <button type="button" class="admin-tab-btn active" data-main-tab="companies">회사관리</button>
+      <button type="button" class="admin-tab-btn" data-main-tab="serviceAdmins">관리자관리</button>
+    </nav>
+
     <section id="companiesView" class="view active">
       <article class="card el-card">
         <h2>회사 관리</h2>
@@ -508,6 +608,72 @@
 
         <div id="companyList" class="company-list">
           <div class="empty">회사 목록을 불러오는 중입니다.</div>
+        </div>
+      </article>
+    </section>
+
+
+    <section id="serviceAdminsView" class="view">
+      <article class="card el-card service-admin-layout">
+        <div>
+          <h2>관리자관리</h2>
+          <p>ExeloLab 사원정보를 기준으로 플랫폼 전체 서비스관리자 계정을 생성하고 관리합니다.</p>
+        </div>
+
+        <div class="notice el-notice">
+          관리자 정보는 별도 저장하지 않습니다. <strong>users.role = service_admin</strong> 계정과 ExeloLab <strong>employees.email</strong>을 자동 매칭해 표시합니다.
+        </div>
+
+        <div class="service-admin-create">
+          <div class="field">
+            <label for="serviceAdminEmployeeSearch">사원 검색</label>
+            <input id="serviceAdminEmployeeSearch" class="input el-input" placeholder="이름 / 사번 / 이메일 검색" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="serviceAdminEmployeeSelect">사원 선택</label>
+            <select id="serviceAdminEmployeeSelect" class="select el-select">
+              <option value="">사원정보를 불러오는 중입니다.</option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <button id="createServiceAdminBtn" class="btn el-btn-primary primary" type="button">관리자 생성</button>
+            <button id="refreshServiceAdminsBtn" class="btn el-btn" type="button">새로고침</button>
+          </div>
+        </div>
+
+        <div class="service-admin-create" style="grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); margin-top:0;">
+          <div class="field">
+            <label>선택된 이메일</label>
+            <div id="selectedEmployeeEmailBox" class="readonly-box">사원을 선택해 주세요.</div>
+          </div>
+          <div class="field">
+            <label>생성될 관리자 계정</label>
+            <div id="generatedAdminEmailBox" class="readonly-box">-</div>
+          </div>
+        </div>
+
+        <div class="toolbar" style="margin:4px 0 0; width:100%;">
+          <div class="badge el-badge" id="serviceAdminCountBadge">서비스관리자 0명</div>
+        </div>
+
+        <div class="service-admin-table-wrap">
+          <table class="service-admin-table">
+            <thead>
+              <tr>
+                <th>관리자계정</th>
+                <th>사번</th>
+                <th>이름</th>
+                <th>직급</th>
+                <th>직책</th>
+                <th>관리자계정 생성일</th>
+                <th>상태</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="serviceAdminTbody">
+              <tr><td colspan="8" class="muted-text">서비스관리자 목록을 불러오는 중입니다.</td></tr>
+            </tbody>
+          </table>
         </div>
       </article>
     </section>
@@ -559,6 +725,7 @@
   const els = {
     companiesView: document.getElementById('companiesView'),
     appsView: document.getElementById('appsView'),
+    serviceAdminsView: document.getElementById('serviceAdminsView'),
     companyNameInput: document.getElementById('companyNameInput'),
     companySubdomainInput: document.getElementById('companySubdomainInput'),
     companyDomainPreview: document.getElementById('companyDomainPreview'),
@@ -572,6 +739,14 @@
     appsWrap: document.getElementById('appsWrap'),
     saveAppsBtn: document.getElementById('saveAppsBtn'),
     cancelAppsBtn: document.getElementById('cancelAppsBtn'),
+    serviceAdminEmployeeSearch: document.getElementById('serviceAdminEmployeeSearch'),
+    serviceAdminEmployeeSelect: document.getElementById('serviceAdminEmployeeSelect'),
+    selectedEmployeeEmailBox: document.getElementById('selectedEmployeeEmailBox'),
+    generatedAdminEmailBox: document.getElementById('generatedAdminEmailBox'),
+    createServiceAdminBtn: document.getElementById('createServiceAdminBtn'),
+    refreshServiceAdminsBtn: document.getElementById('refreshServiceAdminsBtn'),
+    serviceAdminCountBadge: document.getElementById('serviceAdminCountBadge'),
+    serviceAdminTbody: document.getElementById('serviceAdminTbody'),
     feedback: document.getElementById('feedback')
   };
 
@@ -579,6 +754,10 @@
   let selectedCompanyId = '';
   let currentApps = [];
   let appDraft = new Map();
+  let exeloLabCompanyId = '';
+  let serviceAdminRows = [];
+  let serviceAdminEmployees = [];
+  let serviceAdminEmployeeMap = new Map();
 
   function getParentSession() {
     try {
@@ -672,7 +851,12 @@
 
   function showView(viewName) {
     els.companiesView?.classList.toggle('active', viewName === 'companies');
+    els.serviceAdminsView?.classList.toggle('active', viewName === 'serviceAdmins');
     els.appsView?.classList.toggle('active', viewName === 'apps');
+    document.querySelectorAll('[data-main-tab]').forEach(btn => {
+      const key = btn.getAttribute('data-main-tab');
+      btn.classList.toggle('active', key === viewName || (viewName === 'apps' && key === 'companies'));
+    });
   }
 
   function generateCompanyCode() {
@@ -1188,7 +1372,275 @@
     }
   }
 
+
+  function normalizeEmail(value) {
+    return String(value || '').trim().toLowerCase();
+  }
+
+  function toEmployeeEmail(adminEmail) {
+    return normalizeEmail(adminEmail).replace('-admin@', '@');
+  }
+
+  function toAdminEmail(employeeEmail) {
+    const email = normalizeEmail(employeeEmail);
+    if (!email || !email.includes('@')) return '';
+    return email.replace('@', '-admin@');
+  }
+
+  function formatDate(value) {
+    if (!value) return '-';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value).slice(0, 10) || '-';
+    return d.toISOString().slice(0, 10);
+  }
+
+  async function findExeloLabCompanyId() {
+    await ensureServiceAdminAuthSession();
+    if (exeloLabCompanyId) return exeloLabCompanyId;
+
+    const { data, error } = await sb()
+      .from('companies')
+      .select('id, company_name, company_code, subdomain')
+      .or('company_name.ilike.%ExeloLab%,company_code.ilike.%exelolab%,subdomain.eq.exelolab')
+      .limit(5);
+
+    if (error) throw error;
+
+    const rows = data || [];
+    const exact = rows.find(row => normalizeEmail(row.company_name) === 'exelolab')
+      || rows.find(row => normalizeEmail(row.subdomain) === 'exelolab')
+      || rows.find(row => String(row.company_name || '').toLowerCase().includes('exelolab'))
+      || rows[0];
+
+    if (!exact?.id) {
+      throw new Error('ExeloLab 회사 정보를 찾지 못했습니다. 먼저 회사관리에서 ExeloLab 회사를 등록해 주세요.');
+    }
+
+    exeloLabCompanyId = exact.id;
+    return exeloLabCompanyId;
+  }
+
+  async function loadServiceAdminEmployees() {
+    const companyId = await findExeloLabCompanyId();
+    let { data, error } = await sb()
+      .from('employees')
+      .select('id, company_id, employee_no, name, position, grade, authority, email, status, sort_order')
+      .eq('company_id', companyId)
+      .order('sort_order', { ascending: true });
+
+    if (error && String(error.message || '').toLowerCase().includes('company_id')) {
+      const fallback = await sb()
+        .from('employees')
+        .select('id, employee_no, name, position, grade, authority, email, status, sort_order')
+        .order('sort_order', { ascending: true });
+      data = fallback.data;
+      error = fallback.error;
+    }
+
+    if (error) throw error;
+
+    serviceAdminEmployees = (data || [])
+      .filter(emp => normalizeEmail(emp.email))
+      .filter(emp => String(emp.status || '재직') !== '퇴사');
+
+    serviceAdminEmployeeMap = new Map(serviceAdminEmployees.map(emp => [normalizeEmail(emp.email), emp]));
+    renderServiceAdminEmployeeOptions();
+  }
+
+  function renderServiceAdminEmployeeOptions() {
+    if (!els.serviceAdminEmployeeSelect) return;
+
+    const keyword = normalizeEmail(els.serviceAdminEmployeeSearch?.value || '');
+    const rows = serviceAdminEmployees.filter(emp => {
+      if (!keyword) return true;
+      return [emp.name, emp.employee_no, emp.email, emp.position, emp.grade, emp.authority]
+        .some(value => normalizeEmail(value).includes(keyword));
+    });
+
+    const current = els.serviceAdminEmployeeSelect.value;
+    els.serviceAdminEmployeeSelect.innerHTML = '<option value="">사원 선택</option>' + rows.map(emp => {
+      const email = normalizeEmail(emp.email);
+      return `<option value="${escapeHtml(email)}">${escapeHtml(emp.name || '-')} / ${escapeHtml(emp.employee_no || '-')} / ${escapeHtml(email)}</option>`;
+    }).join('');
+
+    if (rows.some(emp => normalizeEmail(emp.email) === current)) {
+      els.serviceAdminEmployeeSelect.value = current;
+    }
+
+    updateSelectedServiceAdminEmployeePreview();
+  }
+
+  function updateSelectedServiceAdminEmployeePreview() {
+    const email = normalizeEmail(els.serviceAdminEmployeeSelect?.value || '');
+    const adminEmail = toAdminEmail(email);
+    if (els.selectedEmployeeEmailBox) els.selectedEmployeeEmailBox.textContent = email || '사원을 선택해 주세요.';
+    if (els.generatedAdminEmailBox) els.generatedAdminEmailBox.textContent = adminEmail || '-';
+  }
+
+  async function loadServiceAdmins() {
+    assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
+    setFeedback('서비스관리자 정보를 불러오는 중입니다.', '');
+
+    await loadServiceAdminEmployees();
+
+    const { data, error } = await sb()
+      .from('users')
+      .select('id, email, role, created_at, is_active')
+      .eq('role', 'service_admin')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    serviceAdminRows = data || [];
+    renderServiceAdmins();
+    setFeedback('서비스관리자 정보를 불러왔습니다.', 'ok');
+  }
+
+  function renderServiceAdmins() {
+    if (els.serviceAdminCountBadge) els.serviceAdminCountBadge.textContent = '서비스관리자 ' + serviceAdminRows.length + '명';
+    if (!els.serviceAdminTbody) return;
+
+    if (!serviceAdminRows.length) {
+      els.serviceAdminTbody.innerHTML = '<tr><td colspan="8" class="muted-text">등록된 서비스관리자 계정이 없습니다.</td></tr>';
+      return;
+    }
+
+    els.serviceAdminTbody.innerHTML = serviceAdminRows.map(admin => {
+      const adminEmail = normalizeEmail(admin.email);
+      const employeeEmail = toEmployeeEmail(adminEmail);
+      const emp = serviceAdminEmployeeMap.get(employeeEmail);
+      const active = admin.is_active !== false;
+      return `
+        <tr>
+          <td>${escapeHtml(adminEmail || '-')}</td>
+          <td>${escapeHtml(emp?.employee_no || '-')}</td>
+          <td>${escapeHtml(emp?.name || '-')}</td>
+          <td>${escapeHtml(emp?.position || emp?.grade || '-')}</td>
+          <td>${escapeHtml(emp?.authority || '-')}</td>
+          <td>${escapeHtml(formatDate(admin.created_at))}</td>
+          <td><span class="badge el-badge ${active ? 'active' : 'inactive'}">${active ? '사용중' : '미사용'}</span></td>
+          <td>
+            <div class="service-admin-actions">
+              <button type="button" class="btn el-btn ${active ? 'el-btn-danger danger' : 'el-btn-primary primary'}" data-toggle-service-admin="${escapeHtml(admin.id)}" data-next-active="${active ? 'false' : 'true'}">${active ? '미사용' : '재사용'}</button>
+              <button type="button" class="btn el-btn-danger danger" data-delete-service-admin="${escapeHtml(admin.id)}" data-admin-email="${escapeHtml(adminEmail)}">삭제</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function createServiceAdmin() {
+    assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
+
+    const employeeEmail = normalizeEmail(els.serviceAdminEmployeeSelect?.value || '');
+    const adminEmail = toAdminEmail(employeeEmail);
+
+    if (!employeeEmail || !adminEmail) {
+      setFeedback('서비스관리자로 등록할 사원을 선택해 주세요.', 'error');
+      return;
+    }
+
+    const emp = serviceAdminEmployeeMap.get(employeeEmail);
+    if (!emp) {
+      setFeedback('선택한 사원정보를 찾지 못했습니다. 새로고침 후 다시 선택해 주세요.', 'error');
+      return;
+    }
+
+    els.createServiceAdminBtn.disabled = true;
+    setFeedback('서비스관리자 계정을 생성하는 중입니다.', '');
+
+    try {
+      const { data: exists, error: checkError } = await sb()
+        .from('users')
+        .select('id')
+        .eq('email', adminEmail)
+        .eq('role', 'service_admin')
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+      if (exists) {
+        setFeedback('이미 등록된 서비스관리자 계정입니다.', 'error');
+        return;
+      }
+
+      const { error } = await sb()
+        .from('users')
+        .insert({
+          email: adminEmail,
+          role: 'service_admin',
+          is_active: true
+        });
+
+      if (error) throw error;
+
+      await loadServiceAdmins();
+      setFeedback(`${emp.name || employeeEmail} 서비스관리자 계정을 생성했습니다.`, 'ok');
+    } catch (error) {
+      console.error(error);
+      setFeedback(error.message || '서비스관리자 생성 중 오류가 발생했습니다.', 'error');
+    } finally {
+      els.createServiceAdminBtn.disabled = false;
+    }
+  }
+
+  async function toggleServiceAdmin(adminId, nextActive) {
+    assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
+    setFeedback('서비스관리자 상태를 변경하는 중입니다.', '');
+
+    const { error } = await sb()
+      .from('users')
+      .update({ is_active: nextActive })
+      .eq('id', adminId)
+      .eq('role', 'service_admin');
+
+    if (error) throw error;
+
+    await loadServiceAdmins();
+    setFeedback('서비스관리자 상태를 변경했습니다.', 'ok');
+  }
+
+  async function deleteServiceAdmin(adminId, adminEmail) {
+    assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
+
+    const ok = confirm(`${adminEmail || '선택한 서비스관리자 계정'}을 삭제하시겠습니까?\n\nemployees 사원정보는 삭제되지 않습니다.`);
+    if (!ok) return;
+
+    setFeedback('서비스관리자 계정을 삭제하는 중입니다.', '');
+
+    const { error } = await sb()
+      .from('users')
+      .delete()
+      .eq('id', adminId)
+      .eq('role', 'service_admin');
+
+    if (error) throw error;
+
+    await loadServiceAdmins();
+    setFeedback('서비스관리자 계정을 삭제했습니다.', 'ok');
+  }
+
   function bindEvents() {
+    document.querySelectorAll('[data-main-tab]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const tab = btn.getAttribute('data-main-tab');
+        showView(tab);
+        if (tab === 'serviceAdmins') {
+          try {
+            await loadServiceAdmins();
+          } catch (error) {
+            console.error(error);
+            setFeedback(error.message || '서비스관리자 정보를 불러오지 못했습니다.', 'error');
+            if (els.serviceAdminTbody) els.serviceAdminTbody.innerHTML = '<tr><td colspan="8" class="muted-text">서비스관리자 정보를 불러오지 못했습니다.</td></tr>';
+          }
+        }
+      });
+    });
+
     els.createCompanyBtn.addEventListener('click', () => createCompany());
     els.cancelCompanyInputBtn?.addEventListener('click', () => resetCompanyInputForm());
 
@@ -1225,6 +1677,16 @@
       saveCompanyApps();
     });
 
+    els.serviceAdminEmployeeSearch?.addEventListener('input', () => renderServiceAdminEmployeeOptions());
+    els.serviceAdminEmployeeSelect?.addEventListener('change', () => updateSelectedServiceAdminEmployeePreview());
+    els.createServiceAdminBtn?.addEventListener('click', () => createServiceAdmin());
+    els.refreshServiceAdminsBtn?.addEventListener('click', () => {
+      loadServiceAdmins().catch(error => {
+        console.error(error);
+        setFeedback(error.message || '서비스관리자 새로고침 중 오류가 발생했습니다.', 'error');
+      });
+    });
+
     document.addEventListener('keydown', async (event) => {
       const input = event.target.closest('[data-edit-company-name], [data-edit-company-subdomain]');
       if (!input) return;
@@ -1250,6 +1712,32 @@
     });
 
     document.addEventListener('click', async (event) => {
+      const toggleServiceAdminBtn = event.target.closest('[data-toggle-service-admin]');
+      if (toggleServiceAdminBtn) {
+        const id = toggleServiceAdminBtn.getAttribute('data-toggle-service-admin');
+        const next = toggleServiceAdminBtn.getAttribute('data-next-active') === 'true';
+        try {
+          await toggleServiceAdmin(id, next);
+        } catch (error) {
+          console.error(error);
+          setFeedback(error.message || '서비스관리자 상태 변경 중 오류가 발생했습니다.', 'error');
+        }
+        return;
+      }
+
+      const deleteServiceAdminBtn = event.target.closest('[data-delete-service-admin]');
+      if (deleteServiceAdminBtn) {
+        const id = deleteServiceAdminBtn.getAttribute('data-delete-service-admin');
+        const email = deleteServiceAdminBtn.getAttribute('data-admin-email');
+        try {
+          await deleteServiceAdmin(id, email);
+        } catch (error) {
+          console.error(error);
+          setFeedback(error.message || '서비스관리자 삭제 중 오류가 발생했습니다.', 'error');
+        }
+        return;
+      }
+
       const openAppsBtn = event.target.closest('[data-open-apps]');
       if (openAppsBtn) {
         const id = openAppsBtn.getAttribute('data-open-apps');
