@@ -2089,8 +2089,16 @@ body.auth-loading .top-user-bar {
 
 .auth-overlay.auth-has-background::before {
   background:
-    linear-gradient(90deg, rgba(15,23,42,.10) 0%, rgba(15,23,42,.04) 46%, rgba(15,23,42,.24) 100%),
-    repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 1px, transparent 1px 18px) !important;
+    linear-gradient(
+      90deg,
+      rgba(15,23,42,.10) 0%,
+      rgba(15,23,42,.04) 46%,
+      rgba(15,23,42,.24) 100%
+    ) !important;
+}
+
+.auth-overlay.auth-has-background::after {
+  display: none !important;
 }
 </style>
 
