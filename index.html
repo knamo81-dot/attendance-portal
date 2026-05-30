@@ -2179,6 +2179,115 @@ body.auth-loading .top-user-bar {
 }
 </style>
 
+
+<style id="mobile-horizontal-slide-guard-final">
+/* ===== Mobile Horizontal Slide Guard Final ===== */
+/* iOS/모바일에서 포탈 본문이 좌우로 밀리거나 브라우저 뒤로가기 스와이프처럼 움직이는 현상 방지 */
+@media (max-width: 768px) {
+  html,
+  body {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    overscroll-behavior-x: none !important;
+    touch-action: pan-y !important;
+  }
+
+  .app,
+  .layout,
+  .portal-main {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    transform: none !important;
+    overscroll-behavior: none !important;
+    overscroll-behavior-x: none !important;
+    touch-action: pan-y !important;
+  }
+
+  .portal-main {
+    display: grid !important;
+    grid-template-rows: auto auto minmax(0, 1fr) !important;
+    padding: 8px !important;
+    gap: 8px !important;
+    box-sizing: border-box !important;
+  }
+
+  #portalFrame {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    overscroll-behavior-x: none !important;
+    touch-action: pan-y !important;
+  }
+
+  .sidenav {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 72px !important;
+    max-width: 72px !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+    transform: translate3d(var(--mobile-drawer-x, -84px), 0, 0) !important;
+    transition: transform .22s ease !important;
+    will-change: transform !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain !important;
+    touch-action: pan-y !important;
+  }
+
+  body.mobile-drawer-open .sidenav {
+    --mobile-drawer-x: 0px !important;
+  }
+
+  body.mobile-drawer-dragging .sidenav {
+    transition: none !important;
+  }
+
+  body:not(.mobile-drawer-open):not(.mobile-drawer-dragging) .sidenav {
+    --mobile-drawer-x: -84px !important;
+  }
+
+  .mobile-drawer-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    touch-action: none !important;
+  }
+
+  .mobile-edge-swipe-zone {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 32px !important;
+    height: 100dvh !important;
+    touch-action: none !important;
+  }
+
+  .portal-subtabs,
+  .portal-filters {
+    touch-action: pan-x pan-y !important;
+  }
+}
+</style>
+
 </head>
 <body class="portal-restoring">
   <div id="portalBootOverlay" class="portal-boot-overlay" aria-live="polite" aria-label="포탈 불러오는 중">
@@ -5282,5 +5391,77 @@ body.auth-loading .top-user-bar {
   boot();
 })();
 </script>
+
+<script id="mobile-horizontal-slide-guard-js-final">
+/* ===== Mobile Horizontal Slide Guard JS Final ===== */
+/* 포탈 shell에서 좌우 스와이프가 본문 전체를 밀어내는 현상을 방지합니다. */
+(function () {
+  const mq = window.matchMedia ? window.matchMedia('(max-width: 768px)') : null;
+
+  function isMobilePortalViewSafe() {
+    return !!(mq && mq.matches);
+  }
+
+  function resetMobileDrawerPosition() {
+    if (!isMobilePortalViewSafe()) return;
+    const body = document.body;
+    if (!body.classList.contains('mobile-drawer-open') && !body.classList.contains('mobile-drawer-dragging')) {
+      body.style.removeProperty('--mobile-drawer-x');
+      body.style.removeProperty('--mobile-drawer-progress');
+    }
+    document.documentElement.scrollLeft = 0;
+    document.body.scrollLeft = 0;
+    window.scrollTo(0, 0);
+  }
+
+  function isHorizontalScrollableTarget(target) {
+    if (!target || !target.closest) return false;
+    return !!target.closest('.portal-subtabs, .portal-filters, .service-company-list');
+  }
+
+  let guardStartX = 0;
+  let guardStartY = 0;
+
+  document.addEventListener('touchstart', function (event) {
+    if (!isMobilePortalViewSafe() || !event.touches || !event.touches.length) return;
+    guardStartX = event.touches[0].clientX;
+    guardStartY = event.touches[0].clientY;
+    resetMobileDrawerPosition();
+  }, { passive: true, capture: true });
+
+  document.addEventListener('touchmove', function (event) {
+    if (!isMobilePortalViewSafe() || !event.touches || !event.touches.length) return;
+
+    const touch = event.touches[0];
+    const dx = touch.clientX - guardStartX;
+    const dy = touch.clientY - guardStartY;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    const isHorizontalSwipe = absX > 8 && absX > absY * 1.05;
+    const body = document.body;
+    const drawerOpen = body.classList.contains('mobile-drawer-open');
+    const drawerDragging = body.classList.contains('mobile-drawer-dragging');
+    const fromEdge = guardStartX <= 34 || guardStartX >= (window.innerWidth - 34);
+
+    if (!isHorizontalSwipe) return;
+
+    if (isHorizontalScrollableTarget(event.target) && !drawerOpen && !drawerDragging && !fromEdge) {
+      return;
+    }
+
+    /* 사이드바 드래그 중에는 기존 drawer 로직은 유지하되, 페이지 자체 이동은 막습니다. */
+    event.preventDefault();
+  }, { passive: false, capture: true });
+
+  document.addEventListener('touchend', resetMobileDrawerPosition, { passive: true, capture: true });
+  document.addEventListener('touchcancel', resetMobileDrawerPosition, { passive: true, capture: true });
+
+  window.addEventListener('resize', resetMobileDrawerPosition, { passive: true });
+  window.addEventListener('orientationchange', function () {
+    setTimeout(resetMobileDrawerPosition, 80);
+  }, { passive: true });
+})();
+</script>
+
 </body>
 </html>
