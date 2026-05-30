@@ -1979,7 +1979,6 @@ input[type="radio"]{
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY';
 
   const HOME_SRC = 'portal-main/portal-main.html';
-  const BLANK_SRC = 'about:blank';
   const SERVICE_MODE_NOTICE_SRC = 'portal-main/service-mode-notice.html';
   const LAST_PAGE_KEY = 'portalLastPage';
 
@@ -3874,8 +3873,8 @@ input[type="radio"]{
   function clearPortalFrame() {
     if (!frame) return;
     frame.onload = null;
-    frame.src = BLANK_SRC;
-    updatePortalSubtabs(BLANK_SRC);
+    frame.src = 'about:blank';
+    updatePortalSubtabs('');
   }
 
   function replacePortalFrame(src) {
@@ -4089,7 +4088,7 @@ input[type="radio"]{
     try { localStorage.removeItem('reagent_current_user'); } catch (_) {}
     clearPortalSession();
     clearLoginInputs();
-    clearPortalFrame();
+    replacePortalFrame(HOME_SRC);
     if (homeBtn) setActiveNav(homeBtn);
     showLogin('로그아웃되었습니다.');
     setTimeout(() => clearLoginInputs(), 80);
