@@ -4783,9 +4783,31 @@ create table if not exists user_app_roles (
       return;
     }
 
+    try {
+      localStorage.setItem('portalBrandSettings:' + companyId, JSON.stringify({
+        ...settingValue,
+        companyId: companyId,
+        cachedAt: new Date().toISOString()
+      }));
+    } catch (_) {}
+
+    try {
+      const message = {
+        type: 'portal-brand-updated',
+        source: 'settings.html',
+        companyId: companyId,
+        settingValue: settingValue,
+        brandColor: color
+      };
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(message, '*');
+      }
+      window.postMessage(message, '*');
+    } catch (_) {}
+
     applyPortalColor(color);
     applyLoginPreview();
-    setFeedback('브랜드 설정을 저장했습니다. 로그인 배경/로고는 실제 로그인 화면에 반영됩니다.', 'ok');
+    setFeedback('브랜드 설정을 저장했습니다. 로그인 배경/로고는 실제 로그인 화면과 새로고침 캐시에 반영됩니다.', 'ok');
   }
 
   function initPortalSetting(){
