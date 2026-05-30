@@ -2152,6 +2152,33 @@ body.auth-loading .top-user-bar {
 }
 </style>
 
+
+<style id="mobile-input-zoom-fix-final">
+/* ===== Mobile Input Zoom Fix Final ===== */
+/* 모바일 브라우저에서 input/select/textarea 글자 크기가 16px 미만이면 자동 확대되는 문제 방지 */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea,
+  .auth-field input,
+  .personal-settings-field input,
+  .personal-settings-field select,
+  .service-company-search,
+  .portal-filter-control {
+    font-size: 16px !important;
+  }
+
+  .auth-field input,
+  .service-company-search {
+    min-height: 42px !important;
+  }
+
+  .auth-card {
+    width: min(420px, calc(100vw - 28px)) !important;
+  }
+}
+</style>
+
 </head>
 <body class="portal-restoring">
   <div id="portalBootOverlay" class="portal-boot-overlay" aria-live="polite" aria-label="포탈 불러오는 중">
