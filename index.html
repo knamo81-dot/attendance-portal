@@ -2465,6 +2465,34 @@ body.auth-loading .top-user-bar {
   window.portalMode = portalRuntimeMode;
   window.isRootOpsMode = isRootOpsMode;
 
+  // 로그인 전에는 Supabase RLS/정책 또는 도메인 조회 순서 때문에 companies 조회가 실패할 수 있습니다.
+  // 이 경우에도 회사별 로그인 브랜딩(system_settings.portal_brand)을 읽을 수 있도록
+  // 현재 운영 중인 회사 접속주소의 최소 식별 정보만 안전하게 보강합니다.
+  const TENANT_COMPANY_FALLBACKS = {
+    xll: {
+      id: 'a14b3835-68e6-4f89-a292-5c90c4cc5c93',
+      company_name: 'ExeloLab',
+      company_code: 'COMP-20260501-ELAB',
+      subdomain: 'xll',
+      is_active: true,
+      __fallback: true
+    },
+    scd: {
+      id: '1138909e-1091-4009-ad04-2eb4daf97575',
+      company_name: '삼천당제약',
+      company_code: 'COMP-20260514-CCC4',
+      subdomain: 'scd',
+      is_active: true,
+      __fallback: true
+    }
+  };
+
+  function getFallbackCompanyBySubdomain(subdomain) {
+    const key = String(subdomain || '').trim().toLowerCase();
+    const row = TENANT_COMPANY_FALLBACKS[key];
+    return row ? { ...row } : null;
+  }
+
   console.info('[PortalTenant] host:', window.location.hostname || '');
   console.info('[PortalTenant] requested subdomain:', requestedSubdomain || '(root)');
   console.info('[PortalTenant] runtime mode:', portalRuntimeMode);
@@ -2641,7 +2669,8 @@ body.auth-loading .top-user-bar {
   }
 
   async function loadPortalBrandSettings() {
-    const companyId = activeCompany?.id || currentProfile?.company_id || currentCompany?.id || requestedCompany?.id || window.currentCompanyId || '';
+    const fallbackCompany = requestedSubdomain ? getFallbackCompanyBySubdomain(requestedSubdomain) : null;
+    const companyId = activeCompany?.id || currentProfile?.company_id || currentCompany?.id || requestedCompany?.id || window.currentCompanyId || fallbackCompany?.id || '';
     if (!companyId) {
       applyPortalBrandColor('#c8102e');
       portalLoginBackgroundDataUrl = '';
@@ -4147,14 +4176,22 @@ body.auth-loading .top-user-bar {
     const clean = String(subdomain || '').trim().toLowerCase();
     if (!clean) return null;
 
-    const { data, error } = await supabaseClient
-      .from('companies')
-      .select('id,company_name,company_code,subdomain,is_active')
-      .eq('subdomain', clean)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabaseClient
+        .from('companies')
+        .select('id,company_name,company_code,subdomain,is_active')
+        .eq('subdomain', clean)
+        .maybeSingle();
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      if (data) return data;
+    } catch (error) {
+      console.warn('[PortalTenant] companies lookup failed before login. fallback will be used if available:', error);
+    }
+
+    // 로그인 전 companies 조회가 막히거나 아직 반영되지 않아도,
+    // 알려진 회사 접속주소는 fallback company_id로 system_settings 조회를 계속 진행합니다.
+    return getFallbackCompanyBySubdomain(clean);
   }
 
   async function ensureRequestedCompany() {
@@ -4172,7 +4209,7 @@ body.auth-loading .top-user-bar {
       applyPortalLoginBrand();
     } catch (error) {
       console.warn('[PortalTenant] requested company lookup failed:', error);
-      requestedCompany = null;
+      requestedCompany = getFallbackCompanyBySubdomain(requestedSubdomain);
       applyPortalLoginBrand();
     }
 
