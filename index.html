@@ -1245,7 +1245,8 @@ input[type="radio"]{
    - 앱 내부 레이아웃은 건드리지 않음
 ========================================================= */
 .mobile-drawer-backdrop,
-.mobile-edge-swipe-zone {
+.mobile-edge-swipe-zone,
+.mobile-right-edge-swipe-zone {
   display: none;
 }
 
@@ -2306,6 +2307,31 @@ body.auth-loading .top-user-bar {
 }
 </style>
 
+
+
+<style id="mobile-iframe-history-edge-guard-final">
+/* ===== Mobile iframe history/edge swipe guard final ===== */
+@media (max-width: 768px) {
+  .mobile-right-edge-swipe-zone {
+    display: block !important;
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    width: 28px !important;
+    height: 100dvh !important;
+    z-index: 75 !important;
+    background: transparent !important;
+    touch-action: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  body.mobile-drawer-open .mobile-right-edge-swipe-zone,
+  body.mobile-drawer-dragging .mobile-right-edge-swipe-zone {
+    pointer-events: none !important;
+  }
+}
+</style>
+
 </head>
 <body class="portal-restoring">
   <div id="portalBootOverlay" class="portal-boot-overlay" aria-live="polite" aria-label="포탈 불러오는 중">
@@ -2370,6 +2396,7 @@ body.auth-loading .top-user-bar {
       </div>
       <div id="mobileDrawerBackdrop" class="mobile-drawer-backdrop" aria-hidden="true"></div>
       <div id="mobileEdgeSwipeZone" class="mobile-edge-swipe-zone" aria-hidden="true"></div>
+      <div id="mobileRightEdgeSwipeZone" class="mobile-right-edge-swipe-zone" aria-hidden="true"></div>
       <div class="portal-main">
         <div id="portalCommonHeader" class="portal-common-header">
           <div class="header-left">
@@ -4771,7 +4798,15 @@ body.auth-loading .top-user-bar {
     if (!frame) return;
     document.body.classList.add('portal-restoring');
     frame.onload = null;
-    frame.src = 'about:blank';
+    try {
+      if (frame.contentWindow && frame.contentWindow.location) {
+        frame.contentWindow.location.replace('about:blank');
+      } else {
+        frame.src = 'about:blank';
+      }
+    } catch (_) {
+      frame.src = 'about:blank';
+    }
     updatePortalSubtabs('');
   }
 
@@ -4817,7 +4852,19 @@ body.auth-loading .top-user-bar {
     restoreSafetyTimer = setTimeout(function () {
       hidePortalBootOverlay();
     }, 5000);
-    frame.src = src;
+
+    // iframe 이동은 src 대입 대신 location.replace를 우선 사용합니다.
+    // 모바일 Safari/WebView에서 iframe 자체 히스토리가 쌓이면 좌우 스와이프 시
+    // 헤더는 현재 메뉴인데 iframe만 이전 프로그램으로 되돌아가는 현상이 발생할 수 있습니다.
+    try {
+      if (frame.contentWindow && frame.contentWindow.location) {
+        frame.contentWindow.location.replace(src);
+      } else {
+        frame.src = src;
+      }
+    } catch (_) {
+      frame.src = src;
+    }
   }
 
   async function navigateBySrc(src, btn, options = {}) {
@@ -5527,6 +5574,25 @@ body.auth-loading .top-user-bar {
     window.visualViewport.addEventListener('resize', softResetMobileDrawerPosition, { passive: true });
     window.visualViewport.addEventListener('scroll', softResetMobileDrawerPosition, { passive: true });
   }
+})();
+</script>
+
+
+
+<script id="mobile-right-edge-swipe-guard-js-final">
+/* 오른쪽 가장자리 스와이프가 iframe 히스토리/브라우저 forward 제스처로 해석되는 것을 방지 */
+(function () {
+  const mq = window.matchMedia ? window.matchMedia('(max-width: 768px)') : null;
+  function isMobile() { return !!(mq && mq.matches); }
+  const rightZone = document.getElementById('mobileRightEdgeSwipeZone');
+  if (!rightZone) return;
+  ['touchstart', 'touchmove'].forEach(function (type) {
+    rightZone.addEventListener(type, function (event) {
+      if (!isMobile()) return;
+      event.preventDefault();
+      event.stopPropagation();
+    }, { passive: false, capture: true });
+  });
 })();
 </script>
 
