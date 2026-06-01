@@ -3777,3 +3777,215 @@ td {
     -webkit-overflow-scrolling:touch !important;
   }
 }
+
+/* =========================================================
+   FINAL FIX: 모바일 제품신청 모달을 제품등록요청 모달 스타일로 통일
+   - 기존 신청 카드를 모바일에서 진짜 모달처럼 표시
+   - 상단: 제목/주문월 + 제품검색만 유지
+   - 하단: 신청 추가 / 입력 초기화 / 닫기
+   - 제품 등록 요청 버튼은 제품신청 모달 하단에서 제거
+========================================================= */
+@media (max-width:760px){
+  body.request-form-modal-open{
+    overflow:hidden !important;
+  }
+
+  body.request-form-modal-open::before{
+    content:"" !important;
+    position:fixed !important;
+    inset:0 !important;
+    z-index:9990 !important;
+    background:rgba(15,23,42,.46) !important;
+    backdrop-filter:blur(1px);
+  }
+
+  body.request-form-modal-open #requestFormCard{
+    display:flex !important;
+    flex-direction:column !important;
+    position:fixed !important;
+    left:10px !important;
+    right:10px !important;
+    top:50% !important;
+    transform:translateY(-50%) !important;
+    z-index:9991 !important;
+    width:auto !important;
+    max-width:calc(100vw - 20px) !important;
+    max-height:90vh !important;
+    min-height:0 !important;
+    overflow:hidden !important;
+    border-radius:22px !important;
+    background:#fff !important;
+    box-shadow:0 30px 70px rgba(15,23,42,.28) !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .card-head{
+    position:sticky !important;
+    top:0 !important;
+    z-index:5 !important;
+    flex:0 0 auto !important;
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) auto !important;
+    align-items:start !important;
+    gap:12px !important;
+    padding:18px 20px 16px !important;
+    background:#fff !important;
+    border-bottom:1px solid var(--line, #d9e2ec) !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .card-head h2{
+    font-size:22px !important;
+    line-height:1.25 !important;
+    letter-spacing:-.04em !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .card-head p,
+  body.request-form-modal-open #requestFormCard .card-head .badge,
+  body.request-form-modal-open #requestFormCard #openRequestFormMobile,
+  body.request-form-modal-open #requestFormCard #requestNewHeader{
+    display:none !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .request-form-title-wrap,
+  body.request-form-modal-open #requestFormCard .card-head > div:first-child{
+    width:100% !important;
+    min-width:0 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .request-form-title-row{
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:flex-start !important;
+    gap:12px !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .order-month-wrap{
+    width:100% !important;
+    display:grid !important;
+    grid-template-columns:64px minmax(0,1fr) !important;
+    align-items:center !important;
+    gap:8px 10px !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .order-month-wrap .small,
+  body.request-form-modal-open #requestFormCard #orderMonthDesc{
+    grid-column:1 / -1 !important;
+    width:100% !important;
+    line-height:1.45 !important;
+    font-size:13px !important;
+    margin:0 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard #orderMonthSelect{
+    width:100% !important;
+    min-width:0 !important;
+    height:44px !important;
+    border-radius:13px !important;
+    font-size:15px !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .request-form-search-wrap,
+  body.request-form-modal-open #requestFormCard .card-head > div:last-child{
+    display:flex !important;
+    align-items:flex-start !important;
+    justify-content:flex-end !important;
+    width:auto !important;
+    min-width:0 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard #openSearch{
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    width:128px !important;
+    min-width:128px !important;
+    max-width:128px !important;
+    height:52px !important;
+    padding:0 12px !important;
+    border-radius:17px !important;
+    font-size:15px !important;
+    font-weight:800 !important;
+    white-space:nowrap !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .card-body{
+    flex:1 1 auto !important;
+    min-height:0 !important;
+    overflow-y:auto !important;
+    -webkit-overflow-scrolling:touch !important;
+    display:flex !important;
+    flex-direction:column !important;
+    padding:0 !important;
+    background:#fff !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .form-grid{
+    grid-template-columns:1fr !important;
+    gap:12px !important;
+    padding:16px 20px 18px !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .field label{
+    font-size:13px !important;
+    font-weight:800 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .field input,
+  body.request-form-modal-open #requestFormCard .field select{
+    height:48px !important;
+    border-radius:15px !important;
+    font-size:15px !important;
+    padding:0 13px !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions,
+  body.request-form-modal-open #requestFormCard .request-form-actions{
+    position:sticky !important;
+    bottom:0 !important;
+    z-index:6 !important;
+    flex:0 0 auto !important;
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:9px !important;
+    margin:0 !important;
+    padding:14px 20px calc(14px + env(safe-area-inset-bottom)) !important;
+    background:#fff !important;
+    border-top:1px solid var(--line, #d9e2ec) !important;
+    box-shadow:0 -10px 24px rgba(15,23,42,.04) !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions .btn{
+    width:100% !important;
+    min-height:48px !important;
+    height:48px !important;
+    border-radius:15px !important;
+    font-size:15px !important;
+    font-weight:800 !important;
+    position:static !important;
+    inset:auto !important;
+    transform:none !important;
+    box-shadow:none !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions #addItem{
+    grid-column:1 / -1 !important;
+    order:1 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions #clearForm{
+    grid-column:1 / 2 !important;
+    order:2 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions #closeRequestFormMobile{
+    display:inline-flex !important;
+    grid-column:2 / 3 !important;
+    order:3 !important;
+    background:#fff !important;
+    color:var(--text, #1f2937) !important;
+    border:1px solid var(--line, #d9e2ec) !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions #requestNew{
+    display:none !important;
+  }
+}
