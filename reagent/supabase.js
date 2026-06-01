@@ -92,7 +92,11 @@ window.ReagentApp.refreshForCompanyChange = function () {
     window.ReagentApp.request?.renderRequest?.();
     window.ReagentApp.collect?.renderCollect?.();
     window.ReagentApp.collect?.renderPrepare?.();
+    window.ReagentApp.orderReceipt?.refresh?.();
   } catch (error) {
     console.warn("회사 전환 후 시약 화면 갱신 실패:", error);
   }
 };
+
+// 발주/입고 관리 저장 테이블명
+window.ReagentApp.ORDER_RECEIPT_TABLE = "reagent_order_receipts";
