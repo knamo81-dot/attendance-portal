@@ -1,785 +1,4136 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>시약·초자 신청/취합</title>
-<link rel="stylesheet" href="style.css"/>
-<link rel="stylesheet" href="../common/mobile.css"/>
-<link rel="stylesheet" href="../common/theme.css"/>
-<script>
-  /*
-    초기 권한 표시 보정
-    - 포탈 iframe에서 권한 적용 전 운영자 탭이 잠깐 보이는 현상을 방지합니다.
-    - 기존 신청/취합/정리/제품관리/운영자 지정 로직은 변경하지 않습니다.
-  */
-  (function () {
-    var root = document.documentElement;
-    var roleClass = 'reagent-role-general';
+/* =========================================================
+   Common theme token link
+   - common/theme.css의 --common-* 값을 사용하도록 연결
+   - 시약·초자 고유 primary/header 색상은 유지
+   - fallback 값을 함께 넣어 common 파일 누락 시에도 기존 화면 유지
+========================================================= */
+:root{
+    --bg:var(--common-bg, #f5f7fb);
+    --card:var(--common-card, #ffffff);
+    --line:var(--common-line, #d9e2ec);
+    --text:var(--common-text, #1f2937);
+    --muted:var(--common-muted, #6b7280);
 
-    try {
-      var params = new URLSearchParams(window.location.search || '');
-      var userRole = String(params.get('user_role') || '').trim();
-      var reagentRole = String(params.get('reagent_role') || '').trim();
-      var saved = JSON.parse(localStorage.getItem('reagent_current_user') || '{}');
+    /* 시약·초자 프로그램 고유 색상은 유지 */
+    --primary:#1d4ed8;
+    --primary-soft:#eaf2ff;
 
-      var isAdmin = userRole === 'admin' || saved.is_global_admin === true || String(saved.user_role || '').trim() === 'admin';
-      var isOperator = isAdmin || reagentRole !== '' || saved.is_reagent_operator === true || String(saved.reagent_role || '').trim() !== '';
-
-      if (isAdmin) {
-        roleClass = 'reagent-role-admin';
-      } else if (isOperator) {
-        roleClass = 'reagent-role-operator';
-      }
-    } catch (_) {}
-
-    root.classList.add(roleClass);
-  })();
-</script>
-<style>
-  /* 권한 JS 적용 전 초기 노출 방지: 일반 사용자는 제품신청만 표시 */
-  html.reagent-role-general .tab-btn[data-tab="collect"],
-  html.reagent-role-general .tab-btn[data-tab="prepare"],
-  html.reagent-role-general .tab-btn[data-tab="product-management"],
-  html.reagent-role-general .admin-request-actions {
-    display: none !important;
-  }
-</style>
+    --shadow:var(--common-shadow-panel, 0 10px 28px rgba(15,23,42,.08));
+    --radius:var(--common-card-radius, 18px)
+    }
     
+    *{box-sizing:border-box}
+    
+    html,body{
+    margin:0;
+    padding:0;
+    width:100%;
+    min-width:0;
+    font-family:var(--common-font-family, -apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",sans-serif);
+    background:var(--bg);
+    color:var(--text)
+    }
+    
+    body{
+    padding:0;
+    width:100%;
+    max-width:none
+    }
+    
+    .shell{
+    width:100%;
+    max-width:none;
+    margin:0;
+    display:grid;
+    gap:12px
+    }
+    
+    
+    .chip-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:14px
+    }
+    
+    .chip{
+    background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.16);
+    border-radius:999px;
+    padding:7px 12px;
+    font-size:13px
+    }
+    
+    .tabs{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap
+    }
+    
+    .tab-btn{
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--text);
+    padding:11px 16px;
+    border-radius:12px;
+    cursor:pointer;
+    font:inherit;
+    font-weight:700
+    }
+    
+    .tab-btn.active{
+    background:var(--primary);
+    border-color:var(--primary);
+    color:#fff
+    }
+    
+    .page{display:none}
+    .page.active{display:block}
+    
+    .card{
+    width:100%;
+    max-width:none;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    overflow:hidden
+    }
+    
+    .card-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    padding:18px 20px;
+    border-bottom:1px solid var(--line)
+    }
+    
+    .card-head h2,.card-head h3{
+    margin:0;
+    letter-spacing:-.03em
+    }
+    
+    .card-head p{
+    margin:6px 0 0;
+    color:var(--muted);
+    font-size:14px
+    }
+    
+    .card-body{
+    padding:18px 20px 20px
+    }
+    
+    .badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:700;
+    white-space:nowrap
+    }
+    
+    .badge.blue{
+    color:var(--primary);
+    background:var(--primary-soft)
+    }
+    
+    .badge.orange{
+    color:#b45309;
+    background:#fff7ed
+    }
+    
+    .field{
+    display:flex;
+    flex-direction:column;
+    gap:7px;
+    min-width:0
+    }
+    
+    .field label{
+    font-size:12px;
+    color:var(--muted);
+    font-weight:700
+    }
+    
+    .field input,.field select,.field button{
+    width:100%;
+    min-width:0;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--text);
+    border-radius:12px;
+    padding:12px 12px;
+    font:inherit;
+    height:46px
+    }
+    
+    .field input[readonly]{background:#f8fafc}
+    
+    .btn,.ghost-btn{
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#fff;
+    cursor:pointer;
+    font:inherit;
+    color:var(--text)
+    }
+    
+    .btn.primary{
+    background:var(--primary);
+    border-color:var(--primary);
+    color:#fff
+    }
+    
+    .btn{padding:11px 14px}
+    
+    .ghost-btn{
+    padding:8px 10px;
+    font-size:12px;
+    background:#f8fafc
+    }
+    
+    .actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:14px
+    }
+    
+    .summary{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:12px
+    }
+    
+    .tile{
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px;
+    background:#fbfdff
+    }
+    
+    .tile .k{
+    color:var(--muted);
+    font-size:12px;
+    margin-bottom:8px
+    }
+    
+    .tile .v{
+    font-size:24px;
+    font-weight:800;
+    letter-spacing:-.03em
+    }
+    
+    .form-grid{
+    display:grid;
+    grid-template-columns:1.05fr 3fr 1.4fr 1.15fr 0.8fr 1fr 1.55fr 0.9fr 2.2fr;
+    gap:10px;
+    align-items:end
+    }
+    
+    .table-wrap{
+    width:100%;
+    max-width:none;
+    border:1px solid var(--line);
+    border-radius:16px;
+    overflow:auto
+    }
+    
+    table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:1180px
+    }
+    
+    th,td{
+    padding:12px 10px;
+    border-bottom:1px solid var(--line);
+    text-align:left;
+    font-size:13px;
+    vertical-align:top
+    }
+    
+    th{
+    background:#fbfdff;
+    color:var(--muted);
+    font-size:12px;
+    position:sticky;
+    top:0;
+    z-index:1
+    }
+    
+    .empty{
+    padding:28px 16px;
+    text-align:center;
+    color:var(--muted)
+    }
+    
+    .collect-filters{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr 1fr;
+    gap:10px;
+    align-items:end
+    }
+    
+    .modal-backdrop{
+    position:fixed;
+    inset:0;
+    background:rgba(15,23,42,.42);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:12px;
+    z-index:20
+    }
+    
+    .modal-backdrop.show{display:flex}
+    
+    .modal{
+    width:min(1100px,100%);
+    max-height:90vh;
+    background:#fff;
+    border-radius:22px;
+    overflow:hidden;
+    box-shadow:0 30px 70px rgba(15,23,42,.28);
+    display:grid;
+    grid-template-rows:auto auto 1fr auto
+    }
+    
+    .modal-head{
+    padding:18px 20px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px
+    }
+    
+    .modal-search{
+    padding:14px 20px;
+    border-bottom:1px solid var(--line);
+    display:grid;
+    grid-template-columns:1.6fr .9fr .9fr .9fr;
+    gap:10px
+    }
+    
+    .modal-body{overflow:auto}
+    
+    .result-item{
+    padding:14px 20px;
+    border-bottom:1px solid var(--line);
+    cursor:pointer
+    }
+    
+    .result-item:hover{background:#f8fbff}
+    
+    .result-title{
+    font-weight:700;
+    margin-bottom:8px
+    }
+    
+    .meta{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap
+    }
+    
+    .meta span{
+    font-size:12px;
+    background:#f3f6fa;
+    border:1px solid #e5edf5;
+    color:#425466;
+    border-radius:999px;
+    padding:5px 9px
+    }
+    
+    .modal-foot{
+    padding:14px 20px;
+    border-top:1px solid var(--line);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap
+    }
+    
+    .small{
+    font-size:12px;
+    color:var(--muted)
+    }
+    
+    .search-hint{
+    margin-top:6px;
+    font-size:12px;
+    color:var(--muted)
+    }
+    
+    .product-link{
+    color:var(--primary);
+    text-decoration:underline;
+    cursor:pointer
+    }
+    
+    .toast-wrap{
+    position:fixed;
+    right:16px;
+    bottom:16px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    z-index:40
+    }
+    
+    .toast{
+    min-width:260px;
+    max-width:420px;
+    background:#111827;
+    color:#fff;
+    border-radius:14px;
+    padding:14px 16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.25)
+    }
+    
+    .toast.success{background:#065f46}
+    .toast.warn{background:#92400e}
+    
+     
+    @media (max-width:1200px){
+    .form-grid,.collect-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .modal-search{grid-template-columns:1fr 1fr}
+    .usage-field{grid-column:1/-1}
+    }
+    
+    @media (max-width:760px){
+    body{padding:10px}
+    .card-head{padding:16px;align-items:flex-start}
+    .card-body{padding:16px}
+    .summary{grid-template-columns:1fr}
+    .modal-search{grid-template-columns:1fr}
+    }
+    
+   /* ===== portal iframe embed: reagent final ===== */
+html.embed-mode,
+html.embed-mode body{
+  margin:0 !important;
+  padding:0 !important;
+  width:100% !important;
+  min-width:0 !important;
+  max-width:none !important;
+  background:#f1f5f9 !important;
+}
 
-<style>
-  /* portal common header mode */
-  .tabs{
-    margin-top:0 !important;
-  }
+html.embed-mode .shell{
+  margin:0 !important;
+  padding:0 !important;
+  width:100% !important;
+  max-width:none !important;
+  gap:16px !important;
+}
 
-  .shell{
-    padding-top:0 !important;
-  }
-</style>
+html.embed-mode .chip-row{
+  display:none !important;
+}
 
+html.embed-mode .tabs{
+  margin-top:0 !important;
+}
 
-<style id="reagent-portal-bridge-style">
-  /* 포탈 공통 버튼 사용: 내부 시약 탭 버튼은 DOM 유지 후 화면에서만 숨김 */
-  .shell > .tabs{
-    display:none !important;
-    height:0 !important;
-    min-height:0 !important;
-    margin:0 !important;
+html.embed-mode .card{
+  margin:0 !important;
+}
+html.embed-mode body{
     padding:0 !important;
-    border:0 !important;
-    overflow:hidden !important;
   }
-
-  .shell{
-    padding-top:0 !important;
-  }
-</style>
-
-
-<style id="hide-send-to-prepare-button">
-  #sendToPrepare,
-  .field:has(#sendToPrepare){
-    display:none !important;
-  }
-</style>
-
-
-<style id="order-receipt-header-inline-layout-final">
-/* ===== 발주/입고 관리 헤더 정렬 최종 =====
-   - 주문월/미입고 품목/년월 보기/새로고침을 '발주/입고 관리' 제목 오른쪽에 붙임
-   - 취합정리 화면의 제목+주문월 배치와 유사하게 정리
-*/
-#page-order-receipt .order-receipt-head{
-  align-items:flex-start !important;
-  justify-content:flex-start !important;
-}
-
-#page-order-receipt .order-receipt-head-left{
-  width:100% !important;
-  min-width:0 !important;
-}
-
-#page-order-receipt .order-receipt-title-row{
-  display:flex !important;
+  /* 상단 헤더 카드 키우기 */
+.reagent-header-card{
+  padding:26px 24px !important;
+  min-height:110px;
   align-items:center !important;
-  justify-content:flex-start !important;
-  gap:12px !important;
-  flex-wrap:wrap !important;
-  width:100% !important;
 }
 
-#page-order-receipt .order-receipt-title-row h2{
-  margin:0 !important;
-  flex:0 0 auto !important;
-  white-space:nowrap !important;
-}
-
-#page-order-receipt .order-receipt-month-wrap{
-  display:flex !important;
-  align-items:center !important;
-  justify-content:flex-start !important;
-  gap:8px !important;
-  flex-wrap:wrap !important;
-  min-width:0 !important;
-  margin:0 !important;
-}
-
-#page-order-receipt .order-receipt-month-wrap .label{
-  font-weight:700 !important;
-  font-size:13px !important;
-  color:#334155 !important;
-  white-space:nowrap !important;
-}
-
-#page-order-receipt #orderReceiptMonth{
-  height:36px !important;
-  min-width:130px !important;
-  border:1px solid var(--line, #d9e2ec) !important;
-  border-radius:10px !important;
-  padding:0 10px !important;
-  font:inherit !important;
-  background:#fff !important;
-  color:var(--text, #1f2937) !important;
-}
-
-#page-order-receipt .order-receipt-month-wrap .btn{
-  height:36px !important;
-  padding:0 14px !important;
-  border-radius:10px !important;
+.reagent-header-card h2{
+  font-size:28px !important;
+  line-height:1.2 !important;
   font-weight:800 !important;
-  white-space:nowrap !important;
+  margin:0 !important;
 }
 
-#page-order-receipt #orderReceiptDesc{
-  margin-top:8px !important;
+/* iframe 안에서는 조금 더 정리 */
+html.embed-mode .reagent-header-card{
+  padding:28px 24px !important;
+  min-height:112px;
+}
+/* 상단 헤더 카드 (홈/근태 스타일 맞춤) */
+.reagent-header-card{
+  padding:32px 28px !important;
+  border-radius:22px !important;
+  align-items:flex-start !important;
+  min-height:140px;
+}
+
+/* 작은 상단 텍스트 */
+.reagent-header-card .sub-title{
+  font-size:14px;
+  color:#64748b;
+  margin-bottom:6px;
+}
+
+/* 메인 타이틀 */
+.reagent-header-card h2{
+  font-size:34px !important;
+  font-weight:800 !important;
+  letter-spacing:-0.5px;
+  margin:0;
+  color:#0f172a;
+}
+
+/* iframe 안에서도 동일하게 */
+html.embed-mode .reagent-header-card{
+  padding:32px 28px !important;
+  min-height:140px;
+}
+/* 헤더 카드 → 파란 배너 스타일 */
+.reagent-header-card{
+  background:linear-gradient(135deg,#173a7a 0%,#2251a3 100%) !important;
+  color:#fff !important;
+  padding:32px 28px !important;
+  border-radius:22px !important;
+  min-height:140px;
+  box-shadow:0 8px 24px rgba(15,23,42,0.15);
+}
+
+/* 상단 작은 텍스트 */
+.reagent-header-card .sub-title{
+  color:rgba(255,255,255,0.75) !important;
+  font-size:14px;
+  margin-bottom:6px;
+}
+
+/* 메인 타이틀 */
+.reagent-header-card h2{
+  color:#fff !important;
+  font-size:34px !important;
+  font-weight:800;
+  margin:0;
+}
+
+/* iframe에서도 동일 */
+html.embed-mode .reagent-header-card{
+  background:linear-gradient(135deg,#173a7a 0%,#2251a3 100%) !important;
+}
+
+/* ===== Reagent app top-left alignment final patch ===== */
+html, body{
+  margin:0 !important;
+  padding:0 !important;
+  width:100% !important;
+  max-width:none !important;
+}
+
+body{
+  background:var(--bg) !important;
+}
+
+.shell{
+  width:100% !important;
+  max-width:none !important;
+  margin:0 !important;
+  padding:0 !important;
+}
+
+/* 포탈 iframe 삽입 시에도 근태/폐수처럼 좌측 상단 기준으로 시작 */
+html.embed-mode,
+html.embed-mode body,
+html.embed-mode .shell{
+  margin:0 !important;
+  padding:0 !important;
+  width:100% !important;
+  max-width:none !important;
+}
+
+/* ===== 제품취합 자동 선택 거래처 음영 박스 ===== */
+.vendor-cell.auto-vendor-selected{
+  background:#eaf2ff !important;
+}
+
+.vendor-cell-start.auto-vendor-selected{
+  border-top-left-radius:14px;
+  border-bottom-left-radius:14px;
+}
+
+.vendor-cell-end.auto-vendor-selected{
+  border-top-right-radius:14px;
+  border-bottom-right-radius:14px;
+}
+
+.vendor-cell.auto-vendor-selected input{
+  background:rgba(255,255,255,0.72) !important;
+  border-color:transparent !important;
+  box-shadow:none !important;
+  font-weight:700;
+}
+
+.vendor-cell.auto-vendor-selected[data-price-field]{
+  color:#1d4ed8;
+  font-weight:800;
+}
+
+.vendor-cell.auto-vendor-selected input[readonly]{
+  background:rgba(255,255,255,0.42) !important;
+}
+
+
+/* ===== 제품취합 확정 행 전체 음영 ===== */
+.collect-row-confirmed > td{
+  background:#f1f5f9 !important;
+  color:#64748b;
+}
+
+.collect-row-confirmed .ghost-btn{
+  background:#e2e8f0 !important;
+  border-color:#cbd5e1 !important;
+  color:#334155 !important;
+}
+
+.collect-row-confirmed input{
+  color:#475569 !important;
+}
+
+.collect-row-confirmed .auto-vendor-selected{
+  background:#dbeafe !important;
+  color:#1e3a8a !important;
+}
+
+.collect-row-confirmed .auto-vendor-selected input{
+  color:#1e3a8a !important;
+}
+
+/* ===== 제품신청 취합완료 행 음영 ===== */
+.request-row-collected > td{
+  background:#f1f5f9 !important;
+  color:#64748b;
+}
+
+.request-row-collected .ghost-btn{
+  background:#e2e8f0 !important;
+  border-color:#cbd5e1 !important;
+  color:#334155 !important;
+}
+
+.request-row-collected input[type="checkbox"]{
+  opacity:.55;
+}
+
+/* 상세정보 안에서는 취합완료 행만 음영, 추가신청건은 일반 배경 유지 */
+.request-detail-collected > td{
+  background:#f1f5f9 !important;
+  color:#64748b;
+}
+
+.request-detail-collected .ghost-btn{
+  background:#e2e8f0 !important;
+  border-color:#cbd5e1 !important;
+  color:#334155 !important;
+}
+
+/* ===== 제품취합 총수량 확정/미확정 색상 ===== */
+.qty-confirmed{
+  color:#2563eb;
+  font-weight:800;
+}
+
+.qty-pending{
+  color:#ea580c;
+  font-weight:800;
+}
+
+/* ===== 주문월 제목 옆 정렬 ===== */
+.title-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.order-month-wrap{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.order-month-wrap .label{
+  font-weight:700;
+  font-size:13px;
+  color:#334155;
+}
+
+.order-month-wrap select{
+  height:36px;
+  border-radius:10px;
+  border:1px solid var(--line);
+  padding:0 10px;
+  font:inherit;
+  background:#fff;
+  min-width:130px;
+}
+
+.order-month-wrap .small{
+  font-size:12px;
+  color:var(--muted);
 }
 
 @media (max-width:760px){
-  #page-order-receipt .order-receipt-title-row{
-    align-items:flex-start !important;
+  .title-row{
+    align-items:flex-start;
+  }
+
+  .order-month-wrap{
+    margin-top:4px;
+  }
+
+  .order-month-wrap .small{
+    width:100%;
+    line-height:1.4;
+  }
+}
+
+/* ===== 취합정리 비교견적 비고 선택 ===== */
+.prepare-remark-select{
+  width:100%;
+  min-width:110px;
+  height:34px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:0 8px;
+  background:#fff;
+  color:var(--text);
+  font:inherit;
+  font-size:12px;
+}
+
+/* ===== 취합정리 문서/표 선택 UI ===== */
+.prepare-control-wrap{
+  display:flex;
+  gap:14px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  align-items:center;
+}
+
+.prepare-control-group{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  padding:6px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#f8fafc;
+}
+
+.prepare-control-label{
+  font-size:12px;
+  font-weight:800;
+  color:#64748b;
+  padding:0 4px;
+}
+
+.prepare-table-panel{
+  display:none;
+}
+
+.prepare-table-panel.active{
+  display:block;
+}
+
+@media (max-width:760px){
+  .prepare-control-wrap{
+    justify-content:flex-start;
+    width:100%;
+  }
+
+  .prepare-control-group{
+    width:100%;
+  }
+
+  .prepare-control-group .btn{
+    flex:1;
+  }
+}
+
+/* ===== 취합정리 엑셀 다운로드 버튼 ===== */
+#downloadExcel{
+  font-weight:800;
+  background:var(--primary);
+  color:#fff;
+  border-color:var(--primary);
+}
+
+#downloadExcel:hover{
+  filter:brightness(1.05);
+}
+
+/* ===== 취합정리 월 상태 토글 버튼 ===== */
+.prepare-finalize-group{
+  gap:4px;
+}
+
+.prepare-finalize-group .prepare-finalize-btn{
+  height:38px;
+  padding:8px 14px;
+  border-radius:10px;
+  font-weight:800;
+  background:#fff;
+  border-color:#d9e2ec;
+  color:#334155;
+}
+
+.prepare-finalize-group .prepare-finalize-btn.primary,
+.prepare-finalize-group .prepare-finalize-btn.active{
+  background:var(--primary);
+  border-color:var(--primary);
+  color:#fff;
+}
+
+.prepare-finalize-group .prepare-finalize-btn:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
+
+@media (max-width:760px){
+  .prepare-finalize-group{
+    width:100%;
+  }
+
+  .prepare-finalize-group .prepare-finalize-btn{
+    flex:1;
+  }
+
+  #downloadExcel{
+    width:100%;
+  }
+}
+
+/* ===== 제품신청 상세내역 추가신청건 색상 ===== */
+.request-detail-pending > td{
+  background:#fff !important;
+}
+
+.request-detail-pending .qty-pending{
+  color:#ea580c !important;
+  font-weight:800;
+}
+
+.request-detail-collected .qty-confirmed{
+  color:#2563eb !important;
+  font-weight:800;
+}
+
+/* ===== 제품취합 테이블 레이아웃 정렬 패치 v1 ===== */
+/* 품명 영역을 넓히고, 단가/가격/거래처 영역을 오른쪽으로 정리 */
+.table-wrap table:has(#collectList){
+  table-layout:fixed;
+  min-width:1680px;
+}
+
+.table-wrap table:has(#collectList) th,
+.table-wrap table:has(#collectList) td{
+  padding:8px 6px;
+  vertical-align:middle;
+  white-space:nowrap;
+}
+
+.table-wrap table:has(#collectList) th:nth-child(1),
+.table-wrap table:has(#collectList) td:nth-child(1){width:78px;text-align:center;}
+.table-wrap table:has(#collectList) th:nth-child(2),
+.table-wrap table:has(#collectList) td:nth-child(2){width:330px;white-space:normal;line-height:1.35;}
+.table-wrap table:has(#collectList) th:nth-child(3),
+.table-wrap table:has(#collectList) td:nth-child(3){width:120px;}
+.table-wrap table:has(#collectList) th:nth-child(4),
+.table-wrap table:has(#collectList) td:nth-child(4){width:110px;}
+.table-wrap table:has(#collectList) th:nth-child(5),
+.table-wrap table:has(#collectList) td:nth-child(5){width:110px;}
+.table-wrap table:has(#collectList) th:nth-child(6),
+.table-wrap table:has(#collectList) td:nth-child(6){width:80px;}
+.table-wrap table:has(#collectList) th:nth-child(7),
+.table-wrap table:has(#collectList) td:nth-child(7){width:90px;}
+.table-wrap table:has(#collectList) th:nth-child(8),
+.table-wrap table:has(#collectList) td:nth-child(8){width:78px;text-align:center;}
+.table-wrap table:has(#collectList) th:nth-child(9),
+.table-wrap table:has(#collectList) td:nth-child(9){width:82px;text-align:center;}
+.table-wrap table:has(#collectList) th:nth-child(10),
+.table-wrap table:has(#collectList) td:nth-child(10){width:90px;text-align:right;}
+.table-wrap table:has(#collectList) th:nth-child(11),
+.table-wrap table:has(#collectList) td:nth-child(11){width:108px;text-align:right;}
+.table-wrap table:has(#collectList) th:nth-child(12),
+.table-wrap table:has(#collectList) td:nth-child(12){width:120px;}
+.table-wrap table:has(#collectList) th:nth-child(13),
+.table-wrap table:has(#collectList) td:nth-child(13){width:90px;text-align:right;}
+.table-wrap table:has(#collectList) th:nth-child(14),
+.table-wrap table:has(#collectList) td:nth-child(14){width:108px;text-align:right;}
+.table-wrap table:has(#collectList) th:nth-child(15),
+.table-wrap table:has(#collectList) td:nth-child(15){width:120px;}
+.table-wrap table:has(#collectList) th:nth-child(16),
+.table-wrap table:has(#collectList) td:nth-child(16){width:80px;text-align:center;}
+
+.table-wrap table:has(#collectList) input.collect-input{
+  height:30px !important;
+  padding:4px 6px !important;
+  border-radius:0 !important;
+  font-size:12px;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell{
+  padding-left:4px;
+  padding-right:4px;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="unit1"],
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="unit2"]{
+  width:82px !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="price1"],
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="price2"]{
+  width:100px !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="vendor1"],
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="vendor2"]{
+  width:110px !important;
+}
+
+.collect-action-box{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+}
+
+.collect-action-box .ghost-btn,
+.table-wrap table:has(#collectList) .ghost-btn{
+  padding:6px 9px;
+  font-size:12px;
+  border-radius:10px;
+}
+
+.collect-name-cell{
+  display:block;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.collect-name-cell:hover{
+  white-space:normal;
+  overflow:visible;
+}
+
+.collect-detail-row td{
+  white-space:normal !important;
+}
+
+/* 거래처 확정 행: 행 전체 음영은 유지하되, 미확정 추가 신청건과 혼동되지 않도록 상세 영역은 차분하게 */
+.collect-row-confirmed > td{
+  background:#f1f5f9 !important;
+}
+
+.collect-row-confirmed + .collect-detail-row td{
+  background:#f8fafc !important;
+}
+
+@media (max-width:1200px){
+  .table-wrap table:has(#collectList){
+    min-width:1560px;
+  }
+  .table-wrap table:has(#collectList) th:nth-child(2),
+  .table-wrap table:has(#collectList) td:nth-child(2){
+    width:280px;
+  }
+}
+
+
+/* ===== final patch: 제품취합 확정행 UI 정리 ===== */
+/* 취소 버튼을 체크박스와 같은 영역에 안정적으로 정렬 */
+.collect-select-cell{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:6px !important;
+  white-space:nowrap !important;
+}
+
+.collect-select-cell .collect-check{
+  margin:0 !important;
+}
+
+.collect-select-cell .collect-cancel-btn{
+  padding:5px 8px !important;
+  font-size:12px !important;
+  border-radius:9px !important;
+}
+
+/* 품명은 가장 넓게 쓰되, 기본은 한 줄 말줄임 */
+.collect-name-cell{
+  display:table-cell !important;
+  max-width:100% !important;
+  white-space:normal !important;
+  line-height:1.35 !important;
+  font-weight:600;
+}
+
+/* 제품취합 표 전체 세로 정렬 안정화 */
+.table-wrap table:has(#collectList) td,
+.table-wrap table:has(#collectList) th{
+  vertical-align:middle !important;
+}
+
+/* 확정 행: input 테두리/밑줄/흰 박스 제거 → 텍스트처럼 보이게 */
+.collect-row-confirmed input.collect-input,
+.collect-row-confirmed .vendor-cell input.collect-input,
+.collect-row-confirmed input[readonly]{
+  border:none !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  outline:none !important;
+  padding:0 2px !important;
+  height:auto !important;
+  min-height:0 !important;
+  line-height:1.4 !important;
+  pointer-events:none !important;
+  color:#475569 !important;
+}
+
+/* 확정 행의 셀 높이/글자 위치 보정 */
+.collect-row-confirmed > td{
+  vertical-align:middle !important;
+  background:#f1f5f9 !important;
+}
+
+/* 확정 행에서 선택 거래처는 파란 박스가 아니라 글자 강조만 */
+.collect-row-confirmed .vendor-cell.auto-vendor-selected{
+  background:transparent !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+.collect-row-confirmed .vendor-cell.auto-vendor-selected input.collect-input{
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+  background:transparent !important;
+  border:none !important;
+}
+
+/* 확정 행에서 기존 vendor-cell 둥근 배경 효과 제거 */
+.collect-row-confirmed .vendor-cell-start.auto-vendor-selected,
+.collect-row-confirmed .vendor-cell-end.auto-vendor-selected{
+  border-radius:0 !important;
+}
+
+/* 제품취합 상세: 확정 건만 음영, 추가신청은 흰색 유지 */
+.collect-detail-confirmed > td{
+  background:#f1f5f9 !important;
+  color:#64748b !important;
+}
+
+.collect-detail-row .qty-confirmed{
+  color:#2563eb !important;
+  font-weight:800 !important;
+}
+
+.collect-detail-row .qty-pending{
+  color:#ea580c !important;
+  font-weight:800 !important;
+}
+
+/* 확정 행 바로 아래 상세 테이블은 전체 회색으로 덮지 않음 */
+.collect-row-confirmed + .collect-detail-row > td{
+  background:#fff !important;
+}
+
+.collect-row-confirmed + .collect-detail-row .collect-detail-confirmed > td{
+  background:#f1f5f9 !important;
+}
+
+/* 거래처 입력 영역 간격 압축 */
+.table-wrap table:has(#collectList) .vendor-cell{
+  padding-left:3px !important;
+  padding-right:3px !important;
+}
+
+.table-wrap table:has(#collectList) input.collect-input{
+  border-radius:8px !important;
+}
+
+/* 일반 미확정 상태의 입력칸은 기존처럼 보이되 조금 정돈 */
+tr:not(.collect-row-confirmed) input.collect-input{
+  background:#fff !important;
+}
+
+
+/* ===== final patch v2: 체크박스 칸 정리 / 취소 버튼 작업 칸 이동 ===== */
+.collect-select-cell{
+  display:table-cell !important;
+  text-align:center !important;
+  vertical-align:middle !important;
+  padding-left:6px !important;
+  padding-right:6px !important;
+  white-space:nowrap !important;
+}
+
+.collect-select-cell .collect-check{
+  margin:0 auto !important;
+  display:block !important;
+}
+
+.collect-select-cell .collect-cancel-btn{
+  display:none !important;
+}
+
+/* 작업 칸 버튼 정렬 */
+.table-wrap table:has(#collectList) td:last-child{
+  text-align:center !important;
+  vertical-align:middle !important;
+}
+
+.table-wrap table:has(#collectList) td:last-child .ghost-btn{
+  min-width:48px !important;
+  padding:6px 9px !important;
+  border-radius:9px !important;
+}
+
+/* 확정 행에서도 작업 칸 취소 버튼은 보이게 */
+.collect-row-confirmed td:last-child .ghost-btn{
+  background:#e2e8f0 !important;
+  border-color:#cbd5e1 !important;
+  color:#334155 !important;
+  pointer-events:auto !important;
+  cursor:pointer !important;
+}
+
+/* 확정 행에서 체크박스는 흐리게만 */
+.collect-row-confirmed .collect-check{
+  opacity:.45 !important;
+}
+
+/* 품명 밑줄처럼 보이는 잔상 제거 재보정 */
+.collect-row-confirmed .collect-name-cell,
+.collect-name-cell{
+  border-bottom:none !important;
+  vertical-align:middle !important;
+}
+
+.collect-row-confirmed .collect-name-cell *{
+  border-bottom:none !important;
+  box-shadow:none !important;
+}
+
+
+/* ===== final minimal patch: 제품취합 상세보기 상태/색상 기준 ===== */
+/* 거래처 확정된 상세 행만 음영 */
+.collect-detail-row .collect-detail-confirmed > td,
+.collect-detail-confirmed > td{
+  background:#f1f5f9 !important;
+  color:#64748b !important;
+}
+
+/* 제품취합 상세보기: 확정 후 확정건=파랑, 미확정/추가신청=주황 */
+.collect-detail-row .qty-confirmed{
+  color:#2563eb !important;
+  font-weight:800 !important;
+}
+
+.collect-detail-row .qty-pending{
+  color:#ea580c !important;
+  font-weight:800 !important;
+}
+
+/* 거래처 확정 전 상세 행은 음영 없이 기본 배경 */
+.collect-detail-row tbody tr:not(.collect-detail-confirmed) > td{
+  background:#fff !important;
+}
+
+/* 체크박스 칸은 체크박스만 보이도록 유지 */
+.collect-select-cell{
+  display:table-cell !important;
+  text-align:center !important;
+  vertical-align:middle !important;
+}
+
+.collect-select-cell .collect-cancel-btn{
+  display:none !important;
+}
+
+/* 확정 행 input 밑줄/위치 보정 유지 */
+.collect-row-confirmed input.collect-input,
+.collect-row-confirmed .vendor-cell input.collect-input,
+.collect-row-confirmed input[readonly]{
+  border:none !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  outline:none !important;
+  padding:0 2px !important;
+  height:auto !important;
+  min-height:0 !important;
+  line-height:1.4 !important;
+  pointer-events:none !important;
+}
+
+.collect-row-confirmed > td{
+  vertical-align:middle !important;
+}
+
+
+/* ===== final patch: 확정 거래처 파란 라운드 박스 복원 ===== */
+/* 거래처 확정 전/후 모두 선택된 거래처 묶음은 파란색 라운드 박스로 표시 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell-start.auto-vendor-selected{
+  border-top-left-radius:14px !important;
+  border-bottom-left-radius:14px !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell-end.auto-vendor-selected{
+  border-top-right-radius:14px !important;
+  border-bottom-right-radius:14px !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected input.collect-input{
+  background:rgba(255,255,255,0.55) !important;
+  border-color:transparent !important;
+  box-shadow:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 확정 행에서도 선택 거래처 파란 박스를 유지 */
+.collect-row-confirmed .vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+.collect-row-confirmed .vendor-cell.auto-vendor-selected input.collect-input,
+.collect-row-confirmed .vendor-cell.auto-vendor-selected input[readonly]{
+  background:rgba(255,255,255,0.38) !important;
+  border-color:transparent !important;
+  box-shadow:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 파란 박스가 확정 행 회색 음영보다 우선 보이도록 보정 */
+.collect-row-confirmed > td.vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+}
+
+
+/* ===== final patch: 미확정/확정 자동선택 거래처 파란 박스 통일 ===== */
+/* 낮은 금액 자동 선택 거래처는 확정 전에도 파란 라운드 박스로 표시 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) tr:not(.collect-row-confirmed) .vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) .collect-row-confirmed .vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 거래처1/2 묶음의 좌우 라운드 */
+.table-wrap table:has(#collectList) .vendor-cell-start.auto-vendor-selected{
+  border-top-left-radius:14px !important;
+  border-bottom-left-radius:14px !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell-end.auto-vendor-selected{
+  border-top-right-radius:14px !important;
+  border-bottom-right-radius:14px !important;
+}
+
+/* 파란 박스 안의 input 흰색 섬 제거: 하나의 파란 박스처럼 보이게 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected input.collect-input,
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected input[readonly],
+.table-wrap table:has(#collectList) .collect-row-confirmed .vendor-cell.auto-vendor-selected input.collect-input,
+.table-wrap table:has(#collectList) .collect-row-confirmed .vendor-cell.auto-vendor-selected input[readonly]{
+  background:transparent !important;
+  border-color:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 확정 행의 회색 배경보다 선택 거래처 파란 박스가 우선 */
+.table-wrap table:has(#collectList) .collect-row-confirmed > td.vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+}
+
+/* 파란 박스 내부 여백을 맞춰 흰 틈처럼 보이는 부분 최소화 */
+.table-wrap table:has(#collectList) .vendor-cell{
+  background-clip:padding-box !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected{
+  padding-top:6px !important;
+  padding-bottom:6px !important;
+}
+
+/* 선택 거래처 박스 안 input 크기 정렬 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected input.collect-input{
+  height:24px !important;
+  line-height:24px !important;
+  padding:0 4px !important;
+}
+
+
+/* ===== final patch: 파란 거래처 박스 바깥 흰 틈 제거 ===== */
+/* 선택 거래처 셀 자체를 끝까지 파란색으로 채워 회색 행 배경과의 흰 틈 제거 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) tr:not(.collect-row-confirmed) > td.vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) .collect-row-confirmed > td.vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  background-color:#dbeafe !important;
+  background-clip:border-box !important;
+  box-shadow:inset 0 0 0 9999px #dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 거래처1/2 묶음의 좌우 라운드 유지 */
+.table-wrap table:has(#collectList) .vendor-cell-start.auto-vendor-selected{
+  border-top-left-radius:14px !important;
+  border-bottom-left-radius:14px !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell-end.auto-vendor-selected{
+  border-top-right-radius:14px !important;
+  border-bottom-right-radius:14px !important;
+}
+
+/* 파란 셀끼리 맞닿는 부분의 흰 선 제거 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected + .vendor-cell.auto-vendor-selected{
+  border-left-color:#dbeafe !important;
+}
+
+/* 확정 행의 회색 배경보다 파란 박스가 무조건 우선 */
+.table-wrap table:has(#collectList) .collect-row-confirmed > td.vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  background-color:#dbeafe !important;
+  box-shadow:inset 0 0 0 9999px #dbeafe !important;
+}
+
+/* 파란 박스 안 input은 흰 칸처럼 보이지 않게 투명 처리 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected input.collect-input,
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected input[readonly]{
+  background:transparent !important;
+  border:none !important;
+  border-color:transparent !important;
+  box-shadow:none !important;
+  outline:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* border-collapse 구조에서 td 사이 미세 흰 틈을 줄이기 위한 보정 */
+.table-wrap table:has(#collectList){
+  border-spacing:0 !important;
+}
+
+.table-wrap table:has(#collectList) td.vendor-cell{
+  border-bottom-color:#d9e2ec !important;
+}
+
+/* 파란 라운드 박스가 행 안에서 떠 보이지 않도록 상하 여백 최소화 */
+.table-wrap table:has(#collectList) .vendor-cell.auto-vendor-selected{
+  padding-top:6px !important;
+  padding-bottom:6px !important;
+}
+
+
+/* ===== final patch: 제품취합 구분선/거래처 음영 최종 정리 ===== */
+/* 품명 셀을 table-cell로 복원해서 행 구분선이 끊기지 않게 처리 */
+.table-wrap table:has(#collectList) .collect-name-cell{
+  display:table-cell !important;
+  border-bottom:1px solid var(--line) !important;
+  vertical-align:middle !important;
+  white-space:normal !important;
+  line-height:1.35 !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+}
+
+/* 제품취합 테이블 모든 셀 구분선 유지 */
+.table-wrap table:has(#collectList) th,
+.table-wrap table:has(#collectList) td{
+  border-bottom:1px solid var(--line) !important;
+}
+
+/* 확정 행은 행 전체 회색 음영을 먼저 깔기 */
+.table-wrap table:has(#collectList) .collect-row-confirmed > td{
+  background:#f1f5f9 !important;
+  background-color:#f1f5f9 !important;
+}
+
+/* 미확정 행은 일반 흰 배경 유지 */
+.table-wrap table:has(#collectList) tr:not(.collect-row-confirmed) > td{
+  background-color:#fff;
+}
+
+/* 미확정/확정 모두 자동 선택된 거래처 3칸은 파란 라운드 박스 */
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) tr:not(.collect-row-confirmed) > td.vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) .collect-row-confirmed > td.vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  background-color:#dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+  box-shadow:none !important;
+}
+
+/* 거래처 묶음 좌우 라운드 */
+.table-wrap table:has(#collectList) td.vendor-cell-start.auto-vendor-selected{
+  border-top-left-radius:14px !important;
+  border-bottom-left-radius:14px !important;
+}
+
+.table-wrap table:has(#collectList) td.vendor-cell-end.auto-vendor-selected{
+  border-top-right-radius:14px !important;
+  border-bottom-right-radius:14px !important;
+}
+
+/* 파란 박스 내부 input은 흰색 칸처럼 보이지 않게 투명 처리 */
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected input.collect-input,
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected input[readonly]{
+  background:transparent !important;
+  border:none !important;
+  border-color:transparent !important;
+  box-shadow:none !important;
+  outline:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 확정 행 input 밑줄/테두리 제거 유지 */
+.table-wrap table:has(#collectList) .collect-row-confirmed input.collect-input,
+.table-wrap table:has(#collectList) .collect-row-confirmed input[readonly]{
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+}
+
+/* 파란 박스와 회색 음영 사이 흰 틈 방지: 확정 행 배경을 깔고, 선택 셀은 그대로 덮기 */
+.table-wrap table:has(#collectList) .collect-row-confirmed > td.vendor-cell{
+  background-color:#f1f5f9 !important;
+}
+
+.table-wrap table:has(#collectList) .collect-row-confirmed > td.vendor-cell.auto-vendor-selected{
+  background-color:#dbeafe !important;
+}
+
+/* 상세 행은 기존 상태 기준 유지 */
+.table-wrap table:has(#collectList) .collect-detail-row > td{
+  background:#fff !important;
+}
+
+/* 체크박스 칸은 체크박스만 */
+.table-wrap table:has(#collectList) .collect-select-cell{
+  display:table-cell !important;
+  text-align:center !important;
+  vertical-align:middle !important;
+}
+
+.table-wrap table:has(#collectList) .collect-select-cell .collect-cancel-btn{
+  display:none !important;
+}
+
+
+/* ===== final patch: 확정 행 회색 바탕을 tr까지 깔아서 파란 라운드 바깥 흰 틈 제거 ===== */
+/* 라운드 모서리 밖에 보이는 부모 배경도 회색으로 강제 */
+.table-wrap table:has(#collectList) tr.collect-row-confirmed{
+  background:#f1f5f9 !important;
+  background-color:#f1f5f9 !important;
+}
+
+/* 확정 행 전체 td는 먼저 회색으로 깔기 */
+.table-wrap table:has(#collectList) tr.collect-row-confirmed > td{
+  background:#f1f5f9 !important;
+  background-color:#f1f5f9 !important;
+}
+
+/* 선택 거래처 3칸만 회색 위에 파란색으로 덮기 */
+.table-wrap table:has(#collectList) tr.collect-row-confirmed > td.vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) tr:not(.collect-row-confirmed) > td.vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  background-color:#dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 파란 라운드 모서리 유지 */
+.table-wrap table:has(#collectList) td.vendor-cell-start.auto-vendor-selected{
+  border-top-left-radius:14px !important;
+  border-bottom-left-radius:14px !important;
+}
+
+.table-wrap table:has(#collectList) td.vendor-cell-end.auto-vendor-selected{
+  border-top-right-radius:14px !important;
+  border-bottom-right-radius:14px !important;
+}
+
+/* 파란 셀 내부 input은 완전 투명 */
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected input.collect-input,
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected input[readonly]{
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* border-collapse 환경에서 모서리 흰 틈을 가리는 보조 레이어 */
+.table-wrap table:has(#collectList) tr.collect-row-confirmed > td.vendor-cell.auto-vendor-selected{
+  box-shadow:
+    inset 0 0 0 9999px #dbeafe,
+    0 0 0 1px #dbeafe !important;
+}
+
+/* 선택 거래처 셀끼리 사이 흰 선 제거 */
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected + td.vendor-cell.auto-vendor-selected{
+  border-left-color:#dbeafe !important;
+}
+
+/* 선택 거래처 주변 셀과 맞닿는 부분의 흰 틈 최소화 */
+.table-wrap table:has(#collectList) tr.collect-row-confirmed > td.vendor-cell.auto-vendor-selected:first-child,
+.table-wrap table:has(#collectList) tr.collect-row-confirmed > td.vendor-cell.auto-vendor-selected:last-child{
+  background-clip:border-box !important;
+}
+
+
+/* ===== final structural patch: 거래처 3칸을 하나의 라운드 박스로 묶기 ===== */
+/* 기존 vendor-cell 파란 td 방식은 사용하지 않고, colspan 셀 안쪽 박스로 표시 */
+.table-wrap table:has(#collectList) .vendor-group-td{
+  padding:4px 5px !important;
+  vertical-align:middle !important;
+  background:inherit !important;
+}
+
+/* 확정 행은 전체 회색을 먼저 깐다 */
+.table-wrap table:has(#collectList) tr.collect-row-confirmed{
+  background:#f1f5f9 !important;
+}
+
+.table-wrap table:has(#collectList) tr.collect-row-confirmed > td{
+  background:#f1f5f9 !important;
+}
+
+/* 미확정 행은 흰색 */
+.table-wrap table:has(#collectList) tr:not(.collect-row-confirmed) > td{
+  background:#fff;
+}
+
+/* 거래처 입력 묶음 기본 박스 */
+.vendor-quote-box{
+  display:grid !important;
+  grid-template-columns:82px 100px 1fr !important;
+  align-items:center !important;
+  gap:6px !important;
+  width:100% !important;
+  min-height:34px !important;
+  padding:4px 8px !important;
+  border-radius:14px !important;
+  background:transparent !important;
+}
+
+/* 선택된 거래처: 파란색 라운드 박스 */
+.vendor-quote-box.auto-vendor-selected{
+  background:#dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 파란 박스 바깥은 td/row 배경이 보이므로, 확정 행에서는 회색만 보임 */
+.collect-row-confirmed .vendor-group-td{
+  background:#f1f5f9 !important;
+}
+
+/* 미확정 행에서는 파란 박스 바깥 흰색이 정상 */
+tr:not(.collect-row-confirmed) .vendor-group-td{
+  background:#fff !important;
+}
+
+/* vendor-group-td 자체에는 파란색을 주지 않음: 흰 틈 방지 핵심 */
+.vendor-group-td.auto-vendor-selected{
+  background:inherit !important;
+  box-shadow:none !important;
+}
+
+/* 입력칸 */
+.vendor-quote-box input.collect-input{
+  width:100% !important;
+  height:26px !important;
+  min-height:26px !important;
+  padding:2px 4px !important;
+  border-radius:7px !important;
+  font-size:12px !important;
+  line-height:1.2 !important;
+}
+
+/* 선택된 파란 박스 안 입력칸은 투명 */
+.vendor-quote-box.auto-vendor-selected input.collect-input{
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 확정 행 입력칸도 텍스트처럼 보이게 */
+.collect-row-confirmed .vendor-quote-box input.collect-input{
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+  pointer-events:none !important;
+}
+
+/* 헤더와 colspan 셀 폭 균형 보정 */
+.table-wrap table:has(#collectList) .vendor-unit-input{ text-align:right !important; }
+.table-wrap table:has(#collectList) .vendor-price-input{ text-align:right !important; }
+.table-wrap table:has(#collectList) .vendor-name-input{ text-align:left !important; }
+
+/* 품명 구분선/표 구분선 유지 */
+.table-wrap table:has(#collectList) th,
+.table-wrap table:has(#collectList) td{
+  border-bottom:1px solid var(--line) !important;
+}
+
+.table-wrap table:has(#collectList) .collect-name-cell{
+  display:table-cell !important;
+  border-bottom:1px solid var(--line) !important;
+  vertical-align:middle !important;
+}
+
+
+/* ===== SAFE PATCH: 취합 기능 보존 + 표시만 최소 보정 ===== */
+/* 품명 구분선 복원 */
+.table-wrap table:has(#collectList) th,
+.table-wrap table:has(#collectList) td{
+  border-bottom:1px solid var(--line) !important;
+  vertical-align:middle !important;
+}
+
+.table-wrap table:has(#collectList) .collect-name-cell{
+  display:table-cell !important;
+  border-bottom:1px solid var(--line) !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  line-height:1.35 !important;
+}
+
+/* 체크박스 칸은 체크박스만 */
+.table-wrap table:has(#collectList) .collect-select-cell{
+  display:table-cell !important;
+  text-align:center !important;
+  vertical-align:middle !important;
+}
+
+.table-wrap table:has(#collectList) .collect-select-cell .collect-cancel-btn{
+  display:none !important;
+}
+
+/* 확정 행 회색 */
+.table-wrap table:has(#collectList) tr.collect-row-confirmed,
+.table-wrap table:has(#collectList) tr.collect-row-confirmed > td{
+  background:#f1f5f9 !important;
+  background-color:#f1f5f9 !important;
+}
+
+/* 자동 선택 거래처 파란 음영: 기존 td 구조 유지 */
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  background-color:#dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+.table-wrap table:has(#collectList) td.vendor-cell-start.auto-vendor-selected{
+  border-top-left-radius:14px !important;
+  border-bottom-left-radius:14px !important;
+}
+
+.table-wrap table:has(#collectList) td.vendor-cell-end.auto-vendor-selected{
+  border-top-right-radius:14px !important;
+  border-bottom-right-radius:14px !important;
+}
+
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected input.collect-input,
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected input[readonly]{
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 확정 행 input */
+.table-wrap table:has(#collectList) tr.collect-row-confirmed input.collect-input,
+.table-wrap table:has(#collectList) tr.collect-row-confirmed input[readonly]{
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+  pointer-events:none !important;
+}
+
+/* 상세보기 */
+.collect-detail-confirmed > td,
+.collect-detail-row .collect-detail-confirmed > td{
+  background:#f1f5f9 !important;
+  color:#64748b !important;
+}
+
+.collect-detail-row tbody tr:not(.collect-detail-confirmed) > td{
+  background:#fff !important;
+}
+
+.collect-detail-row .qty-confirmed{
+  color:#2563eb !important;
+  font-weight:800 !important;
+}
+
+.collect-detail-row .qty-pending{
+  color:#ea580c !important;
+  font-weight:800 !important;
+}
+
+/* === 관리자 기능 탭 오른쪽 정렬 === */
+.admin-tab {
+  margin-left: auto;
+}
+
+/* ===== compact action buttons patch ===== */
+.tabs{
+  gap:6px;
+}
+
+.tab-btn{
+  height:40px;
+  padding:0 14px;
+  border-radius:12px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:13px;
+}
+
+.btn{
+  height:40px;
+  padding:0 14px;
+  border-radius:12px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:13px;
+}
+
+.badge{
+  min-height:36px;
+  padding:0 12px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.actions{
+  gap:8px;
+}
+
+.request-list-toggle .btn,
+.prepare-control-group .btn,
+.prepare-finalize-group .prepare-finalize-btn{
+  height:36px !important;
+  padding:0 14px !important;
+  border-radius:10px !important;
+}
+
+#openSearch,
+#addItem,
+#clearForm,
+#requestNew,
+#addToCollect,
+#confirmSelectedCollect,
+#sendToPrepare,
+#downloadExcel{
+  height:40px !important;
+  padding:0 16px !important;
+}
+
+@media (max-width:760px){
+  .tab-btn,
+  .btn{
+    width:100%;
+  }
+
+  .tabs{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+
+/* ===== ExeloLab Common Compact UI 적용: reagent ===== */
+/* 기능/JS 변경 없이 시약·초자 화면 밀도만 조정 */
+
+:root{
+  --rg-page-gap:10px;
+  --rg-card-padding:14px;
+  --rg-card-radius:var(--common-card-radius, 14px);
+  --rg-control-height:34px;
+  --rg-control-radius:var(--common-control-radius, 10px);
+  --rg-font-title:16px;
+  --rg-font-base:12px;
+  --rg-font-small:var(--common-font-size-small, 11px);
+  --rg-shadow:var(--common-shadow-card, 0 5px 14px rgba(15,23,42,.045));
+}
+
+body{
+  font-size:var(--rg-font-base);
+}
+
+.shell{
+  gap:var(--rg-page-gap) !important;
+}
+
+/* 카드 */
+.card{
+  border-radius:var(--rg-card-radius);
+  box-shadow:var(--rg-shadow);
+}
+
+.card-head{
+  padding:13px 16px;
+  gap:8px;
+}
+
+.card-head h2,
+.card-head h3{
+  font-size:var(--rg-font-title);
+}
+
+.card-head p{
+  margin-top:4px;
+  font-size:var(--rg-font-small);
+}
+
+.card-body{
+  padding:14px 16px 16px;
+}
+
+/* 상단 헤더 카드 */
+.reagent-header-card,
+html.embed-mode .reagent-header-card{
+  padding:22px 24px !important;
+  min-height:98px !important;
+  border-radius:18px !important;
+}
+
+.reagent-header-card .sub-title{
+  font-size:var(--rg-font-small) !important;
+  margin-bottom:5px !important;
+}
+
+.reagent-header-card h2{
+  font-size:26px !important;
+  line-height:1.2 !important;
+}
+
+/* 탭/버튼 */
+.tabs{
+  gap:6px;
+}
+
+.tab-btn,
+.btn{
+  height:var(--rg-control-height) !important;
+  min-height:var(--rg-control-height) !important;
+  padding:0 12px !important;
+  border-radius:var(--rg-control-radius) !important;
+  font-size:var(--rg-font-base) !important;
+}
+
+.ghost-btn{
+  padding:6px 8px;
+  border-radius:8px;
+  font-size:var(--rg-font-small);
+}
+
+.actions{
+  gap:7px;
+  margin-top:10px;
+}
+
+/* 입력 */
+.field{
+  gap:5px;
+}
+
+.field label{
+  font-size:var(--rg-font-small);
+}
+
+.field input,
+.field select,
+.field button{
+  height:var(--rg-control-height);
+  border-radius:var(--rg-control-radius);
+  padding:0 10px;
+  font-size:var(--rg-font-base);
+}
+
+.form-grid{
+  gap:8px;
+}
+
+/* 배지/요약 */
+.badge{
+  min-height:28px;
+  padding:0 9px;
+  font-size:var(--rg-font-small);
+}
+
+.summary{
+  gap:var(--rg-page-gap);
+}
+
+.tile{
+  border-radius:12px;
+  padding:11px;
+}
+
+.tile .k{
+  font-size:var(--rg-font-small);
+  margin-bottom:5px;
+}
+
+.tile .v{
+  font-size:20px;
+}
+
+/* 표 */
+.table-wrap{
+  border-radius:13px;
+}
+
+table{
+  min-width:1080px;
+}
+
+th,
+td{
+  padding:8px 8px;
+  font-size:var(--rg-font-base);
+}
+
+th{
+  font-size:var(--rg-font-small);
+}
+
+/* 신청/취합 필터 */
+.collect-filters{
+  gap:8px;
+}
+
+/* 모달 */
+.modal{
+  border-radius:18px;
+}
+
+.modal-head{
+  padding:14px 16px;
+}
+
+.modal-search{
+  padding:12px 16px;
+  gap:8px;
+}
+
+.result-item{
+  padding:11px 16px;
+}
+
+.result-title{
+  margin-bottom:6px;
+}
+
+.modal-foot{
+  padding:12px 16px;
+}
+
+.meta{
+  gap:6px;
+}
+
+.meta span{
+  font-size:var(--rg-font-small);
+  padding:4px 7px;
+}
+
+.small,
+.search-hint,
+.order-month-wrap .small,
+.prepare-control-label{
+  font-size:var(--rg-font-small);
+}
+
+/* 주문월/컨트롤 */
+.title-row{
+  gap:8px;
+}
+
+.order-month-wrap{
+  gap:6px;
+}
+
+.order-month-wrap .label{
+  font-size:var(--rg-font-small);
+}
+
+.order-month-wrap select,
+.prepare-remark-select{
+  height:32px;
+  border-radius:8px;
+  font-size:var(--rg-font-small);
+}
+
+.prepare-control-wrap{
+  gap:10px;
+}
+
+.prepare-control-group{
+  gap:6px;
+  padding:5px;
+  border-radius:11px;
+}
+
+.request-list-toggle .btn,
+.prepare-control-group .btn,
+.prepare-finalize-group .prepare-finalize-btn{
+  height:32px !important;
+  padding:0 11px !important;
+  border-radius:8px !important;
+  font-size:var(--rg-font-small) !important;
+}
+
+#openSearch,
+#addItem,
+#clearForm,
+#requestNew,
+#addToCollect,
+#confirmSelectedCollect,
+#sendToPrepare,
+#downloadExcel{
+  height:34px !important;
+  padding:0 13px !important;
+}
+
+/* 제품취합 테이블 compact */
+.table-wrap table:has(#collectList){
+  min-width:1560px;
+}
+
+.table-wrap table:has(#collectList) th,
+.table-wrap table:has(#collectList) td{
+  padding:6px 5px !important;
+}
+
+.table-wrap table:has(#collectList) input.collect-input{
+  height:28px !important;
+  padding:3px 5px !important;
+  font-size:11.5px !important;
+  border-radius:7px !important;
+}
+
+.table-wrap table:has(#collectList) .ghost-btn{
+  padding:5px 7px !important;
+  font-size:11px !important;
+  border-radius:8px !important;
+}
+
+.table-wrap table:has(#collectList) th:nth-child(2),
+.table-wrap table:has(#collectList) td:nth-child(2){
+  width:300px;
+}
+
+.vendor-quote-box{
+  min-height:30px !important;
+  padding:3px 6px !important;
+  border-radius:11px !important;
+  gap:5px !important;
+}
+
+.vendor-quote-box input.collect-input{
+  height:24px !important;
+  min-height:24px !important;
+  font-size:11.5px !important;
+}
+
+/* 토스트 */
+.toast-wrap{
+  right:12px;
+  bottom:12px;
+  gap:8px;
+}
+
+.toast{
+  min-width:230px;
+  border-radius:12px;
+  padding:11px 13px;
+  font-size:var(--rg-font-base);
+}
+
+/* iframe */
+html.embed-mode .shell{
+  gap:var(--rg-page-gap) !important;
+}
+
+@media (max-width:1200px){
+  .form-grid,
+  .collect-filters{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media (max-width:760px){
+  body{
+    padding:0 !important;
+  }
+
+  .card-head,
+  .card-body{
+    padding:12px;
+  }
+
+  .reagent-header-card,
+  html.embed-mode .reagent-header-card{
+    padding:18px 16px !important;
+    min-height:88px !important;
+  }
+
+  .reagent-header-card h2{
+    font-size:23px !important;
+  }
+}
+
+/* ===== Portal Compact Patch: Reagent Collect Controls ===== */
+/* 제품취합/제품관리 필터 영역이 화면 전체를 4등분으로 차지하지 않도록 필요한 폭만 사용 */
+.collect-filters{
+  display:flex !important;
+  align-items:flex-end !important;
+  justify-content:flex-start !important;
+  flex-wrap:wrap !important;
+  gap:8px !important;
+}
+
+.collect-filters .field{
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:0 !important;
+}
+
+/* 구분/상태/사용여부 같은 짧은 select */
+.collect-filters .field:has(select){
+  width:auto !important;
+  min-width:130px !important;
+  max-width:180px !important;
+}
+
+/* 검색 input은 너무 길어지지 않게 제한 */
+.collect-filters .field:has(input){
+  width:320px !important;
+  min-width:240px !important;
+  max-width:360px !important;
+}
+
+/* 버튼은 글자 길이에 맞게 */
+.collect-filters .field:has(button){
+  width:auto !important;
+  min-width:0 !important;
+}
+
+.collect-filters .field input,
+.collect-filters .field select,
+.collect-filters .field button{
+  width:auto !important;
+  min-width:0 !important;
+}
+
+.collect-filters .field input{
+  width:100% !important;
+}
+
+.collect-filters .field select{
+  min-width:130px !important;
+}
+
+.collect-filters .field button{
+  white-space:nowrap !important;
+  width:auto !important;
+}
+
+/* 제품취합 주요 버튼이 길게 늘어나지 않도록 */
+#confirmSelectedCollect,
+#sendToPrepare,
+#pmRefreshRequests,
+#pmResetProduct,
+#refreshMyRegistrationRequests{
+  width:auto !important;
+  min-width:max-content !important;
+  white-space:nowrap !important;
+  flex:0 0 auto !important;
+}
+
+/* 제품취합 요약카드는 기존보다 조금 더 균형 있게 */
+#page-collect .summary{
+  grid-template-columns:repeat(4, minmax(150px, 1fr)) !important;
+}
+
+/* 제품취합 테이블은 입력 컬럼 때문에 가로 스크롤 유지하되 과도한 폭은 줄임 */
+.table-wrap table:has(#collectList){
+  min-width:1480px !important;
+}
+
+.table-wrap table:has(#collectList) th:nth-child(2),
+.table-wrap table:has(#collectList) td:nth-child(2){
+  width:280px !important;
+}
+
+.table-wrap table:has(#collectList) th:nth-child(12),
+.table-wrap table:has(#collectList) td:nth-child(12),
+.table-wrap table:has(#collectList) th:nth-child(15),
+.table-wrap table:has(#collectList) td:nth-child(15){
+  width:108px !important;
+}
+
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="vendor1"],
+.table-wrap table:has(#collectList) .vendor-cell input[data-field="vendor2"]{
+  width:100px !important;
+}
+
+/* 작은 화면에서는 다시 2열 배치 */
+@media (max-width:1200px){
+  .collect-filters{
+    display:grid !important;
+    grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .collect-filters .field,
+  .collect-filters .field:has(select),
+  .collect-filters .field:has(input),
+  .collect-filters .field:has(button){
+    width:100% !important;
+    max-width:none !important;
+  }
+
+  .collect-filters .field input,
+  .collect-filters .field select,
+  .collect-filters .field button{
+    width:100% !important;
+  }
+}
+
+@media (max-width:760px){
+  .collect-filters{
+    grid-template-columns:1fr !important;
+  }
+
+  #page-collect .summary{
+    grid-template-columns:1fr !important;
+  }
+}
+
+/* ===== Reagent Collect Table Inner Scroll + Safe Sticky ===== */
+/* 제품취합 테이블은 페이지/iframe이 아니라 테이블 박스 내부에서만 가로 스크롤 */
+#page-collect .collect-table-wrap{
+  width:100% !important;
+  max-width:100% !important;
+  overflow-x:auto !important;
+  overflow-y:auto !important;
+  position:relative !important;
+  border-radius:13px !important;
+  isolation:isolate !important;
+}
+
+/* 페이지 전체가 가로로 밀리는 현상 방지 */
+html,
+body,
+.shell,
+#page-collect,
+#page-collect .card,
+#page-collect .card-body{
+  max-width:100% !important;
+  overflow-x:hidden !important;
+}
+
+/* 실제 가로 스크롤은 여기서만 허용 */
+#page-collect .collect-table-wrap{
+  overflow-x:auto !important;
+}
+
+/* 제품취합 테이블 기본 폭 유지 */
+#page-collect .collect-table-wrap table{
+  table-layout:fixed !important;
+  border-collapse:separate !important;
+  border-spacing:0 !important;
+  width:max-content !important;
+  min-width:1480px !important;
+}
+
+/* 컬럼 폭 재정렬 */
+#page-collect .collect-table-wrap table th:nth-child(1),
+#page-collect .collect-table-wrap table td:nth-child(1){width:68px !important; min-width:68px !important; max-width:68px !important; text-align:center !important;}
+
+#page-collect .collect-table-wrap table th:nth-child(2),
+#page-collect .collect-table-wrap table td:nth-child(2){width:250px !important; min-width:250px !important; max-width:250px !important;}
+
+#page-collect .collect-table-wrap table th:nth-child(3),
+#page-collect .collect-table-wrap table td:nth-child(3){width:105px !important; min-width:105px !important; max-width:105px !important;}
+
+#page-collect .collect-table-wrap table th:nth-child(4),
+#page-collect .collect-table-wrap table td:nth-child(4){width:105px !important; min-width:105px !important; max-width:105px !important;}
+
+#page-collect .collect-table-wrap table th:nth-child(5),
+#page-collect .collect-table-wrap table td:nth-child(5){width:105px !important; min-width:105px !important; max-width:105px !important;}
+
+#page-collect .collect-table-wrap table th:nth-child(6),
+#page-collect .collect-table-wrap table td:nth-child(6){width:75px !important; min-width:75px !important; max-width:75px !important;}
+
+#page-collect .collect-table-wrap table th:nth-child(7),
+#page-collect .collect-table-wrap table td:nth-child(7){width:85px !important; min-width:85px !important; max-width:85px !important;}
+
+#page-collect .collect-table-wrap table th:nth-child(8),
+#page-collect .collect-table-wrap table td:nth-child(8){width:78px !important; min-width:78px !important; max-width:78px !important; text-align:center !important;}
+
+#page-collect .collect-table-wrap table th:nth-child(9),
+#page-collect .collect-table-wrap table td:nth-child(9){width:78px !important; min-width:78px !important; max-width:78px !important; text-align:center !important;}
+
+#page-collect .collect-table-wrap table th:nth-child(10),
+#page-collect .collect-table-wrap table td:nth-child(10),
+#page-collect .collect-table-wrap table th:nth-child(13),
+#page-collect .collect-table-wrap table td:nth-child(13){width:88px !important; min-width:88px !important; max-width:88px !important;}
+
+#page-collect .collect-table-wrap table th:nth-child(11),
+#page-collect .collect-table-wrap table td:nth-child(11),
+#page-collect .collect-table-wrap table th:nth-child(14),
+#page-collect .collect-table-wrap table td:nth-child(14){width:100px !important; min-width:100px !important; max-width:100px !important;}
+
+#page-collect .collect-table-wrap table th:nth-child(12),
+#page-collect .collect-table-wrap table td:nth-child(12),
+#page-collect .collect-table-wrap table th:nth-child(15),
+#page-collect .collect-table-wrap table td:nth-child(15){width:108px !important; min-width:108px !important; max-width:108px !important;}
+
+#page-collect .collect-table-wrap table th:nth-child(16),
+#page-collect .collect-table-wrap table td:nth-child(16){width:70px !important; min-width:70px !important; max-width:70px !important; text-align:center !important;}
+
+/* 화면이 좁을 때만 좌측 핵심 컬럼 고정 */
+@media (max-width:1600px){
+  #page-collect .collect-table-wrap table th:nth-child(1),
+  #page-collect .collect-table-wrap table td:nth-child(1){
+    position:sticky !important;
+    left:0 !important;
+    z-index:20 !important;
+  }
+
+  #page-collect .collect-table-wrap table th:nth-child(2),
+  #page-collect .collect-table-wrap table td:nth-child(2){
+    position:sticky !important;
+    left:68px !important;
+    z-index:20 !important;
+  }
+
+  #page-collect .collect-table-wrap table th:nth-child(3),
+  #page-collect .collect-table-wrap table td:nth-child(3){
+    position:sticky !important;
+    left:318px !important;
+    z-index:20 !important;
+  }
+
+  #page-collect .collect-table-wrap table th:nth-child(4),
+  #page-collect .collect-table-wrap table td:nth-child(4){
+    position:sticky !important;
+    left:423px !important;
+    z-index:20 !important;
+    box-shadow:8px 0 12px rgba(15,23,42,.07) !important;
+    border-right:1px solid #cbd5e1 !important;
+  }
+
+  /* sticky 컬럼 배경 */
+  #page-collect .collect-table-wrap table thead th:nth-child(1),
+  #page-collect .collect-table-wrap table thead th:nth-child(2),
+  #page-collect .collect-table-wrap table thead th:nth-child(3),
+  #page-collect .collect-table-wrap table thead th:nth-child(4){
+    background:#fbfdff !important;
+    z-index:30 !important;
+  }
+
+  #page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(1),
+  #page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(2),
+  #page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(3),
+  #page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(4){
+    background:#ffffff !important;
+  }
+
+  #page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(1),
+  #page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(2),
+  #page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(3),
+  #page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(4){
+    background:#f1f5f9 !important;
+  }
+
+  #page-collect .collect-table-wrap table td:nth-child(2),
+  #page-collect .collect-table-wrap table .collect-name-cell{
+    white-space:normal !important;
+    line-height:1.32 !important;
+    word-break:keep-all !important;
+    overflow-wrap:anywhere !important;
+  }
+}
+
+/* 큰 화면에서는 고정 해제 */
+@media (min-width:1601px){
+  #page-collect .collect-table-wrap table th:nth-child(1),
+  #page-collect .collect-table-wrap table th:nth-child(2),
+  #page-collect .collect-table-wrap table th:nth-child(3),
+  #page-collect .collect-table-wrap table th:nth-child(4),
+  #page-collect .collect-table-wrap table td:nth-child(1),
+  #page-collect .collect-table-wrap table td:nth-child(2),
+  #page-collect .collect-table-wrap table td:nth-child(3),
+  #page-collect .collect-table-wrap table td:nth-child(4){
+    position:static !important;
+    left:auto !important;
+    box-shadow:none !important;
+  }
+}
+
+/* 아주 좁은 화면에서는 고정 폭을 조금 줄임 */
+@media (max-width:1200px){
+  #page-collect .collect-table-wrap table th:nth-child(1),
+  #page-collect .collect-table-wrap table td:nth-child(1){
+    width:60px !important;
+    min-width:60px !important;
+    max-width:60px !important;
+  }
+
+  #page-collect .collect-table-wrap table th:nth-child(2),
+  #page-collect .collect-table-wrap table td:nth-child(2){
+    width:210px !important;
+    min-width:210px !important;
+    max-width:210px !important;
+    left:60px !important;
+  }
+
+  #page-collect .collect-table-wrap table th:nth-child(3),
+  #page-collect .collect-table-wrap table td:nth-child(3){
+    width:94px !important;
+    min-width:94px !important;
+    max-width:94px !important;
+    left:270px !important;
+  }
+
+  #page-collect .collect-table-wrap table th:nth-child(4),
+  #page-collect .collect-table-wrap table td:nth-child(4){
+    width:94px !important;
+    min-width:94px !important;
+    max-width:94px !important;
+    left:364px !important;
+  }
+}
+
+/* ===== Reagent Collect Scroll UX Final Polish ===== */
+/* 현재 동작 유지: 제조사/제품코드가 품명 쪽 여유공간으로 자연스럽게 이동하는 방식 유지 */
+/* 가운데 경계선만 부드럽게 조정 */
+#page-collect .collect-table-wrap table th:nth-child(4),
+#page-collect .collect-table-wrap table td:nth-child(4){
+  border-right:1px solid rgba(148,163,184,.45) !important;
+  box-shadow:6px 0 10px rgba(15,23,42,.035) !important;
+}
+
+/* sticky 영역 배경 안정화 */
+#page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(1),
+#page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(2),
+#page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(3),
+#page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(4){
+  background:#fff !important;
+}
+
+#page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(1),
+#page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(2),
+#page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(3),
+#page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(4){
+  background:#f1f5f9 !important;
+}
+
+/* 가로 스크롤은 제품취합 테이블 박스 안에서만 보이도록 유지 */
+#page-collect .collect-table-wrap{
+  overflow-x:auto !important;
+  overflow-y:auto !important;
+  scrollbar-gutter:stable both-edges;
+}
+
+/* 스크롤바 시각 정리 */
+#page-collect .collect-table-wrap::-webkit-scrollbar{
+  height:12px;
+  width:12px;
+}
+
+#page-collect .collect-table-wrap::-webkit-scrollbar-track{
+  background:#f1f5f9;
+  border-radius:999px;
+}
+
+#page-collect .collect-table-wrap::-webkit-scrollbar-thumb{
+  background:#94a3b8;
+  border:3px solid #f1f5f9;
+  border-radius:999px;
+}
+
+#page-collect .collect-table-wrap::-webkit-scrollbar-thumb:hover{
+  background:#64748b;
+}
+
+/* Firefox */
+#page-collect .collect-table-wrap{
+  scrollbar-width:thin;
+  scrollbar-color:#94a3b8 #f1f5f9;
+}
+
+/* 품명/제조사/제품코드 식별성 유지 */
+#page-collect .collect-table-wrap table td:nth-child(2){
+  font-weight:700 !important;
+}
+
+#page-collect .collect-table-wrap table td:nth-child(3),
+#page-collect .collect-table-wrap table td:nth-child(4){
+  color:#334155 !important;
+}
+
+/* 작은 화면에서도 현재 이동감 유지 */
+@media (max-width:1200px){
+  #page-collect .collect-table-wrap table th:nth-child(4),
+  #page-collect .collect-table-wrap table td:nth-child(4){
+    box-shadow:5px 0 9px rgba(15,23,42,.035) !important;
+  }
+}
+
+/* =========================================================
+   Portal iframe fit patch
+   - 통합 iframe 플랫폼 내부 배치 최적화
+   - 시약·초자 기존 신청/취합/정리/제품관리 로직은 변경하지 않음
+========================================================= */
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  background: transparent !important;
+  overflow-x: hidden;
+}
+
+.shell {
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  padding: 10px;
+}
+
+.page.active {
+  width: 100%;
+}
+
+.card,
+.card-body,
+.card-head,
+.table-wrap,
+.form-grid,
+.summary {
+  min-width: 0;
+}
+
+.table-wrap {
+  max-width: 100%;
+}
+
+html.embed-mode body,
+html.embed-mode .shell {
+  background: transparent !important;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    padding: 8px;
+  }
+}
+
+/* =========================================================
+   Step 3-1 Common Button Shape Link: reagent
+   - 버튼 색상은 기존 시약·초자 스타일 유지
+   - 높이/반경/패딩/폰트/정렬만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+button,
+.btn,
+.tab-btn,
+.ghost-btn,
+.prepare-finalize-btn,
+.badge {
+  min-height: var(--common-control-height, var(--rg-control-height, 34px));
+  border-radius: var(--common-control-radius, var(--rg-control-radius, 10px));
+  font-size: var(--rg-font-base, 12px);
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.btn,
+.tab-btn {
+  height: var(--common-control-height, var(--rg-control-height, 34px)) !important;
+  padding: 0 var(--common-control-padding-x, 12px) !important;
+}
+
+.ghost-btn {
+  min-height: calc(var(--common-control-height, var(--rg-control-height, 34px)) - 4px);
+  height: auto;
+  padding: 0 10px;
+  font-size: var(--rg-font-small, 11px);
+}
+
+.badge {
+  min-height: calc(var(--common-control-height, var(--rg-control-height, 34px)) - 6px);
+  padding: 0 10px;
+  font-size: var(--rg-font-small, 11px);
+}
+
+.request-list-toggle .btn,
+.prepare-control-group .btn,
+.prepare-finalize-group .prepare-finalize-btn {
+  height: calc(var(--common-control-height, var(--rg-control-height, 34px)) - 2px) !important;
+  padding: 0 11px !important;
+}
+
+#openSearch,
+#addItem,
+#clearForm,
+#requestNew,
+#addToCollect,
+#confirmSelectedCollect,
+#sendToPrepare,
+#downloadExcel {
+  height: var(--common-control-height, var(--rg-control-height, 34px)) !important;
+  padding: 0 var(--common-control-padding-x, 13px) !important;
+}
+
+@media (max-width: 760px) {
+  .tab-btn,
+  .btn {
+    width: 100%;
+  }
+}
+
+/* =========================================================
+   Step 3-2 Common Card Surface Link: reagent
+   - 카드 높이/레이아웃/취합 테이블/거래처 음영 로직은 유지
+   - 카드 겉모양(radius, shadow, border, background)만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+.card,
+.tile,
+.table-wrap,
+.modal,
+.modal-head,
+.modal-search,
+.modal-foot,
+.result-item,
+.prepare-control-group,
+.vendor-quote-box,
+.toast {
+  border-color: var(--common-line, var(--line));
+  border-radius: var(--common-card-radius, var(--rg-card-radius, 14px));
+}
+
+.card,
+.tile,
+.table-wrap,
+.modal,
+.prepare-control-group {
+  background-color: var(--common-card, var(--card));
+}
+
+.card,
+.modal,
+.toast {
+  box-shadow: var(--common-shadow-card, var(--rg-shadow, 0 5px 14px rgba(15,23,42,.045)));
+}
+
+/* 내부 보조 박스는 컨트롤 radius 기준으로 살짝 낮게 유지 */
+.tile,
+.table-wrap,
+.prepare-control-group,
+.vendor-quote-box,
+.result-item,
+.meta span,
+.prepare-remark-select,
+.order-month-wrap select {
+  border-radius: var(--common-control-radius, var(--rg-control-radius, 10px));
+}
+
+/* 헤더 배너/선택 거래처/확정 행의 의미 색상은 유지 */
+.reagent-header-card,
+.vendor-cell.auto-vendor-selected,
+.vendor-quote-box.auto-vendor-selected,
+.collect-row-confirmed > td,
+.request-row-collected > td,
+.request-detail-collected > td {
+  box-shadow: var(--common-shadow-soft, 0 3px 10px rgba(15,23,42,.04));
+}
+
+/* 모달 외곽은 화면 위에 뜨는 요소라 기존보다 조금 큰 그림자 유지 */
+.modal {
+  box-shadow: var(--common-shadow-modal, 0 30px 70px rgba(15,23,42,.28));
+}
+
+/* =========================================================
+   Step 3-3 Common Input Shape Link: reagent
+   - 일반 input/select의 폭/테이블 컬럼/취합 입력칸 특수 로직은 유지
+   - 높이/반경/폰트/테두리/포커스만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+input,
+select,
+.prepare-remark-select {
+  min-height: var(--common-control-height, var(--rg-control-height, 34px));
+  border-radius: var(--common-control-radius, var(--rg-control-radius, 10px));
+  border-color: var(--common-line, var(--line));
+  background-color: var(--common-card, #fff);
+  color: var(--common-text, var(--text));
+  font-size: var(--rg-font-base, 12px);
+  outline: none;
+}
+
+input:focus,
+select:focus,
+.prepare-remark-select:focus {
+  border-color: var(--common-focus, var(--primary, #1d4ed8));
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.10);
+}
+
+/* 기본 폼 입력은 버튼 높이와 맞춤 */
+.field input,
+.field select,
+.order-month-wrap select,
+.prepare-remark-select {
+  min-height: var(--common-control-height, var(--rg-control-height, 34px));
+  height: var(--common-control-height, var(--rg-control-height, 34px));
+  border-radius: var(--common-control-radius, var(--rg-control-radius, 10px));
+  font-size: var(--rg-font-base, 12px);
+}
+
+/* 취합 필터는 기존 폭 제어 유지, 높이만 공통화 */
+.collect-filters .field input,
+.collect-filters .field select {
+  height: var(--common-control-height, var(--rg-control-height, 34px)) !important;
+  min-height: var(--common-control-height, var(--rg-control-height, 34px)) !important;
+  border-radius: var(--common-control-radius, var(--rg-control-radius, 10px)) !important;
+}
+
+/* 제품취합 테이블 내부 input은 기존 compact/특수 스타일 유지 */
+.table-wrap table:has(#collectList) input.collect-input,
+.vendor-quote-box input.collect-input {
+  min-height: 24px !important;
+  height: 24px !important;
+  border-radius: 7px !important;
+  font-size: 11.5px !important;
+}
+
+/* 자동 선택/확정 행의 투명 input 로직 유지 */
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected input.collect-input,
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected input[readonly],
+.vendor-quote-box.auto-vendor-selected input.collect-input,
+.collect-row-confirmed input.collect-input,
+.collect-row-confirmed input[readonly] {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 체크박스는 공통 높이 강제 제외 */
+input[type="checkbox"] {
+  min-height: auto !important;
+  height: 16px !important;
+  width: 16px !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+
+/* =========================================================
+   Step 3-4-1/2 Common Table Surface + Density Link: reagent
+   - 취합 테이블 컬럼 폭/table-layout/overflow/sticky 구조는 유지
+   - 테이블 선/헤더/본문색 + padding/font/row-height만 공통화
+   - 기능/JS 변경 없음
+========================================================= */
+.table-wrap {
+  border-color: var(--common-line, var(--line));
+  background-color: var(--common-card, #ffffff);
+}
+
+table {
+  color: var(--common-text, var(--text));
+  background-color: var(--common-card, #ffffff);
+}
+
+th,
+td {
+  border-color: var(--common-line, var(--line));
+  font-size: var(--rg-font-base, 12px);
+  line-height: 1.35;
+}
+
+th {
+  background-color: var(--common-table-head-bg, #fbfdff);
+  color: var(--common-muted, var(--muted));
+  font-weight: 800;
+}
+
+td {
+  color: var(--common-text, var(--text));
+}
+
+/* 3-4-2: 일반 표 밀도 통일 */
+.table-wrap table:not(:has(#collectList)) th,
+.table-wrap table:not(:has(#collectList)) td {
+  padding: 8px 8px;
+}
+
+/* 제품취합 표는 기존 컬럼/폭/입력 구조를 유지하고 밀도만 보정 */
+.table-wrap table:has(#collectList) th,
+.table-wrap table:has(#collectList) td {
+  border-color: var(--common-line, var(--line)) !important;
+  font-size: var(--rg-font-small, 11px) !important;
+  line-height: 1.28 !important;
+}
+
+/* 의미 색상 행/셀은 유지 */
+.collect-row-confirmed > td,
+.request-row-collected > td,
+.request-detail-collected > td,
+.collect-detail-confirmed > td,
+.collect-detail-row .collect-detail-confirmed > td {
+  background: #f1f5f9 !important;
+}
+
+.request-detail-pending > td,
+.collect-detail-row tbody tr:not(.collect-detail-confirmed) > td {
+  background: #fff !important;
+}
+
+.table-wrap table:has(#collectList) td.vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) tr:not(.collect-row-confirmed) > td.vendor-cell.auto-vendor-selected,
+.table-wrap table:has(#collectList) .collect-row-confirmed > td.vendor-cell.auto-vendor-selected {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+}
+
+/* 입력칸 3-3 compact 유지 */
+.table-wrap table:has(#collectList) input.collect-input,
+.vendor-quote-box input.collect-input {
+  border-color: var(--common-line, var(--line));
+}
+
+/* =========================================================
+   Step 3-5/6 Common Modal Toast Feedback Link: reagent
+   - modal display/grid/width/max-height/overflow 구조는 유지
+   - radius, shadow, border, background, font, gap만 공통화
+   - 기능/JS 변경 없음
+========================================================= */
+.modal-backdrop {
+  background: var(--common-overlay-bg, rgba(15,23,42,.42));
+  backdrop-filter: blur(var(--common-overlay-blur, 2px));
+}
+
+.modal {
+  border: 1px solid var(--common-modal-border, var(--line));
+  border-radius: var(--common-modal-radius, 22px);
+  background: var(--common-modal-bg, #ffffff);
+  box-shadow: var(--common-modal-shadow, 0 30px 70px rgba(15,23,42,.28));
+  color: var(--common-text, var(--text));
+}
+
+.modal-head,
+.modal-search,
+.modal-foot {
+  border-color: var(--common-line, var(--line));
+}
+
+.modal-head h2,
+.modal-head h3,
+.result-title {
+  color: var(--common-text, var(--text));
+  line-height: 1.25;
+}
+
+.modal-head p,
+.small,
+.search-hint {
+  color: var(--common-muted, var(--muted));
+  font-size: var(--common-modal-body-size, 12px);
+  line-height: 1.45;
+}
+
+.modal-foot,
+.actions {
+  gap: var(--common-modal-button-gap, 8px);
+}
+
+.toast {
+  border-radius: var(--common-toast-radius, 14px);
+  padding: var(--common-toast-padding, 12px 14px);
+  font-size: var(--common-toast-font-size, 12px);
+  line-height: 1.45;
+  box-shadow: var(--common-toast-shadow, 0 12px 30px rgba(15,23,42,.18));
+}
+
+.toast.success {
+  background: var(--common-success, #065f46);
+}
+
+.toast.warn {
+  background: #92400e;
+}
+
+/* ===== Order / Receipt Management ===== */
+.order-receipt-table-wrap {
+  max-height: calc(100dvh - 280px);
+  overflow: auto;
+}
+
+.order-receipt-table {
+  min-width: 1840px;
+  table-layout: fixed;
+}
+
+.order-receipt-table th,
+.order-receipt-table td {
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.order-receipt-row {
+  user-select: none;
+}
+
+.order-receipt-row.selected td {
+  background: #eff6ff !important;
+}
+
+.order-product-name {
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.order-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 62px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  border: 1px solid transparent;
+}
+
+.order-status.waiting {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+.order-status.ordered {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.order-status.done {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.order-receipt-date {
+  width: 118px;
+  min-height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 12px;
+  background: #ffffff;
+}
+
+.order-receipt-date:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+
+.order-receipt-date:disabled {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+
+.order-receipt-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.order-receipt-bulk-actions .btn:disabled,
+.order-date-clear:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.order-date-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.order-date-clear {
+  width: 26px;
+  height: 26px;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 900;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.order-date-clear:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+@media (max-width: 768px) {
+  .order-receipt-table-wrap {
+    max-height: calc(100dvh - 310px);
+  }
+
+  .order-receipt-date,
+  #orderReceiptMonth {
+    font-size: 16px !important;
+  }
+}
+
+/* ===== Order / Receipt Header Layout Final ===== */
+.order-receipt-head {
+  align-items: flex-start;
+}
+
+.order-receipt-head-left {
+  width: 100%;
+  min-width: 0;
+}
+
+.order-receipt-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.order-receipt-title-row h2 {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.order-receipt-month-wrap {
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
+.order-receipt-month-wrap #orderReceiptMonth {
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 10px;
+  font: inherit;
+  background: #fff;
+  min-width: 130px;
+}
+
+.order-receipt-month-wrap .btn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .order-receipt-title-row {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .order-receipt-month-wrap {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .order-receipt-month-wrap .btn,
+  .order-receipt-month-wrap #orderReceiptMonth {
+    flex: 1 1 auto;
+  }
+}
+
+/* ===== Final Patch: 발주/입고 관리 내부 세로 스크롤 제거 + 체크박스 크기 보정 ===== */
+/* 테이블 박스 안쪽 세로 스크롤을 제거하고, 포탈 iframe/페이지의 바깥 스크롤을 사용합니다. */
+#page-order-receipt .order-receipt-table-wrap{
+  max-height:none !important;
+  height:auto !important;
+  min-height:0 !important;
+  overflow-y:visible !important;
+  overflow-x:auto !important;
+  -webkit-overflow-scrolling:touch;
+}
+
+/* 내부 스크롤 제거 시 테이블 헤더가 박스 안에서 어색하게 고정되지 않도록 일반 헤더처럼 보정 */
+#page-order-receipt .order-receipt-table th{
+  position:static !important;
+  top:auto !important;
+}
+
+/* 발주/입고 테이블은 현재 폭/가로 스크롤 정책은 유지하되, 세로 방향은 자연스럽게 문서 흐름을 따르게 합니다. */
+#page-order-receipt .order-receipt-table{
+  height:auto !important;
+}
+
+/* 선택 체크박스가 과하게 크게 보이지 않도록 발주/입고 관리 테이블 안에서만 크기 축소 */
+#page-order-receipt .order-receipt-table input[type="checkbox"],
+#page-order-receipt .order-receipt-table .order-receipt-check{
+  width:14px !important;
+  height:14px !important;
+  min-width:14px !important;
+  min-height:14px !important;
+  max-width:14px !important;
+  max-height:14px !important;
+  padding:0 !important;
+  margin:0 auto !important;
+  transform:none !important;
+  display:block !important;
+  cursor:pointer;
+}
+
+/* 선택 컬럼도 체크박스 크기에 맞춰 과도한 여백을 줄입니다. */
+#page-order-receipt .order-receipt-table th:first-child,
+#page-order-receipt .order-receipt-table td:first-child{
+  width:42px !important;
+  min-width:42px !important;
+  max-width:42px !important;
+  text-align:center !important;
+  vertical-align:middle !important;
+}
+
+/* =========================================================
+   제품신청 모바일 전용 UI
+   - PC 테이블 구조는 유지
+   - 모바일에서만 신청 폼을 모달로 열고, 신청 목록은 카드형으로 표시
+========================================================= */
+.mobile-request-open,
+.mobile-request-close,
+.request-mobile-list{
+  display:none;
+}
+
+@media (max-width:760px){
+  #page-request{
+    position:relative;
+  }
+
+  #page-request .summary{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+  }
+
+  #page-request .tile{
+    padding:10px 12px;
+    border-radius:12px;
+  }
+
+  #page-request .tile .k{
+    font-size:11px;
+    margin-bottom:4px;
+  }
+
+  #page-request .tile .v{
+    font-size:20px;
+    line-height:1.1;
+  }
+
+  .mobile-request-open{
+    display:inline-flex;
+  }
+
+  .mobile-request-close{
+    display:inline-flex;
+  }
+
+  .request-form-card{
+    display:none;
+  }
+
+  body.request-form-modal-open{
+    overflow:hidden;
+  }
+
+  body.request-form-modal-open::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    z-index:9990;
+    background:rgba(15,23,42,.46);
+  }
+
+  body.request-form-modal-open .request-form-card{
+    display:block;
+    position:fixed;
+    left:12px;
+    right:12px;
+    top:50%;
+    transform:translateY(-50%);
+    z-index:9991;
+    max-height:calc(100vh - 28px);
+    overflow:auto;
+    border-radius:20px;
+    box-shadow:0 24px 60px rgba(15,23,42,.26);
+  }
+
+  body.request-form-modal-open .request-form-card .card-head{
+    position:sticky;
+    top:0;
+    z-index:2;
+    background:#fff;
+    padding:14px 14px 12px;
+    align-items:flex-start;
+  }
+
+  body.request-form-modal-open .request-form-card .card-head h2{
+    font-size:18px;
+  }
+
+  body.request-form-modal-open .request-form-card .card-head p,
+  body.request-form-modal-open .request-form-card .badge{
+    display:none;
+  }
+
+  body.request-form-modal-open .request-form-card .card-body{
+    padding:14px;
+  }
+
+  .request-form-card .form-grid{
+    grid-template-columns:1fr;
+    gap:10px;
+  }
+
+  .request-form-card .actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+
+  .request-form-card .actions .btn{
+    width:100%;
+    min-height:44px;
+  }
+
+  .request-form-card .actions #addItem{
+    grid-column:1 / -1;
+  }
+
+  .request-table-wrap{
+    display:none;
+  }
+
+  .request-mobile-list{
+    display:grid;
+    gap:10px;
+    margin-top:14px;
+  }
+
+  .request-mobile-empty{
+    border:1px dashed var(--line);
+    border-radius:14px;
+    padding:18px;
+    text-align:center;
+    color:var(--muted);
+    background:#f8fafc;
+    font-weight:700;
+  }
+
+  .request-mobile-card{
+    border:1px solid var(--line);
+    border-radius:16px;
+    background:#fff;
+    overflow:hidden;
+    box-shadow:0 6px 16px rgba(15,23,42,.05);
+  }
+
+  .request-mobile-card.is-collected{
+    background:#f8fafc;
+  }
+
+  .request-mobile-card-main{
+    padding:13px 14px;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  .request-mobile-line1,
+  .request-mobile-line2{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-width:0;
+  }
+
+  .request-mobile-line1 strong{
+    flex:1;
+    min-width:0;
+    font-size:15px;
+    line-height:1.35;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .request-mobile-line1 span{
+    flex:0 0 auto;
+    max-width:90px;
+    border-radius:999px;
+    background:#f1f5f9;
+    color:#475569;
+    padding:4px 8px;
+    font-size:11px;
+    font-weight:800;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .request-mobile-check{
+    flex:0 0 auto;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .request-mobile-check input{
+    width:18px;
+    height:18px;
+    accent-color:var(--primary);
+  }
+
+  .request-mobile-line2{
+    justify-content:space-between;
+    margin-top:7px;
+    color:#64748b;
+    font-size:13px;
+  }
+
+  .request-mobile-line2 span{
+    min-width:0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .request-mobile-line2 b{
+    color:#0f172a;
+    white-space:nowrap;
+    font-size:13px;
+  }
+
+  .request-mobile-detail{
+    display:none;
+    border-top:1px solid var(--line);
+    background:#f8fafc;
+    padding:12px 14px 14px;
+  }
+
+  .request-mobile-card.open .request-mobile-detail{
+    display:block;
+  }
+
+  .request-mobile-spec{
+    display:grid;
+    grid-template-columns:74px minmax(0,1fr);
+    gap:6px 10px;
+    font-size:12px;
+    margin-bottom:12px;
+  }
+
+  .request-mobile-spec span{
+    color:#64748b;
+    font-weight:700;
+  }
+
+  .request-mobile-spec b{
+    color:#1f2937;
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+
+  .request-mobile-detail-list{
+    display:grid;
+    gap:8px;
+  }
+
+  .request-mobile-detail-item{
+    border:1px solid #e2e8f0;
+    border-radius:12px;
+    padding:10px;
+    background:#fff;
+  }
+
+  .request-mobile-detail-item.is-collected{
+    background:#eef2f7;
+    color:#64748b;
+  }
+
+  .request-mobile-detail-item.is-pending{
+    border-color:#fed7aa;
+    background:#fff7ed;
+  }
+
+  .request-mobile-detail-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:8px;
+    font-size:12px;
+    margin-bottom:8px;
+  }
+
+  .request-mobile-detail-top strong{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  .request-mobile-detail-top span{
+    font-weight:800;
+    color:#475569;
+    white-space:nowrap;
+  }
+
+  .request-mobile-detail-grid{
+    display:grid;
+    grid-template-columns:64px minmax(0,1fr);
+    gap:5px 8px;
+    font-size:12px;
+  }
+
+  .request-mobile-detail-grid span{
+    color:#64748b;
+    font-weight:700;
+  }
+
+  .request-mobile-detail-grid b{
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+
+  .request-mobile-detail-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:6px;
+    margin-top:9px;
+  }
+
+  .request-mobile-lock{
+    color:#94a3b8;
+    font-size:12px;
+    font-weight:800;
+  }
+}
+
+/* ===== Mobile request action buttons patch ===== */
+.mobile-request-action-pair{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:nowrap;
+}
+
+.mobile-registration-open{
+  background:#fff;
+  color:var(--primary);
+  border-color:var(--primary);
+  font-weight:800;
+}
+
+@media (max-width:760px){
+  #page-request .card-head > div:last-child{
+    width:100%;
+  }
+
+  #page-request .mobile-request-open.mobile-request-half,
+  #page-request .mobile-registration-open.mobile-request-half{
+    width:calc(50% - 4px) !important;
+    min-width:0 !important;
+    flex:0 0 calc(50% - 4px) !important;
+    padding-left:6px !important;
+    padding-right:6px !important;
+    font-size:12px !important;
+    white-space:nowrap !important;
+  }
+
+  #page-request .mobile-request-action-pair{
+    width:100% !important;
+    display:flex !important;
     gap:8px !important;
   }
 
-  #page-order-receipt .order-receipt-month-wrap{
+  #page-request #openSearch{
     width:100% !important;
-    gap:6px !important;
   }
 
-  #page-order-receipt #orderReceiptMonth{
-    flex:1 1 130px !important;
-    min-width:120px !important;
+  #productRegistrationRequestModal .modal{
+    width:100% !important;
+    max-height:92vh !important;
   }
 
-  #page-order-receipt .order-receipt-month-wrap .btn{
-    flex:1 1 auto !important;
-    min-width:max-content !important;
+  #productRegistrationRequestModal .form-grid{
+    grid-template-columns:1fr !important;
   }
 }
-</style>
-
-</head>
-<body>
-<input id="productKeyword" type="hidden"/>
-<div class="shell">
-<div class="tabs"><button class="tab-btn active" data-tab="request">제품 신청</button><button class="tab-btn" data-tab="collect">제품 취합</button><button class="tab-btn" data-tab="prepare">취합 정리</button><button class="tab-btn" data-tab="order-receipt">발주/입고 관리</button><button class="tab-btn" data-tab="product-management">제품 관리</button></div>
-<section class="page active" id="page-request"><section class="card request-form-card" id="requestFormCard"><div class="card-head request-form-modal-head"><div class="request-form-title-wrap" style="min-width:0;"><div class="request-form-title-row" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><h2 style="margin:0;">제품 신청</h2><div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:700; font-size:13px; color:#334155;">주문월</span><select id="orderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:130px;"></select><span class="small" id="orderMonthDesc" style="color:#6b7280;">선택한 주문월에 발주할 품목을 신청합니다.</span></div></div><p>제품은 검색해서 선택하고 수량/용도만 입력합니다.</p></div><div class="request-form-search-wrap" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;"><button class="btn primary" id="openSearch" style="width:auto; padding:10px 14px; white-space:nowrap;">제품검색</button><span class="badge blue">검색 → 자동입력 → 수량/용도</span></div></div>
-<div class="card-body"><div class="form-grid">
-<div class="field"><label>분류</label><input id="category" placeholder="자동입력" readonly/></div>
-<div class="field"><label>품명</label><input id="productName" placeholder="자동입력" readonly/></div>
-<div class="field"><label>제조사</label><input id="maker" placeholder="자동입력" readonly/></div>
-<div class="field"><label>제품코드</label><input id="code" placeholder="자동입력" readonly/></div>
-<div class="field"><label>규격</label><input id="capacity" placeholder="자동입력" readonly/></div>
-<div class="field"><label>CAS 번호</label><input id="cas" placeholder="자동입력" readonly/></div>
-<div class="field"><label>등급</label><input id="grade" placeholder="자동입력" readonly/></div>
-<div class="field"><label>수량</label><input id="qty" max="999" min="1" placeholder="수량" step="1" type="number"/></div>
-<div class="field usage-field"><label>용도</label><input id="usage" placeholder="예: 효능평가 전처리용"/></div></div>
-</div><div class="actions request-form-actions"><button class="btn primary" id="addItem">신청 추가</button><button class="btn" id="clearForm">입력 초기화</button><button class="btn mobile-request-close" id="closeRequestFormMobile" type="button">닫기</button><button class="btn" id="requestNew" type="button" hidden aria-hidden="true" tabindex="-1">제품 등록 요청</button></div></section>
-<section class="card"><div class="card-head"><div><h3 id="requestListSectionTitle">신청 목록</h3><p id="requestListSectionDesc">체크한 품목만 취합 탭으로 반영됩니다.</p></div><div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;"><div class="mobile-request-action-pair"><button class="btn primary mobile-request-open mobile-request-half" id="openRequestFormMobileList" type="button" style="height:36px; padding:0 14px; border-radius:10px;">제품 신청하기</button><button class="btn mobile-request-half mobile-registration-open" id="requestNewList" type="button" style="height:36px; padding:0 14px; border-radius:10px;">제품 등록 요청</button></div><div class="request-list-toggle" style="display:inline-flex; align-items:center; gap:4px; padding:4px; border:1px solid #d9e2ec; border-radius:14px; background:#f8fafc;"><span style="font-weight:800; font-size:13px; color:#334155; padding:0 8px; white-space:nowrap;">목록 선택</span><button class="btn primary" id="showRequestListPanel" type="button" style="height:36px; padding:0 14px; border-radius:10px;">신청 목록</button><button class="btn" id="showRequestStatusPanel" type="button" style="height:36px; padding:0 14px; border-radius:10px;">제품 등록 요청 현황</button></div></div></div>
-<div class="card-body"><div id="requestApplicationPanel"><div class="summary"><div class="tile"><div class="k">통합 품목 수</div><div class="v" id="sumDraftCount">0</div></div><div class="tile"><div class="k">시약</div><div class="v" id="sumReagent">0</div></div><div class="tile"><div class="k">초자/소모품</div><div class="v" id="sumGlass">0</div></div><div class="tile"><div class="k">안전용품</div><div class="v" id="sumSafety">0</div></div></div>
-<div class="actions admin-request-actions" style="margin-top:16px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
-  <div class="admin-action-left">
-    <button class="btn primary" id="addToCollect">취합추가</button>
-  </div>
-  <div class="admin-action-right">
-    <button class="btn" id="clearDraft">전체 데이터 비우기</button>
-  </div>
-</div>
-<div class="small" style="margin-top:10px;">체크박스 선택 후 취합추가를 눌러야 제품 취합에 반영됩니다.</div>
-<div class="table-wrap request-table-wrap" style="margin-top:16px;"><table><thead><tr><th>선택</th><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>CAS</th><th>등급</th><th>규격</th><th>총수량</th><th>신청자수</th><th>용도</th><th>작업</th></tr></thead><tbody id="draftTableBody"><tr><td class="empty" colspan="12">아직 추가된 신청 항목이 없습니다.</td></tr></tbody></table></div><div class="request-mobile-list" id="draftMobileCards" aria-live="polite"></div>
-</div>
-<div id="registrationRequestStatusPanel" style="display:none;">
-  <div class="collect-filters" style="margin-top:0;">
-    <div class="field"><label>상태</label><select id="myRequestStatusFilter"><option value="">전체</option><option value="요청중">요청중</option><option value="등록">등록</option><option value="반려">반려</option></select></div>
-    <div class="field"><label>&nbsp;</label><button class="btn" id="refreshMyRegistrationRequests" type="button">새로고침</button></div>
-    <div class="field"><label>&nbsp;</label><span class="badge blue" id="myRequestStatusBadge">내 요청 0건</span></div>
-  </div>
-  <div class="small" style="margin-top:10px;">내가 요청한 미등록 제품의 처리 상태를 누계로 확인합니다. 요청/확인중은 요청중으로 표시됩니다.</div>
-  <div class="table-wrap" style="margin-top:16px;">
-    <table>
-      <thead><tr><th>요청일</th><th>상태</th><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>CAS</th><th>등급</th><th>규격</th><th>요청사유/용도</th><th>처리/반려 사유</th></tr></thead>
-      <tbody id="myRegistrationRequestList"><tr><td class="empty" colspan="11">제품 등록 요청 현황이 없습니다.</td></tr></tbody>
-    </table>
-  </div>
-</div></div></section></section>
-<section class="page" id="page-collect"><section class="card"><div class="card-head"><div style="min-width:0;"><div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><h2 style="margin:0;">제품 취합</h2><div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:700; font-size:13px; color:#334155;">주문월</span><select id="collectOrderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:130px;"></select><span class="small" id="collectOrderMonthDesc" style="color:#6b7280;">선택한 주문월 기준으로 취합합니다.</span></div></div><p>신청 목록에서 체크 후 취합추가한 항목만 표시됩니다.</p></div><span class="badge blue">신청 데이터 연동</span></div>
-<div class="card-body"><div class="collect-filters"><div class="field"><label>구분</label><select id="collectCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div><div class="field"><label>검색</label><input id="collectKeyword" placeholder="품명 / 제조사 / 코드 검색"/></div><div class="field"><label>&nbsp;</label><button class="btn primary" id="confirmSelectedCollect">선택 거래처 확정</button></div></div>
-<div class="summary" style="margin-top:16px;"><div class="tile"><div class="k">통합 품목 수</div><div class="v" id="collectCount">0</div></div><div class="tile"><div class="k">취합 총수량</div><div class="v" id="collectQty">0</div></div><div class="tile"><div class="k">시약 / 초자 / 안전</div><div class="v" id="collectMix">0 / 0 / 0</div></div><div class="tile"><div class="k">견적 비교 시안</div><div class="v">2 SET</div></div></div>
-<div class="table-wrap collect-table-wrap" style="margin-top:16px;">
-  <table class="collect-fixed-table">
-    <colgroup>
-      <col style="width:78px;">   <!-- 선택/취소 -->
-      <col style="width:360px;">  <!-- 품명 -->
-      <col style="width:110px;">  <!-- 제조사 -->
-      <col style="width:95px;">   <!-- 제품코드 -->
-      <col style="width:105px;">  <!-- CAS -->
-      <col style="width:75px;">   <!-- 등급 -->
-      <col style="width:90px;">   <!-- 규격 -->
-      <col style="width:80px;">   <!-- 총수량 -->
-      <col style="width:75px;">   <!-- 상세 -->
-      <col style="width:82px;">   <!-- 단가1 -->
-      <col style="width:100px;">  <!-- 가격1 -->
-      <col style="width:118px;">  <!-- 거래처1 -->
-      <col style="width:82px;">   <!-- 단가2 -->
-      <col style="width:100px;">  <!-- 가격2 -->
-      <col style="width:118px;">  <!-- 거래처2 -->
-      <col style="width:70px;">   <!-- 작업 -->
-    </colgroup>
-    <thead>
-      <tr>
-        <th>선택</th><th>품명</th><th>제조사</th><th>제품코드</th><th>CAS</th><th>등급</th><th>규격</th><th>총수량</th><th>상세</th>
-        <th>단가</th><th>가격</th><th>거래처1</th><th>단가</th><th>가격</th><th>거래처2</th><th>작업</th>
-      </tr>
-    </thead>
-    <tbody id="collectList"><tr><td class="empty" colspan="16">취합할 항목이 없습니다.</td></tr></tbody>
-  </table>
-</div></div></section></section>
-
-<section class="page" id="page-prepare">
-  <section class="card">
-    <div class="card-head">
-      <div style="min-width:0;">
-        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-          <h2 style="margin:0;">취합 정리</h2>
-          <div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span style="font-weight:700; font-size:13px; color:#334155;">주문월</span>
-            <select id="prepareOrderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:130px;"></select>
-            <span class="small" id="prepareOrderMonthDesc" style="color:#6b7280;">확정된 취합자료 기준으로 기안서용 표와 비교견적표를 생성합니다.</span>
-          </div>
-        </div>
-        <p>제품 취합에서 거래처 확정된 자료만 정리됩니다. 해당월 확정 전까지는 다시 반영할 수 있습니다.</p>
-      </div>
-      <span class="badge blue">기안 / 비교견적</span>
-    </div>
-    <div class="card-body">
-      <div class="actions" style="margin-top:0; justify-content:space-between; align-items:center;">
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-          <div class="prepare-control-group prepare-finalize-group">
-            <span class="prepare-control-label">월 상태</span>
-            <button class="btn prepare-finalize-btn" id="finalizePrepareMonth">확정</button>
-            <button class="btn prepare-finalize-btn" id="cancelFinalizePrepareMonth">미확정</button>
-          </div>
-          <button class="btn primary" id="downloadExcel">엑셀 다운로드</button>
-        </div>
-        <div class="prepare-control-wrap">
-          <div class="prepare-control-group">
-            <span class="prepare-control-label">문서 선택</span>
-            <button class="btn prepare-view-btn primary" id="showQuoteMain" data-prepare-view="main">시약/초자</button>
-            <button class="btn prepare-view-btn" id="showQuoteSafety" data-prepare-view="safety">안전용품</button>
-          </div>
-          <div class="prepare-control-group">
-            <span class="prepare-control-label">표 선택</span>
-            <button class="btn prepare-table-view-btn primary" id="showPrepareSummary" data-prepare-table-view="summary">기안서용 요약표</button>
-            <button class="btn prepare-table-view-btn" id="showPrepareQuote" data-prepare-table-view="quote">비교견적표</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="summary" style="margin-top:16px;">
-        <div class="tile"><div class="k">확정 품목 수</div><div class="v" id="prepareCount">0</div></div>
-        <div class="tile"><div class="k">총 수량</div><div class="v" id="prepareQty">0</div></div>
-        <div class="tile"><div class="k">예상 금액</div><div class="v" id="prepareAmount">0</div></div>
-        <div class="tile"><div class="k">문서 구분</div><div class="v" id="prepareDocType" style="font-size:20px;">시약/초자</div></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="card prepare-table-panel active" id="prepareSummaryPanel" data-prepare-table-panel="summary" style="margin-top:12px;">
-    <div class="card-head">
-      <div>
-        <h3>기안서용 요약표</h3>
-        <p>기안서 본문에 붙여 넣을 구매 예정 내역입니다.</p>
-      </div>
-      <span class="badge orange" id="prepareSummaryBadge">0건</span>
-    </div>
-    <div class="card-body">
-      <div class="table-wrap">
-        <table class="prepare-summary-table prepare-fixed-table">
-          <colgroup>
-            <col style="width:90px;">
-            <col style="width:260px;">
-            <col style="width:80px;">
-            <col style="width:420px;">
-            <col style="width:120px;">
-            <col style="width:140px;">
-            <col style="width:170px;">
-          </colgroup>
-          <thead>
-            <tr><th class="txt">구분</th><th class="txt">품명</th><th class="num">수량</th><th class="txt">용도</th><th class="num">단가</th><th class="num">금액</th><th class="txt">거래처</th></tr>
-          </thead>
-          <tbody id="prepareSummaryList"><tr><td class="empty" colspan="7">취합 정리 반영된 자료가 없습니다.</td></tr></tbody>
-          <tfoot id="prepareSummaryFoot"></tfoot>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section class="card prepare-table-panel" id="prepareQuotePanel" data-prepare-table-panel="quote" style="margin-top:12px;">
-    <div class="card-head">
-      <div>
-        <h3>비교견적표</h3>
-        <p>최저가 구매 근거를 확인하기 위한 비교 거래처 내역입니다.</p>
-      </div>
-      <span class="badge blue" id="prepareQuoteBadge">비교견적</span>
-    </div>
-    <div class="card-body">
-      <div class="table-wrap">
-        <table class="prepare-quote-table prepare-fixed-table">
-          <colgroup>
-            <col style="width:80px;">
-            <col style="width:180px;">
-            <col style="width:130px;">
-            <col style="width:80px;">
-            <col style="width:120px;">
-            <col style="width:100px;">
-            <col style="width:120px;">
-            <col style="width:70px;">
-            <col style="width:260px;">
-            <col style="width:120px;">
-            <col style="width:130px;">
-            <col style="width:140px;">
-            <col style="width:120px;">
-            <col style="width:130px;">
-            <col style="width:140px;">
-            <col style="width:170px;">
-          </colgroup>
-          <thead>
-            <tr>
-              <th class="txt">구분</th><th class="txt">품명</th><th class="txt">제조사</th><th class="txt">등급</th><th class="txt">제품코드</th><th class="txt">규격</th><th class="txt">CAS</th><th class="num">수량</th><th class="txt">용도</th>
-              <th class="num">구매 단가</th><th class="num">구매 금액</th><th class="txt">구매 거래처</th>
-              <th class="num">비교 단가</th><th class="num">비교 금액</th><th class="txt">비교 거래처</th><th class="txt">비고</th>
-            </tr>
-          </thead>
-          <tbody id="prepareQuoteList"><tr><td class="empty" colspan="16">비교견적 자료가 없습니다.</td></tr></tbody>
-          <tfoot id="prepareQuoteFoot"></tfoot>
-        </table>
-      </div>
-      <div class="small" style="margin-top:10px;">정렬 기준: 기안서용 요약표와 비교견적표 모두 구분 → 거래처 → 용도 → 품명 → 비고 순입니다.</div>
-    </div>
-  </section>
-</section>
-
-<section class="page" id="page-order-receipt">
-  <section class="card">
-    <div class="card-head order-receipt-head">
-      <div class="order-receipt-head-left">
-        <div class="order-receipt-title-row">
-          <h2>발주/입고 관리</h2>
-          <div class="order-month-wrap order-receipt-month-wrap">
-            <span class="label">주문월</span>
-            <select id="orderReceiptMonth"></select>
-            <button class="btn" id="showUnreceivedOrders" type="button">미입고 품목</button>
-            <button class="btn" id="resetOrderReceiptFilter" type="button">년월 보기</button>
-            <button class="btn primary" id="refreshOrderReceipt" type="button">새로고침</button>
-          </div>
-        </div>
-        <p id="orderReceiptDesc">선택한 주문월의 취합정리 확정자료 기준으로 발주/입고 일자를 관리합니다.</p>
-      </div>
-    </div>
-    <div class="card-body">
-      <div class="summary">
-        <div class="tile"><div class="k">표시 품목</div><div class="v" id="orderReceiptCount">0건</div></div>
-        <div class="tile"><div class="k">미입고</div><div class="v" id="orderReceiptUnreceivedCount">0건</div></div>
-        <div class="tile"><div class="k">구매금액</div><div class="v" id="orderReceiptAmount">0</div></div>
-        <div class="tile"><div class="k">선택</div><div class="v" id="orderReceiptSelectedCount">0건</div></div>
-      </div>
-      <div id="orderReceiptReadonlyNotice" class="small" style="margin-top:10px; color:#64748b;" hidden>일반사용자는 발주/입고 현황 조회만 가능합니다.</div>
-      <div class="small" style="margin-top:10px;">관리자는 행을 드래그해 여러 품목을 선택한 뒤 발주일자 또는 입고일자를 선택하면 선택 품목 전체에 같은 날짜가 적용됩니다.</div>
-      <div class="order-receipt-bulk-actions">
-        <button class="btn" id="clearSelectedOrderDate" type="button" disabled>선택 발주일자 삭제</button>
-        <button class="btn" id="clearSelectedReceiptDate" type="button" disabled>선택 입고일자 삭제</button>
-        <span class="small">날짜칸 옆 × 버튼은 해당 품목 1건만 삭제합니다.</span>
-      </div>
-      <div class="table-wrap order-receipt-table-wrap" style="margin-top:16px;">
-        <table class="order-receipt-table">
-          <colgroup>
-            <col style="width:54px;">
-            <col style="width:90px;">
-            <col style="width:260px;">
-            <col style="width:120px;">
-            <col style="width:80px;">
-            <col style="width:120px;">
-            <col style="width:110px;">
-            <col style="width:120px;">
-            <col style="width:70px;">
-            <col style="width:110px;">
-            <col style="width:120px;">
-            <col style="width:140px;">
-            <col style="width:160px;">
-            <col style="width:160px;">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>선택</th><th>상태</th><th>품명</th><th>제조사</th><th>등급</th><th>제품코드</th><th>규격</th><th>CAS</th><th>수량</th><th>구매단가</th><th>구매금액</th><th>구매거래처</th><th>발주일자</th><th>입고일자</th>
-            </tr>
-          </thead>
-          <tbody id="orderReceiptList"><tr><td class="empty" colspan="14">발주/입고 관리 자료를 불러오는 중입니다.</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-</section>
-
-<section class="page" id="page-product-management">
-  <section class="card">
-    <div class="card-head">
-      <div>
-        <h2 id="pmPageTitle">제품 관리</h2>
-        <p id="pmPageDesc">관리자·운영자 전용 제품 마스터 및 미등록 제품 요청 관리 화면입니다.</p>
-      </div>
-      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
-        <div class="request-list-toggle" style="display:inline-flex; align-items:center; gap:4px; padding:4px; border:1px solid #d9e2ec; border-radius:14px; background:#f8fafc;">
-          <span style="font-weight:800; font-size:13px; color:#334155; padding:0 8px; white-space:nowrap;">관리 선택</span>
-          <button class="btn primary" id="showPmProductPanel" type="button" style="height:36px; padding:0 14px; border-radius:10px;">제품 마스터 관리</button>
-          <button class="btn" id="showPmRequestPanel" type="button" style="height:36px; padding:0 14px; border-radius:10px;">제품 등록 요청 관리</button>
-        </div>
-        
-      </div>
-    </div>
-    <div class="card-body">
-      <div class="summary">
-        <div class="tile"><div class="k">전체 제품</div><div class="v" id="pmTotalCount">0건</div></div>
-        <div class="tile"><div class="k">사용 제품</div><div class="v" id="pmActiveCount">0건</div></div>
-        <div class="tile"><div class="k">사용 중지</div><div class="v" id="pmInactiveCount">0건</div></div>
-        <div class="tile"><div class="k">요청 대기</div><div class="v" id="pmPendingCount">0건</div></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="card" id="pmProductMasterPanel" style="margin-top:12px;">
-    <div class="card-head">
-      <div>
-        <h3>제품 마스터 관리</h3>
-        <p>제품 신청 화면의 제품검색과 자동입력에 사용되는 기준 데이터입니다.</p>
-      </div>
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
-        <button class="btn" id="pmDownloadTemplate" type="button">엑셀 양식 다운로드</button>
-        <button class="btn primary" id="pmUploadExcel" type="button">엑셀 업로드</button>
-        <input id="pmUploadExcelFile" type="file" accept=".xlsx,.xls" style="display:none;"/>
-      </div>
-    </div>
-    <div class="card-body">
-      <div class="collect-filters">
-        <div class="field"><label>검색</label><input id="pmProductKeyword" placeholder="품명 / 제조사 / 제품코드 / CAS / 거래처 검색"/></div>
-        <div class="field"><label>구분</label><select id="pmProductCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div>
-        <div class="field"><label>사용여부</label><select id="pmProductActive"><option value="">전체</option><option value="active">사용</option><option value="inactive">사용중지</option></select></div>
-        <div class="field"><label>&nbsp;</label><button class="btn" id="pmResetProduct">신규 입력</button></div>
-      </div>
-
-      <div class="form-grid" style="margin-top:16px; grid-template-columns:1fr 2fr 1.2fr 1.2fr 1fr 1fr 1fr 1.3fr 1fr;">
-        <input id="pmProductId" type="hidden"/>
-        <div class="field"><label>구분</label><select id="pmCategory"><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div>
-        <div class="field"><label>품명</label><input id="pmName" placeholder="제품명"/></div>
-        <div class="field"><label>제조사</label><input id="pmMaker" placeholder="제조사"/></div>
-        <div class="field"><label>제품코드</label><input id="pmCode" placeholder="제품코드"/></div>
-        <div class="field"><label>규격</label><input id="pmCapacity" placeholder="규격"/></div>
-        <div class="field"><label>CAS</label><input id="pmCas" placeholder="CAS"/></div>
-        <div class="field"><label>등급</label><input id="pmGrade" placeholder="등급"/></div>
-        <div class="field"><label>기본거래처</label><input id="pmDefaultVendor" placeholder="거래처"/></div>
-        <div class="field"><label>선정사유</label><select id="pmDefaultVendorReason"><option value="">선정사유 선택</option><option value="최저가 구매">최저가 구매</option><option value="제조원 구매">제조원 구매</option><option value="취급처 구매">취급처 구매</option><option value="대리점 구매">대리점 구매</option><option value="온라인 구매">온라인 구매</option></select></div>
-      </div>
-
-      <div class="field" style="margin-top:10px;"><label>비고</label><input id="pmMemo" placeholder="비고"/></div>
-      <div class="actions" style="justify-content:space-between; align-items:center;">
-        <div><strong id="pmFormTitle">제품 등록</strong></div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn primary" id="pmSaveProduct">저장</button>
-          <button class="btn" id="pmDeactivateProduct" style="display:none;">사용중지</button>
-        </div>
-      </div>
-
-      <div class="table-wrap" style="margin-top:16px;">
-        <table>
-          <thead>
-            <tr><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>규격</th><th>CAS</th><th>등급</th><th>기본거래처</th><th>선정사유</th><th>사용여부</th><th>수정자</th><th>작업</th></tr>
-          </thead>
-          <tbody id="pmProductList"><tr><td class="empty" colspan="12">제품 마스터를 불러오는 중입니다.</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section class="card" id="pmRegistrationRequestPanel" style="margin-top:12px; display:none;">
-    <div class="card-head">
-      <div>
-        <h3>제품 등록 요청 관리</h3>
-        <p>담당자가 제품 신청 화면에서 요청한 미등록 제품을 확인하고 승인 또는 반려합니다.</p>
-      </div>
-      <span class="badge blue">product_registration_requests</span>
-    </div>
-    <div class="card-body">
-      <div class="collect-filters">
-        <div class="field"><label>검색</label><input id="pmRequestKeyword" placeholder="품명 / 제조사 / 요청자 / 팀 / 용도 검색"/></div>
-        <div class="field"><label>상태</label><select id="pmRequestStatus"><option value="">전체</option><option value="요청">요청</option><option value="확인중">확인중</option><option value="등록완료">등록완료</option><option value="반려">반려</option></select></div>
-        <div class="field"><label>&nbsp;</label><button class="btn" id="pmRefreshRequests">요청 새로고침</button></div>
-        <div class="field"><label>&nbsp;</label><div class="small" style="padding:12px 0;">승인 시 제품 마스터에 자동 등록됩니다.</div></div>
-      </div>
-      <div class="table-wrap" style="margin-top:16px;">
-        <table>
-          <thead>
-            <tr><th>상태</th><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>규격</th><th>CAS</th><th>등급</th><th>용도</th><th>요청자</th><th>처리/반려사유</th><th>작업</th></tr>
-          </thead>
-          <tbody id="pmRequestList"><tr><td class="empty" colspan="12">제품 등록 요청을 불러오는 중입니다.</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-</section>
 
 
-</div>
-<div class="modal-backdrop" id="searchModal"><div class="modal"><div class="modal-head"><div><h3>제품 검색</h3><div class="small">품명, 제품코드, 제조사, CAS 번호로 검색할 수 있습니다.</div></div><button class="btn" id="closeSearch">닫기</button></div>
-<div class="modal-search"><div class="field"><label>키워드</label><input id="searchInput" placeholder="예: ethanol, 459844, Sigma, 64-17-5"/><div class="search-hint">부분 검색 가능</div></div><div class="field"><label>분류</label><select id="searchCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div><div class="field"><label>제조사</label><select id="searchMaker"><option value="">전체</option></select></div><div class="field"><label>정렬</label><select id="sortMode"><option value="relevance">관련도순</option><option value="name">품명순</option><option value="maker">제조사순</option></select></div></div>
-<div class="modal-body" id="searchResults"></div><div class="modal-foot"><div class="small" id="resultInfo">검색 결과 0건</div><div class="small">원하는 제품이 없으면 <span class="product-link" id="inlineRequest">제품 등록 요청</span>으로 넘길 수 있습니다.</div></div></div></div>
-<div class="toast-wrap" id="toastWrap"></div>
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  if (!window.supabase) {
-    document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
-  }
-</script>
-<script src="supabase.js"></script>
-<script src="request.js"></script>
-<script src="collect.js"></script>
-<script src="product_management.js"></script>
-<script src="order_receipt.js"></script>
-<script src="app.js"></script>
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    let pmInitialized = false;
-    const initProductManagement = () => {
-      if (pmInitialized) return;
-      pmInitialized = true;
-      window.ReagentApp.productManagement?.init?.();
-    };
-
-    document.querySelector('.tab-btn[data-tab="product-management"]')?.addEventListener("click", () => {
-      setTimeout(initProductManagement, 0);
-    });
-
-    document.querySelector('.tab-btn[data-tab="order-receipt"]')?.addEventListener("click", () => {
-      setTimeout(() => window.ReagentApp.orderReceipt?.init?.(), 0);
-    });
-  });
-</script>
-
-<script id="reagent-tab-emergency-fallback">
-(function () {
-  function activateReagentTab(tab) {
-    tab = tab || "request";
-    var tabButtons = document.querySelectorAll(".tab-btn, button[data-tab]");
-    var pages = document.querySelectorAll(".page");
-    var targetBtn = document.querySelector('.tab-btn[data-tab="' + tab + '"], button[data-tab="' + tab + '"]');
-    var targetPage = document.getElementById("page-" + tab) || document.querySelector('.page[data-tab="' + tab + '"], [data-page="' + tab + '"]');
-
-    tabButtons.forEach(function (btn) {
-      var on = btn === targetBtn;
-      btn.classList.toggle("active", on);
-      btn.disabled = false;
-      btn.style.removeProperty("pointer-events");
-      btn.style.removeProperty("visibility");
-      btn.style.removeProperty("display");
-      btn.setAttribute("aria-hidden", "false");
-    });
-
-    pages.forEach(function (page) {
-      var on = page === targetPage;
-      page.classList.toggle("active", on);
-      page.hidden = false;
-      page.style.display = on ? "" : "none";
-    });
-
-    if (tab === "prepare") {
-      try { window.ReagentApp?.collect?.initPrepareMonthControl?.(); } catch (_) {}
-      try { window.ReagentApp?.collect?.renderPrepare?.(); } catch (_) {}
-    }
-    if (tab === "order-receipt") {
-      try { window.ReagentApp?.orderReceipt?.init?.(); } catch (_) {}
-    }
-    if (tab === "product-management") {
-      try { window.ReagentApp?.productManagement?.init?.(); } catch (_) {}
-    }
+/* ===== mobile patch: 제품 등록 요청 모달 내부 스크롤 ===== */
+@media (max-width:760px){
+  #productRegistrationRequestModal.modal-backdrop{
+    align-items:center !important;
+    justify-content:center !important;
+    padding:10px !important;
+    overflow:hidden !important;
   }
 
-  window.__reagentActivateTab = activateReagentTab;
-
-  document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll(".tab-btn, button[data-tab]").forEach(function (btn) {
-      btn.disabled = false;
-      btn.style.removeProperty("pointer-events");
-      btn.onclick = function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        activateReagentTab(btn.getAttribute("data-tab") || "request");
-        return false;
-      };
-    });
-  });
-})();
-</script>
-
-
-<script id="reagent-portal-bridge">
-(function () {
-  'use strict';
-
-  const REAGENT_TABS = [
-    { id: 'request', label: '제품신청' },
-    { id: 'collect', label: '제품취합' },
-    { id: 'prepare', label: '취합정리' },
-    { id: 'order-receipt', label: '발주/입고 관리' },
-    { id: 'product-management', label: '제품관리' }
-  ];
-
-  function getAllowedReagentTabs() {
-    try {
-      if (window.ReagentApp && typeof window.ReagentApp.getAllowedPortalTabs === 'function') {
-        return window.ReagentApp.getAllowedPortalTabs();
-      }
-    } catch (_) {}
-    return REAGENT_TABS;
+  #productRegistrationRequestModal .modal{
+    width:calc(100vw - 20px) !important;
+    max-width:100% !important;
+    max-height:90vh !important;
+    overflow:hidden !important;
+    display:flex !important;
+    flex-direction:column !important;
+    border-radius:22px !important;
   }
 
-  function getActiveTabId() {
-    const active = document.querySelector('.shell > .tabs .tab-btn.active[data-tab], .tab-btn.active[data-tab]');
-    return active ? active.getAttribute('data-tab') : 'request';
+  #productRegistrationRequestModal .modal-head{
+    position:sticky !important;
+    top:0 !important;
+    z-index:5 !important;
+    flex:0 0 auto !important;
+    background:#fff !important;
+    border-bottom:1px solid var(--line, #d9e2ec) !important;
   }
 
-  function notifyPortalTabs() {
-    if (!window.parent || window.parent === window) return;
-
-    window.parent.postMessage({
-      type: 'portal-tabs-ready',
-      tabs: getAllowedReagentTabs(),
-      activeTabId: getActiveTabId(),
-      source: 'reagent'
-    }, '*');
-
-    window.parent.postMessage({
-      type: 'portal-filters-ready',
-      enabled: false,
-      filters: [],
-      source: 'reagent'
-    }, '*');
+  #productRegistrationRequestModal .modal-body,
+  #productRegistrationRequestModal .card-body{
+    flex:1 1 auto !important;
+    min-height:0 !important;
+    overflow-y:auto !important;
+    -webkit-overflow-scrolling:touch !important;
+    padding-bottom:calc(24px + env(safe-area-inset-bottom)) !important;
   }
 
-  function notifyPortalActiveTab(tabId) {
-    if (!window.parent || window.parent === window || !tabId) return;
-
-    window.parent.postMessage({
-      type: 'portal-tab-active',
-      activeTabId: tabId,
-      tabId: tabId,
-      source: 'reagent'
-    }, '*');
+  #productRegistrationRequestModal .modal-foot{
+    position:sticky !important;
+    bottom:0 !important;
+    z-index:5 !important;
+    flex:0 0 auto !important;
+    background:#fff !important;
+    border-top:1px solid var(--line, #d9e2ec) !important;
+    padding-bottom:calc(12px + env(safe-area-inset-bottom)) !important;
   }
 
-  function activateReagentPortalTab(tabId) {
-    if (!tabId) return false;
+  #productRegistrationRequestModal .form-grid{
+    grid-template-columns:1fr !important;
+  }
+}
 
-    if (typeof window.__reagentActivateTab === 'function') {
-      window.__reagentActivateTab(tabId);
-      notifyPortalActiveTab(tabId);
-      return true;
-    }
 
-    const target = document.querySelector('.tab-btn[data-tab="' + tabId + '"], button[data-tab="' + tabId + '"]');
-    if (!target) return false;
+/* ===== mobile patch: 제품 등록 요청 모달 상단 닫기 버튼 제거 + 스크롤 유지 ===== */
+#productRegistrationRequestModal #closeProductRequestModal,
+#productRegistrationRequestModal .modal-head button[id*="close"],
+#productRegistrationRequestModal .modal-head .close,
+#productRegistrationRequestModal .modal-head .modal-close{
+  display:none !important;
+}
 
-    target.click();
+#productRegistrationRequestModal .modal-head{
+  justify-content:flex-start !important;
+}
 
-    if (tabId === 'prepare') {
-      try { window.ReagentApp?.collect?.initPrepareMonthControl?.(); } catch (_) {}
-      try { window.ReagentApp?.collect?.renderPrepare?.(); } catch (_) {}
-    }
+#productRegistrationRequestModal .modal-head > div{
+  width:100% !important;
+  min-width:0 !important;
+}
 
-    if (tabId === 'order-receipt') {
-      try { window.ReagentApp?.orderReceipt?.init?.(); } catch (_) {}
-    }
-
-    if (tabId === 'product-management') {
-      try { window.ReagentApp?.productManagement?.init?.(); } catch (_) {}
-    }
-
-    notifyPortalActiveTab(tabId);
-    return true;
+@media (max-width:760px){
+  #productRegistrationRequestModal.modal-backdrop{
+    align-items:center !important;
+    justify-content:center !important;
+    padding:10px !important;
+    overflow:hidden !important;
   }
 
-  window.portalTabs = getAllowedReagentTabs();
-  window.portalActivateTab = activateReagentPortalTab;
-
-  window.addEventListener('message', function (event) {
-    const payload = event && event.data ? event.data : {};
-
-    if (payload.type === 'portal-tabs-request') {
-      notifyPortalTabs();
-      return;
-    }
-
-    if (payload.type === 'portal-filters-request') {
-      window.parent?.postMessage({
-        type: 'portal-filters-ready',
-        enabled: false,
-        filters: [],
-        source: 'reagent'
-      }, '*');
-      return;
-    }
-
-    if (payload.type === 'portal-tab-change') {
-      activateReagentPortalTab(payload.tabId || payload.tab || '');
-    }
-  });
-
-  document.addEventListener('click', function (event) {
-    const btn = event.target && event.target.closest
-      ? event.target.closest('.tab-btn[data-tab], button[data-tab]')
-      : null;
-
-    if (!btn) return;
-
-    setTimeout(function () {
-      notifyPortalActiveTab(btn.getAttribute('data-tab') || getActiveTabId());
-    }, 0);
-  });
-
-  function notifyAll() {
-    notifyPortalTabs();
+  #productRegistrationRequestModal .modal{
+    width:calc(100vw - 20px) !important;
+    max-width:100% !important;
+    max-height:90vh !important;
+    overflow:hidden !important;
+    display:flex !important;
+    flex-direction:column !important;
+    border-radius:22px !important;
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', notifyAll);
-  } else {
-    notifyAll();
+  #productRegistrationRequestModal .modal-head{
+    position:sticky !important;
+    top:0 !important;
+    z-index:5 !important;
+    flex:0 0 auto !important;
+    background:#fff !important;
+    border-bottom:1px solid var(--line, #d9e2ec) !important;
   }
 
-  setTimeout(notifyAll, 250);
-  setTimeout(notifyAll, 800);
-  setTimeout(notifyAll, 1600);
-  setTimeout(notifyAll, 3000);
-})();
-</script>
+  #productRegistrationRequestModal .modal-body,
+  #productRegistrationRequestModal .card-body{
+    flex:1 1 auto !important;
+    min-height:0 !important;
+    overflow-y:auto !important;
+    -webkit-overflow-scrolling:touch !important;
+    padding-bottom:calc(24px + env(safe-area-inset-bottom)) !important;
+  }
 
-<script src="../common/common.js"></script>
-</body></html>
+  #productRegistrationRequestModal .modal-foot{
+    position:sticky !important;
+    bottom:0 !important;
+    z-index:5 !important;
+    flex:0 0 auto !important;
+    background:#fff !important;
+    border-top:1px solid var(--line, #d9e2ec) !important;
+    padding-bottom:calc(12px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* =========================================================
+   FINAL MOBILE PATCH: 제품신청 모달 버튼 정리
+   - 모바일 제품신청 모달 상단: 제품 신청하기 / 제품 등록 요청 / 닫기 제거
+   - 모바일 제품신청 모달 하단: 신청 추가 1줄 + 입력 초기화 / 닫기 2열
+   - 하단 제품 등록 요청 버튼 제거
+   - 기존 제품검색 버튼과 입력/스크롤 동작은 유지
+========================================================= */
+@media (max-width:760px){
+  /* 제품신청 모달 상단의 불필요 버튼 제거 */
+  body.request-form-modal-open #requestFormCard #openRequestFormMobile,
+  body.request-form-modal-open #requestFormCard #requestNewHeader,
+  body.request-form-modal-open #requestFormCard .card-head #closeRequestFormMobile{
+    display:none !important;
+  }
+
+  /* 상단에는 제품검색만 남도록 정리 */
+  body.request-form-modal-open #requestFormCard .card-head{
+    display:grid !important;
+    grid-template-columns:1fr auto !important;
+    align-items:start !important;
+    gap:10px !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .card-head > div:first-child{
+    min-width:0 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .card-head > div:last-child{
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:flex-end !important;
+    justify-content:flex-start !important;
+    gap:8px !important;
+    width:auto !important;
+    min-width:0 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard #openSearch{
+    display:inline-flex !important;
+    width:128px !important;
+    min-width:128px !important;
+    max-width:128px !important;
+    height:44px !important;
+    padding:0 12px !important;
+    border-radius:14px !important;
+    white-space:nowrap !important;
+  }
+
+  /* 하단 버튼 영역 재배치 */
+  body.request-form-modal-open #requestFormCard .actions{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:8px !important;
+    position:relative !important;
+    padding-bottom:0 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions #addItem{
+    grid-column:1 / -1 !important;
+    width:100% !important;
+    min-height:46px !important;
+    order:1 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions #clearForm{
+    grid-column:1 / 2 !important;
+    width:100% !important;
+    min-height:44px !important;
+    order:2 !important;
+  }
+
+  /* 기존 하단 제품 등록 요청 버튼은 제거 */
+  body.request-form-modal-open #requestFormCard .actions #requestNew{
+    display:none !important;
+  }
+
+  /* 상단 닫기 버튼을 하단 오른쪽 버튼처럼 사용 */
+  body.request-form-modal-open #requestFormCard #closeRequestFormMobile{
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    position:fixed !important;
+    right:24px !important;
+    bottom:calc(24px + env(safe-area-inset-bottom)) !important;
+    width:calc(50vw - 28px) !important;
+    max-width:360px !important;
+    min-height:44px !important;
+    height:44px !important;
+    padding:0 12px !important;
+    border-radius:12px !important;
+    background:#fff !important;
+    border:1px solid var(--line, #d9e2ec) !important;
+    color:var(--text, #1f2937) !important;
+    font-weight:800 !important;
+    z-index:10000 !important;
+    box-shadow:none !important;
+  }
+
+  /* 고정 닫기 버튼과 내용 겹침 방지 */
+  body.request-form-modal-open #requestFormCard .card-body{
+    padding-bottom:calc(76px + env(safe-area-inset-bottom)) !important;
+  }
+
+  /* 모달 스크롤 유지 */
+  body.request-form-modal-open #requestFormCard{
+    overflow:auto !important;
+    -webkit-overflow-scrolling:touch !important;
+  }
+}
+
+/* =========================================================
+   FINAL FIX: 모바일 제품신청 모달을 제품등록요청 모달 스타일로 통일
+   - 기존 신청 카드를 모바일에서 진짜 모달처럼 표시
+   - 상단: 제목/주문월 + 제품검색만 유지
+   - 하단: 신청 추가 / 입력 초기화 / 닫기
+   - 제품 등록 요청 버튼은 제품신청 모달 하단에서 제거
+========================================================= */
+@media (max-width:760px){
+  body.request-form-modal-open{
+    overflow:hidden !important;
+  }
+
+  body.request-form-modal-open::before{
+    content:"" !important;
+    position:fixed !important;
+    inset:0 !important;
+    z-index:9990 !important;
+    background:rgba(15,23,42,.46) !important;
+    backdrop-filter:blur(1px);
+  }
+
+  body.request-form-modal-open #requestFormCard{
+    display:flex !important;
+    flex-direction:column !important;
+    position:fixed !important;
+    left:10px !important;
+    right:10px !important;
+    top:50% !important;
+    transform:translateY(-50%) !important;
+    z-index:9991 !important;
+    width:auto !important;
+    max-width:calc(100vw - 20px) !important;
+    max-height:90vh !important;
+    min-height:0 !important;
+    overflow:hidden !important;
+    border-radius:22px !important;
+    background:#fff !important;
+    box-shadow:0 30px 70px rgba(15,23,42,.28) !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .card-head{
+    position:sticky !important;
+    top:0 !important;
+    z-index:5 !important;
+    flex:0 0 auto !important;
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) auto !important;
+    align-items:start !important;
+    gap:12px !important;
+    padding:18px 20px 16px !important;
+    background:#fff !important;
+    border-bottom:1px solid var(--line, #d9e2ec) !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .card-head h2{
+    font-size:22px !important;
+    line-height:1.25 !important;
+    letter-spacing:-.04em !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .card-head p,
+  body.request-form-modal-open #requestFormCard .card-head .badge,
+  body.request-form-modal-open #requestFormCard #openRequestFormMobile,
+  body.request-form-modal-open #requestFormCard #requestNewHeader{
+    display:none !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .request-form-title-wrap,
+  body.request-form-modal-open #requestFormCard .card-head > div:first-child{
+    width:100% !important;
+    min-width:0 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .request-form-title-row{
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:flex-start !important;
+    gap:12px !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .order-month-wrap{
+    width:100% !important;
+    display:grid !important;
+    grid-template-columns:64px minmax(0,1fr) !important;
+    align-items:center !important;
+    gap:8px 10px !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .order-month-wrap .small,
+  body.request-form-modal-open #requestFormCard #orderMonthDesc{
+    grid-column:1 / -1 !important;
+    width:100% !important;
+    line-height:1.45 !important;
+    font-size:13px !important;
+    margin:0 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard #orderMonthSelect{
+    width:100% !important;
+    min-width:0 !important;
+    height:44px !important;
+    border-radius:13px !important;
+    font-size:15px !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .request-form-search-wrap,
+  body.request-form-modal-open #requestFormCard .card-head > div:last-child{
+    display:flex !important;
+    align-items:flex-start !important;
+    justify-content:flex-end !important;
+    width:auto !important;
+    min-width:0 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard #openSearch{
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    width:128px !important;
+    min-width:128px !important;
+    max-width:128px !important;
+    height:52px !important;
+    padding:0 12px !important;
+    border-radius:17px !important;
+    font-size:15px !important;
+    font-weight:800 !important;
+    white-space:nowrap !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .card-body{
+    flex:1 1 auto !important;
+    min-height:0 !important;
+    overflow-y:auto !important;
+    -webkit-overflow-scrolling:touch !important;
+    display:flex !important;
+    flex-direction:column !important;
+    padding:0 !important;
+    background:#fff !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .form-grid{
+    grid-template-columns:1fr !important;
+    gap:12px !important;
+    padding:16px 20px 18px !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .field label{
+    font-size:13px !important;
+    font-weight:800 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .field input,
+  body.request-form-modal-open #requestFormCard .field select{
+    height:48px !important;
+    border-radius:15px !important;
+    font-size:15px !important;
+    padding:0 13px !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions,
+  body.request-form-modal-open #requestFormCard .request-form-actions{
+    position:sticky !important;
+    bottom:0 !important;
+    z-index:6 !important;
+    flex:0 0 auto !important;
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:9px !important;
+    margin:0 !important;
+    padding:14px 20px calc(14px + env(safe-area-inset-bottom)) !important;
+    background:#fff !important;
+    border-top:1px solid var(--line, #d9e2ec) !important;
+    box-shadow:0 -10px 24px rgba(15,23,42,.04) !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions .btn{
+    width:100% !important;
+    min-height:48px !important;
+    height:48px !important;
+    border-radius:15px !important;
+    font-size:15px !important;
+    font-weight:800 !important;
+    position:static !important;
+    inset:auto !important;
+    transform:none !important;
+    box-shadow:none !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions #addItem{
+    grid-column:1 / -1 !important;
+    order:1 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions #clearForm{
+    grid-column:1 / 2 !important;
+    order:2 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions #closeRequestFormMobile{
+    display:inline-flex !important;
+    grid-column:2 / 3 !important;
+    order:3 !important;
+    background:#fff !important;
+    color:var(--text, #1f2937) !important;
+    border:1px solid var(--line, #d9e2ec) !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions #requestNew{
+    display:none !important;
+  }
+}
+
+/* =========================================================
+   FINAL FIX v2: 제품신청 모바일 모달 스크롤 구조 통일
+   - 배경 신청목록 스크롤 차단
+   - 모달 내부 본문만 스크롤
+   - 하단 신청추가/입력초기화/닫기 버튼은 제품등록요청처럼 고정 footer 처리
+   - 이전 패치의 닫기 버튼 fixed 처리 무력화
+========================================================= */
+#requestFormCard > .request-form-actions{
+  margin:0;
+  padding:0 16px 16px;
+  background:#fff;
+}
+
+@media (max-width:760px){
+  body.request-form-modal-open,
+  html:has(body.request-form-modal-open){
+    overflow:hidden !important;
+    height:100% !important;
+    overscroll-behavior:none !important;
+  }
+
+  body.request-form-modal-open #page-request,
+  body.request-form-modal-open .shell{
+    overflow:hidden !important;
+    max-height:100vh !important;
+  }
+
+  body.request-form-modal-open #requestFormCard{
+    display:grid !important;
+    grid-template-rows:auto minmax(0, 1fr) auto !important;
+    position:fixed !important;
+    left:14px !important;
+    right:14px !important;
+    top:50% !important;
+    transform:translateY(-50%) !important;
+    width:auto !important;
+    max-width:calc(100vw - 28px) !important;
+    height:auto !important;
+    max-height:86vh !important;
+    min-height:0 !important;
+    overflow:hidden !important;
+    border-radius:22px !important;
+    background:#fff !important;
+    box-shadow:0 30px 70px rgba(15,23,42,.28) !important;
+    z-index:9991 !important;
+    overscroll-behavior:contain !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .card-head{
+    grid-row:1 !important;
+    position:relative !important;
+    top:auto !important;
+    z-index:2 !important;
+    padding:18px 20px 16px !important;
+    background:#fff !important;
+    border-bottom:1px solid var(--line, #d9e2ec) !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .card-body{
+    grid-row:2 !important;
+    min-height:0 !important;
+    height:auto !important;
+    max-height:none !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    -webkit-overflow-scrolling:touch !important;
+    overscroll-behavior:contain !important;
+    padding:0 !important;
+    background:#fff !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .form-grid{
+    padding:16px 20px 18px !important;
+  }
+
+  body.request-form-modal-open #requestFormCard > .request-form-actions,
+  body.request-form-modal-open #requestFormCard .actions.request-form-actions{
+    grid-row:3 !important;
+    position:relative !important;
+    inset:auto !important;
+    left:auto !important;
+    right:auto !important;
+    bottom:auto !important;
+    top:auto !important;
+    z-index:3 !important;
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:9px !important;
+    margin:0 !important;
+    padding:14px 20px calc(14px + env(safe-area-inset-bottom)) !important;
+    background:#fff !important;
+    border-top:1px solid var(--line, #d9e2ec) !important;
+    box-shadow:0 -10px 24px rgba(15,23,42,.05) !important;
+    overflow:visible !important;
+  }
+
+  body.request-form-modal-open #requestFormCard > .request-form-actions .btn,
+  body.request-form-modal-open #requestFormCard .actions.request-form-actions .btn{
+    position:relative !important;
+    inset:auto !important;
+    left:auto !important;
+    right:auto !important;
+    bottom:auto !important;
+    top:auto !important;
+    transform:none !important;
+    width:100% !important;
+    max-width:none !important;
+    min-width:0 !important;
+    height:48px !important;
+    min-height:48px !important;
+    padding:0 12px !important;
+    border-radius:15px !important;
+    font-size:15px !important;
+    font-weight:800 !important;
+    box-shadow:none !important;
+  }
+
+  body.request-form-modal-open #requestFormCard > .request-form-actions #addItem,
+  body.request-form-modal-open #requestFormCard .actions.request-form-actions #addItem{
+    grid-column:1 / -1 !important;
+    order:1 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard > .request-form-actions #clearForm,
+  body.request-form-modal-open #requestFormCard .actions.request-form-actions #clearForm{
+    grid-column:1 / 2 !important;
+    order:2 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard > .request-form-actions #closeRequestFormMobile,
+  body.request-form-modal-open #requestFormCard .actions.request-form-actions #closeRequestFormMobile{
+    display:inline-flex !important;
+    grid-column:2 / 3 !important;
+    order:3 !important;
+    background:#fff !important;
+    color:var(--text, #1f2937) !important;
+    border:1px solid var(--line, #d9e2ec) !important;
+  }
+
+  body.request-form-modal-open #requestFormCard > .request-form-actions #requestNew,
+  body.request-form-modal-open #requestFormCard .actions.request-form-actions #requestNew{
+    display:none !important;
+  }
+}
