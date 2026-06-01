@@ -539,10 +539,27 @@
         const status = this.getOrderStatus(row);
         const selected = this.selectedKeys.has(row.recordKey);
         const gradeCapacity = [row.grade, row.capacity].filter((v) => String(v || "").trim()).join(" / ");
-        const team = this.getFirstValue(row, ["team", "request_team", "requestTeam", "department"]);
-        const requester = this.getFirstValue(row, ["requester", "requester_name", "requesterName", "applicant", "name_requester"]);
-        const requestDate = this.getFirstValue(row, ["request_date", "requestDate", "created_at", "createdAt", "applied_at", "application_date"]);
         const qtyText = formatNumber(row.qty) || "0";
+        const orderDateText = this.formatDateText(row.order_date);
+        const receiptDateText = this.formatDateText(row.receipt_date);
+        const orderDateValue = orderDateText === "-" ? "" : orderDateText;
+        const receiptDateValue = receiptDateText === "-" ? "" : receiptDateText;
+
+        const renderDateCell = (label, field, value, text) => {
+          if (!operator) {
+            return `<span>${escapeHtml(label)}</span><b>${escapeHtml(text)}</b>`;
+          }
+
+          return `
+            <span>${escapeHtml(label)}</span>
+            <b>
+              <div class="order-receipt-mobile-date-box">
+                <input class="order-receipt-date order-receipt-mobile-date" data-field="${attr(field)}" type="date" value="${attr(value)}" aria-label="${attr(label)}"/>
+                ${value ? `<button type="button" class="order-date-clear order-receipt-mobile-date-clear" data-field="${attr(field)}" title="${attr(label)} 삭제" aria-label="${attr(label)} 삭제">×</button>` : ""}
+              </div>
+            </b>
+          `;
+        };
 
         return `
           <article class="order-receipt-mobile-card ${selected ? "selected" : ""}" data-record-key="${attr(row.recordKey)}">
@@ -564,11 +581,8 @@
                 <span>CAS</span><b>${escapeHtml(row.cas || "-")}</b>
                 <span>등급/규격</span><b>${escapeHtml(gradeCapacity || "-")}</b>
                 <span>용도</span><b>${escapeHtml(row.usage || "-")}</b>
-                <span>팀</span><b>${escapeHtml(team || "-")}</b>
-                <span>신청자</span><b>${escapeHtml(requester || "-")}</b>
-                <span>신청일자</span><b>${escapeHtml(this.formatDateText(requestDate))}</b>
-                <span>발주일자</span><b>${escapeHtml(this.formatDateText(row.order_date))}</b>
-                <span>입고일자</span><b>${escapeHtml(this.formatDateText(row.receipt_date))}</b>
+                ${renderDateCell("발주일자", "order_date", orderDateValue, orderDateText)}
+                ${renderDateCell("입고일자", "receipt_date", receiptDateValue, receiptDateText)}
               </div>
             </div>
           </article>
@@ -675,6 +689,31 @@
           e.preventDefault();
           toggle();
         });
+
+        if (operator) {
+          card.querySelectorAll(".order-receipt-mobile-date-clear").forEach((button) => {
+            button.addEventListener("click", async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              await this.clearDate(key, button.dataset.field);
+            });
+          });
+
+          card.querySelectorAll(".order-receipt-mobile-date").forEach((input) => {
+            input.addEventListener("click", (e) => {
+              e.stopPropagation();
+              try { input.showPicker?.(); } catch (_) {}
+            });
+            input.addEventListener("focus", (e) => {
+              e.stopPropagation();
+              try { input.showPicker?.(); } catch (_) {}
+            });
+            input.addEventListener("change", async (e) => {
+              e.stopPropagation();
+              await this.setDate(key, e.target.dataset.field, e.target.value || "");
+            });
+          });
+        }
       });
     },
 
