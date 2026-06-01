@@ -3949,3 +3949,168 @@ td {
     pointer-events:auto !important;
   }
 }
+
+
+/* =========================================================
+   HOTFIX 2026-06-01: 제품신청 → 제품검색 모달 전환
+   - 모바일에서 제품신청 모달 위에 제품검색 모달이 겹쳐 보이는 문제 해결
+   - 제품검색 모달을 제품신청 모달과 같은 폭/라운드/compact UI로 통일
+   - 검색 모달이 열릴 때 제품신청 모달은 임시 숨김 처리
+========================================================= */
+@media (max-width:760px){
+  html.search-modal-open,
+  body.search-modal-open{
+    overflow:hidden !important;
+    touch-action:none !important;
+  }
+
+  .request-form-modal-backdrop.request-search-hidden{
+    display:none !important;
+    visibility:hidden !important;
+    pointer-events:none !important;
+  }
+
+  #searchModal.modal-backdrop{
+    position:fixed !important;
+    inset:0 !important;
+    z-index:12000 !important;
+    display:none !important;
+    align-items:center !important;
+    justify-content:center !important;
+    padding:12px !important;
+    background:rgba(15,23,42,.42) !important;
+    overflow:hidden !important;
+    overscroll-behavior:contain !important;
+  }
+
+  #searchModal.modal-backdrop.show{
+    display:flex !important;
+  }
+
+  #searchModal .modal{
+    position:relative !important;
+    left:auto !important;
+    right:auto !important;
+    top:auto !important;
+    bottom:auto !important;
+    transform:none !important;
+    width:min(520px, calc(100vw - 24px)) !important;
+    max-width:calc(100vw - 24px) !important;
+    max-height:calc(100dvh - 24px) !important;
+    margin:0 auto !important;
+    border-radius:18px !important;
+    background:#fff !important;
+    box-shadow:0 30px 70px rgba(15,23,42,.28) !important;
+    overflow:hidden !important;
+    display:flex !important;
+    flex-direction:column !important;
+  }
+
+  #searchModal .modal-head{
+    flex:0 0 auto !important;
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) auto !important;
+    align-items:center !important;
+    gap:10px !important;
+    padding:14px 16px !important;
+    border-bottom:1px solid var(--line,#d9e2ec) !important;
+  }
+
+  #searchModal .modal-head h3{
+    margin:0 !important;
+    font-size:18px !important;
+    line-height:1.25 !important;
+    letter-spacing:-.03em !important;
+  }
+
+  #searchModal .modal-head .small{
+    margin-top:4px !important;
+    font-size:12px !important;
+    line-height:1.45 !important;
+  }
+
+  #searchModal #closeSearch{
+    width:auto !important;
+    min-width:88px !important;
+    height:34px !important;
+    padding:0 14px !important;
+    border-radius:10px !important;
+    font-size:12px !important;
+  }
+
+  #searchModal .modal-search{
+    flex:0 0 auto !important;
+    display:grid !important;
+    grid-template-columns:1fr !important;
+    gap:10px !important;
+    padding:14px 16px !important;
+    border-bottom:1px solid var(--line,#d9e2ec) !important;
+  }
+
+  #searchModal .field{
+    gap:5px !important;
+  }
+
+  #searchModal .field label{
+    font-size:11px !important;
+    color:var(--muted,#6b7280) !important;
+    font-weight:800 !important;
+  }
+
+  #searchModal .field input,
+  #searchModal .field select{
+    height:34px !important;
+    min-height:34px !important;
+    border-radius:10px !important;
+    padding:0 10px !important;
+    font-size:12px !important;
+  }
+
+  #searchModal .search-hint{
+    margin-top:4px !important;
+    font-size:11px !important;
+    line-height:1.4 !important;
+  }
+
+  #searchModal .modal-body{
+    flex:1 1 auto !important;
+    min-height:0 !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    -webkit-overflow-scrolling:touch !important;
+    padding:8px 0 !important;
+  }
+
+  #searchModal .result-item{
+    padding:12px 16px !important;
+  }
+
+  #searchModal .result-title{
+    font-size:13px !important;
+    line-height:1.35 !important;
+    margin-bottom:8px !important;
+  }
+
+  #searchModal .meta{
+    gap:6px !important;
+  }
+
+  #searchModal .meta span{
+    font-size:11px !important;
+    padding:4px 8px !important;
+    border-radius:999px !important;
+    line-height:1.25 !important;
+  }
+
+  #searchModal .modal-foot{
+    flex:0 0 auto !important;
+    display:block !important;
+    padding:10px 16px 12px !important;
+    border-top:1px solid var(--line,#d9e2ec) !important;
+  }
+
+  #searchModal .modal-foot .small{
+    font-size:11px !important;
+    line-height:1.45 !important;
+  }
+}
