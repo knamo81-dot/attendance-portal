@@ -4377,3 +4377,194 @@ td {
     overflow:hidden !important;
   }
 }
+
+
+/* =========================================================
+   FINAL PATCH: 제품신청 모달 상단 한 줄 + 하단 버튼 본문 스크롤
+   - 제품 신청 제목 옆에 주문월 선택 / 제품검색 배치
+   - '주문월' 텍스트 제거 후 select만 표시
+   - 하단 버튼은 고정 footer가 아니라 본문 스크롤에 포함
+========================================================= */
+@media (max-width:760px){
+  .request-form-modal-backdrop #requestFormCard{
+    max-height:90vh !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .request-form-modal-head,
+  .request-form-modal-backdrop #requestFormCard .card-head{
+    display:grid !important;
+    grid-template-columns:minmax(0, 1fr) auto !important;
+    align-items:center !important;
+    gap:10px !important;
+    padding:14px 18px 12px !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .request-form-title-wrap{
+    min-width:0 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .request-form-title-row{
+    display:flex !important;
+    flex-direction:row !important;
+    align-items:center !important;
+    gap:10px !important;
+    flex-wrap:nowrap !important;
+    min-width:0 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .card-head h2{
+    flex:0 0 auto !important;
+    font-size:18px !important;
+    line-height:1.2 !important;
+    white-space:nowrap !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .order-month-wrap{
+    flex:0 1 auto !important;
+    display:flex !important;
+    align-items:center !important;
+    gap:0 !important;
+    width:auto !important;
+    min-width:0 !important;
+    margin:0 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .order-month-wrap > span:not(.small),
+  .request-form-modal-backdrop #requestFormCard .order-month-wrap .small,
+  .request-form-modal-backdrop #requestFormCard #orderMonthDesc,
+  .request-form-modal-backdrop #requestFormCard .card-head p,
+  .request-form-modal-backdrop #requestFormCard .badge{
+    display:none !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard #orderMonthSelect{
+    width:128px !important;
+    min-width:0 !important;
+    max-width:128px !important;
+    height:38px !important;
+    padding:0 8px !important;
+    border-radius:12px !important;
+    font-size:14px !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .request-form-search-wrap{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-end !important;
+    width:auto !important;
+    min-width:0 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard #openSearch{
+    width:92px !important;
+    min-width:92px !important;
+    max-width:92px !important;
+    height:38px !important;
+    padding:0 10px !important;
+    border-radius:13px !important;
+    font-size:14px !important;
+    font-weight:800 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .card-body{
+    flex:1 1 auto !important;
+    min-height:0 !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    -webkit-overflow-scrolling:touch !important;
+    padding:0 !important;
+    background:#fff !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .form-grid{
+    grid-template-columns:1fr !important;
+    gap:10px !important;
+    padding:14px 18px 8px !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .field{
+    gap:5px !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .field label{
+    font-size:12px !important;
+    font-weight:800 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .field input,
+  .request-form-modal-backdrop #requestFormCard .field select{
+    height:42px !important;
+    border-radius:13px !important;
+    font-size:14px !important;
+    padding:0 12px !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .actions.request-form-actions,
+  .request-form-modal-backdrop #requestFormCard > .request-form-actions,
+  body.request-form-modal-open #requestFormCard .actions.request-form-actions{
+    position:relative !important;
+    inset:auto !important;
+    flex:0 0 auto !important;
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:8px !important;
+    margin:0 !important;
+    padding:6px 18px calc(18px + env(safe-area-inset-bottom)) !important;
+    background:#fff !important;
+    border-top:none !important;
+    box-shadow:none !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .actions.request-form-actions .btn,
+  body.request-form-modal-open #requestFormCard .actions.request-form-actions .btn{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    height:42px !important;
+    min-height:42px !important;
+    padding:0 12px !important;
+    border-radius:13px !important;
+    font-size:14px !important;
+    font-weight:800 !important;
+    position:relative !important;
+    inset:auto !important;
+    transform:none !important;
+    box-shadow:none !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard #addItem{
+    grid-column:1 / -1 !important;
+    order:1 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard #clearForm{
+    grid-column:1 / 2 !important;
+    order:2 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard #closeRequestFormMobile{
+    display:inline-flex !important;
+    grid-column:2 / 3 !important;
+    order:3 !important;
+    background:#fff !important;
+    color:var(--text, #1f2937) !important;
+    border:1px solid var(--line, #d9e2ec) !important;
+  }
+}
+
+@media (max-width:390px){
+  .request-form-modal-backdrop #requestFormCard .request-form-modal-head,
+  .request-form-modal-backdrop #requestFormCard .card-head{
+    grid-template-columns:1fr !important;
+    align-items:start !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .request-form-search-wrap{
+    justify-content:flex-start !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard #openSearch{
+    width:100% !important;
+    max-width:none !important;
+  }
+}
