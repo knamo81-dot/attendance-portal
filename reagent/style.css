@@ -4134,3 +4134,246 @@ td {
     display:none !important;
   }
 }
+
+
+/* =========================================================
+   FINAL STRUCTURAL FIX: 제품신청 모달을 제품등록요청 모달 방식으로 통일
+   - PC: 기존 신청 카드 그대로 표시
+   - 모바일: 별도 backdrop 안에서 모달처럼 표시
+   - 배경 스크롤 차단 / 본문만 스크롤 / 하단 버튼 고정
+========================================================= */
+.request-form-modal-backdrop{
+  display:contents;
+}
+
+@media (max-width:760px){
+  html.request-form-modal-open,
+  body.request-form-modal-open{
+    overflow:hidden !important;
+    height:100% !important;
+    overscroll-behavior:none !important;
+    touch-action:none !important;
+  }
+
+  body.request-form-modal-open::before{
+    content:none !important;
+    display:none !important;
+  }
+
+  .request-form-modal-backdrop{
+    position:fixed !important;
+    inset:0 !important;
+    z-index:9990 !important;
+    display:none !important;
+    align-items:center !important;
+    justify-content:center !important;
+    padding:10px !important;
+    background:rgba(15,23,42,.46) !important;
+    overflow:hidden !important;
+    overscroll-behavior:contain !important;
+    touch-action:auto !important;
+  }
+
+  .request-form-modal-backdrop.show{
+    display:flex !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard{
+    display:flex !important;
+    flex-direction:column !important;
+    position:relative !important;
+    inset:auto !important;
+    left:auto !important;
+    right:auto !important;
+    top:auto !important;
+    bottom:auto !important;
+    transform:none !important;
+    width:calc(100vw - 20px) !important;
+    max-width:100% !important;
+    height:auto !important;
+    max-height:90vh !important;
+    min-height:0 !important;
+    margin:0 !important;
+    overflow:hidden !important;
+    border-radius:22px !important;
+    background:#fff !important;
+    box-shadow:0 30px 70px rgba(15,23,42,.28) !important;
+    z-index:9991 !important;
+    overscroll-behavior:contain !important;
+    touch-action:auto !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .request-form-modal-head,
+  .request-form-modal-backdrop #requestFormCard .card-head{
+    position:relative !important;
+    top:auto !important;
+    z-index:5 !important;
+    flex:0 0 auto !important;
+    display:grid !important;
+    grid-template-columns:1fr auto !important;
+    align-items:start !important;
+    gap:10px !important;
+    padding:16px 18px 14px !important;
+    background:#fff !important;
+    border-bottom:1px solid var(--line, #d9e2ec) !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .request-form-title-wrap{
+    min-width:0 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .request-form-title-row{
+    display:flex !important;
+    align-items:flex-start !important;
+    gap:8px !important;
+    flex-direction:column !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .card-head h2{
+    font-size:18px !important;
+    line-height:1.25 !important;
+    margin:0 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .card-head p,
+  .request-form-modal-backdrop #requestFormCard .badge{
+    display:none !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .order-month-wrap{
+    gap:6px !important;
+    width:100% !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .order-month-wrap select{
+    height:36px !important;
+    min-width:120px !important;
+    max-width:150px !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .order-month-wrap .small{
+    display:none !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .request-form-search-wrap{
+    display:flex !important;
+    align-items:flex-start !important;
+    justify-content:flex-end !important;
+    width:auto !important;
+    min-width:0 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard #openSearch{
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    width:112px !important;
+    min-width:112px !important;
+    max-width:112px !important;
+    height:44px !important;
+    padding:0 12px !important;
+    border-radius:14px !important;
+    font-size:14px !important;
+    font-weight:800 !important;
+    white-space:nowrap !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .card-body{
+    flex:1 1 auto !important;
+    min-height:0 !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    -webkit-overflow-scrolling:touch !important;
+    overscroll-behavior:contain !important;
+    padding:0 !important;
+    background:#fff !important;
+    touch-action:pan-y !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .form-grid{
+    display:grid !important;
+    grid-template-columns:1fr !important;
+    gap:12px !important;
+    padding:16px 18px 18px !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .field label{
+    font-size:13px !important;
+    font-weight:800 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .field input,
+  .request-form-modal-backdrop #requestFormCard .field select{
+    height:48px !important;
+    border-radius:15px !important;
+    font-size:15px !important;
+    padding:0 13px !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard > .request-form-actions,
+  .request-form-modal-backdrop #requestFormCard .actions.request-form-actions{
+    flex:0 0 auto !important;
+    position:relative !important;
+    inset:auto !important;
+    z-index:5 !important;
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:9px !important;
+    margin:0 !important;
+    padding:14px 18px calc(14px + env(safe-area-inset-bottom)) !important;
+    background:#fff !important;
+    border-top:1px solid var(--line, #d9e2ec) !important;
+    box-shadow:0 -10px 24px rgba(15,23,42,.05) !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard > .request-form-actions .btn,
+  .request-form-modal-backdrop #requestFormCard .actions.request-form-actions .btn{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    height:48px !important;
+    min-height:48px !important;
+    padding:0 12px !important;
+    border-radius:15px !important;
+    font-size:15px !important;
+    font-weight:800 !important;
+    position:relative !important;
+    inset:auto !important;
+    transform:none !important;
+    box-shadow:none !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard #addItem{
+    grid-column:1 / -1 !important;
+    order:1 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard #clearForm{
+    grid-column:1 / 2 !important;
+    order:2 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard #closeRequestFormMobile{
+    display:inline-flex !important;
+    grid-column:2 / 3 !important;
+    order:3 !important;
+    background:#fff !important;
+    color:var(--text, #1f2937) !important;
+    border:1px solid var(--line, #d9e2ec) !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard #requestNew,
+  .request-form-modal-backdrop #requestFormCard #requestNewHeader,
+  .request-form-modal-backdrop #requestFormCard #openRequestFormMobile{
+    display:none !important;
+  }
+
+  body:not(.request-form-modal-open) .request-form-modal-backdrop{
+    display:none !important;
+  }
+
+  body.request-form-modal-open #page-request,
+  body.request-form-modal-open .shell{
+    overflow:hidden !important;
+  }
+}
