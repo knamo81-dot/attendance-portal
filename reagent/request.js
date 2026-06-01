@@ -1239,6 +1239,7 @@ window.ReagentApp.request = {
 
     this.requestRows.unshift(data);
     this.clearForm();
+    this.closeRequestFormMobile?.();
     this.renderRequest();
     window.ReagentApp.collect?.renderCollect?.();
     window.ReagentApp.collect?.renderPrepare?.();
@@ -1747,7 +1748,130 @@ window.ReagentApp.request = {
     window.ReagentApp.toast("삭제되었습니다.", "success");
   },
 
+  openRequestFormMobile() {
+    if (!window.matchMedia || !window.matchMedia("(max-width: 760px)").matches) return;
+    document.body.classList.add("request-form-modal-open");
+    window.setTimeout(() => {
+      const firstInput = document.getElementById("qty") || document.getElementById("productName");
+      firstInput?.focus?.();
+    }, 80);
+  },
+
+  closeRequestFormMobile() {
+    document.body.classList.remove("request-form-modal-open");
+  },
+
+  bindMobileRequestForm() {
+    const openBtns = [document.getElementById("openRequestFormMobile"), document.getElementById("openRequestFormMobileList")].filter(Boolean);
+    const closeBtn = document.getElementById("closeRequestFormMobile");
+    openBtns.forEach((openBtn) => {
+      if (openBtn.dataset.bound) return;
+      openBtn.dataset.bound = "1";
+      openBtn.addEventListener("click", () => this.openRequestFormMobile());
+    });
+    if (closeBtn && !closeBtn.dataset.bound) {
+      closeBtn.dataset.bound = "1";
+      closeBtn.addEventListener("click", () => this.closeRequestFormMobile());
+    }
+    if (!this._requestFormEscBound) {
+      this._requestFormEscBound = true;
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") this.closeRequestFormMobile();
+      });
+    }
+  },
+
+  renderMobileRequestCards(groups) {
+    const container = document.getElementById("draftMobileCards");
+    if (!container) return;
+
+    if (!groups.length) {
+      container.innerHTML = `<div class="request-mobile-empty">데이터 없음</div>`;
+      return;
+    }
+
+    container.innerHTML = groups.map((group) => {
+      const isCompletedOnly = group.collectedQty > 0 && group.newQty === 0;
+      const isAdditional = group.collectedQty > 0 && group.newQty > 0;
+      const isVendorConfirmed = group.isConfirmed === true;
+      const checked = isCompletedOnly || (!isAdditional && this.selectedKeys.includes(group.key));
+      const disabled = isCompletedOnly ? "disabled" : "";
+      const qtyLabel = group.collectedQty === 0
+        ? `${group.totalQty}`
+        : isVendorConfirmed
+          ? `${group.collectedQty > 0 ? `완료 ${group.collectedQty}` : ""}${group.newQty > 0 ? ` / 추가 ${group.newQty}` : ""}`
+          : `${group.collectedQty > 0 ? `완료 ${group.collectedQty}` : ""}${group.newQty > 0 ? ` / 추가 ${group.newQty}` : ""}`;
+
+      const detailItems = this.splitEntryStatus(group).map((item) => {
+        const isLocked = item.rowStatus === "취합완료";
+        const isPending = item.rowStatus === "추가신청건";
+        const statusClass = isLocked ? "is-collected" : (isPending ? "is-pending" : "");
+        return `
+          <div class="request-mobile-detail-item ${statusClass}">
+            <div class="request-mobile-detail-top">
+              <strong>${this.html(item.team)} / ${this.html(item.requester)}</strong>
+              <span>${this.html(item.rowStatus)}</span>
+            </div>
+            <div class="request-mobile-detail-grid">
+              <span>신청일자</span><b>${this.html(this.formatDateTime(item.created_at || item.id))}</b>
+              <span>수량</span><b>${this.html(item.qty)}</b>
+              <span>용도</span><b>${this.html(item.usage || "-")}</b>
+            </div>
+            <div class="request-mobile-detail-actions">
+              ${isLocked ? `<span class="request-mobile-lock">잠김</span>` : `<button type="button" class="ghost-btn detail-edit-btn" data-id="${item.id}">수정</button><button type="button" class="ghost-btn detail-delete-btn" data-id="${item.id}">삭제</button>`}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      return `
+        <article class="request-mobile-card ${isCompletedOnly ? "is-collected" : ""}" data-key="${this.attr(group.key)}">
+          <div class="request-mobile-card-main" role="button" tabindex="0" data-mobile-detail-key="${this.attr(group.key)}">
+            <div class="request-mobile-line1">
+              <label class="request-mobile-check" onclick="event.stopPropagation();">
+                <input type="checkbox" class="request-check" data-key="${this.attr(group.key)}" ${checked ? "checked" : ""} ${disabled}>
+              </label>
+              <strong>${this.html(group.name || "품명 없음")}</strong>
+              <span>${this.html(this.getGroupActionLabel(group))}</span>
+            </div>
+            <div class="request-mobile-line2">
+              <span>${this.html(group.maker || "제조사 없음")}</span>
+              <b>수량 ${this.html(qtyLabel || "0")}</b>
+            </div>
+          </div>
+          <div class="request-mobile-detail" data-mobile-detail-panel="${this.attr(group.key)}">
+            <div class="request-mobile-spec">
+              <span>구분</span><b>${this.html(group.category || "-")}</b>
+              <span>제품코드</span><b>${this.html(group.code || "-")}</b>
+              <span>CAS</span><b>${this.html(group.cas || "-")}</b>
+              <span>등급/규격</span><b>${this.html([group.grade, group.capacity].filter(Boolean).join(" / ") || "-")}</b>
+              <span>용도</span><b>${this.html(group.entries.map((e) => e.usage).filter(Boolean).join(" / ") || "-")}</b>
+            </div>
+            <div class="request-mobile-detail-list">${detailItems}</div>
+          </div>
+        </article>
+      `;
+    }).join("");
+
+    container.querySelectorAll("[data-mobile-detail-key]").forEach((card) => {
+      const toggle = () => {
+        const wrapper = card.closest(".request-mobile-card");
+        wrapper?.classList.toggle("open");
+      };
+      card.addEventListener("click", (event) => {
+        if (event.target.closest("input,button,label")) return;
+        toggle();
+      });
+      card.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        toggle();
+      });
+    });
+  },
+
   renderRequest() {
+    this.bindMobileRequestForm?.();
     this.bindRegistrationStatusPanel?.();
     const { els } = window.ReagentApp;
     if (!els.draftTableBody) return;
@@ -1773,6 +1897,7 @@ window.ReagentApp.request = {
       if (els.sumReagent) els.sumReagent.textContent = "0";
       if (els.sumGlass) els.sumGlass.textContent = "0";
       if (els.sumSafety) els.sumSafety.textContent = "0";
+      this.renderMobileRequestCards([]);
       return;
     }
 
@@ -1890,6 +2015,8 @@ window.ReagentApp.request = {
         </tr>
       `;
     }).join("");
+
+    this.renderMobileRequestCards(groups);
 
     document.querySelectorAll(".request-check").forEach((chk) => {
       chk.addEventListener("change", (e) => {
