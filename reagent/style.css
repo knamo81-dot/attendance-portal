@@ -3498,3 +3498,54 @@ td {
     font-weight:800;
   }
 }
+
+/* ===== Mobile request action buttons patch ===== */
+.mobile-request-action-pair{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:nowrap;
+}
+
+.mobile-registration-open{
+  background:#fff;
+  color:var(--primary);
+  border-color:var(--primary);
+  font-weight:800;
+}
+
+@media (max-width:760px){
+  #page-request .card-head > div:last-child{
+    width:100%;
+  }
+
+  #page-request .mobile-request-open.mobile-request-half,
+  #page-request .mobile-registration-open.mobile-request-half{
+    width:calc(50% - 4px) !important;
+    min-width:0 !important;
+    flex:0 0 calc(50% - 4px) !important;
+    padding-left:6px !important;
+    padding-right:6px !important;
+    font-size:12px !important;
+    white-space:nowrap !important;
+  }
+
+  #page-request .mobile-request-action-pair{
+    width:100% !important;
+    display:flex !important;
+    gap:8px !important;
+  }
+
+  #page-request #openSearch{
+    width:100% !important;
+  }
+
+  #productRegistrationRequestModal .modal{
+    width:100% !important;
+    max-height:92vh !important;
+  }
+
+  #productRegistrationRequestModal .form-grid{
+    grid-template-columns:1fr !important;
+  }
+}
