@@ -1750,20 +1750,38 @@ window.ReagentApp.request = {
 
   openRequestFormMobile() {
     if (!window.matchMedia || !window.matchMedia("(max-width: 760px)").matches) return;
+
+    const backdrop = document.getElementById("requestFormModalBackdrop");
+    const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+
+    document.body.dataset.requestModalScrollY = String(scrollY);
     document.body.classList.add("request-form-modal-open");
+    document.documentElement.classList.add("request-form-modal-open");
+    backdrop?.classList.add("show");
+
     window.setTimeout(() => {
       const firstInput = document.getElementById("qty") || document.getElementById("productName");
-      firstInput?.focus?.();
+      firstInput?.focus?.({ preventScroll: true });
     }, 80);
   },
 
   closeRequestFormMobile() {
+    const backdrop = document.getElementById("requestFormModalBackdrop");
+    const scrollY = Number(document.body.dataset.requestModalScrollY || 0);
+
+    backdrop?.classList.remove("show");
     document.body.classList.remove("request-form-modal-open");
+    document.documentElement.classList.remove("request-form-modal-open");
+
+    if (Number.isFinite(scrollY) && scrollY >= 0) {
+      window.requestAnimationFrame(() => window.scrollTo(0, scrollY));
+    }
   },
 
   bindMobileRequestForm() {
     const openBtns = [document.getElementById("openRequestFormMobile"), document.getElementById("openRequestFormMobileList")].filter(Boolean);
     const closeBtn = document.getElementById("closeRequestFormMobile");
+    const backdrop = document.getElementById("requestFormModalBackdrop");
     const registrationBtns = [
       document.getElementById("requestNew"),
       document.getElementById("requestNewHeader"),
@@ -1789,6 +1807,14 @@ window.ReagentApp.request = {
       closeBtn.dataset.bound = "1";
       closeBtn.addEventListener("click", () => this.closeRequestFormMobile());
     }
+
+    if (backdrop && !backdrop.dataset.bound) {
+      backdrop.dataset.bound = "1";
+      backdrop.addEventListener("click", (event) => {
+        if (event.target === backdrop) this.closeRequestFormMobile();
+      });
+    }
+
     if (!this._requestFormEscBound) {
       this._requestFormEscBound = true;
       document.addEventListener("keydown", (event) => {
