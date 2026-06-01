@@ -131,7 +131,9 @@
         selected: document.getElementById("orderReceiptSelectedCount"),
         body: document.getElementById("orderReceiptList"),
         desc: document.getElementById("orderReceiptDesc"),
-        readonlyNotice: document.getElementById("orderReceiptReadonlyNotice")
+        readonlyNotice: document.getElementById("orderReceiptReadonlyNotice"),
+        clearOrderDate: document.getElementById("clearSelectedOrderDate"),
+        clearReceiptDate: document.getElementById("clearSelectedReceiptDate")
       };
     },
 
@@ -271,6 +273,14 @@
         APP.toast?.("발주/입고 목록을 새로고침했습니다.", "success");
       });
 
+      els.clearOrderDate?.addEventListener("click", async () => {
+        await this.clearSelectedDate("order_date");
+      });
+
+      els.clearReceiptDate?.addEventListener("click", async () => {
+        await this.clearSelectedDate("receipt_date");
+      });
+
       document.addEventListener("mouseup", () => {
         this.dragSelecting = false;
       });
@@ -319,6 +329,8 @@
         if (checkbox) checkbox.checked = selected;
       });
       if (els.selected) els.selected.textContent = `${this.selectedKeys.size}건`;
+      if (els.clearOrderDate) els.clearOrderDate.disabled = !isOperator() || this.selectedKeys.size === 0;
+      if (els.clearReceiptDate) els.clearReceiptDate.disabled = !isOperator() || this.selectedKeys.size === 0;
     },
 
     getApplyKeys(fallbackKey) {
@@ -328,10 +340,10 @@
       return fallbackKey ? [fallbackKey] : selected;
     },
 
-    async setDate(recordKey, field, value) {
-      const keys = this.getApplyKeys(recordKey);
-      if (!keys.length) return;
-      keys.forEach((key) => {
+    async setDateForKeys(keys, field, value) {
+      const targetKeys = Array.isArray(keys) ? keys.filter(Boolean) : [];
+      if (!targetKeys.length || !field) return;
+      targetKeys.forEach((key) => {
         this.records[key] = this.records[key] || {};
         const [order_month, item_key] = key.split("__");
         this.records[key].order_month = this.records[key].order_month || order_month || "";
@@ -340,7 +352,28 @@
       });
       this.saveLocalRecords();
       this.render();
-      await this.saveRemote(keys);
+      await this.saveRemote(targetKeys);
+    },
+
+    async setDate(recordKey, field, value) {
+      const keys = this.getApplyKeys(recordKey);
+      await this.setDateForKeys(keys, field, value);
+    },
+
+    async clearDate(recordKey, field) {
+      if (!recordKey || !field) return;
+      await this.setDateForKeys([recordKey], field, "");
+      APP.toast?.(field === "order_date" ? "발주일자를 삭제했습니다." : "입고일자를 삭제했습니다.", "success");
+    },
+
+    async clearSelectedDate(field) {
+      const keys = this.getSelectedKeys();
+      if (!keys.length) {
+        APP.toast?.("먼저 날짜를 삭제할 품목을 선택해 주세요.", "warn");
+        return;
+      }
+      await this.setDateForKeys(keys, field, "");
+      APP.toast?.(`${keys.length}건의 ${field === "order_date" ? "발주일자" : "입고일자"}를 삭제했습니다.`, "success");
     },
 
     getRowByRecordKey(key) {
@@ -402,6 +435,8 @@
       if (els.amount) els.amount.textContent = formatNumber(totalAmount) || "0";
       if (els.selected) els.selected.textContent = `${this.selectedKeys.size}건`;
       if (els.readonlyNotice) els.readonlyNotice.hidden = operator;
+      if (els.clearOrderDate) els.clearOrderDate.disabled = !operator || this.selectedKeys.size === 0;
+      if (els.clearReceiptDate) els.clearReceiptDate.disabled = !operator || this.selectedKeys.size === 0;
       if (els.desc) {
         els.desc.textContent = this.showUnreceived
           ? "입고일자가 비어 있는 전체 미입고 품목을 표시합니다."
@@ -432,8 +467,18 @@
             <td class="num">${formatNumber(row.purchaseUnit)}</td>
             <td class="num">${formatNumber(row.purchaseAmount)}</td>
             <td class="txt">${escapeHtml(row.purchaseVendor)}</td>
-            <td class="txt"><input class="order-receipt-date" data-field="order_date" type="date" value="${attr(row.order_date)}" ${disabled}/></td>
-            <td class="txt"><input class="order-receipt-date" data-field="receipt_date" type="date" value="${attr(row.receipt_date)}" ${disabled}/></td>
+            <td class="txt">
+              <div class="order-date-box">
+                <input class="order-receipt-date" data-field="order_date" type="date" value="${attr(row.order_date)}" ${disabled}/>
+                ${operator && row.order_date ? `<button type="button" class="order-date-clear" data-field="order_date" title="발주일자 삭제" aria-label="발주일자 삭제">×</button>` : ""}
+              </div>
+            </td>
+            <td class="txt">
+              <div class="order-date-box">
+                <input class="order-receipt-date" data-field="receipt_date" type="date" value="${attr(row.receipt_date)}" ${disabled}/>
+                ${operator && row.receipt_date ? `<button type="button" class="order-date-clear" data-field="receipt_date" title="입고일자 삭제" aria-label="입고일자 삭제">×</button>` : ""}
+              </div>
+            </td>
           </tr>
         `;
       }).join("");
@@ -465,6 +510,14 @@
           }, { passive: true });
           tr.addEventListener("touchmove", () => this.dragOver(key), { passive: true });
         }
+
+        tr.querySelectorAll(".order-date-clear").forEach((button) => {
+          button.addEventListener("click", async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            await this.clearDate(key, button.dataset.field);
+          });
+        });
 
         tr.querySelectorAll(".order-receipt-date").forEach((input) => {
           input.addEventListener("focus", () => {
