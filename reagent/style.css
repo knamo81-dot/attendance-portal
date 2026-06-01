@@ -4378,108 +4378,141 @@ td {
   }
 }
 
-
 /* =========================================================
-   FINAL PATCH: 제품신청 모달 상단 한 줄 + 하단 버튼 본문 스크롤
-   - 제품 신청 제목 옆에 주문월 선택 / 제품검색 배치
-   - '주문월' 텍스트 제거 후 select만 표시
-   - 하단 버튼은 고정 footer가 아니라 본문 스크롤에 포함
+   FINAL PATCH: 제품신청하기 모달 compact + 버튼 일반 스크롤
+   - 제품 등록 요청 모달처럼 공통 compact UI 수치 사용
+   - 닫기/입력초기화 버튼 겹침 방지
+   - 하단 버튼 고정 해제: 본문과 함께 스크롤
+   - 주문월 텍스트 제거, 제목 옆에 월 선택 + 제품검색 한 줄 배치
 ========================================================= */
 @media (max-width:760px){
+  .request-form-modal-backdrop.show{
+    align-items:center !important;
+    justify-content:center !important;
+    padding:10px !important;
+  }
+
   .request-form-modal-backdrop #requestFormCard{
+    display:block !important;
+    width:calc(100vw - 20px) !important;
+    max-width:100% !important;
     max-height:90vh !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    -webkit-overflow-scrolling:touch !important;
+    overscroll-behavior:contain !important;
+    border-radius:18px !important;
+    background:#fff !important;
+    box-shadow:0 30px 70px rgba(15,23,42,.28) !important;
   }
 
   .request-form-modal-backdrop #requestFormCard .request-form-modal-head,
   .request-form-modal-backdrop #requestFormCard .card-head{
-    display:grid !important;
-    grid-template-columns:minmax(0, 1fr) auto !important;
+    position:relative !important;
+    display:flex !important;
     align-items:center !important;
-    gap:10px !important;
-    padding:14px 18px 12px !important;
+    justify-content:space-between !important;
+    gap:8px !important;
+    padding:12px 14px !important;
+    background:#fff !important;
+    border-bottom:1px solid var(--line, #d9e2ec) !important;
   }
 
   .request-form-modal-backdrop #requestFormCard .request-form-title-wrap{
+    flex:1 1 auto !important;
     min-width:0 !important;
   }
 
   .request-form-modal-backdrop #requestFormCard .request-form-title-row{
     display:flex !important;
-    flex-direction:row !important;
     align-items:center !important;
-    gap:10px !important;
+    justify-content:flex-start !important;
+    flex-direction:row !important;
     flex-wrap:nowrap !important;
+    gap:8px !important;
     min-width:0 !important;
   }
 
   .request-form-modal-backdrop #requestFormCard .card-head h2{
     flex:0 0 auto !important;
-    font-size:18px !important;
-    line-height:1.2 !important;
+    font-size:16px !important;
+    line-height:1.25 !important;
+    margin:0 !important;
+    font-weight:800 !important;
     white-space:nowrap !important;
   }
 
-  .request-form-modal-backdrop #requestFormCard .order-month-wrap{
-    flex:0 1 auto !important;
-    display:flex !important;
-    align-items:center !important;
-    gap:0 !important;
-    width:auto !important;
-    min-width:0 !important;
-    margin:0 !important;
-  }
-
-  .request-form-modal-backdrop #requestFormCard .order-month-wrap > span:not(.small),
-  .request-form-modal-backdrop #requestFormCard .order-month-wrap .small,
-  .request-form-modal-backdrop #requestFormCard #orderMonthDesc,
   .request-form-modal-backdrop #requestFormCard .card-head p,
-  .request-form-modal-backdrop #requestFormCard .badge{
+  .request-form-modal-backdrop #requestFormCard .badge,
+  .request-form-modal-backdrop #requestFormCard #orderMonthDesc,
+  .request-form-modal-backdrop #requestFormCard .order-month-wrap .small{
     display:none !important;
   }
 
-  .request-form-modal-backdrop #requestFormCard #orderMonthSelect{
-    width:128px !important;
+  .request-form-modal-backdrop #requestFormCard .order-month-wrap{
+    flex:0 1 132px !important;
+    width:auto !important;
     min-width:0 !important;
-    max-width:128px !important;
-    height:38px !important;
+    gap:0 !important;
+    margin:0 !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .order-month-wrap > span:first-child{
+    display:none !important;
+  }
+
+  .request-form-modal-backdrop #requestFormCard .order-month-wrap select,
+  .request-form-modal-backdrop #requestFormCard #orderMonthSelect{
+    width:100% !important;
+    min-width:112px !important;
+    max-width:132px !important;
+    height:var(--rg-control-height, 34px) !important;
+    min-height:var(--rg-control-height, 34px) !important;
     padding:0 8px !important;
-    border-radius:12px !important;
-    font-size:14px !important;
+    border-radius:var(--rg-control-radius, 10px) !important;
+    font-size:var(--rg-font-base, 12px) !important;
   }
 
   .request-form-modal-backdrop #requestFormCard .request-form-search-wrap{
+    flex:0 0 auto !important;
     display:flex !important;
     align-items:center !important;
     justify-content:flex-end !important;
     width:auto !important;
     min-width:0 !important;
+    gap:0 !important;
   }
 
   .request-form-modal-backdrop #requestFormCard #openSearch{
-    width:92px !important;
-    min-width:92px !important;
-    max-width:92px !important;
-    height:38px !important;
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    width:auto !important;
+    min-width:68px !important;
+    max-width:86px !important;
+    height:var(--rg-control-height, 34px) !important;
+    min-height:var(--rg-control-height, 34px) !important;
     padding:0 10px !important;
-    border-radius:13px !important;
-    font-size:14px !important;
+    border-radius:var(--rg-control-radius, 10px) !important;
+    font-size:var(--rg-font-base, 12px) !important;
     font-weight:800 !important;
+    white-space:nowrap !important;
   }
 
   .request-form-modal-backdrop #requestFormCard .card-body{
-    flex:1 1 auto !important;
+    display:block !important;
+    flex:none !important;
     min-height:0 !important;
-    overflow-y:auto !important;
-    overflow-x:hidden !important;
-    -webkit-overflow-scrolling:touch !important;
+    overflow:visible !important;
     padding:0 !important;
     background:#fff !important;
   }
 
   .request-form-modal-backdrop #requestFormCard .form-grid{
+    display:grid !important;
     grid-template-columns:1fr !important;
-    gap:10px !important;
-    padding:14px 18px 8px !important;
+    gap:8px !important;
+    padding:12px 14px 8px !important;
   }
 
   .request-form-modal-backdrop #requestFormCard .field{
@@ -4487,49 +4520,51 @@ td {
   }
 
   .request-form-modal-backdrop #requestFormCard .field label{
-    font-size:12px !important;
-    font-weight:800 !important;
+    font-size:var(--rg-font-small, 11px) !important;
+    font-weight:700 !important;
+    line-height:1.2 !important;
   }
 
   .request-form-modal-backdrop #requestFormCard .field input,
-  .request-form-modal-backdrop #requestFormCard .field select{
-    height:42px !important;
-    border-radius:13px !important;
-    font-size:14px !important;
-    padding:0 12px !important;
+  .request-form-modal-backdrop #requestFormCard .field select,
+  .request-form-modal-backdrop #requestFormCard .field button{
+    height:var(--rg-control-height, 34px) !important;
+    min-height:var(--rg-control-height, 34px) !important;
+    border-radius:var(--rg-control-radius, 10px) !important;
+    font-size:var(--rg-font-base, 12px) !important;
+    padding:0 10px !important;
   }
 
-  .request-form-modal-backdrop #requestFormCard .actions.request-form-actions,
   .request-form-modal-backdrop #requestFormCard > .request-form-actions,
-  body.request-form-modal-open #requestFormCard .actions.request-form-actions{
+  .request-form-modal-backdrop #requestFormCard .actions.request-form-actions{
     position:relative !important;
     inset:auto !important;
-    flex:0 0 auto !important;
     display:grid !important;
     grid-template-columns:1fr 1fr !important;
     gap:8px !important;
     margin:0 !important;
-    padding:6px 18px calc(18px + env(safe-area-inset-bottom)) !important;
+    padding:8px 14px calc(12px + env(safe-area-inset-bottom)) !important;
     background:#fff !important;
-    border-top:none !important;
+    border-top:0 !important;
     box-shadow:none !important;
   }
 
-  .request-form-modal-backdrop #requestFormCard .actions.request-form-actions .btn,
-  body.request-form-modal-open #requestFormCard .actions.request-form-actions .btn{
+  .request-form-modal-backdrop #requestFormCard > .request-form-actions .btn,
+  .request-form-modal-backdrop #requestFormCard .actions.request-form-actions .btn{
     width:100% !important;
     min-width:0 !important;
     max-width:none !important;
-    height:42px !important;
-    min-height:42px !important;
-    padding:0 12px !important;
-    border-radius:13px !important;
-    font-size:14px !important;
+    height:var(--rg-control-height, 34px) !important;
+    min-height:var(--rg-control-height, 34px) !important;
+    padding:0 10px !important;
+    border-radius:var(--rg-control-radius, 10px) !important;
+    font-size:var(--rg-font-base, 12px) !important;
     font-weight:800 !important;
     position:relative !important;
     inset:auto !important;
     transform:none !important;
     box-shadow:none !important;
+    white-space:nowrap !important;
   }
 
   .request-form-modal-backdrop #requestFormCard #addItem{
@@ -4546,25 +4581,19 @@ td {
     display:inline-flex !important;
     grid-column:2 / 3 !important;
     order:3 !important;
+    position:relative !important;
+    bottom:auto !important;
+    right:auto !important;
+    left:auto !important;
+    top:auto !important;
     background:#fff !important;
     color:var(--text, #1f2937) !important;
     border:1px solid var(--line, #d9e2ec) !important;
   }
-}
 
-@media (max-width:390px){
-  .request-form-modal-backdrop #requestFormCard .request-form-modal-head,
-  .request-form-modal-backdrop #requestFormCard .card-head{
-    grid-template-columns:1fr !important;
-    align-items:start !important;
-  }
-
-  .request-form-modal-backdrop #requestFormCard .request-form-search-wrap{
-    justify-content:flex-start !important;
-  }
-
-  .request-form-modal-backdrop #requestFormCard #openSearch{
-    width:100% !important;
-    max-width:none !important;
+  .request-form-modal-backdrop #requestFormCard #requestNew,
+  .request-form-modal-backdrop #requestFormCard #requestNewHeader,
+  .request-form-modal-backdrop #requestFormCard #openRequestFormMobile{
+    display:none !important;
   }
 }
