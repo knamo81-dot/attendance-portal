@@ -348,7 +348,10 @@ window.ReagentApp.getTabAccessLevel = function (target) {
 
   if (
     tab === "request" ||
-    label === "제품신청"
+    tab === "order-receipt" ||
+    label === "제품신청" ||
+    label === "발주/입고관리" ||
+    label === "발주/입고 관리"
   ) {
     return "all";
   }
@@ -1001,5 +1004,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (document.querySelector('.tab-btn[data-tab="product-management"]')?.classList.contains("active")) {
     window.ReagentApp.productManagement?.init?.();
+  }
+  if (document.querySelector('.tab-btn[data-tab="order-receipt"]')?.classList.contains("active")) {
+    window.ReagentApp.orderReceipt?.init?.();
   }
 });
