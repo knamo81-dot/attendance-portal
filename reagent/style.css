@@ -4170,10 +4170,47 @@ td {
     box-shadow:0 12px 34px rgba(15,23,42,.34) !important;
   }
 }
-@media (max-width:760px){
+
+/* =========================================================
+   Mobile input zoom prevention final patch
+   - iOS/Safari는 input/select/textarea 폰트가 16px 미만이면 자동 확대됩니다.
+   - 일반 화면 + 제품신청/제품검색/제품등록요청 모달 입력창 모두 적용합니다.
+   - 컨트롤 높이/레이아웃은 유지하고 폰트 크기만 16px로 보정합니다.
+========================================================= */
+@media (max-width: 760px){
+  html,
+  body{
+    -webkit-text-size-adjust: 100% !important;
+    text-size-adjust: 100% !important;
+  }
+
   input,
   select,
-  textarea{
-    font-size:16px !important;
+  textarea,
+  .field input,
+  .field select,
+  .field textarea,
+  .modal input,
+  .modal select,
+  .modal textarea,
+  #requestFormCard input,
+  #requestFormCard select,
+  #requestFormCard textarea,
+  #searchModal input,
+  #searchModal select,
+  #searchModal textarea,
+  #productSearchModal input,
+  #productSearchModal select,
+  #productSearchModal textarea,
+  #productRegistrationRequestModal input,
+  #productRegistrationRequestModal select,
+  #productRegistrationRequestModal textarea{
+    font-size: 16px !important;
+  }
+
+  input::placeholder,
+  textarea::placeholder{
+    font-size: 16px !important;
   }
 }
+
