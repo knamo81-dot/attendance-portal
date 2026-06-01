@@ -4170,3 +4170,10 @@ td {
     box-shadow:0 12px 34px rgba(15,23,42,.34) !important;
   }
 }
+@media (max-width:760px){
+  input,
+  select,
+  textarea{
+    font-size:16px !important;
+  }
+}
