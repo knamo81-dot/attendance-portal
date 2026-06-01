@@ -468,6 +468,10 @@ window.ReagentApp.request = {
   },
 
   async openRegistrationRequestDialog() {
+    // 제품신청하기 모바일 모달이 열린 상태에서 제품등록요청 모달을 열면
+    // backdrop 레이어가 겹쳐 클릭이 막힐 수 있으므로 먼저 닫습니다.
+    this.closeRequestFormMobile?.();
+
     const modal = this.ensureRegistrationRequestModal();
     const draft = this.getCurrentSearchDraft();
 
