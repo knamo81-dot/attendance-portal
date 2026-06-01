@@ -4233,3 +4233,182 @@ td {
   }
 }
 
+/* ===== 발주/입고관리 모바일 카드형 최적화 ===== */
+.order-receipt-mobile-list{
+  display:none;
+}
+
+.order-receipt-mobile-empty{
+  border:1px dashed var(--line);
+  border-radius:14px;
+  padding:18px;
+  text-align:center;
+  color:var(--muted);
+  background:#f8fafc;
+  font-weight:700;
+}
+
+@media (max-width:760px){
+  /* 상단 통계: 4개를 2개씩 배치 */
+  #page-order-receipt .summary{
+    grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
+    gap:8px !important;
+  }
+
+  #page-order-receipt .summary .tile{
+    min-height:0 !important;
+    padding:10px 12px !important;
+    border-radius:13px !important;
+  }
+
+  #page-order-receipt .summary .tile .k{
+    font-size:11px !important;
+    margin-bottom:4px !important;
+  }
+
+  #page-order-receipt .summary .tile .v{
+    font-size:18px !important;
+    line-height:1.2 !important;
+  }
+
+  /* 모바일에서는 긴 발주/입고 테이블 대신 카드 리스트 표시 */
+  #page-order-receipt .order-receipt-table-wrap{
+    display:none !important;
+  }
+
+  #page-order-receipt .order-receipt-mobile-list{
+    display:grid !important;
+    gap:10px;
+    margin-top:14px;
+  }
+
+  .order-receipt-mobile-card{
+    border:1px solid var(--line);
+    border-radius:16px;
+    background:#fff;
+    overflow:hidden;
+    box-shadow:0 6px 16px rgba(15,23,42,.05);
+  }
+
+  .order-receipt-mobile-card.selected{
+    border-color:#93c5fd;
+    box-shadow:0 0 0 2px rgba(37,99,235,.12), 0 6px 16px rgba(15,23,42,.05);
+  }
+
+  .order-receipt-mobile-main{
+    padding:13px 14px;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  .order-receipt-mobile-line1,
+  .order-receipt-mobile-line2{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-width:0;
+  }
+
+  .order-receipt-mobile-line1 strong{
+    flex:1;
+    min-width:0;
+    font-size:15px;
+    line-height:1.35;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    color:#0f172a;
+  }
+
+  .order-receipt-mobile-check{
+    flex:0 0 auto;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .order-receipt-mobile-check input{
+    width:18px !important;
+    height:18px !important;
+    min-height:18px !important;
+    padding:0 !important;
+    accent-color:var(--primary);
+  }
+
+  .order-receipt-mobile-line2{
+    justify-content:space-between;
+    margin-top:7px;
+    color:#64748b;
+    font-size:13px;
+  }
+
+  .order-receipt-mobile-line2 span{
+    min-width:0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .order-receipt-mobile-line2 b{
+    color:#0f172a;
+    white-space:nowrap;
+    font-size:13px;
+  }
+
+  .order-receipt-mobile-detail{
+    display:none;
+    border-top:1px solid var(--line);
+    background:#f8fafc;
+    padding:12px 14px 14px;
+  }
+
+  .order-receipt-mobile-card.open .order-receipt-mobile-detail{
+    display:block;
+  }
+
+  .order-receipt-mobile-spec{
+    display:grid;
+    grid-template-columns:74px minmax(0,1fr);
+    gap:6px 10px;
+    font-size:12px;
+  }
+
+  .order-receipt-mobile-spec span{
+    color:#64748b;
+    font-weight:700;
+  }
+
+  .order-receipt-mobile-spec b{
+    color:#1f2937;
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+
+  /* 상태 배지: 제품신청 카드의 취합완료 자리와 동일한 역할 */
+  .order-receipt-mobile-card .order-status{
+    flex:0 0 auto;
+    max-width:90px;
+    border-radius:999px;
+    padding:4px 8px;
+    font-size:11px;
+    font-weight:800;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .order-status.waiting{
+    color:#475569 !important;
+    background:#f1f5f9 !important;
+  }
+
+  .order-status.ordered{
+    color:#1d4ed8 !important;
+    background:#eaf2ff !important;
+  }
+
+  .order-status.done{
+    color:#047857 !important;
+    background:#ecfdf5 !important;
+  }
+}
