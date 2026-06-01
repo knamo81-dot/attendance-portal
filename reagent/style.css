@@ -3126,3 +3126,100 @@ td {
     flex: 1 1 auto;
   }
 }
+
+
+/* ===== final patch: 발주/입고 관리 이중 세로스크롤 제거 ===== */
+/*
+  목적
+  - 포탈 iframe 스크롤 + 시약 내부 표 스크롤이 동시에 생기는 현상 방지
+  - 발주/입고 관리 탭에서는 페이지 전체가 아니라 표 영역만 세로 스크롤
+  - 다른 탭의 기존 스크롤 구조는 최대한 건드리지 않음
+*/
+html:has(#page-order-receipt.active),
+body:has(#page-order-receipt.active){
+  height:100% !important;
+  max-height:100% !important;
+  overflow:hidden !important;
+}
+
+body:has(#page-order-receipt.active) .shell{
+  height:100vh !important;
+  max-height:100vh !important;
+  overflow:hidden !important;
+  display:block !important;
+}
+
+#page-order-receipt.active{
+  display:block !important;
+  height:100vh !important;
+  max-height:100vh !important;
+  overflow:hidden !important;
+}
+
+#page-order-receipt.active > .card{
+  height:100% !important;
+  max-height:100% !important;
+  display:flex !important;
+  flex-direction:column !important;
+  overflow:hidden !important;
+}
+
+#page-order-receipt .card-head{
+  flex:0 0 auto !important;
+}
+
+#page-order-receipt .card-body{
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  display:flex !important;
+  flex-direction:column !important;
+  overflow:hidden !important;
+}
+
+#page-order-receipt .summary,
+#page-order-receipt #orderReceiptReadonlyNotice,
+#page-order-receipt .card-body > .small,
+#page-order-receipt .order-receipt-bulk-actions{
+  flex:0 0 auto !important;
+}
+
+#page-order-receipt .order-receipt-table-wrap{
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  max-height:none !important;
+  overflow:auto !important;
+  -webkit-overflow-scrolling:touch !important;
+  overscroll-behavior:contain !important;
+}
+
+#page-order-receipt .order-receipt-table-wrap table{
+  width:max-content !important;
+  min-width:1500px !important;
+}
+
+#page-order-receipt .order-receipt-table-wrap th{
+  position:sticky !important;
+  top:0 !important;
+  z-index:3 !important;
+  background:#fbfdff !important;
+}
+
+html.embed-mode:has(#page-order-receipt.active),
+html.embed-mode:has(#page-order-receipt.active) body,
+html.embed-mode:has(#page-order-receipt.active) .shell{
+  height:100vh !important;
+  max-height:100vh !important;
+  overflow:hidden !important;
+}
+
+@media (max-width:760px){
+  #page-order-receipt.active,
+  body:has(#page-order-receipt.active) .shell{
+    height:100dvh !important;
+    max-height:100dvh !important;
+  }
+
+  #page-order-receipt .order-receipt-table-wrap{
+    min-height:260px !important;
+  }
+}
