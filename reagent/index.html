@@ -311,6 +311,11 @@
       </div>
       <div id="orderReceiptReadonlyNotice" class="small" style="margin-top:10px; color:#64748b;" hidden>일반사용자는 발주/입고 현황 조회만 가능합니다.</div>
       <div class="small" style="margin-top:10px;">관리자는 행을 드래그해 여러 품목을 선택한 뒤 발주일자 또는 입고일자를 선택하면 선택 품목 전체에 같은 날짜가 적용됩니다.</div>
+      <div class="order-receipt-bulk-actions">
+        <button class="btn" id="clearSelectedOrderDate" type="button" disabled>선택 발주일자 삭제</button>
+        <button class="btn" id="clearSelectedReceiptDate" type="button" disabled>선택 입고일자 삭제</button>
+        <span class="small">날짜칸 옆 × 버튼은 해당 품목 1건만 삭제합니다.</span>
+      </div>
       <div class="table-wrap order-receipt-table-wrap" style="margin-top:16px;">
         <table class="order-receipt-table">
           <colgroup>
@@ -326,8 +331,8 @@
             <col style="width:110px;">
             <col style="width:120px;">
             <col style="width:140px;">
-            <col style="width:130px;">
-            <col style="width:130px;">
+            <col style="width:160px;">
+            <col style="width:160px;">
           </colgroup>
           <thead>
             <tr>
@@ -684,4 +689,3 @@
 
 <script src="../common/common.js"></script>
 </body></html>
-
