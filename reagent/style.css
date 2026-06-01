@@ -4171,46 +4171,65 @@ td {
   }
 }
 
+
+
 /* =========================================================
-   Mobile input zoom prevention final patch
-   - iOS/Safari는 input/select/textarea 폰트가 16px 미만이면 자동 확대됩니다.
-   - 일반 화면 + 제품신청/제품검색/제품등록요청 모달 입력창 모두 적용합니다.
-   - 컨트롤 높이/레이아웃은 유지하고 폰트 크기만 16px로 보정합니다.
+   HOTFIX 2026-06-01: 모바일 입력창 자동 줌인 방지 v2
+   - style.css 이후 common/mobile.css, common/theme.css가 로드되어도 이 블록의 높은 선택자 우선순위로 모달/일반 입력창 16px 유지
+   - iOS/Safari는 input/select/textarea의 실제 font-size가 16px 미만이면 포커스 시 자동 확대됩니다.
 ========================================================= */
-@media (max-width: 760px){
+@media (max-width:760px){
   html,
   body{
-    -webkit-text-size-adjust: 100% !important;
-    text-size-adjust: 100% !important;
+    -webkit-text-size-adjust:100% !important;
+    text-size-adjust:100% !important;
   }
 
-  input,
-  select,
-  textarea,
-  .field input,
-  .field select,
-  .field textarea,
-  .modal input,
-  .modal select,
-  .modal textarea,
-  #requestFormCard input,
-  #requestFormCard select,
-  #requestFormCard textarea,
-  #searchModal input,
-  #searchModal select,
-  #searchModal textarea,
-  #productSearchModal input,
-  #productSearchModal select,
-  #productSearchModal textarea,
-  #productRegistrationRequestModal input,
-  #productRegistrationRequestModal select,
-  #productRegistrationRequestModal textarea{
-    font-size: 16px !important;
+  /* 일반 화면 입력창 */
+  html body .shell input:not([type="checkbox"]):not([type="radio"]),
+  html body .shell select,
+  html body .shell textarea,
+  html body .shell .field input:not([type="checkbox"]):not([type="radio"]),
+  html body .shell .field select,
+  html body .shell .field textarea,
+
+  /* 제품신청하기 모달 */
+  html body #requestFormModalBackdrop #requestFormCard input:not([type="checkbox"]):not([type="radio"]),
+  html body #requestFormModalBackdrop #requestFormCard select,
+  html body #requestFormModalBackdrop #requestFormCard textarea,
+  html body .request-form-modal-backdrop #requestFormCard input:not([type="checkbox"]):not([type="radio"]),
+  html body .request-form-modal-backdrop #requestFormCard select,
+  html body .request-form-modal-backdrop #requestFormCard textarea,
+
+  /* 제품검색 모달 */
+  html body #searchModal input:not([type="checkbox"]):not([type="radio"]),
+  html body #searchModal select,
+  html body #searchModal textarea,
+  html body #searchModal .field input:not([type="checkbox"]):not([type="radio"]),
+  html body #searchModal .field select,
+  html body #searchModal .field textarea,
+
+  /* 제품등록요청 모달 */
+  html body #productRegistrationRequestModal input:not([type="checkbox"]):not([type="radio"]),
+  html body #productRegistrationRequestModal select,
+  html body #productRegistrationRequestModal textarea,
+  html body #productRegistrationRequestModal .field input:not([type="checkbox"]):not([type="radio"]),
+  html body #productRegistrationRequestModal .field select,
+  html body #productRegistrationRequestModal .field textarea{
+    font-size:16px !important;
+    line-height:1.25 !important;
   }
 
-  input::placeholder,
-  textarea::placeholder{
-    font-size: 16px !important;
+  /* placeholder까지 16px로 맞춰 일부 iOS에서 포커스 판정이 작게 잡히는 현상 방지 */
+  html body .shell input::placeholder,
+  html body .shell textarea::placeholder,
+  html body #requestFormCard input::placeholder,
+  html body #requestFormCard textarea::placeholder,
+  html body #searchModal input::placeholder,
+  html body #searchModal textarea::placeholder,
+  html body #productRegistrationRequestModal input::placeholder,
+  html body #productRegistrationRequestModal textarea::placeholder{
+    font-size:16px !important;
   }
 }
 
