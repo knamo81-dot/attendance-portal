@@ -4114,3 +4114,60 @@ td {
     line-height:1.45 !important;
   }
 }
+
+
+/* =========================================================
+   HOTFIX 2026-06-01: 모바일 모달 위 토스트 표시
+   - 제품신청/제품검색/제품등록요청 모달 뒤에 오류 메시지가 숨는 문제 해결
+   - 수량/용도 미입력 안내가 항상 현재 모달 위에 표시되도록 z-index 보정
+========================================================= */
+.toast-wrap{
+  z-index:30000 !important;
+  pointer-events:none !important;
+}
+
+.toast-wrap .toast,
+.toast{
+  pointer-events:auto !important;
+}
+
+@media (max-width:760px){
+  body.request-modal-open .toast-wrap,
+  html.request-modal-open .toast-wrap,
+  body.search-modal-open .toast-wrap,
+  html.search-modal-open .toast-wrap,
+  body.registration-request-modal-open .toast-wrap,
+  html.registration-request-modal-open .toast-wrap,
+  .request-form-modal-backdrop.show ~ .toast-wrap,
+  #searchModal.show ~ .toast-wrap,
+  #productRegistrationRequestModal.show ~ .toast-wrap{
+    position:fixed !important;
+    left:16px !important;
+    right:16px !important;
+    bottom:calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+    width:auto !important;
+    max-width:none !important;
+    z-index:30000 !important;
+    display:flex !important;
+    align-items:stretch !important;
+    gap:8px !important;
+  }
+
+  body.request-modal-open .toast,
+  html.request-modal-open .toast,
+  body.search-modal-open .toast,
+  html.search-modal-open .toast,
+  body.registration-request-modal-open .toast,
+  html.registration-request-modal-open .toast,
+  .toast-wrap .toast{
+    width:100% !important;
+    max-width:none !important;
+    min-width:0 !important;
+    border-radius:12px !important;
+    padding:11px 13px !important;
+    font-size:12px !important;
+    line-height:1.45 !important;
+    box-shadow:0 12px 34px rgba(15,23,42,.34) !important;
+  }
+}
+
