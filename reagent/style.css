@@ -3500,9 +3500,10 @@ td {
 }
 
 /* =========================================================
-   Mobile request / registration modal clean block
-   - 이전 누적 모바일 모달 패치를 제거하고 이 블록 하나로 통합
-   - 제품신청하기 모달은 공통 compact UI 수치 사용
+   Mobile request / registration modal final block
+   - 제품신청하기 모달 클릭 차단 문제 수정
+   - backdrop은 ::before로 분리하여 카드 위를 덮지 않음
+   - 제품신청/제품등록요청 모달 모두 compact UI 기준 사용
    - 하단 버튼은 sticky/fixed 없이 본문과 함께 스크롤
 ========================================================= */
 
@@ -3554,16 +3555,32 @@ td {
     align-items:center !important;
     justify-content:center !important;
     padding:12px !important;
-    background:rgba(15,23,42,.42) !important;
-    z-index:60 !important;
+    background:transparent !important;
+    z-index:1000 !important;
     overflow:hidden !important;
+    pointer-events:auto !important;
+    isolation:isolate !important;
   }
 
   .request-form-modal-backdrop.show{
     display:flex !important;
   }
 
+  .request-form-modal-backdrop::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:rgba(15,23,42,.42);
+    z-index:0;
+    pointer-events:none;
+  }
+
   .request-form-modal-backdrop #requestFormCard{
+    position:relative !important;
+    z-index:1 !important;
+    pointer-events:auto !important;
+    opacity:1 !important;
+    filter:none !important;
     width:min(520px,100%) !important;
     max-width:100% !important;
     max-height:calc(100dvh - 24px) !important;
@@ -3577,10 +3594,14 @@ td {
     -webkit-overflow-scrolling:touch;
   }
 
+  .request-form-modal-backdrop #requestFormCard *{
+    pointer-events:auto;
+  }
+
   .request-form-modal-backdrop #requestFormCard .request-form-modal-head,
   .request-form-modal-backdrop #requestFormCard .card-head{
     display:grid !important;
-    grid-template-columns:auto minmax(118px,1fr) auto !important;
+    grid-template-columns:auto minmax(135px,1fr) auto !important;
     align-items:center !important;
     gap:8px !important;
     padding:14px 16px 10px !important;
@@ -3750,7 +3771,7 @@ td {
 
   /* 제품 등록 요청 모달도 동일 compact 기준으로 통일 */
   #productRegistrationRequestModal{
-    z-index:70 !important;
+    z-index:1100 !important;
     padding:12px !important;
     overflow:hidden !important;
   }
@@ -3760,6 +3781,11 @@ td {
   }
 
   #productRegistrationRequestModal .modal{
+    position:relative !important;
+    z-index:1 !important;
+    pointer-events:auto !important;
+    opacity:1 !important;
+    filter:none !important;
     width:min(520px,100%) !important;
     max-height:calc(100dvh - 24px) !important;
     display:block !important;
@@ -3767,6 +3793,10 @@ td {
     overflow-x:hidden !important;
     border-radius:18px !important;
     -webkit-overflow-scrolling:touch;
+  }
+
+  #productRegistrationRequestModal .modal *{
+    pointer-events:auto;
   }
 
   #productRegistrationRequestModal .modal-head{
@@ -3841,3 +3871,20 @@ td {
   }
 }
 
+
+/* ===== modal stacking safety patch ===== */
+@media (max-width:760px){
+  #searchModal{
+    z-index:1200 !important;
+  }
+
+  #searchModal .modal{
+    position:relative !important;
+    z-index:1 !important;
+    pointer-events:auto !important;
+  }
+
+  #searchModal .modal *{
+    pointer-events:auto;
+  }
+}
