@@ -4412,3 +4412,64 @@ td {
     background:#ecfdf5 !important;
   }
 }
+
+/* ===== 발주/입고관리 모바일 날짜 입력 최종 패치 =====
+   - 모바일 카드 펼침 영역에서 팀/신청자/신청일자 제거 후 발주일자/입고일자만 표시
+   - 관리자/운영자에게만 날짜 입력 활성화
+   - 일반 사용자는 날짜 텍스트만 조회
+*/
+@media (max-width:760px){
+  #page-order-receipt .order-receipt-mobile-spec{
+    grid-template-columns:74px minmax(0,1fr) !important;
+    align-items:center !important;
+  }
+
+  #page-order-receipt .order-receipt-mobile-date-box{
+    display:flex !important;
+    align-items:center !important;
+    gap:6px !important;
+    width:100% !important;
+    min-width:0 !important;
+  }
+
+  #page-order-receipt .order-receipt-mobile-date{
+    flex:1 1 auto !important;
+    width:100% !important;
+    min-width:0 !important;
+    height:36px !important;
+    min-height:36px !important;
+    border:1px solid var(--line, #d9e2ec) !important;
+    border-radius:10px !important;
+    padding:0 10px !important;
+    background:#fff !important;
+    color:var(--text, #1f2937) !important;
+    font-size:16px !important;
+    line-height:36px !important;
+  }
+
+  #page-order-receipt .order-receipt-mobile-date:focus{
+    outline:none !important;
+    border-color:#2563eb !important;
+    box-shadow:0 0 0 3px rgba(37,99,235,.12) !important;
+  }
+
+  #page-order-receipt .order-receipt-mobile-date-clear{
+    flex:0 0 30px !important;
+    width:30px !important;
+    height:30px !important;
+    min-width:30px !important;
+    min-height:30px !important;
+    padding:0 !important;
+    border-radius:999px !important;
+    font-size:16px !important;
+  }
+
+  #page-order-receipt .order-receipt-mobile-spec b:has(.order-receipt-mobile-date-box){
+    width:100% !important;
+    min-width:0 !important;
+  }
+
+  #page-order-receipt .order-receipt-mobile-detail{
+    padding-bottom:16px !important;
+  }
+}
