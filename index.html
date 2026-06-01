@@ -2180,57 +2180,74 @@ body.auth-loading .top-user-bar {
 </style>
 
 
+
 <style id="mobile-horizontal-slide-guard-final">
-/* ===== Mobile Horizontal Slide Guard Final ===== */
-/* iOS/모바일에서 포탈 본문이 좌우로 밀리거나 브라우저 뒤로가기 스와이프처럼 움직이는 현상 방지 */
+/* ===== Mobile Horizontal Slide Guard Final v2 ===== */
+/* 
+  포탈 전체가 좌우로 밀리는 현상 방지.
+  v1의 app/layout/portal-main position:fixed 강제 방식은 화면 전환/iframe 갱신에 영향을 줄 수 있어 제거.
+  고정은 body/html의 가로 오버플로우 차단과 sidenav drawer에만 적용합니다.
+*/
 @media (max-width: 768px) {
   html,
   body {
-    position: fixed !important;
-    inset: 0 !important;
-    width: 100vw !important;
-    max-width: 100vw !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     height: 100dvh !important;
     max-height: 100dvh !important;
     overflow: hidden !important;
+    overflow-x: hidden !important;
     overscroll-behavior: none !important;
     overscroll-behavior-x: none !important;
     touch-action: pan-y !important;
+  }
+
+  body {
+    position: relative !important;
   }
 
   .app,
   .layout,
   .portal-main {
-    position: fixed !important;
-    inset: 0 !important;
     width: 100vw !important;
     max-width: 100vw !important;
-    height: 100dvh !important;
-    max-height: 100dvh !important;
     min-width: 0 !important;
     overflow: hidden !important;
+    overflow-x: hidden !important;
     transform: none !important;
     overscroll-behavior: none !important;
     overscroll-behavior-x: none !important;
-    touch-action: pan-y !important;
+    box-sizing: border-box !important;
+  }
+
+  .app,
+  .layout {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
   }
 
   .portal-main {
+    height: 100dvh !important;
+    min-height: 0 !important;
     display: grid !important;
     grid-template-rows: auto auto minmax(0, 1fr) !important;
     padding: 8px !important;
     gap: 8px !important;
-    box-sizing: border-box !important;
   }
 
   #portalFrame {
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    display: block !important;
     overflow: hidden !important;
+    transform: none !important;
     overscroll-behavior: none !important;
     overscroll-behavior-x: none !important;
-    touch-action: pan-y !important;
   }
 
   .sidenav {
@@ -2238,6 +2255,7 @@ body.auth-loading .top-user-bar {
     top: 0 !important;
     left: 0 !important;
     bottom: 0 !important;
+    z-index: 90 !important;
     width: 72px !important;
     max-width: 72px !important;
     height: 100dvh !important;
@@ -5059,6 +5077,7 @@ body.auth-loading .top-user-bar {
     navButtons.forEach(function (btn) {
       btn.addEventListener('click', function (event) {
         event.preventDefault();
+        closeMobileDrawer();
         navigate(btn).then(function () {
           closeMobileDrawer();
         }).catch(function (error) {
@@ -5392,9 +5411,15 @@ body.auth-loading .top-user-bar {
 })();
 </script>
 
+
 <script id="mobile-horizontal-slide-guard-js-final">
-/* ===== Mobile Horizontal Slide Guard JS Final ===== */
-/* 포탈 shell에서 좌우 스와이프가 본문 전체를 밀어내는 현상을 방지합니다. */
+/* ===== Mobile Horizontal Slide Guard JS Final v2 ===== */
+/*
+  포탈 shell 좌우 밀림 방지 + drawer 상태 꼬임 복구.
+  - 포탈 본문 전체 이동을 막습니다.
+  - 네비게이션 클릭 전/후 drawer 상태를 강제로 초기화합니다.
+  - drawer CSS 변수 잔류로 인한 화면 밀림을 복구합니다.
+*/
 (function () {
   const mq = window.matchMedia ? window.matchMedia('(max-width: 768px)') : null;
 
@@ -5402,16 +5427,39 @@ body.auth-loading .top-user-bar {
     return !!(mq && mq.matches);
   }
 
-  function resetMobileDrawerPosition() {
+  function hardResetMobileDrawerState() {
     if (!isMobilePortalViewSafe()) return;
+
+    const body = document.body;
+    body.classList.remove('mobile-drawer-open');
+    body.classList.remove('mobile-drawer-dragging');
+    body.style.removeProperty('--mobile-drawer-x');
+    body.style.removeProperty('--mobile-drawer-progress');
+
+    document.documentElement.scrollLeft = 0;
+    document.body.scrollLeft = 0;
+
+    try {
+      window.scrollTo(0, 0);
+    } catch (_) {}
+
+    const backdrop = document.getElementById('mobileDrawerBackdrop');
+    if (backdrop) backdrop.setAttribute('aria-hidden', 'true');
+  }
+
+  function softResetMobileDrawerPosition() {
+    if (!isMobilePortalViewSafe()) return;
+
     const body = document.body;
     if (!body.classList.contains('mobile-drawer-open') && !body.classList.contains('mobile-drawer-dragging')) {
       body.style.removeProperty('--mobile-drawer-x');
       body.style.removeProperty('--mobile-drawer-progress');
+      const backdrop = document.getElementById('mobileDrawerBackdrop');
+      if (backdrop) backdrop.setAttribute('aria-hidden', 'true');
     }
+
     document.documentElement.scrollLeft = 0;
     document.body.scrollLeft = 0;
-    window.scrollTo(0, 0);
   }
 
   function isHorizontalScrollableTarget(target) {
@@ -5426,7 +5474,7 @@ body.auth-loading .top-user-bar {
     if (!isMobilePortalViewSafe() || !event.touches || !event.touches.length) return;
     guardStartX = event.touches[0].clientX;
     guardStartY = event.touches[0].clientY;
-    resetMobileDrawerPosition();
+    softResetMobileDrawerPosition();
   }, { passive: true, capture: true });
 
   document.addEventListener('touchmove', function (event) {
@@ -5437,29 +5485,48 @@ body.auth-loading .top-user-bar {
     const dy = touch.clientY - guardStartY;
     const absX = Math.abs(dx);
     const absY = Math.abs(dy);
-    const isHorizontalSwipe = absX > 8 && absX > absY * 1.05;
+    const isHorizontalSwipe = absX > 10 && absX > absY * 1.08;
+    if (!isHorizontalSwipe) return;
+
     const body = document.body;
     const drawerOpen = body.classList.contains('mobile-drawer-open');
     const drawerDragging = body.classList.contains('mobile-drawer-dragging');
-    const fromEdge = guardStartX <= 34 || guardStartX >= (window.innerWidth - 34);
+    const fromLeftEdge = guardStartX <= 34;
+    const fromRightEdge = guardStartX >= (window.innerWidth - 34);
 
-    if (!isHorizontalSwipe) return;
-
-    if (isHorizontalScrollableTarget(event.target) && !drawerOpen && !drawerDragging && !fromEdge) {
+    /* 탭/필터 영역의 자연스러운 가로 스크롤은 허용 */
+    if (isHorizontalScrollableTarget(event.target) && !drawerOpen && !drawerDragging && !fromLeftEdge && !fromRightEdge) {
       return;
     }
 
-    /* 사이드바 드래그 중에는 기존 drawer 로직은 유지하되, 페이지 자체 이동은 막습니다. */
+    /* 포탈 전체 wrapper가 좌우로 밀리는 것을 방지 */
     event.preventDefault();
   }, { passive: false, capture: true });
 
-  document.addEventListener('touchend', resetMobileDrawerPosition, { passive: true, capture: true });
-  document.addEventListener('touchcancel', resetMobileDrawerPosition, { passive: true, capture: true });
+  document.addEventListener('touchend', softResetMobileDrawerPosition, { passive: true, capture: true });
+  document.addEventListener('touchcancel', softResetMobileDrawerPosition, { passive: true, capture: true });
 
-  window.addEventListener('resize', resetMobileDrawerPosition, { passive: true });
+  /* 네비게이션 시 drawer 상태가 남아있으면 헤더/iframe 전환이 어긋날 수 있어 강제 초기화 */
+  document.addEventListener('click', function (event) {
+    if (!isMobilePortalViewSafe()) return;
+    const navButton = event.target && event.target.closest ? event.target.closest('.nav-btn[data-portal-src]') : null;
+    if (!navButton) return;
+
+    hardResetMobileDrawerState();
+    setTimeout(hardResetMobileDrawerState, 80);
+    setTimeout(softResetMobileDrawerPosition, 260);
+  }, { capture: true });
+
+  window.addEventListener('resize', softResetMobileDrawerPosition, { passive: true });
   window.addEventListener('orientationchange', function () {
-    setTimeout(resetMobileDrawerPosition, 80);
+    setTimeout(hardResetMobileDrawerState, 80);
+    setTimeout(softResetMobileDrawerPosition, 280);
   }, { passive: true });
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', softResetMobileDrawerPosition, { passive: true });
+    window.visualViewport.addEventListener('scroll', softResetMobileDrawerPosition, { passive: true });
+  }
 })();
 </script>
 
