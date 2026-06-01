@@ -1764,11 +1764,27 @@ window.ReagentApp.request = {
   bindMobileRequestForm() {
     const openBtns = [document.getElementById("openRequestFormMobile"), document.getElementById("openRequestFormMobileList")].filter(Boolean);
     const closeBtn = document.getElementById("closeRequestFormMobile");
+    const registrationBtns = [
+      document.getElementById("requestNew"),
+      document.getElementById("requestNewHeader"),
+      document.getElementById("requestNewList")
+    ].filter(Boolean);
+
     openBtns.forEach((openBtn) => {
       if (openBtn.dataset.bound) return;
       openBtn.dataset.bound = "1";
       openBtn.addEventListener("click", () => this.openRequestFormMobile());
     });
+
+    registrationBtns.forEach((button) => {
+      if (button.dataset.registrationBound) return;
+      button.dataset.registrationBound = "1";
+      button.addEventListener("click", async () => {
+        this.closeRequestFormMobile();
+        await this.openRegistrationRequestDialog?.();
+      });
+    });
+
     if (closeBtn && !closeBtn.dataset.bound) {
       closeBtn.dataset.bound = "1";
       closeBtn.addEventListener("click", () => this.closeRequestFormMobile());
