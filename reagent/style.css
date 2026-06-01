@@ -2922,3 +2922,98 @@ td {
 .toast.warn {
   background: #92400e;
 }
+
+/* ===== Order / Receipt Management ===== */
+.order-receipt-table-wrap {
+  max-height: calc(100dvh - 280px);
+  overflow: auto;
+}
+
+.order-receipt-table {
+  min-width: 1760px;
+  table-layout: fixed;
+}
+
+.order-receipt-table th,
+.order-receipt-table td {
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.order-receipt-row {
+  user-select: none;
+}
+
+.order-receipt-row.selected td {
+  background: #eff6ff !important;
+}
+
+.order-product-name {
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.order-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 62px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  border: 1px solid transparent;
+}
+
+.order-status.waiting {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+.order-status.ordered {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.order-status.done {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.order-receipt-date {
+  width: 118px;
+  min-height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 12px;
+  background: #ffffff;
+}
+
+.order-receipt-date:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+
+.order-receipt-date:disabled {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+@media (max-width: 768px) {
+  .order-receipt-table-wrap {
+    max-height: calc(100dvh - 310px);
+  }
+
+  .order-receipt-date,
+  #orderReceiptMonth {
+    font-size: 16px !important;
+  }
+}
