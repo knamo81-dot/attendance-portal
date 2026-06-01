@@ -3174,3 +3174,327 @@ td {
   text-align:center !important;
   vertical-align:middle !important;
 }
+
+/* =========================================================
+   제품신청 모바일 전용 UI
+   - PC 테이블 구조는 유지
+   - 모바일에서만 신청 폼을 모달로 열고, 신청 목록은 카드형으로 표시
+========================================================= */
+.mobile-request-open,
+.mobile-request-close,
+.request-mobile-list{
+  display:none;
+}
+
+@media (max-width:760px){
+  #page-request{
+    position:relative;
+  }
+
+  #page-request .summary{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+  }
+
+  #page-request .tile{
+    padding:10px 12px;
+    border-radius:12px;
+  }
+
+  #page-request .tile .k{
+    font-size:11px;
+    margin-bottom:4px;
+  }
+
+  #page-request .tile .v{
+    font-size:20px;
+    line-height:1.1;
+  }
+
+  .mobile-request-open{
+    display:inline-flex;
+  }
+
+  .mobile-request-close{
+    display:inline-flex;
+  }
+
+  .request-form-card{
+    display:none;
+  }
+
+  body.request-form-modal-open{
+    overflow:hidden;
+  }
+
+  body.request-form-modal-open::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    z-index:9990;
+    background:rgba(15,23,42,.46);
+  }
+
+  body.request-form-modal-open .request-form-card{
+    display:block;
+    position:fixed;
+    left:12px;
+    right:12px;
+    top:50%;
+    transform:translateY(-50%);
+    z-index:9991;
+    max-height:calc(100vh - 28px);
+    overflow:auto;
+    border-radius:20px;
+    box-shadow:0 24px 60px rgba(15,23,42,.26);
+  }
+
+  body.request-form-modal-open .request-form-card .card-head{
+    position:sticky;
+    top:0;
+    z-index:2;
+    background:#fff;
+    padding:14px 14px 12px;
+    align-items:flex-start;
+  }
+
+  body.request-form-modal-open .request-form-card .card-head h2{
+    font-size:18px;
+  }
+
+  body.request-form-modal-open .request-form-card .card-head p,
+  body.request-form-modal-open .request-form-card .badge{
+    display:none;
+  }
+
+  body.request-form-modal-open .request-form-card .card-body{
+    padding:14px;
+  }
+
+  .request-form-card .form-grid{
+    grid-template-columns:1fr;
+    gap:10px;
+  }
+
+  .request-form-card .actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+
+  .request-form-card .actions .btn{
+    width:100%;
+    min-height:44px;
+  }
+
+  .request-form-card .actions #addItem{
+    grid-column:1 / -1;
+  }
+
+  .request-table-wrap{
+    display:none;
+  }
+
+  .request-mobile-list{
+    display:grid;
+    gap:10px;
+    margin-top:14px;
+  }
+
+  .request-mobile-empty{
+    border:1px dashed var(--line);
+    border-radius:14px;
+    padding:18px;
+    text-align:center;
+    color:var(--muted);
+    background:#f8fafc;
+    font-weight:700;
+  }
+
+  .request-mobile-card{
+    border:1px solid var(--line);
+    border-radius:16px;
+    background:#fff;
+    overflow:hidden;
+    box-shadow:0 6px 16px rgba(15,23,42,.05);
+  }
+
+  .request-mobile-card.is-collected{
+    background:#f8fafc;
+  }
+
+  .request-mobile-card-main{
+    padding:13px 14px;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  .request-mobile-line1,
+  .request-mobile-line2{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-width:0;
+  }
+
+  .request-mobile-line1 strong{
+    flex:1;
+    min-width:0;
+    font-size:15px;
+    line-height:1.35;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .request-mobile-line1 span{
+    flex:0 0 auto;
+    max-width:90px;
+    border-radius:999px;
+    background:#f1f5f9;
+    color:#475569;
+    padding:4px 8px;
+    font-size:11px;
+    font-weight:800;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .request-mobile-check{
+    flex:0 0 auto;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .request-mobile-check input{
+    width:18px;
+    height:18px;
+    accent-color:var(--primary);
+  }
+
+  .request-mobile-line2{
+    justify-content:space-between;
+    margin-top:7px;
+    color:#64748b;
+    font-size:13px;
+  }
+
+  .request-mobile-line2 span{
+    min-width:0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .request-mobile-line2 b{
+    color:#0f172a;
+    white-space:nowrap;
+    font-size:13px;
+  }
+
+  .request-mobile-detail{
+    display:none;
+    border-top:1px solid var(--line);
+    background:#f8fafc;
+    padding:12px 14px 14px;
+  }
+
+  .request-mobile-card.open .request-mobile-detail{
+    display:block;
+  }
+
+  .request-mobile-spec{
+    display:grid;
+    grid-template-columns:74px minmax(0,1fr);
+    gap:6px 10px;
+    font-size:12px;
+    margin-bottom:12px;
+  }
+
+  .request-mobile-spec span{
+    color:#64748b;
+    font-weight:700;
+  }
+
+  .request-mobile-spec b{
+    color:#1f2937;
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+
+  .request-mobile-detail-list{
+    display:grid;
+    gap:8px;
+  }
+
+  .request-mobile-detail-item{
+    border:1px solid #e2e8f0;
+    border-radius:12px;
+    padding:10px;
+    background:#fff;
+  }
+
+  .request-mobile-detail-item.is-collected{
+    background:#eef2f7;
+    color:#64748b;
+  }
+
+  .request-mobile-detail-item.is-pending{
+    border-color:#fed7aa;
+    background:#fff7ed;
+  }
+
+  .request-mobile-detail-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:8px;
+    font-size:12px;
+    margin-bottom:8px;
+  }
+
+  .request-mobile-detail-top strong{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  .request-mobile-detail-top span{
+    font-weight:800;
+    color:#475569;
+    white-space:nowrap;
+  }
+
+  .request-mobile-detail-grid{
+    display:grid;
+    grid-template-columns:64px minmax(0,1fr);
+    gap:5px 8px;
+    font-size:12px;
+  }
+
+  .request-mobile-detail-grid span{
+    color:#64748b;
+    font-weight:700;
+  }
+
+  .request-mobile-detail-grid b{
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+
+  .request-mobile-detail-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:6px;
+    margin-top:9px;
+  }
+
+  .request-mobile-lock{
+    color:#94a3b8;
+    font-size:12px;
+    font-weight:800;
+  }
+}
