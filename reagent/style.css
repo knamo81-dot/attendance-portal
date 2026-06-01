@@ -3667,3 +3667,113 @@ td {
     padding-bottom:calc(12px + env(safe-area-inset-bottom)) !important;
   }
 }
+
+/* =========================================================
+   FINAL MOBILE PATCH: 제품신청 모달 버튼 정리
+   - 모바일 제품신청 모달 상단: 제품 신청하기 / 제품 등록 요청 / 닫기 제거
+   - 모바일 제품신청 모달 하단: 신청 추가 1줄 + 입력 초기화 / 닫기 2열
+   - 하단 제품 등록 요청 버튼 제거
+   - 기존 제품검색 버튼과 입력/스크롤 동작은 유지
+========================================================= */
+@media (max-width:760px){
+  /* 제품신청 모달 상단의 불필요 버튼 제거 */
+  body.request-form-modal-open #requestFormCard #openRequestFormMobile,
+  body.request-form-modal-open #requestFormCard #requestNewHeader,
+  body.request-form-modal-open #requestFormCard .card-head #closeRequestFormMobile{
+    display:none !important;
+  }
+
+  /* 상단에는 제품검색만 남도록 정리 */
+  body.request-form-modal-open #requestFormCard .card-head{
+    display:grid !important;
+    grid-template-columns:1fr auto !important;
+    align-items:start !important;
+    gap:10px !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .card-head > div:first-child{
+    min-width:0 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .card-head > div:last-child{
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:flex-end !important;
+    justify-content:flex-start !important;
+    gap:8px !important;
+    width:auto !important;
+    min-width:0 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard #openSearch{
+    display:inline-flex !important;
+    width:128px !important;
+    min-width:128px !important;
+    max-width:128px !important;
+    height:44px !important;
+    padding:0 12px !important;
+    border-radius:14px !important;
+    white-space:nowrap !important;
+  }
+
+  /* 하단 버튼 영역 재배치 */
+  body.request-form-modal-open #requestFormCard .actions{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:8px !important;
+    position:relative !important;
+    padding-bottom:0 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions #addItem{
+    grid-column:1 / -1 !important;
+    width:100% !important;
+    min-height:46px !important;
+    order:1 !important;
+  }
+
+  body.request-form-modal-open #requestFormCard .actions #clearForm{
+    grid-column:1 / 2 !important;
+    width:100% !important;
+    min-height:44px !important;
+    order:2 !important;
+  }
+
+  /* 기존 하단 제품 등록 요청 버튼은 제거 */
+  body.request-form-modal-open #requestFormCard .actions #requestNew{
+    display:none !important;
+  }
+
+  /* 상단 닫기 버튼을 하단 오른쪽 버튼처럼 사용 */
+  body.request-form-modal-open #requestFormCard #closeRequestFormMobile{
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    position:fixed !important;
+    right:24px !important;
+    bottom:calc(24px + env(safe-area-inset-bottom)) !important;
+    width:calc(50vw - 28px) !important;
+    max-width:360px !important;
+    min-height:44px !important;
+    height:44px !important;
+    padding:0 12px !important;
+    border-radius:12px !important;
+    background:#fff !important;
+    border:1px solid var(--line, #d9e2ec) !important;
+    color:var(--text, #1f2937) !important;
+    font-weight:800 !important;
+    z-index:10000 !important;
+    box-shadow:none !important;
+  }
+
+  /* 고정 닫기 버튼과 내용 겹침 방지 */
+  body.request-form-modal-open #requestFormCard .card-body{
+    padding-bottom:calc(76px + env(safe-area-inset-bottom)) !important;
+  }
+
+  /* 모달 스크롤 유지 */
+  body.request-form-modal-open #requestFormCard{
+    overflow:auto !important;
+    -webkit-overflow-scrolling:touch !important;
+  }
+}
