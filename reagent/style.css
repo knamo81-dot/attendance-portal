@@ -3061,3 +3061,68 @@ td {
     font-size: 16px !important;
   }
 }
+
+/* ===== Order / Receipt Header Layout Final ===== */
+.order-receipt-head {
+  align-items: flex-start;
+}
+
+.order-receipt-head-left {
+  width: 100%;
+  min-width: 0;
+}
+
+.order-receipt-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.order-receipt-title-row h2 {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.order-receipt-month-wrap {
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
+.order-receipt-month-wrap #orderReceiptMonth {
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 10px;
+  font: inherit;
+  background: #fff;
+  min-width: 130px;
+}
+
+.order-receipt-month-wrap .btn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .order-receipt-title-row {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .order-receipt-month-wrap {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .order-receipt-month-wrap .btn,
+  .order-receipt-month-wrap #orderReceiptMonth {
+    flex: 1 1 auto;
+  }
+}
