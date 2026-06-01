@@ -84,6 +84,100 @@
   }
 </style>
 
+
+<style id="order-receipt-header-inline-layout-final">
+/* ===== 발주/입고 관리 헤더 정렬 최종 =====
+   - 주문월/미입고 품목/년월 보기/새로고침을 '발주/입고 관리' 제목 오른쪽에 붙임
+   - 취합정리 화면의 제목+주문월 배치와 유사하게 정리
+*/
+#page-order-receipt .order-receipt-head{
+  align-items:flex-start !important;
+  justify-content:flex-start !important;
+}
+
+#page-order-receipt .order-receipt-head-left{
+  width:100% !important;
+  min-width:0 !important;
+}
+
+#page-order-receipt .order-receipt-title-row{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:12px !important;
+  flex-wrap:wrap !important;
+  width:100% !important;
+}
+
+#page-order-receipt .order-receipt-title-row h2{
+  margin:0 !important;
+  flex:0 0 auto !important;
+  white-space:nowrap !important;
+}
+
+#page-order-receipt .order-receipt-month-wrap{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:8px !important;
+  flex-wrap:wrap !important;
+  min-width:0 !important;
+  margin:0 !important;
+}
+
+#page-order-receipt .order-receipt-month-wrap .label{
+  font-weight:700 !important;
+  font-size:13px !important;
+  color:#334155 !important;
+  white-space:nowrap !important;
+}
+
+#page-order-receipt #orderReceiptMonth{
+  height:36px !important;
+  min-width:130px !important;
+  border:1px solid var(--line, #d9e2ec) !important;
+  border-radius:10px !important;
+  padding:0 10px !important;
+  font:inherit !important;
+  background:#fff !important;
+  color:var(--text, #1f2937) !important;
+}
+
+#page-order-receipt .order-receipt-month-wrap .btn{
+  height:36px !important;
+  padding:0 14px !important;
+  border-radius:10px !important;
+  font-weight:800 !important;
+  white-space:nowrap !important;
+}
+
+#page-order-receipt #orderReceiptDesc{
+  margin-top:8px !important;
+}
+
+@media (max-width:760px){
+  #page-order-receipt .order-receipt-title-row{
+    align-items:flex-start !important;
+    gap:8px !important;
+  }
+
+  #page-order-receipt .order-receipt-month-wrap{
+    width:100% !important;
+    gap:6px !important;
+  }
+
+  #page-order-receipt #orderReceiptMonth{
+    flex:1 1 130px !important;
+    min-width:120px !important;
+  }
+
+  #page-order-receipt .order-receipt-month-wrap .btn{
+    flex:1 1 auto !important;
+    min-width:max-content !important;
+  }
+}
+</style>
+
 </head>
 <body>
 <input id="productKeyword" type="hidden"/>
