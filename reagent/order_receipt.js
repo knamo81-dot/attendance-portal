@@ -205,11 +205,82 @@
       return Array.from(map.values());
     },
 
+    sortOrderReceiptRows(rows) {
+      const categoryOrder = { "시약": 1, "초자": 2, "초자/소모품": 2, "안전용품": 3 };
+      const sortedRows = Array.isArray(rows) ? [...rows] : [];
+
+      // 취합정리(sortPrepareRows)와 같은 흐름으로 정렬합니다.
+      // 컬럼은 추가하지 않고, 화면에 표시되는 행 순서만 맞춥니다.
+      // 정렬 기준: 구분 → 대표 거래처 → 일반 비교견적 → 기타 거래처 → 온라인 구매 → 거래처 → 용도 → 품명 → 비고
+      const getSortInfo = (row = {}) => {
+        const category = String(row.category || "");
+        const remark = String(row.remark || "").trim();
+        const vendor = String(row.purchaseVendor || "").trim();
+
+        return {
+          category,
+          categoryOrder: categoryOrder[category] || 99,
+          remark,
+          vendor,
+          isOnline: remark === "온라인 구매",
+          isGeneral: !vendor && remark !== "온라인 구매"
+        };
+      };
+
+      const firstVendorByBucket = {};
+      sortedRows.forEach((row) => {
+        const info = getSortInfo(row);
+        if (info.isOnline || info.isGeneral || !info.vendor) return;
+
+        const bucketKey = String(info.category || "");
+        if (!firstVendorByBucket[bucketKey]) {
+          firstVendorByBucket[bucketKey] = info.vendor;
+        }
+      });
+
+      const getBlockOrder = (row = {}) => {
+        const info = getSortInfo(row);
+        if (info.isOnline) return 9;
+        if (info.isGeneral) return 2;
+
+        const firstVendor = firstVendorByBucket[String(info.category || "")] || "";
+        if (info.vendor && info.vendor === firstVendor) return 1;
+        if (info.vendor) return 3;
+        return 2;
+      };
+
+      return sortedRows.sort((a, b) => {
+        const aInfo = getSortInfo(a);
+        const bInfo = getSortInfo(b);
+
+        if (aInfo.categoryOrder !== bInfo.categoryOrder) {
+          return aInfo.categoryOrder - bInfo.categoryOrder;
+        }
+
+        const aBlockOrder = getBlockOrder(a);
+        const bBlockOrder = getBlockOrder(b);
+        if (aBlockOrder !== bBlockOrder) {
+          return aBlockOrder - bBlockOrder;
+        }
+
+        const vendorCompare = aInfo.vendor.localeCompare(bInfo.vendor, "ko");
+        if (vendorCompare !== 0) return vendorCompare;
+
+        const usageCompare = String(a.usage || "").localeCompare(String(b.usage || ""), "ko");
+        if (usageCompare !== 0) return usageCompare;
+
+        const nameCompare = String(a.name || "").localeCompare(String(b.name || ""), "ko");
+        if (nameCompare !== 0) return nameCompare;
+
+        return String(a.remark || "").localeCompare(String(b.remark || ""), "ko");
+      });
+    },
+
     getDisplayRows() {
       const month = this.getCurrentMonth();
       const baseRows = this.showUnreceived ? this.getAllKnownRows() : this.getRowsForMonth(month);
 
-      return baseRows.map((row) => {
+      const rows = baseRows.map((row) => {
         const recordKey = this.makeRowKey(row);
         const record = this.records[recordKey] || {};
         return {
@@ -222,6 +293,8 @@
         if (!this.showUnreceived) return true;
         return !String(row.receipt_date || "").trim();
       });
+
+      return this.sortOrderReceiptRows(rows);
     },
 
     initMonthOptions() {
