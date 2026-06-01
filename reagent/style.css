@@ -3667,3 +3667,104 @@ td {
     padding-bottom:calc(12px + env(safe-area-inset-bottom)) !important;
   }
 }
+/* ===== mobile final patch: 제품신청 모달 하단 버튼 재배치 ===== */
+@media (max-width:760px){
+  /* 모바일에서는 제품 등록 요청 버튼 제거 */
+  #page-request .mobile-registration-open,
+  #page-request #requestNewHeader,
+  #page-request #requestNewList,
+  #page-request #requestNew{
+    display:none !important;
+  }
+
+  /* 제품신청 모달이 열린 상태에서 상단의 불필요한 버튼 제거 */
+  body.request-form-modal-open .request-form-card #openRequestFormMobile,
+  body.request-form-modal-open .request-form-card #requestNewHeader{
+    display:none !important;
+  }
+
+  /* 모달 구조: 스크롤은 유지하고 하단 버튼 영역이 안정적으로 보이도록 조정 */
+  body.request-form-modal-open .request-form-card{
+    display:flex !important;
+    flex-direction:column !important;
+    overflow:hidden !important;
+    max-height:calc(100vh - 28px) !important;
+  }
+
+  body.request-form-modal-open .request-form-card .card-head{
+    flex:0 0 auto !important;
+  }
+
+  body.request-form-modal-open .request-form-card .card-body{
+    flex:1 1 auto !important;
+    min-height:0 !important;
+    overflow-y:auto !important;
+    -webkit-overflow-scrolling:touch !important;
+    padding-bottom:calc(18px + env(safe-area-inset-bottom)) !important;
+  }
+
+  /* 하단 버튼: 신청 추가 첫째줄 / 입력 초기화 + 닫기 둘째줄 */
+  body.request-form-modal-open .request-form-card .actions{
+    position:sticky !important;
+    bottom:0 !important;
+    z-index:4 !important;
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:8px !important;
+    margin:14px -14px -14px !important;
+    padding:12px 14px calc(14px + env(safe-area-inset-bottom)) !important;
+    background:#fff !important;
+    border-top:1px solid var(--line, #d9e2ec) !important;
+  }
+
+  body.request-form-modal-open .request-form-card .actions #addItem{
+    grid-column:1 / -1 !important;
+    width:100% !important;
+    min-height:44px !important;
+    order:1 !important;
+  }
+
+  body.request-form-modal-open .request-form-card .actions #clearForm{
+    grid-column:1 / 2 !important;
+    width:100% !important;
+    min-height:44px !important;
+    order:2 !important;
+  }
+
+  /* 기존 상단 닫기 버튼을 하단 오른쪽 버튼처럼 이동 */
+  body.request-form-modal-open .request-form-card #closeRequestFormMobile{
+    display:inline-flex !important;
+    position:absolute !important;
+    right:14px !important;
+    bottom:calc(14px + env(safe-area-inset-bottom)) !important;
+    z-index:6 !important;
+    width:calc((100% - 36px) / 2) !important;
+    height:44px !important;
+    min-height:44px !important;
+    align-items:center !important;
+    justify-content:center !important;
+    padding:0 12px !important;
+    border-radius:10px !important;
+    background:#fff !important;
+    color:var(--text, #1f2937) !important;
+    border:1px solid var(--line, #d9e2ec) !important;
+    font-weight:800 !important;
+    box-shadow:none !important;
+  }
+
+  /* 상단 액션 영역은 제품검색만 남기고 공간 압축 */
+  body.request-form-modal-open .request-form-card .card-head > div:last-child{
+    width:auto !important;
+    min-width:0 !important;
+    margin-left:auto !important;
+    gap:0 !important;
+  }
+
+  body.request-form-modal-open .request-form-card #openSearch{
+    width:auto !important;
+    min-width:96px !important;
+    height:34px !important;
+    padding:0 12px !important;
+    white-space:nowrap !important;
+  }
+}
