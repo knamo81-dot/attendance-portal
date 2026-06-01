@@ -290,20 +290,70 @@ window.ReagentApp.request = {
     }
   },
 
+  isMobileViewport() {
+    return !!(window.matchMedia && window.matchMedia("(max-width: 760px)").matches);
+  },
+
+  isRequestFormModalOpen() {
+    return !!document.getElementById("requestFormModalBackdrop")?.classList.contains("show");
+  },
+
+  hideRequestFormWhileSearching() {
+    if (!this.isMobileViewport() || !this.isRequestFormModalOpen()) return false;
+
+    const backdrop = document.getElementById("requestFormModalBackdrop");
+    backdrop?.classList.add("request-search-hidden");
+    backdrop?.classList.remove("show");
+
+    document.body.classList.add("request-search-modal-open");
+    document.documentElement.classList.add("request-search-modal-open");
+    return true;
+  },
+
+  restoreRequestFormAfterSearching() {
+    const shouldRestore = this._restoreRequestFormAfterSearch === true;
+    this._restoreRequestFormAfterSearch = false;
+
+    document.body.classList.remove("request-search-modal-open");
+    document.documentElement.classList.remove("request-search-modal-open");
+
+    const backdrop = document.getElementById("requestFormModalBackdrop");
+    backdrop?.classList.remove("request-search-hidden");
+
+    if (shouldRestore && this.isMobileViewport()) {
+      document.body.classList.add("request-form-modal-open");
+      document.documentElement.classList.add("request-form-modal-open");
+      backdrop?.classList.add("show");
+    }
+  },
+
   async openSearchModal() {
     const { els } = window.ReagentApp;
     if (!els.searchModal) return;
+
+    this._restoreRequestFormAfterSearch = this.hideRequestFormWhileSearching();
+
+    document.body.classList.add("search-modal-open");
+    document.documentElement.classList.add("search-modal-open");
     els.searchModal.classList.add("show");
+
     await this.populateMakerOptions();
     this.renderSearchResults();
     setTimeout(() => {
-      els.searchInput?.focus();
+      els.searchInput?.focus?.({ preventScroll: true });
     }, 0);
   },
 
-  closeSearchModal() {
+  closeSearchModal(options = {}) {
     const { els } = window.ReagentApp;
     els.searchModal?.classList.remove("show");
+
+    document.body.classList.remove("search-modal-open");
+    document.documentElement.classList.remove("search-modal-open");
+
+    if (options.restoreRequestForm !== false) {
+      this.restoreRequestFormAfterSearching();
+    }
   },
 
   async renderSearchResults() {
@@ -379,7 +429,7 @@ window.ReagentApp.request = {
     // 제품마스터의 기본거래처/선정사유를 신청 저장 시 함께 넘기기 위해 보관합니다.
     this.selectedProduct = this.normalizeProductRow(product);
 
-    this.closeSearchModal();
+    this.closeSearchModal({ restoreRequestForm: true });
     toast("제품이 선택되었습니다.", "success");
   },
 
@@ -1823,10 +1873,28 @@ window.ReagentApp.request = {
       });
     }
 
+    const searchModal = document.getElementById("searchModal");
+    const closeSearchBtn = document.getElementById("closeSearch");
+    if (searchModal && !searchModal.dataset.requestSearchBound) {
+      searchModal.dataset.requestSearchBound = "1";
+      searchModal.addEventListener("click", (event) => {
+        if (event.target === searchModal) this.closeSearchModal({ restoreRequestForm: true });
+      });
+    }
+    if (closeSearchBtn && !closeSearchBtn.dataset.requestSearchBound) {
+      closeSearchBtn.dataset.requestSearchBound = "1";
+      closeSearchBtn.addEventListener("click", () => this.closeSearchModal({ restoreRequestForm: true }));
+    }
+
     if (!this._requestFormEscBound) {
       this._requestFormEscBound = true;
       document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") this.closeRequestFormMobile();
+        if (event.key !== "Escape") return;
+        if (window.ReagentApp?.els?.searchModal?.classList.contains("show")) {
+          this.closeSearchModal({ restoreRequestForm: true });
+          return;
+        }
+        this.closeRequestFormMobile();
       });
     }
   },
