@@ -449,7 +449,11 @@ window.ReagentApp.request = {
 
     document.body.appendChild(modal);
 
-    const close = () => modal.classList.remove("show");
+    const close = () => {
+      modal.classList.remove("show");
+      document.body.classList.remove("registration-request-modal-open");
+      document.documentElement.classList.remove("registration-request-modal-open");
+    };
     modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
     modal.querySelector("#closeProductRequestModal")?.addEventListener("click", close);
     modal.querySelector("#cancelProductRequest")?.addEventListener("click", close);
@@ -468,10 +472,6 @@ window.ReagentApp.request = {
   },
 
   async openRegistrationRequestDialog() {
-    // 제품신청하기 모바일 모달이 열린 상태에서 제품등록요청 모달을 열면
-    // backdrop 레이어가 겹쳐 클릭이 막힐 수 있으므로 먼저 닫습니다.
-    this.closeRequestFormMobile?.();
-
     const modal = this.ensureRegistrationRequestModal();
     const draft = this.getCurrentSearchDraft();
 
@@ -484,8 +484,10 @@ window.ReagentApp.request = {
     this.setModalValue("reqCapacity", draft.capacity || "");
     this.setModalValue("reqUsage", draft.usage || "");
 
+    document.body.classList.add("registration-request-modal-open");
+    document.documentElement.classList.add("registration-request-modal-open");
     modal.classList.add("show");
-    setTimeout(() => document.getElementById("reqName")?.focus(), 0);
+    setTimeout(() => document.getElementById("reqName")?.focus({ preventScroll: true }), 0);
   },
 
   async submitRegistrationRequestFromModal() {
@@ -507,6 +509,8 @@ window.ReagentApp.request = {
     if (!ok) return;
 
     document.getElementById("productRegistrationRequestModal")?.classList.remove("show");
+    document.body.classList.remove("registration-request-modal-open");
+    document.documentElement.classList.remove("registration-request-modal-open");
     this.closeSearchModal?.();
 
     await this.loadMyRegistrationRequests?.(true);
