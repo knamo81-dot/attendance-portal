@@ -88,7 +88,7 @@
 <body>
 <input id="productKeyword" type="hidden"/>
 <div class="shell">
-<div class="tabs"><button class="tab-btn active" data-tab="request">제품 신청</button><button class="tab-btn" data-tab="collect">제품 취합</button><button class="tab-btn" data-tab="prepare">취합 정리</button><button class="tab-btn" data-tab="product-management">제품 관리</button></div>
+<div class="tabs"><button class="tab-btn active" data-tab="request">제품 신청</button><button class="tab-btn" data-tab="collect">제품 취합</button><button class="tab-btn" data-tab="prepare">취합 정리</button><button class="tab-btn" data-tab="order-receipt">발주/입고 관리</button><button class="tab-btn" data-tab="product-management">제품 관리</button></div>
 <section class="page active" id="page-request"><section class="card"><div class="card-head"><div style="min-width:0;"><div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><h2 style="margin:0;">제품 신청</h2><div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:700; font-size:13px; color:#334155;">주문월</span><select id="orderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:130px;"></select><span class="small" id="orderMonthDesc" style="color:#6b7280;">선택한 주문월에 발주할 품목을 신청합니다.</span></div></div><p>제품은 검색해서 선택하고 수량/용도만 입력합니다.</p></div><div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;"><button class="btn primary" id="openSearch" style="width:auto; padding:10px 14px; white-space:nowrap;">제품검색</button><span class="badge blue">검색 → 자동입력 → 수량/용도</span></div></div>
 <div class="card-body"><div class="form-grid">
 <div class="field"><label>분류</label><input id="category" placeholder="자동입력" readonly/></div>
@@ -285,6 +285,62 @@
   </section>
 </section>
 
+<section class="page" id="page-order-receipt">
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>발주/입고 관리</h2>
+        <p id="orderReceiptDesc">선택한 주문월의 취합정리 확정자료 기준으로 발주/입고 일자를 관리합니다.</p>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+        <div class="field" style="min-width:150px;">
+          <label>년월 검색</label>
+          <select id="orderReceiptMonth" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:130px;"></select>
+        </div>
+        <button class="btn" id="showUnreceivedOrders" type="button">미입고 품목</button>
+        <button class="btn" id="resetOrderReceiptFilter" type="button">년월 보기</button>
+        <button class="btn primary" id="refreshOrderReceipt" type="button">새로고침</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="summary">
+        <div class="tile"><div class="k">표시 품목</div><div class="v" id="orderReceiptCount">0건</div></div>
+        <div class="tile"><div class="k">미입고</div><div class="v" id="orderReceiptUnreceivedCount">0건</div></div>
+        <div class="tile"><div class="k">구매금액</div><div class="v" id="orderReceiptAmount">0</div></div>
+        <div class="tile"><div class="k">선택</div><div class="v" id="orderReceiptSelectedCount">0건</div></div>
+      </div>
+      <div id="orderReceiptReadonlyNotice" class="small" style="margin-top:10px; color:#64748b;" hidden>일반사용자는 발주/입고 현황 조회만 가능합니다.</div>
+      <div class="small" style="margin-top:10px;">관리자는 행을 드래그해 여러 품목을 선택한 뒤 발주일자 또는 입고일자를 선택하면 선택 품목 전체에 같은 날짜가 적용됩니다.</div>
+      <div class="table-wrap order-receipt-table-wrap" style="margin-top:16px;">
+        <table class="order-receipt-table">
+          <colgroup>
+            <col style="width:54px;">
+            <col style="width:90px;">
+            <col style="width:260px;">
+            <col style="width:120px;">
+            <col style="width:80px;">
+            <col style="width:120px;">
+            <col style="width:110px;">
+            <col style="width:120px;">
+            <col style="width:70px;">
+            <col style="width:110px;">
+            <col style="width:120px;">
+            <col style="width:140px;">
+            <col style="width:130px;">
+            <col style="width:130px;">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>선택</th><th>상태</th><th>품명</th><th>제조사</th><th>등급</th><th>제품코드</th><th>규격</th><th>CAS</th><th>수량</th><th>구매단가</th><th>구매금액</th><th>구매거래처</th><th>발주일자</th><th>입고일자</th>
+            </tr>
+          </thead>
+          <tbody id="orderReceiptList"><tr><td class="empty" colspan="14">발주/입고 관리 자료를 불러오는 중입니다.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</section>
+
 <section class="page" id="page-product-management">
   <section class="card">
     <div class="card-head">
@@ -408,6 +464,7 @@
 <script src="request.js"></script>
 <script src="collect.js"></script>
 <script src="product_management.js"></script>
+<script src="order_receipt.js"></script>
 <script src="app.js"></script>
 <script>
   document.addEventListener("DOMContentLoaded", () => {
@@ -420,6 +477,10 @@
 
     document.querySelector('.tab-btn[data-tab="product-management"]')?.addEventListener("click", () => {
       setTimeout(initProductManagement, 0);
+    });
+
+    document.querySelector('.tab-btn[data-tab="order-receipt"]')?.addEventListener("click", () => {
+      setTimeout(() => window.ReagentApp.orderReceipt?.init?.(), 0);
     });
   });
 </script>
@@ -454,6 +515,9 @@
       try { window.ReagentApp?.collect?.initPrepareMonthControl?.(); } catch (_) {}
       try { window.ReagentApp?.collect?.renderPrepare?.(); } catch (_) {}
     }
+    if (tab === "order-receipt") {
+      try { window.ReagentApp?.orderReceipt?.init?.(); } catch (_) {}
+    }
     if (tab === "product-management") {
       try { window.ReagentApp?.productManagement?.init?.(); } catch (_) {}
     }
@@ -485,8 +549,18 @@
     { id: 'request', label: '제품신청' },
     { id: 'collect', label: '제품취합' },
     { id: 'prepare', label: '취합정리' },
+    { id: 'order-receipt', label: '발주/입고 관리' },
     { id: 'product-management', label: '제품관리' }
   ];
+
+  function getAllowedReagentTabs() {
+    try {
+      if (window.ReagentApp && typeof window.ReagentApp.getAllowedPortalTabs === 'function') {
+        return window.ReagentApp.getAllowedPortalTabs();
+      }
+    } catch (_) {}
+    return REAGENT_TABS;
+  }
 
   function getActiveTabId() {
     const active = document.querySelector('.shell > .tabs .tab-btn.active[data-tab], .tab-btn.active[data-tab]');
@@ -498,7 +572,7 @@
 
     window.parent.postMessage({
       type: 'portal-tabs-ready',
-      tabs: REAGENT_TABS,
+      tabs: getAllowedReagentTabs(),
       activeTabId: getActiveTabId(),
       source: 'reagent'
     }, '*');
@@ -541,6 +615,10 @@
       try { window.ReagentApp?.collect?.renderPrepare?.(); } catch (_) {}
     }
 
+    if (tabId === 'order-receipt') {
+      try { window.ReagentApp?.orderReceipt?.init?.(); } catch (_) {}
+    }
+
     if (tabId === 'product-management') {
       try { window.ReagentApp?.productManagement?.init?.(); } catch (_) {}
     }
@@ -549,7 +627,7 @@
     return true;
   }
 
-  window.portalTabs = REAGENT_TABS;
+  window.portalTabs = getAllowedReagentTabs();
   window.portalActivateTab = activateReagentPortalTab;
 
   window.addEventListener('message', function (event) {
@@ -606,3 +684,4 @@
 
 <script src="../common/common.js"></script>
 </body></html>
+
