@@ -2930,7 +2930,7 @@ td {
 }
 
 .order-receipt-table {
-  min-width: 1760px;
+  min-width: 1840px;
   table-layout: fixed;
 }
 
@@ -3005,6 +3005,50 @@ td {
 .order-receipt-date:disabled {
   background: #f8fafc;
   color: #64748b;
+}
+
+
+.order-receipt-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.order-receipt-bulk-actions .btn:disabled,
+.order-date-clear:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.order-date-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.order-date-clear {
+  width: 26px;
+  height: 26px;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 900;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.order-date-clear:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
 }
 
 @media (max-width: 768px) {
