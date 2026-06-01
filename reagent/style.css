@@ -3550,55 +3550,17 @@ td {
   }
 }
 
-
-/* ===== mobile patch: 제품 등록 요청 모달 내부 스크롤 ===== */
-@media (max-width:760px){
-  #productRegistrationRequestModal.modal-backdrop{
-    align-items:center !important;
-    justify-content:center !important;
-    padding:10px !important;
-    overflow:hidden !important;
-  }
-
-  #productRegistrationRequestModal .modal{
-    width:calc(100vw - 20px) !important;
-    max-width:100% !important;
-    max-height:90vh !important;
-    overflow:hidden !important;
-    display:flex !important;
-    flex-direction:column !important;
-    border-radius:22px !important;
-  }
-
-  #productRegistrationRequestModal .modal-head{
-    position:sticky !important;
-    top:0 !important;
-    z-index:5 !important;
-    flex:0 0 auto !important;
-    background:#fff !important;
-    border-bottom:1px solid var(--line, #d9e2ec) !important;
-  }
-
-  #productRegistrationRequestModal .modal-body,
-  #productRegistrationRequestModal .card-body{
-    flex:1 1 auto !important;
-    min-height:0 !important;
-    overflow-y:auto !important;
-    -webkit-overflow-scrolling:touch !important;
-    padding-bottom:calc(24px + env(safe-area-inset-bottom)) !important;
-  }
-
-  #productRegistrationRequestModal .modal-foot{
-    position:sticky !important;
-    bottom:0 !important;
-    z-index:5 !important;
-    flex:0 0 auto !important;
-    background:#fff !important;
-    border-top:1px solid var(--line, #d9e2ec) !important;
-    padding-bottom:calc(12px + env(safe-area-inset-bottom)) !important;
-  }
-
-  #productRegistrationRequestModal .form-grid{
-    grid-template-columns:1fr !important;
-  }
+/* ===== Mobile product registration modal: remove top close button ===== */
+#productRegistrationRequestModal #closeProductRequestModal{
+  display:none !important;
 }
+
+#productRegistrationRequestModal .modal-head{
+  justify-content:flex-start !important;
+}
+
+#productRegistrationRequestModal .modal-head > div{
+  width:100% !important;
+  min-width:0 !important;
+}
+
