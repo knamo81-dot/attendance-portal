@@ -130,6 +130,7 @@
         amount: document.getElementById("orderReceiptAmount"),
         selected: document.getElementById("orderReceiptSelectedCount"),
         body: document.getElementById("orderReceiptList"),
+        mobileCards: document.getElementById("orderReceiptMobileCards"),
         desc: document.getElementById("orderReceiptDesc"),
         readonlyNotice: document.getElementById("orderReceiptReadonlyNotice"),
         clearOrderDate: document.getElementById("clearSelectedOrderDate"),
@@ -401,6 +402,13 @@
         const checkbox = tr.querySelector(".order-receipt-check");
         if (checkbox) checkbox.checked = selected;
       });
+      document.querySelectorAll(".order-receipt-mobile-card").forEach((card) => {
+        const key = card.dataset.recordKey || "";
+        const selected = this.selectedKeys.has(key);
+        card.classList.toggle("selected", selected);
+        const checkbox = card.querySelector(".order-receipt-mobile-checkbox");
+        if (checkbox) checkbox.checked = selected;
+      });
       if (els.selected) els.selected.textContent = `${this.selectedKeys.size}건`;
       if (els.clearOrderDate) els.clearOrderDate.disabled = !isOperator() || this.selectedKeys.size === 0;
       if (els.clearReceiptDate) els.clearReceiptDate.disabled = !isOperator() || this.selectedKeys.size === 0;
@@ -493,6 +501,83 @@
       }
     },
 
+    getOrderStatus(row = {}) {
+      if (String(row.receipt_date || "").trim()) {
+        return { label: "입고완료", className: "done" };
+      }
+      if (String(row.order_date || "").trim()) {
+        return { label: "발주완료", className: "ordered" };
+      }
+      return { label: "발주전", className: "waiting" };
+    },
+
+    getFirstValue(row = {}, keys = []) {
+      for (const key of keys) {
+        const value = row?.[key];
+        if (value !== undefined && value !== null && String(value).trim() !== "") return value;
+      }
+      return "";
+    },
+
+    formatDateText(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return "-";
+      if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+      return raw;
+    },
+
+    renderMobileCards(rows = [], operator = false) {
+      const els = this.getEls();
+      if (!els.mobileCards) return;
+
+      if (!rows.length) {
+        els.mobileCards.innerHTML = `<div class="order-receipt-mobile-empty">표시할 발주/입고 관리 품목이 없습니다.</div>`;
+        return;
+      }
+
+      els.mobileCards.innerHTML = rows.map((row) => {
+        const status = this.getOrderStatus(row);
+        const selected = this.selectedKeys.has(row.recordKey);
+        const gradeCapacity = [row.grade, row.capacity].filter((v) => String(v || "").trim()).join(" / ");
+        const team = this.getFirstValue(row, ["team", "request_team", "requestTeam", "department"]);
+        const requester = this.getFirstValue(row, ["requester", "requester_name", "requesterName", "applicant", "name_requester"]);
+        const requestDate = this.getFirstValue(row, ["request_date", "requestDate", "created_at", "createdAt", "applied_at", "application_date"]);
+        const qtyText = formatNumber(row.qty) || "0";
+
+        return `
+          <article class="order-receipt-mobile-card ${selected ? "selected" : ""}" data-record-key="${attr(row.recordKey)}">
+            <div class="order-receipt-mobile-main" role="button" tabindex="0" aria-expanded="false">
+              <div class="order-receipt-mobile-line1">
+                ${operator ? `<label class="order-receipt-mobile-check" aria-label="품목 선택"><input type="checkbox" class="order-receipt-mobile-checkbox" ${selected ? "checked" : ""}/></label>` : ""}
+                <strong>${escapeHtml(row.name || "-")}</strong>
+                <span class="order-status ${status.className}">${escapeHtml(status.label)}</span>
+              </div>
+              <div class="order-receipt-mobile-line2">
+                <span>${escapeHtml(row.maker || "-")}</span>
+                <b>수량 ${escapeHtml(qtyText)}</b>
+              </div>
+            </div>
+            <div class="order-receipt-mobile-detail">
+              <div class="order-receipt-mobile-spec">
+                <span>구분</span><b>${escapeHtml(row.category || "-")}</b>
+                <span>제품코드</span><b>${escapeHtml(row.code || "-")}</b>
+                <span>CAS</span><b>${escapeHtml(row.cas || "-")}</b>
+                <span>등급/규격</span><b>${escapeHtml(gradeCapacity || "-")}</b>
+                <span>용도</span><b>${escapeHtml(row.usage || "-")}</b>
+                <span>팀</span><b>${escapeHtml(team || "-")}</b>
+                <span>신청자</span><b>${escapeHtml(requester || "-")}</b>
+                <span>신청일자</span><b>${escapeHtml(this.formatDateText(requestDate))}</b>
+                <span>발주일자</span><b>${escapeHtml(this.formatDateText(row.order_date))}</b>
+                <span>입고일자</span><b>${escapeHtml(this.formatDateText(row.receipt_date))}</b>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      this.bindMobileCardEvents();
+    },
+
     render() {
       const els = this.getEls();
       if (!els.body) return;
@@ -518,12 +603,14 @@
 
       if (!rows.length) {
         els.body.innerHTML = `<tr><td class="empty" colspan="14">표시할 발주/입고 관리 품목이 없습니다.</td></tr>`;
+        this.renderMobileCards([], operator);
         return;
       }
 
       els.body.innerHTML = rows.map((row) => {
-        const status = row.receipt_date ? "입고완료" : (row.order_date ? "발주완료" : "발주전");
-        const statusClass = row.receipt_date ? "done" : (row.order_date ? "ordered" : "waiting");
+        const statusInfo = this.getOrderStatus(row);
+        const status = statusInfo.label;
+        const statusClass = statusInfo.className;
         const disabled = operator ? "" : "disabled";
         const selected = this.selectedKeys.has(row.recordKey);
         return `
@@ -556,8 +643,39 @@
         `;
       }).join("");
 
+      this.renderMobileCards(rows, operator);
       this.bindRowEvents();
       this.updateSelectionUI();
+    },
+
+    bindMobileCardEvents() {
+      const operator = isOperator();
+      document.querySelectorAll(".order-receipt-mobile-card").forEach((card) => {
+        const key = card.dataset.recordKey || "";
+        const main = card.querySelector(".order-receipt-mobile-main");
+        const checkbox = card.querySelector(".order-receipt-mobile-checkbox");
+
+        checkbox?.addEventListener("click", (e) => e.stopPropagation());
+        checkbox?.addEventListener("change", (e) => {
+          this.setRowSelected(key, e.target.checked);
+          this.updateSelectionUI();
+        });
+
+        const toggle = () => {
+          const opened = card.classList.toggle("open");
+          if (main) main.setAttribute("aria-expanded", opened ? "true" : "false");
+        };
+
+        main?.addEventListener("click", (e) => {
+          if (e.target?.closest?.("input,button,label,select,textarea")) return;
+          toggle();
+        });
+        main?.addEventListener("keydown", (e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          toggle();
+        });
+      });
     },
 
     bindRowEvents() {
