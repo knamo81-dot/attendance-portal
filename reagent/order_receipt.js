@@ -417,7 +417,8 @@
         return !String(row.receipt_date || "").trim();
       });
 
-      return this.sortOrderReceiptRows(rows);
+      this.rows = this.sortOrderReceiptRows(rows);
+      return this.rows;
     },
 
     initMonthOptions() {
@@ -578,6 +579,52 @@
       this.records[key][field] = value || "";
     },
 
+    applyLocalDateToVisibleRows(keys = [], field, value) {
+      if (!Array.isArray(this.rows) || !this.rows.length || !field) return;
+      const keySet = new Set(keys.filter(Boolean));
+      this.rows = this.rows.map((row) => {
+        const candidates = this.getRowKeyCandidates(row);
+        const matched = candidates.some((key) => keySet.has(key)) || keySet.has(row.recordKey || "");
+        return matched ? { ...row, [field]: value || "" } : row;
+      });
+    },
+
+    forceDateInputValue(recordKeys = [], field, value) {
+      if (!field) return;
+      const keySet = new Set(recordKeys.filter(Boolean));
+      document.querySelectorAll(".order-receipt-row, .order-receipt-mobile-card").forEach((el) => {
+        const key = el.dataset.recordKey || "";
+        if (!keySet.has(key)) return;
+        const input = el.querySelector(`.order-receipt-date[data-field="${field}"]`);
+        if (input) {
+          input.value = value || "";
+          input.dataset.lastAppliedValue = value || "";
+        }
+        const statusInfo = this.getOrderStatus({
+          order_date: field === "order_date" ? value : (this.records[key]?.order_date || ""),
+          receipt_date: field === "receipt_date" ? value : (this.records[key]?.receipt_date || "")
+        });
+        const badge = el.querySelector(".order-status");
+        if (badge) {
+          badge.className = `order-status ${statusInfo.className}`;
+          badge.textContent = statusInfo.label;
+        }
+      });
+    },
+
+    async commitDateInput(recordKey, input) {
+      if (!recordKey || !input) return;
+      const field = input.dataset.field || "";
+      const value = input.value || "";
+      if (!field) return;
+
+      const lastKey = `${field}:${value}`;
+      if (input.dataset.lastCommittedValue === lastKey) return;
+      input.dataset.lastCommittedValue = lastKey;
+
+      await this.setDate(recordKey, field, value, { single: true });
+    },
+
     async setDateForKeys(keys, field, value) {
       const originalKeys = Array.isArray(keys) ? keys.filter(Boolean) : [];
       if (!originalKeys.length || !field) return;
@@ -590,7 +637,9 @@
       });
 
       targetKeys.forEach((key) => this.applyLocalDateToKey(key, field, value));
+      this.applyLocalDateToVisibleRows(targetKeys, field, value);
       this.saveLocalRecords();
+      this.forceDateInputValue(targetKeys, field, value);
       this.render();
 
       await this.saveRemote(originalKeys);
@@ -927,9 +976,11 @@
               e.stopPropagation();
               try { input.showPicker?.(); } catch (_) {}
             });
-            input.addEventListener("change", async (e) => {
-              e.stopPropagation();
-              await this.setDate(key, e.target.dataset.field, e.target.value || "", { single: true });
+            ["input", "change", "blur"].forEach((eventName) => {
+              input.addEventListener(eventName, async (e) => {
+                e.stopPropagation();
+                await this.commitDateInput(key, input);
+              });
             });
           });
         }
@@ -975,8 +1026,10 @@
           input.addEventListener("click", () => {
             try { input.showPicker?.(); } catch (_) {}
           });
-          input.addEventListener("change", async (e) => {
-            await this.setDate(key, e.target.dataset.field, e.target.value || "", { single: true });
+          ["input", "change", "blur"].forEach((eventName) => {
+            input.addEventListener(eventName, async () => {
+              await this.commitDateInput(key, input);
+            });
           });
         });
       });
