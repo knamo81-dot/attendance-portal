@@ -44,202 +44,58 @@
     return APP.hasReagentOperatorAccess?.() === true;
   }
 
+  function getMeta(row = {}) {
+    const meta = row.meta_json;
+    return meta && typeof meta === "object" && !Array.isArray(meta) ? meta : {};
+  }
+
+  function parseItemKey(itemKey = "", fallbackMonth = "") {
+    const parts = String(itemKey || "").split("||");
+    return {
+      order_month: parts[0] || fallbackMonth || "",
+      category: parts[1] || "",
+      name: parts[2] || "",
+      maker: parts[3] || "",
+      code: parts[4] || "",
+      capacity: parts[5] || "",
+      cas: parts[6] || "",
+      grade: parts[7] || ""
+    };
+  }
+
+  function getSelectedVendor(meta = {}) {
+    const selected = String(meta.selectedVendor || "").trim();
+    if (selected === "vendor1") return String(meta.vendor1 || "").trim();
+    if (selected === "vendor2") return String(meta.vendor2 || "").trim();
+    return selected || String(meta.vendor1 || meta.vendor2 || "").trim();
+  }
+
+  function getSelectedUnit(meta = {}) {
+    const selected = String(meta.selectedVendor || "").trim();
+    if (selected === "vendor1") return toNumber(meta.unit1);
+    if (selected === "vendor2") return toNumber(meta.unit2);
+    return toNumber(meta.unit1 || meta.unit2);
+  }
+
+  function getSelectedAmount(meta = {}, qty = 0) {
+    const selected = String(meta.selectedVendor || "").trim();
+    if (selected === "vendor1") return toNumber(meta.price1) || (toNumber(meta.unit1) * qty);
+    if (selected === "vendor2") return toNumber(meta.price2) || (toNumber(meta.unit2) * qty);
+    return toNumber(meta.price1 || meta.price2) || (getSelectedUnit(meta) * qty);
+  }
+
   APP.orderReceipt = {
     rows: [],
-    remoteEnabled: true,
-    remoteFailed: false,
-    records: {},
     selectedKeys: new Set(),
     dragSelecting: false,
     dragMode: "add",
     showUnreceived: false,
     initialized: false,
+    remoteFailed: false,
+    remoteEnabled: true,
 
     get tableName() {
-      // 발주/입고일자는 취합 확정 품목 테이블에 직접 저장합니다.
-      // 기존 품목 등록 요청용 테이블(reagent_order_receipts)로 저장되지 않도록 고정합니다.
       return "reagent_collect_items";
-    },
-
-    getStorageKey() {
-      const companyId = APP.getCompanyId?.() || "default";
-      return `reagent_order_receipt_dates_${companyId}`;
-    },
-
-    loadLocalRecords() {
-      try {
-        this.records = JSON.parse(localStorage.getItem(this.getStorageKey()) || "{}");
-      } catch (_) {
-        this.records = {};
-      }
-      if (!this.records || typeof this.records !== "object") this.records = {};
-      return this.records;
-    },
-
-    saveLocalRecords() {
-      try {
-        localStorage.setItem(this.getStorageKey(), JSON.stringify(this.records || {}));
-      } catch (_) {}
-    },
-
-    async loadRemoteRecords() {
-      this.loadLocalRecords();
-      const sb = APP.sb;
-      if (!sb || this.remoteFailed || !this.remoteEnabled) return;
-
-      try {
-        let query = sb.from(this.tableName).select("*");
-        query = APP.scopedCompanyQuery ? APP.scopedCompanyQuery(query) : query;
-        const { data, error } = await query;
-        if (error) throw error;
-        (Array.isArray(data) ? data : []).forEach((row) => {
-          const meta = row.meta_json && typeof row.meta_json === "object" ? row.meta_json : {};
-          const monthCandidates = [
-            row.order_month,
-            meta.order_month,
-            meta.orderMonth,
-            this.getCurrentMonth()
-          ].filter(Boolean);
-          const itemCandidates = [
-            row.item_key,
-            row.collect_item_key,
-            row.product_key,
-            row.key,
-            row.product_code,
-            row.code,
-            meta.item_key,
-            meta.collect_item_key,
-            meta.product_key,
-            meta.code
-          ].filter(Boolean);
-
-          const baseRecord = {
-            id: row.id || "",
-            order_month: row.order_month || meta.order_month || meta.orderMonth || "",
-            item_key: row.item_key || row.collect_item_key || row.product_key || row.key || meta.item_key || meta.collect_item_key || meta.product_key || "",
-            product_name: row.product_name || row.name || meta.product_name || meta.name || "",
-            maker: row.maker || meta.maker || "",
-            product_code: row.product_code || row.code || meta.product_code || meta.code || "",
-            order_date: row.order_date || "",
-            receipt_date: row.receipt_date || ""
-          };
-
-          monthCandidates.forEach((month) => {
-            itemCandidates.forEach((itemKey) => {
-              const key = this.makeRecordKey(month, itemKey);
-              if (!key) return;
-              this.records[key] = {
-                ...(this.records[key] || {}),
-                ...baseRecord,
-                order_month: baseRecord.order_month || month,
-                item_key: baseRecord.item_key || itemKey
-              };
-            });
-          });
-        });
-        this.saveLocalRecords();
-      } catch (error) {
-        this.remoteFailed = true;
-        console.warn("발주/입고 원격 저장 테이블 조회를 건너뜁니다. 로컬 저장으로 동작합니다:", error);
-      }
-    },
-
-    makeRecordKey(month, itemKey) {
-      const m = normalizeMonth(month);
-      const k = String(itemKey || "").trim();
-      return k ? `${m}__${k}` : "";
-    },
-
-    getRowKeyCandidates(row = {}) {
-      const month = row.order_month || this.getCurrentMonth();
-      const rawKeys = [
-        row.item_key,
-        row.key,
-        row.collect_item_key,
-        row.product_key,
-        row.prepare_key,
-        row.productKey,
-        row.collectItemKey
-      ];
-
-      const candidates = [];
-      rawKeys.forEach((value) => {
-        const key = this.makeRecordKey(month, value);
-        if (key && !candidates.includes(key)) candidates.push(key);
-      });
-
-      // 과거 버전에서 제품코드 기반 키가 만들어졌을 가능성까지 보정합니다.
-      const codeKey = this.makeRecordKey(month, row.code);
-      if (codeKey && !candidates.includes(codeKey)) candidates.push(codeKey);
-
-      return candidates;
-    },
-
-    makeRowKey(row) {
-      const candidates = this.getRowKeyCandidates(row);
-      return candidates[0] || "";
-    },
-
-    getRecordStateForRow(row = {}) {
-      const candidates = this.getRowKeyCandidates(row);
-      let recordKey = row.recordKey || candidates[0] || "";
-
-      const candidateWithId = candidates.find((key) => this.records[key]?.id);
-      const candidateWithDates = candidates.find((key) => this.records[key]?.order_date || this.records[key]?.receipt_date);
-      const candidateWithRecord = candidates.find((key) => this.records[key]);
-
-      if (candidateWithDates) recordKey = candidateWithDates;
-      else if (candidateWithId) recordKey = candidateWithId;
-      else if (candidateWithRecord) recordKey = candidateWithRecord;
-
-      // 키가 서로 다른 이전 저장값까지 보정합니다.
-      // 같은 주문월에서 item_key / 제품코드 / 품명+제조사 조합이 맞으면 해당 기록을 사용합니다.
-      if (!this.records[recordKey]) {
-        const month = normalizeMonth(row.order_month || this.getCurrentMonth());
-        const rowKeys = new Set(candidates.map((key) => String(key).split("__")[1]).filter(Boolean));
-        const rowCode = String(row.code || "").trim();
-        const rowName = String(row.name || "").trim();
-        const rowMaker = String(row.maker || "").trim();
-
-        Object.entries(this.records || {}).some(([key, rec]) => {
-          const [recMonth, recItemKey] = String(key).split("__");
-          if (normalizeMonth(recMonth) !== month) return false;
-
-          const recKeys = [
-            recItemKey,
-            rec?.item_key,
-            rec?.collect_item_key,
-            rec?.product_key,
-            rec?.product_code,
-            rec?.code
-          ].map((value) => String(value || "").trim()).filter(Boolean);
-
-          if (recKeys.some((value) => rowKeys.has(value) || value === rowCode)) {
-            recordKey = key;
-            return true;
-          }
-
-          const recName = String(rec?.product_name || rec?.name || "").trim();
-          const recMaker = String(rec?.maker || "").trim();
-          if (rowName && recName && rowName === recName && (!rowMaker || !recMaker || rowMaker === recMaker)) {
-            recordKey = key;
-            return true;
-          }
-
-          return false;
-        });
-      }
-
-      const record = this.records[recordKey] || {};
-      const orderDate = String(record.order_date || row.order_date || "").trim();
-      const receiptDate = String(record.receipt_date || row.receipt_date || "").trim();
-
-      return {
-        recordKey,
-        record,
-        order_date: orderDate,
-        receipt_date: receiptDate
-      };
     },
 
     getEls() {
@@ -261,36 +117,89 @@
       };
     },
 
+    getRecordKey(row = {}) {
+      return row.id ? `id:${row.id}` : `${normalizeMonth(row.order_month)}__${row.item_key || row.key || ""}`;
+    },
+
+    normalizeServerRow(row = {}) {
+      const meta = getMeta(row);
+      const parsed = parseItemKey(row.item_key || "", row.order_month || "");
+      const orderMonth = normalizeMonth(row.order_month || parsed.order_month || meta.order_month || meta.orderMonth || todayMonth());
+      const qty = toNumber(row.collected_qty || meta.confirmedQty || meta.collected_qty || meta.qty || 0);
+      const purchaseUnit = getSelectedUnit(meta);
+      const purchaseAmount = getSelectedAmount(meta, qty);
+
+      return {
+        id: row.id || "",
+        recordKey: row.id ? `id:${row.id}` : `${orderMonth}__${row.item_key || ""}`,
+        item_key: row.item_key || "",
+        order_month: orderMonth,
+        category: row.category || meta.category || parsed.category || "",
+        name: row.product_name || row.name || meta.product_name || meta.name || parsed.name || "",
+        maker: row.maker || meta.maker || parsed.maker || "",
+        code: row.product_code || row.code || meta.product_code || meta.code || parsed.code || "",
+        capacity: row.capacity || meta.capacity || parsed.capacity || "",
+        cas: row.cas || meta.cas || parsed.cas || "",
+        grade: row.grade || meta.grade || parsed.grade || "",
+        usage: row.usage || meta.usage || meta.purpose || meta.request_usage || "-",
+        qty,
+        purchaseVendor: row.purchase_vendor || meta.purchaseVendor || getSelectedVendor(meta),
+        purchaseUnit,
+        purchaseAmount,
+        remark: row.prepare_remark || meta.prepareRemark || "",
+        confirmed: row.confirmed === true || meta.confirmed === true,
+        order_date: row.order_date || "",
+        receipt_date: row.receipt_date || ""
+      };
+    },
+
+    async loadRowsFromServer() {
+      const sb = APP.sb;
+      if (!sb || this.remoteFailed || !this.remoteEnabled) return [];
+
+      try {
+        let query = sb.from(this.tableName).select("*");
+        query = APP.scopedCompanyQuery ? APP.scopedCompanyQuery(query) : query;
+        const { data, error } = await query;
+        if (error) throw error;
+        return (Array.isArray(data) ? data : [])
+          .map((row) => this.normalizeServerRow(row))
+          .filter((row) => row.item_key || row.id);
+      } catch (error) {
+        this.remoteFailed = true;
+        console.warn("발주/입고 목록 서버 조회 실패:", error);
+        APP.toast?.(`발주/입고 목록 조회 실패: ${error.message || "Supabase 연결을 확인하세요."}`, "warn");
+        return [];
+      }
+    },
+
+    async loadRemoteRecords() {
+      this.rows = await this.loadRowsFromServer();
+      return this.rows;
+    },
+
     getAvailableMonths() {
-      const request = APP.request;
       const months = new Set();
       months.add(todayMonth());
 
       try {
-        if (request?.getCurrentOrderMonth) months.add(request.getCurrentOrderMonth());
+        const requestMonth = APP.request?.getCurrentOrderMonth?.();
+        if (requestMonth) months.add(requestMonth);
       } catch (_) {}
 
-      try {
-        (request?.requestRows || []).forEach((row) => {
-          if (row.order_month) months.add(row.order_month);
-        });
-      } catch (_) {}
-
-      Object.keys(this.records || {}).forEach((key) => {
-        const month = key.split("__")[0];
-        if (/^\d{4}-\d{2}$/.test(month)) months.add(month);
+      (this.rows || []).forEach((row) => {
+        if (row.order_month) months.add(row.order_month);
       });
 
       return Array.from(months).filter(Boolean).sort();
     },
 
     setCurrentMonth(month) {
-      const request = APP.request;
       const next = normalizeMonth(month);
-      if (request?.setCurrentOrderMonth) request.setCurrentOrderMonth(next);
-      else {
-        try { localStorage.setItem("reagent_order_month", next); } catch (_) {}
-      }
+      try {
+        if (APP.request?.setCurrentOrderMonth) APP.request.setCurrentOrderMonth(next);
+        else localStorage.setItem("reagent_order_month", next);
+      } catch (_) {}
     },
 
     getCurrentMonth() {
@@ -299,95 +208,25 @@
       return normalizeMonth(els.month?.value || requestMonth || todayMonth());
     },
 
-    getRowsForMonth(month) {
-      const request = APP.request;
-      const collect = APP.collect;
-      if (!request || !collect?.getConfirmedPrepareRows) return [];
-
-      const prev = request.getCurrentOrderMonth ? request.getCurrentOrderMonth() : "";
-      const target = normalizeMonth(month);
-      try {
-        if (request.setCurrentOrderMonth) request.setCurrentOrderMonth(target);
-        const rows = collect.getConfirmedPrepareRows() || [];
-        return rows.map((row) => ({ ...row, order_month: row.order_month || target }));
-      } finally {
-        try {
-          if (prev && request.setCurrentOrderMonth) request.setCurrentOrderMonth(prev);
-        } catch (_) {}
-      }
-    },
-
-    getAllKnownRows() {
+    initMonthOptions() {
+      const els = this.getEls();
+      if (!els.month) return;
+      const current = this.getCurrentMonth();
       const months = this.getAvailableMonths();
-      const map = new Map();
-      months.forEach((month) => {
-        this.getRowsForMonth(month).forEach((row) => {
-          const key = this.makeRowKey(row);
-          if (key) map.set(key, row);
-        });
-      });
-      return Array.from(map.values());
+      if (!months.includes(current)) months.push(current);
+      months.sort();
+      els.month.innerHTML = months.map((month) => `<option value="${attr(month)}">${attr(month)}</option>`).join("");
+      els.month.value = current;
     },
 
-    sortOrderReceiptRows(rows) {
+    sortOrderReceiptRows(rows = []) {
       const categoryOrder = { "시약": 1, "초자": 2, "초자/소모품": 2, "안전용품": 3 };
-      const sortedRows = Array.isArray(rows) ? [...rows] : [];
+      return [...rows].sort((a, b) => {
+        const aCat = categoryOrder[a.category] || 99;
+        const bCat = categoryOrder[b.category] || 99;
+        if (aCat !== bCat) return aCat - bCat;
 
-      // 취합정리(sortPrepareRows)와 같은 흐름으로 정렬합니다.
-      // 컬럼은 추가하지 않고, 화면에 표시되는 행 순서만 맞춥니다.
-      // 정렬 기준: 구분 → 대표 거래처 → 일반 비교견적 → 기타 거래처 → 온라인 구매 → 거래처 → 용도 → 품명 → 비고
-      const getSortInfo = (row = {}) => {
-        const category = String(row.category || "");
-        const remark = String(row.remark || "").trim();
-        const vendor = String(row.purchaseVendor || "").trim();
-
-        return {
-          category,
-          categoryOrder: categoryOrder[category] || 99,
-          remark,
-          vendor,
-          isOnline: remark === "온라인 구매",
-          isGeneral: !vendor && remark !== "온라인 구매"
-        };
-      };
-
-      const firstVendorByBucket = {};
-      sortedRows.forEach((row) => {
-        const info = getSortInfo(row);
-        if (info.isOnline || info.isGeneral || !info.vendor) return;
-
-        const bucketKey = String(info.category || "");
-        if (!firstVendorByBucket[bucketKey]) {
-          firstVendorByBucket[bucketKey] = info.vendor;
-        }
-      });
-
-      const getBlockOrder = (row = {}) => {
-        const info = getSortInfo(row);
-        if (info.isOnline) return 9;
-        if (info.isGeneral) return 2;
-
-        const firstVendor = firstVendorByBucket[String(info.category || "")] || "";
-        if (info.vendor && info.vendor === firstVendor) return 1;
-        if (info.vendor) return 3;
-        return 2;
-      };
-
-      return sortedRows.sort((a, b) => {
-        const aInfo = getSortInfo(a);
-        const bInfo = getSortInfo(b);
-
-        if (aInfo.categoryOrder !== bInfo.categoryOrder) {
-          return aInfo.categoryOrder - bInfo.categoryOrder;
-        }
-
-        const aBlockOrder = getBlockOrder(a);
-        const bBlockOrder = getBlockOrder(b);
-        if (aBlockOrder !== bBlockOrder) {
-          return aBlockOrder - bBlockOrder;
-        }
-
-        const vendorCompare = aInfo.vendor.localeCompare(bInfo.vendor, "ko");
+        const vendorCompare = String(a.purchaseVendor || "").localeCompare(String(b.purchaseVendor || ""), "ko");
         if (vendorCompare !== 0) return vendorCompare;
 
         const usageCompare = String(a.usage || "").localeCompare(String(b.usage || ""), "ko");
@@ -402,34 +241,11 @@
 
     getDisplayRows() {
       const month = this.getCurrentMonth();
-      const baseRows = this.showUnreceived ? this.getAllKnownRows() : this.getRowsForMonth(month);
-
-      const rows = baseRows.map((row) => {
-        const state = this.getRecordStateForRow(row);
-        return {
-          ...row,
-          recordKey: state.recordKey,
-          order_date: state.order_date,
-          receipt_date: state.receipt_date
-        };
-      }).filter((row) => {
-        if (!this.showUnreceived) return true;
-        return !String(row.receipt_date || "").trim();
+      const rows = (this.rows || []).filter((row) => {
+        if (this.showUnreceived) return !String(row.receipt_date || "").trim();
+        return normalizeMonth(row.order_month) === month;
       });
-
-      this.rows = this.sortOrderReceiptRows(rows);
-      return this.rows;
-    },
-
-    initMonthOptions() {
-      const els = this.getEls();
-      if (!els.month) return;
-      const current = this.getCurrentMonth();
-      const months = this.getAvailableMonths();
-      if (!months.includes(current)) months.push(current);
-      months.sort();
-      els.month.innerHTML = months.map((month) => `<option value="${attr(month)}">${attr(month)}</option>`).join("");
-      els.month.value = current;
+      return this.sortOrderReceiptRows(rows);
     },
 
     async init() {
@@ -438,8 +254,6 @@
         return;
       }
       this.initialized = true;
-      this.loadLocalRecords();
-      await this.loadRemoteRecords();
       this.bindEvents();
       await this.refresh();
     },
@@ -449,6 +263,7 @@
       els.month?.addEventListener("change", () => {
         this.showUnreceived = false;
         this.setCurrentMonth(els.month.value);
+        this.selectedKeys.clear();
         this.render();
       });
 
@@ -470,24 +285,14 @@
         APP.toast?.("발주/입고 목록을 새로고침했습니다.", "success");
       });
 
-      els.clearOrderDate?.addEventListener("click", async () => {
-        await this.clearSelectedDate("order_date");
-      });
+      els.clearOrderDate?.addEventListener("click", async () => this.clearSelectedDate("order_date"));
+      els.clearReceiptDate?.addEventListener("click", async () => this.clearSelectedDate("receipt_date"));
 
-      els.clearReceiptDate?.addEventListener("click", async () => {
-        await this.clearSelectedDate("receipt_date");
-      });
-
-      document.addEventListener("mouseup", () => {
-        this.dragSelecting = false;
-      });
-      document.addEventListener("touchend", () => {
-        this.dragSelecting = false;
-      });
+      document.addEventListener("mouseup", () => { this.dragSelecting = false; });
+      document.addEventListener("touchend", () => { this.dragSelecting = false; });
     },
 
     async refresh() {
-      this.loadLocalRecords();
       await this.loadRemoteRecords();
       this.initMonthOptions();
       this.render();
@@ -495,6 +300,10 @@
 
     getSelectedKeys() {
       return Array.from(this.selectedKeys || []);
+    },
+
+    findRowByKey(key) {
+      return (this.rows || []).find((row) => row.recordKey === key) || null;
     },
 
     setRowSelected(key, selected) {
@@ -518,18 +327,11 @@
 
     updateSelectionUI() {
       const els = this.getEls();
-      document.querySelectorAll(".order-receipt-row").forEach((tr) => {
-        const key = tr.dataset.recordKey || "";
+      document.querySelectorAll(".order-receipt-row, .order-receipt-mobile-card").forEach((el) => {
+        const key = el.dataset.recordKey || "";
         const selected = this.selectedKeys.has(key);
-        tr.classList.toggle("selected", selected);
-        const checkbox = tr.querySelector(".order-receipt-check");
-        if (checkbox) checkbox.checked = selected;
-      });
-      document.querySelectorAll(".order-receipt-mobile-card").forEach((card) => {
-        const key = card.dataset.recordKey || "";
-        const selected = this.selectedKeys.has(key);
-        card.classList.toggle("selected", selected);
-        const checkbox = card.querySelector(".order-receipt-mobile-checkbox");
+        el.classList.toggle("selected", selected);
+        const checkbox = el.querySelector(".order-receipt-check, .order-receipt-mobile-checkbox");
         if (checkbox) checkbox.checked = selected;
       });
       if (els.selected) els.selected.textContent = `${this.selectedKeys.size}건`;
@@ -544,116 +346,57 @@
       return fallbackKey ? [fallbackKey] : selected;
     },
 
-    getSyncedKeysForRecordKey(recordKey) {
-      const keys = new Set();
-      if (recordKey) keys.add(recordKey);
-
-      const row = this.getRowByRecordKey(recordKey) || {};
-      this.getRowKeyCandidates(row).forEach((key) => keys.add(key));
-
-      const currentRecord = this.records[recordKey] || {};
-      const currentId = String(currentRecord.id || row.id || "").trim();
-      const currentItemKey = String(currentRecord.item_key || row.item_key || row.key || "").trim();
-      const currentMonth = normalizeMonth(currentRecord.order_month || row.order_month || String(recordKey || "").split("__")[0] || this.getCurrentMonth());
-
-      Object.entries(this.records || {}).forEach(([key, rec]) => {
-        const [month, itemKey] = String(key || "").split("__");
-        const recMonth = normalizeMonth(rec?.order_month || month || this.getCurrentMonth());
-        const recId = String(rec?.id || "").trim();
-        const recItemKey = String(rec?.item_key || itemKey || "").trim();
-
-        if (currentId && recId && recId === currentId) keys.add(key);
-        if (currentItemKey && recItemKey && recItemKey === currentItemKey && recMonth === currentMonth) keys.add(key);
-      });
-
-      return Array.from(keys).filter(Boolean);
-    },
-
-    applyLocalDateToKey(key, field, value) {
-      if (!key || !field) return;
-      this.records[key] = this.records[key] || {};
-      const [order_month, ...itemParts] = String(key).split("__");
-      const item_key = itemParts.join("__");
-      this.records[key].order_month = this.records[key].order_month || order_month || "";
-      this.records[key].item_key = this.records[key].item_key || item_key || "";
-      this.records[key][field] = value || "";
-    },
-
-    applyLocalDateToVisibleRows(keys = [], field, value) {
-      if (!Array.isArray(this.rows) || !this.rows.length || !field) return;
+    updateLocalRows(keys = [], field, value) {
       const keySet = new Set(keys.filter(Boolean));
-      this.rows = this.rows.map((row) => {
-        const candidates = this.getRowKeyCandidates(row);
-        const matched = candidates.some((key) => keySet.has(key)) || keySet.has(row.recordKey || "");
-        return matched ? { ...row, [field]: value || "" } : row;
-      });
+      this.rows = (this.rows || []).map((row) => keySet.has(row.recordKey) ? { ...row, [field]: value || "" } : row);
     },
 
-    forceDateInputValue(recordKeys = [], field, value) {
-      if (!field) return;
-      const keySet = new Set(recordKeys.filter(Boolean));
-      document.querySelectorAll(".order-receipt-row, .order-receipt-mobile-card").forEach((el) => {
-        const key = el.dataset.recordKey || "";
-        if (!keySet.has(key)) return;
-        const input = el.querySelector(`.order-receipt-date[data-field="${field}"]`);
-        if (input) {
-          input.value = value || "";
-          input.dataset.lastAppliedValue = value || "";
+    async saveDateToServer(keys = [], field, value) {
+      const sb = APP.sb;
+      if (!sb || !field) return;
+
+      const payload = { [field]: value || null };
+      const updatedBy = APP.collect?.getCurrentUserName?.() || APP.currentUser?.name || APP.currentUser?.user_name || "";
+      if (updatedBy) payload.updated_by = updatedBy;
+
+      for (const key of keys) {
+        const row = this.findRowByKey(key);
+        if (!row) continue;
+
+        let query = sb.from(this.tableName).update(payload);
+        if (row.id) {
+          query = query.eq("id", row.id);
+        } else {
+          query = query.eq("item_key", row.item_key).eq("order_month", row.order_month);
+          const companyId = APP.getCompanyId?.() || "";
+          if (companyId) query = query.eq("company_id", companyId);
         }
-        const statusInfo = this.getOrderStatus({
-          order_date: field === "order_date" ? value : (this.records[key]?.order_date || ""),
-          receipt_date: field === "receipt_date" ? value : (this.records[key]?.receipt_date || "")
-        });
-        const badge = el.querySelector(".order-status");
-        if (badge) {
-          badge.className = `order-status ${statusInfo.className}`;
-          badge.textContent = statusInfo.label;
-        }
-      });
-    },
 
-    async commitDateInput(recordKey, input) {
-      if (!recordKey || !input) return;
-      const field = input.dataset.field || "";
-      const value = input.value || "";
-      if (!field) return;
-
-      const lastKey = `${field}:${value}`;
-      if (input.dataset.lastCommittedValue === lastKey) return;
-      input.dataset.lastCommittedValue = lastKey;
-
-      await this.setDate(recordKey, field, value, { single: true });
-    },
-
-    async setDateForKeys(keys, field, value) {
-      const originalKeys = Array.isArray(keys) ? keys.filter(Boolean) : [];
-      if (!originalKeys.length || !field) return;
-
-      const targetKeys = [];
-      originalKeys.forEach((key) => {
-        this.getSyncedKeysForRecordKey(key).forEach((syncedKey) => {
-          if (!targetKeys.includes(syncedKey)) targetKeys.push(syncedKey);
-        });
-      });
-
-      targetKeys.forEach((key) => this.applyLocalDateToKey(key, field, value));
-      this.applyLocalDateToVisibleRows(targetKeys, field, value);
-      this.saveLocalRecords();
-      this.forceDateInputValue(targetKeys, field, value);
-      this.render();
-
-      await this.saveRemote(originalKeys);
+        const { error } = await query;
+        if (error) throw error;
+      }
     },
 
     async setDate(recordKey, field, value, options = {}) {
       const keys = options.single === true ? [recordKey] : this.getApplyKeys(recordKey);
-      await this.setDateForKeys(keys, field, value);
+      const targetKeys = keys.filter(Boolean);
+      if (!targetKeys.length || !field) return;
+
+      this.updateLocalRows(targetKeys, field, value);
+      this.render();
+
+      try {
+        await this.saveDateToServer(targetKeys, field, value);
+        APP.toast?.(field === "order_date" ? "발주일자를 저장했습니다." : "입고일자를 저장했습니다.", "success");
+      } catch (error) {
+        console.warn("발주/입고일자 서버 저장 실패:", error);
+        APP.toast?.(`발주/입고일자 서버 저장 실패: ${error.message || "Supabase 권한/컬럼을 확인하세요."}`, "warn");
+        await this.refresh();
+      }
     },
 
     async clearDate(recordKey, field) {
-      if (!recordKey || !field) return;
-      await this.setDateForKeys([recordKey], field, "");
-      APP.toast?.(field === "order_date" ? "발주일자를 삭제했습니다." : "입고일자를 삭제했습니다.", "success");
+      await this.setDate(recordKey, field, "", { single: true });
     },
 
     async clearSelectedDate(field) {
@@ -662,104 +405,14 @@
         APP.toast?.("먼저 날짜를 삭제할 품목을 선택해 주세요.", "warn");
         return;
       }
-      await this.setDateForKeys(keys, field, "");
+      await this.setDate(keys[0], field, "", { single: false });
       APP.toast?.(`${keys.length}건의 ${field === "order_date" ? "발주일자" : "입고일자"}를 삭제했습니다.`, "success");
     },
 
-    getRowByRecordKey(key) {
-      return this.getAllKnownRows().find((row) => {
-        if (this.makeRowKey(row) === key) return true;
-        return this.getRowKeyCandidates(row).includes(key);
-      }) || null;
-    },
-
-    async saveRemote(keys) {
-      const sb = APP.sb;
-      if (!sb || this.remoteFailed || !this.remoteEnabled) return;
-
-      const targetKeys = Array.isArray(keys) ? keys.filter(Boolean) : [];
-      if (!targetKeys.length) return;
-
-      const companyId = APP.getCompanyId?.() || "";
-
-      const runUpdate = async ({ payload, id, itemKey, month }) => {
-        let query = sb.from(this.tableName).update(payload);
-
-        if (id) {
-          query = query.eq("id", id);
-        } else {
-          if (!itemKey) return { data: [], error: null };
-          query = query.eq("item_key", itemKey);
-          if (month) query = query.eq("order_month", month);
-          if (companyId) query = query.eq("company_id", companyId);
-        }
-
-        return await query.select("id");
-      };
-
-      try {
-        for (const key of targetKeys) {
-          const rec = this.records[key] || {};
-          const row = this.getRowByRecordKey(key) || {};
-          const state = this.getRecordStateForRow({ ...row, recordKey: key });
-          const stateRec = state.record || {};
-          const [order_month, item_key] = String(key || "").split("__");
-
-          const targetId = stateRec.id || rec.id || row.id || "";
-          const targetMonth = stateRec.order_month || rec.order_month || order_month || row.order_month || "";
-          const targetItemKey = stateRec.item_key || rec.item_key || row.item_key || row.key || item_key || "";
-
-          const payload = {
-            order_date: rec.order_date || stateRec.order_date || null,
-            receipt_date: rec.receipt_date || stateRec.receipt_date || null
-          };
-
-          const updatedBy = APP.collect?.getCurrentUserName?.() || APP.currentUser?.name || APP.currentUser?.user_name || "";
-          if (updatedBy) payload.updated_by = updatedBy;
-
-          // 1순위: reagent_collect_items.id 기준 업데이트
-          let result = await runUpdate({ payload, id: targetId, itemKey: targetItemKey, month: targetMonth });
-          if (result.error) throw result.error;
-
-          // 2순위: order_month + item_key 기준 업데이트
-          if ((!result.data || result.data.length === 0) && targetItemKey && targetMonth) {
-            result = await runUpdate({ payload, id: "", itemKey: targetItemKey, month: targetMonth });
-            if (result.error) throw result.error;
-          }
-
-          // 3순위: order_month 값이 비어 있는 기존 데이터 대비 item_key 기준 업데이트
-          if ((!result.data || result.data.length === 0) && targetItemKey) {
-            result = await runUpdate({ payload, id: "", itemKey: targetItemKey, month: "" });
-            if (result.error) throw result.error;
-          }
-        }
-
-        // 저장 직후 서버값을 다시 읽어 PC/모바일 표시를 동기화합니다.
-        await this.loadRemoteRecords();
-        this.render();
-      } catch (error) {
-        this.remoteFailed = true;
-        console.warn("발주/입고 날짜 원격 저장 실패. 로컬 저장은 유지됩니다:", error);
-        APP.toast?.(`발주/입고일자 서버 저장 실패: ${error.message || "Supabase 컬럼/권한을 확인하세요."}`, "warn");
-      }
-    },
-
     getOrderStatus(row = {}) {
-      if (String(row.receipt_date || "").trim()) {
-        return { label: "입고완료", className: "done" };
-      }
-      if (String(row.order_date || "").trim()) {
-        return { label: "발주완료", className: "ordered" };
-      }
+      if (String(row.receipt_date || "").trim()) return { label: "입고완료", className: "done" };
+      if (String(row.order_date || "").trim()) return { label: "발주완료", className: "ordered" };
       return { label: "발주전", className: "waiting" };
-    },
-
-    getFirstValue(row = {}, keys = []) {
-      for (const key of keys) {
-        const value = row?.[key];
-        if (value !== undefined && value !== null && String(value).trim() !== "") return value;
-      }
-      return "";
     },
 
     formatDateText(value) {
@@ -770,25 +423,14 @@
     },
 
     getRowDateState(row = {}) {
-      const state = this.getRecordStateForRow(row);
-      const orderDate = state.order_date;
-      const receiptDate = state.receipt_date;
-      const orderDateText = this.formatDateText(orderDate);
-      const receiptDateText = this.formatDateText(receiptDate);
-
+      const orderDateText = this.formatDateText(row.order_date);
+      const receiptDateText = this.formatDateText(row.receipt_date);
       return {
-        recordKey: state.recordKey,
-        orderDate,
-        receiptDate,
         orderDateText,
         receiptDateText,
         orderDateValue: orderDateText === "-" ? "" : orderDateText,
         receiptDateValue: receiptDateText === "-" ? "" : receiptDateText,
-        status: this.getOrderStatus({
-          ...row,
-          order_date: orderDate,
-          receipt_date: receiptDate
-        })
+        status: this.getOrderStatus(row)
       };
     },
 
@@ -804,19 +446,12 @@
       els.mobileCards.innerHTML = rows.map((row) => {
         const dateState = this.getRowDateState(row);
         const status = dateState.status;
-        const selected = this.selectedKeys.has(dateState.recordKey);
+        const selected = this.selectedKeys.has(row.recordKey);
         const gradeCapacity = [row.grade, row.capacity].filter((v) => String(v || "").trim()).join(" / ");
         const qtyText = formatNumber(row.qty) || "0";
-        const orderDateText = dateState.orderDateText;
-        const receiptDateText = dateState.receiptDateText;
-        const orderDateValue = dateState.orderDateValue;
-        const receiptDateValue = dateState.receiptDateValue;
 
         const renderDateCell = (label, field, value, text) => {
-          if (!operator) {
-            return `<span>${escapeHtml(label)}</span><b>${escapeHtml(text)}</b>`;
-          }
-
+          if (!operator) return `<span>${escapeHtml(label)}</span><b>${escapeHtml(text)}</b>`;
           return `
             <span>${escapeHtml(label)}</span>
             <b>
@@ -829,7 +464,7 @@
         };
 
         return `
-          <article class="order-receipt-mobile-card ${selected ? "selected" : ""}" data-record-key="${attr(dateState.recordKey)}">
+          <article class="order-receipt-mobile-card ${selected ? "selected" : ""}" data-record-key="${attr(row.recordKey)}">
             <div class="order-receipt-mobile-main" role="button" tabindex="0" aria-expanded="false">
               <div class="order-receipt-mobile-line1">
                 ${operator ? `<label class="order-receipt-mobile-check" aria-label="품목 선택"><input type="checkbox" class="order-receipt-mobile-checkbox" ${selected ? "checked" : ""}/></label>` : ""}
@@ -848,8 +483,8 @@
                 <span>CAS</span><b>${escapeHtml(row.cas || "-")}</b>
                 <span>등급/규격</span><b>${escapeHtml(gradeCapacity || "-")}</b>
                 <span>용도</span><b>${escapeHtml(row.usage || "-")}</b>
-                ${renderDateCell("발주일자", "order_date", orderDateValue, orderDateText)}
-                ${renderDateCell("입고일자", "receipt_date", receiptDateValue, receiptDateText)}
+                ${renderDateCell("발주일자", "order_date", dateState.orderDateValue, dateState.orderDateText)}
+                ${renderDateCell("입고일자", "receipt_date", dateState.receiptDateValue, dateState.receiptDateText)}
               </div>
             </div>
           </article>
@@ -867,7 +502,7 @@
       const rows = this.getDisplayRows();
       const operator = isOperator();
       const totalAmount = rows.reduce((sum, row) => sum + toNumber(row.purchaseAmount), 0);
-      const unreceivedCount = rows.filter((row) => !this.getRowDateState(row).receiptDate).length;
+      const unreceivedCount = rows.filter((row) => !String(row.receipt_date || "").trim()).length;
 
       if (els.count) els.count.textContent = `${rows.length}건`;
       if (els.unreceived) els.unreceived.textContent = `${unreceivedCount}건`;
@@ -891,14 +526,12 @@
       els.body.innerHTML = rows.map((row) => {
         const dateState = this.getRowDateState(row);
         const statusInfo = dateState.status;
-        const status = statusInfo.label;
-        const statusClass = statusInfo.className;
         const disabled = operator ? "" : "disabled";
         const selected = this.selectedKeys.has(row.recordKey);
         return `
           <tr class="order-receipt-row ${selected ? "selected" : ""}" data-record-key="${attr(row.recordKey)}">
             <td class="txt"><input type="checkbox" class="order-receipt-check" ${selected ? "checked" : ""} ${operator ? "" : "disabled"} /></td>
-            <td class="txt"><span class="order-status ${statusClass}">${escapeHtml(status)}</span></td>
+            <td class="txt"><span class="order-status ${statusInfo.className}">${escapeHtml(statusInfo.label)}</span></td>
             <td class="txt order-product-name">${escapeHtml(row.name)}</td>
             <td class="txt">${escapeHtml(row.maker)}</td>
             <td class="txt">${escapeHtml(row.grade)}</td>
@@ -928,6 +561,18 @@
       this.renderMobileCards(rows, operator);
       this.bindRowEvents();
       this.updateSelectionUI();
+    },
+
+    bindDateInput(recordKey, input) {
+      if (!recordKey || !input || input.dataset.orderReceiptBound === "1") return;
+      input.dataset.orderReceiptBound = "1";
+
+      input.addEventListener("focus", () => { try { input.showPicker?.(); } catch (_) {} });
+      input.addEventListener("click", () => { try { input.showPicker?.(); } catch (_) {} });
+      input.addEventListener("change", async (e) => {
+        e.stopPropagation();
+        await this.setDate(recordKey, input.dataset.field, input.value || "", { single: true });
+      });
     },
 
     bindMobileCardEvents() {
@@ -966,23 +611,7 @@
               await this.clearDate(key, button.dataset.field);
             });
           });
-
-          card.querySelectorAll(".order-receipt-mobile-date").forEach((input) => {
-            input.addEventListener("click", (e) => {
-              e.stopPropagation();
-              try { input.showPicker?.(); } catch (_) {}
-            });
-            input.addEventListener("focus", (e) => {
-              e.stopPropagation();
-              try { input.showPicker?.(); } catch (_) {}
-            });
-            ["input", "change", "blur"].forEach((eventName) => {
-              input.addEventListener(eventName, async (e) => {
-                e.stopPropagation();
-                await this.commitDateInput(key, input);
-              });
-            });
-          });
+          card.querySelectorAll(".order-receipt-mobile-date").forEach((input) => this.bindDateInput(key, input));
         }
       });
     },
@@ -1019,19 +648,7 @@
           });
         });
 
-        tr.querySelectorAll(".order-receipt-date").forEach((input) => {
-          input.addEventListener("focus", () => {
-            try { input.showPicker?.(); } catch (_) {}
-          });
-          input.addEventListener("click", () => {
-            try { input.showPicker?.(); } catch (_) {}
-          });
-          ["input", "change", "blur"].forEach((eventName) => {
-            input.addEventListener(eventName, async () => {
-              await this.commitDateInput(key, input);
-            });
-          });
-        });
+        tr.querySelectorAll(".order-receipt-date").forEach((input) => this.bindDateInput(key, input));
       });
     }
   };
