@@ -56,7 +56,9 @@
     initialized: false,
 
     get tableName() {
-      return APP.ORDER_RECEIPT_TABLE || "reagent_collect_items";
+      // 발주/입고일자는 취합 확정 품목 테이블에 직접 저장합니다.
+      // 기존 품목 등록 요청용 테이블(reagent_order_receipts)로 저장되지 않도록 고정합니다.
+      return "reagent_collect_items";
     },
 
     getStorageKey() {
@@ -91,16 +93,49 @@
         const { data, error } = await query;
         if (error) throw error;
         (Array.isArray(data) ? data : []).forEach((row) => {
-          const key = this.makeRecordKey(row.order_month, row.item_key || row.collect_item_key || row.product_key);
-          if (!key) return;
-          this.records[key] = {
-            ...(this.records[key] || {}),
-            id: row.id || this.records[key]?.id,
-            order_month: row.order_month || this.records[key]?.order_month,
-            item_key: row.item_key || row.collect_item_key || row.product_key || this.records[key]?.item_key,
+          const meta = row.meta_json && typeof row.meta_json === "object" ? row.meta_json : {};
+          const monthCandidates = [
+            row.order_month,
+            meta.order_month,
+            meta.orderMonth,
+            this.getCurrentMonth()
+          ].filter(Boolean);
+          const itemCandidates = [
+            row.item_key,
+            row.collect_item_key,
+            row.product_key,
+            row.key,
+            row.product_code,
+            row.code,
+            meta.item_key,
+            meta.collect_item_key,
+            meta.product_key,
+            meta.code
+          ].filter(Boolean);
+
+          const baseRecord = {
+            id: row.id || "",
+            order_month: row.order_month || meta.order_month || meta.orderMonth || "",
+            item_key: row.item_key || row.collect_item_key || row.product_key || row.key || meta.item_key || meta.collect_item_key || meta.product_key || "",
+            product_name: row.product_name || row.name || meta.product_name || meta.name || "",
+            maker: row.maker || meta.maker || "",
+            product_code: row.product_code || row.code || meta.product_code || meta.code || "",
             order_date: row.order_date || "",
             receipt_date: row.receipt_date || ""
           };
+
+          monthCandidates.forEach((month) => {
+            itemCandidates.forEach((itemKey) => {
+              const key = this.makeRecordKey(month, itemKey);
+              if (!key) return;
+              this.records[key] = {
+                ...(this.records[key] || {}),
+                ...baseRecord,
+                order_month: baseRecord.order_month || month,
+                item_key: baseRecord.item_key || itemKey
+              };
+            });
+          });
         });
         this.saveLocalRecords();
       } catch (error) {
@@ -559,33 +594,58 @@
 
       const companyId = APP.getCompanyId?.() || "";
 
+      const runUpdate = async ({ payload, id, itemKey, month }) => {
+        let query = sb.from(this.tableName).update(payload);
+
+        if (id) {
+          query = query.eq("id", id);
+        } else {
+          if (!itemKey) return { data: [], error: null };
+          query = query.eq("item_key", itemKey);
+          if (month) query = query.eq("order_month", month);
+          if (companyId) query = query.eq("company_id", companyId);
+        }
+
+        return await query.select("id");
+      };
+
       try {
         for (const key of targetKeys) {
           const rec = this.records[key] || {};
           const row = this.getRowByRecordKey(key) || {};
+          const state = this.getRecordStateForRow({ ...row, recordKey: key });
+          const stateRec = state.record || {};
           const [order_month, item_key] = String(key || "").split("__");
-          const targetMonth = rec.order_month || order_month || row.order_month || "";
-          const targetItemKey = rec.item_key || row.item_key || row.key || item_key || "";
 
-          if (!targetMonth || !targetItemKey) continue;
+          const targetId = stateRec.id || rec.id || row.id || "";
+          const targetMonth = stateRec.order_month || rec.order_month || order_month || row.order_month || "";
+          const targetItemKey = stateRec.item_key || rec.item_key || row.item_key || row.key || item_key || "";
 
           const payload = {
-            order_date: rec.order_date || null,
-            receipt_date: rec.receipt_date || null,
+            order_date: rec.order_date || stateRec.order_date || null,
+            receipt_date: rec.receipt_date || stateRec.receipt_date || null,
             updated_at: new Date().toISOString()
           };
 
-          let query = sb
-            .from(this.tableName)
-            .update(payload)
-            .eq("order_month", targetMonth)
-            .eq("item_key", targetItemKey);
+          // 1순위: reagent_collect_items.id 기준 업데이트
+          let result = await runUpdate({ payload, id: targetId, itemKey: targetItemKey, month: targetMonth });
+          if (result.error) throw result.error;
 
-          if (companyId) query = query.eq("company_id", companyId);
+          // 2순위: order_month + item_key 기준 업데이트
+          if ((!result.data || result.data.length === 0) && targetItemKey && targetMonth) {
+            result = await runUpdate({ payload, id: "", itemKey: targetItemKey, month: targetMonth });
+            if (result.error) throw result.error;
+          }
 
-          const { error } = await query;
-          if (error) throw error;
+          // 3순위: order_month 값이 비어 있는 기존 데이터 대비 item_key 기준 업데이트
+          if ((!result.data || result.data.length === 0) && targetItemKey) {
+            result = await runUpdate({ payload, id: "", itemKey: targetItemKey, month: "" });
+            if (result.error) throw result.error;
+          }
         }
+
+        // 저장 직후 서버값을 다시 읽어 PC/모바일 표시를 동기화합니다.
+        await this.loadRemoteRecords();
       } catch (error) {
         this.remoteFailed = true;
         console.warn("발주/입고 날짜 원격 저장 실패. 로컬 저장은 유지됩니다:", error);
