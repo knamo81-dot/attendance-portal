@@ -591,7 +591,7 @@
       input.addEventListener("click", () => { try { input.showPicker?.(); } catch (_) {} });
       input.addEventListener("change", async (e) => {
         e.stopPropagation();
-        await this.setDate(recordKey, input.dataset.field, input.value || "", { single: true });
+        await this.setDate(recordKey, input.dataset.field, input.value || "");
       });
     },
 
