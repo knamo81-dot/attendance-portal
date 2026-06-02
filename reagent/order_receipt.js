@@ -184,12 +184,16 @@
       const candidates = this.getRowKeyCandidates(row);
       let recordKey = row.recordKey || candidates[0] || "";
 
-      const candidateWithId = candidates.find((key) => this.records[key]?.id);
+      // 날짜를 방금 입력한 직후에는 id가 있는 서버 레코드보다
+      // 날짜값이 반영된 로컬 레코드를 우선 사용해야 화면이 즉시 갱신됩니다.
+      const explicitRecord = row.recordKey ? this.records[row.recordKey] : null;
       const candidateWithDates = candidates.find((key) => this.records[key]?.order_date || this.records[key]?.receipt_date);
+      const candidateWithId = candidates.find((key) => this.records[key]?.id);
       const candidateWithRecord = candidates.find((key) => this.records[key]);
 
-      if (candidateWithId) recordKey = candidateWithId;
+      if (explicitRecord?.order_date || explicitRecord?.receipt_date) recordKey = row.recordKey;
       else if (candidateWithDates) recordKey = candidateWithDates;
+      else if (candidateWithId) recordKey = candidateWithId;
       else if (candidateWithRecord) recordKey = candidateWithRecord;
 
       // 키가 서로 다른 이전 저장값까지 보정합니다.
@@ -546,16 +550,46 @@
     async setDateForKeys(keys, field, value) {
       const targetKeys = Array.isArray(keys) ? keys.filter(Boolean) : [];
       if (!targetKeys.length || !field) return;
+
+      const canonicalKeys = [];
+
       targetKeys.forEach((key) => {
-        this.records[key] = this.records[key] || {};
-        const [order_month, item_key] = key.split("__");
-        this.records[key].order_month = this.records[key].order_month || order_month || "";
-        this.records[key].item_key = this.records[key].item_key || item_key || "";
-        this.records[key][field] = value || "";
+        const row = this.getRowByRecordKey(key) || {};
+        const candidates = Array.from(new Set([
+          key,
+          ...this.getRowKeyCandidates(row)
+        ].filter(Boolean)));
+
+        const currentState = this.getRecordStateForRow({ ...row, recordKey: key });
+        const baseKey = currentState.recordKey || key;
+        const baseRecord = {
+          ...(this.records[baseKey] || {}),
+          ...(this.records[key] || {}),
+          ...(currentState.record || {})
+        };
+
+        const [fallbackMonth, fallbackItemKey] = String(baseKey || key || "").split("__");
+        baseRecord.order_month = baseRecord.order_month || fallbackMonth || row.order_month || "";
+        baseRecord.item_key = baseRecord.item_key || row.item_key || row.key || fallbackItemKey || "";
+        baseRecord[field] = value || "";
+
+        candidates.forEach((candidateKey) => {
+          const [order_month, item_key] = String(candidateKey || "").split("__");
+          this.records[candidateKey] = {
+            ...(this.records[candidateKey] || {}),
+            ...baseRecord,
+            order_month: baseRecord.order_month || order_month || "",
+            item_key: baseRecord.item_key || item_key || "",
+            [field]: value || ""
+          };
+        });
+
+        canonicalKeys.push(baseKey || key);
       });
+
       this.saveLocalRecords();
       this.render();
-      await this.saveRemote(targetKeys);
+      await this.saveRemote(Array.from(new Set(canonicalKeys)));
     },
 
     async setDate(recordKey, field, value) {
