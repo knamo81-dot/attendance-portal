@@ -526,6 +526,29 @@
       return raw;
     },
 
+    getRowDateState(row = {}) {
+      const recordKey = row.recordKey || this.makeRowKey(row);
+      const record = recordKey ? (this.records[recordKey] || {}) : {};
+      const orderDate = String(record.order_date || row.order_date || "").trim();
+      const receiptDate = String(record.receipt_date || row.receipt_date || "").trim();
+      const orderDateText = this.formatDateText(orderDate);
+      const receiptDateText = this.formatDateText(receiptDate);
+
+      return {
+        orderDate,
+        receiptDate,
+        orderDateText,
+        receiptDateText,
+        orderDateValue: orderDateText === "-" ? "" : orderDateText,
+        receiptDateValue: receiptDateText === "-" ? "" : receiptDateText,
+        status: this.getOrderStatus({
+          ...row,
+          order_date: orderDate,
+          receipt_date: receiptDate
+        })
+      };
+    },
+
     renderMobileCards(rows = [], operator = false) {
       const els = this.getEls();
       if (!els.mobileCards) return;
@@ -536,14 +559,15 @@
       }
 
       els.mobileCards.innerHTML = rows.map((row) => {
-        const status = this.getOrderStatus(row);
+        const dateState = this.getRowDateState(row);
+        const status = dateState.status;
         const selected = this.selectedKeys.has(row.recordKey);
         const gradeCapacity = [row.grade, row.capacity].filter((v) => String(v || "").trim()).join(" / ");
         const qtyText = formatNumber(row.qty) || "0";
-        const orderDateText = this.formatDateText(row.order_date);
-        const receiptDateText = this.formatDateText(row.receipt_date);
-        const orderDateValue = orderDateText === "-" ? "" : orderDateText;
-        const receiptDateValue = receiptDateText === "-" ? "" : receiptDateText;
+        const orderDateText = dateState.orderDateText;
+        const receiptDateText = dateState.receiptDateText;
+        const orderDateValue = dateState.orderDateValue;
+        const receiptDateValue = dateState.receiptDateValue;
 
         const renderDateCell = (label, field, value, text) => {
           if (!operator) {
@@ -600,7 +624,7 @@
       const rows = this.getDisplayRows();
       const operator = isOperator();
       const totalAmount = rows.reduce((sum, row) => sum + toNumber(row.purchaseAmount), 0);
-      const unreceivedCount = rows.filter((row) => !String(row.receipt_date || "").trim()).length;
+      const unreceivedCount = rows.filter((row) => !this.getRowDateState(row).receiptDate).length;
 
       if (els.count) els.count.textContent = `${rows.length}건`;
       if (els.unreceived) els.unreceived.textContent = `${unreceivedCount}건`;
@@ -622,7 +646,8 @@
       }
 
       els.body.innerHTML = rows.map((row) => {
-        const statusInfo = this.getOrderStatus(row);
+        const dateState = this.getRowDateState(row);
+        const statusInfo = dateState.status;
         const status = statusInfo.label;
         const statusClass = statusInfo.className;
         const disabled = operator ? "" : "disabled";
@@ -643,14 +668,14 @@
             <td class="txt">${escapeHtml(row.purchaseVendor)}</td>
             <td class="txt">
               <div class="order-date-box">
-                <input class="order-receipt-date" data-field="order_date" type="date" value="${attr(row.order_date)}" ${disabled}/>
-                ${operator && row.order_date ? `<button type="button" class="order-date-clear" data-field="order_date" title="발주일자 삭제" aria-label="발주일자 삭제">×</button>` : ""}
+                <input class="order-receipt-date" data-field="order_date" type="date" value="${attr(dateState.orderDateValue)}" ${disabled}/>
+                ${operator && dateState.orderDateValue ? `<button type="button" class="order-date-clear" data-field="order_date" title="발주일자 삭제" aria-label="발주일자 삭제">×</button>` : ""}
               </div>
             </td>
             <td class="txt">
               <div class="order-date-box">
-                <input class="order-receipt-date" data-field="receipt_date" type="date" value="${attr(row.receipt_date)}" ${disabled}/>
-                ${operator && row.receipt_date ? `<button type="button" class="order-date-clear" data-field="receipt_date" title="입고일자 삭제" aria-label="입고일자 삭제">×</button>` : ""}
+                <input class="order-receipt-date" data-field="receipt_date" type="date" value="${attr(dateState.receiptDateValue)}" ${disabled}/>
+                ${operator && dateState.receiptDateValue ? `<button type="button" class="order-date-clear" data-field="receipt_date" title="입고일자 삭제" aria-label="입고일자 삭제">×</button>` : ""}
               </div>
             </td>
           </tr>
