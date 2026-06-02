@@ -1,6 +1,9 @@
 (function () {
   "use strict";
 
+  // order_receipt.js - server direct refactor baseline
+  // 기준 데이터: reagent_collect_items / 화면 데이터: APP.orderReceipt.rows
+
   window.ReagentApp = window.ReagentApp || {};
 
   const APP = window.ReagentApp;
@@ -303,7 +306,12 @@
     },
 
     findRowByKey(key) {
-      return (this.rows || []).find((row) => row.recordKey === key) || null;
+      const rawKey = String(key || "");
+      const rawId = rawKey.startsWith("id:") ? rawKey.slice(3) : "";
+      return (this.rows || []).find((row) =>
+        String(row.recordKey || "") === rawKey ||
+        (rawId && String(row.id || "") === rawId)
+      ) || null;
     },
 
     setRowSelected(key, selected) {
@@ -348,7 +356,19 @@
 
     updateLocalRows(keys = [], field, value) {
       const keySet = new Set(keys.filter(Boolean));
-      this.rows = (this.rows || []).map((row) => keySet.has(row.recordKey) ? { ...row, [field]: value || "" } : row);
+      const idSet = new Set(
+        keys
+          .map((key) => String(key || "").startsWith("id:") ? String(key).slice(3) : "")
+          .filter(Boolean)
+      );
+
+      this.rows = (this.rows || []).map((row) => {
+        const matched =
+          keySet.has(String(row.recordKey || "")) ||
+          (idSet.size > 0 && idSet.has(String(row.id || "")));
+
+        return matched ? { ...row, [field]: value || "" } : row;
+      });
     },
 
     async saveDateToServer(keys = [], field, value) {
