@@ -23,8 +23,6 @@ window.ReagentApp.getPortalSession = function () {
 window.ReagentApp.getCompanyId = function () {
   const session = window.ReagentApp.getPortalSession?.() || {};
 
-  // 서비스관리자 회사 전환 시에는 activeCompanyId를 최우선으로 사용합니다.
-  // 일반 회사 계정은 기존 companyId/company_id를 그대로 사용합니다.
   const fromSession =
     session.activeCompanyId ||
     session.active_company_id ||
@@ -98,5 +96,5 @@ window.ReagentApp.refreshForCompanyChange = function () {
   }
 };
 
-// 발주/입고 관리 저장 테이블명
-window.ReagentApp.ORDER_RECEIPT_TABLE = "reagent_order_receipts";
+// 발주/입고 관리 날짜 저장 테이블명
+window.ReagentApp.ORDER_RECEIPT_TABLE = "reagent_collect_items";
