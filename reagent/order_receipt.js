@@ -2,6 +2,7 @@
   "use strict";
 
   // order_receipt.js - server direct refactor baseline
+  // 3차 자동 갱신 버전: 다른 PC/모바일 변경사항 주기 반영
   // 기준 데이터: reagent_collect_items / 화면 데이터: APP.orderReceipt.rows
 
   window.ReagentApp = window.ReagentApp || {};
@@ -96,6 +97,10 @@
     initialized: false,
     remoteFailed: false,
     remoteEnabled: true,
+    autoRefreshTimer: null,
+    autoRefreshMs: 15000,
+    isSaving: false,
+    isRefreshing: false,
 
     get tableName() {
       return "reagent_collect_items";
@@ -169,10 +174,9 @@
           .map((row) => this.normalizeServerRow(row))
           .filter((row) => row.item_key || row.id);
       } catch (error) {
-        this.remoteFailed = true;
         console.warn("발주/입고 목록 서버 조회 실패:", error);
-        APP.toast?.(`발주/입고 목록 조회 실패: ${error.message || "Supabase 연결을 확인하세요."}`, "warn");
-        return [];
+        // 자동 갱신 중 일시 오류가 발생해도 다음 주기에 다시 시도합니다.
+        return this.rows || [];
       }
     },
 
@@ -259,6 +263,7 @@
       this.initialized = true;
       this.bindEvents();
       await this.refresh();
+      this.startAutoRefresh();
     },
 
     bindEvents() {
@@ -284,8 +289,7 @@
       });
 
       els.refresh?.addEventListener("click", async () => {
-        await this.refresh();
-        APP.toast?.("발주/입고 목록을 새로고침했습니다.", "success");
+        await this.refresh({ toast: true });
       });
 
       els.clearOrderDate?.addEventListener("click", async () => this.clearSelectedDate("order_date"));
@@ -293,12 +297,50 @@
 
       document.addEventListener("mouseup", () => { this.dragSelecting = false; });
       document.addEventListener("touchend", () => { this.dragSelecting = false; });
+
+      document.addEventListener("visibilitychange", async () => {
+        if (!document.hidden && this.initialized && !this.isSaving) {
+          await this.refresh({ silent: true });
+        }
+      });
     },
 
-    async refresh() {
-      await this.loadRemoteRecords();
-      this.initMonthOptions();
-      this.render();
+    async refresh(options = {}) {
+      if (this.isRefreshing) return;
+      this.isRefreshing = true;
+
+      try {
+        await this.loadRemoteRecords();
+        this.initMonthOptions();
+        this.render();
+
+        if (options.toast === true) {
+          APP.toast?.("발주/입고 목록을 새로고침했습니다.", "success");
+        }
+      } finally {
+        this.isRefreshing = false;
+      }
+    },
+
+    startAutoRefresh() {
+      this.stopAutoRefresh();
+
+      this.autoRefreshTimer = window.setInterval(async () => {
+        if (document.hidden) return;
+        if (this.isSaving || this.isRefreshing || this.dragSelecting) return;
+
+        // 사용자가 여러 품목을 선택해서 날짜 작업 중이면 화면을 갑자기 갱신하지 않습니다.
+        if ((this.selectedKeys?.size || 0) > 0) return;
+
+        await this.refresh({ silent: true });
+      }, this.autoRefreshMs);
+    },
+
+    stopAutoRefresh() {
+      if (this.autoRefreshTimer) {
+        clearInterval(this.autoRefreshTimer);
+        this.autoRefreshTimer = null;
+      }
     },
 
     getSelectedKeys() {
@@ -405,13 +447,16 @@
       this.updateLocalRows(targetKeys, field, value);
       this.render();
 
+      this.isSaving = true;
       try {
         await this.saveDateToServer(targetKeys, field, value);
         APP.toast?.(field === "order_date" ? "발주일자를 저장했습니다." : "입고일자를 저장했습니다.", "success");
       } catch (error) {
         console.warn("발주/입고일자 서버 저장 실패:", error);
         APP.toast?.(`발주/입고일자 서버 저장 실패: ${error.message || "Supabase 권한/컬럼을 확인하세요."}`, "warn");
-        await this.refresh();
+        await this.refresh({ silent: true });
+      } finally {
+        this.isSaving = false;
       }
     },
 
