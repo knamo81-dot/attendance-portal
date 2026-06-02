@@ -184,12 +184,10 @@
       const candidates = this.getRowKeyCandidates(row);
       let recordKey = row.recordKey || candidates[0] || "";
 
-      const candidateWithDates = candidates.find((key) => this.records[key]?.order_date || this.records[key]?.receipt_date);
       const candidateWithId = candidates.find((key) => this.records[key]?.id);
+      const candidateWithDates = candidates.find((key) => this.records[key]?.order_date || this.records[key]?.receipt_date);
       const candidateWithRecord = candidates.find((key) => this.records[key]);
 
-      // 날짜 입력 직후에는 로컬로 갱신된 날짜 record를 우선 사용해야
-      // 새로고침 없이도 PC/모바일 상태 배지가 바로 바뀝니다.
       if (candidateWithDates) recordKey = candidateWithDates;
       else if (candidateWithId) recordKey = candidateWithId;
       else if (candidateWithRecord) recordKey = candidateWithRecord;
@@ -545,40 +543,61 @@
       return fallbackKey ? [fallbackKey] : selected;
     },
 
+    getSyncedKeysForRecordKey(recordKey) {
+      const keys = new Set();
+      if (recordKey) keys.add(recordKey);
+
+      const row = this.getRowByRecordKey(recordKey) || {};
+      this.getRowKeyCandidates(row).forEach((key) => keys.add(key));
+
+      const currentRecord = this.records[recordKey] || {};
+      const currentId = String(currentRecord.id || row.id || "").trim();
+      const currentItemKey = String(currentRecord.item_key || row.item_key || row.key || "").trim();
+      const currentMonth = normalizeMonth(currentRecord.order_month || row.order_month || String(recordKey || "").split("__")[0] || this.getCurrentMonth());
+
+      Object.entries(this.records || {}).forEach(([key, rec]) => {
+        const [month, itemKey] = String(key || "").split("__");
+        const recMonth = normalizeMonth(rec?.order_month || month || this.getCurrentMonth());
+        const recId = String(rec?.id || "").trim();
+        const recItemKey = String(rec?.item_key || itemKey || "").trim();
+
+        if (currentId && recId && recId === currentId) keys.add(key);
+        if (currentItemKey && recItemKey && recItemKey === currentItemKey && recMonth === currentMonth) keys.add(key);
+      });
+
+      return Array.from(keys).filter(Boolean);
+    },
+
+    applyLocalDateToKey(key, field, value) {
+      if (!key || !field) return;
+      this.records[key] = this.records[key] || {};
+      const [order_month, ...itemParts] = String(key).split("__");
+      const item_key = itemParts.join("__");
+      this.records[key].order_month = this.records[key].order_month || order_month || "";
+      this.records[key].item_key = this.records[key].item_key || item_key || "";
+      this.records[key][field] = value || "";
+    },
+
     async setDateForKeys(keys, field, value) {
-      const targetKeys = Array.isArray(keys) ? keys.filter(Boolean) : [];
-      if (!targetKeys.length || !field) return;
+      const originalKeys = Array.isArray(keys) ? keys.filter(Boolean) : [];
+      if (!originalKeys.length || !field) return;
 
-      const saveKeys = new Set();
-
-      targetKeys.forEach((key) => {
-        const row = this.getRowByRecordKey(key) || {};
-        const state = this.getRecordStateForRow({ ...row, recordKey: key });
-        const candidates = this.getRowKeyCandidates(row);
-        const updateKeys = new Set([key, state.recordKey, ...candidates].filter(Boolean));
-
-        updateKeys.forEach((updateKey) => {
-          this.records[updateKey] = {
-            ...(state.record || {}),
-            ...(this.records[updateKey] || {})
-          };
-
-          const [order_month, item_key] = String(updateKey || "").split("__");
-          this.records[updateKey].id = this.records[updateKey].id || state.record?.id || row.id || "";
-          this.records[updateKey].order_month = this.records[updateKey].order_month || state.record?.order_month || order_month || row.order_month || "";
-          this.records[updateKey].item_key = this.records[updateKey].item_key || state.record?.item_key || row.item_key || row.key || item_key || "";
-          this.records[updateKey][field] = value || "";
-          saveKeys.add(updateKey);
+      const targetKeys = [];
+      originalKeys.forEach((key) => {
+        this.getSyncedKeysForRecordKey(key).forEach((syncedKey) => {
+          if (!targetKeys.includes(syncedKey)) targetKeys.push(syncedKey);
         });
       });
 
+      targetKeys.forEach((key) => this.applyLocalDateToKey(key, field, value));
       this.saveLocalRecords();
       this.render();
-      await this.saveRemote(Array.from(saveKeys));
+
+      await this.saveRemote(originalKeys);
     },
 
-    async setDate(recordKey, field, value) {
-      const keys = this.getApplyKeys(recordKey);
+    async setDate(recordKey, field, value, options = {}) {
+      const keys = options.single === true ? [recordKey] : this.getApplyKeys(recordKey);
       await this.setDateForKeys(keys, field, value);
     },
 
@@ -910,7 +929,7 @@
             });
             input.addEventListener("change", async (e) => {
               e.stopPropagation();
-              await this.setDate(key, e.target.dataset.field, e.target.value || "");
+              await this.setDate(key, e.target.dataset.field, e.target.value || "", { single: true });
             });
           });
         }
@@ -957,7 +976,7 @@
             try { input.showPicker?.(); } catch (_) {}
           });
           input.addEventListener("change", async (e) => {
-            await this.setDate(key, e.target.dataset.field, e.target.value || "");
+            await this.setDate(key, e.target.dataset.field, e.target.value || "", { single: true });
           });
         });
       });
