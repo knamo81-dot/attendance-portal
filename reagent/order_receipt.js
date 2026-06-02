@@ -18,12 +18,6 @@
     return escapeHtml(value);
   }
 
-  function cssEscape(value) {
-    const raw = String(value ?? "");
-    if (window.CSS && typeof window.CSS.escape === "function") return window.CSS.escape(raw);
-    return raw.replace(/[^a-zA-Z0-9_-]/g, (ch) => `\\${ch}`);
-  }
-
   function toNumber(value) {
     const n = Number(String(value ?? "").replace(/,/g, ""));
     return Number.isFinite(n) ? n : 0;
@@ -309,12 +303,7 @@
     },
 
     findRowByKey(key) {
-      const rawKey = String(key || "");
-      const rawId = rawKey.startsWith("id:") ? rawKey.slice(3) : rawKey;
-      return (this.rows || []).find((row) =>
-        String(row.recordKey || "") === rawKey ||
-        String(row.id || "") === rawId
-      ) || null;
+      return (this.rows || []).find((row) => row.recordKey === key) || null;
     },
 
     setRowSelected(key, selected) {
@@ -359,50 +348,7 @@
 
     updateLocalRows(keys = [], field, value) {
       const keySet = new Set(keys.filter(Boolean));
-      const idSet = new Set(
-        keys
-          .map((key) => String(key || "").startsWith("id:") ? String(key).slice(3) : String(key || ""))
-          .filter(Boolean)
-      );
-
-      this.rows = (this.rows || []).map((row) => {
-        const rowKey = String(row.recordKey || "");
-        const rowId = String(row.id || "");
-        const matched = keySet.has(rowKey) || idSet.has(rowId);
-        return matched ? { ...row, [field]: value || "" } : row;
-      });
-    },
-
-    syncRowDom(recordKey) {
-      const row = this.findRowByKey(recordKey);
-      if (!row) return;
-
-      const state = this.getRowDateState(row);
-      const selector = `[data-record-key="${cssEscape(recordKey)}"]`;
-
-      document.querySelectorAll(selector).forEach((el) => {
-        const badge = el.querySelector(".order-status");
-        if (badge) {
-          badge.className = `order-status ${state.status.className}`;
-          badge.textContent = state.status.label;
-        }
-
-        const orderInput = el.querySelector('.order-receipt-date[data-field="order_date"]');
-        if (orderInput) orderInput.value = state.orderDateValue;
-
-        const receiptInput = el.querySelector('.order-receipt-date[data-field="receipt_date"]');
-        if (receiptInput) receiptInput.value = state.receiptDateValue;
-
-        const clearOrder = el.querySelector('.order-date-clear[data-field="order_date"]');
-        if (clearOrder) clearOrder.style.display = state.orderDateValue ? "" : "none";
-
-        const clearReceipt = el.querySelector('.order-date-clear[data-field="receipt_date"]');
-        if (clearReceipt) clearReceipt.style.display = state.receiptDateValue ? "" : "none";
-      });
-    },
-
-    syncRowsDom(keys = []) {
-      keys.filter(Boolean).forEach((key) => this.syncRowDom(key));
+      this.rows = (this.rows || []).map((row) => keySet.has(row.recordKey) ? { ...row, [field]: value || "" } : row);
     },
 
     async saveDateToServer(keys = [], field, value) {
@@ -437,13 +383,10 @@
       if (!targetKeys.length || !field) return;
 
       this.updateLocalRows(targetKeys, field, value);
-      this.syncRowsDom(targetKeys);
       this.render();
-      this.syncRowsDom(targetKeys);
 
       try {
         await this.saveDateToServer(targetKeys, field, value);
-        this.syncRowsDom(targetKeys);
         APP.toast?.(field === "order_date" ? "발주일자를 저장했습니다." : "입고일자를 저장했습니다.", "success");
       } catch (error) {
         console.warn("발주/입고일자 서버 저장 실패:", error);
