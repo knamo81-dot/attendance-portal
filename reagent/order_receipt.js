@@ -3,6 +3,7 @@
 
   // order_receipt.js - server direct refactor baseline
   // 3차 자동 갱신 버전: 다른 PC/모바일 변경사항 주기 반영
+  // 5차 Realtime 버전: reagent_collect_items 변경 즉시 반영
   // 기준 데이터: reagent_collect_items / 화면 데이터: APP.orderReceipt.rows
 
   window.ReagentApp = window.ReagentApp || {};
@@ -101,6 +102,9 @@
     autoRefreshMs: 15000,
     isSaving: false,
     isRefreshing: false,
+    realtimeChannel: null,
+    realtimeDebounceTimer: null,
+    realtimeRefreshDelayMs: 250,
 
     get tableName() {
       return "reagent_collect_items";
@@ -263,6 +267,7 @@
       this.initialized = true;
       this.bindEvents();
       await this.refresh();
+      this.startRealtime();
       this.startAutoRefresh();
     },
 
@@ -300,6 +305,7 @@
 
       document.addEventListener("visibilitychange", async () => {
         if (!document.hidden && this.initialized && !this.isSaving) {
+          if (!this.realtimeChannel) this.startRealtime();
           await this.refresh({ silent: true });
         }
       });
@@ -320,6 +326,61 @@
       } finally {
         this.isRefreshing = false;
       }
+    },
+
+    startRealtime() {
+      const sb = APP.sb;
+      if (!sb || typeof sb.channel !== "function") return;
+
+      this.stopRealtime();
+
+      const companyId = APP.getCompanyId?.() || "";
+      const filter = companyId ? `company_id=eq.${companyId}` : undefined;
+
+      try {
+        let channel = sb.channel(`order_receipt_${companyId || "default"}`);
+
+        const onChange = () => {
+          if (this.isSaving || this.isRefreshing) return;
+
+          clearTimeout(this.realtimeDebounceTimer);
+          this.realtimeDebounceTimer = window.setTimeout(async () => {
+            if (this.isSaving || this.isRefreshing) return;
+            if ((this.selectedKeys?.size || 0) > 0) return;
+            await this.refresh({ silent: true });
+          }, this.realtimeRefreshDelayMs);
+        };
+
+        const eventConfig = {
+          event: "*",
+          schema: "public",
+          table: this.tableName
+        };
+        if (filter) eventConfig.filter = filter;
+
+        this.realtimeChannel = channel
+          .on("postgres_changes", eventConfig, onChange)
+          .subscribe((status) => {
+            if (status === "SUBSCRIBED") {
+              console.info("발주/입고 Realtime 구독 시작:", this.tableName);
+            }
+          });
+      } catch (error) {
+        console.warn("발주/입고 Realtime 구독 실패. 자동 갱신으로 동작합니다:", error);
+      }
+    },
+
+    stopRealtime() {
+      if (this.realtimeDebounceTimer) {
+        clearTimeout(this.realtimeDebounceTimer);
+        this.realtimeDebounceTimer = null;
+      }
+
+      const sb = APP.sb;
+      if (this.realtimeChannel && sb?.removeChannel) {
+        try { sb.removeChannel(this.realtimeChannel); } catch (_) {}
+      }
+      this.realtimeChannel = null;
     },
 
     startAutoRefresh() {
