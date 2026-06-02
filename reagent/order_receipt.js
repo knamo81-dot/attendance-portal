@@ -56,12 +56,12 @@
     initialized: false,
 
     get tableName() {
-      return APP.ORDER_RECEIPT_TABLE || "reagent_order_receipts";
+      return APP.ORDER_RECEIPT_TABLE || "reagent_collect_items";
     },
 
     getStorageKey() {
       const companyId = APP.getCompanyId?.() || "default";
-      return `reagent_order_receipts_${companyId}`;
+      return `reagent_order_receipt_dates_${companyId}`;
     },
 
     loadLocalRecords() {
@@ -554,40 +554,41 @@
       const sb = APP.sb;
       if (!sb || this.remoteFailed || !this.remoteEnabled) return;
 
-      const payloads = keys.map((key) => {
-        const rec = this.records[key] || {};
-        const row = this.getRowByRecordKey(key) || {};
-        const [order_month, item_key] = key.split("__");
-        const canonicalItemKey = rec.item_key || row.item_key || row.key || item_key || "";
-        return APP.withCompanyPayload ? APP.withCompanyPayload({
-          order_month: rec.order_month || order_month || row.order_month || "",
-          item_key: canonicalItemKey,
-          product_name: row.name || "",
-          maker: row.maker || "",
-          grade: row.grade || "",
-          product_code: row.code || "",
-          capacity: row.capacity || "",
-          cas: row.cas || "",
-          quantity: toNumber(row.qty),
-          purchase_unit_price: toNumber(row.purchaseUnit),
-          purchase_amount: toNumber(row.purchaseAmount),
-          purchase_vendor: row.purchaseVendor || "",
-          order_date: rec.order_date || null,
-          receipt_date: rec.receipt_date || null,
-          updated_at: new Date().toISOString()
-        }) : {};
-      }).filter((row) => row.order_month && row.item_key);
+      const targetKeys = Array.isArray(keys) ? keys.filter(Boolean) : [];
+      if (!targetKeys.length) return;
 
-      if (!payloads.length) return;
+      const companyId = APP.getCompanyId?.() || "";
 
       try {
-        const { error } = await sb
-          .from(this.tableName)
-          .upsert(payloads, { onConflict: "company_id,order_month,item_key" });
-        if (error) throw error;
+        for (const key of targetKeys) {
+          const rec = this.records[key] || {};
+          const row = this.getRowByRecordKey(key) || {};
+          const [order_month, item_key] = String(key || "").split("__");
+          const targetMonth = rec.order_month || order_month || row.order_month || "";
+          const targetItemKey = rec.item_key || row.item_key || row.key || item_key || "";
+
+          if (!targetMonth || !targetItemKey) continue;
+
+          const payload = {
+            order_date: rec.order_date || null,
+            receipt_date: rec.receipt_date || null,
+            updated_at: new Date().toISOString()
+          };
+
+          let query = sb
+            .from(this.tableName)
+            .update(payload)
+            .eq("order_month", targetMonth)
+            .eq("item_key", targetItemKey);
+
+          if (companyId) query = query.eq("company_id", companyId);
+
+          const { error } = await query;
+          if (error) throw error;
+        }
       } catch (error) {
         this.remoteFailed = true;
-        console.warn("발주/입고 원격 저장 실패. 로컬 저장은 유지됩니다:", error);
+        console.warn("발주/입고 날짜 원격 저장 실패. 로컬 저장은 유지됩니다:", error);
       }
     },
 
