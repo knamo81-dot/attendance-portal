@@ -623,9 +623,11 @@
 
           const payload = {
             order_date: rec.order_date || stateRec.order_date || null,
-            receipt_date: rec.receipt_date || stateRec.receipt_date || null,
-            updated_at: new Date().toISOString()
+            receipt_date: rec.receipt_date || stateRec.receipt_date || null
           };
+
+          const updatedBy = APP.collect?.getCurrentUserName?.() || APP.currentUser?.name || APP.currentUser?.user_name || "";
+          if (updatedBy) payload.updated_by = updatedBy;
 
           // 1순위: reagent_collect_items.id 기준 업데이트
           let result = await runUpdate({ payload, id: targetId, itemKey: targetItemKey, month: targetMonth });
@@ -649,6 +651,7 @@
       } catch (error) {
         this.remoteFailed = true;
         console.warn("발주/입고 날짜 원격 저장 실패. 로컬 저장은 유지됩니다:", error);
+        APP.toast?.(`발주/입고일자 서버 저장 실패: ${error.message || "Supabase 컬럼/권한을 확인하세요."}`, "warn");
       }
     },
 
