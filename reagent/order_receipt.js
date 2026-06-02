@@ -184,12 +184,13 @@
       const candidates = this.getRowKeyCandidates(row);
       let recordKey = row.recordKey || candidates[0] || "";
 
-      for (const key of candidates) {
-        if (this.records[key]) {
-          recordKey = key;
-          break;
-        }
-      }
+      const candidateWithId = candidates.find((key) => this.records[key]?.id);
+      const candidateWithDates = candidates.find((key) => this.records[key]?.order_date || this.records[key]?.receipt_date);
+      const candidateWithRecord = candidates.find((key) => this.records[key]);
+
+      if (candidateWithId) recordKey = candidateWithId;
+      else if (candidateWithDates) recordKey = candidateWithDates;
+      else if (candidateWithRecord) recordKey = candidateWithRecord;
 
       // 키가 서로 다른 이전 저장값까지 보정합니다.
       // 같은 주문월에서 item_key / 제품코드 / 품명+제조사 조합이 맞으면 해당 기록을 사용합니다.
@@ -648,6 +649,7 @@
 
         // 저장 직후 서버값을 다시 읽어 PC/모바일 표시를 동기화합니다.
         await this.loadRemoteRecords();
+        this.render();
       } catch (error) {
         this.remoteFailed = true;
         console.warn("발주/입고 날짜 원격 저장 실패. 로컬 저장은 유지됩니다:", error);
