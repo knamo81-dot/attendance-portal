@@ -115,8 +115,95 @@
       return k ? `${m}__${k}` : "";
     },
 
+    getRowKeyCandidates(row = {}) {
+      const month = row.order_month || this.getCurrentMonth();
+      const rawKeys = [
+        row.item_key,
+        row.key,
+        row.collect_item_key,
+        row.product_key,
+        row.prepare_key,
+        row.productKey,
+        row.collectItemKey
+      ];
+
+      const candidates = [];
+      rawKeys.forEach((value) => {
+        const key = this.makeRecordKey(month, value);
+        if (key && !candidates.includes(key)) candidates.push(key);
+      });
+
+      // 과거 버전에서 제품코드 기반 키가 만들어졌을 가능성까지 보정합니다.
+      const codeKey = this.makeRecordKey(month, row.code);
+      if (codeKey && !candidates.includes(codeKey)) candidates.push(codeKey);
+
+      return candidates;
+    },
+
     makeRowKey(row) {
-      return this.makeRecordKey(row.order_month, row.key || row.item_key);
+      const candidates = this.getRowKeyCandidates(row);
+      return candidates[0] || "";
+    },
+
+    getRecordStateForRow(row = {}) {
+      const candidates = this.getRowKeyCandidates(row);
+      let recordKey = row.recordKey || candidates[0] || "";
+
+      for (const key of candidates) {
+        if (this.records[key]) {
+          recordKey = key;
+          break;
+        }
+      }
+
+      // 키가 서로 다른 이전 저장값까지 보정합니다.
+      // 같은 주문월에서 item_key / 제품코드 / 품명+제조사 조합이 맞으면 해당 기록을 사용합니다.
+      if (!this.records[recordKey]) {
+        const month = normalizeMonth(row.order_month || this.getCurrentMonth());
+        const rowKeys = new Set(candidates.map((key) => String(key).split("__")[1]).filter(Boolean));
+        const rowCode = String(row.code || "").trim();
+        const rowName = String(row.name || "").trim();
+        const rowMaker = String(row.maker || "").trim();
+
+        Object.entries(this.records || {}).some(([key, rec]) => {
+          const [recMonth, recItemKey] = String(key).split("__");
+          if (normalizeMonth(recMonth) !== month) return false;
+
+          const recKeys = [
+            recItemKey,
+            rec?.item_key,
+            rec?.collect_item_key,
+            rec?.product_key,
+            rec?.product_code,
+            rec?.code
+          ].map((value) => String(value || "").trim()).filter(Boolean);
+
+          if (recKeys.some((value) => rowKeys.has(value) || value === rowCode)) {
+            recordKey = key;
+            return true;
+          }
+
+          const recName = String(rec?.product_name || rec?.name || "").trim();
+          const recMaker = String(rec?.maker || "").trim();
+          if (rowName && recName && rowName === recName && (!rowMaker || !recMaker || rowMaker === recMaker)) {
+            recordKey = key;
+            return true;
+          }
+
+          return false;
+        });
+      }
+
+      const record = this.records[recordKey] || {};
+      const orderDate = String(record.order_date || row.order_date || "").trim();
+      const receiptDate = String(record.receipt_date || row.receipt_date || "").trim();
+
+      return {
+        recordKey,
+        record,
+        order_date: orderDate,
+        receipt_date: receiptDate
+      };
     },
 
     getEls() {
@@ -282,13 +369,12 @@
       const baseRows = this.showUnreceived ? this.getAllKnownRows() : this.getRowsForMonth(month);
 
       const rows = baseRows.map((row) => {
-        const recordKey = this.makeRowKey(row);
-        const record = this.records[recordKey] || {};
+        const state = this.getRecordStateForRow(row);
         return {
           ...row,
-          recordKey,
-          order_date: record.order_date || "",
-          receipt_date: record.receipt_date || ""
+          recordKey: state.recordKey,
+          order_date: state.order_date,
+          receipt_date: state.receipt_date
         };
       }).filter((row) => {
         if (!this.showUnreceived) return true;
@@ -458,7 +544,10 @@
     },
 
     getRowByRecordKey(key) {
-      return this.getAllKnownRows().find((row) => this.makeRowKey(row) === key) || null;
+      return this.getAllKnownRows().find((row) => {
+        if (this.makeRowKey(row) === key) return true;
+        return this.getRowKeyCandidates(row).includes(key);
+      }) || null;
     },
 
     async saveRemote(keys) {
@@ -469,9 +558,10 @@
         const rec = this.records[key] || {};
         const row = this.getRowByRecordKey(key) || {};
         const [order_month, item_key] = key.split("__");
+        const canonicalItemKey = rec.item_key || row.item_key || row.key || item_key || "";
         return APP.withCompanyPayload ? APP.withCompanyPayload({
           order_month: rec.order_month || order_month || row.order_month || "",
-          item_key: rec.item_key || item_key || row.key || "",
+          item_key: canonicalItemKey,
           product_name: row.name || "",
           maker: row.maker || "",
           grade: row.grade || "",
@@ -527,14 +617,14 @@
     },
 
     getRowDateState(row = {}) {
-      const recordKey = row.recordKey || this.makeRowKey(row);
-      const record = recordKey ? (this.records[recordKey] || {}) : {};
-      const orderDate = String(record.order_date || row.order_date || "").trim();
-      const receiptDate = String(record.receipt_date || row.receipt_date || "").trim();
+      const state = this.getRecordStateForRow(row);
+      const orderDate = state.order_date;
+      const receiptDate = state.receipt_date;
       const orderDateText = this.formatDateText(orderDate);
       const receiptDateText = this.formatDateText(receiptDate);
 
       return {
+        recordKey: state.recordKey,
         orderDate,
         receiptDate,
         orderDateText,
@@ -561,7 +651,7 @@
       els.mobileCards.innerHTML = rows.map((row) => {
         const dateState = this.getRowDateState(row);
         const status = dateState.status;
-        const selected = this.selectedKeys.has(row.recordKey);
+        const selected = this.selectedKeys.has(dateState.recordKey);
         const gradeCapacity = [row.grade, row.capacity].filter((v) => String(v || "").trim()).join(" / ");
         const qtyText = formatNumber(row.qty) || "0";
         const orderDateText = dateState.orderDateText;
@@ -586,7 +676,7 @@
         };
 
         return `
-          <article class="order-receipt-mobile-card ${selected ? "selected" : ""}" data-record-key="${attr(row.recordKey)}">
+          <article class="order-receipt-mobile-card ${selected ? "selected" : ""}" data-record-key="${attr(dateState.recordKey)}">
             <div class="order-receipt-mobile-main" role="button" tabindex="0" aria-expanded="false">
               <div class="order-receipt-mobile-line1">
                 ${operator ? `<label class="order-receipt-mobile-check" aria-label="품목 선택"><input type="checkbox" class="order-receipt-mobile-checkbox" ${selected ? "checked" : ""}/></label>` : ""}
