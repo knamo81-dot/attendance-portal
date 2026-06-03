@@ -3513,7 +3513,9 @@ body.auth-loading .top-user-bar {
   }
 
   function getCurrentFrameBaseSrc() {
-    const raw = frame?.getAttribute('src') || '';
+    // iframe 이동 시 contentWindow.location.replace를 사용하면
+    // getAttribute('src')가 이전 주소를 들고 있을 수 있어 dataset 값을 우선 사용합니다.
+    const raw = frame?.dataset?.currentSrc || frame?.getAttribute('src') || '';
     const withoutQuery = normalizePortalSrc(raw);
     if (!withoutQuery || withoutQuery === 'about:blank') return '';
     try {
@@ -4365,7 +4367,7 @@ body.auth-loading .top-user-bar {
     broadcastPortalLanguage(getPreferredLanguage());
 
     const currentSrc = getCurrentFrameBaseSrc();
-    replacePortalFrame(buildSrcWithSession(currentSrc));
+    replacePortalFrame(buildSrcWithSession(currentSrc, { forceReload: true }));
     closeServiceCompanyModal();
 
     if (!options.silent) {
@@ -4638,11 +4640,12 @@ body.auth-loading .top-user-bar {
     } catch (_) {}
   }
 
-  function buildSrcWithSession(src) {
+  function buildSrcWithSession(src, options = {}) {
     if (!src) return src;
     const session = buildPortalSession();
     const params = [];
     const isGlobalApp = isGlobalPortalSrc(src);
+    const forceReload = options.forceReload === true;
 
     if (session.email) params.push('email=' + encodeURIComponent(session.email));
 
@@ -4654,8 +4657,6 @@ body.auth-loading .top-user-bar {
       if (session.companyName) params.push('company_name=' + encodeURIComponent(session.companyName));
     } else {
       params.push('service_admin_global=1');
-      // 회사 선택(activeCompanyId) 변경 후에도 서비스관리자 iframe이 이전 스코프/캐시를 물고 있지 않도록 강제 새로고침합니다.
-      params.push('v=' + Date.now());
     }
 
     if (session.language) params.push('lang=' + encodeURIComponent(session.language));
@@ -4667,6 +4668,12 @@ body.auth-loading .top-user-bar {
 
     if (isReagentSrc(src)) {
       params.push('portal_auth=1');
+    }
+
+    // 서비스관리자 회사 전환 시 iframe 내부 앱이 직전 회사 메모리/캐시를 들고 있지 않도록
+    // 모든 현재 앱에 강제 새로고침 파라미터를 붙입니다.
+    // 기존에는 service-admin/reagent 일부에만 v가 붙어 근태/폐수/홈 등에서 직전 회사 데이터 잔상이 남을 수 있었습니다.
+    if (forceReload || isGlobalApp || isReagentSrc(src)) {
       params.push('v=' + Date.now());
     }
 
@@ -4812,6 +4819,9 @@ body.auth-loading .top-user-bar {
 
   function replacePortalFrame(src) {
     if (!frame || !src) return;
+    // 실제 iframe 이동은 location.replace를 사용하더라도, 현재 주소 추적용으로 별도 보관합니다.
+    // 회사 전환 후 다시 같은 앱을 재로드할 때 이전 src 속성값을 참조하는 문제를 막습니다.
+    try { frame.dataset.currentSrc = src; } catch (_) {}
     showPortalBootOverlay();
     let restoreSafetyTimer = null;
     updatePortalHeader(src);
