@@ -3619,8 +3619,20 @@ body.auth-loading .top-user-bar {
     return normalizePortalSrc(src) === 'research-staff/index.html';
   }
 
+  function findResearchStaffNavButton() {
+    const direct = document.getElementById('researchStaffNavBtn');
+    if (direct) return direct;
+
+    const candidates = Array.from(document.querySelectorAll('.nav-btn, [data-portal-src]'));
+    return candidates.find(function (btn) {
+      const text = String(btn.textContent || '').trim();
+      const src = normalizePortalSrc(btn.getAttribute?.('data-portal-src') || '');
+      return text === '인력' || src === 'research-staff/index.html' || src.includes('research-staff');
+    }) || null;
+  }
+
   function updateResearchStaffButtonVisibility() {
-    const btn = els.researchStaffNavBtn || document.getElementById('researchStaffNavBtn');
+    const btn = findResearchStaffNavButton();
     if (!btn) return;
 
     const allowed = Boolean(currentUser && canAccessResearchStaffApp());
@@ -3628,6 +3640,14 @@ body.auth-loading .top-user-bar {
     btn.style.display = allowed ? '' : 'none';
     btn.setAttribute('aria-hidden', allowed ? 'false' : 'true');
     btn.tabIndex = allowed ? 0 : -1;
+    btn.dataset.peopleAccessAllowed = allowed ? 'Y' : 'N';
+  }
+
+  function scheduleResearchStaffButtonVisibilityRefresh() {
+    updateResearchStaffButtonVisibility();
+    [80, 250, 600, 1200, 2200].forEach(function (delay) {
+      setTimeout(updateResearchStaffButtonVisibility, delay);
+    });
   }
 
   function isSettingsSrc(src) {
@@ -4252,7 +4272,7 @@ body.auth-loading .top-user-bar {
     window.currentUserRole = null;
     updateServiceAdminButtonVisibility();
     updateSettingsButtonVisibility();
-    updateResearchStaffButtonVisibility();
+    scheduleResearchStaffButtonVisibilityRefresh();
   }
 
   window.getPortalSession = function () {
@@ -4312,6 +4332,7 @@ body.auth-loading .top-user-bar {
     if (els.loginCard) els.loginCard.hidden = true;
     if (els.passwordCard) els.passwordCard.hidden = true;
     if (els.topUserBar) els.topUserBar.hidden = false;
+    scheduleResearchStaffButtonVisibilityRefresh();
   }
 
   function applyRoleUI() {
@@ -4328,6 +4349,7 @@ body.auth-loading .top-user-bar {
     els.userChip.innerHTML = `<span>${escapeHtml(name)}</span>${company}<span class="role">${escapeHtml(roleText)}</span>`;
     updateServiceAdminButtonVisibility();
     updateSettingsButtonVisibility();
+    scheduleResearchStaffButtonVisibilityRefresh();
   }
 
 
@@ -5208,6 +5230,10 @@ body.auth-loading .top-user-bar {
         });
       });
     });
+
+
+  window.addEventListener('load', scheduleResearchStaffButtonVisibilityRefresh);
+  document.addEventListener('DOMContentLoaded', scheduleResearchStaffButtonVisibilityRefresh);
 
     els.mobileDrawerBackdrop?.addEventListener('click', function () {
       closeMobileDrawer();
