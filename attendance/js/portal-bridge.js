@@ -155,6 +155,87 @@
     return isInternalAdminTabAllowed() || hasAdminOperatorRoleInState() || hasAdminOperatorRoleInDom();
   }
 
+  function normalizeKoreanRoleText(value) {
+    return String(value || '').trim().replace(/\s+/g, '');
+  }
+
+  function getSessionRoleText(session) {
+    session = session || getPortalSession() || {};
+    return [
+      session.role,
+      session.user_role,
+      session.userRole,
+      session.systemRole,
+      session.system_role,
+      session.portalRole,
+      session.portal_role,
+      session.employee?.role,
+      session.profile?.role,
+      session.user?.role
+    ].filter(Boolean).map(normalizeKoreanRoleText);
+  }
+
+  function getSessionDutyText(session) {
+    session = session || getPortalSession() || {};
+    return [
+      session.duty,
+      session.employeeDuty,
+      session.employee_duty,
+      session.employee?.duty,
+      session.profile?.duty,
+      session.user?.duty
+    ].filter(Boolean).map(normalizeKoreanRoleText);
+  }
+
+  function isServiceOrCompanyAdmin() {
+    const session = getPortalSession() || {};
+
+    if (session.mode === 'service' && (session.isServiceAdmin === true || session.is_service_admin === true)) return true;
+    if (session.isServiceAdmin === true || session.is_service_admin === true) return true;
+    if (session.isAdmin === true || session.is_admin === true) return true;
+
+    const roles = getSessionRoleText(session);
+    return roles.some(function (role) {
+      return [
+        'service_admin',
+        'serviceadmin',
+        '서비스관리자',
+        'admin',
+        'administrator',
+        '관리자',
+        '시스템관리자',
+        '회사관리자'
+      ].includes(String(role).toLowerCase()) || ['서비스관리자', '관리자', '회사관리자', '시스템관리자'].includes(role);
+    });
+  }
+
+  function hasAttendanceAnalysisDuty() {
+    const allowedDuties = ['담당', '팀장', '소장', '본부장'];
+    const duties = getSessionDutyText();
+    return duties.some(function (duty) {
+      return allowedDuties.includes(duty);
+    });
+  }
+
+  function canShowAnalysisTabs() {
+    if (isServiceOrCompanyAdmin()) return true;
+
+    if (hasPortalAttendanceRole()) {
+      const role = getPortalAttendanceRole();
+      if (['admin', 'operator'].includes(role)) return true;
+      if (['user', 'viewer'].includes(role)) return false;
+    }
+
+    return hasAttendanceAnalysisDuty() || hasAdminOperatorRoleInState() || hasAdminOperatorRoleInDom();
+  }
+
+  function isAllowedPortalTab(tabId) {
+    const id = normalizeTabId(tabId);
+    if (id === 'attendance') return true;
+    if (id === 'admin') return canShowAdminTab();
+    return canShowAnalysisTabs();
+  }
+
   function ensureInternalAdminVisible() {
     if (!canShowAdminTab()) return;
 
@@ -202,7 +283,11 @@
   }
 
   function getPortalTabs() {
-    return canShowAdminTab() ? BASE_TABS.concat([ADMIN_TAB]) : BASE_TABS.slice();
+    const tabs = canShowAnalysisTabs()
+      ? BASE_TABS.slice()
+      : BASE_TABS.filter(function (tab) { return tab.id === 'attendance'; });
+
+    return canShowAdminTab() ? tabs.concat([ADMIN_TAB]) : tabs;
   }
 
   const TAB_ALIASES = {
@@ -231,7 +316,8 @@
 
   function getActiveTabId() {
     const active = document.querySelector('.mainTab.active[data-main]');
-    return normalizeTabId(active?.getAttribute('data-main') || 'attendance');
+    const id = normalizeTabId(active?.getAttribute('data-main') || 'attendance');
+    return isAllowedPortalTab(id) ? id : 'attendance';
   }
 
   function postTabs() {
@@ -246,7 +332,7 @@
 
   function postActiveTab(tabId) {
     if (!window.parent || window.parent === window) return;
-    const id = normalizeTabId(tabId);
+    const id = isAllowedPortalTab(tabId) ? normalizeTabId(tabId) : 'attendance';
     window.parent.postMessage({
       type: 'portal-tab-active',
       activeTabId: id,
@@ -402,7 +488,12 @@
   }
 
   function activateTab(tabId) {
-    const id = normalizeTabId(tabId);
+    let id = normalizeTabId(tabId);
+
+    if (!isAllowedPortalTab(id)) {
+      id = 'attendance';
+    }
+
     let ok = false;
 
     if (id === 'admin') {
