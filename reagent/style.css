@@ -5147,25 +5147,28 @@ td {
 }
 
 /* =========================================================
-   STEP 2-3 FINAL - 기안서용 요약표만 Sticky 제외
-   기준
-   - 비교견적표: 기존 sticky 유지
-   - 기안서용 요약표(#prepareDocList): 좌측 sticky 해제, 일반 테이블 유지
-   주의
-   - prepareList / prepareViewList는 건드리지 않음
+   STEP 2-4 FINAL - 취합정리 비교견적표 Sticky 강제 복구
+   목적
+   - 기안서용 요약표(#prepareDocList)는 sticky 제외
+   - 그 외 취합정리 표는 비교견적표로 보고 좌측 sticky 적용
+   이유
+   - 실제 비교견적표 tbody id가 #prepareList/#prepareViewList와 다를 수 있어
+     :has(#prepareList) 방식만으로는 누락 가능
 ========================================================= */
 
-/* 기안서용 요약표 래퍼는 일반 가로 스크롤만 유지 */
-#page-prepare .table-wrap:has(#prepareDocList),
-#page-prepare .prepare-table-panel:has(#prepareDocList){
-  width:100% !important;
+/* 취합정리 표 래퍼 공통: 내부 가로스크롤 */
+#page-prepare .prepare-table-panel,
+#page-prepare .prepare-table-panel .table-wrap,
+#page-prepare .table-wrap{
   max-width:100% !important;
+  min-width:0 !important;
   overflow-x:auto !important;
   overflow-y:auto !important;
   position:relative !important;
+  isolation:isolate !important;
 }
 
-/* 기안서용 요약표는 정보량이 적으므로 자동폭 일반 테이블 */
+/* 1) 기안서용 요약표는 일반 테이블로 명확히 제외 */
 #page-prepare .table-wrap:has(#prepareDocList) table,
 #page-prepare .prepare-table-panel:has(#prepareDocList) table{
   table-layout:auto !important;
@@ -5175,7 +5178,7 @@ td {
   border-spacing:0 !important;
 }
 
-/* 기안서용 요약표의 좌측 sticky 해제 */
+/* 기안서용 요약표 좌측 sticky 해제 */
 #page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(1),
 #page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(1),
 #page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(2),
@@ -5199,7 +5202,7 @@ td {
   border-right:0 !important;
 }
 
-/* 기안서용 요약표 header의 상단 sticky만 유지 */
+/* 기안서용 요약표 헤더 상단 고정만 유지 */
 #page-prepare .table-wrap:has(#prepareDocList) table thead th,
 #page-prepare .prepare-table-panel:has(#prepareDocList) table thead th{
   position:sticky !important;
@@ -5208,22 +5211,161 @@ td {
   z-index:30 !important;
 }
 
-/* 기안서용 요약표 셀 배경/폭 보정 */
-#page-prepare .table-wrap:has(#prepareDocList) table th,
-#page-prepare .table-wrap:has(#prepareDocList) table td,
-#page-prepare .prepare-table-panel:has(#prepareDocList) table th,
-#page-prepare .prepare-table-panel:has(#prepareDocList) table td{
-  background:inherit;
+/* 2) prepareDocList가 없는 취합정리 표 = 비교견적표로 처리 */
+#page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table,
+#page-prepare .table-wrap:not(:has(#prepareDocList)) table{
+  table-layout:fixed !important;
+  border-collapse:separate !important;
+  border-spacing:0 !important;
+  width:100% !important;
+  min-width:1500px !important;
+}
+
+/* 비교견적표 셀 기본 */
+#page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table th,
+#page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table td,
+#page-prepare .table-wrap:not(:has(#prepareDocList)) table th,
+#page-prepare .table-wrap:not(:has(#prepareDocList)) table td{
+  padding:6px 6px !important;
+  vertical-align:middle !important;
+  border-bottom:1px solid var(--line) !important;
   white-space:nowrap !important;
 }
 
-/* 품명 컬럼은 줄바꿈 허용 */
-#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(2),
-#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(2),
-#page-prepare .prepare-table-panel:has(#prepareDocList) table th:nth-child(2),
-#page-prepare .prepare-table-panel:has(#prepareDocList) table td:nth-child(2){
-  min-width:260px !important;
+/* 1열 */
+#page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table th:nth-child(1),
+#page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table td:nth-child(1),
+#page-prepare .table-wrap:not(:has(#prepareDocList)) table th:nth-child(1),
+#page-prepare .table-wrap:not(:has(#prepareDocList)) table td:nth-child(1){
+  width:72px !important;
+  min-width:72px !important;
+  max-width:72px !important;
+  position:sticky !important;
+  left:0 !important;
+  z-index:31 !important;
+  text-align:center !important;
+  background:#fff !important;
+}
+
+/* 2열 품명 */
+#page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table th:nth-child(2),
+#page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table td:nth-child(2),
+#page-prepare .table-wrap:not(:has(#prepareDocList)) table th:nth-child(2),
+#page-prepare .table-wrap:not(:has(#prepareDocList)) table td:nth-child(2){
+  width:280px !important;
+  min-width:280px !important;
+  max-width:280px !important;
+  position:sticky !important;
+  left:72px !important;
+  z-index:31 !important;
   white-space:normal !important;
   line-height:1.35 !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
   font-weight:600 !important;
+  background:#fff !important;
+}
+
+/* 3열 제조사 */
+#page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table th:nth-child(3),
+#page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table td:nth-child(3),
+#page-prepare .table-wrap:not(:has(#prepareDocList)) table th:nth-child(3),
+#page-prepare .table-wrap:not(:has(#prepareDocList)) table td:nth-child(3){
+  width:115px !important;
+  min-width:115px !important;
+  max-width:115px !important;
+  position:sticky !important;
+  left:352px !important;
+  z-index:31 !important;
+  background:#fff !important;
+}
+
+/* 4열 제품코드 */
+#page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table th:nth-child(4),
+#page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table td:nth-child(4),
+#page-prepare .table-wrap:not(:has(#prepareDocList)) table th:nth-child(4),
+#page-prepare .table-wrap:not(:has(#prepareDocList)) table td:nth-child(4){
+  width:115px !important;
+  min-width:115px !important;
+  max-width:115px !important;
+  position:sticky !important;
+  left:467px !important;
+  z-index:31 !important;
+  border-right:1px solid rgba(148,163,184,.55) !important;
+  box-shadow:8px 0 12px rgba(15,23,42,.07) !important;
+  background:#fff !important;
+}
+
+/* 비교견적표 헤더 */
+#page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table thead th,
+#page-prepare .table-wrap:not(:has(#prepareDocList)) table thead th{
+  position:sticky !important;
+  top:0 !important;
+  background:#fbfdff !important;
+  z-index:50 !important;
+}
+
+#page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table thead th:nth-child(-n+4),
+#page-prepare .table-wrap:not(:has(#prepareDocList)) table thead th:nth-child(-n+4){
+  z-index:80 !important;
+}
+
+/* 혹시 table-wrap과 prepare-table-panel이 중첩되어도 기안서 표는 최종적으로 sticky 해제 */
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(-n+4),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(-n+4),
+#page-prepare .prepare-table-panel:has(#prepareDocList) table th:nth-child(-n+4),
+#page-prepare .prepare-table-panel:has(#prepareDocList) table td:nth-child(-n+4){
+  position:static !important;
+  left:auto !important;
+  z-index:auto !important;
+  box-shadow:none !important;
+  border-right:0 !important;
+}
+
+/* 좁은 화면 보정 */
+@media (max-width:1200px){
+  #page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table,
+  #page-prepare .table-wrap:not(:has(#prepareDocList)) table{
+    min-width:1420px !important;
+  }
+
+  #page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table th:nth-child(1),
+  #page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table td:nth-child(1),
+  #page-prepare .table-wrap:not(:has(#prepareDocList)) table th:nth-child(1),
+  #page-prepare .table-wrap:not(:has(#prepareDocList)) table td:nth-child(1){
+    width:64px !important;
+    min-width:64px !important;
+    max-width:64px !important;
+    left:0 !important;
+  }
+
+  #page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table th:nth-child(2),
+  #page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table td:nth-child(2),
+  #page-prepare .table-wrap:not(:has(#prepareDocList)) table th:nth-child(2),
+  #page-prepare .table-wrap:not(:has(#prepareDocList)) table td:nth-child(2){
+    width:230px !important;
+    min-width:230px !important;
+    max-width:230px !important;
+    left:64px !important;
+  }
+
+  #page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table th:nth-child(3),
+  #page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table td:nth-child(3),
+  #page-prepare .table-wrap:not(:has(#prepareDocList)) table th:nth-child(3),
+  #page-prepare .table-wrap:not(:has(#prepareDocList)) table td:nth-child(3){
+    width:100px !important;
+    min-width:100px !important;
+    max-width:100px !important;
+    left:294px !important;
+  }
+
+  #page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table th:nth-child(4),
+  #page-prepare .prepare-table-panel:not(:has(#prepareDocList)) table td:nth-child(4),
+  #page-prepare .table-wrap:not(:has(#prepareDocList)) table th:nth-child(4),
+  #page-prepare .table-wrap:not(:has(#prepareDocList)) table td:nth-child(4){
+    width:100px !important;
+    min-width:100px !important;
+    max-width:100px !important;
+    left:394px !important;
+  }
 }
