@@ -5147,258 +5147,25 @@ td {
 }
 
 /* =========================================================
-   STEP 2-1 FINAL - 취합정리 Sticky Selector 보정
-   원인
-   - 기존 STEP 2는 #prepareList / #prepareDocList / #prepareViewList 기준으로 적용
-   - 실제 tbody id가 다르거나 panel 구조가 다르면 스크롤은 생기지만 sticky가 미적용됨
-   보정
-   - #page-prepare 내부의 prepare-table-panel/table-wrap 하위 table 전체에 직접 적용
+   STEP 2-3 FINAL - 기안서용 요약표만 Sticky 제외
+   기준
+   - 비교견적표: 기존 sticky 유지
+   - 기안서용 요약표(#prepareDocList): 좌측 sticky 해제, 일반 테이블 유지
+   주의
+   - prepareList / prepareViewList는 건드리지 않음
 ========================================================= */
 
-/* 취합정리 영역의 실제 테이블 래퍼를 모두 내부 스크롤 대상으로 보정 */
-#page-prepare .prepare-table-panel .table-wrap,
-#page-prepare .prepare-table-panel.table-wrap,
-#page-prepare .table-wrap{
+/* 기안서용 요약표 래퍼는 일반 가로 스크롤만 유지 */
+#page-prepare .table-wrap:has(#prepareDocList),
+#page-prepare .prepare-table-panel:has(#prepareDocList){
+  width:100% !important;
   max-width:100% !important;
-  min-width:0 !important;
   overflow-x:auto !important;
   overflow-y:auto !important;
   position:relative !important;
-  isolation:isolate !important;
-  border-radius:13px !important;
 }
 
-/* 취합정리 내부 테이블 공통 폭 */
-#page-prepare .prepare-table-panel table,
-#page-prepare .table-wrap table{
-  table-layout:fixed !important;
-  border-collapse:separate !important;
-  border-spacing:0 !important;
-  width:100% !important;
-  min-width:1500px !important;
-}
-
-/* 취합정리 셀 공통 */
-#page-prepare .prepare-table-panel table th,
-#page-prepare .prepare-table-panel table td,
-#page-prepare .table-wrap table th,
-#page-prepare .table-wrap table td{
-  padding:6px 6px !important;
-  vertical-align:middle !important;
-  border-bottom:1px solid var(--line) !important;
-  white-space:nowrap !important;
-}
-
-/* 1열: 구분 */
-#page-prepare .prepare-table-panel table th:nth-child(1),
-#page-prepare .prepare-table-panel table td:nth-child(1),
-#page-prepare .table-wrap table th:nth-child(1),
-#page-prepare .table-wrap table td:nth-child(1){
-  width:72px !important;
-  min-width:72px !important;
-  max-width:72px !important;
-  position:sticky !important;
-  left:0 !important;
-  z-index:31 !important;
-  text-align:center !important;
-}
-
-/* 2열: 품명 */
-#page-prepare .prepare-table-panel table th:nth-child(2),
-#page-prepare .prepare-table-panel table td:nth-child(2),
-#page-prepare .table-wrap table th:nth-child(2),
-#page-prepare .table-wrap table td:nth-child(2){
-  width:280px !important;
-  min-width:280px !important;
-  max-width:280px !important;
-  position:sticky !important;
-  left:72px !important;
-  z-index:31 !important;
-  white-space:normal !important;
-  line-height:1.35 !important;
-  word-break:keep-all !important;
-  overflow-wrap:anywhere !important;
-  font-weight:600 !important;
-}
-
-/* 3열: 제조사 */
-#page-prepare .prepare-table-panel table th:nth-child(3),
-#page-prepare .prepare-table-panel table td:nth-child(3),
-#page-prepare .table-wrap table th:nth-child(3),
-#page-prepare .table-wrap table td:nth-child(3){
-  width:115px !important;
-  min-width:115px !important;
-  max-width:115px !important;
-  position:sticky !important;
-  left:352px !important;
-  z-index:31 !important;
-}
-
-/* 4열: 제품코드 */
-#page-prepare .prepare-table-panel table th:nth-child(4),
-#page-prepare .prepare-table-panel table td:nth-child(4),
-#page-prepare .table-wrap table th:nth-child(4),
-#page-prepare .table-wrap table td:nth-child(4){
-  width:115px !important;
-  min-width:115px !important;
-  max-width:115px !important;
-  position:sticky !important;
-  left:467px !important;
-  z-index:31 !important;
-  border-right:1px solid rgba(148,163,184,.55) !important;
-  box-shadow:8px 0 12px rgba(15,23,42,.07) !important;
-}
-
-/* header는 위쪽 sticky와 좌측 sticky가 겹치므로 z-index를 더 높임 */
-#page-prepare .prepare-table-panel table thead th,
-#page-prepare .table-wrap table thead th{
-  position:sticky !important;
-  top:0 !important;
-  background:#fbfdff !important;
-  z-index:50 !important;
-}
-
-#page-prepare .prepare-table-panel table thead th:nth-child(1),
-#page-prepare .prepare-table-panel table thead th:nth-child(2),
-#page-prepare .prepare-table-panel table thead th:nth-child(3),
-#page-prepare .prepare-table-panel table thead th:nth-child(4),
-#page-prepare .table-wrap table thead th:nth-child(1),
-#page-prepare .table-wrap table thead th:nth-child(2),
-#page-prepare .table-wrap table thead th:nth-child(3),
-#page-prepare .table-wrap table thead th:nth-child(4){
-  z-index:70 !important;
-}
-
-/* sticky body 배경: 스크롤 시 뒤쪽 글자가 비치지 않도록 */
-#page-prepare .prepare-table-panel table tbody tr td:nth-child(1),
-#page-prepare .prepare-table-panel table tbody tr td:nth-child(2),
-#page-prepare .prepare-table-panel table tbody tr td:nth-child(3),
-#page-prepare .prepare-table-panel table tbody tr td:nth-child(4),
-#page-prepare .table-wrap table tbody tr td:nth-child(1),
-#page-prepare .table-wrap table tbody tr td:nth-child(2),
-#page-prepare .table-wrap table tbody tr td:nth-child(3),
-#page-prepare .table-wrap table tbody tr td:nth-child(4){
-  background:#fff !important;
-}
-
-/* 확정/비활성 계열 행이 있으면 sticky 영역도 같은 배경 유지 */
-#page-prepare tr.prepare-row-confirmed td:nth-child(1),
-#page-prepare tr.prepare-row-confirmed td:nth-child(2),
-#page-prepare tr.prepare-row-confirmed td:nth-child(3),
-#page-prepare tr.prepare-row-confirmed td:nth-child(4),
-#page-prepare tr.row-confirmed td:nth-child(1),
-#page-prepare tr.row-confirmed td:nth-child(2),
-#page-prepare tr.row-confirmed td:nth-child(3),
-#page-prepare tr.row-confirmed td:nth-child(4){
-  background:#f1f5f9 !important;
-}
-
-/* 오른쪽 컬럼 최소 폭 */
-#page-prepare .prepare-table-panel table th:nth-child(n+5),
-#page-prepare .prepare-table-panel table td:nth-child(n+5),
-#page-prepare .table-wrap table th:nth-child(n+5),
-#page-prepare .table-wrap table td:nth-child(n+5){
-  min-width:90px !important;
-}
-
-/* 좁은 화면 sticky 폭/left 재계산 */
-@media (max-width:1200px){
-  #page-prepare .prepare-table-panel table,
-  #page-prepare .table-wrap table{
-    min-width:1420px !important;
-  }
-
-  #page-prepare .prepare-table-panel table th:nth-child(1),
-  #page-prepare .prepare-table-panel table td:nth-child(1),
-  #page-prepare .table-wrap table th:nth-child(1),
-  #page-prepare .table-wrap table td:nth-child(1){
-    width:64px !important;
-    min-width:64px !important;
-    max-width:64px !important;
-    left:0 !important;
-  }
-
-  #page-prepare .prepare-table-panel table th:nth-child(2),
-  #page-prepare .prepare-table-panel table td:nth-child(2),
-  #page-prepare .table-wrap table th:nth-child(2),
-  #page-prepare .table-wrap table td:nth-child(2){
-    width:230px !important;
-    min-width:230px !important;
-    max-width:230px !important;
-    left:64px !important;
-  }
-
-  #page-prepare .prepare-table-panel table th:nth-child(3),
-  #page-prepare .prepare-table-panel table td:nth-child(3),
-  #page-prepare .table-wrap table th:nth-child(3),
-  #page-prepare .table-wrap table td:nth-child(3){
-    width:100px !important;
-    min-width:100px !important;
-    max-width:100px !important;
-    left:294px !important;
-  }
-
-  #page-prepare .prepare-table-panel table th:nth-child(4),
-  #page-prepare .prepare-table-panel table td:nth-child(4),
-  #page-prepare .table-wrap table th:nth-child(4),
-  #page-prepare .table-wrap table td:nth-child(4){
-    width:100px !important;
-    min-width:100px !important;
-    max-width:100px !important;
-    left:394px !important;
-  }
-}
-
-/* =========================================================
-   STEP 2-2 FINAL - 취합정리 Sticky 적용 범위 재정리
-   목적
-   - 기안서용 요약표: sticky 제외, 일반 테이블 유지
-   - 비교견적표: 좌측 핵심 컬럼 sticky 유지
-   기준
-   - #prepareDocList = 기안서용 요약표 계열로 보고 sticky 해제
-   - #prepareList / #prepareViewList = 비교견적표 계열 sticky 유지
-========================================================= */
-
-/* 1) 우선 취합정리 전체 테이블에서 좌측 sticky를 해제 */
-#page-prepare .table-wrap table th:nth-child(1),
-#page-prepare .table-wrap table td:nth-child(1),
-#page-prepare .table-wrap table th:nth-child(2),
-#page-prepare .table-wrap table td:nth-child(2),
-#page-prepare .table-wrap table th:nth-child(3),
-#page-prepare .table-wrap table td:nth-child(3),
-#page-prepare .table-wrap table th:nth-child(4),
-#page-prepare .table-wrap table td:nth-child(4),
-#page-prepare .prepare-table-panel table th:nth-child(1),
-#page-prepare .prepare-table-panel table td:nth-child(1),
-#page-prepare .prepare-table-panel table th:nth-child(2),
-#page-prepare .prepare-table-panel table td:nth-child(2),
-#page-prepare .prepare-table-panel table th:nth-child(3),
-#page-prepare .prepare-table-panel table td:nth-child(3),
-#page-prepare .prepare-table-panel table th:nth-child(4),
-#page-prepare .prepare-table-panel table td:nth-child(4){
-  position:static !important;
-  left:auto !important;
-  z-index:auto !important;
-  box-shadow:none !important;
-  border-right:0 !important;
-}
-
-/* 헤더의 세로 sticky는 유지 */
-#page-prepare .table-wrap table thead th,
-#page-prepare .prepare-table-panel table thead th{
-  position:sticky !important;
-  top:0 !important;
-  background:#fbfdff !important;
-  z-index:30 !important;
-}
-
-/* 2) 기안서용 요약표는 별도 일반 테이블로 정리 */
-#page-prepare .table-wrap:has(#prepareDocList),
-#page-prepare .prepare-table-panel:has(#prepareDocList){
-  overflow-x:auto !important;
-  overflow-y:auto !important;
-}
-
+/* 기안서용 요약표는 정보량이 적으므로 자동폭 일반 테이블 */
 #page-prepare .table-wrap:has(#prepareDocList) table,
 #page-prepare .prepare-table-panel:has(#prepareDocList) table{
   table-layout:auto !important;
@@ -5408,19 +5175,31 @@ td {
   border-spacing:0 !important;
 }
 
-#page-prepare .table-wrap:has(#prepareDocList) table th,
-#page-prepare .table-wrap:has(#prepareDocList) table td,
-#page-prepare .prepare-table-panel:has(#prepareDocList) table th,
-#page-prepare .prepare-table-panel:has(#prepareDocList) table td{
+/* 기안서용 요약표의 좌측 sticky 해제 */
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(1),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(1),
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(2),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(2),
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(3),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(3),
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(4),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(4),
+#page-prepare .prepare-table-panel:has(#prepareDocList) table th:nth-child(1),
+#page-prepare .prepare-table-panel:has(#prepareDocList) table td:nth-child(1),
+#page-prepare .prepare-table-panel:has(#prepareDocList) table th:nth-child(2),
+#page-prepare .prepare-table-panel:has(#prepareDocList) table td:nth-child(2),
+#page-prepare .prepare-table-panel:has(#prepareDocList) table th:nth-child(3),
+#page-prepare .prepare-table-panel:has(#prepareDocList) table td:nth-child(3),
+#page-prepare .prepare-table-panel:has(#prepareDocList) table th:nth-child(4),
+#page-prepare .prepare-table-panel:has(#prepareDocList) table td:nth-child(4){
   position:static !important;
   left:auto !important;
   z-index:auto !important;
   box-shadow:none !important;
   border-right:0 !important;
-  white-space:nowrap !important;
-  background:inherit;
 }
 
+/* 기안서용 요약표 header의 상단 sticky만 유지 */
 #page-prepare .table-wrap:has(#prepareDocList) table thead th,
 #page-prepare .prepare-table-panel:has(#prepareDocList) table thead th{
   position:sticky !important;
@@ -5429,180 +5208,22 @@ td {
   z-index:30 !important;
 }
 
-/* 기안서용 요약표 품명은 너무 좁아지지 않게만 보정 */
+/* 기안서용 요약표 셀 배경/폭 보정 */
+#page-prepare .table-wrap:has(#prepareDocList) table th,
+#page-prepare .table-wrap:has(#prepareDocList) table td,
+#page-prepare .prepare-table-panel:has(#prepareDocList) table th,
+#page-prepare .prepare-table-panel:has(#prepareDocList) table td{
+  background:inherit;
+  white-space:nowrap !important;
+}
+
+/* 품명 컬럼은 줄바꿈 허용 */
 #page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(2),
 #page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(2),
 #page-prepare .prepare-table-panel:has(#prepareDocList) table th:nth-child(2),
 #page-prepare .prepare-table-panel:has(#prepareDocList) table td:nth-child(2){
-  white-space:normal !important;
   min-width:260px !important;
-  font-weight:600 !important;
-  line-height:1.35 !important;
-}
-
-/* 3) 비교견적표 계열만 다시 sticky 적용 */
-#page-prepare .table-wrap:has(#prepareList) table,
-#page-prepare .table-wrap:has(#prepareViewList) table,
-#page-prepare .prepare-table-panel:has(#prepareList) table,
-#page-prepare .prepare-table-panel:has(#prepareViewList) table{
-  table-layout:fixed !important;
-  border-collapse:separate !important;
-  border-spacing:0 !important;
-  width:100% !important;
-  min-width:1500px !important;
-}
-
-/* 비교견적표 1열 */
-#page-prepare .table-wrap:has(#prepareList) table th:nth-child(1),
-#page-prepare .table-wrap:has(#prepareList) table td:nth-child(1),
-#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(1),
-#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(1),
-#page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(1),
-#page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(1),
-#page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(1),
-#page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(1){
-  width:72px !important;
-  min-width:72px !important;
-  max-width:72px !important;
-  position:sticky !important;
-  left:0 !important;
-  z-index:31 !important;
-  text-align:center !important;
-  background:#fff !important;
-}
-
-/* 비교견적표 2열 */
-#page-prepare .table-wrap:has(#prepareList) table th:nth-child(2),
-#page-prepare .table-wrap:has(#prepareList) table td:nth-child(2),
-#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(2),
-#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(2),
-#page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(2),
-#page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(2),
-#page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(2),
-#page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(2){
-  width:280px !important;
-  min-width:280px !important;
-  max-width:280px !important;
-  position:sticky !important;
-  left:72px !important;
-  z-index:31 !important;
   white-space:normal !important;
   line-height:1.35 !important;
-  word-break:keep-all !important;
-  overflow-wrap:anywhere !important;
   font-weight:600 !important;
-  background:#fff !important;
-}
-
-/* 비교견적표 3열 */
-#page-prepare .table-wrap:has(#prepareList) table th:nth-child(3),
-#page-prepare .table-wrap:has(#prepareList) table td:nth-child(3),
-#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(3),
-#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(3),
-#page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(3),
-#page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(3),
-#page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(3),
-#page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(3){
-  width:115px !important;
-  min-width:115px !important;
-  max-width:115px !important;
-  position:sticky !important;
-  left:352px !important;
-  z-index:31 !important;
-  background:#fff !important;
-}
-
-/* 비교견적표 4열 */
-#page-prepare .table-wrap:has(#prepareList) table th:nth-child(4),
-#page-prepare .table-wrap:has(#prepareList) table td:nth-child(4),
-#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(4),
-#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(4),
-#page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(4),
-#page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(4),
-#page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(4),
-#page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(4){
-  width:115px !important;
-  min-width:115px !important;
-  max-width:115px !important;
-  position:sticky !important;
-  left:467px !important;
-  z-index:31 !important;
-  border-right:1px solid rgba(148,163,184,.55) !important;
-  box-shadow:8px 0 12px rgba(15,23,42,.07) !important;
-  background:#fff !important;
-}
-
-/* 비교견적표 헤더 sticky 우선순위 */
-#page-prepare .table-wrap:has(#prepareList) table thead th:nth-child(-n+4),
-#page-prepare .table-wrap:has(#prepareViewList) table thead th:nth-child(-n+4),
-#page-prepare .prepare-table-panel:has(#prepareList) table thead th:nth-child(-n+4),
-#page-prepare .prepare-table-panel:has(#prepareViewList) table thead th:nth-child(-n+4){
-  background:#fbfdff !important;
-  z-index:70 !important;
-}
-
-/* 좁은 화면에서 비교견적표 sticky left 재계산 */
-@media (max-width:1200px){
-  #page-prepare .table-wrap:has(#prepareList) table,
-  #page-prepare .table-wrap:has(#prepareViewList) table,
-  #page-prepare .prepare-table-panel:has(#prepareList) table,
-  #page-prepare .prepare-table-panel:has(#prepareViewList) table{
-    min-width:1420px !important;
-  }
-
-  #page-prepare .table-wrap:has(#prepareList) table th:nth-child(1),
-  #page-prepare .table-wrap:has(#prepareList) table td:nth-child(1),
-  #page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(1),
-  #page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(1),
-  #page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(1),
-  #page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(1),
-  #page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(1),
-  #page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(1){
-    width:64px !important;
-    min-width:64px !important;
-    max-width:64px !important;
-    left:0 !important;
-  }
-
-  #page-prepare .table-wrap:has(#prepareList) table th:nth-child(2),
-  #page-prepare .table-wrap:has(#prepareList) table td:nth-child(2),
-  #page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(2),
-  #page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(2),
-  #page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(2),
-  #page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(2),
-  #page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(2),
-  #page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(2){
-    width:230px !important;
-    min-width:230px !important;
-    max-width:230px !important;
-    left:64px !important;
-  }
-
-  #page-prepare .table-wrap:has(#prepareList) table th:nth-child(3),
-  #page-prepare .table-wrap:has(#prepareList) table td:nth-child(3),
-  #page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(3),
-  #page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(3),
-  #page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(3),
-  #page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(3),
-  #page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(3),
-  #page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(3){
-    width:100px !important;
-    min-width:100px !important;
-    max-width:100px !important;
-    left:294px !important;
-  }
-
-  #page-prepare .table-wrap:has(#prepareList) table th:nth-child(4),
-  #page-prepare .table-wrap:has(#prepareList) table td:nth-child(4),
-  #page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(4),
-  #page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(4),
-  #page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(4),
-  #page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(4),
-  #page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(4),
-  #page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(4){
-    width:100px !important;
-    min-width:100px !important;
-    max-width:100px !important;
-    left:394px !important;
-  }
 }
