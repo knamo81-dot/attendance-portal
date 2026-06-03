@@ -660,10 +660,10 @@
             <td class="txt"><span class="order-status ${statusInfo.className}">${escapeHtml(statusInfo.label)}</span></td>
             <td class="txt order-product-name">${escapeHtml(row.name)}</td>
             <td class="txt">${escapeHtml(row.maker)}</td>
-            <td class="txt">${escapeHtml(row.grade)}</td>
             <td class="txt">${escapeHtml(row.code)}</td>
-            <td class="txt">${escapeHtml(row.capacity)}</td>
             <td class="txt">${escapeHtml(row.cas)}</td>
+            <td class="txt">${escapeHtml(row.grade)}</td>
+            <td class="txt">${escapeHtml(row.capacity)}</td>
             <td class="num">${formatNumber(row.qty)}</td>
             <td class="num">${formatNumber(row.purchaseUnit)}</td>
             <td class="num">${formatNumber(row.purchaseAmount)}</td>
