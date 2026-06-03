@@ -2,7 +2,22 @@ const SUPABASE_URL = "https://mbqpsovlwvedwrtbbauj.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY";
 
 window.ReagentApp = window.ReagentApp || {};
-window.ReagentApp.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const rawSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/*
+  시약 앱 company_id 자동 스코프 래퍼
+  - 아래 테이블은 조회/수정/삭제 시 company_id 필터를 자동 적용합니다.
+  - insert/update/upsert payload에는 company_id를 자동 주입합니다.
+  - 기존 withCompanyPayload / scopedCompanyQuery 수동 방식은 유지하여 기존 코드와 호환합니다.
+*/
+const REAGENT_TENANT_TABLES = new Set([
+  "product_master",
+  "product_registration_requests",
+  "reagent_requests",
+  "reagent_collect_items",
+  "reagent_operators"
+]);
 
 window.ReagentApp.getPortalSession = function () {
   try {
@@ -68,19 +83,72 @@ window.ReagentApp.getCompanyName = function () {
   );
 };
 
-window.ReagentApp.withCompanyPayload = function (payload = {}) {
+function withCompanyPayload(payload = {}) {
   const companyId = window.ReagentApp.getCompanyId?.() || "";
   return companyId ? { ...payload, company_id: companyId } : { ...payload };
-};
+}
 
-window.ReagentApp.withCompanyRows = function (rows = []) {
-  return (Array.isArray(rows) ? rows : []).map((row) => window.ReagentApp.withCompanyPayload(row));
-};
+function withCompanyRows(rows = []) {
+  return (Array.isArray(rows) ? rows : []).map((row) => withCompanyPayload(row));
+}
 
-window.ReagentApp.scopedCompanyQuery = function (query) {
+function scopeCompanyQuery(query) {
   const companyId = window.ReagentApp.getCompanyId?.() || "";
   return companyId ? query.eq("company_id", companyId) : query;
-};
+}
+
+function createReagentTenantScopedClient(client) {
+  return new Proxy(client, {
+    get(target, prop) {
+      if (prop !== "from") return target[prop];
+
+      return function (tableName) {
+        const query = target.from(tableName);
+
+        if (!REAGENT_TENANT_TABLES.has(tableName)) {
+          return query;
+        }
+
+        const originalSelect = query.select.bind(query);
+        const originalInsert = query.insert.bind(query);
+        const originalUpdate = query.update.bind(query);
+        const originalUpsert = query.upsert.bind(query);
+        const originalDelete = query.delete.bind(query);
+
+        query.select = function (...args) {
+          return scopeCompanyQuery(originalSelect(...args));
+        };
+
+        query.insert = function (values, ...args) {
+          const rows = Array.isArray(values) ? withCompanyRows(values) : withCompanyPayload(values);
+          return originalInsert(rows, ...args);
+        };
+
+        query.update = function (values, ...args) {
+          return scopeCompanyQuery(originalUpdate(withCompanyPayload(values), ...args));
+        };
+
+        query.upsert = function (values, ...args) {
+          const rows = Array.isArray(values) ? withCompanyRows(values) : withCompanyPayload(values);
+          return originalUpsert(rows, ...args);
+        };
+
+        query.delete = function (...args) {
+          return scopeCompanyQuery(originalDelete(...args));
+        };
+
+        return query;
+      };
+    }
+  });
+}
+
+window.ReagentApp.rawSb = rawSupabase;
+window.ReagentApp.sb = createReagentTenantScopedClient(rawSupabase);
+
+window.ReagentApp.withCompanyPayload = withCompanyPayload;
+window.ReagentApp.withCompanyRows = withCompanyRows;
+window.ReagentApp.scopedCompanyQuery = scopeCompanyQuery;
 
 window.ReagentApp.refreshForCompanyChange = function () {
   try {
