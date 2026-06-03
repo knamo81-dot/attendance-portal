@@ -5127,8 +5127,51 @@ create table if not exists user_app_roles (
 (function () {
   'use strict';
 
+  var SETTINGS_PORTAL_TABS = [
+    { id: 'org', label: '조직관리' },
+    { id: 'employee', label: '사원정보관리' },
+    { id: 'team', label: '팀변경관리' },
+    { id: 'issue', label: '특이사항관리' },
+    { id: 'resPlaces', label: '예약장소설정' },
+    { id: 'permission', label: '권한관리' },
+    { id: 'asset', label: '자산관리' },
+    { id: 'portal', label: '포탈설정' }
+  ];
+
+  function normalizeSectionId(sectionId) {
+    var raw = String(sectionId || '').trim();
+    if (!raw) return 'org';
+
+    var aliases = {
+      organization: 'org',
+      orgManage: 'org',
+      employees: 'employee',
+      employeeManage: 'employee',
+      teams: 'team',
+      teamManage: 'team',
+      specialNotes: 'issue',
+      issueManage: 'issue',
+      reservationPlaces: 'resPlaces',
+      reservePlaces: 'resPlaces',
+      places: 'resPlaces',
+      permissions: 'permission',
+      permissionManage: 'permission',
+      assets: 'asset',
+      assetManage: 'asset',
+      assetSettings: 'asset',
+      portalSettings: 'portal'
+    };
+
+    return aliases[raw] || raw;
+  }
+
+  function getActiveSectionId() {
+    var active = document.querySelector('.admin-subnav-btn.active[data-admin-section]');
+    return normalizeSectionId(active && active.getAttribute('data-admin-section'));
+  }
+
   function getSectionButton(sectionId) {
-    var id = String(sectionId || '').trim() || 'org';
+    var id = normalizeSectionId(sectionId);
     return (
       document.querySelector('.admin-subnav-btn[data-admin-section="' + id + '"]') ||
       document.querySelector('.admin-subnav-btn[data-admin-section="org"]') ||
@@ -5136,44 +5179,99 @@ create table if not exists user_app_roles (
     );
   }
 
+  function postPortalTabs(activeId) {
+    try {
+      if (!window.parent || window.parent === window) return;
+      var id = normalizeSectionId(activeId || getActiveSectionId());
+      window.parent.postMessage({
+        type: 'portal-tabs-ready',
+        source: 'settings',
+        tabs: SETTINGS_PORTAL_TABS.slice(),
+        activeTabId: id,
+        tabId: id
+      }, '*');
+    } catch (_) {}
+  }
+
+  function postActiveTab(sectionId) {
+    try {
+      if (!window.parent || window.parent === window) return;
+      var id = normalizeSectionId(sectionId || getActiveSectionId());
+      window.parent.postMessage({
+        type: 'portal-tab-active',
+        source: 'settings',
+        activeTabId: id,
+        tabId: id
+      }, '*');
+    } catch (_) {}
+  }
+
   function activateSettingsSection(sectionId) {
-    var btn = getSectionButton(sectionId);
+    var id = normalizeSectionId(sectionId);
+    var btn = getSectionButton(id);
     if (btn && typeof btn.click === 'function') {
       btn.click();
+      postActiveTab(id);
       return true;
     }
 
     // click 이벤트가 아직 준비되지 않았을 때를 대비한 최소 fallback
-    var id = String(sectionId || '').trim() || 'org';
     document.querySelectorAll('.admin-section-panel').forEach(function (panel) {
       panel.hidden = panel.id !== ('adminSection' + id.charAt(0).toUpperCase() + id.slice(1));
     });
     document.querySelectorAll('.admin-subnav-btn').forEach(function (item) {
       item.classList.toggle('active', item.getAttribute('data-admin-section') === id);
     });
+    postActiveTab(id);
     return false;
+  }
+
+  function bindLocalTabSync() {
+    document.querySelectorAll('.admin-subnav-btn[data-admin-section]').forEach(function (btn) {
+      if (btn.__settingsPortalBridgeBound) return;
+      btn.__settingsPortalBridgeBound = true;
+      btn.addEventListener('click', function () {
+        var id = normalizeSectionId(btn.getAttribute('data-admin-section'));
+        setTimeout(function () { postActiveTab(id); }, 0);
+      });
+    });
   }
 
   // 포탈에서 iframe.contentWindow 함수 직접 호출 시 사용
   window.openPortalSettingsSection = activateSettingsSection;
+  window.getPortalSettingsTabs = function () {
+    return SETTINGS_PORTAL_TABS.slice();
+  };
+  window.postPortalSettingsTabs = postPortalTabs;
 
-  // 포탈 공통 탭 클릭 수신
+  // 포탈 공통 탭 클릭/요청 수신
   window.addEventListener('message', function (event) {
     var data = event && event.data ? event.data : {};
     if (!data || typeof data !== 'object') return;
 
     if (data.type === 'portal-tab-change') {
       activateSettingsSection(data.tabId || data.tab || 'org');
+      return;
+    }
+
+    if (data.type === 'portal-tabs-request' || data.type === 'PORTAL_TABS_REQUEST') {
+      postPortalTabs();
     }
   });
 
-  // iframe 로드 후 현재 기본 탭 정리
+  function initBridge() {
+    bindLocalTabSync();
+    activateSettingsSection(getActiveSectionId() || 'org');
+    postPortalTabs(getActiveSectionId());
+    setTimeout(function () { postPortalTabs(getActiveSectionId()); }, 120);
+    setTimeout(function () { postPortalTabs(getActiveSectionId()); }, 450);
+  }
+
+  // iframe 로드 후 현재 기본 탭 정리 및 포탈 공통 탭 목록 전송
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () {
-      activateSettingsSection('org');
-    });
+    document.addEventListener('DOMContentLoaded', initBridge, { once: true });
   } else {
-    activateSettingsSection('org');
+    initBridge();
   }
 })();
 </script>
