@@ -5688,3 +5688,109 @@ td {
   scrollbar-width:thin;
   scrollbar-color:#94a3b8 #f1f5f9;
 }
+
+/* =========================================================
+   STEP 3-1 FINAL - 발주/입고관리 Sticky 컬럼 비침/겹침 보정
+   문제
+   - 가로 스크롤 시 CAS 등 오른쪽 컬럼의 첫 글자가 제조사/제품코드 sticky 영역에 비쳐 보임
+   원인
+   - sticky 셀 배경/레이어가 오른쪽 스크롤 셀을 완전히 덮지 못함
+   보정
+   - sticky 1~5열의 background, z-index, overflow, box-shadow를 강화
+========================================================= */
+
+/* sticky 기준 컨테이너 레이어 분리 */
+#page-order-receipt .order-receipt-table-wrap{
+  position:relative !important;
+  isolation:isolate !important;
+  background:#fff !important;
+}
+
+/* 테이블 레이어 안정화 */
+#page-order-receipt .order-receipt-table{
+  border-collapse:separate !important;
+  border-spacing:0 !important;
+  background:#fff !important;
+}
+
+/* 모든 셀은 자기 영역 밖 글자 비침 방지 */
+#page-order-receipt .order-receipt-table th,
+#page-order-receipt .order-receipt-table td{
+  overflow:hidden !important;
+  text-overflow:clip !important;
+  background-clip:border-box !important;
+}
+
+/* sticky 1~5열은 오른쪽 스크롤 컬럼보다 확실히 위에 배치 */
+#page-order-receipt .order-receipt-table tbody td:nth-child(1),
+#page-order-receipt .order-receipt-table tbody td:nth-child(2),
+#page-order-receipt .order-receipt-table tbody td:nth-child(3),
+#page-order-receipt .order-receipt-table tbody td:nth-child(4),
+#page-order-receipt .order-receipt-table tbody td:nth-child(5){
+  background:#fff !important;
+  background-color:#fff !important;
+  z-index:90 !important;
+}
+
+/* sticky header는 가장 위 */
+#page-order-receipt .order-receipt-table thead th:nth-child(1),
+#page-order-receipt .order-receipt-table thead th:nth-child(2),
+#page-order-receipt .order-receipt-table thead th:nth-child(3),
+#page-order-receipt .order-receipt-table thead th:nth-child(4),
+#page-order-receipt .order-receipt-table thead th:nth-child(5){
+  background:#fbfdff !important;
+  background-color:#fbfdff !important;
+  z-index:120 !important;
+}
+
+/* sticky 컬럼 뒤로 지나가는 텍스트를 가리는 흰색 덮개 효과 */
+#page-order-receipt .order-receipt-table tbody td:nth-child(1),
+#page-order-receipt .order-receipt-table tbody td:nth-child(2),
+#page-order-receipt .order-receipt-table tbody td:nth-child(3),
+#page-order-receipt .order-receipt-table tbody td:nth-child(4),
+#page-order-receipt .order-receipt-table tbody td:nth-child(5){
+  box-shadow:inset 0 0 0 9999px #fff !important;
+}
+
+/* 선택 행에서는 sticky 영역도 선택 배경으로 덮기 */
+#page-order-receipt .order-receipt-table tr.order-receipt-row.selected > td:nth-child(1),
+#page-order-receipt .order-receipt-table tr.order-receipt-row.selected > td:nth-child(2),
+#page-order-receipt .order-receipt-table tr.order-receipt-row.selected > td:nth-child(3),
+#page-order-receipt .order-receipt-table tr.order-receipt-row.selected > td:nth-child(4),
+#page-order-receipt .order-receipt-table tr.order-receipt-row.selected > td:nth-child(5){
+  background:#eaf2ff !important;
+  background-color:#eaf2ff !important;
+  box-shadow:inset 0 0 0 9999px #eaf2ff !important;
+}
+
+/* sticky 마지막 컬럼 오른쪽에 명확한 가림막/경계 */
+#page-order-receipt .order-receipt-table th:nth-child(5),
+#page-order-receipt .order-receipt-table td:nth-child(5){
+  border-right:1px solid rgba(148,163,184,.65) !important;
+  box-shadow:
+    inset 0 0 0 9999px #fff,
+    10px 0 16px rgba(15,23,42,.12) !important;
+}
+
+/* 선택 행의 5열은 선택 배경 + 그림자 유지 */
+#page-order-receipt .order-receipt-table tr.order-receipt-row.selected > td:nth-child(5){
+  box-shadow:
+    inset 0 0 0 9999px #eaf2ff,
+    10px 0 16px rgba(15,23,42,.12) !important;
+}
+
+/* 헤더 5열은 헤더 배경 + 그림자 */
+#page-order-receipt .order-receipt-table thead th:nth-child(5){
+  box-shadow:
+    inset 0 0 0 9999px #fbfdff,
+    10px 0 16px rgba(15,23,42,.12) !important;
+}
+
+/* 품명은 줄바꿈이 필요하므로 clip 대신 정상 줄바꿈 */
+#page-order-receipt .order-receipt-table td.order-product-name,
+#page-order-receipt .order-receipt-table th:nth-child(3),
+#page-order-receipt .order-receipt-table td:nth-child(3){
+  white-space:normal !important;
+  overflow:hidden !important;
+  line-height:1.35 !important;
+}
