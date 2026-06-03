@@ -4884,3 +4884,264 @@ td {
   scrollbar-width:thin;
   scrollbar-color:#94a3b8 #f1f5f9;
 }
+
+/* =========================================================
+   STEP 2 FINAL - 취합정리 테이블 폭/스크롤/sticky 구조 정리
+   - 구분/품명/제조사/제품코드 고정
+   - 오른쪽 컬럼은 테이블 내부 가로스크롤
+========================================================= */
+
+#page-prepare,
+#page-prepare .card,
+#page-prepare .card-body{
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  overflow-x:hidden !important;
+}
+
+#page-prepare .prepare-table-panel,
+#page-prepare .table-wrap:has(#prepareList),
+#page-prepare .table-wrap:has(#prepareDocList),
+#page-prepare .table-wrap:has(#prepareViewList){
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  overflow-x:auto !important;
+  overflow-y:auto !important;
+  position:relative !important;
+  border-radius:13px !important;
+  isolation:isolate !important;
+  scrollbar-gutter:stable both-edges !important;
+}
+
+#page-prepare .table-wrap:has(#prepareList) table,
+#page-prepare .table-wrap:has(#prepareDocList) table,
+#page-prepare .table-wrap:has(#prepareViewList) table{
+  table-layout:fixed !important;
+  border-collapse:separate !important;
+  border-spacing:0 !important;
+  width:100% !important;
+  min-width:1500px !important;
+}
+
+#page-prepare .table-wrap:has(#prepareList) table th,
+#page-prepare .table-wrap:has(#prepareList) table td,
+#page-prepare .table-wrap:has(#prepareDocList) table th,
+#page-prepare .table-wrap:has(#prepareDocList) table td,
+#page-prepare .table-wrap:has(#prepareViewList) table th,
+#page-prepare .table-wrap:has(#prepareViewList) table td{
+  padding:6px 6px !important;
+  vertical-align:middle !important;
+  border-bottom:1px solid var(--line) !important;
+  white-space:nowrap !important;
+}
+
+/* 고정 컬럼 폭 */
+#page-prepare .table-wrap:has(#prepareList) table th:nth-child(1),
+#page-prepare .table-wrap:has(#prepareList) table td:nth-child(1),
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(1),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(1),
+#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(1),
+#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(1){
+  width:72px !important;
+  min-width:72px !important;
+  max-width:72px !important;
+  text-align:center !important;
+}
+
+#page-prepare .table-wrap:has(#prepareList) table th:nth-child(2),
+#page-prepare .table-wrap:has(#prepareList) table td:nth-child(2),
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(2),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(2),
+#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(2),
+#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(2){
+  width:280px !important;
+  min-width:280px !important;
+  max-width:280px !important;
+  white-space:normal !important;
+  line-height:1.35 !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+  font-weight:600 !important;
+}
+
+#page-prepare .table-wrap:has(#prepareList) table th:nth-child(3),
+#page-prepare .table-wrap:has(#prepareList) table td:nth-child(3),
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(3),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(3),
+#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(3),
+#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(3){
+  width:115px !important;
+  min-width:115px !important;
+  max-width:115px !important;
+}
+
+#page-prepare .table-wrap:has(#prepareList) table th:nth-child(4),
+#page-prepare .table-wrap:has(#prepareList) table td:nth-child(4),
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(4),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(4),
+#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(4),
+#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(4){
+  width:115px !important;
+  min-width:115px !important;
+  max-width:115px !important;
+}
+
+/* 오른쪽 컬럼 기본 폭 */
+#page-prepare .table-wrap:has(#prepareList) table th:nth-child(n+5),
+#page-prepare .table-wrap:has(#prepareList) table td:nth-child(n+5),
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(n+5),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(n+5),
+#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(n+5),
+#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(n+5){
+  min-width:92px !important;
+}
+
+/* sticky 고정: 1~4열 */
+#page-prepare .table-wrap:has(#prepareList) table th:nth-child(1),
+#page-prepare .table-wrap:has(#prepareList) table td:nth-child(1),
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(1),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(1),
+#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(1),
+#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(1){
+  position:sticky !important;
+  left:0 !important;
+  z-index:21 !important;
+}
+
+#page-prepare .table-wrap:has(#prepareList) table th:nth-child(2),
+#page-prepare .table-wrap:has(#prepareList) table td:nth-child(2),
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(2),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(2),
+#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(2),
+#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(2){
+  position:sticky !important;
+  left:72px !important;
+  z-index:21 !important;
+}
+
+#page-prepare .table-wrap:has(#prepareList) table th:nth-child(3),
+#page-prepare .table-wrap:has(#prepareList) table td:nth-child(3),
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(3),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(3),
+#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(3),
+#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(3){
+  position:sticky !important;
+  left:352px !important;
+  z-index:21 !important;
+}
+
+#page-prepare .table-wrap:has(#prepareList) table th:nth-child(4),
+#page-prepare .table-wrap:has(#prepareList) table td:nth-child(4),
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(4),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(4),
+#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(4),
+#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(4){
+  position:sticky !important;
+  left:467px !important;
+  z-index:21 !important;
+  border-right:1px solid rgba(148,163,184,.55) !important;
+  box-shadow:8px 0 12px rgba(15,23,42,.07) !important;
+}
+
+/* header sticky */
+#page-prepare .table-wrap:has(#prepareList) table thead th,
+#page-prepare .table-wrap:has(#prepareDocList) table thead th,
+#page-prepare .table-wrap:has(#prepareViewList) table thead th{
+  position:sticky !important;
+  top:0 !important;
+  background:#fbfdff !important;
+  z-index:30 !important;
+}
+
+#page-prepare .table-wrap:has(#prepareList) table thead th:nth-child(-n+4),
+#page-prepare .table-wrap:has(#prepareDocList) table thead th:nth-child(-n+4),
+#page-prepare .table-wrap:has(#prepareViewList) table thead th:nth-child(-n+4){
+  z-index:40 !important;
+}
+
+/* sticky body background */
+#page-prepare .table-wrap:has(#prepareList) table tbody td:nth-child(-n+4),
+#page-prepare .table-wrap:has(#prepareDocList) table tbody td:nth-child(-n+4),
+#page-prepare .table-wrap:has(#prepareViewList) table tbody td:nth-child(-n+4){
+  background:#fff !important;
+}
+
+/* 좁은 화면 보정 */
+@media (max-width:1200px){
+  #page-prepare .table-wrap:has(#prepareList) table,
+  #page-prepare .table-wrap:has(#prepareDocList) table,
+  #page-prepare .table-wrap:has(#prepareViewList) table{
+    min-width:1420px !important;
+  }
+
+  #page-prepare .table-wrap:has(#prepareList) table th:nth-child(1),
+  #page-prepare .table-wrap:has(#prepareList) table td:nth-child(1),
+  #page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(1),
+  #page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(1),
+  #page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(1),
+  #page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(1){
+    width:64px !important;
+    min-width:64px !important;
+    max-width:64px !important;
+    left:0 !important;
+  }
+
+  #page-prepare .table-wrap:has(#prepareList) table th:nth-child(2),
+  #page-prepare .table-wrap:has(#prepareList) table td:nth-child(2),
+  #page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(2),
+  #page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(2),
+  #page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(2),
+  #page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(2){
+    width:230px !important;
+    min-width:230px !important;
+    max-width:230px !important;
+    left:64px !important;
+  }
+
+  #page-prepare .table-wrap:has(#prepareList) table th:nth-child(3),
+  #page-prepare .table-wrap:has(#prepareList) table td:nth-child(3),
+  #page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(3),
+  #page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(3),
+  #page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(3),
+  #page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(3){
+    width:100px !important;
+    min-width:100px !important;
+    max-width:100px !important;
+    left:294px !important;
+  }
+
+  #page-prepare .table-wrap:has(#prepareList) table th:nth-child(4),
+  #page-prepare .table-wrap:has(#prepareList) table td:nth-child(4),
+  #page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(4),
+  #page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(4),
+  #page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(4),
+  #page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(4){
+    width:100px !important;
+    min-width:100px !important;
+    max-width:100px !important;
+    left:394px !important;
+  }
+}
+
+/* 취합정리 스크롤바 */
+#page-prepare .table-wrap:has(#prepareList)::-webkit-scrollbar,
+#page-prepare .table-wrap:has(#prepareDocList)::-webkit-scrollbar,
+#page-prepare .table-wrap:has(#prepareViewList)::-webkit-scrollbar{
+  height:12px;
+  width:12px;
+}
+#page-prepare .table-wrap:has(#prepareList)::-webkit-scrollbar-track,
+#page-prepare .table-wrap:has(#prepareDocList)::-webkit-scrollbar-track,
+#page-prepare .table-wrap:has(#prepareViewList)::-webkit-scrollbar-track{
+  background:#f1f5f9;
+  border-radius:999px;
+}
+#page-prepare .table-wrap:has(#prepareList)::-webkit-scrollbar-thumb,
+#page-prepare .table-wrap:has(#prepareDocList)::-webkit-scrollbar-thumb,
+#page-prepare .table-wrap:has(#prepareViewList)::-webkit-scrollbar-thumb{
+  background:#94a3b8;
+  border:3px solid #f1f5f9;
+  border-radius:999px;
+}
