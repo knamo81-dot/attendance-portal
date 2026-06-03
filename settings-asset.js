@@ -8,11 +8,11 @@
   const TABLE = 'asset_setting_items';
 
   const SETTING_TYPES = [
-    { key: 'cost_type', title: '비용구분 관리', desc: '예: 일반, 제조, 연구소', placeholder: '예: 연구소' },
-    { key: 'account_subject', title: '계정과목 관리', desc: '예: 구축물, 공구와기구, 비품, 기계장치', placeholder: '예: 기계장치' },
-    { key: 'asset_status', title: '자산상태 관리', desc: '예: 사용중, 미사용, 폐기, 매각, 이관', placeholder: '예: 사용중' },
-    { key: 'location', title: '위치 관리', desc: '예: 연구소 3층, 분석실, 제조동', placeholder: '예: 분석실' },
-    { key: 'extra_field', title: '추가정보 관리', desc: '예: QA관리번호, Tax코드, ERP번호, CAPEX번호', placeholder: '예: QA관리번호' }
+    { key: 'cost_type', tabLabel: '비용구분', title: '비용구분 관리', desc: '예: 일반, 제조, 연구소', placeholder: '예: 연구소' },
+    { key: 'account_subject', tabLabel: '계정과목', title: '계정과목 관리', desc: '예: 구축물, 공구와기구, 비품, 기계장치', placeholder: '예: 기계장치' },
+    { key: 'asset_status', tabLabel: '자산상태', title: '자산상태 관리', desc: '예: 사용중, 미사용, 폐기, 매각, 이관', placeholder: '예: 사용중' },
+    { key: 'location', tabLabel: '위치관리', title: '위치 관리', desc: '예: 연구소 3층, 분석실, 제조동', placeholder: '예: 분석실' },
+    { key: 'extra_field', tabLabel: '추가정보', title: '추가정보 관리', desc: '예: QA관리번호, Tax코드, ERP번호, CAPEX번호', placeholder: '예: QA관리번호' }
   ];
 
   const DEFAULT_ITEMS = {
@@ -26,7 +26,8 @@
   let state = {
     loaded: false,
     rows: [],
-    busy: false
+    busy: false,
+    activeType: 'cost_type'
   };
 
   function $(id) {
@@ -99,13 +100,29 @@
     if (message) el.classList.add(type || 'ok');
   }
 
+  function getTypeMeta(type) {
+    return SETTING_TYPES.find(item => item.key === type) || SETTING_TYPES[0];
+  }
+
+  function getActiveType() {
+    if (!state.activeType || !SETTING_TYPES.some(item => item.key === state.activeType)) {
+      state.activeType = SETTING_TYPES[0].key;
+    }
+    return state.activeType;
+  }
+
   function injectStyle() {
     if ($('assetSettingsStyle')) return;
     const style = document.createElement('style');
     style.id = 'assetSettingsStyle';
     style.textContent = `
-      #settings-page .asset-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
-      #settings-page .asset-setting-card{border:1px solid #e2e8f0;border-radius:15px;background:#fff;padding:14px;box-shadow:0 5px 14px rgba(15,23,42,.045)}
+      #settings-page .asset-settings-shell{display:grid;gap:10px}
+      #settings-page .asset-settings-tabs{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:0 0 10px 0}
+      #settings-page .asset-setting-tab{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:auto;min-width:max-content;height:var(--st-control-height,34px);min-height:var(--st-control-height,34px);padding:0 12px;border:1px solid #e2e8f0;border-radius:var(--st-control-radius,10px);background:#fff;color:#0f172a;font-size:var(--st-font-base,12.5px);font-weight:700;white-space:nowrap;cursor:pointer;box-shadow:none}
+      #settings-page .asset-setting-tab:hover{background:#f8fafc;border-color:#cbd5e1}
+      #settings-page .asset-setting-tab.active{background:#0f172a;color:#fff;border-color:#0f172a}
+      #settings-page .asset-setting-tab-count{margin-left:6px;opacity:.75;font-size:11px;font-weight:800}
+      #settings-page .asset-setting-panel{border:1px solid #e2e8f0;border-radius:15px;background:#fff;padding:14px;box-shadow:0 5px 14px rgba(15,23,42,.045)}
       #settings-page .asset-setting-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
       #settings-page .asset-setting-title{font-size:16px;font-weight:800;color:#0f172a}
       #settings-page .asset-setting-desc{margin-top:4px;font-size:11px;line-height:1.45;color:#64748b}
@@ -123,7 +140,6 @@
       #settings-page .asset-settings-feedback.error{color:#b91c1c}
       #settings-page .asset-settings-feedback.loading{color:#475569}
       #settings-page .asset-settings-sql{margin-top:10px;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;color:#334155;padding:12px;font-size:11px;line-height:1.55;white-space:pre-wrap;overflow:auto}
-      @media (max-width:1250px){#settings-page .asset-settings-grid{grid-template-columns:1fr}}
       @media (max-width:760px){#settings-page .asset-setting-add,#settings-page .asset-setting-row{grid-template-columns:1fr}.asset-setting-actions{justify-content:flex-start!important}}
     `;
     document.head.appendChild(style);
@@ -136,53 +152,79 @@
     injectStyle();
 
     mount.innerHTML = `
-      <div class="real-card">
+      <div class="real-card asset-settings-shell">
         <div class="real-box-head">
           <div>
             <div class="real-box-title">자산관리 설정</div>
-            <div class="real-box-sub">자산 프로그램에서 사용할 회사별 기준값을 관리합니다. 기존 데이터 보호를 위해 항목 삭제 대신 사용중/미사용 전환만 제공합니다.</div>
+            <div class="real-box-sub">자산 프로그램에서 사용할 회사별 기준값을 관리합니다.</div>
           </div>
           <button id="assetSettingsRefreshBtn" class="real-btn ghost" type="button">새로고침</button>
         </div>
-        <div class="real-warning-box" style="margin-top:0;margin-bottom:10px;">
-          추가정보는 예약장소설정처럼 항목명을 직접 추가하는 방식입니다. 예: QA관리번호, Tax코드, ERP번호, CAPEX번호. 미사용 처리한 항목은 신규 입력 화면에서는 숨기고, 기존 자산 상세/이력에서는 유지하는 구조로 사용합니다.
-        </div>
-        <div id="assetSettingsGrid" class="asset-settings-grid"></div>
+        <div id="assetSettingsTabs" class="asset-settings-tabs"></div>
+        <div id="assetSettingsGrid"></div>
         <div id="assetSettingsFeedback" class="asset-settings-feedback"></div>
       </div>
     `;
 
     $('assetSettingsRefreshBtn')?.addEventListener('click', () => load(true));
-    renderCards();
+    renderAssetSettings();
   }
 
-  function renderCards() {
+  function renderAssetSettings() {
+    renderTabs();
+    renderDetail();
+  }
+
+  function renderTabs() {
+    const tabs = $('assetSettingsTabs');
+    if (!tabs) return;
+    const activeType = getActiveType();
+    tabs.innerHTML = SETTING_TYPES.map(type => {
+      const rows = rowsByType(type.key);
+      const activeCount = rows.filter(row => row.is_active !== false).length;
+      const label = type.tabLabel || type.title.replace(/ 관리$/, '');
+      return `
+        <button class="asset-setting-tab ${activeType === type.key ? 'active' : ''}" data-asset-tab="${esc(type.key)}" type="button">
+          ${esc(label)}<span class="asset-setting-tab-count">${activeCount}</span>
+        </button>
+      `;
+    }).join('');
+
+    tabs.querySelectorAll('[data-asset-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.activeType = btn.getAttribute('data-asset-tab') || SETTING_TYPES[0].key;
+        renderAssetSettings();
+      });
+    });
+  }
+
+  function renderDetail() {
     const grid = $('assetSettingsGrid');
     if (!grid) return;
 
     const editable = canEdit();
-    grid.innerHTML = SETTING_TYPES.map(type => {
-      const rows = rowsByType(type.key);
-      const activeCount = rows.filter(row => row.is_active !== false).length;
-      return `
-        <section class="asset-setting-card" data-asset-setting-type="${esc(type.key)}">
-          <div class="asset-setting-head">
-            <div>
-              <div class="asset-setting-title">${esc(type.title)}</div>
-              <div class="asset-setting-desc">${esc(type.desc)}</div>
-            </div>
-            <div class="asset-setting-count">사용중 ${activeCount}</div>
+    const type = getTypeMeta(getActiveType());
+    const rows = rowsByType(type.key);
+    const activeCount = rows.filter(row => row.is_active !== false).length;
+
+    grid.innerHTML = `
+      <section class="asset-setting-panel" data-asset-setting-type="${esc(type.key)}">
+        <div class="asset-setting-head">
+          <div>
+            <div class="asset-setting-title">${esc(type.title)}</div>
+            <div class="asset-setting-desc">${esc(type.desc)}</div>
           </div>
-          <div class="asset-setting-add">
-            <input class="real-input asset-setting-input" data-type="${esc(type.key)}" placeholder="${esc(type.placeholder)}" ${editable ? '' : 'disabled'}>
-            <button class="real-btn asset-setting-add-btn" data-type="${esc(type.key)}" type="button" ${editable ? '' : 'disabled'}>추가</button>
-          </div>
-          <div class="asset-setting-list">
-            ${rows.length ? rows.map(rowTemplate).join('') : '<div class="real-empty" style="padding:14px;">등록된 항목이 없습니다.</div>'}
-          </div>
-        </section>
-      `;
-    }).join('');
+          <div class="asset-setting-count">사용중 ${activeCount}</div>
+        </div>
+        <div class="asset-setting-add">
+          <input class="real-input asset-setting-input" data-type="${esc(type.key)}" placeholder="${esc(type.placeholder)}" ${editable ? '' : 'disabled'}>
+          <button class="real-btn asset-setting-add-btn" data-type="${esc(type.key)}" type="button" ${editable ? '' : 'disabled'}>추가</button>
+        </div>
+        <div class="asset-setting-list">
+          ${rows.length ? rows.map(rowTemplate).join('') : '<div class="real-empty" style="padding:14px;">등록된 항목이 없습니다.</div>'}
+        </div>
+      </section>
+    `;
 
     grid.querySelectorAll('.asset-setting-add-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -276,7 +318,7 @@ on public.asset_setting_items(company_id, setting_type, item_name);`;
       if (error) throw error;
       state.rows = data || [];
       state.loaded = true;
-      renderCards();
+      renderAssetSettings();
       setFeedback('자산관리 설정을 불러왔습니다.', 'ok');
     } catch (error) {
       console.error('[settings-asset] load failed:', error);
