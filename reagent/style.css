@@ -5369,3 +5369,322 @@ td {
     left:394px !important;
   }
 }
+
+/* =========================================================
+   STEP 3 FINAL - 발주/입고관리 Sticky + 컬럼 순서 보정
+   기준 컬럼 순서
+   - 선택 / 상태 / 품명 / 제조사 / 제품코드 / CAS / 등급 / 규격 / 수량 ...
+   Sticky 고정 영역
+   - 선택 / 상태 / 품명 / 제조사 / 제품코드
+   스크롤 영역
+   - CAS부터 오른쪽 전체
+========================================================= */
+
+/* 발주/입고관리 페이지 전체 가로 밀림 방지 */
+#page-order-receipt,
+#page-order-receipt .card,
+#page-order-receipt .card-body{
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  overflow-x:hidden !important;
+}
+
+/* 실제 가로 스크롤은 테이블 박스 내부에서만 */
+#page-order-receipt .order-receipt-table-wrap{
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  overflow-x:auto !important;
+  overflow-y:auto !important;
+  position:relative !important;
+  border-radius:13px !important;
+  isolation:isolate !important;
+  scrollbar-gutter:stable both-edges !important;
+}
+
+/* 테이블은 큰 화면에서는 100%, 작은 화면에서는 내부 가로스크롤 */
+#page-order-receipt .order-receipt-table{
+  table-layout:fixed !important;
+  border-collapse:separate !important;
+  border-spacing:0 !important;
+  width:100% !important;
+  min-width:1680px !important;
+}
+
+/* 셀 기본 */
+#page-order-receipt .order-receipt-table th,
+#page-order-receipt .order-receipt-table td{
+  padding:6px 6px !important;
+  vertical-align:middle !important;
+  border-bottom:1px solid var(--line, #d9e2ec) !important;
+  white-space:nowrap !important;
+  background:#fff;
+}
+
+/* 헤더 */
+#page-order-receipt .order-receipt-table thead th{
+  position:sticky !important;
+  top:0 !important;
+  background:#fbfdff !important;
+  z-index:40 !important;
+}
+
+/* 컬럼 폭 */
+#page-order-receipt .order-receipt-table th:nth-child(1),
+#page-order-receipt .order-receipt-table td:nth-child(1){
+  width:54px !important;
+  min-width:54px !important;
+  max-width:54px !important;
+  text-align:center !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(2),
+#page-order-receipt .order-receipt-table td:nth-child(2){
+  width:90px !important;
+  min-width:90px !important;
+  max-width:90px !important;
+  text-align:center !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(3),
+#page-order-receipt .order-receipt-table td:nth-child(3){
+  width:270px !important;
+  min-width:270px !important;
+  max-width:270px !important;
+  white-space:normal !important;
+  line-height:1.35 !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+  font-weight:700 !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(4),
+#page-order-receipt .order-receipt-table td:nth-child(4){
+  width:120px !important;
+  min-width:120px !important;
+  max-width:120px !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(5),
+#page-order-receipt .order-receipt-table td:nth-child(5){
+  width:120px !important;
+  min-width:120px !important;
+  max-width:120px !important;
+}
+
+/* CAS부터 오른쪽 */
+#page-order-receipt .order-receipt-table th:nth-child(6),
+#page-order-receipt .order-receipt-table td:nth-child(6){
+  width:120px !important;
+  min-width:120px !important;
+  max-width:120px !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(7),
+#page-order-receipt .order-receipt-table td:nth-child(7){
+  width:80px !important;
+  min-width:80px !important;
+  max-width:80px !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(8),
+#page-order-receipt .order-receipt-table td:nth-child(8){
+  width:110px !important;
+  min-width:110px !important;
+  max-width:110px !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(9),
+#page-order-receipt .order-receipt-table td:nth-child(9){
+  width:70px !important;
+  min-width:70px !important;
+  max-width:70px !important;
+  text-align:right !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(10),
+#page-order-receipt .order-receipt-table td:nth-child(10){
+  width:110px !important;
+  min-width:110px !important;
+  max-width:110px !important;
+  text-align:right !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(11),
+#page-order-receipt .order-receipt-table td:nth-child(11){
+  width:120px !important;
+  min-width:120px !important;
+  max-width:120px !important;
+  text-align:right !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(12),
+#page-order-receipt .order-receipt-table td:nth-child(12){
+  width:140px !important;
+  min-width:140px !important;
+  max-width:140px !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(13),
+#page-order-receipt .order-receipt-table td:nth-child(13),
+#page-order-receipt .order-receipt-table th:nth-child(14),
+#page-order-receipt .order-receipt-table td:nth-child(14){
+  width:160px !important;
+  min-width:160px !important;
+  max-width:160px !important;
+}
+
+/* Sticky: 선택 / 상태 / 품명 / 제조사 / 제품코드 */
+#page-order-receipt .order-receipt-table th:nth-child(1),
+#page-order-receipt .order-receipt-table td:nth-child(1){
+  position:sticky !important;
+  left:0 !important;
+  z-index:31 !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(2),
+#page-order-receipt .order-receipt-table td:nth-child(2){
+  position:sticky !important;
+  left:54px !important;
+  z-index:31 !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(3),
+#page-order-receipt .order-receipt-table td:nth-child(3){
+  position:sticky !important;
+  left:144px !important;
+  z-index:31 !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(4),
+#page-order-receipt .order-receipt-table td:nth-child(4){
+  position:sticky !important;
+  left:414px !important;
+  z-index:31 !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(5),
+#page-order-receipt .order-receipt-table td:nth-child(5){
+  position:sticky !important;
+  left:534px !important;
+  z-index:31 !important;
+  border-right:1px solid rgba(148,163,184,.55) !important;
+  box-shadow:8px 0 12px rgba(15,23,42,.07) !important;
+}
+
+/* Sticky 헤더는 body보다 위 */
+#page-order-receipt .order-receipt-table thead th:nth-child(-n+5){
+  z-index:70 !important;
+  background:#fbfdff !important;
+}
+
+/* 선택 행 배경이 sticky에도 유지되도록 */
+#page-order-receipt .order-receipt-table tr.order-receipt-row.selected > td{
+  background:#eaf2ff !important;
+}
+
+#page-order-receipt .order-receipt-table tr.order-receipt-row:not(.selected) > td:nth-child(-n+5){
+  background:#fff !important;
+}
+
+/* 상태 배지/날짜 입력칸 안정화 */
+#page-order-receipt .order-receipt-table .order-status{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-width:58px !important;
+  height:24px !important;
+}
+
+#page-order-receipt .order-date-box{
+  display:flex !important;
+  align-items:center !important;
+  gap:6px !important;
+  min-width:0 !important;
+}
+
+#page-order-receipt .order-receipt-date{
+  width:118px !important;
+  min-width:118px !important;
+  height:30px !important;
+  padding:0 8px !important;
+  border-radius:9px !important;
+}
+
+#page-order-receipt .order-date-clear{
+  flex:0 0 auto !important;
+}
+
+/* 좁은 화면 보정 */
+@media (max-width:1200px){
+  #page-order-receipt .order-receipt-table{
+    min-width:1580px !important;
+  }
+
+  #page-order-receipt .order-receipt-table th:nth-child(1),
+  #page-order-receipt .order-receipt-table td:nth-child(1){
+    width:50px !important;
+    min-width:50px !important;
+    max-width:50px !important;
+    left:0 !important;
+  }
+
+  #page-order-receipt .order-receipt-table th:nth-child(2),
+  #page-order-receipt .order-receipt-table td:nth-child(2){
+    width:82px !important;
+    min-width:82px !important;
+    max-width:82px !important;
+    left:50px !important;
+  }
+
+  #page-order-receipt .order-receipt-table th:nth-child(3),
+  #page-order-receipt .order-receipt-table td:nth-child(3){
+    width:230px !important;
+    min-width:230px !important;
+    max-width:230px !important;
+    left:132px !important;
+  }
+
+  #page-order-receipt .order-receipt-table th:nth-child(4),
+  #page-order-receipt .order-receipt-table td:nth-child(4){
+    width:105px !important;
+    min-width:105px !important;
+    max-width:105px !important;
+    left:362px !important;
+  }
+
+  #page-order-receipt .order-receipt-table th:nth-child(5),
+  #page-order-receipt .order-receipt-table td:nth-child(5){
+    width:105px !important;
+    min-width:105px !important;
+    max-width:105px !important;
+    left:467px !important;
+  }
+}
+
+/* 스크롤바 */
+#page-order-receipt .order-receipt-table-wrap::-webkit-scrollbar{
+  height:12px;
+  width:12px;
+}
+
+#page-order-receipt .order-receipt-table-wrap::-webkit-scrollbar-track{
+  background:#f1f5f9;
+  border-radius:999px;
+}
+
+#page-order-receipt .order-receipt-table-wrap::-webkit-scrollbar-thumb{
+  background:#94a3b8;
+  border:3px solid #f1f5f9;
+  border-radius:999px;
+}
+
+#page-order-receipt .order-receipt-table-wrap::-webkit-scrollbar-thumb:hover{
+  background:#64748b;
+}
+
+#page-order-receipt .order-receipt-table-wrap{
+  scrollbar-width:thin;
+  scrollbar-color:#94a3b8 #f1f5f9;
+}
