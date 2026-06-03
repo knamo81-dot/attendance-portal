@@ -346,26 +346,26 @@
       <div class="table-wrap">
         <table class="prepare-quote-table prepare-fixed-table">
           <colgroup>
-            <col style="width:80px;">
-            <col style="width:180px;">
-            <col style="width:130px;">
-            <col style="width:80px;">
-            <col style="width:120px;">
-            <col style="width:100px;">
-            <col style="width:120px;">
-            <col style="width:70px;">
-            <col style="width:260px;">
-            <col style="width:120px;">
-            <col style="width:130px;">
-            <col style="width:140px;">
-            <col style="width:120px;">
-            <col style="width:130px;">
-            <col style="width:140px;">
-            <col style="width:170px;">
+            <col style="width:80px;">   <!-- 구분 -->
+            <col style="width:180px;">  <!-- 품명 -->
+            <col style="width:130px;">  <!-- 제조사 -->
+            <col style="width:120px;">  <!-- 제품코드 -->
+            <col style="width:120px;">  <!-- CAS -->
+            <col style="width:80px;">   <!-- 등급 -->
+            <col style="width:100px;">  <!-- 규격 -->
+            <col style="width:70px;">   <!-- 수량 -->
+            <col style="width:260px;">  <!-- 용도 -->
+            <col style="width:120px;">  <!-- 구매 단가 -->
+            <col style="width:130px;">  <!-- 구매 금액 -->
+            <col style="width:140px;">  <!-- 구매 거래처 -->
+            <col style="width:120px;">  <!-- 비교 단가 -->
+            <col style="width:130px;">  <!-- 비교 금액 -->
+            <col style="width:140px;">  <!-- 비교 거래처 -->
+            <col style="width:170px;">  <!-- 비고 -->
           </colgroup>
           <thead>
             <tr>
-              <th class="txt">구분</th><th class="txt">품명</th><th class="txt">제조사</th><th class="txt">등급</th><th class="txt">제품코드</th><th class="txt">규격</th><th class="txt">CAS</th><th class="num">수량</th><th class="txt">용도</th>
+              <th class="txt">구분</th><th class="txt">품명</th><th class="txt">제조사</th><th class="txt">제품코드</th><th class="txt">CAS</th><th class="txt">등급</th><th class="txt">규격</th><th class="num">수량</th><th class="txt">용도</th>
               <th class="num">구매 단가</th><th class="num">구매 금액</th><th class="txt">구매 거래처</th>
               <th class="num">비교 단가</th><th class="num">비교 금액</th><th class="txt">비교 거래처</th><th class="txt">비고</th>
             </tr>
@@ -413,24 +413,24 @@
       <div class="table-wrap order-receipt-table-wrap" style="margin-top:16px;">
         <table class="order-receipt-table">
           <colgroup>
-            <col style="width:54px;">
-            <col style="width:90px;">
-            <col style="width:260px;">
-            <col style="width:120px;">
-            <col style="width:80px;">
-            <col style="width:120px;">
-            <col style="width:110px;">
-            <col style="width:120px;">
-            <col style="width:70px;">
-            <col style="width:110px;">
-            <col style="width:120px;">
-            <col style="width:140px;">
-            <col style="width:160px;">
-            <col style="width:160px;">
+            <col style="width:54px;">   <!-- 선택 -->
+            <col style="width:90px;">   <!-- 상태 -->
+            <col style="width:260px;">  <!-- 품명 -->
+            <col style="width:120px;">  <!-- 제조사 -->
+            <col style="width:120px;">  <!-- 제품코드 -->
+            <col style="width:120px;">  <!-- CAS -->
+            <col style="width:80px;">   <!-- 등급 -->
+            <col style="width:110px;">  <!-- 규격 -->
+            <col style="width:70px;">   <!-- 수량 -->
+            <col style="width:110px;">  <!-- 구매단가 -->
+            <col style="width:120px;">  <!-- 구매금액 -->
+            <col style="width:140px;">  <!-- 구매거래처 -->
+            <col style="width:160px;">  <!-- 발주일자 -->
+            <col style="width:160px;">  <!-- 입고일자 -->
           </colgroup>
           <thead>
             <tr>
-              <th>선택</th><th>상태</th><th>품명</th><th>제조사</th><th>등급</th><th>제품코드</th><th>규격</th><th>CAS</th><th>수량</th><th>구매단가</th><th>구매금액</th><th>구매거래처</th><th>발주일자</th><th>입고일자</th>
+              <th>선택</th><th>상태</th><th>품명</th><th>제조사</th><th>제품코드</th><th>CAS</th><th>등급</th><th>규격</th><th>수량</th><th>구매단가</th><th>구매금액</th><th>구매거래처</th><th>발주일자</th><th>입고일자</th>
             </tr>
           </thead>
           <tbody id="orderReceiptList"><tr><td class="empty" colspan="14">발주/입고 관리 자료를 불러오는 중입니다.</td></tr></tbody>
@@ -562,6 +562,12 @@
 </script>
 <script src="supabase.js"></script>
 <script src="request.js"></script>
+<!--
+  COLUMN ORDER NOTE
+  - HTML header/colgroup order updated:
+    품명 → 제조사 → 제품코드 → CAS → 등급 → 규격
+  - 실제 tbody 데이터 출력 순서는 collect.js / order_receipt.js 렌더링 코드도 동일 순서로 맞춰야 완전히 반영됩니다.
+-->
 <script src="collect.js"></script>
 <script src="product_management.js"></script>
 <script src="order_receipt.js"></script>
