@@ -4473,3 +4473,414 @@ td {
     padding-bottom:16px !important;
   }
 }
+
+/* =========================================================
+   STEP 1 FINAL - 제품취합 테이블 폭/스크롤/sticky 구조 정리
+   목적
+   - 페이지/iframe 전체 가로 밀림 방지
+   - 제품취합 테이블 박스 내부에서만 가로 스크롤
+   - 큰 모니터에서는 테이블이 컨테이너 폭을 채움
+   - 작은 화면에서는 제품코드까지 좌측 sticky 고정, CAS부터 우측 스크롤
+   - 기존 누적 patch는 이 블록이 최종 우선순위로 정리
+========================================================= */
+
+/* 제품취합 페이지 자체는 화면 폭을 넘지 않게 고정 */
+#page-collect,
+#page-collect .card,
+#page-collect .card-body{
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  overflow-x:hidden !important;
+}
+
+/* 제품취합 테이블 스크롤 컨테이너 */
+#page-collect .collect-table-wrap,
+#page-collect .table-wrap:has(#collectList){
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  overflow-x:auto !important;
+  overflow-y:auto !important;
+  position:relative !important;
+  border-radius:13px !important;
+  isolation:isolate !important;
+  scrollbar-gutter:stable both-edges !important;
+}
+
+/* 테이블은 큰 화면에서는 100%를 채우고, 작은 화면에서는 내부 스크롤 */
+#page-collect .collect-table-wrap table,
+#page-collect .table-wrap:has(#collectList) table{
+  table-layout:fixed !important;
+  border-collapse:separate !important;
+  border-spacing:0 !important;
+  width:100% !important;
+  min-width:1480px !important;
+}
+
+/* 제품취합 공통 셀 밀도 */
+#page-collect .collect-table-wrap table th,
+#page-collect .collect-table-wrap table td,
+#page-collect .table-wrap:has(#collectList) table th,
+#page-collect .table-wrap:has(#collectList) table td{
+  padding:6px 5px !important;
+  vertical-align:middle !important;
+  border-bottom:1px solid var(--line) !important;
+  white-space:nowrap !important;
+}
+
+/* 컬럼 기준: 제품코드까지 좌측 고정, CAS부터 우측 스크롤 */
+#page-collect .collect-table-wrap table th:nth-child(1),
+#page-collect .collect-table-wrap table td:nth-child(1),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(1),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(1){
+  width:68px !important;
+  min-width:68px !important;
+  max-width:68px !important;
+  text-align:center !important;
+}
+
+#page-collect .collect-table-wrap table th:nth-child(2),
+#page-collect .collect-table-wrap table td:nth-child(2),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(2),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(2){
+  width:260px !important;
+  min-width:260px !important;
+  max-width:260px !important;
+  white-space:normal !important;
+  line-height:1.35 !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+}
+
+#page-collect .collect-table-wrap table th:nth-child(3),
+#page-collect .collect-table-wrap table td:nth-child(3),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(3),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(3){
+  width:110px !important;
+  min-width:110px !important;
+  max-width:110px !important;
+}
+
+#page-collect .collect-table-wrap table th:nth-child(4),
+#page-collect .collect-table-wrap table td:nth-child(4),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(4),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(4){
+  width:110px !important;
+  min-width:110px !important;
+  max-width:110px !important;
+}
+
+/* CAS 이후 영역 */
+#page-collect .collect-table-wrap table th:nth-child(5),
+#page-collect .collect-table-wrap table td:nth-child(5),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(5),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(5){
+  width:110px !important;
+  min-width:110px !important;
+  max-width:110px !important;
+}
+
+#page-collect .collect-table-wrap table th:nth-child(6),
+#page-collect .collect-table-wrap table td:nth-child(6),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(6),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(6){
+  width:75px !important;
+  min-width:75px !important;
+  max-width:75px !important;
+}
+
+#page-collect .collect-table-wrap table th:nth-child(7),
+#page-collect .collect-table-wrap table td:nth-child(7),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(7),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(7){
+  width:85px !important;
+  min-width:85px !important;
+  max-width:85px !important;
+}
+
+#page-collect .collect-table-wrap table th:nth-child(8),
+#page-collect .collect-table-wrap table td:nth-child(8),
+#page-collect .collect-table-wrap table th:nth-child(9),
+#page-collect .collect-table-wrap table td:nth-child(9),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(8),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(8),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(9),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(9){
+  width:78px !important;
+  min-width:78px !important;
+  max-width:78px !important;
+  text-align:center !important;
+}
+
+#page-collect .collect-table-wrap table th:nth-child(10),
+#page-collect .collect-table-wrap table td:nth-child(10),
+#page-collect .collect-table-wrap table th:nth-child(13),
+#page-collect .collect-table-wrap table td:nth-child(13),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(10),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(10),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(13),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(13){
+  width:88px !important;
+  min-width:88px !important;
+  max-width:88px !important;
+  text-align:right !important;
+}
+
+#page-collect .collect-table-wrap table th:nth-child(11),
+#page-collect .collect-table-wrap table td:nth-child(11),
+#page-collect .collect-table-wrap table th:nth-child(14),
+#page-collect .collect-table-wrap table td:nth-child(14),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(11),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(11),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(14),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(14){
+  width:100px !important;
+  min-width:100px !important;
+  max-width:100px !important;
+  text-align:right !important;
+}
+
+#page-collect .collect-table-wrap table th:nth-child(12),
+#page-collect .collect-table-wrap table td:nth-child(12),
+#page-collect .collect-table-wrap table th:nth-child(15),
+#page-collect .collect-table-wrap table td:nth-child(15),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(12),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(12),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(15),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(15){
+  width:108px !important;
+  min-width:108px !important;
+  max-width:108px !important;
+}
+
+#page-collect .collect-table-wrap table th:nth-child(16),
+#page-collect .collect-table-wrap table td:nth-child(16),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(16),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(16){
+  width:70px !important;
+  min-width:70px !important;
+  max-width:70px !important;
+  text-align:center !important;
+}
+
+/* sticky: 제품코드까지 항상 고정 */
+#page-collect .collect-table-wrap table th:nth-child(1),
+#page-collect .collect-table-wrap table td:nth-child(1),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(1),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(1){
+  position:sticky !important;
+  left:0 !important;
+  z-index:21 !important;
+}
+
+#page-collect .collect-table-wrap table th:nth-child(2),
+#page-collect .collect-table-wrap table td:nth-child(2),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(2),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(2){
+  position:sticky !important;
+  left:68px !important;
+  z-index:21 !important;
+}
+
+#page-collect .collect-table-wrap table th:nth-child(3),
+#page-collect .collect-table-wrap table td:nth-child(3),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(3),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(3){
+  position:sticky !important;
+  left:328px !important;
+  z-index:21 !important;
+}
+
+#page-collect .collect-table-wrap table th:nth-child(4),
+#page-collect .collect-table-wrap table td:nth-child(4),
+#page-collect .table-wrap:has(#collectList) table th:nth-child(4),
+#page-collect .table-wrap:has(#collectList) table td:nth-child(4){
+  position:sticky !important;
+  left:438px !important;
+  z-index:21 !important;
+  border-right:1px solid rgba(148,163,184,.55) !important;
+  box-shadow:8px 0 12px rgba(15,23,42,.07) !important;
+}
+
+/* sticky header/background */
+#page-collect .collect-table-wrap table thead th,
+#page-collect .table-wrap:has(#collectList) table thead th{
+  position:sticky !important;
+  top:0 !important;
+  background:#fbfdff !important;
+  z-index:30 !important;
+}
+
+#page-collect .collect-table-wrap table thead th:nth-child(1),
+#page-collect .collect-table-wrap table thead th:nth-child(2),
+#page-collect .collect-table-wrap table thead th:nth-child(3),
+#page-collect .collect-table-wrap table thead th:nth-child(4),
+#page-collect .table-wrap:has(#collectList) table thead th:nth-child(1),
+#page-collect .table-wrap:has(#collectList) table thead th:nth-child(2),
+#page-collect .table-wrap:has(#collectList) table thead th:nth-child(3),
+#page-collect .table-wrap:has(#collectList) table thead th:nth-child(4){
+  z-index:40 !important;
+}
+
+/* sticky body background */
+#page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(1),
+#page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(2),
+#page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(3),
+#page-collect .collect-table-wrap table tbody tr:not(.collect-row-confirmed) > td:nth-child(4),
+#page-collect .table-wrap:has(#collectList) table tbody tr:not(.collect-row-confirmed) > td:nth-child(1),
+#page-collect .table-wrap:has(#collectList) table tbody tr:not(.collect-row-confirmed) > td:nth-child(2),
+#page-collect .table-wrap:has(#collectList) table tbody tr:not(.collect-row-confirmed) > td:nth-child(3),
+#page-collect .table-wrap:has(#collectList) table tbody tr:not(.collect-row-confirmed) > td:nth-child(4){
+  background:#fff !important;
+}
+
+#page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(1),
+#page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(2),
+#page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(3),
+#page-collect .collect-table-wrap table tbody tr.collect-row-confirmed > td:nth-child(4),
+#page-collect .table-wrap:has(#collectList) table tbody tr.collect-row-confirmed > td:nth-child(1),
+#page-collect .table-wrap:has(#collectList) table tbody tr.collect-row-confirmed > td:nth-child(2),
+#page-collect .table-wrap:has(#collectList) table tbody tr.collect-row-confirmed > td:nth-child(3),
+#page-collect .table-wrap:has(#collectList) table tbody tr.collect-row-confirmed > td:nth-child(4){
+  background:#f1f5f9 !important;
+}
+
+/* 제품취합 입력/버튼 밀도 유지 */
+#page-collect .collect-table-wrap table input.collect-input,
+#page-collect .table-wrap:has(#collectList) table input.collect-input{
+  height:28px !important;
+  min-height:28px !important;
+  padding:3px 5px !important;
+  font-size:11.5px !important;
+  border-radius:7px !important;
+}
+
+#page-collect .collect-table-wrap table .ghost-btn,
+#page-collect .table-wrap:has(#collectList) table .ghost-btn{
+  padding:5px 7px !important;
+  font-size:11px !important;
+  border-radius:8px !important;
+}
+
+/* 품명 셀 안정화 */
+#page-collect .collect-name-cell{
+  display:table-cell !important;
+  white-space:normal !important;
+  line-height:1.35 !important;
+  font-weight:600 !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+}
+
+/* 선택 거래처 파란 음영 유지 */
+#page-collect .vendor-cell.auto-vendor-selected{
+  background:#dbeafe !important;
+  background-color:#dbeafe !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+#page-collect .vendor-cell.auto-vendor-selected input.collect-input,
+#page-collect .vendor-cell.auto-vendor-selected input[readonly]{
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+  color:#1d4ed8 !important;
+  font-weight:800 !important;
+}
+
+/* 확정 행 */
+#page-collect tr.collect-row-confirmed,
+#page-collect tr.collect-row-confirmed > td{
+  background:#f1f5f9 !important;
+  background-color:#f1f5f9 !important;
+}
+
+#page-collect tr.collect-row-confirmed input.collect-input,
+#page-collect tr.collect-row-confirmed input[readonly]{
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+  pointer-events:none !important;
+}
+
+/* 아주 좁은 화면 sticky 폭 보정 */
+@media (max-width:1200px){
+  #page-collect .collect-table-wrap table,
+  #page-collect .table-wrap:has(#collectList) table{
+    min-width:1420px !important;
+  }
+
+  #page-collect .collect-table-wrap table th:nth-child(1),
+  #page-collect .collect-table-wrap table td:nth-child(1),
+  #page-collect .table-wrap:has(#collectList) table th:nth-child(1),
+  #page-collect .table-wrap:has(#collectList) table td:nth-child(1){
+    width:60px !important;
+    min-width:60px !important;
+    max-width:60px !important;
+    left:0 !important;
+  }
+
+  #page-collect .collect-table-wrap table th:nth-child(2),
+  #page-collect .collect-table-wrap table td:nth-child(2),
+  #page-collect .table-wrap:has(#collectList) table th:nth-child(2),
+  #page-collect .table-wrap:has(#collectList) table td:nth-child(2){
+    width:220px !important;
+    min-width:220px !important;
+    max-width:220px !important;
+    left:60px !important;
+  }
+
+  #page-collect .collect-table-wrap table th:nth-child(3),
+  #page-collect .collect-table-wrap table td:nth-child(3),
+  #page-collect .table-wrap:has(#collectList) table th:nth-child(3),
+  #page-collect .table-wrap:has(#collectList) table td:nth-child(3){
+    width:96px !important;
+    min-width:96px !important;
+    max-width:96px !important;
+    left:280px !important;
+  }
+
+  #page-collect .collect-table-wrap table th:nth-child(4),
+  #page-collect .collect-table-wrap table td:nth-child(4),
+  #page-collect .table-wrap:has(#collectList) table th:nth-child(4),
+  #page-collect .table-wrap:has(#collectList) table td:nth-child(4){
+    width:96px !important;
+    min-width:96px !important;
+    max-width:96px !important;
+    left:376px !important;
+  }
+}
+
+/* 스크롤바 정리 */
+#page-collect .collect-table-wrap::-webkit-scrollbar,
+#page-collect .table-wrap:has(#collectList)::-webkit-scrollbar{
+  height:12px;
+  width:12px;
+}
+
+#page-collect .collect-table-wrap::-webkit-scrollbar-track,
+#page-collect .table-wrap:has(#collectList)::-webkit-scrollbar-track{
+  background:#f1f5f9;
+  border-radius:999px;
+}
+
+#page-collect .collect-table-wrap::-webkit-scrollbar-thumb,
+#page-collect .table-wrap:has(#collectList)::-webkit-scrollbar-thumb{
+  background:#94a3b8;
+  border:3px solid #f1f5f9;
+  border-radius:999px;
+}
+
+#page-collect .collect-table-wrap::-webkit-scrollbar-thumb:hover,
+#page-collect .table-wrap:has(#collectList)::-webkit-scrollbar-thumb:hover{
+  background:#64748b;
+}
+
+#page-collect .collect-table-wrap,
+#page-collect .table-wrap:has(#collectList){
+  scrollbar-width:thin;
+  scrollbar-color:#94a3b8 #f1f5f9;
+}
