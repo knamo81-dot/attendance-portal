@@ -1431,7 +1431,7 @@ window.ReagentApp.collect = {
     const sheet2Data = [
       [quoteTitle],
       [],
-      ["No", "구분", "품명", "제조원", "등급", "제품번호", "단위", "CAS", "수량", "목적", "구매 업체", "", "", "비교 업체", "", ""],
+      ["No", "구분", "품명", "제조원", "제품번호", "CAS", "등급", "단위", "수량", "목적", "구매 업체", "", "", "비교 업체", "", ""],
       ["", "", "", "", "", "", "", "", "", "", "단가", "금액", "거래처", "단가", "금액", "거래처"]
     ];
 
@@ -1447,10 +1447,10 @@ window.ReagentApp.collect = {
         row.category,
         row.name,
         row.maker,
-        row.grade,
         row.code,
-        row.capacity,
         row.cas,
+        row.grade,
+        row.capacity,
         row.qty,
         row.usage,
         row.purchaseUnit,
@@ -1467,7 +1467,7 @@ window.ReagentApp.collect = {
     const ws2 = XLSX.utils.aoa_to_sheet(sheet2Data);
     ws2["!cols"] = [
       { wch: 6 }, { wch: 10 }, { wch: 32 }, { wch: 18 },
-      { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 16 },
+      { wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 14 },
       { wch: 8 }, { wch: 38 }, { wch: 14 }, { wch: 16 },
       { wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 20 }
     ];
@@ -1607,10 +1607,10 @@ window.ReagentApp.collect = {
       #prepareQuotePanel .prepare-quote-table col:nth-child(1)  { width: 60px !important; }   /* 구분 */
       #prepareQuotePanel .prepare-quote-table col:nth-child(2)  { width: 330px !important; }  /* 품명 */
       #prepareQuotePanel .prepare-quote-table col:nth-child(3)  { width: 115px !important; }  /* 제조사 */
-      #prepareQuotePanel .prepare-quote-table col:nth-child(4)  { width: 58px !important; }   /* 등급 */
-      #prepareQuotePanel .prepare-quote-table col:nth-child(5)  { width: 92px !important; }   /* 제품코드 */
-      #prepareQuotePanel .prepare-quote-table col:nth-child(6)  { width: 72px !important; }   /* 규격 */
-      #prepareQuotePanel .prepare-quote-table col:nth-child(7)  { width: 92px !important; }   /* CAS */
+      #prepareQuotePanel .prepare-quote-table col:nth-child(4)  { width: 92px !important; }   /* 제품코드 */
+      #prepareQuotePanel .prepare-quote-table col:nth-child(5)  { width: 92px !important; }   /* CAS */
+      #prepareQuotePanel .prepare-quote-table col:nth-child(6)  { width: 58px !important; }   /* 등급 */
+      #prepareQuotePanel .prepare-quote-table col:nth-child(7)  { width: 72px !important; }   /* 규격 */
       #prepareQuotePanel .prepare-quote-table col:nth-child(8)  { width: 55px !important; }   /* 수량 */
       #prepareQuotePanel .prepare-quote-table col:nth-child(9)  { width: 175px !important; }  /* 용도 */
       #prepareQuotePanel .prepare-quote-table col:nth-child(10) { width: 88px !important; }   /* 구매 단가 */
@@ -1737,10 +1737,10 @@ if (els.count) els.count.textContent = String(rows.length);
         <td class="txt">${this.html(row.category)}</td>
         <td class="txt">${this.html(row.name)}</td>
         <td class="txt">${this.html(row.maker)}</td>
-        <td class="txt">${this.html(row.grade)}</td>
         <td class="txt">${this.html(row.code)}</td>
-        <td class="txt">${this.html(row.capacity)}</td>
         <td class="txt">${this.html(row.cas)}</td>
+        <td class="txt">${this.html(row.grade)}</td>
+        <td class="txt">${this.html(row.capacity)}</td>
         <td class="num">${this.formatNumber(row.qty)}</td>
         <td class="txt usage-cell">${this.html(row.usage)}</td>
         <td class="num">${this.formatNumber(row.purchaseUnit)}</td>
