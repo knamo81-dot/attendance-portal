@@ -2607,6 +2607,7 @@ body.auth-loading .top-user-bar {
     mobileEdgeSwipeZone: document.getElementById('mobileEdgeSwipeZone'),
     portalSideNav: document.getElementById('portalSideNav'),
     settingsNavBtn: document.getElementById('settingsNavBtn'),
+    researchStaffNavBtn: document.getElementById('researchStaffNavBtn'),
     serviceAdminBtn: document.getElementById('serviceAdminBtn'),
     portalSubtabsWrap: document.getElementById('portalSubtabsWrap'),
     portalSubtabs: document.getElementById('portalSubtabs'),
@@ -3579,6 +3580,56 @@ body.auth-loading .top-user-bar {
     els.settingsNavBtn.tabIndex = allowed ? 0 : -1;
   }
 
+  function getCurrentEmployeeDuty() {
+    const employee = currentEmployee || {};
+    const normalizedEmployee = normalizePortalEmployee(employee) || {};
+    return String(
+      employee.duty ||
+      employee.job_duty ||
+      employee.job_title ||
+      employee.responsibility ||
+      employee.role_title ||
+      employee['직책'] ||
+      normalizedEmployee.duty ||
+      normalizedEmployee.raw?.duty ||
+      normalizedEmployee.raw?.job_duty ||
+      normalizedEmployee.raw?.job_title ||
+      normalizedEmployee.raw?.responsibility ||
+      normalizedEmployee.raw?.role_title ||
+      normalizedEmployee.raw?.['직책'] ||
+      ''
+    ).trim();
+  }
+
+  function canAccessResearchStaffApp() {
+    // 서비스관리자는 회사 전환 검증과 운영 관리를 위해 접근을 허용합니다.
+    if (isServiceAdminRole()) return true;
+
+    // 회사 관리자도 인력 운영현황 접근을 허용합니다.
+    if (canUseSettingsMenu()) return true;
+
+    // 인력 프로그램은 직급(position)이 아니라 직책(duty) 기준으로만 판단합니다.
+    // 담당 이상: 담당, 팀장, 소장, 본부장
+    const duty = getCurrentEmployeeDuty();
+    const allowedDuties = new Set(['담당', '팀장', '소장', '본부장']);
+    return allowedDuties.has(duty);
+  }
+
+  function isResearchStaffSrc(src) {
+    return normalizePortalSrc(src) === 'research-staff/index.html';
+  }
+
+  function updateResearchStaffButtonVisibility() {
+    const btn = els.researchStaffNavBtn || document.getElementById('researchStaffNavBtn');
+    if (!btn) return;
+
+    const allowed = Boolean(currentUser && canAccessResearchStaffApp());
+    btn.hidden = !allowed;
+    btn.style.display = allowed ? '' : 'none';
+    btn.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+    btn.tabIndex = allowed ? 0 : -1;
+  }
+
   function isSettingsSrc(src) {
     return normalizePortalSrc(src) === 'settings.html';
   }
@@ -3859,6 +3910,7 @@ body.auth-loading .top-user-bar {
       team: employee.team || employee.team_name || employee.team_code || '',
       team_code: employee.team_code || '',
       position: employee.position || '',
+      duty: employee.duty || employee.job_duty || employee.job_title || employee.responsibility || employee.role_title || employee['직책'] || '',
       role: employee.role || employee.portal_role || employee.app_role || 'user',
       raw: employee
     };
@@ -4200,6 +4252,7 @@ body.auth-loading .top-user-bar {
     window.currentUserRole = null;
     updateServiceAdminButtonVisibility();
     updateSettingsButtonVisibility();
+    updateResearchStaffButtonVisibility();
   }
 
   window.getPortalSession = function () {
@@ -4894,6 +4947,13 @@ body.auth-loading .top-user-bar {
       return;
     }
 
+    if (isResearchStaffSrc(src) && !canAccessResearchStaffApp()) {
+      try { sessionStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
+      const fallbackBtn = homeBtn || findNavBySrc(HOME_SRC);
+      await navigateBySrc(HOME_SRC, fallbackBtn, { skipSave: true });
+      return;
+    }
+
     const serviceModeNoticeSrc = getServiceModeNoticeSrc(src);
     if (serviceModeNoticeSrc) {
       // service_admin 모드에서는 개인 홈/업무/AIC 앱으로 직접 진입하지 않고
@@ -4954,6 +5014,11 @@ body.auth-loading .top-user-bar {
     }
 
     if (lastSrc && isServiceAdminSrc(lastSrc) && !isServiceAdminRole()) {
+      try { sessionStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
+      lastSrc = '';
+    }
+
+    if (lastSrc && isResearchStaffSrc(lastSrc) && !canAccessResearchStaffApp()) {
       try { sessionStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
       lastSrc = '';
     }
