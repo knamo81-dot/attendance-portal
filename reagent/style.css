@@ -5348,3 +5348,261 @@ td {
     left:394px !important;
   }
 }
+
+/* =========================================================
+   STEP 2-2 FINAL - 취합정리 Sticky 적용 범위 재정리
+   목적
+   - 기안서용 요약표: sticky 제외, 일반 테이블 유지
+   - 비교견적표: 좌측 핵심 컬럼 sticky 유지
+   기준
+   - #prepareDocList = 기안서용 요약표 계열로 보고 sticky 해제
+   - #prepareList / #prepareViewList = 비교견적표 계열 sticky 유지
+========================================================= */
+
+/* 1) 우선 취합정리 전체 테이블에서 좌측 sticky를 해제 */
+#page-prepare .table-wrap table th:nth-child(1),
+#page-prepare .table-wrap table td:nth-child(1),
+#page-prepare .table-wrap table th:nth-child(2),
+#page-prepare .table-wrap table td:nth-child(2),
+#page-prepare .table-wrap table th:nth-child(3),
+#page-prepare .table-wrap table td:nth-child(3),
+#page-prepare .table-wrap table th:nth-child(4),
+#page-prepare .table-wrap table td:nth-child(4),
+#page-prepare .prepare-table-panel table th:nth-child(1),
+#page-prepare .prepare-table-panel table td:nth-child(1),
+#page-prepare .prepare-table-panel table th:nth-child(2),
+#page-prepare .prepare-table-panel table td:nth-child(2),
+#page-prepare .prepare-table-panel table th:nth-child(3),
+#page-prepare .prepare-table-panel table td:nth-child(3),
+#page-prepare .prepare-table-panel table th:nth-child(4),
+#page-prepare .prepare-table-panel table td:nth-child(4){
+  position:static !important;
+  left:auto !important;
+  z-index:auto !important;
+  box-shadow:none !important;
+  border-right:0 !important;
+}
+
+/* 헤더의 세로 sticky는 유지 */
+#page-prepare .table-wrap table thead th,
+#page-prepare .prepare-table-panel table thead th{
+  position:sticky !important;
+  top:0 !important;
+  background:#fbfdff !important;
+  z-index:30 !important;
+}
+
+/* 2) 기안서용 요약표는 별도 일반 테이블로 정리 */
+#page-prepare .table-wrap:has(#prepareDocList),
+#page-prepare .prepare-table-panel:has(#prepareDocList){
+  overflow-x:auto !important;
+  overflow-y:auto !important;
+}
+
+#page-prepare .table-wrap:has(#prepareDocList) table,
+#page-prepare .prepare-table-panel:has(#prepareDocList) table{
+  table-layout:auto !important;
+  width:100% !important;
+  min-width:980px !important;
+  border-collapse:collapse !important;
+  border-spacing:0 !important;
+}
+
+#page-prepare .table-wrap:has(#prepareDocList) table th,
+#page-prepare .table-wrap:has(#prepareDocList) table td,
+#page-prepare .prepare-table-panel:has(#prepareDocList) table th,
+#page-prepare .prepare-table-panel:has(#prepareDocList) table td{
+  position:static !important;
+  left:auto !important;
+  z-index:auto !important;
+  box-shadow:none !important;
+  border-right:0 !important;
+  white-space:nowrap !important;
+  background:inherit;
+}
+
+#page-prepare .table-wrap:has(#prepareDocList) table thead th,
+#page-prepare .prepare-table-panel:has(#prepareDocList) table thead th{
+  position:sticky !important;
+  top:0 !important;
+  background:#fbfdff !important;
+  z-index:30 !important;
+}
+
+/* 기안서용 요약표 품명은 너무 좁아지지 않게만 보정 */
+#page-prepare .table-wrap:has(#prepareDocList) table th:nth-child(2),
+#page-prepare .table-wrap:has(#prepareDocList) table td:nth-child(2),
+#page-prepare .prepare-table-panel:has(#prepareDocList) table th:nth-child(2),
+#page-prepare .prepare-table-panel:has(#prepareDocList) table td:nth-child(2){
+  white-space:normal !important;
+  min-width:260px !important;
+  font-weight:600 !important;
+  line-height:1.35 !important;
+}
+
+/* 3) 비교견적표 계열만 다시 sticky 적용 */
+#page-prepare .table-wrap:has(#prepareList) table,
+#page-prepare .table-wrap:has(#prepareViewList) table,
+#page-prepare .prepare-table-panel:has(#prepareList) table,
+#page-prepare .prepare-table-panel:has(#prepareViewList) table{
+  table-layout:fixed !important;
+  border-collapse:separate !important;
+  border-spacing:0 !important;
+  width:100% !important;
+  min-width:1500px !important;
+}
+
+/* 비교견적표 1열 */
+#page-prepare .table-wrap:has(#prepareList) table th:nth-child(1),
+#page-prepare .table-wrap:has(#prepareList) table td:nth-child(1),
+#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(1),
+#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(1),
+#page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(1),
+#page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(1),
+#page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(1),
+#page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(1){
+  width:72px !important;
+  min-width:72px !important;
+  max-width:72px !important;
+  position:sticky !important;
+  left:0 !important;
+  z-index:31 !important;
+  text-align:center !important;
+  background:#fff !important;
+}
+
+/* 비교견적표 2열 */
+#page-prepare .table-wrap:has(#prepareList) table th:nth-child(2),
+#page-prepare .table-wrap:has(#prepareList) table td:nth-child(2),
+#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(2),
+#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(2),
+#page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(2),
+#page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(2),
+#page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(2),
+#page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(2){
+  width:280px !important;
+  min-width:280px !important;
+  max-width:280px !important;
+  position:sticky !important;
+  left:72px !important;
+  z-index:31 !important;
+  white-space:normal !important;
+  line-height:1.35 !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+  font-weight:600 !important;
+  background:#fff !important;
+}
+
+/* 비교견적표 3열 */
+#page-prepare .table-wrap:has(#prepareList) table th:nth-child(3),
+#page-prepare .table-wrap:has(#prepareList) table td:nth-child(3),
+#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(3),
+#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(3),
+#page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(3),
+#page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(3),
+#page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(3),
+#page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(3){
+  width:115px !important;
+  min-width:115px !important;
+  max-width:115px !important;
+  position:sticky !important;
+  left:352px !important;
+  z-index:31 !important;
+  background:#fff !important;
+}
+
+/* 비교견적표 4열 */
+#page-prepare .table-wrap:has(#prepareList) table th:nth-child(4),
+#page-prepare .table-wrap:has(#prepareList) table td:nth-child(4),
+#page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(4),
+#page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(4),
+#page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(4),
+#page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(4),
+#page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(4),
+#page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(4){
+  width:115px !important;
+  min-width:115px !important;
+  max-width:115px !important;
+  position:sticky !important;
+  left:467px !important;
+  z-index:31 !important;
+  border-right:1px solid rgba(148,163,184,.55) !important;
+  box-shadow:8px 0 12px rgba(15,23,42,.07) !important;
+  background:#fff !important;
+}
+
+/* 비교견적표 헤더 sticky 우선순위 */
+#page-prepare .table-wrap:has(#prepareList) table thead th:nth-child(-n+4),
+#page-prepare .table-wrap:has(#prepareViewList) table thead th:nth-child(-n+4),
+#page-prepare .prepare-table-panel:has(#prepareList) table thead th:nth-child(-n+4),
+#page-prepare .prepare-table-panel:has(#prepareViewList) table thead th:nth-child(-n+4){
+  background:#fbfdff !important;
+  z-index:70 !important;
+}
+
+/* 좁은 화면에서 비교견적표 sticky left 재계산 */
+@media (max-width:1200px){
+  #page-prepare .table-wrap:has(#prepareList) table,
+  #page-prepare .table-wrap:has(#prepareViewList) table,
+  #page-prepare .prepare-table-panel:has(#prepareList) table,
+  #page-prepare .prepare-table-panel:has(#prepareViewList) table{
+    min-width:1420px !important;
+  }
+
+  #page-prepare .table-wrap:has(#prepareList) table th:nth-child(1),
+  #page-prepare .table-wrap:has(#prepareList) table td:nth-child(1),
+  #page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(1),
+  #page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(1),
+  #page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(1),
+  #page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(1),
+  #page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(1),
+  #page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(1){
+    width:64px !important;
+    min-width:64px !important;
+    max-width:64px !important;
+    left:0 !important;
+  }
+
+  #page-prepare .table-wrap:has(#prepareList) table th:nth-child(2),
+  #page-prepare .table-wrap:has(#prepareList) table td:nth-child(2),
+  #page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(2),
+  #page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(2),
+  #page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(2),
+  #page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(2),
+  #page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(2),
+  #page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(2){
+    width:230px !important;
+    min-width:230px !important;
+    max-width:230px !important;
+    left:64px !important;
+  }
+
+  #page-prepare .table-wrap:has(#prepareList) table th:nth-child(3),
+  #page-prepare .table-wrap:has(#prepareList) table td:nth-child(3),
+  #page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(3),
+  #page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(3),
+  #page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(3),
+  #page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(3),
+  #page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(3),
+  #page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(3){
+    width:100px !important;
+    min-width:100px !important;
+    max-width:100px !important;
+    left:294px !important;
+  }
+
+  #page-prepare .table-wrap:has(#prepareList) table th:nth-child(4),
+  #page-prepare .table-wrap:has(#prepareList) table td:nth-child(4),
+  #page-prepare .table-wrap:has(#prepareViewList) table th:nth-child(4),
+  #page-prepare .table-wrap:has(#prepareViewList) table td:nth-child(4),
+  #page-prepare .prepare-table-panel:has(#prepareList) table th:nth-child(4),
+  #page-prepare .prepare-table-panel:has(#prepareList) table td:nth-child(4),
+  #page-prepare .prepare-table-panel:has(#prepareViewList) table th:nth-child(4),
+  #page-prepare .prepare-table-panel:has(#prepareViewList) table td:nth-child(4){
+    width:100px !important;
+    min-width:100px !important;
+    max-width:100px !important;
+    left:394px !important;
+  }
+}
