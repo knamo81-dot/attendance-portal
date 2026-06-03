@@ -5690,107 +5690,213 @@ td {
 }
 
 /* =========================================================
-   STEP 3-1 FINAL - 발주/입고관리 Sticky 컬럼 비침/겹침 보정
-   문제
-   - 가로 스크롤 시 CAS 등 오른쪽 컬럼의 첫 글자가 제조사/제품코드 sticky 영역에 비쳐 보임
-   원인
-   - sticky 셀 배경/레이어가 오른쪽 스크롤 셀을 완전히 덮지 못함
-   보정
-   - sticky 1~5열의 background, z-index, overflow, box-shadow를 강화
+   ORDER RECEIPT STICKY GROUP PATCH - 제품코드까지 sticky 묶음 보정
+   목적
+   - 발주/입고관리에서 선택/상태/품명/제조사/제품코드까지 하나의 고정 영역처럼 동작
+   - CAS 컬럼이 sticky 영역 아래로 비쳐 보이는 현상 최소화
+   기준 컬럼
+   1 선택 54px
+   2 상태 90px
+   3 품명 260px
+   4 제조사 120px
+   5 제품코드 120px
 ========================================================= */
 
-/* sticky 기준 컨테이너 레이어 분리 */
+#page-order-receipt,
+#page-order-receipt .card,
+#page-order-receipt .card-body{
+  max-width:100% !important;
+  overflow-x:hidden !important;
+}
+
 #page-order-receipt .order-receipt-table-wrap{
+  width:100% !important;
+  max-width:100% !important;
+  overflow-x:auto !important;
+  overflow-y:auto !important;
   position:relative !important;
   isolation:isolate !important;
   background:#fff !important;
 }
 
-/* 테이블 레이어 안정화 */
 #page-order-receipt .order-receipt-table{
+  table-layout:fixed !important;
   border-collapse:separate !important;
   border-spacing:0 !important;
+  width:100% !important;
+  min-width:1680px !important;
   background:#fff !important;
 }
 
-/* 모든 셀은 자기 영역 밖 글자 비침 방지 */
 #page-order-receipt .order-receipt-table th,
 #page-order-receipt .order-receipt-table td{
-  overflow:hidden !important;
-  text-overflow:clip !important;
+  vertical-align:middle !important;
+  white-space:nowrap !important;
   background-clip:border-box !important;
 }
 
-/* sticky 1~5열은 오른쪽 스크롤 컬럼보다 확실히 위에 배치 */
-#page-order-receipt .order-receipt-table tbody td:nth-child(1),
-#page-order-receipt .order-receipt-table tbody td:nth-child(2),
-#page-order-receipt .order-receipt-table tbody td:nth-child(3),
-#page-order-receipt .order-receipt-table tbody td:nth-child(4),
-#page-order-receipt .order-receipt-table tbody td:nth-child(5){
+/* sticky 대상 1~5열 공통 */
+#page-order-receipt .order-receipt-table th:nth-child(-n+5),
+#page-order-receipt .order-receipt-table td:nth-child(-n+5){
+  position:sticky !important;
   background:#fff !important;
   background-color:#fff !important;
+  z-index:80 !important;
+  overflow:hidden !important;
+}
+
+/* 헤더는 더 위 */
+#page-order-receipt .order-receipt-table thead th{
+  position:sticky !important;
+  top:0 !important;
+  background:#fbfdff !important;
+  background-color:#fbfdff !important;
   z-index:90 !important;
 }
 
-/* sticky header는 가장 위 */
-#page-order-receipt .order-receipt-table thead th:nth-child(1),
-#page-order-receipt .order-receipt-table thead th:nth-child(2),
-#page-order-receipt .order-receipt-table thead th:nth-child(3),
-#page-order-receipt .order-receipt-table thead th:nth-child(4),
-#page-order-receipt .order-receipt-table thead th:nth-child(5){
-  background:#fbfdff !important;
-  background-color:#fbfdff !important;
+#page-order-receipt .order-receipt-table thead th:nth-child(-n+5){
   z-index:120 !important;
 }
 
-/* sticky 컬럼 뒤로 지나가는 텍스트를 가리는 흰색 덮개 효과 */
-#page-order-receipt .order-receipt-table tbody td:nth-child(1),
-#page-order-receipt .order-receipt-table tbody td:nth-child(2),
-#page-order-receipt .order-receipt-table tbody td:nth-child(3),
-#page-order-receipt .order-receipt-table tbody td:nth-child(4),
-#page-order-receipt .order-receipt-table tbody td:nth-child(5){
+/* colgroup 기준과 동일하게 width/left 고정 */
+#page-order-receipt .order-receipt-table th:nth-child(1),
+#page-order-receipt .order-receipt-table td:nth-child(1){
+  width:54px !important;
+  min-width:54px !important;
+  max-width:54px !important;
+  left:0 !important;
+  text-align:center !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(2),
+#page-order-receipt .order-receipt-table td:nth-child(2){
+  width:90px !important;
+  min-width:90px !important;
+  max-width:90px !important;
+  left:54px !important;
+  text-align:center !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(3),
+#page-order-receipt .order-receipt-table td:nth-child(3){
+  width:260px !important;
+  min-width:260px !important;
+  max-width:260px !important;
+  left:144px !important;
+  white-space:normal !important;
+  line-height:1.35 !important;
+  word-break:keep-all !important;
+  overflow-wrap:anywhere !important;
+  font-weight:700 !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(4),
+#page-order-receipt .order-receipt-table td:nth-child(4){
+  width:120px !important;
+  min-width:120px !important;
+  max-width:120px !important;
+  left:404px !important;
+}
+
+#page-order-receipt .order-receipt-table th:nth-child(5),
+#page-order-receipt .order-receipt-table td:nth-child(5){
+  width:120px !important;
+  min-width:120px !important;
+  max-width:120px !important;
+  left:524px !important;
+}
+
+/* sticky 마지막 컬럼인 제품코드 오른쪽을 경계로 강하게 덮음 */
+#page-order-receipt .order-receipt-table th:nth-child(5),
+#page-order-receipt .order-receipt-table td:nth-child(5){
+  border-right:1px solid rgba(148,163,184,.72) !important;
+  box-shadow:10px 0 14px rgba(15,23,42,.10) !important;
+}
+
+/* sticky 영역 뒤로 지나가는 컬럼이 보이지 않게 배경 레이어 강화 */
+#page-order-receipt .order-receipt-table tbody td:nth-child(-n+5){
   box-shadow:inset 0 0 0 9999px #fff !important;
 }
 
-/* 선택 행에서는 sticky 영역도 선택 배경으로 덮기 */
-#page-order-receipt .order-receipt-table tr.order-receipt-row.selected > td:nth-child(1),
-#page-order-receipt .order-receipt-table tr.order-receipt-row.selected > td:nth-child(2),
-#page-order-receipt .order-receipt-table tr.order-receipt-row.selected > td:nth-child(3),
-#page-order-receipt .order-receipt-table tr.order-receipt-row.selected > td:nth-child(4),
-#page-order-receipt .order-receipt-table tr.order-receipt-row.selected > td:nth-child(5){
+#page-order-receipt .order-receipt-table tbody td:nth-child(5){
+  box-shadow:
+    inset 0 0 0 9999px #fff,
+    10px 0 14px rgba(15,23,42,.10) !important;
+}
+
+#page-order-receipt .order-receipt-table thead th:nth-child(-n+5){
+  box-shadow:inset 0 0 0 9999px #fbfdff !important;
+}
+
+#page-order-receipt .order-receipt-table thead th:nth-child(5){
+  box-shadow:
+    inset 0 0 0 9999px #fbfdff,
+    10px 0 14px rgba(15,23,42,.10) !important;
+}
+
+/* 선택 행 sticky 배경 */
+#page-order-receipt .order-receipt-table tr.order-receipt-row.selected > td:nth-child(-n+5){
   background:#eaf2ff !important;
   background-color:#eaf2ff !important;
   box-shadow:inset 0 0 0 9999px #eaf2ff !important;
 }
 
-/* sticky 마지막 컬럼 오른쪽에 명확한 가림막/경계 */
-#page-order-receipt .order-receipt-table th:nth-child(5),
-#page-order-receipt .order-receipt-table td:nth-child(5){
-  border-right:1px solid rgba(148,163,184,.65) !important;
-  box-shadow:
-    inset 0 0 0 9999px #fff,
-    10px 0 16px rgba(15,23,42,.12) !important;
-}
-
-/* 선택 행의 5열은 선택 배경 + 그림자 유지 */
 #page-order-receipt .order-receipt-table tr.order-receipt-row.selected > td:nth-child(5){
   box-shadow:
     inset 0 0 0 9999px #eaf2ff,
-    10px 0 16px rgba(15,23,42,.12) !important;
+    10px 0 14px rgba(15,23,42,.10) !important;
 }
 
-/* 헤더 5열은 헤더 배경 + 그림자 */
-#page-order-receipt .order-receipt-table thead th:nth-child(5){
-  box-shadow:
-    inset 0 0 0 9999px #fbfdff,
-    10px 0 16px rgba(15,23,42,.12) !important;
+/* 오른쪽 컬럼은 sticky보다 낮은 레이어 */
+#page-order-receipt .order-receipt-table th:nth-child(n+6),
+#page-order-receipt .order-receipt-table td:nth-child(n+6){
+  position:relative !important;
+  z-index:1 !important;
 }
 
-/* 품명은 줄바꿈이 필요하므로 clip 대신 정상 줄바꿈 */
-#page-order-receipt .order-receipt-table td.order-product-name,
-#page-order-receipt .order-receipt-table th:nth-child(3),
-#page-order-receipt .order-receipt-table td:nth-child(3){
-  white-space:normal !important;
-  overflow:hidden !important;
-  line-height:1.35 !important;
+/* 좁은 화면 보정: 1~5열 전체가 같은 그룹으로 움직이도록 left 재계산 */
+@media (max-width:1200px){
+  #page-order-receipt .order-receipt-table{
+    min-width:1580px !important;
+  }
+
+  #page-order-receipt .order-receipt-table th:nth-child(1),
+  #page-order-receipt .order-receipt-table td:nth-child(1){
+    width:50px !important;
+    min-width:50px !important;
+    max-width:50px !important;
+    left:0 !important;
+  }
+
+  #page-order-receipt .order-receipt-table th:nth-child(2),
+  #page-order-receipt .order-receipt-table td:nth-child(2){
+    width:82px !important;
+    min-width:82px !important;
+    max-width:82px !important;
+    left:50px !important;
+  }
+
+  #page-order-receipt .order-receipt-table th:nth-child(3),
+  #page-order-receipt .order-receipt-table td:nth-child(3){
+    width:230px !important;
+    min-width:230px !important;
+    max-width:230px !important;
+    left:132px !important;
+  }
+
+  #page-order-receipt .order-receipt-table th:nth-child(4),
+  #page-order-receipt .order-receipt-table td:nth-child(4){
+    width:105px !important;
+    min-width:105px !important;
+    max-width:105px !important;
+    left:362px !important;
+  }
+
+  #page-order-receipt .order-receipt-table th:nth-child(5),
+  #page-order-receipt .order-receipt-table td:nth-child(5){
+    width:105px !important;
+    min-width:105px !important;
+    max-width:105px !important;
+    left:467px !important;
+  }
 }
