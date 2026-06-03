@@ -1752,6 +1752,7 @@ html.embed-mode #settings-page .admin-section-panel > .real-card:first-child {
                 <button class="admin-subnav-btn" data-admin-section="issue">특이사항 관리</button>
                 <button class="admin-subnav-btn" data-admin-section="resPlaces">예약장소 설정</button>
                 <button class="admin-subnav-btn" data-admin-section="permission">권한 관리</button>
+                <button class="admin-subnav-btn" data-admin-section="asset">자산관리</button>
                 <button class="admin-subnav-btn" data-admin-section="portal">포탈 설정</button>
               </div>
               <div class="admin-header-title" id="adminSectionTitle">조직 관리</div>
@@ -2127,6 +2128,13 @@ create table if not exists user_app_roles (
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div id="adminSectionAsset" class="admin-section-panel" hidden>
+                <div class="real-admin-top-note">
+                  자산관리 기준정보를 회사별로 관리합니다. 각 항목은 삭제하지 않고 사용중/미사용으로 전환하여 기존 자산 데이터와의 연결을 보존합니다.
+                </div>
+                <div id="assetSettingsMount"></div>
               </div>
 
               <div id="adminSectionPortal" class="admin-section-panel" hidden>
@@ -2814,7 +2822,7 @@ create table if not exists user_app_roles (
     }
 
     function renderAdminSection() {
-      const validAdminSections = ['org', 'employee', 'team', 'issue', 'resPlaces', 'permission', 'portal'];
+      const validAdminSections = ['org', 'employee', 'team', 'issue', 'resPlaces', 'permission', 'asset', 'portal'];
       if (!validAdminSections.includes(state.adminSection)) state.adminSection = 'org';
       const sectionMap = {
         org: {
@@ -2840,6 +2848,10 @@ create table if not exists user_app_roles (
         permission: {
           title: '권한 관리',
           desc: '프로그램별 권한을 먼저 눈으로 검증하는 화면입니다. 현재는 저장·조회만 수행하고 각 프로그램과 직접 연동하지 않습니다.'
+        },
+        asset: {
+          title: '자산관리',
+          desc: '자산 프로그램에서 사용할 비용구분, 계정과목, 상태, 위치, 추가정보 항목을 회사별로 관리합니다.'
         },
         portal: {
           title: '포탈 설정',
@@ -2867,6 +2879,9 @@ create table if not exists user_app_roles (
       if (state.adminSection === 'permission' && typeof window.loadPermissionAdminPage === 'function') {
         window.loadPermissionAdminPage();
       }
+      if (state.adminSection === 'asset' && typeof window.loadAssetSettingsAdminPage === 'function') {
+        window.loadAssetSettingsAdminPage();
+      }
       if (state.adminSection === 'portal' && typeof window.loadPortalBrandSettings === 'function') {
         window.loadPortalBrandSettings();
       }
@@ -2880,7 +2895,7 @@ create table if not exists user_app_roles (
       const btn = event.target.closest('.admin-subnav-btn');
       if (!btn) return;
       const sec = btn.dataset.adminSection || 'org';
-      const validAdminSections = ['org', 'employee', 'team', 'issue', 'resPlaces', 'permission', 'portal'];
+      const validAdminSections = ['org', 'employee', 'team', 'issue', 'resPlaces', 'permission', 'asset', 'portal'];
       state.adminSection = validAdminSections.includes(sec) ? sec : 'org';
       renderAdminSection();
       if (state.adminSection === 'org') loadOrganizations();
@@ -5442,7 +5457,8 @@ create table if not exists user_app_roles (
     portal_reservations: true,
     portal_schedules: true,
     portal_memos: true,
-    system_settings: true
+    system_settings: true,
+    asset_setting_items: true
   };
 
   function shouldPatchTable(tableName) {
@@ -5700,6 +5716,7 @@ create table if not exists user_app_roles (
   setTimeout(function(){ patchAllSupabaseClients(); renderSettingsTenantHint(); notifyParentReady(); }, 5000);
 })();
 </script>
+<script src="./settings-asset.js"></script>
 
 </body>
 </html>
