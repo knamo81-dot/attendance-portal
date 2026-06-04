@@ -8445,14 +8445,14 @@ function isHalfDayVacationReason(reason){
 }
 function isVacationReason(reason){
   const s = normalizeAttendanceReasonText(reason);
-  return ["연차휴가","연차","오전반차","오후반차","반차","리프레쉬"].some(k => s === k || s.includes(k));
+  return ["연차휴가","연차","오전반차","오후반차","반차","리프레쉬","경조휴가"].some(k => s === k || s.includes(k));
 }
 function isRefreshLeaveReason(reason){
   const s = normalizeAttendanceReasonText(reason);
   return s === '리프레쉬' || s.includes('리프레쉬');
 }
 function isOutsideReason(reason){
-  return ['외근','출장','오전외근','오후외근'].includes(String(reason || '').trim());
+  return ['외근','출장','오전외근','오후외근','교육'].includes(String(reason || '').trim());
 }
 const ATTENDANCE_CONTINUOUS_LEAVE_KEYWORDS = ['육아휴직','출산휴가','산전후휴가','병가','가족돌봄휴직','장기휴직','휴직'];
 function isContinuousLeaveReason(reason){
@@ -8485,16 +8485,16 @@ function isExcusedReasonBeforeMissing(reason){
   // 이 목록은 "시간이 없어도 누락으로 보면 안 되는" 근태 사유입니다.
   return reasonHasExactOrIncluded(reason, [
     '육아휴직','출산휴가','산전후휴가','병가','가족돌봄휴직','장기휴직','휴직',
-    '연차','연차휴가','반차','오전반차','오후반차','공가','보건휴가','리프레쉬',
-    '외근','오전외근','오후외근','출장','파견','재택근무','단축근무'
+    '연차','연차휴가','반차','오전반차','오후반차','공가','보건휴가','리프레쉬','경조휴가',
+    '외근','오전외근','오후외근','출장','교육','파견','재택근무','단축근무'
   ]);
 }
 function getPrimaryExcusedReason(reason){
   const s = normalizeAttendanceReasonText(reason);
   const ordered = [
     '육아휴직','출산휴가','산전후휴가','가족돌봄휴직','장기휴직','휴직','병가',
-    '리프레쉬','오전반차','오후반차','반차','연차휴가','연차','공가','보건휴가',
-    '오전외근','오후외근','외근','출장','파견','재택근무','단축근무'
+    '리프레쉬','오전반차','오후반차','반차','연차휴가','연차','공가','보건휴가','경조휴가',
+    '오전외근','오후외근','외근','출장','교육','파견','재택근무','단축근무'
   ];
   return ordered.find(k => s.includes(k)) || '';
 }
