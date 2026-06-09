@@ -2998,35 +2998,134 @@
     try { return fn(); } catch(e){ return fallback; }
   }
 
-  function getSupabaseClient(){
-    // 포탈에서 이미 생성된 Supabase 클라이언트를 최우선 사용합니다.
-    const parentClient = safeGet(()=>window.parent && window.parent.supabase, null);
-    if (parentClient && typeof parentClient.from === 'function') return parentClient;
+  function hasFromClient(obj){
+    return !!(obj && typeof obj.from === 'function');
+  }
 
-    const ownClient = safeGet(()=>window.supabase, null);
-    if (ownClient && typeof ownClient.from === 'function') return ownClient;
+  function scanForSupabaseClient(scope){
+    if(!scope) return null;
 
-    // 단독 페이지 테스트용: URL/KEY가 전역으로 제공된 경우만 새로 생성합니다.
-    const url =
+    const directNames = [
+      'supabaseClient',
+      'supabase_client',
+      'sb',
+      'db',
+      'database',
+      'portalSupabase',
+      'portalSupabaseClient',
+      'EXELO_SUPABASE',
+      'EXELO_DB',
+      '__supabaseClient',
+      '__SUPABASE_CLIENT__',
+      'client'
+    ];
+
+    for(const name of directNames){
+      const value = safeGet(()=>scope[name], null);
+      if(hasFromClient(value)) return { client:value, source:name };
+    }
+
+    const containers = [
+      'portal',
+      'Portal',
+      'portalApp',
+      'PortalApp',
+      'portalSession',
+      '__PORTAL__',
+      '__PORTAL_STATE__',
+      'app',
+      'App'
+    ];
+
+    for(const name of containers){
+      const box = safeGet(()=>scope[name], null);
+      if(hasFromClient(box)) return { client:box, source:name };
+      if(box && typeof box === 'object'){
+        for(const key of Object.keys(box)){
+          const value = safeGet(()=>box[key], null);
+          if(hasFromClient(value)) return { client:value, source:name + '.' + key };
+        }
+      }
+    }
+
+    // 마지막으로 window 전역 중 Supabase client 형태(.from 함수)를 가진 객체를 탐색합니다.
+    const keys = safeGet(()=>Object.keys(scope), []);
+    for(const key of keys){
+      if(key === 'supabase') continue; // supabase-js 라이브러리는 client가 아님
+      const value = safeGet(()=>scope[key], null);
+      if(hasFromClient(value)) return { client:value, source:'window.' + key };
+    }
+
+    return null;
+  }
+
+  function createClientFromGlobalConfig(){
+    const lib =
+      safeGet(()=>window.supabase, null) ||
+      safeGet(()=>window.parent && window.parent.supabase, null);
+
+    if(!lib || typeof lib.createClient !== 'function') return null;
+
+    const configSources = [
+      safeGet(()=>window.APP_CONFIG, null),
+      safeGet(()=>window.appConfig, null),
+      safeGet(()=>window.CONFIG, null),
+      safeGet(()=>window.parent && window.parent.APP_CONFIG, null),
+      safeGet(()=>window.parent && window.parent.appConfig, null),
+      safeGet(()=>window.parent && window.parent.CONFIG, null),
+      safeGet(()=>window.portalSession, null),
+      safeGet(()=>window.parent && window.parent.portalSession, null)
+    ].filter(Boolean);
+
+    let url =
       safeGet(()=>window.EXELO_SUPABASE_URL, '') ||
       safeGet(()=>window.SUPABASE_URL, '') ||
       safeGet(()=>window.parent && window.parent.EXELO_SUPABASE_URL, '') ||
       safeGet(()=>window.parent && window.parent.SUPABASE_URL, '');
 
-    const key =
+    let key =
       safeGet(()=>window.EXELO_SUPABASE_ANON_KEY, '') ||
       safeGet(()=>window.SUPABASE_ANON_KEY, '') ||
       safeGet(()=>window.parent && window.parent.EXELO_SUPABASE_ANON_KEY, '') ||
       safeGet(()=>window.parent && window.parent.SUPABASE_ANON_KEY, '');
 
-    const lib = safeGet(()=>window.supabase, null);
-    if (url && key && lib && typeof lib.createClient === 'function') {
-      return lib.createClient(url, key);
+    const urlKeys = ['supabaseUrl','SUPABASE_URL','url','projectUrl','supabase_url'];
+    const keyKeys = ['supabaseAnonKey','SUPABASE_ANON_KEY','anonKey','key','supabase_anon_key'];
+
+    for(const cfg of configSources){
+      if(!url){
+        for(const k of urlKeys){
+          if(cfg && cfg[k]) { url = cfg[k]; break; }
+        }
+      }
+      if(!key){
+        for(const k of keyKeys){
+          if(cfg && cfg[k]) { key = cfg[k]; break; }
+        }
+      }
+    }
+
+    if(url && key){
+      return { client: lib.createClient(url, key), source:'createClient(global-config)' };
     }
     return null;
   }
 
-  const db = getSupabaseClient();
+  function getSupabaseClient(){
+    const parentFound = scanForSupabaseClient(safeGet(()=>window.parent, null));
+    if(parentFound) return parentFound;
+
+    const ownFound = scanForSupabaseClient(window);
+    if(ownFound) return ownFound;
+
+    const created = createClientFromGlobalConfig();
+    if(created) return created;
+
+    return { client:null, source:'not-found' };
+  }
+
+  const dbInfo = getSupabaseClient();
+  const db = dbInfo.client;
 
   const state = {
     portalSession: null,
@@ -3038,20 +3137,10 @@
   };
 
   function $(id){ return document.getElementById(id); }
-  function setValue(id, value){
-    const el = $(id);
-    if(el) el.value = value || '';
-  }
-  function getValue(id){
-    const el = $(id);
-    return el ? el.value : '';
-  }
-  function today(){
-    return new Date().toISOString().slice(0,10);
-  }
-  function toNumber(v){
-    return Number(v || 0) || 0;
-  }
+  function setValue(id, value){ const el = $(id); if(el) el.value = value || ''; }
+  function getValue(id){ const el = $(id); return el ? el.value : ''; }
+  function today(){ return new Date().toISOString().slice(0,10); }
+  function toNumber(v){ return Number(v || 0) || 0; }
 
   function readPortalSession(){
     const candidates = [
@@ -3218,7 +3307,12 @@
 
   async function saveRequest(status){
     if(!db){
-      alert('Supabase 클라이언트를 찾지 못했습니다. 포탈 공통 연결 상태를 확인해주세요.');
+      console.error('[TravelExpense] Supabase client not found', {
+        windowKeys: safeGet(()=>Object.keys(window).filter(k=>/supabase|client|db|portal|config/i.test(k)).slice(0,80), []),
+        parentKeys: safeGet(()=>Object.keys(window.parent).filter(k=>/supabase|client|db|portal|config/i.test(k)).slice(0,80), []),
+        portalSession: state.portalSession
+      });
+      alert('Supabase 클라이언트를 찾지 못했습니다. F12 콘솔의 [TravelExpense] Supabase client not found 로그를 확인해 주세요.');
       return null;
     }
     if(!state.companyId){
@@ -3446,7 +3540,7 @@
       companyId: state.companyId,
       employeeNo: state.employeeNo,
       hasDbClient: !!db,
-      dbSource: safeGet(()=>window.parent && window.parent.supabase && typeof window.parent.supabase.from === 'function', false) ? 'parent.supabase' : 'local'
+      dbSource: dbInfo.source
     });
   }
 
