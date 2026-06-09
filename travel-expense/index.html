@@ -3244,5 +3244,234 @@
 })();
 </script>
 
+
+<script id="travel-expense-card-detail-loader">
+(function(){
+  if (window.__travelExpenseCardDetailLoaderInstalled) return;
+  window.__travelExpenseCardDetailLoaderInstalled = true;
+
+  function safe(fn, fallback){
+    try { return fn(); } catch(e){ return fallback; }
+  }
+
+  function hasClient(obj){
+    return !!(obj && typeof obj.from === 'function');
+  }
+
+  function findDb(scope){
+    if(!scope) return null;
+    const names = ['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];
+    for(const name of names){
+      const value = safe(()=>scope[name], null);
+      if(hasClient(value)) return value;
+    }
+    const keys = safe(()=>Object.keys(scope), []);
+    for(const key of keys){
+      if(key === 'supabase') continue;
+      const value = safe(()=>scope[key], null);
+      if(hasClient(value)) return value;
+    }
+    return null;
+  }
+
+  function getDb(){
+    return findDb(safe(()=>window.parent, null)) || findDb(window);
+  }
+
+  function pick(obj, keys){
+    for(const key of keys){
+      if(obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
+    }
+    return '';
+  }
+
+  function getSession(){
+    return (
+      safe(()=>window.portalSession, null) ||
+      safe(()=>window.parent && window.parent.portalSession, null) ||
+      safe(()=>window.parent && window.parent.__PORTAL_SESSION__, null) ||
+      safe(()=>JSON.parse(sessionStorage.getItem('portalSession') || 'null'), null) ||
+      safe(()=>JSON.parse(localStorage.getItem('portalSession') || 'null'), null) ||
+      {}
+    );
+  }
+
+  function getCompanyId(){
+    const session = getSession();
+    const user = session.user || session.currentUser || session.profile || session;
+    const employee = session.employee || session.employeeInfo || session.matchedEmployee || {};
+    const company = session.company || session.activeCompany || {};
+    return (
+      session.activeCompanyId ||
+      session.companyId ||
+      session.company_id ||
+      pick(company, ['id','company_id','companyId']) ||
+      pick(user, ['company_id','companyId']) ||
+      pick(employee, ['company_id','companyId']) ||
+      ''
+    );
+  }
+
+  function setVal(id, value){
+    const el = document.getElementById(id);
+    if(el) el.value = value || '';
+  }
+
+  function setMoney(id, value){
+    const el = document.getElementById(id);
+    if(!el) return;
+    if(typeof window.money === 'function') el.textContent = window.money(value || 0);
+    else el.textContent = Math.round(Number(value || 0)).toLocaleString('ko-KR') + '원';
+  }
+
+  function readRequestIdFromCard(card){
+    if(!card) return '';
+    if(card.dataset && card.dataset.requestId) return card.dataset.requestId;
+    const onclick = card.getAttribute('onclick') || '';
+    const match = onclick.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    return match ? match[0] : '';
+  }
+
+  function markActive(requestId){
+    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
+      const active = readRequestIdFromCard(card) === requestId;
+      card.style.borderColor = active ? '#2563eb' : '';
+      card.style.boxShadow = active ? '0 0 0 2px rgba(37,99,235,.16)' : '';
+    });
+  }
+
+  async function loadRoutes(db, companyId, requestId){
+    const routeBox = document.getElementById('routeSegments');
+    if(routeBox) routeBox.innerHTML = '';
+
+    const res = await db.from('travel_expense_routes')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('request_id', requestId)
+      .order('sort_order', { ascending:true });
+
+    if(res.error){
+      console.warn('[TravelExpense] routes load warning', res.error);
+      if(typeof window.updateRoute === 'function') window.updateRoute();
+      return;
+    }
+
+    if(res.data && res.data.length && typeof window.addRouteSegment === 'function'){
+      res.data.forEach(route => window.addRouteSegment(route.from_place || '', route.to_place || '', route.distance_km || ''));
+    }else if(typeof window.updateRoute === 'function'){
+      window.updateRoute();
+    }
+  }
+
+  async function loadItems(db, companyId, requestId){
+    const itemBox = document.getElementById('costList');
+    if(itemBox) itemBox.innerHTML = '';
+
+    const res = await db.from('travel_expense_items')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('request_id', requestId)
+      .order('created_at', { ascending:true });
+
+    if(res.error){
+      console.warn('[TravelExpense] items load warning', res.error);
+      return;
+    }
+
+    if(res.data && res.data.length && typeof window.addCostRow === 'function'){
+      res.data.forEach(item => window.addCostRow(item.item_type || '', item.pay_type || '', item.amount || ''));
+    }
+  }
+
+  window.loadTravelExpenseRequest = async function(requestId){
+    const db = getDb();
+    const companyId = getCompanyId();
+
+    if(!db){
+      alert('DB 연결 정보를 찾지 못했습니다.');
+      console.error('[TravelExpense] DB client not found');
+      return;
+    }
+    if(!companyId){
+      alert('회사 정보를 확인하지 못했습니다.');
+      return;
+    }
+    if(!requestId){
+      alert('선택한 제출 내역의 ID를 찾지 못했습니다.');
+      return;
+    }
+
+    const res = await db.from('travel_expense_requests')
+      .select('*')
+      .eq('id', requestId)
+      .eq('company_id', companyId)
+      .maybeSingle();
+
+    if(res.error || !res.data){
+      alert('선택한 제출 내역을 불러오지 못했습니다.');
+      console.error('[TravelExpense] detail load error', res.error);
+      return;
+    }
+
+    const row = res.data;
+    markActive(requestId);
+
+    setVal('applicantName', row.applicant_name || '');
+    setVal('applicantDivision', row.division_name || row.division_code || '');
+    setVal('applicantTeam', row.team_name || row.team_code || '');
+    setVal('tripType', row.trip_type || '출장');
+    setVal('tripDate', row.trip_date || '');
+    setVal('transport', row.transport || '자차');
+    setVal('requestDate', row.request_date || '');
+    setVal('voucherDateDisplay', row.voucher_date || '');
+    setVal('paymentDueDateDisplay', row.payment_due_date || '');
+
+    await loadRoutes(db, companyId, requestId);
+    await loadItems(db, companyId, requestId);
+
+    if(typeof window.toggleFuel === 'function') window.toggleFuel();
+    if(typeof window.calcAll === 'function') window.calcAll();
+
+    setMoney('fuelCost', row.fuel_amount || 0);
+    setMoney('totalCost', row.total_amount || 0);
+    setMoney('corpCost', row.corp_card_amount || 0);
+    setMoney('personalCost', row.personal_amount || 0);
+
+    window.scrollTo({ top:0, behavior:'smooth' });
+  };
+
+  document.addEventListener('click', function(event){
+    const card = event.target.closest('.submission-scroll .list-card');
+    if(!card) return;
+
+    if(event.target.closest('.card-menu, .kebab-btn, .dropdown-menu, button')) return;
+
+    const requestId = readRequestIdFromCard(card);
+    if(requestId){
+      event.preventDefault();
+      window.loadTravelExpenseRequest(requestId);
+    }
+  }, true);
+
+  function prepareCards(){
+    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
+      const id = readRequestIdFromCard(card);
+      if(id && !card.dataset.requestId) card.dataset.requestId = id;
+      card.style.cursor = 'pointer';
+    });
+  }
+
+  const observer = new MutationObserver(prepareCards);
+  function start(){
+    prepareCards();
+    const box = document.querySelector('.submission-scroll');
+    if(box) observer.observe(box, { childList:true, subtree:true });
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
 </body>
 </html>
