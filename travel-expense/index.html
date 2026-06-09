@@ -3163,6 +3163,10 @@
       voucher_date:getVal('voucherDateDisplay')||null,
       payment_due_date:getVal('paymentDueDateDisplay')||null,
       status,
+      total_distance_km: Number((document.getElementById('distance') || {}).value || 0) || 0,
+      gas_price: Number((document.getElementById('gasPrice') || {}).value || 0) || 0,
+      fuel_efficiency: Number((document.getElementById('efficiency') || {}).value || 0) || 0,
+      round_unit: Number((document.getElementById('roundUnit') || {}).value || 1) || 1,
       ...amounts()
     };
     // users.id는 bigint입니다. UUID(auth_user_id)는 created_by_user_id에 넣지 않습니다.
@@ -3426,6 +3430,11 @@
     setVal('voucherDateDisplay', row.voucher_date || '');
     setVal('paymentDueDateDisplay', row.payment_due_date || '');
 
+    setVal('distance', row.total_distance_km || row.distance_km || '');
+    setVal('gasPrice', row.gas_price || '');
+    setVal('efficiency', row.fuel_efficiency || '');
+    setVal('roundUnit', row.round_unit || 1);
+
     await loadRoutes(db, companyId, requestId);
     await loadItems(db, companyId, requestId);
 
@@ -3470,6 +3479,203 @@
 
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
+})();
+</script>
+
+
+<script id="travel-expense-fuel-fields-db-fix">
+(function(){
+  if(window.__travelExpenseFuelFieldsDbFixInstalled) return;
+  window.__travelExpenseFuelFieldsDbFixInstalled = true;
+
+  function safe(fn, fallback){ try { return fn(); } catch(e){ return fallback; } }
+  function hasClient(obj){ return !!(obj && typeof obj.from === 'function'); }
+
+  function findDb(scope){
+    if(!scope) return null;
+    const names = ['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];
+    for(const name of names){
+      const value = safe(()=>scope[name], null);
+      if(hasClient(value)) return value;
+    }
+    const keys = safe(()=>Object.keys(scope), []);
+    for(const key of keys){
+      if(key === 'supabase') continue;
+      const value = safe(()=>scope[key], null);
+      if(hasClient(value)) return value;
+    }
+    return null;
+  }
+
+  function getDb(){
+    return findDb(safe(()=>window.parent, null)) || findDb(window);
+  }
+
+  function pick(obj, keys){
+    for(const key of keys){
+      if(obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
+    }
+    return '';
+  }
+
+  function getSession(){
+    return (
+      safe(()=>window.portalSession, null) ||
+      safe(()=>window.parent && window.parent.portalSession, null) ||
+      safe(()=>window.parent && window.parent.__PORTAL_SESSION__, null) ||
+      safe(()=>JSON.parse(sessionStorage.getItem('portalSession') || 'null'), null) ||
+      safe(()=>JSON.parse(localStorage.getItem('portalSession') || 'null'), null) ||
+      {}
+    );
+  }
+
+  function getCompanyId(){
+    const session = getSession();
+    const user = session.user || session.currentUser || session.profile || session;
+    const employee = session.employee || session.employeeInfo || session.matchedEmployee || {};
+    const company = session.company || session.activeCompany || {};
+    return (
+      session.activeCompanyId ||
+      session.companyId ||
+      session.company_id ||
+      pick(company, ['id','company_id','companyId']) ||
+      pick(user, ['company_id','companyId']) ||
+      pick(employee, ['company_id','companyId']) ||
+      ''
+    );
+  }
+
+  function getEmployeeNo(){
+    const session = getSession();
+    const user = session.user || session.currentUser || session.profile || session;
+    const employee = session.employee || session.employeeInfo || session.matchedEmployee || {};
+    return pick(employee, ['employee_no','employeeNo']) || pick(user, ['employee_no','employeeNo']) || '';
+  }
+
+  function value(id){
+    const el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+
+  function setValue(id, val){
+    const el = document.getElementById(id);
+    if(el) el.value = val === null || val === undefined ? '' : val;
+  }
+
+  function fuelPayload(){
+    return {
+      total_distance_km: Number(value('distance') || 0) || 0,
+      gas_price: Number(value('gasPrice') || 0) || 0,
+      fuel_efficiency: Number(value('efficiency') || 0) || 0,
+      round_unit: Number(value('roundUnit') || 1) || 1,
+      fuel_amount: Number(String((document.getElementById('fuelCost') || {}).textContent || '').replace(/[^\d.-]/g,'')) || 0
+    };
+  }
+
+  async function updateLatestFuelFields(){
+    const db = getDb();
+    const companyId = getCompanyId();
+    const employeeNo = getEmployeeNo();
+    if(!db || !companyId || !employeeNo) return;
+
+    const latest = await db.from('travel_expense_requests')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('applicant_employee_no', employeeNo)
+      .order('created_at', { ascending:false })
+      .limit(1)
+      .maybeSingle();
+
+    if(latest.error || !latest.data) {
+      console.warn('[TravelExpense] latest request lookup warning', latest.error);
+      return;
+    }
+
+    const upd = await db.from('travel_expense_requests')
+      .update(fuelPayload())
+      .eq('id', latest.data.id)
+      .eq('company_id', companyId);
+
+    if(upd.error) console.warn('[TravelExpense] fuel fields update warning', upd.error);
+  }
+
+  async function loadFuelFields(requestId){
+    const db = getDb();
+    const companyId = getCompanyId();
+    if(!db || !companyId || !requestId) return;
+
+    const res = await db.from('travel_expense_requests')
+      .select('total_distance_km, gas_price, fuel_efficiency, round_unit, fuel_amount')
+      .eq('id', requestId)
+      .eq('company_id', companyId)
+      .maybeSingle();
+
+    if(res.error || !res.data) {
+      console.warn('[TravelExpense] fuel fields load warning', res.error);
+      return;
+    }
+
+    const row = res.data;
+    setValue('distance', row.total_distance_km || '');
+    setValue('gasPrice', row.gas_price || '');
+    setValue('efficiency', row.fuel_efficiency || '');
+    setValue('roundUnit', row.round_unit || 1);
+
+    if(typeof window.calcAll === 'function') window.calcAll();
+
+    const fuelEl = document.getElementById('fuelCost');
+    if(fuelEl && typeof window.money === 'function') fuelEl.textContent = window.money(row.fuel_amount || 0);
+  }
+
+  // 기존 저장 함수 래핑: 저장 성공 후 새 컬럼 보정 update
+  function wrapSave(name){
+    const original = window[name];
+    if(typeof original !== 'function' || original.__fuelWrapped) return;
+
+    const wrapped = async function(){
+      const result = await original.apply(this, arguments);
+      setTimeout(updateLatestFuelFields, 250);
+      setTimeout(updateLatestFuelFields, 900);
+      return result;
+    };
+    wrapped.__fuelWrapped = true;
+    window[name] = wrapped;
+  }
+
+  // 기존 카드 상세 로드 함수 래핑: 로드 후 유류 입력값 보정
+  function wrapDetail(){
+    const original = window.loadTravelExpenseRequest;
+    if(typeof original !== 'function' || original.__fuelWrapped) return;
+
+    const wrapped = async function(requestId){
+      const result = await original.apply(this, arguments);
+      await loadFuelFields(requestId);
+      return result;
+    };
+    wrapped.__fuelWrapped = true;
+    window.loadTravelExpenseRequest = wrapped;
+  }
+
+  function init(){
+    wrapSave('submitTravelExpense');
+    wrapSave('saveTravelExpenseDraft');
+    wrapDetail();
+
+    // 카드 클릭 이벤트가 직접 loader를 안 타는 경우 대비
+    document.addEventListener('click', function(event){
+      const card = event.target.closest('.submission-scroll .list-card');
+      if(!card || event.target.closest('.card-menu, .kebab-btn, .dropdown-menu, button')) return;
+      const id = (card.dataset && card.dataset.requestId) || ((card.getAttribute('onclick') || '').match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i) || [])[0];
+      if(id) setTimeout(()=>loadFuelFields(id), 350);
+    }, true);
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+
+  // 다른 스크립트가 나중에 함수를 덮어쓸 수 있어 한 번 더 래핑
+  setTimeout(init, 500);
+  setTimeout(init, 1500);
 })();
 </script>
 
