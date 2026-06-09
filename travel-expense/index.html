@@ -1424,6 +1424,7 @@
     }
   }
 </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <header>
@@ -1496,20 +1497,20 @@
             <div class="basic-info-grid">
               <div>
                 <label>신청자</label>
-                <input value="" />
+                <input id="applicantName" value="" readonly />
               </div>
               <div>
                 <label>본부</label>
-                <input value="" />
+                <input id="applicantDivision" value="" readonly />
               </div>
               <div>
                 <label>팀</label>
-                <input value="" />
+                <input id="applicantTeam" value="" readonly />
               </div>
 
               <div>
                 <label>출장/외근 구분</label>
-                <select>
+                <select id="tripType">
                   <option>출장</option>
                   <option>외근</option>
                   <option>교육/세미나</option>
@@ -1517,7 +1518,7 @@
               </div>
               <div>
                 <label>출장일</label>
-                <input type="date" value=""/>
+                <input id="tripDate" type="date" value=""/>
               </div>
               <div>
                 <label>이동수단</label>
@@ -1530,7 +1531,7 @@
 
               <div>
                 <label>신청일</label>
-                <input type="date" value="" readonly title="출장자가 제출한 신청일입니다." />
+                <input id="requestDate" type="date" value="" readonly title="출장자가 제출한 신청일입니다." />
               </div>
               <div>
                 <label>지결작성일</label>
@@ -1630,8 +1631,8 @@
               개인 지급예정금액은 <b>개인카드 + 현금 + 자차 유류비</b> 기준입니다.
             </div>
             <div class="actions">
-              <button class="btn-ghost">임시저장</button>
-              <button>제출하기</button>
+              <button class="btn-ghost" type="button" onclick="saveTravelExpenseDraft()">임시저장</button>
+              <button type="button" onclick="submitTravelExpense()">제출하기</button>
             </div>
           </section>
         </div>
@@ -2671,6 +2672,445 @@
     </section>
     ${evidencePages(printTrips, mode)}
   </div>
+
+<script id="travel-expense-multitenant-integration">
+(function(){
+  const SUPABASE_URL =
+    window.EXELO_SUPABASE_URL ||
+    window.SUPABASE_URL ||
+    (window.parent && (window.parent.EXELO_SUPABASE_URL || window.parent.SUPABASE_URL)) ||
+    '';
+
+  const SUPABASE_ANON_KEY =
+    window.EXELO_SUPABASE_ANON_KEY ||
+    window.SUPABASE_ANON_KEY ||
+    (window.parent && (window.parent.EXELO_SUPABASE_ANON_KEY || window.parent.SUPABASE_ANON_KEY)) ||
+    '';
+
+  const db = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+
+  const state = {
+    portalSession: null,
+    companyId: null,
+    userId: null,
+    employeeNo: null,
+    profile: null,
+    currentRequestId: null
+  };
+
+  function $(id){ return document.getElementById(id); }
+  function setValue(id, value){
+    const el = $(id);
+    if(el) el.value = value || '';
+  }
+  function getValue(id){
+    const el = $(id);
+    return el ? el.value : '';
+  }
+  function today(){
+    return new Date().toISOString().slice(0,10);
+  }
+
+  function readPortalSession(){
+    const candidates = [];
+    try { candidates.push(window.portalSession); } catch(e){}
+    try { candidates.push(window.parent && window.parent.portalSession); } catch(e){}
+    try { candidates.push(window.parent && window.parent.__PORTAL_SESSION__); } catch(e){}
+    try { candidates.push(JSON.parse(sessionStorage.getItem('portalSession') || 'null')); } catch(e){}
+    try { candidates.push(JSON.parse(localStorage.getItem('portalSession') || 'null')); } catch(e){}
+
+    return candidates.find(Boolean) || null;
+  }
+
+  function pick(obj, keys){
+    for(const key of keys){
+      if(obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
+    }
+    return '';
+  }
+
+  function normalizeSession(raw){
+    raw = raw || {};
+    const user = raw.user || raw.currentUser || raw.profile || raw;
+    const employee = raw.employee || raw.employeeInfo || raw.matchedEmployee || raw.staff || {};
+    const company = raw.company || raw.activeCompany || {};
+
+    return {
+      raw,
+      userId: pick(user, ['id','user_id','userId']),
+      email: pick(user, ['email','user_email','userEmail']),
+      name: pick(employee, ['name','employee_name','employeeName']) || pick(user, ['name','display_name','displayName']),
+      employeeNo: pick(employee, ['employee_no','employeeNo']) || pick(user, ['employee_no','employeeNo']),
+      companyId: raw.activeCompanyId || raw.companyId || raw.company_id || pick(company, ['id','company_id','companyId']) || pick(user, ['company_id','companyId']),
+      divisionCode: pick(employee, ['division_code','divisionCode']),
+      divisionName: pick(employee, ['division_name','divisionName']),
+      teamCode: pick(employee, ['team_code','teamCode']),
+      teamName: pick(employee, ['team_name','teamName'])
+    };
+  }
+
+  async function fetchProfileFromDb(base){
+    if(!db) return base;
+
+    let userRow = null;
+    if(base.email){
+      const { data } = await db.from('users').select('*').eq('email', base.email).maybeSingle();
+      userRow = data || null;
+    } else if(base.userId){
+      const { data } = await db.from('users').select('*').eq('id', base.userId).maybeSingle();
+      userRow = data || null;
+    }
+
+    const companyId = base.companyId || pick(userRow, ['company_id','companyId']);
+    const employeeNo = base.employeeNo || pick(userRow, ['employee_no','employeeNo']);
+    let employeeRow = null;
+    if(companyId && employeeNo){
+      const { data } = await db.from('employees')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('employee_no', employeeNo)
+        .maybeSingle();
+      employeeRow = data || null;
+    }
+
+    const divisionCode = base.divisionCode || pick(employeeRow, ['division_code','divisionCode']);
+    const teamCode = base.teamCode || pick(employeeRow, ['team_code','teamCode']);
+    let divisionRow = null;
+    let teamRow = null;
+
+    if(companyId && divisionCode){
+      const { data } = await db.from('divisions')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('division_code', divisionCode)
+        .maybeSingle();
+      divisionRow = data || null;
+    }
+    if(companyId && teamCode){
+      const { data } = await db.from('teams')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('team_code', teamCode)
+        .maybeSingle();
+      teamRow = data || null;
+    }
+
+    return {
+      ...base,
+      userId: base.userId || pick(userRow, ['id','user_id','userId']),
+      companyId,
+      employeeNo,
+      name: base.name || pick(employeeRow, ['name','employee_name','employeeName']) || pick(userRow, ['name']),
+      divisionCode,
+      divisionName: base.divisionName || pick(divisionRow, ['division_name','divisionName']) || divisionCode,
+      teamCode,
+      teamName: base.teamName || pick(teamRow, ['team_name','teamName']) || teamCode
+    };
+  }
+
+  function applyProfile(profile){
+    state.profile = profile || {};
+    state.companyId = profile.companyId || '';
+    state.userId = profile.userId || null;
+    state.employeeNo = profile.employeeNo || '';
+
+    setValue('applicantName', profile.name || '');
+    setValue('applicantDivision', profile.divisionName || profile.divisionCode || '');
+    setValue('applicantTeam', profile.teamName || profile.teamCode || '');
+    setValue('requestDate', getValue('requestDate') || today());
+
+    ['applicantName','applicantDivision','applicantTeam','requestDate','voucherDateDisplay','paymentDueDateDisplay'].forEach(id=>{
+      const el = $(id);
+      if(el) el.readOnly = true;
+    });
+  }
+
+  function collectRoutes(){
+    return Array.from(document.querySelectorAll('#routeSegments .route-row')).map((row, index)=>{
+      const inputs = row.querySelectorAll('input');
+      return {
+        sort_order: index + 1,
+        from_place: inputs[0] ? inputs[0].value : '',
+        to_place: inputs[1] ? inputs[1].value : '',
+        distance_km: Number(inputs[2] ? inputs[2].value : 0) || 0
+      };
+    }).filter(r => r.from_place || r.to_place || r.distance_km);
+  }
+
+  function collectItems(){
+    return Array.from(document.querySelectorAll('#costList .cost-row')).map(row=>{
+      const selects = row.querySelectorAll('select');
+      const amountInput = row.querySelector('input[type="number"]');
+      return {
+        item_type: selects[0] ? selects[0].value : '',
+        pay_type: selects[1] ? selects[1].value : '',
+        amount: Number(amountInput ? amountInput.value : 0) || 0,
+        memo: ''
+      };
+    }).filter(i => i.item_type || i.pay_type || i.amount);
+  }
+
+  function currentAmounts(){
+    const parseMoney = text => Number(String(text || '').replace(/[^\d.-]/g,'')) || 0;
+    return {
+      total_amount: parseMoney(($('totalCost') || {}).textContent),
+      corp_card_amount: parseMoney(($('corpCost') || {}).textContent),
+      personal_amount: parseMoney(($('personalCost') || {}).textContent),
+      fuel_amount: parseMoney(($('fuelCost') || {}).textContent)
+    };
+  }
+
+  async function saveRequest(status){
+    if(!db){
+      alert('Supabase 연결 정보가 없어 저장할 수 없습니다. 포탈 공통 Supabase 설정을 먼저 확인해주세요.');
+      return null;
+    }
+    if(!state.companyId){
+      alert('회사 정보(company_id)를 확인하지 못했습니다. 다시 로그인 후 시도해주세요.');
+      return null;
+    }
+
+    if(typeof calcAll === 'function') calcAll();
+
+    const profile = state.profile || {};
+    const payload = {
+      company_id: state.companyId,
+      applicant_employee_no: profile.employeeNo || state.employeeNo || '',
+      applicant_name: profile.name || getValue('applicantName'),
+      division_code: profile.divisionCode || '',
+      division_name: profile.divisionName || getValue('applicantDivision'),
+      team_code: profile.teamCode || '',
+      team_name: profile.teamName || getValue('applicantTeam'),
+      trip_type: getValue('tripType') || '출장',
+      trip_date: getValue('tripDate') || null,
+      transport: getValue('transport') || '자차',
+      request_date: getValue('requestDate') || today(),
+      voucher_date: getValue('voucherDateDisplay') || null,
+      payment_due_date: getValue('paymentDueDateDisplay') || null,
+      status,
+      created_by_user_id: state.userId || null,
+      ...currentAmounts()
+    };
+
+    const { data: request, error } = await db.from('travel_expense_requests')
+      .insert(payload)
+      .select('id')
+      .single();
+
+    if(error){
+      console.error('[TravelExpense] request save error', error);
+      alert('출장비 신청 저장 중 오류가 발생했습니다: ' + error.message);
+      return null;
+    }
+
+    const requestId = request.id;
+    state.currentRequestId = requestId;
+
+    const routes = collectRoutes().map(r => ({...r, company_id: state.companyId, request_id: requestId}));
+    if(routes.length){
+      const { error: routeError } = await db.from('travel_expense_routes').insert(routes);
+      if(routeError) console.error('[TravelExpense] route save error', routeError);
+    }
+
+    const items = collectItems().map(i => ({...i, company_id: state.companyId, request_id: requestId}));
+    if(items.length){
+      const { error: itemError } = await db.from('travel_expense_items').insert(items);
+      if(itemError) console.error('[TravelExpense] item save error', itemError);
+    }
+
+    await loadMyRequests();
+    await loadAdminRequests();
+    alert(status === '임시저장' ? '임시저장되었습니다.' : '제출되었습니다.');
+    return requestId;
+  }
+
+  async function loadMyRequests(){
+    if(!db || !state.companyId) return;
+    let query = db.from('travel_expense_requests')
+      .select('*')
+      .eq('company_id', state.companyId)
+      .order('created_at', { ascending:false });
+
+    if(state.employeeNo){
+      query = query.eq('applicant_employee_no', state.employeeNo);
+    }
+
+    const { data, error } = await query;
+    if(error){
+      console.error('[TravelExpense] my requests load error', error);
+      return;
+    }
+
+    const container = document.querySelector('.submission-scroll');
+    if(!container) return;
+    if(!data || !data.length){
+      container.innerHTML = '<div class="notice empty-state">제출 내역이 없습니다.</div>';
+      return;
+    }
+
+    container.innerHTML = data.map(row => `
+      <div class="list-card" data-request-id="${row.id}">
+        <div class="list-top">
+          <div class="list-title">${row.trip_type || '출장'} · ${row.trip_date || '-'}</div>
+          <span class="status s-wait">${row.status || '-'}</span>
+        </div>
+        <div class="meta">
+          신청자: ${row.applicant_name || '-'}<br>
+          본부/팀: ${row.division_name || '-'} / ${row.team_name || '-'}<br>
+          총액: ${money(row.total_amount || 0)} · 개인지급: ${money(row.personal_amount || 0)}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function loadAdminRequests(){
+    if(!db || !state.companyId) return;
+
+    const { data, error } = await db.from('travel_expense_requests')
+      .select('*')
+      .eq('company_id', state.companyId)
+      .order('created_at', { ascending:false });
+
+    if(error){
+      console.error('[TravelExpense] admin requests load error', error);
+      return;
+    }
+
+    const badge = $('adminVisibleCount');
+    if(badge) badge.textContent = (data ? data.length : 0) + '건';
+
+    const panel = document.querySelector('.admin-list-panel');
+    if(!panel) return;
+    let holder = panel.querySelector('.admin-request-list');
+    if(!holder){
+      holder = document.createElement('div');
+      holder.className = 'admin-request-list';
+      const oldEmpty = panel.querySelector('.empty-state');
+      if(oldEmpty) oldEmpty.replaceWith(holder);
+      else panel.appendChild(holder);
+    }
+
+    if(!data || !data.length){
+      holder.innerHTML = '<div class="notice empty-state">제출된 정산서가 없습니다.</div>';
+      updateAdminSummary([]);
+      return;
+    }
+
+    holder.innerHTML = data.map(row => `
+      <div class="admin-trip-row" data-request-id="${row.id}" onclick="window.selectTravelExpenseAdminRequest && window.selectTravelExpenseAdminRequest('${row.id}')">
+        <input type="checkbox" onclick="event.stopPropagation(); window.updateTravelExpenseAdminBulk && window.updateTravelExpenseAdminBulk();" data-total="${row.total_amount || 0}" data-corp="${row.corp_card_amount || 0}" data-personal="${row.personal_amount || 0}">
+        <div class="admin-trip-main">
+          <div class="admin-trip-title-row">
+            <b>${row.applicant_name || '-'} · ${row.trip_type || '출장'}</b>
+            <span class="status s-wait">${row.status || '-'}</span>
+          </div>
+          <div class="admin-trip-meta">${row.division_name || '-'} / ${row.team_name || '-'} · ${row.trip_date || '-'}</div>
+          <div class="admin-trip-amounts">총액 ${money(row.total_amount || 0)} · 법인 ${money(row.corp_card_amount || 0)} · 개인 ${money(row.personal_amount || 0)}</div>
+        </div>
+      </div>
+    `).join('');
+
+    window.__travelExpenseAdminRows = data;
+    updateAdminSummary([]);
+  }
+
+  function updateAdminSummary(selected){
+    const total = selected.reduce((s, r)=>s + Number(r.total || 0),0);
+    const corp = selected.reduce((s, r)=>s + Number(r.corp || 0),0);
+    const personal = selected.reduce((s, r)=>s + Number(r.personal || 0),0);
+    const countEl = $('adminSelectedCount');
+    const totalEl = $('adminSelectedTotal');
+    const corpEl = $('adminSelectedCorp');
+    const personalEl = $('adminSelectedPersonal');
+    if(countEl) countEl.textContent = selected.length + '건';
+    if(totalEl) totalEl.textContent = money(total);
+    if(corpEl) corpEl.textContent = money(corp);
+    if(personalEl) personalEl.textContent = money(personal);
+  }
+
+  window.updateTravelExpenseAdminBulk = function(){
+    const selected = Array.from(document.querySelectorAll('.admin-request-list input[type="checkbox"]:checked')).map(chk => ({
+      total: chk.dataset.total,
+      corp: chk.dataset.corp,
+      personal: chk.dataset.personal
+    }));
+    updateAdminSummary(selected);
+  };
+
+  window.selectTravelExpenseAdminRequest = async function(id){
+    const rows = window.__travelExpenseAdminRows || [];
+    const row = rows.find(r => r.id === id);
+    document.querySelectorAll('.admin-trip-row.active').forEach(el=>el.classList.remove('active'));
+    const active = document.querySelector(`.admin-trip-row[data-request-id="${id}"]`);
+    if(active) active.classList.add('active');
+
+    const panel = $('adminDetailPanel');
+    if(!panel || !row) return;
+    panel.innerHTML = `
+      <div class="admin-detail-top">
+        <div class="admin-detail-title">
+          <h2>${row.applicant_name || '-'} 정산서</h2>
+          <p>${row.division_name || '-'} / ${row.team_name || '-'} · ${row.trip_date || '-'}</p>
+        </div>
+      </div>
+      <div class="admin-mini-summary">
+        <div class="admin-mini-card"><small>총액</small><b>${money(row.total_amount || 0)}</b></div>
+        <div class="admin-mini-card"><small>법인카드</small><b>${money(row.corp_card_amount || 0)}</b></div>
+        <div class="admin-mini-card"><small>개인지급</small><b>${money(row.personal_amount || 0)}</b></div>
+        <div class="admin-mini-card"><small>상태</small><b>${row.status || '-'}</b></div>
+      </div>
+      <div class="admin-review-section">
+        <h3>기본 정보</h3>
+        <div class="admin-section-body admin-info-grid">
+          <div class="admin-info-item"><span>신청자</span><b>${row.applicant_name || '-'}</b></div>
+          <div class="admin-info-item"><span>본부</span><b>${row.division_name || '-'}</b></div>
+          <div class="admin-info-item"><span>팀</span><b>${row.team_name || '-'}</b></div>
+          <div class="admin-info-item"><span>구분</span><b>${row.trip_type || '-'}</b></div>
+          <div class="admin-info-item"><span>출장일</span><b>${row.trip_date || '-'}</b></div>
+          <div class="admin-info-item"><span>이동수단</span><b>${row.transport || '-'}</b></div>
+        </div>
+      </div>
+    `;
+  };
+
+  window.saveTravelExpenseDraft = function(){ return saveRequest('임시저장'); };
+  window.submitTravelExpense = function(){ return saveRequest('검토대기'); };
+
+  const originalNewRequest = window.newRequest;
+  window.newRequest = function(){
+    if(typeof originalNewRequest === 'function') originalNewRequest();
+    state.currentRequestId = null;
+  };
+
+  async function init(){
+    state.portalSession = readPortalSession();
+    const base = normalizeSession(state.portalSession);
+    const profile = await fetchProfileFromDb(base);
+    applyProfile(profile);
+    await loadMyRequests();
+    await loadAdminRequests();
+    console.log('[TravelExpense] multitenant ready', { companyId: state.companyId, employeeNo: state.employeeNo, db: !!db });
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+  if(document.readyState !== 'loading') init();
+
+  window.addEventListener('message', function(event){
+    const data = event.data || {};
+    const tabId = data.tabId || data.id || data.value || data.tab;
+    if(data.type && !String(data.type).includes('TAB')) return;
+    if(tabId === 'expense-user' || tabId === 'user' || tabId === 'applicant'){
+      if(typeof setMode === 'function') setMode('user');
+    }
+    if(tabId === 'expense-admin' || tabId === 'admin' || tabId === 'review'){
+      if(typeof setMode === 'function') setMode('admin');
+    }
+  });
+})();
+</script>
+
 </body>
 </html>`;
   }
