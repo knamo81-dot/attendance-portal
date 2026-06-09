@@ -4196,8 +4196,8 @@ create table if not exists user_app_roles (
     window.loadReservationResourcesAdminPage = loadReservationResourcesAdmin;
   }
 
-  const PERMISSION_APPS=[{key:'attendance',label:'근태'},{key:'wastewater',label:'폐수'},{key:'reagent',label:'시약초자'},{key:'research_staff',label:'인력'}];
-  const PERMISSION_ROLES={attendance:[['operator','운영자']],wastewater:[['operator','운영자'],['approver','결재자']],reagent:[['operator','운영자']],research_staff:[['operator','운영자']]};
+  const PERMISSION_APPS=[{key:'attendance',label:'근태'},{key:'wastewater',label:'폐수'},{key:'reagent',label:'시약초자'},{key:'research_staff',label:'인력'},{key:'travel_expense',label:'출장비정산'}];
+  const PERMISSION_ROLES={attendance:[['operator','운영자']],wastewater:[['operator','운영자'],['approver','결재자']],reagent:[['operator','운영자']],research_staff:[['operator','운영자']],travel_expense:[['operator','운영자']]};
   const ATTENDANCE_AUTO_ROLES=[['company_head','대표이사'],['director','소장/본부장'],['manager','담당'],['team_leader','팀장']];
   const SCOPE_LABELS={self:'본인',team:'팀',hq:'본부',all:'전체',custom:'직접입력'};
   const appLabel=k=>PERMISSION_APPS.find(a=>a.key===k)?.label||k||'-';
