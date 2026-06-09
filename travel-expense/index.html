@@ -1374,6 +1374,56 @@
     html, body { min-height: 100%; }
     body { overflow-x: hidden; }
   </style>
+
+
+<script id="portal-embedded-early-marker">
+  try {
+    if (window.self !== window.top) {
+      document.documentElement.classList.add('portal-embedded');
+    }
+  } catch (_) {
+    document.documentElement.classList.add('portal-embedded');
+  }
+</script>
+<style id="portal-bridge-embedded-cleanup">
+  /* 포탈 iframe 안에서는 포탈 공통 헤더/브릿지를 사용하므로 내부 헤더와 내부 탭을 숨깁니다. */
+  html.portal-embedded header,
+  html.portal-embedded main > .tabs {
+    display: none !important;
+  }
+
+  html.portal-embedded body {
+    background: #f3f6fb !important;
+    overflow-x: hidden !important;
+  }
+
+  html.portal-embedded main {
+    max-width: 1460px !important;
+    margin: 0 auto !important;
+    padding: 18px 24px 48px !important;
+  }
+
+  html.portal-embedded .user-view .status-panel,
+  html.portal-embedded .admin-list-panel,
+  html.portal-embedded .admin-detail-panel {
+    top: 12px !important;
+  }
+
+  html.portal-embedded .user-view .status-panel {
+    height: calc(100vh - 30px) !important;
+  }
+
+  html.portal-embedded .admin-list-panel,
+  html.portal-embedded .admin-detail-panel {
+    max-height: calc(100vh - 30px) !important;
+  }
+
+  @media(max-width:760px){
+    html.portal-embedded main {
+      padding: 12px 10px 38px !important;
+    }
+  }
+</style>
 </head>
 <body>
   <header>
@@ -1881,10 +1931,40 @@
   }
 
   function setMode(mode, btn){
-    document.body.classList.toggle('admin', mode === 'admin');
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-    btn.classList.add('active');
+    const normalizedMode = mode === 'admin' ? 'admin' : 'user';
+    document.body.classList.toggle('admin', normalizedMode === 'admin');
+
+    document.querySelectorAll('.tab').forEach(t=>{
+      const onclickText = String(t.getAttribute('onclick') || '');
+      const isTarget = onclickText.includes("setMode('" + normalizedMode + "'") || onclickText.includes('setMode(\"' + normalizedMode + '\"');
+      t.classList.toggle('active', isTarget);
+    });
+
+    if(btn && btn.classList){
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    notifyPortalActiveTab(normalizedMode);
   }
+
+  function getTravelPortalTabIdByMode(mode){
+    return mode === 'admin' ? 'expense-admin' : 'expense-user';
+  }
+
+  function notifyPortalActiveTab(mode){
+    try {
+      if(window.parent && window.parent !== window){
+        window.parent.postMessage({
+          type:'portal-tab-active',
+          activeTabId:getTravelPortalTabIdByMode(mode),
+          tabId:getTravelPortalTabIdByMode(mode),
+          source:'travel-expense'
+        }, '*');
+      }
+    } catch (_) {}
+  }
+
   calcAll();
 </script>
 
@@ -2833,6 +2913,83 @@
 })();
 </script>
 
+
+
+<script id="portal-bridge-tabs-for-travel-expense">
+(function(){
+  const PORTAL_TABS = [
+    { id: 'expense-user', label: '출장자 입력 화면' },
+    { id: 'expense-admin', label: '관리팀 검토 화면' }
+  ];
+
+  function isEmbedded(){
+    try { return window.parent && window.parent !== window; }
+    catch (_) { return true; }
+  }
+
+  function currentMode(){
+    return document.body.classList.contains('admin') ? 'admin' : 'user';
+  }
+
+  function currentTabId(){
+    return currentMode() === 'admin' ? 'expense-admin' : 'expense-user';
+  }
+
+  function publishTabs(){
+    if(!isEmbedded()) return;
+    try {
+      window.parent.postMessage({
+        type: 'portal-tabs-ready',
+        tabs: PORTAL_TABS,
+        activeTabId: currentTabId(),
+        source: 'travel-expense'
+      }, '*');
+    } catch (_) {}
+  }
+
+  function switchByPortalTab(tabId){
+    const id = String(tabId || '').trim();
+    if(!id) return;
+
+    if(['expense-admin','admin','review','manager','관리팀 검토 화면','관리팀검토화면'].includes(id)){
+      if(typeof window.setMode === 'function') window.setMode('admin', null);
+      return;
+    }
+
+    if(['expense-user','user','request','applicant','traveler','출장자 입력 화면','출장자입력화면'].includes(id)){
+      if(typeof window.setMode === 'function') window.setMode('user', null);
+    }
+  }
+
+  window.addEventListener('message', function(event){
+    const payload = event && event.data ? event.data : {};
+    const type = String(payload.type || '');
+
+    if(type === 'portal-tabs-request' || type === 'PORTAL_TABS_REQUEST'){
+      publishTabs();
+      return;
+    }
+
+    if(type === 'portal-tab-change' || type === 'PORTAL_TAB_CHANGE'){
+      switchByPortalTab(payload.tabId || payload.tab || payload.activeTabId || payload.activeTab);
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', function(){
+    document.documentElement.classList.toggle('portal-embedded', isEmbedded());
+    publishTabs();
+    setTimeout(publishTabs, 250);
+    setTimeout(publishTabs, 900);
+  });
+
+  window.addEventListener('load', function(){
+    publishTabs();
+    setTimeout(publishTabs, 500);
+  });
+
+  window.travelExpensePortalTabs = PORTAL_TABS;
+  window.openTravelExpenseSection = switchByPortalTab;
+})();
+</script>
 </body>
 </html>
-
