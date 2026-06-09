@@ -1,1 +1,2838 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>출장비 정산</title>
+  <style>
+    :root{
+      --bg:#f5f7fb;
+      --card:#ffffff;
+      --line:#e5e9f2;
+      --text:#1f2937;
+      --muted:#6b7280;
+      --main:#2563eb;
+      --soft:#eff6ff;
+      --danger:#ef4444;
+      --ok:#16a34a;
+      --warn:#f59e0b;
+      --shadow:0 10px 30px rgba(15,23,42,.08);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    header{
+      position:sticky;
+      top:0;
+      z-index:10;
+      background:rgba(255,255,255,.92);
+      backdrop-filter:blur(10px);
+      border-bottom:1px solid var(--line);
+      padding:14px 18px;
+    }
+    .header-inner{
+      max-width:1180px;
+      margin:0 auto;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+    }
+    .brand{
+      font-weight:800;
+      font-size:18px;
+      letter-spacing:-.03em;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      padding:7px 11px;
+      border-radius:999px;
+      background:var(--soft);
+      color:var(--main);
+      font-size:12px;
+      font-weight:700;
+      white-space:nowrap;
+    }
+    main{
+      max-width:1180px;
+      margin:0 auto;
+      padding:20px 16px 50px;
+    }
+    .tabs{
+      display:flex;
+      gap:8px;
+      margin-bottom:16px;
+      overflow:auto;
+      padding-bottom:2px;
+    }
+    .tab{
+      border:1px solid var(--line);
+      background:#fff;
+      padding:10px 14px;
+      border-radius:999px;
+      font-weight:700;
+      color:var(--muted);
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    .tab.active{
+      background:var(--main);
+      border-color:var(--main);
+      color:white;
+    }
+
+    .layout aside{
+      align-self:start;
+      position:sticky;
+      top:88px;
+    }
+    .layout{
+      display:grid;
+      grid-template-columns:minmax(0,1.45fr) minmax(300px,.55fr);
+      gap:18px;
+    }
+    .section{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:18px;
+      margin-bottom:18px;
+    }
+    h2{
+      font-size:18px;
+      margin:0 0 14px;
+      letter-spacing:-.03em;
+    }
+    h3{
+      font-size:15px;
+      margin:18px 0 10px;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:12px;
+    }
+    label{
+      display:block;
+      font-size:12px;
+      color:var(--muted);
+      margin-bottom:6px;
+      font-weight:700;
+    }
+    input,select,textarea{
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:12px;
+      font-size:14px;
+      background:#fff;
+      outline:none;
+    }
+    textarea{min-height:74px;resize:vertical}
+    input:focus,select:focus,textarea:focus{
+      border-color:var(--main);
+      box-shadow:0 0 0 3px rgba(37,99,235,.12);
+    }
+    .upload{
+      border:1.5px dashed #b9c4d8;
+      border-radius:14px;
+      padding:14px;
+      background:#fafcff;
+      color:var(--muted);
+      font-size:13px;
+    }
+    .upload strong{color:var(--text)}
+
+    .receipt-btn{
+      background:#f8fafc;
+      color:#334155;
+      border:1px solid var(--line);
+      padding:11px 10px;
+      font-size:13px;
+      width:100%;
+    }
+    .receipt-btn.attached{
+      background:#ecfdf5;
+      color:#047857;
+      border-color:#bbf7d0;
+    }
+    .receipt-input{
+      display:none;
+    }
+    .cost-row{
+      display:grid;
+      grid-template-columns:1.05fr .95fr .95fr 112px 46px;
+      gap:8px;
+      align-items:end;
+      padding:10px;
+      border:1px solid var(--line);
+      border-radius:14px;
+      margin-bottom:8px;
+      background:#fff;
+    }
+    button{
+      border:0;
+      border-radius:12px;
+      padding:12px 14px;
+      font-weight:800;
+      cursor:pointer;
+      background:var(--main);
+      color:white;
+    }
+    .btn-sub{background:#eef2ff;color:#3730a3}
+    .btn-ghost{background:#f3f4f6;color:#374151}
+    .btn-danger{background:#fee2e2;color:#b91c1c}
+
+    
+    .process-grid{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:10px;
+    }
+    .process-card{
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:#fff;
+      padding:12px;
+    }
+    .process-title{
+      font-weight:900;
+      margin-bottom:10px;
+      letter-spacing:-.03em;
+      font-size:15px;
+    }
+    .process-card.request{background:#fffbeb;border-color:#fde68a}
+    .process-card.done{background:#eff6ff;border-color:#bfdbfe}
+    .process-card.pending{background:#fef2f2;border-color:#fecaca}
+    .process-line{
+      display:grid;
+      grid-template-columns:76px 1fr;
+      align-items:center;
+      gap:8px;
+      padding:7px 0;
+      border-top:1px dashed rgba(148,163,184,.45);
+      font-size:13px;
+    }
+    .process-line span{color:#64748b;font-weight:800}
+    .process-line b{
+      font-size:14px;
+      text-align:right;
+      white-space:nowrap;
+    }
+    .summary{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:10px;
+    }
+    .sum-card{
+      border-radius:16px;
+      border:1px solid var(--line);
+      padding:14px;
+      background:#fff;
+    }
+    .sum-card small{
+      display:block;
+      color:var(--muted);
+      font-weight:700;
+      margin-bottom:6px;
+    }
+    .sum-card b{
+      font-size:18px;
+      letter-spacing:-.04em;
+    }
+    .sum-card.pay{background:#f0fdf4;border-color:#bbf7d0}
+    .sum-card.corp{background:#eff6ff;border-color:#bfdbfe}
+    .sum-card.total{background:#fffbeb;border-color:#fde68a}
+    .status{
+      display:inline-flex;
+      padding:5px 9px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:800;
+    }
+    .s-wait{background:#fff7ed;color:#c2410c}
+    .s-ok{background:#ecfdf5;color:#047857}
+    .s-reject{background:#fef2f2;color:#b91c1c}
+    .list-card{
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:14px;
+      margin-bottom:10px;
+      background:#fff;
+    }
+    .list-top{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:8px;
+    }
+    .list-title{font-weight:800}
+    .meta{
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.65;
+    }
+    .actions{
+      display:flex;
+      gap:8px;
+      margin-top:12px;
+      flex-wrap:wrap;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:13px;
+      overflow:hidden;
+      border-radius:14px;
+    }
+    th,td{
+      border-bottom:1px solid var(--line);
+      padding:11px 9px;
+      text-align:left;
+      white-space:nowrap;
+    }
+    th{
+      color:var(--muted);
+      background:#f8fafc;
+      font-size:12px;
+    }
+    .admin-view{display:none}
+    .user-view{display:block}
+    body.admin .admin-view{display:block}
+    body.admin .user-view{display:none}
+    .notice{
+      border-radius:16px;
+      background:#f8fafc;
+      border:1px solid var(--line);
+      padding:14px;
+      color:#475569;
+      font-size:13px;
+      line-height:1.7;
+    }
+    .fuel-box{
+      background:#f8fafc;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:14px;
+      margin-top:10px;
+    }
+    .fuel-result{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      margin-top:10px;
+      padding:12px;
+      border-radius:14px;
+      background:#fff;
+      border:1px solid var(--line);
+    }
+    .fuel-result b{font-size:20px}
+
+    .route-panel{
+      grid-column:1 / -1;
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:#f8fafc;
+      padding:14px;
+    }
+    .route-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .route-title{
+      font-weight:800;
+      font-size:14px;
+    }
+    .route-row{
+      display:grid;
+      grid-template-columns:34px 1fr 28px 1fr 110px 46px;
+      gap:8px;
+      align-items:end;
+      margin-bottom:8px;
+    }
+
+    .route-arrow{
+      height:42px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#64748b;
+      font-weight:900;
+      font-size:18px;
+    }
+    .route-num{
+      width:34px;
+      height:42px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:12px;
+      background:#eef2ff;
+      color:#3730a3;
+      font-weight:900;
+    }
+    .route-summary{
+      margin-top:10px;
+      padding:12px;
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:#fff;
+      color:#475569;
+      font-size:13px;
+      line-height:1.6;
+    }
+    .checkline{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-top:8px;
+      font-size:13px;
+      color:#475569;
+      font-weight:700;
+    }
+    .checkline input{
+      width:auto;
+      box-shadow:none;
+    }
+
+    @media(max-width:860px){
+      .layout{grid-template-columns:1fr}
+      .layout aside{position:static}
+      .grid{grid-template-columns:1fr}
+      .summary{grid-template-columns:1fr}
+  
+    .receipt-btn{
+      background:#f8fafc;
+      color:#334155;
+      border:1px solid var(--line);
+      padding:11px 10px;
+      font-size:13px;
+      width:100%;
+    }
+    .receipt-btn.attached{
+      background:#ecfdf5;
+      color:#047857;
+      border-color:#bbf7d0;
+    }
+    .receipt-input{
+      display:none;
+    }
+    .cost-row{
+        grid-template-columns:1fr 1fr;
+      }
+      .cost-row button{grid-column:1/3}
+      .route-row{grid-template-columns:34px 1fr}
+      .route-arrow{display:none}
+      .route-row .distance-wrap{grid-column:1/3}
+      .route-row button{grid-column:1/3}
+      .header-inner{align-items:flex-start;flex-direction:column}
+      table{display:block;overflow:auto}
+    }
+  
+    /* compact override */
+    .user-view .layout{
+      grid-template-columns:minmax(0,1.55fr) minmax(280px,.45fr) !important;
+      align-items:start;
+    }
+    .user-view .summary{
+      display:grid !important;
+      grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+      gap:10px !important;
+    }
+    .user-view .sum-card{
+      min-height:74px !important;
+      padding:12px 14px !important;
+      border-radius:14px !important;
+    }
+    .user-view .sum-card small{
+      margin-bottom:5px !important;
+      font-size:12px !important;
+    }
+    .user-view .sum-card b{
+      font-size:18px !important;
+      line-height:1.2 !important;
+    }
+    .user-view aside .process-grid{
+      display:grid !important;
+      grid-template-columns:1fr !important;
+      gap:10px !important;
+    }
+    .user-view aside .process-card{
+      padding:12px !important;
+      border-radius:14px !important;
+    }
+    .user-view aside .process-title{
+      font-size:15px !important;
+      margin-bottom:8px !important;
+    }
+    .user-view aside .process-line{
+      display:grid !important;
+      grid-template-columns:70px minmax(0,1fr) !important;
+      gap:8px !important;
+      padding:6px 0 !important;
+      font-size:12px !important;
+    }
+    .user-view aside .process-line b{
+      font-size:14px !important;
+      text-align:right !important;
+      white-space:nowrap !important;
+    }
+    @media(max-width:860px){
+      .user-view .layout{
+        grid-template-columns:1fr !important;
+      }
+      .user-view .summary{
+        grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+      }
+      .user-view .sum-card{
+        padding:10px !important;
+      }
+      .user-view .sum-card b{
+        font-size:16px !important;
+      }
+    }
+    @media(max-width:520px){
+      .user-view .summary{
+        grid-template-columns:1fr !important;
+      }
+    }
+
+  
+    .process-table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:13px;
+    }
+    .process-table th,
+    .process-table td{
+      padding:10px 8px;
+      border-bottom:1px dashed rgba(148,163,184,.4);
+    }
+    .process-table th{
+      text-align:center;
+      font-weight:900;
+    }
+    .process-table td:first-child{
+      font-weight:800;
+      color:#475569;
+      width:90px;
+    }
+    .process-table td:not(:first-child){
+      text-align:right;
+      font-weight:800;
+    }
+    .process-head-request{background:#fffbeb;}
+    .process-head-done{background:#eff6ff;}
+    .process-head-pending{background:#fef2f2;}
+
+
+    /* layout ratio update */
+    .user-view .layout{
+      grid-template-columns:minmax(0,1.25fr) minmax(380px,0.75fr) !important;
+      gap:18px !important;
+    }
+    .user-view aside{
+      min-width:380px !important;
+    }
+    .process-table th,
+    .process-table td{
+      padding:10px 6px !important;
+      font-size:14px !important;
+    }
+    @media(max-width:860px){
+      .user-view .layout{
+        grid-template-columns:1fr !important;
+      }
+      .user-view aside{
+        min-width:auto !important;
+      }
+    }
+
+
+    /* final left status / right form layout */
+    .user-view .expense-workspace{
+      display:grid !important;
+      grid-template-columns:minmax(330px,.78fr) minmax(0,1.42fr) !important;
+      gap:18px !important;
+      align-items:start !important;
+    }
+    .user-view .status-panel{
+      position:sticky !important;
+      top:88px !important;
+      align-self:start !important;
+      min-width:330px !important;
+    }
+    .user-view .form-panel{
+      min-width:0 !important;
+    }
+    .user-view .summary{
+      display:grid !important;
+      grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+      gap:10px !important;
+    }
+    .user-view .sum-card{
+      min-height:74px !important;
+      padding:12px 14px !important;
+      border-radius:14px !important;
+    }
+    .user-view .sum-card small{
+      margin-bottom:5px !important;
+      font-size:12px !important;
+    }
+    .user-view .sum-card b{
+      font-size:18px !important;
+      line-height:1.2 !important;
+    }
+    .process-table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:13px;
+      table-layout:auto;
+    }
+    .process-table th,
+    .process-table td{
+      padding:10px 7px !important;
+      border-bottom:1px dashed rgba(148,163,184,.42) !important;
+      white-space:nowrap;
+    }
+    .process-table th{
+      text-align:center !important;
+      font-weight:900 !important;
+    }
+    .process-table td:first-child{
+      font-weight:800 !important;
+      color:#475569 !important;
+      width:72px !important;
+    }
+    .process-table td:not(:first-child){
+      text-align:right !important;
+      font-weight:900 !important;
+    }
+    .process-head-request{background:#fffbeb !important;}
+    .process-head-done{background:#eff6ff !important;}
+    .process-head-pending{background:#fef2f2 !important;}
+    @media(max-width:980px){
+      .user-view .expense-workspace{
+        grid-template-columns:1fr !important;
+      }
+      .user-view .status-panel{
+        position:static !important;
+        min-width:auto !important;
+      }
+    }
+    @media(max-width:560px){
+      .user-view .summary{
+        grid-template-columns:1fr !important;
+      }
+      .process-table th,
+      .process-table td{
+        font-size:12px !important;
+        padding:8px 5px !important;
+      }
+    }
+
+
+    /* option 3 scroll UX - enlarged submission list */
+    .user-view .expense-workspace{
+      display:grid !important;
+      grid-template-columns:minmax(340px,.78fr) minmax(0,1.42fr) !important;
+      gap:18px !important;
+      align-items:start !important;
+    }
+
+    .user-view .status-panel{
+      position:sticky !important;
+      top:88px !important;
+      height:calc(100vh - 104px) !important;
+      min-width:340px !important;
+      display:grid !important;
+      grid-template-rows:auto minmax(560px,1fr) !important;
+      gap:14px !important;
+      overflow:hidden !important;
+      align-self:start !important;
+    }
+
+    .user-view .status-panel > .section{
+      margin-bottom:0 !important;
+    }
+
+    .user-view .status-panel > .section:first-child{
+      padding:14px !important;
+    }
+
+    .user-view .status-panel > .section:nth-child(2){
+      min-height:560px !important;
+      display:flex !important;
+      flex-direction:column !important;
+      overflow:hidden !important;
+      padding:14px !important;
+    }
+
+    .user-view .status-panel > .section:nth-child(2) h2{
+      flex:0 0 auto !important;
+      margin-bottom:10px !important;
+    }
+
+    .user-view .submission-scroll{
+      flex:1 1 auto !important;
+      min-height:0 !important;
+      overflow-y:auto !important;
+      padding-right:6px !important;
+    }
+
+    .user-view .submission-scroll::-webkit-scrollbar{
+      width:8px;
+    }
+
+    .user-view .submission-scroll::-webkit-scrollbar-thumb{
+      background:#cbd5e1;
+      border-radius:999px;
+    }
+
+    .user-view .submission-scroll .list-card{
+      padding:11px 12px !important;
+      margin-bottom:8px !important;
+      border-radius:14px !important;
+    }
+
+    .user-view .submission-scroll .list-top{
+      margin-bottom:5px !important;
+    }
+
+    .user-view .submission-scroll .list-title{
+      font-size:14px !important;
+    }
+
+    .user-view .submission-scroll .meta{
+      font-size:12px !important;
+      line-height:1.45 !important;
+    }
+
+    .user-view .process-table th,
+    .user-view .process-table td{
+      padding:8px 5px !important;
+      font-size:12px !important;
+      white-space:nowrap !important;
+    }
+
+    .user-view .process-table td:first-child{
+      width:64px !important;
+    }
+
+    .user-view .form-panel{
+      min-width:0 !important;
+    }
+
+    .user-view .summary{
+      display:grid !important;
+      grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+      gap:10px !important;
+    }
+
+    .user-view .sum-card{
+      min-height:74px !important;
+      padding:12px 14px !important;
+    }
+
+    .user-view .sum-card b{
+      font-size:18px !important;
+    }
+
+    @media(max-width:980px){
+      .user-view .expense-workspace{
+        grid-template-columns:1fr !important;
+      }
+      .user-view .status-panel{
+        position:static !important;
+        height:auto !important;
+        min-width:auto !important;
+        display:block !important;
+        overflow:visible !important;
+      }
+      .user-view .status-panel > .section:nth-child(2){
+        min-height:auto !important;
+        display:block !important;
+        overflow:visible !important;
+      }
+      .user-view .submission-scroll{
+        overflow:visible !important;
+      }
+    }
+
+    @media(max-width:560px){
+      .user-view .summary{
+        grid-template-columns:1fr !important;
+      }
+    }
+
+
+    /* clean dashboard redesign */
+    body{
+      background:#f3f6fb !important;
+    }
+    main{
+      max-width:1460px !important;
+      padding:22px 24px 48px !important;
+    }
+    .section{
+      border-radius:16px !important;
+      box-shadow:0 10px 24px rgba(15,23,42,.055) !important;
+      padding:18px !important;
+    }
+    .user-view .expense-workspace{
+      display:grid !important;
+      grid-template-columns:410px minmax(0,1fr) !important;
+      gap:18px !important;
+      align-items:start !important;
+    }
+    .user-view .status-panel{
+      position:sticky !important;
+      top:88px !important;
+      height:calc(100vh - 110px) !important;
+      min-width:410px !important;
+      display:grid !important;
+      grid-template-rows:auto minmax(0,1fr) !important;
+      gap:14px !important;
+      overflow:hidden !important;
+      align-self:start !important;
+    }
+    .user-view .status-panel > .section{
+      margin-bottom:0 !important;
+    }
+    .user-view .status-panel > .section:first-child{
+      padding:18px !important;
+    }
+    .user-view .status-panel > .section:nth-child(2){
+      min-height:0 !important;
+      display:flex !important;
+      flex-direction:column !important;
+      overflow:hidden !important;
+      padding:18px !important;
+    }
+    .user-view .submission-scroll{
+      flex:1 1 auto !important;
+      min-height:0 !important;
+      overflow-y:auto !important;
+      padding-right:6px !important;
+    }
+    .user-view .submission-scroll .list-card{
+      padding:13px 14px !important;
+      margin-bottom:10px !important;
+      border-radius:14px !important;
+      transition:.16s ease;
+    }
+    .user-view .submission-scroll .list-card:hover{
+      border-color:#2563eb !important;
+      box-shadow:0 8px 20px rgba(37,99,235,.10) !important;
+    }
+    .process-table{
+      width:100% !important;
+      border-collapse:collapse !important;
+      table-layout:fixed !important;
+      font-size:13px !important;
+    }
+    .process-table th,
+    .process-table td{
+      padding:12px 8px !important;
+      border:1px solid #e5e9f2 !important;
+      white-space:nowrap !important;
+    }
+    .process-table th{
+      text-align:center !important;
+      font-weight:900 !important;
+    }
+    .process-table td:first-child{
+      width:72px !important;
+      color:#334155 !important;
+      font-weight:900 !important;
+      text-align:left !important;
+      background:#fafafa !important;
+    }
+    .process-table td:not(:first-child){
+      text-align:right !important;
+      font-weight:900 !important;
+    }
+    .process-head-request{background:#fff7d6 !important;}
+    .process-head-done{background:#eaf3ff !important;}
+    .process-head-pending{background:#ffecec !important;}
+    .user-view .form-panel{
+      min-width:0 !important;
+    }
+    .user-view .form-panel .section{
+      margin-bottom:10px !important;
+    }
+    .user-view .grid{
+      grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+      gap:12px 16px !important;
+    }
+    .route-panel{
+      padding:16px !important;
+      border-radius:16px !important;
+    }
+    .route-row{
+      grid-template-columns:38px minmax(0,1.1fr) 24px minmax(0,1.4fr) 128px 68px !important;
+      gap:10px !important;
+      align-items:end !important;
+    }
+    .route-row .btn-danger,
+    .route-row button.btn-danger{
+      width:64px !important;
+      height:42px !important;
+      padding:0 !important;
+      font-size:13px !important;
+      line-height:1 !important;
+      white-space:nowrap !important;
+      display:flex !important;
+      align-items:center !important;
+      justify-content:center !important;
+      writing-mode:horizontal-tb !important;
+    }
+    .cost-row{
+      grid-template-columns:1fr 1fr 1fr 120px 64px !important;
+      gap:10px !important;
+    }
+    .cost-row .btn-danger,
+    .cost-row button.btn-danger{
+      width:64px !important;
+      height:42px !important;
+      padding:0 !important;
+      font-size:13px !important;
+      white-space:nowrap !important;
+      writing-mode:horizontal-tb !important;
+    }
+    .user-view .summary{
+      display:grid !important;
+      grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+      gap:12px !important;
+    }
+    .user-view .sum-card{
+      min-height:88px !important;
+      padding:14px 16px !important;
+      border-radius:14px !important;
+    }
+    .user-view .sum-card b{
+      font-size:18px !important;
+    }
+    .actions{
+      justify-content:flex-end !important;
+      gap:10px !important;
+    }
+    .actions button{
+      min-width:120px !important;
+    }
+    @media(max-width:1100px){
+      .user-view .expense-workspace{
+        grid-template-columns:1fr !important;
+      }
+      .user-view .status-panel{
+        position:static !important;
+        height:auto !important;
+        min-width:auto !important;
+        display:block !important;
+        overflow:visible !important;
+      }
+      .user-view .submission-scroll{
+        overflow:visible !important;
+      }
+    }
+    @media(max-width:760px){
+      main{padding:16px 12px 40px !important;}
+      .user-view .grid{
+        grid-template-columns:1fr !important;
+      }
+      .route-row{
+        grid-template-columns:34px 1fr !important;
+      }
+      .route-arrow{display:none !important;}
+      .route-row .distance-wrap{grid-column:1/3 !important;}
+      .route-row button{grid-column:1/3 !important; width:100% !important;}
+      .cost-row{
+        grid-template-columns:1fr 1fr !important;
+      }
+      .cost-row .receipt-wrap{grid-column:1/3 !important;}
+      .cost-row button{grid-column:1/3 !important; width:100% !important;}
+      .user-view .summary{
+        grid-template-columns:1fr !important;
+      }
+    }
+
+
+    .section-title-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-bottom:14px;
+    }
+    .section-title-row h2{
+      margin:0 !important;
+    }
+    .btn-small{
+      padding:9px 12px !important;
+      border-radius:11px !important;
+      font-size:13px !important;
+      white-space:nowrap !important;
+      min-width:auto !important;
+    }
+
+
+    .card-menu{
+      position:relative;
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .kebab-btn{
+      width:30px;
+      height:30px;
+      padding:0 !important;
+      min-width:0 !important;
+      border-radius:10px !important;
+      background:#f3f4f6 !important;
+      color:#475569 !important;
+      font-size:18px !important;
+      line-height:1 !important;
+    }
+    .dropdown-menu{
+      position:absolute;
+      right:0;
+      top:34px;
+      min-width:126px;
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:12px;
+      box-shadow:0 10px 28px rgba(15,23,42,.14);
+      padding:6px;
+      display:none;
+      z-index:50;
+    }
+    .dropdown-menu.open{display:block;}
+    .dropdown-menu button{
+      width:100%;
+      display:block;
+      text-align:left;
+      background:#fff !important;
+      color:#334155 !important;
+      padding:9px 10px !important;
+      border-radius:9px !important;
+      font-size:13px !important;
+      min-width:0 !important;
+    }
+    .dropdown-menu button:hover{
+      background:#f8fafc !important;
+    }
+    .dropdown-menu button.danger{
+      color:#b91c1c !important;
+    }
+    .modal-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(15,23,42,.42);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:100;
+      padding:18px;
+    }
+    .modal-backdrop.open{display:flex;}
+    .confirm-modal{
+      width:min(420px,100%);
+      background:#fff;
+      border-radius:18px;
+      padding:20px;
+      box-shadow:0 20px 50px rgba(15,23,42,.25);
+    }
+    .confirm-modal h3{
+      margin:0 0 10px;
+      font-size:18px;
+    }
+    .confirm-modal p{
+      margin:0;
+      color:#64748b;
+      line-height:1.6;
+      font-size:14px;
+    }
+    .modal-actions{
+      display:flex;
+      justify-content:flex-end;
+      gap:8px;
+      margin-top:18px;
+    }
+
+
+
+    /* admin review console redesign - isolated */
+    .admin-view .admin-console-head{padding:18px !important;}
+    .admin-head-main{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:16px;}
+    .admin-head-main h2{margin:0 0 6px !important;}
+    .admin-head-main p{margin:0;color:#64748b;font-size:13px;line-height:1.55;}
+    .admin-head-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+    .admin-toolbar{display:grid;grid-template-columns:180px 180px minmax(240px,1fr);gap:12px;margin-bottom:14px;}
+    .admin-selected-summary{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr)) minmax(420px,auto);gap:10px;align-items:stretch;}
+    .admin-selected-summary>div:not(.admin-bulk-actions){border:1px solid var(--line);background:#fff;border-radius:14px;padding:12px;}
+    .admin-selected-summary span{display:block;color:#64748b;font-size:12px;font-weight:800;margin-bottom:5px;}
+    .admin-selected-summary b{font-size:18px;letter-spacing:-.04em;}
+    .admin-bulk-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center;}
+    .admin-bulk-actions button,.admin-head-actions button{min-width:auto !important;padding:10px 12px !important;font-size:13px !important;}
+    .admin-action-message{margin-top:12px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:14px;padding:11px 13px;font-size:13px;font-weight:700;line-height:1.5;}
+    .admin-action-message.warn{background:#fffbeb;border-color:#fde68a;color:#92400e;}
+    .admin-action-message.ok{background:#ecfdf5;border-color:#bbf7d0;color:#047857;}
+    .admin-review-layout{display:grid;grid-template-columns:minmax(420px,.92fr) minmax(560px,1.08fr);gap:18px;align-items:start;}
+    .admin-list-panel,.admin-detail-panel{min-width:0;}
+    .admin-list-panel{position:sticky;top:88px;max-height:calc(100vh - 106px);overflow:hidden;display:flex;flex-direction:column;}
+    .admin-list-panel .section-title-row{flex:0 0 auto;}
+    .admin-count-badge{display:inline-flex;align-items:center;background:#f1f5f9;color:#334155;border-radius:999px;padding:7px 10px;font-size:12px;font-weight:900;}
+    .admin-applicant-group{border:1px solid var(--line);border-radius:16px;background:#f8fafc;margin-bottom:12px;overflow:hidden;}
+    .admin-group-head{display:flex;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);font-size:13px;color:#475569;}
+    .admin-group-head b{color:#111827;}
+    .admin-group-head span{margin-left:8px;color:#64748b;}
+    .admin-trip-row{display:grid;grid-template-columns:22px minmax(0,1fr);gap:10px;align-items:center;padding:13px 12px;background:#fff;border-bottom:1px solid var(--line);cursor:pointer;transition:.15s ease;}
+    .admin-trip-row:last-child{border-bottom:0;}
+    .admin-trip-row:hover{background:#f8fbff;}
+    .admin-trip-row.active{background:#eff6ff;box-shadow:inset 4px 0 0 var(--main);}
+    .admin-trip-row input[type="checkbox"]{width:17px;height:17px;margin:0;}
+    .admin-trip-main{min-width:0;}
+    .admin-trip-title-row{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:5px;}
+    .admin-trip-title-row b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .admin-trip-meta,.admin-trip-amounts{font-size:12px;color:#64748b;line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .admin-detail-panel{position:sticky;top:88px;max-height:calc(100vh - 106px);overflow:auto;}
+    .admin-detail-empty{border:1px dashed #cbd5e1;border-radius:16px;padding:28px;text-align:center;color:#64748b;background:#f8fafc;font-weight:800;}
+    .admin-detail-top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:14px;}
+    .admin-detail-title h2{margin:0 0 6px !important;}
+    .admin-detail-title p{margin:0;color:#64748b;font-size:13px;line-height:1.55;}
+    .admin-detail-buttons{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+    .admin-detail-buttons button{min-width:auto !important;padding:8px 10px !important;font-size:12px !important;}
+    .admin-mini-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px;}
+    .admin-mini-card{border:1px solid var(--line);border-radius:14px;background:#fff;padding:12px;}
+    .admin-mini-card small{display:block;color:#64748b;font-size:11px;font-weight:900;margin-bottom:5px;}
+    .admin-mini-card b{font-size:17px;letter-spacing:-.04em;}
+    .admin-review-section{border:1px solid var(--line);border-radius:16px;background:#fff;margin-bottom:12px;overflow:hidden;}
+    .admin-review-section h3{margin:0;padding:13px 14px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+    .admin-section-body{padding:14px;}
+    .admin-info-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+    .admin-info-item{border:1px solid #eef2f7;border-radius:12px;padding:10px;background:#fafafa;}
+    .admin-info-item span{display:block;color:#64748b;font-size:11px;font-weight:900;margin-bottom:4px;}
+    .admin-info-item b{font-size:13px;}
+    .admin-table-wrap{overflow:auto;}
+    .admin-check-table{width:100%;border-collapse:collapse;font-size:13px;}
+    .admin-check-table th,.admin-check-table td{border:1px solid #e5e9f2;padding:10px 8px;white-space:nowrap;}
+    .admin-check-table th{background:#f8fafc;color:#64748b;font-size:12px;}
+    .admin-check-table td.amount{text-align:right;font-weight:900;}
+    .admin-check-table td.center{text-align:center;}
+    .admin-total-line{display:flex;justify-content:flex-end;gap:12px;align-items:center;margin-top:10px;padding:11px 12px;border-radius:12px;background:#f8fafc;font-weight:900;}
+    .admin-total-line span{color:#64748b;font-size:12px;}
+    .admin-total-line b{font-size:16px;}
+    .admin-evidence-btn{background:#eef2ff !important;color:#3730a3 !important;border:1px solid #c7d2fe !important;padding:8px 10px !important;border-radius:10px !important;font-size:12px !important;min-width:auto !important;}
+    .admin-evidence-btn.missing{background:#fef2f2 !important;color:#b91c1c !important;border-color:#fecaca !important;}
+    .admin-fuel-formula{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px;}
+    .admin-fuel-formula .admin-info-item{background:#fffbeb;border-color:#fde68a;}
+    .admin-doc-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+    .admin-doc-card{border:1px solid var(--line);border-radius:14px;padding:12px;background:#fff;display:flex;justify-content:space-between;gap:10px;align-items:center;}
+    .admin-doc-card b{font-size:13px;}
+    .admin-doc-card span{display:block;margin-top:4px;color:#64748b;font-size:12px;}
+    .admin-review-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+    .admin-review-checks label{display:flex;align-items:center;gap:8px;margin:0;color:#334155;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:10px;font-size:13px;}
+    .admin-review-checks input{width:auto;}
+    .admin-manager-memo{margin-top:12px;}
+    .admin-manager-memo textarea{min-height:80px;}
+    .admin-final-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px;}
+    .admin-final-actions button{min-width:auto !important;}
+    @media(max-width:1180px){
+      .admin-selected-summary{grid-template-columns:repeat(4,minmax(0,1fr));}
+      .admin-bulk-actions{grid-column:1/-1;justify-content:flex-start;}
+      .admin-review-layout{grid-template-columns:1fr;}
+      .admin-list-panel,.admin-detail-panel{position:static;max-height:none;overflow:visible;}
+    }
+    @media(max-width:760px){
+      .admin-head-main,.admin-detail-top{flex-direction:column;}
+      .admin-toolbar{grid-template-columns:1fr;}
+      .admin-selected-summary,.admin-mini-summary,.admin-info-grid,.admin-fuel-formula,.admin-doc-list,.admin-review-checks{grid-template-columns:1fr;}
+      .admin-trip-row{grid-template-columns:22px minmax(0,1fr);}
+    }
+
+
+    /* management settlement date display - applicant screen */
+    .settlement-date-pair{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .settlement-date-pair input[readonly]{
+      background:#f8fafc;
+      color:#334155;
+      font-weight:700;
+    }
+    .settlement-help{
+      grid-column:1/-1;
+      color:#64748b;
+      font-size:12px;
+      line-height:1.45;
+      margin-top:-2px;
+    }
+    .admin-schedule-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+      margin-bottom:12px;
+    }
+    .admin-schedule-grid input{
+      height:40px;
+      padding:9px 10px;
+      border-radius:10px;
+    }
+    @media(max-width:760px){
+      .settlement-date-pair,.admin-schedule-grid{grid-template-columns:1fr;}
+    }
+
+
+    /* applicant basic info row layout */
+    .basic-info-grid{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:12px 16px;
+    }
+    .basic-info-grid .route-panel,
+    .basic-info-grid .settlement-help{
+      grid-column:1 / -1;
+    }
+    .basic-info-grid input[readonly]{
+      background:#f8fafc;
+      color:#334155;
+      font-weight:700;
+    }
+    @media(max-width:900px){
+      .basic-info-grid{grid-template-columns:1fr;}
+    }
+
+</style>
+
+<style id="admin-final-adjustments">
+  .admin-detail-buttons{display:flex !important;flex-wrap:nowrap !important;gap:6px !important;justify-content:flex-end !important;min-width:max-content !important;}
+  .admin-detail-buttons button{padding:8px 8px !important;font-size:12px !important;border-radius:10px !important;white-space:nowrap !important;letter-spacing:-.04em !important;}
+  .admin-basic-info-grid{grid-template-columns:repeat(3,minmax(0,1fr)) !important;}
+  .admin-bulk-actions{flex-wrap:nowrap !important;}
+  .admin-bulk-actions button{padding:9px 10px !important;font-size:12px !important;white-space:nowrap !important;letter-spacing:-.04em !important;}
+  @media(max-width:900px){.admin-detail-buttons,.admin-bulk-actions{flex-wrap:wrap !important}.admin-basic-info-grid{grid-template-columns:1fr !important;}}
+</style>
+
+<style id="iframe-compact-admin-console">
+  /* iframe 대응: 관리팀 검토 콘솔 상단 영역 세로폭 축소 */
+  .admin-view .admin-console-head{
+    padding:12px 14px !important;
+    margin-bottom:12px !important;
+  }
+  .admin-head-main{
+    margin-bottom:10px !important;
+  }
+  .admin-head-main h2{
+    font-size:17px !important;
+    margin:0 0 3px !important;
+  }
+  .admin-head-main p{
+    font-size:12px !important;
+    line-height:1.35 !important;
+  }
+
+  .admin-toolbar{
+    grid-template-columns:170px 170px minmax(220px,1fr) !important;
+    gap:8px !important;
+    margin-bottom:10px !important;
+  }
+  .admin-toolbar label{
+    font-size:11px !important;
+    margin-bottom:4px !important;
+  }
+  .admin-toolbar select,
+  .admin-toolbar input{
+    height:38px !important;
+    min-height:38px !important;
+    padding:8px 10px !important;
+    border-radius:10px !important;
+    font-size:13px !important;
+  }
+
+  .admin-selected-summary{
+    grid-template-columns:repeat(4,minmax(112px,1fr)) minmax(390px,auto) !important;
+    gap:8px !important;
+  }
+  .admin-selected-summary>div:not(.admin-bulk-actions){
+    padding:9px 10px !important;
+    min-height:54px !important;
+    border-radius:12px !important;
+  }
+  .admin-selected-summary span{
+    font-size:11px !important;
+    margin-bottom:3px !important;
+  }
+  .admin-selected-summary b{
+    font-size:17px !important;
+    line-height:1.15 !important;
+  }
+
+  .admin-bulk-actions{
+    gap:6px !important;
+    flex-wrap:nowrap !important;
+    align-items:center !important;
+    justify-content:flex-end !important;
+  }
+  .admin-bulk-actions button{
+    height:38px !important;
+    min-height:38px !important;
+    padding:8px 10px !important;
+    font-size:12px !important;
+    border-radius:10px !important;
+    white-space:nowrap !important;
+    letter-spacing:-.04em !important;
+  }
+
+  /* 기존 파란 안내문은 삭제 대상. 혹시 남아도 공간을 잡아먹지 않게 처리 */
+  .admin-action-message{
+    display:none !important;
+  }
+
+  /* 하단 목록과 상세 영역도 살짝 조밀하게 */
+  .admin-review-layout{
+    gap:12px !important;
+  }
+  .admin-list-panel,
+  .admin-detail-panel{
+    top:78px !important;
+    max-height:calc(100vh - 90px) !important;
+  }
+  .admin-list-panel{
+    padding:14px !important;
+  }
+  .admin-list-panel .section-title-row{
+    margin-bottom:10px !important;
+  }
+  .admin-list-panel .section-title-row h2{
+    font-size:17px !important;
+  }
+  .admin-applicant-group{
+    margin-bottom:9px !important;
+    border-radius:13px !important;
+  }
+  .admin-group-head{
+    padding:9px 11px !important;
+  }
+  .admin-trip-row{
+    padding:10px 10px !important;
+    gap:8px !important;
+  }
+  .admin-trip-title-row{
+    margin-bottom:3px !important;
+  }
+  .admin-trip-meta,
+  .admin-trip-amounts{
+    font-size:11.5px !important;
+    line-height:1.35 !important;
+  }
+
+  @media(max-width:1180px){
+    .admin-selected-summary{
+      grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+    }
+    .admin-bulk-actions{
+      grid-column:1/-1 !important;
+      justify-content:flex-start !important;
+      flex-wrap:wrap !important;
+    }
+  }
+  @media(max-width:760px){
+    .admin-toolbar,
+    .admin-selected-summary{
+      grid-template-columns:1fr !important;
+    }
+  }
+</style>
+
+
+<style id="empty-state-style">
+  .empty-state{
+    min-height:72px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#64748b;
+    font-weight:800;
+    background:#f8fafc;
+    border:1px dashed #cbd5e1;
+    border-radius:14px;
+  }
+
+    html, body { min-height: 100%; }
+    body { overflow-x: hidden; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div>
+        <div class="brand">출장비 정산</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:3px;">결재서류·영수증 업로드 → 관리팀 검토 → 지출결의 작성</div>
+      </div>
+      <span class="pill">Travel Expense</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="tabs">
+      <button class="tab active" onclick="setMode('user', this)">출장자 입력 화면</button>
+      <button class="tab" onclick="setMode('admin', this)">관리팀 검토 화면</button>
+    </div>
+
+    <div class="user-view">
+      <div class="layout expense-workspace">
+        <aside class="status-panel">
+<section class="section">
+  <h2>처리 내역</h2>
+
+  <table class="process-table">
+    <thead>
+      <tr>
+        <th></th>
+        <th class="process-head-request">요청금액</th>
+        <th class="process-head-done">처리금액</th>
+        <th class="process-head-pending">미처리금액</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>총금액</td>
+        <td>0원</td>
+        <td>0원</td>
+        <td>0원</td>
+      </tr>
+      <tr>
+        <td>법인카드</td>
+        <td>0원</td>
+        <td>0원</td>
+        <td>0원</td>
+      </tr>
+      <tr>
+        <td>개인지급</td>
+        <td>0원</td>
+        <td>0원</td>
+        <td>0원</td>
+      </tr>
+    </tbody>
+  </table>
+
+</section>
+
+<section class="section">
+            <div class="section-title-row">
+              <h2>내 제출 내역</h2>
+              <button class="btn-sub btn-small" type="button" onclick="newRequest()">+ 신규 작성</button>
+            </div>
+            <div class="submission-scroll"><div class="notice empty-state">제출 내역이 없습니다.</div></div>
+          </section>
+        </aside>
+
+        <div class="form-panel">
+<section class="section">
+            <h2>1. 기본 정보</h2>
+            <div class="basic-info-grid">
+              <div>
+                <label>신청자</label>
+                <input value="" />
+              </div>
+              <div>
+                <label>본부</label>
+                <input value="" />
+              </div>
+              <div>
+                <label>팀</label>
+                <input value="" />
+              </div>
+
+              <div>
+                <label>출장/외근 구분</label>
+                <select>
+                  <option>출장</option>
+                  <option>외근</option>
+                  <option>교육/세미나</option>
+                </select>
+              </div>
+              <div>
+                <label>출장일</label>
+                <input type="date" value=""/>
+              </div>
+              <div>
+                <label>이동수단</label>
+                <select id="transport" onchange="toggleFuel()">
+                  <option>자차</option>
+                  <option>대중교통</option>
+                  <option>법인차</option>
+                </select>
+              </div>
+
+              <div>
+                <label>신청일</label>
+                <input type="date" value="" readonly title="출장자가 제출한 신청일입니다." />
+              </div>
+              <div>
+                <label>지결작성일</label>
+                <input id="voucherDateDisplay" type="date" readonly title="관리팀 검토 화면에서 입력한 지결작성일이 표시됩니다." />
+              </div>
+              <div>
+                <label>입금예정일</label>
+                <input id="paymentDueDateDisplay" type="date" readonly title="관리팀 검토 화면에서 입력한 입금예정일이 표시됩니다." />
+              </div>
+              <div class="settlement-help">관리팀 처리일정은 관리팀 검토 화면에서 입력한 값이 자동 표시됩니다.</div>
+
+              <div class="route-panel">
+                <div class="route-head">
+                  <div>
+                    <div class="route-title">이동경로</div>
+                    <div style="font-size:12px;color:#6b7280;margin-top:2px;">출발지 → 도착지 기준으로 구간별 입력</div>
+                  </div>
+                  <button class="btn-sub" type="button" onclick="addRouteSegment()">+ 이동구간 추가</button>
+                </div>
+                <div id="routeSegments"></div>
+                <div class="route-summary">
+                  <b>정산서 표기:</b> <span id="routeLabel">-</span><br/>
+                  <b>거리계산 경로:</b> <span id="fullRouteLabel">-</span>
+                </div>
+              </div>
+            </div>
+
+            <h3>결재 완료 서류 업로드</h3>
+            <div class="upload">
+              <strong>출장계/외근신청서 PDF 또는 캡처</strong><br/>
+              파일 선택 영역 미리보기 · 실제 개발 시 드래그앤드롭/모바일 사진 업로드 적용
+            </div>
+          </section>
+
+<section class="section" id="fuelSection">
+            <h2>2. 자차 유류비 자동 계산</h2>
+            <div class="grid">
+              <div>
+                <label>총 이동거리(km)</label>
+                <input id="distance" type="number" value="" oninput="calcAll()" />
+              </div>
+              <div>
+                <label>당일 휘발유가(원/L)</label>
+                <input id="gasPrice" type="number" value="" oninput="calcAll()" />
+              </div>
+              <div>
+                <label>회사 기준연비(km/L)</label>
+                <input id="efficiency" type="number" value="" oninput="calcAll()" />
+              </div>
+              <div>
+                <label>반올림 기준</label>
+                <select id="roundUnit" onchange="calcAll()">
+                  <option value="1" selected>원 단위</option>
+                  <option value="10">10원 단위</option>
+                  <option value="100">100원 단위</option>
+                </select>
+              </div>
+            </div>
+            <div class="fuel-result">
+              <div>
+                <div style="font-size:12px;color:#6b7280;font-weight:700;">자동계산 유류비</div>
+                <div style="font-size:12px;color:#6b7280;">총 이동거리 ÷ 기준연비 × 당일 유가</div>
+              </div>
+              <b id="fuelCost">0원</b>
+            </div>
+          </section>
+
+<section class="section">
+            <h2>3. 사용금액 입력</h2>
+            <div id="costList"></div>
+            <button class="btn-sub" onclick="addCostRow()">+ 비용 항목 추가</button>
+
+            <div class="notice" style="margin-top:12px;">
+              각 비용 항목 옆의 <b>영수증 첨부</b> 버튼으로 증빙을 연결합니다.<br/>
+              추후 ZIP 다운로드 시 항목별 폴더/파일명으로 자동 정리할 수 있습니다.
+            </div>
+          </section>
+
+<section class="section">
+            <h2>4. 정산 요약</h2>
+            <div class="summary">
+              <div class="sum-card total">
+                <small>총 사용금액</small>
+                <b id="totalCost">0원</b>
+              </div>
+              <div class="sum-card corp">
+                <small>법인카드</small>
+                <b id="corpCost">0원</b>
+              </div>
+              <div class="sum-card pay">
+                <small>개인 지급예정금액</small>
+                <b id="personalCost">0원</b>
+              </div>
+            </div>
+            <div class="notice" style="margin-top:12px;">
+              이 정산요약은 <b>현재 작성 또는 선택 중인 출장/외근 1건</b> 기준입니다.<br/>
+              개인 지급예정금액은 <b>개인카드 + 현금 + 자차 유류비</b> 기준입니다.
+            </div>
+            <div class="actions">
+              <button class="btn-ghost">임시저장</button>
+              <button>제출하기</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-view">
+      <section class="section admin-console-head">
+        <div class="admin-head-main">
+          <div>
+            <h2>관리팀 검토 콘솔</h2>
+            <p>신청건을 선택하면 우측 검토 상세에서 이동거리, 유류비, 법인카드, 개인지급, 증빙을 한 번에 확인합니다.</p>
+          </div>
+        </div>
+
+        <div class="admin-toolbar">
+          <div>
+            <label>정렬 기준</label>
+            <select id="adminSort" onchange="adminSortChanged()">
+              <option value="applicant">신청자별</option>
+              <option value="requestDate">신청일순</option>
+              <option value="tripDate">출장일순</option>
+              <option value="status">상태순</option>
+            </select>
+          </div>
+          <div>
+            <label>상태 필터</label>
+            <select id="adminStatusFilter" onchange="adminFilterChanged()">
+              <option value="all">전체</option>
+              <option value="검토대기">검토대기</option>
+              <option value="수정요청">수정요청</option>
+              <option value="지출결의완료">지출결의완료</option>
+              <option value="지급완료">지급완료</option>
+            </select>
+          </div>
+          <div class="admin-search-wrap">
+            <label>검색</label>
+            <input id="adminSearch" type="search" placeholder="신청자, 출장지, 항목 검색" oninput="adminFilterChanged()" />
+          </div>
+        </div>
+
+        <div class="admin-selected-summary">
+          <div><span>선택건수</span><b id="adminSelectedCount">0건</b></div>
+          <div><span>총액</span><b id="adminSelectedTotal">0원</b></div>
+          <div><span>법인카드</span><b id="adminSelectedCorp">0원</b></div>
+          <div><span>개인지급</span><b id="adminSelectedPersonal">0원</b></div>
+          <div class="admin-bulk-actions">
+            <button type="button" class="btn-sub" onclick="adminBulkAction('전체 출력')">전체출력</button>
+            <button type="button" class="btn-ghost" onclick="adminBulkAction('법인카드 출력')">법인카드출력</button>
+            <button type="button" class="btn-ghost" onclick="adminBulkAction('개인지급 출력')">개인지급출력</button>
+            <button type="button" onclick="adminBulkAction('지출결의 완료')">지출결의 완료</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="admin-review-layout">
+        <section class="section admin-list-panel">
+          <div class="section-title-row">
+            <h2>신청자별 제출 목록</h2>
+            <span class="admin-count-badge" id="adminVisibleCount">0건</span>
+          </div>
+          <div class="notice empty-state">제출된 정산서가 없습니다.</div>
+        </section>
+
+        <section class="section admin-detail-panel" id="adminDetailPanel">
+          <div class="admin-detail-empty">검토할 정산서를 선택하세요.</div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+
+<script id="admin-action-message-safety">
+  window.setAdminActionMessage = function(message, type){
+    const el = document.getElementById('adminActionMessage');
+    if(!el) return;
+    el.className = 'admin-action-message' + (type ? ' ' + type : '');
+    el.textContent = message || '';
+  };
+</script>
+
+<script>
+  const costList = document.getElementById('costList');
+  const routeSegments = document.getElementById('routeSegments');
+
+  function money(n){
+    return Math.round(Number(n || 0)).toLocaleString('ko-KR') + '원';
+  }
+
+  function addRouteSegment(from='', to='', distance=''){
+    const row = document.createElement('div');
+    row.className = 'route-row';
+    row.innerHTML = `
+      <div class="route-num"></div>
+      <div>
+        <label>출발지</label>
+        <input value="${from}" oninput="updateRoute()" placeholder="예: 연구소" />
+      </div>
+      <div class="route-arrow">→</div>
+      <div>
+        <label>도착지</label>
+        <input value="${to}" oninput="updateRoute()" placeholder="예: 관악구 업체" />
+      </div>
+      <div class="distance-wrap">
+        <label>구간거리(km)</label>
+        <input type="number" value="${distance}" oninput="updateRoute()" />
+      </div>
+      <button class="btn-danger" type="button" onclick="this.closest('.route-row').remove();renumberRoute();updateRoute()">삭제</button>
+    `;
+    routeSegments.appendChild(row);
+    renumberRoute();
+    updateRoute();
+  }
+
+  function renumberRoute(){
+    document.querySelectorAll('.route-num').forEach((el, i)=>{
+      el.textContent = i + 1;
+    });
+  }
+
+  function updateRoute(){
+    const segments = [...routeSegments.querySelectorAll('.route-row')].map(row => {
+      const inputs = row.querySelectorAll('input');
+      return {
+        from: inputs[0].value || '출발지',
+        to: inputs[1].value || '도착지',
+        distance: Number(inputs[2].value || 0)
+      };
+    });
+
+    let compactPath = [];
+    if(segments.length){
+      compactPath.push(segments[0].from);
+      segments.forEach(seg => compactPath.push(seg.to));
+    }
+
+    const routeText = segments.map(seg => `${seg.from} → ${seg.to}`).join(' / ') || '-';
+    const fullRoute = compactPath.join(' → ') || '-';
+    const totalDistance = segments.reduce((sum, seg)=>sum + seg.distance, 0);
+
+    document.getElementById('routeLabel').textContent = routeText;
+    document.getElementById('fullRouteLabel').textContent = fullRoute;
+    document.getElementById('distance').value = totalDistance;
+
+    calcAll();
+  }
+
+  function addCostRow(type='', pay='', amount=''){
+    const row = document.createElement('div');
+    row.className = 'cost-row';
+    row.innerHTML = `
+      <div>
+        <label>항목</label>
+        <select onchange="calcAll()">
+          <option ${type==='식대'?'selected':''}>식대</option>
+          <option ${type==='교통비'?'selected':''}>교통비</option>
+          <option ${type==='주차비'?'selected':''}>주차비</option>
+          <option ${type==='통행료'?'selected':''}>통행료</option>
+          <option ${type==='숙박비'?'selected':''}>숙박비</option>
+          <option ${type==='기타'?'selected':''}>기타</option>
+        </select>
+      </div>
+      <div>
+        <label>사용구분</label>
+        <select onchange="calcAll()">
+          <option ${pay==='법인카드'?'selected':''}>법인카드</option>
+          <option ${pay==='개인카드'?'selected':''}>개인카드</option>
+          <option ${pay==='현금'?'selected':''}>현금</option>
+        </select>
+      </div>
+      <div>
+        <label>금액</label>
+        <input type="number" value="${amount}" oninput="calcAll()" />
+      </div>
+      <div class="receipt-wrap">
+        <label>영수증</label>
+        <input class="receipt-input" type="file" accept="image/*,.pdf" multiple onchange="handleReceiptUpload(this)" />
+        <button class="receipt-btn" type="button" onclick="this.previousElementSibling.click()">영수증 첨부</button>
+      </div>
+      <button class="btn-danger" onclick="this.closest('.cost-row').remove();calcAll()">삭제</button>
+    `;
+    costList.appendChild(row);
+    calcAll();
+  }
+
+
+  function handleReceiptUpload(input){
+    const btn = input.nextElementSibling;
+    const count = input.files ? input.files.length : 0;
+    if(count > 0){
+      btn.textContent = `첨부 ${count}건`;
+      btn.classList.add('attached');
+    }else{
+      btn.textContent = '영수증 첨부';
+      btn.classList.remove('attached');
+    }
+  }
+
+  function calcFuel(){
+    const transport = document.getElementById('transport').value;
+    if(transport !== '자차') return 0;
+    const distance = Number(document.getElementById('distance').value || 0);
+    const gas = Number(document.getElementById('gasPrice').value || 0);
+    const eff = Number(document.getElementById('efficiency').value || 1);
+    const unit = Number(document.getElementById('roundUnit').value || 1);
+    const raw = distance / eff * gas;
+    return Math.round(raw / unit) * unit;
+  }
+
+  function calcAll(){
+    let total = 0;
+    let corp = 0;
+    let personal = 0;
+
+    document.querySelectorAll('.cost-row').forEach(row=>{
+      const pay = row.querySelectorAll('select')[1].value;
+      const amount = Number(row.querySelector('input').value || 0);
+      total += amount;
+      if(pay === '법인카드') corp += amount;
+      else personal += amount;
+    });
+
+    const fuel = calcFuel();
+    total += fuel;
+    personal += fuel;
+
+    document.getElementById('fuelCost').textContent = money(fuel);
+    document.getElementById('totalCost').textContent = money(total);
+    document.getElementById('corpCost').textContent = money(corp);
+    document.getElementById('personalCost').textContent = money(personal);
+  }
+
+  function toggleFuel(){
+    const isCar = document.getElementById('transport').value === '자차';
+    document.getElementById('fuelSection').style.display = isCar ? 'block' : 'none';
+    calcAll();
+  }
+
+
+  function closeAllMenus(){
+    document.querySelectorAll('.dropdown-menu.open').forEach(menu => menu.classList.remove('open'));
+  }
+
+  function toggleMenu(event, btn){
+    event.stopPropagation();
+    const menu = btn.nextElementSibling;
+    const isOpen = menu.classList.contains('open');
+    closeAllMenus();
+    if(!isOpen) menu.classList.add('open');
+  }
+
+  document.addEventListener('click', closeAllMenus);
+
+  function openConfirmModal(title, text, actionLabel, action){
+    closeAllMenus();
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmText').textContent = text;
+    const btn = document.getElementById('confirmActionBtn');
+    btn.textContent = actionLabel;
+    btn.onclick = function(){
+      action();
+      closeConfirmModal();
+    };
+    document.getElementById('confirmModal').classList.add('open');
+  }
+
+  function closeConfirmModal(){
+    document.getElementById('confirmModal').classList.remove('open');
+  }
+
+  function confirmDeleteDraft(){
+    openConfirmModal(
+      '임시저장 건 삭제',
+      '임시저장 상태의 출장/외근 내역만 삭제할 수 있습니다. 정말 삭제하시겠습니까?',
+      '삭제',
+      function(){ alert('삭제 처리 예시입니다. 실제 개발 시 DB에서 임시저장 건을 삭제합니다.'); }
+    );
+  }
+
+  function confirmCancelSubmit(){
+    openConfirmModal(
+      '제출취소',
+      '검토대기 상태의 신청건은 삭제 대신 제출취소로 처리합니다. 상태가 임시저장으로 변경됩니다.',
+      '제출취소',
+      function(){ alert('제출취소 처리 예시입니다. 실제 개발 시 상태를 임시저장으로 변경합니다.'); }
+    );
+  }
+
+
+  function newRequest(){
+    document.querySelectorAll('.list-card').forEach(card => card.style.borderColor = '');
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  function loadSampleRequest(){
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  function setMode(mode, btn){
+    document.body.classList.toggle('admin', mode === 'admin');
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  calcAll();
+</script>
+
+  <div class="modal-backdrop" id="confirmModal">
+    <div class="confirm-modal">
+      <h3 id="confirmTitle">확인</h3>
+      <p id="confirmText">처리하시겠습니까?</p>
+      <div class="modal-actions">
+        <button class="btn-ghost" type="button" onclick="closeConfirmModal()">취소</button>
+        <button id="confirmActionBtn" type="button">확인</button>
+      </div>
+    </div>
+  </div>
+
+
+<script>
+(function(){
+  const trips = {};
+  let currentId = null;
+  function won(n){ return Number(n||0).toLocaleString('ko-KR') + '원'; }
+  function fuelRaw(trip){ const km = (trip.routes||[]).reduce((s,r)=>s+Number(r.km||0),0); return km / (trip.fuel.efficiency||1) * (trip.fuel.gasPrice||0); }
+  function roundBy(n, unit){ return Math.round(n / (unit||1)) * (unit||1); }
+  function fuelCost(trip){ return roundBy(fuelRaw(trip), trip.fuel.roundUnit||1); }
+  function totals(trip){
+    const fuel = fuelCost(trip);
+    let corp=0, personal=0;
+    trip.expenses.forEach(e=>{ if(e.pay==='법인카드') corp += e.amount; else personal += e.amount; });
+    personal += fuel;
+    return {corp, personal, fuel, total:corp+personal};
+  }
+  function msg(text, type){
+    const el = document.getElementById('adminActionMessage');
+    if(!el) return;
+    el.className = 'admin-action-message' + (type ? ' ' + type : '');
+    el.textContent = text;
+  }
+  function expenseRows(list){
+    if(!list.length) return '<tr><td colspan="5" class="center">해당 내역 없음</td></tr>';
+    return list.map((e, i)=>`<tr><td>${e.date}</td><td>${e.item}</td><td>${e.pay}</td><td class="amount">${won(e.amount)}</td><td class="center"><button type="button" class="admin-evidence-btn ${e.ok?'':'missing'}" onclick="adminOpenEvidenceViewer('expense','${e.item}')">${e.ok?'증빙보기':'미첨부'}</button></td></tr>`).join('');
+  }
+  function routeRows(trip){
+    if(!trip.routes.length) return '<tr><td colspan="5" class="center">자차 유류비 정산 대상 아님</td></tr>';
+    const rawTotal = fuelRaw(trip);
+    const totalKm = trip.routes.reduce((s,r)=>s+r.km,0);
+    return trip.routes.map((r,i)=>{
+      const segFuel = totalKm ? Math.round(rawTotal * (r.km/totalKm)) : 0;
+      return `<tr><td class="center">${i+1}</td><td>${r.from}</td><td>${r.to}</td><td class="amount">${r.km}km</td><td class="amount">${won(segFuel)}</td></tr>`;
+    }).join('');
+  }
+  function renderDetail(id){
+    const trip = trips[id]; if(!trip) return;
+    currentId = id;
+    syncApplicantSettlementDates(trip);
+    document.querySelectorAll('.admin-trip-row').forEach(r=>r.classList.toggle('active', r.dataset.id===id));
+    const t = totals(trip);
+    const totalKm = trip.routes.reduce((s,r)=>s+r.km,0);
+    const corpExpenses = trip.expenses.filter(e=>e.pay==='법인카드');
+    const personalExpenses = trip.expenses.filter(e=>e.pay!=='법인카드');
+    const panel = document.getElementById('adminDetailPanel');
+    panel.innerHTML = `
+      <div class="admin-detail-top">
+        <div class="admin-detail-title">
+          <h2>${trip.title}</h2>
+          <p>${trip.applicant} · ${trip.division || '연구본부'} · ${trip.team || trip.dept} · ${trip.tripDate} · ${trip.routeText}</p>
+        </div>
+        <div class="admin-detail-buttons">
+          <button type="button" onclick="adminPrintStatement('all')">전체출력</button>
+          <button type="button" class="btn-ghost" onclick="adminPrintStatement('corp')">법인카드출력</button>
+          <button type="button" class="btn-ghost" onclick="adminPrintStatement('personal')">개인지급출력</button>
+        </div>
+      </div>
+      <div class="admin-mini-summary">
+        <div class="admin-mini-card"><small>상태</small><b>${trip.status}</b></div>
+        <div class="admin-mini-card"><small>총액</small><b>${won(t.total)}</b></div>
+        <div class="admin-mini-card"><small>법인카드</small><b>${won(t.corp)}</b></div>
+        <div class="admin-mini-card"><small>개인지급</small><b>${won(t.personal)}</b></div>
+      </div>
+
+      <div class="admin-review-section">
+        <h3>① 기본정보</h3>
+        <div class="admin-section-body admin-info-grid admin-basic-info-grid">
+          <div class="admin-info-item"><span>신청자</span><b>${trip.applicant}</b></div>
+          <div class="admin-info-item"><span>본부</span><b>${trip.division || '연구본부'}</b></div>
+          <div class="admin-info-item"><span>팀</span><b>${trip.team || trip.dept}</b></div>
+          <div class="admin-info-item"><span>출장/외근 구분</span><b>${trip.type}</b></div>
+          <div class="admin-info-item"><span>출장일</span><b>${trip.tripDate}</b></div>
+          <div class="admin-info-item"><span>이동수단</span><b>${trip.transport || '자차'}</b></div>
+          <div class="admin-info-item"><span>신청일</span><b>${trip.requestDate}</b></div>
+          <div class="admin-info-item"><span>지결작성일</span><b>${trip.voucherDate || '미입력'}</b></div>
+          <div class="admin-info-item"><span>입금예정일</span><b>${trip.paymentDueDate || '미입력'}</b></div>
+        </div>
+      </div>
+
+      <div class="admin-review-section">
+        <h3>② 이동경로 및 거리 검토 <button type="button" class="admin-evidence-btn" onclick="adminOpenEvidenceViewer('document')">출장계 보기</button></h3>
+        <div class="admin-section-body">
+          <div class="admin-table-wrap"><table class="admin-check-table"><thead><tr><th>구간</th><th>출발지</th><th>도착지</th><th>거리</th><th>구간 유류비 참고</th></tr></thead><tbody>${routeRows(trip)}</tbody></table></div>
+          <div class="admin-total-line"><span>총 이동거리</span><b>${totalKm}km</b></div>
+        </div>
+      </div>
+
+      <div class="admin-review-section">
+        <h3>③ 유류비 정산 검토 <button type="button" class="admin-evidence-btn" onclick="adminPrintStatement('personal')">개인지급출력</button></h3>
+        <div class="admin-section-body">
+          <div class="admin-fuel-formula">
+            <div class="admin-info-item"><span>총거리</span><b>${totalKm}km</b></div>
+            <div class="admin-info-item"><span>기준연비</span><b>${trip.fuel.efficiency}km/L</b></div>
+            <div class="admin-info-item"><span>당일 유가</span><b>${won(trip.fuel.gasPrice).replace('원','원/L')}</b></div>
+            <div class="admin-info-item"><span>유류비</span><b>${won(t.fuel)}</b></div>
+          </div>
+          <div class="notice">계산식: 총거리 ÷ 기준연비 × 당일 유가 = ${totalKm} ÷ ${trip.fuel.efficiency} × ${trip.fuel.gasPrice.toLocaleString('ko-KR')} = ${won(t.fuel)}</div>
+        </div>
+      </div>
+
+      <div class="admin-review-section">
+        <h3>④ 법인카드 사용내역 <button type="button" class="admin-evidence-btn" onclick="adminOpenEvidenceViewer('corp')">법인카드 증빙 보기</button></h3>
+        <div class="admin-section-body">
+          <div class="admin-table-wrap"><table class="admin-check-table"><thead><tr><th>일자</th><th>항목</th><th>결제수단</th><th>금액</th><th>증빙</th></tr></thead><tbody>${expenseRows(corpExpenses)}</tbody></table></div>
+          <div class="admin-total-line"><span>법인카드 합계</span><b>${won(t.corp)}</b></div>
+        </div>
+      </div>
+
+      <div class="admin-review-section">
+        <h3>⑤ 개인지급 내역 <button type="button" class="admin-evidence-btn" onclick="adminOpenEvidenceViewer('personal')">개인지급 증빙 보기</button></h3>
+        <div class="admin-section-body">
+          <div class="admin-table-wrap"><table class="admin-check-table"><thead><tr><th>일자</th><th>항목</th><th>결제수단</th><th>금액</th><th>증빙</th></tr></thead><tbody>${expenseRows(personalExpenses)}${t.fuel?`<tr><td>${trip.tripDate}</td><td>유류비</td><td>자동계산</td><td class="amount">${won(t.fuel)}</td><td class="center"><button type="button" class="admin-evidence-btn" onclick="adminPrintStatement('personal')">유류비내역</button></td></tr>`:''}</tbody></table></div>
+          <div class="admin-total-line"><span>개인지급 합계</span><b>${won(t.personal)}</b></div>
+        </div>
+      </div>
+
+      <div class="admin-review-section">
+        <h3>⑥ 첨부자료</h3>
+        <div class="admin-section-body admin-doc-list">
+          ${trip.documents.map((d,i)=>`<div class="admin-doc-card"><div><b>${d.type}</b><span>${d.name}<br/>업로드: ${d.uploaded}</span></div><button type="button" class="admin-evidence-btn" onclick="adminOpenEvidenceViewer('document','${d.type}')">보기</button></div>`).join('')}
+        </div>
+      </div>
+
+      <div class="admin-review-section">
+        <h3>⑦ 검토 결과</h3>
+        <div class="admin-section-body">
+          <div class="admin-schedule-grid">
+            <div>
+              <label>지결작성일</label>
+              <input type="date" id="adminVoucherDate" value="${trip.voucherDate || ''}" onchange="adminUpdateSettlementDates('${trip.id}')" />
+            </div>
+            <div>
+              <label>지급예정일</label>
+              <input type="date" id="adminPaymentDueDate" value="${trip.paymentDueDate || ''}" onchange="adminUpdateSettlementDates('${trip.id}')" />
+            </div>
+          </div>
+          <div class="notice" style="margin-bottom:12px;">관리팀이 입력한 지결작성일과 지급예정일은 출장자 입력 화면의 관리팀 처리 일정 영역에 표시됩니다.</div>
+          <div class="admin-review-checks">
+            <label><input type="checkbox"> 이동경로/거리 확인</label>
+            <label><input type="checkbox"> 유류비 계산 확인</label>
+            <label><input type="checkbox"> 법인카드 금액/증빙 확인</label>
+            <label><input type="checkbox"> 개인지급 금액/증빙 확인</label>
+            <label><input type="checkbox"> 출장계/외근신청서 확인</label>
+            <label><input type="checkbox"> 지출결의 첨부자료 준비 완료</label>
+          </div>
+          <div class="admin-manager-memo"><label>관리팀 메모</label><textarea>${trip.memo || ''}</textarea></div>
+          <div class="admin-final-actions">
+            <button type="button" class="btn-ghost" onclick="adminAdminAction('수정요청')">수정요청</button>
+            <button type="button" class="btn-sub" onclick="adminAdminAction('승인')">승인</button>
+            <button type="button" onclick="adminAdminAction('지출결의 완료')">지출결의 완료</button>
+            <button type="button" onclick="adminAdminAction('지급완료')">지급완료</button>
+          </div>
+        </div>
+      </div>`;
+  }
+  function syncApplicantSettlementDates(trip){
+    if(!trip) return;
+    const voucherEl = document.getElementById('voucherDateDisplay');
+    const payEl = document.getElementById('paymentDueDateDisplay');
+    if(voucherEl) voucherEl.value = trip.voucherDate || '';
+    if(payEl) payEl.value = trip.paymentDueDate || '';
+  }
+  window.adminUpdateSettlementDates = function(id){
+    const trip = trips[id];
+    if(!trip) return;
+    const voucherEl = document.getElementById('adminVoucherDate');
+    const payEl = document.getElementById('adminPaymentDueDate');
+    trip.voucherDate = voucherEl ? voucherEl.value : trip.voucherDate;
+    trip.paymentDueDate = payEl ? payEl.value : trip.paymentDueDate;
+    syncApplicantSettlementDates(trip);
+    msg('관리팀 처리 일정이 반영되었습니다. 출장자 입력 화면의 지결작성일/지급예정일에도 표시됩니다.', 'ok');
+  };
+
+  window.adminSelectDetailById = renderDetail;
+  window.adminUpdateSelectedSummary = function(){
+    let count=0,total=0,corp=0,personal=0;
+    document.querySelectorAll('.admin-trip-row input[type="checkbox"]:checked').forEach(cb=>{
+      const row=cb.closest('.admin-trip-row'); count++; total+=Number(row.dataset.total||0); corp+=Number(row.dataset.corp||0); personal+=Number(row.dataset.personal||0);
+    });
+    document.getElementById('adminSelectedCount').textContent=count+'건';
+    document.getElementById('adminSelectedTotal').textContent=won(total);
+    document.getElementById('adminSelectedCorp').textContent=won(corp);
+    document.getElementById('adminSelectedPersonal').textContent=won(personal);
+  };
+  window.adminFilterChanged = function(){
+    const q=(document.getElementById('adminSearch')?.value||'').toLowerCase();
+    const st=document.getElementById('adminStatusFilter')?.value||'all';
+    let visible=0;
+    document.querySelectorAll('.admin-trip-row').forEach(row=>{
+      const text=(row.innerText+' '+row.dataset.applicant+' '+row.dataset.title).toLowerCase();
+      const okQ=!q || text.includes(q);
+      const okS=st==='all' || row.dataset.status===st;
+      row.style.display=(okQ&&okS)?'grid':'none';
+      if(okQ&&okS) visible++;
+    });
+    document.getElementById('adminVisibleCount').textContent=visible+'건';
+  };
+  window.adminSortChanged = function(){ msg('정렬 기준이 변경되었습니다. 실제 정렬은 Supabase 연동 단계에서 order by로 연결하면 됩니다.', 'ok'); };
+
+  function selectedTrips(){
+    const checked=[...document.querySelectorAll('.admin-trip-row input[type="checkbox"]:checked')];
+    return checked.map(cb => trips[cb.closest('.admin-trip-row').dataset.id]).filter(Boolean);
+  }
+  function modeLabel(mode){
+    if(mode==='corp') return '법인카드용';
+    if(mode==='personal') return '개인지급용';
+    return '전체';
+  }
+  function modeFromAction(action){
+    if(String(action).includes('법인카드')) return 'corp';
+    if(String(action).includes('개인지급')) return 'personal';
+    return 'all';
+  }
+  function categoryOfExpense(e){
+    if(!e) return 'etc';
+    const item = e.item || '';
+    if(item.includes('숙박')) return 'lodging';
+    if(item.includes('대중') || item.includes('교통') || item.includes('택시') || item.includes('버스') || item.includes('지하철') || item.includes('기차')) return 'transit';
+    if(item.includes('식') || item.includes('식대') || item.includes('식비')) return 'meal';
+    return 'etc';
+  }
+  function displayAmount(n){
+    n = Math.round(Number(n || 0));
+    return n ? won(n) : '-';
+  }
+  function getPrintableExpenses(trip, mode){
+    return trip.expenses.filter(e => {
+      if(mode === 'corp') return e.pay === '법인카드';
+      if(mode === 'personal') return e.pay !== '법인카드';
+      return true;
+    });
+  }
+  function fuelSegmentsForTrip(trip, mode){
+    if(mode === 'corp') return [];
+    const totalKm = (trip.routes || []).reduce((s,r)=>s+Number(r.km||0),0);
+    const fuel = fuelCost(trip);
+    if(!totalKm || !fuel) return [];
+    let used = 0;
+    return trip.routes.map((r, i) => {
+      let amount = i === trip.routes.length - 1 ? (fuel - used) : Math.round((fuel * Number(r.km||0) / totalKm) / 10) * 10;
+      used += amount;
+      return {
+        applicant: trip.applicant,
+        date: trip.tripDate,
+        route: `${r.from} → ${r.to}`,
+        km: Number(r.km || 0),
+        efficiency: trip.fuel?.efficiency || 10,
+        gas: trip.fuel?.gasPrice || 0,
+        amount
+      };
+    });
+  }
+  function summaryForTrips(printTrips, mode){
+    const out={lodging:0,fuel:0,transit:0,meal:0,etc:0,total:0,corp:0,personal:0,km:0};
+    printTrips.forEach(trip => {
+      getPrintableExpenses(trip, mode).forEach(e => {
+        const amount = Number(e.amount || 0);
+        const cat = categoryOfExpense(e);
+        out[cat] += amount;
+        out.total += amount;
+        if(e.pay === '법인카드') out.corp += amount; else out.personal += amount;
+      });
+      const segs = fuelSegmentsForTrip(trip, mode);
+      const fuel = segs.reduce((s,r)=>s+r.amount,0);
+      const km = segs.reduce((s,r)=>s+r.km,0);
+      out.fuel += fuel;
+      out.personal += fuel;
+      out.total += fuel;
+      out.km += km;
+    });
+    return out;
+  }
+  function statementRowsForTrips(printTrips, mode){
+    return printTrips.map(trip => {
+      const sum = {lodging:0,fuel:0,transit:0,meal:0,etc:0,total:0,corp:0,personal:0,km:0};
+      getPrintableExpenses(trip, mode).forEach(e => {
+        const amount = Number(e.amount || 0);
+        const cat = categoryOfExpense(e);
+        sum[cat] += amount;
+        sum.total += amount;
+        if(e.pay === '법인카드') sum.corp += amount; else sum.personal += amount;
+      });
+      const segs = fuelSegmentsForTrip(trip, mode);
+      sum.fuel += segs.reduce((s,r)=>s+r.amount,0);
+      sum.km += segs.reduce((s,r)=>s+r.km,0);
+      sum.personal += sum.fuel;
+      sum.total += sum.fuel;
+      return `<tr>
+        <td>${trip.applicant}</td>
+        <td>${trip.tripDate}</td>
+        <td>${trip.tripDate}</td>
+        <td class="num">${displayAmount(sum.lodging)}</td>
+        <td class="num">${displayAmount(sum.fuel)}</td>
+        <td class="num">${displayAmount(sum.transit)}</td>
+        <td class="num">${displayAmount(sum.meal)}</td>
+        <td class="num">${displayAmount(sum.etc)}</td>
+        <td class="num">${displayAmount(sum.total)}</td>
+        <td class="num">${sum.km ? sum.km + 'km' : '-'}</td>
+        <td class="left">${trip.title || trip.routeText || '-'}</td>
+      </tr>`;
+    }).join('');
+  }
+  function fuelStatementRows(printTrips, mode){
+    const rows = [];
+    printTrips.forEach(trip => fuelSegmentsForTrip(trip, mode).forEach(seg => rows.push(seg)));
+    if(!rows.length) return '<tr><td colspan="9">유류비 정산 내역이 없습니다.</td></tr>';
+    return rows.map((f, idx) => `<tr>
+      <td>${idx+1}</td>
+      <td>${f.applicant}</td>
+      <td>${f.date}</td>
+      <td class="left">${f.route}</td>
+      <td class="num">${f.km}km</td>
+      <td class="num">${f.efficiency}km/L</td>
+      <td class="num">${Number(f.gas||0).toLocaleString('ko-KR')}원/L</td>
+      <td class="num">${displayAmount(f.amount)}</td>
+      <td class="left">총거리 ÷ 기준연비 × 당일 유가</td>
+    </tr>`).join('');
+  }
+  function evidencePages(printTrips, mode){
+    const corpItems = [];
+    const personalItems = [];
+    const documentItems = [];
+    const fuelItems = [];
+
+    printTrips.forEach(trip => {
+      if(mode === 'all'){
+        (trip.documents || []).forEach(d => documentItems.push({
+          kind:'결재서류',
+          title:d.type,
+          pay:'결재서류',
+          amount:'-',
+          owner:trip.applicant,
+          date:trip.tripDate,
+          file:d.name,
+          place:trip.routeText || trip.title || '-',
+          missing:false
+        }));
+      }
+
+      getPrintableExpenses(trip, mode).forEach(e => {
+        const item = {
+          kind:e.pay === '법인카드' ? '법인카드 증빙' : '개인지급 증빙',
+          title:e.item,
+          pay:e.pay,
+          amount:won(e.amount),
+          owner:trip.applicant,
+          date:e.date || trip.tripDate,
+          file:e.evidence || '미첨부',
+          place:e.place || '-',
+          missing:!e.ok
+        };
+        if(e.pay === '법인카드') corpItems.push(item);
+        else personalItems.push(item);
+      });
+
+      if(mode !== 'corp' && fuelCost(trip) > 0){
+        fuelItems.push({
+          kind:'유류비 정산',
+          title:'유류비',
+          pay:'개인지급',
+          amount:won(fuelCost(trip)),
+          owner:trip.applicant,
+          date:trip.tripDate,
+          file:'유류비_정산내역.pdf',
+          place:`총거리 ${(trip.routes||[]).reduce((s,r)=>s+Number(r.km||0),0)}km · 기준연비 ${trip.fuel?.efficiency || 10}km/L · 유가 ${Number(trip.fuel?.gasPrice || 0).toLocaleString('ko-KR')}원/L`,
+          missing:false,
+          fuel:true
+        });
+      }
+    });
+
+    function renderCard(p, idx){
+      return `<article class="evidence-item-card ${p.missing ? 'missing' : ''}">
+        <div class="evidence-item-head">
+          <div>
+            <span class="evidence-index">${idx+1}</span>
+            <b>${p.title}</b>
+          </div>
+          <strong>${p.amount}</strong>
+        </div>
+        <div class="evidence-meta-line">
+          <span>신청자 ${p.owner}</span>
+          <span>${p.pay}</span>
+          <span>${p.date}</span>
+        </div>
+        <div class="fake-receipt compact">
+          <b>${p.missing ? '미첨부 증빙' : (p.fuel ? '유류비 자동계산 내역' : '영수증/PDF 미리보기 영역')}</b>
+          <span>${p.missing ? '수정요청 대상입니다.' : '서버 연동 후 실제 첨부파일이 이 위치에 출력됩니다.'}</span>
+        </div>
+        <table class="evidence-meta compact-meta">
+          <tr><th>파일명</th><td>${p.file}</td></tr>
+          <tr><th>내용</th><td>${p.place || '-'}</td></tr>
+        </table>
+      </article>`;
+    }
+
+    function renderSection(title, desc, items){
+      if(!items.length) return '';
+      const total = items.reduce((s,it)=>s + (String(it.amount).replace(/[^0-9.-]/g,'') ? Number(String(it.amount).replace(/[^0-9.-]/g,'')) : 0),0);
+      return `<section class="evidence-page itemized-evidence-page">
+        <div class="evidence-section-title">
+          <div><h2>${title}</h2><p>${desc}</p></div>
+          <div class="evidence-section-total"><span>합계</span><b>${total ? won(total) : '-'}</b></div>
+        </div>
+        <div class="itemized-evidence-grid">
+          ${items.map(renderCard).join('')}
+        </div>
+      </section>`;
+    }
+
+    return [
+      renderSection('법인카드 증빙', '법인카드 지출결의용 증빙입니다. 항목별 금액과 영수증을 바로 대조할 수 있습니다.', corpItems),
+      renderSection('개인지급 증빙', '개인카드·현금·유류비 지출결의용 증빙입니다. 유류비는 자동계산 내역으로 표시합니다.', personalItems.concat(fuelItems)),
+      renderSection('출장계 / 외근신청서', '출장 또는 외근 사전 결재서류입니다.', documentItems)
+    ].join('');
+  }
+  function makeStatementDocument(printTrips, mode, titlePrefix){
+    const today = new Date().toISOString().slice(0,10);
+    const label = modeLabel(mode);
+    const totals = summaryForTrips(printTrips, mode);
+    const bodyRows = statementRowsForTrips(printTrips, mode);
+    const fuelRows = fuelStatementRows(printTrips, mode);
+    const applicantLabel = printTrips.length === 1 ? printTrips[0].applicant : `${printTrips[0].applicant} 외 ${printTrips.length-1}건`;
+    return `<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>${label} 출장비 정산서</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef2f7;color:#111827;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",Arial,sans-serif;}
+  .print-shell{max-width:1200px;margin:0 auto;padding:22px;}
+  .print-toolbar{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:12px;margin:-22px -22px 18px;padding:14px 22px;background:rgba(255,255,255,.94);border-bottom:1px solid #dbe3ef;backdrop-filter:blur(10px);}
+  .print-toolbar b{font-size:18px}.print-toolbar div:last-child{display:flex;gap:8px}
+  button{border:0;border-radius:12px;padding:11px 14px;font-weight:900;cursor:pointer;background:#2563eb;color:#fff}
+  button.secondary{background:#eef2ff;color:#3730a3}
+  .statement-page,.evidence-page{background:#fff;border:1px solid #d8e0ed;border-radius:18px;box-shadow:0 12px 30px rgba(15,23,42,.08);padding:28px;margin-bottom:20px;}
+  .statement-title{text-align:center;font-size:30px;font-weight:900;letter-spacing:-.05em;margin:0 0 18px;}
+  .statement-sub{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:14px;font-weight:900;margin-bottom:10px;}
+  .statement-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px;}
+  .statement-table th,.statement-table td{border:1px solid #111827;padding:10px 8px;text-align:center;vertical-align:middle;word-break:keep-all;}
+  .statement-table th{background:#e5e7eb;color:#334155;font-weight:900;}
+  .statement-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .statement-table td.left{text-align:left;white-space:normal;line-height:1.35;}
+  .statement-table .sum-row td{background:#eef6e8;font-weight:900;}
+  .label-cell{font-weight:900;background:#fff;}
+  .pay-label{font-weight:900;background:#f8fafc;}
+  .statement-note{margin:12px 0 18px;border:1px solid #dbe3ef;background:#f8fafc;border-radius:12px;padding:11px 13px;color:#334155;font-size:13px;line-height:1.55;}
+  .fuel-statement-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:22px 0 10px;}
+  .fuel-statement-title b{font-size:20px}.fuel-statement-title span{color:#64748b;font-size:13px;font-weight:900;}
+  .fuel-calc-box{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px;}
+  .fuel-calc-card{border:1px solid #dbe3ef;border-radius:12px;padding:12px;background:#f8fafc;}
+  .fuel-calc-card small{display:block;color:#64748b;font-weight:900;margin-bottom:6px}.fuel-calc-card b{font-size:18px;}
+  .evidence-page h2{margin:0 0 14px;font-size:22px;}
+  .evidence-card{border:1px solid #dbe3ef;border-radius:16px;padding:18px;background:#fff;}
+  .fake-receipt{height:520px;border:2px dashed #cbd5e1;border-radius:16px;background:#f8fafc;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#64748b;gap:8px;margin-bottom:14px;}
+  .fake-receipt b{font-size:24px;color:#1f2937}.fake-receipt span{font-size:14px;}
+  .evidence-meta{width:100%;border-collapse:collapse;font-size:13px}.evidence-meta th,.evidence-meta td{border:1px solid #dbe3ef;padding:9px;text-align:left}.evidence-meta th{width:110px;background:#f8fafc;color:#475569;}
+  .itemized-evidence-page{page-break-after:always;}
+  .evidence-section-title{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:16px;border-bottom:2px solid #111827;padding-bottom:12px;}
+  .evidence-section-title h2{margin:0 0 6px;font-size:23px;letter-spacing:-.04em;}
+  .evidence-section-title p{margin:0;color:#64748b;font-size:13px;line-height:1.55;font-weight:700;}
+  .evidence-section-total{min-width:150px;border:1px solid #dbe3ef;border-radius:12px;background:#f8fafc;padding:11px 13px;text-align:right;}
+  .evidence-section-total span{display:block;color:#64748b;font-size:12px;font-weight:900;margin-bottom:5px;}
+  .evidence-section-total b{font-size:18px;}
+  .itemized-evidence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;}
+  .evidence-item-card{border:1px solid #dbe3ef;border-radius:16px;background:#fff;padding:14px;break-inside:avoid;page-break-inside:avoid;}
+  .evidence-item-card.missing{border-color:#fecaca;background:#fffafa;}
+  .evidence-item-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px;}
+  .evidence-item-head>div{display:flex;align-items:center;gap:8px;min-width:0;}
+  .evidence-item-head b{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .evidence-item-head strong{font-size:16px;white-space:nowrap;}
+  .evidence-index{width:24px;height:24px;border-radius:999px;background:#eef2ff;color:#3730a3;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;}
+  .evidence-meta-line{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  .evidence-meta-line span{border:1px solid #e5e9f2;background:#f8fafc;border-radius:999px;padding:5px 8px;color:#475569;font-size:11px;font-weight:800;}
+  .fake-receipt.compact{height:230px;margin-bottom:10px;border-width:1.5px;border-radius:12px;}
+  .fake-receipt.compact b{font-size:18px;}
+  .fake-receipt.compact span{font-size:12px;}
+  .evidence-meta.compact-meta th,.evidence-meta.compact-meta td{padding:7px 8px;font-size:12px;}
+  .evidence-meta.compact-meta th{width:72px;}
+  @media print{
+    body{background:#fff}.print-toolbar{display:none}.print-shell{max-width:none;padding:0}.statement-page,.evidence-page{border:0;box-shadow:none;border-radius:0;margin:0;page-break-after:always;padding:14mm}.statement-page:last-child,.evidence-page:last-child{page-break-after:auto}
+    .statement-title{font-size:25px}.statement-table{font-size:11px}.statement-table th,.statement-table td{padding:7px 5px}.fake-receipt{height:190mm}.itemized-evidence-grid{grid-template-columns:repeat(2,1fr);gap:10px}.fake-receipt.compact{height:72mm}.evidence-item-card{padding:10px}.evidence-section-title{margin-bottom:10px}.evidence-section-title h2{font-size:20px}
+  }
+
+    /* applicant basic info row layout */
+    .basic-info-grid{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:12px 16px;
+    }
+    .basic-info-grid .route-panel,
+    .basic-info-grid .settlement-help{
+      grid-column:1 / -1;
+    }
+    .basic-info-grid input[readonly]{
+      background:#f8fafc;
+      color:#334155;
+      font-weight:700;
+    }
+    @media(max-width:900px){
+      .basic-info-grid{grid-template-columns:1fr;}
+    }
+
+</style>
+
+<style id="admin-final-adjustments">
+  .admin-detail-buttons{display:flex !important;flex-wrap:nowrap !important;gap:6px !important;justify-content:flex-end !important;min-width:max-content !important;}
+  .admin-detail-buttons button{padding:8px 8px !important;font-size:12px !important;border-radius:10px !important;white-space:nowrap !important;letter-spacing:-.04em !important;}
+  .admin-basic-info-grid{grid-template-columns:repeat(3,minmax(0,1fr)) !important;}
+  .admin-bulk-actions{flex-wrap:nowrap !important;}
+  .admin-bulk-actions button{padding:9px 10px !important;font-size:12px !important;white-space:nowrap !important;letter-spacing:-.04em !important;}
+  @media(max-width:900px){.admin-detail-buttons,.admin-bulk-actions{flex-wrap:wrap !important}.admin-basic-info-grid{grid-template-columns:1fr !important;}}
+</style>
+
+<style id="iframe-compact-admin-console">
+  /* iframe 대응: 관리팀 검토 콘솔 상단 영역 세로폭 축소 */
+  .admin-view .admin-console-head{
+    padding:12px 14px !important;
+    margin-bottom:12px !important;
+  }
+  .admin-head-main{
+    margin-bottom:10px !important;
+  }
+  .admin-head-main h2{
+    font-size:17px !important;
+    margin:0 0 3px !important;
+  }
+  .admin-head-main p{
+    font-size:12px !important;
+    line-height:1.35 !important;
+  }
+
+  .admin-toolbar{
+    grid-template-columns:170px 170px minmax(220px,1fr) !important;
+    gap:8px !important;
+    margin-bottom:10px !important;
+  }
+  .admin-toolbar label{
+    font-size:11px !important;
+    margin-bottom:4px !important;
+  }
+  .admin-toolbar select,
+  .admin-toolbar input{
+    height:38px !important;
+    min-height:38px !important;
+    padding:8px 10px !important;
+    border-radius:10px !important;
+    font-size:13px !important;
+  }
+
+  .admin-selected-summary{
+    grid-template-columns:repeat(4,minmax(112px,1fr)) minmax(390px,auto) !important;
+    gap:8px !important;
+  }
+  .admin-selected-summary>div:not(.admin-bulk-actions){
+    padding:9px 10px !important;
+    min-height:54px !important;
+    border-radius:12px !important;
+  }
+  .admin-selected-summary span{
+    font-size:11px !important;
+    margin-bottom:3px !important;
+  }
+  .admin-selected-summary b{
+    font-size:17px !important;
+    line-height:1.15 !important;
+  }
+
+  .admin-bulk-actions{
+    gap:6px !important;
+    flex-wrap:nowrap !important;
+    align-items:center !important;
+    justify-content:flex-end !important;
+  }
+  .admin-bulk-actions button{
+    height:38px !important;
+    min-height:38px !important;
+    padding:8px 10px !important;
+    font-size:12px !important;
+    border-radius:10px !important;
+    white-space:nowrap !important;
+    letter-spacing:-.04em !important;
+  }
+
+  /* 기존 파란 안내문은 삭제 대상. 혹시 남아도 공간을 잡아먹지 않게 처리 */
+  .admin-action-message{
+    display:none !important;
+  }
+
+  /* 하단 목록과 상세 영역도 살짝 조밀하게 */
+  .admin-review-layout{
+    gap:12px !important;
+  }
+  .admin-list-panel,
+  .admin-detail-panel{
+    top:78px !important;
+    max-height:calc(100vh - 90px) !important;
+  }
+  .admin-list-panel{
+    padding:14px !important;
+  }
+  .admin-list-panel .section-title-row{
+    margin-bottom:10px !important;
+  }
+  .admin-list-panel .section-title-row h2{
+    font-size:17px !important;
+  }
+  .admin-applicant-group{
+    margin-bottom:9px !important;
+    border-radius:13px !important;
+  }
+  .admin-group-head{
+    padding:9px 11px !important;
+  }
+  .admin-trip-row{
+    padding:10px 10px !important;
+    gap:8px !important;
+  }
+  .admin-trip-title-row{
+    margin-bottom:3px !important;
+  }
+  .admin-trip-meta,
+  .admin-trip-amounts{
+    font-size:11.5px !important;
+    line-height:1.35 !important;
+  }
+
+  @media(max-width:1180px){
+    .admin-selected-summary{
+      grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+    }
+    .admin-bulk-actions{
+      grid-column:1/-1 !important;
+      justify-content:flex-start !important;
+      flex-wrap:wrap !important;
+    }
+  }
+  @media(max-width:760px){
+    .admin-toolbar,
+    .admin-selected-summary{
+      grid-template-columns:1fr !important;
+    }
+  }
+</style>
+
+
+<style id="empty-state-style">
+  .empty-state{
+    min-height:72px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#64748b;
+    font-weight:800;
+    background:#f8fafc;
+    border:1px dashed #cbd5e1;
+    border-radius:14px;
+  }
+</style>
+</head>
+<body>
+  <div class="print-shell">
+    <div class="print-toolbar">
+      <b>${titlePrefix || label} 출장비 정산서 미리보기 · ${applicantLabel}</b>
+      <div><button class="secondary" onclick="window.print()">인쇄/PDF</button><button class="secondary" onclick="window.close()">닫기</button></div>
+    </div>
+    <section class="statement-page">
+      <div class="statement-title">국내출장비 정산서</div>
+      <div class="statement-sub"><span>[ 부서명 : 글로벌R&D팀 ]</span><span>출력구분 : ${label} / 출력일 : ${today}</span></div>
+      <table class="statement-table">
+        <colgroup><col style="width:9%"><col style="width:10%"><col style="width:10%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:12%"></colgroup>
+        <thead><tr><th>성 명</th><th>출발일</th><th>도착일</th><th>숙박비</th><th>유류비</th><th>대중교통</th><th>식비</th><th>기타<br>(주차비 등)</th><th>계</th><th>출장지<br>거리(KM)</th><th>비 고</th></tr></thead>
+        <tbody>
+          ${bodyRows}
+          <tr class="sum-row"><td class="label-cell" colspan="3">합 계</td><td class="num">${displayAmount(totals.lodging)}</td><td class="num">${displayAmount(totals.fuel)}</td><td class="num">${displayAmount(totals.transit)}</td><td class="num">${displayAmount(totals.meal)}</td><td class="num">${displayAmount(totals.etc)}</td><td class="num">${displayAmount(totals.total)}</td><td class="num">${totals.km?totals.km+'km':'-'}</td><td>-</td></tr>
+          <tr><td class="label-cell" rowspan="2">정산금액</td><td class="pay-label" colspan="2">법인카드</td><td></td><td></td><td></td><td></td><td class="num">${displayAmount(totals.corp)}</td><td class="num">${displayAmount(totals.corp)}</td><td></td><td></td></tr>
+          <tr><td class="pay-label" colspan="2">현 금<br><span style="font-size:11px;color:#64748b;">개인카드/현금/유류비</span></td><td></td><td class="num">${displayAmount(totals.fuel)}</td><td class="num">${displayAmount(totals.transit)}</td><td></td><td class="num">${displayAmount(totals.personal)}</td><td class="num">${displayAmount(totals.personal)}</td><td></td><td></td></tr>
+        </tbody>
+      </table>
+      <div class="statement-note">※ 이 출력물은 기존 국내출장비 정산서 구조를 유지하면서 유류비를 별도 항목으로 분리한 통합 정산서입니다. ${mode==='corp'?'법인카드 출력은 법인카드 사용분만 표시합니다.':mode==='personal'?'개인지급 출력은 개인카드·현금·유류비만 표시합니다.':'전체 출력은 법인카드·개인지급·유류비를 모두 표시합니다.'}</div>
+      <div class="fuel-statement-block">
+        <div class="fuel-statement-title"><b>유류비 정산 내역</b><span>이동구간별 자동계산 근거 포함</span></div>
+        <table class="statement-table">
+          <thead><tr><th>순번</th><th>성명</th><th>출장일</th><th>이동구간</th><th>구간거리</th><th>기준연비</th><th>당일 유가</th><th>구간 유류비</th><th>비고</th></tr></thead>
+          <tbody>${fuelRows}</tbody>
+        </table>
+      </div>
+      <div class="fuel-calc-box">
+        <div class="fuel-calc-card"><small>총 사용금액</small><b>${displayAmount(totals.total)}</b></div>
+        <div class="fuel-calc-card"><small>법인카드</small><b>${displayAmount(totals.corp)}</b></div>
+        <div class="fuel-calc-card"><small>개인지급</small><b>${displayAmount(totals.personal)}</b></div>
+        <div class="fuel-calc-card"><small>유류비</small><b>${displayAmount(totals.fuel)}</b></div>
+      </div>
+    </section>
+    ${evidencePages(printTrips, mode)}
+  </div>
+</body>
+</html>`;
+  }
+  function openPrintPreview(printTrips, mode, prefix){
+    if(!printTrips || !printTrips.length){ msg('출력할 신청건을 선택하세요.', 'warn'); return; }
+    const label = modeLabel(mode);
+    const w=window.open('', 'expenseStatementPreview', 'width=1200,height=920,resizable=yes,scrollbars=yes');
+    if(!w){ msg('팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 시도하세요.', 'warn'); return; }
+    w.document.open();
+    w.document.write(makeStatementDocument(printTrips, mode, prefix));
+    w.document.close();
+    w.focus();
+    msg(`${prefix || '건별'} ${label} 정산서 미리보기 창을 열었습니다. 정산서 + 유류비 내역 + 해당 증빙 페이지가 함께 구성됩니다.`, 'ok');
+  }
+  window.adminBulkAction = function(action){
+    const mode = modeFromAction(action);
+    if(String(action).includes('출력')){
+      const items = selectedTrips();
+      if(!items.length){ msg('묶음 출력할 건을 먼저 체크하세요.', 'warn'); return; }
+      openPrintPreview(items, mode, '묶음');
+      return;
+    }
+    const checked=selectedTrips();
+    if(!checked.length){ msg('묶음 처리할 건을 먼저 체크하세요.', 'warn'); return; }
+    msg(action+' 대상 '+checked.length+'건을 처리합니다. 현재는 로컬 프로토타입 예시입니다.', 'ok');
+  };
+  window.adminAdminAction = function(action){ const trip=trips[currentId]; if(!trip){ msg('처리할 신청건이 없습니다.', 'warn'); return; } msg(action+' 처리 예시입니다. 대상: '+trip.applicant+' / '+trip.title, 'ok'); };
+  function evidenceItems(trip, mode){
+    let items=[];
+    if(mode==='all' || mode==='document') items=items.concat(trip.documents.map(d=>({kind:'결재서류', title:d.type, name:d.name, uploaded:d.uploaded})));
+    const ex = trip.expenses.filter(e=>{
+      if(mode==='corp') return e.pay==='법인카드';
+      if(mode==='personal') return e.pay!=='법인카드';
+      if(mode==='expense') return true;
+      return mode==='all';
+    }).map(e=>({kind:e.pay, title:e.item+' · '+won(e.amount), name:e.evidence, uploaded:e.uploaded, missing:!e.ok}));
+    items=items.concat(ex);
+    if((mode==='all' || mode==='personal') && fuelCost(trip)>0) items.push({kind:'유류비', title:'유류비 정산 내역 · '+won(fuelCost(trip)), name:'유류비_정산내역.pdf', uploaded:'자동계산'});
+    return items;
+  }
+  window.adminOpenEvidenceViewer = function(mode){
+    const trip=trips[currentId];
+    if(!trip){ msg('확인할 증빙 데이터가 없습니다.', 'warn'); return; }
+    const items=evidenceItems(trip, mode||'all');
+    const cards=items.map((it,i)=>`<div class="thumb" onclick="show(${i})"><b>${it.kind}</b><span>${it.title}</span></div>`).join('');
+    const data=JSON.stringify(items).replace(/</g,'\\u003c');
+    const viewer=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>증빙 뷰어 - ${trip.title}</title><style>body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans KR',sans-serif;background:#0f172a;color:#e5e7eb}.wrap{display:grid;grid-template-columns:280px 1fr;height:100vh}.side{background:#111827;border-right:1px solid #334155;padding:18px;overflow:auto}.side h1{font-size:18px;margin:0 0 6px}.side p{font-size:12px;color:#94a3b8;line-height:1.5;margin:0 0 16px}.thumb{border:1px solid #334155;border-radius:12px;padding:12px;margin-bottom:8px;background:#1f2937;cursor:pointer}.thumb:hover{border-color:#93c5fd}.thumb b{display:block;font-size:12px;color:#93c5fd;margin-bottom:4px}.thumb span{font-size:13px}.viewer{display:flex;align-items:center;justify-content:center;padding:28px}.paper{width:min(780px,92%);min-height:72vh;background:#fff;color:#111827;border-radius:16px;box-shadow:0 20px 70px rgba(0,0,0,.35);padding:32px;text-align:center}.paper h2{margin:0 0 10px}.fake-img{height:460px;border:2px dashed #cbd5e1;border-radius:14px;display:flex;align-items:center;justify-content:center;background:#f8fafc;color:#64748b;font-weight:800;line-height:1.7;margin:22px 0}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left}.meta div{background:#f1f5f9;border-radius:10px;padding:10px;font-size:13px}.topbtn{position:fixed;right:18px;top:14px}button{border:0;border-radius:10px;padding:10px 12px;font-weight:800;cursor:pointer}
+    /* applicant basic info row layout */
+    .basic-info-grid{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:12px 16px;
+    }
+    .basic-info-grid .route-panel,
+    .basic-info-grid .settlement-help{
+      grid-column:1 / -1;
+    }
+    .basic-info-grid input[readonly]{
+      background:#f8fafc;
+      color:#334155;
+      font-weight:700;
+    }
+    @media(max-width:900px){
+      .basic-info-grid{grid-template-columns:1fr;}
+    }
+
+</style>
+<style id="admin-final-adjustments">
+  .admin-detail-buttons{display:flex !important;flex-wrap:nowrap !important;gap:6px !important;justify-content:flex-end !important;min-width:max-content !important;}
+  .admin-detail-buttons button{padding:8px 8px !important;font-size:12px !important;border-radius:10px !important;white-space:nowrap !important;letter-spacing:-.04em !important;}
+  .admin-basic-info-grid{grid-template-columns:repeat(3,minmax(0,1fr)) !important;}
+  .admin-bulk-actions{flex-wrap:nowrap !important;}
+  .admin-bulk-actions button{padding:9px 10px !important;font-size:12px !important;white-space:nowrap !important;letter-spacing:-.04em !important;}
+  @media(max-width:900px){.admin-detail-buttons,.admin-bulk-actions{flex-wrap:wrap !important}.admin-basic-info-grid{grid-template-columns:1fr !important;}}
+</style>
+
+<style id="iframe-compact-admin-console">
+  /* iframe 대응: 관리팀 검토 콘솔 상단 영역 세로폭 축소 */
+  .admin-view .admin-console-head{
+    padding:12px 14px !important;
+    margin-bottom:12px !important;
+  }
+  .admin-head-main{
+    margin-bottom:10px !important;
+  }
+  .admin-head-main h2{
+    font-size:17px !important;
+    margin:0 0 3px !important;
+  }
+  .admin-head-main p{
+    font-size:12px !important;
+    line-height:1.35 !important;
+  }
+
+  .admin-toolbar{
+    grid-template-columns:170px 170px minmax(220px,1fr) !important;
+    gap:8px !important;
+    margin-bottom:10px !important;
+  }
+  .admin-toolbar label{
+    font-size:11px !important;
+    margin-bottom:4px !important;
+  }
+  .admin-toolbar select,
+  .admin-toolbar input{
+    height:38px !important;
+    min-height:38px !important;
+    padding:8px 10px !important;
+    border-radius:10px !important;
+    font-size:13px !important;
+  }
+
+  .admin-selected-summary{
+    grid-template-columns:repeat(4,minmax(112px,1fr)) minmax(390px,auto) !important;
+    gap:8px !important;
+  }
+  .admin-selected-summary>div:not(.admin-bulk-actions){
+    padding:9px 10px !important;
+    min-height:54px !important;
+    border-radius:12px !important;
+  }
+  .admin-selected-summary span{
+    font-size:11px !important;
+    margin-bottom:3px !important;
+  }
+  .admin-selected-summary b{
+    font-size:17px !important;
+    line-height:1.15 !important;
+  }
+
+  .admin-bulk-actions{
+    gap:6px !important;
+    flex-wrap:nowrap !important;
+    align-items:center !important;
+    justify-content:flex-end !important;
+  }
+  .admin-bulk-actions button{
+    height:38px !important;
+    min-height:38px !important;
+    padding:8px 10px !important;
+    font-size:12px !important;
+    border-radius:10px !important;
+    white-space:nowrap !important;
+    letter-spacing:-.04em !important;
+  }
+
+  /* 기존 파란 안내문은 삭제 대상. 혹시 남아도 공간을 잡아먹지 않게 처리 */
+  .admin-action-message{
+    display:none !important;
+  }
+
+  /* 하단 목록과 상세 영역도 살짝 조밀하게 */
+  .admin-review-layout{
+    gap:12px !important;
+  }
+  .admin-list-panel,
+  .admin-detail-panel{
+    top:78px !important;
+    max-height:calc(100vh - 90px) !important;
+  }
+  .admin-list-panel{
+    padding:14px !important;
+  }
+  .admin-list-panel .section-title-row{
+    margin-bottom:10px !important;
+  }
+  .admin-list-panel .section-title-row h2{
+    font-size:17px !important;
+  }
+  .admin-applicant-group{
+    margin-bottom:9px !important;
+    border-radius:13px !important;
+  }
+  .admin-group-head{
+    padding:9px 11px !important;
+  }
+  .admin-trip-row{
+    padding:10px 10px !important;
+    gap:8px !important;
+  }
+  .admin-trip-title-row{
+    margin-bottom:3px !important;
+  }
+  .admin-trip-meta,
+  .admin-trip-amounts{
+    font-size:11.5px !important;
+    line-height:1.35 !important;
+  }
+
+  @media(max-width:1180px){
+    .admin-selected-summary{
+      grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+    }
+    .admin-bulk-actions{
+      grid-column:1/-1 !important;
+      justify-content:flex-start !important;
+      flex-wrap:wrap !important;
+    }
+  }
+  @media(max-width:760px){
+    .admin-toolbar,
+    .admin-selected-summary{
+      grid-template-columns:1fr !important;
+    }
+  }
+</style>
+
+
+<style id="empty-state-style">
+  .empty-state{
+    min-height:72px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#64748b;
+    font-weight:800;
+    background:#f8fafc;
+    border:1px dashed #cbd5e1;
+    border-radius:14px;
+  }
+</style>
+</head><body><button class="topbtn" onclick="window.close()">닫기</button><div class="wrap"><aside class="side"><h1>증빙 뷰어</h1><p>${trip.applicant} · ${trip.tripDate}<br>${trip.title}<br>듀얼 모니터에서 이 창을 다른 화면으로 이동해서 검토할 수 있습니다.</p>${cards}</aside><main class="viewer"><div class="paper"><h2 id="title">증빙</h2><div class="fake-img" id="preview">영수증/PDF 미리보기 영역<br>서버 연동 후 실제 파일 표시</div><div class="meta"><div>파일명<br><b id="name">-</b></div><div>업로드<br><b id="uploaded">-</b></div></div></div></main></div><script>const items=${data};function show(i){const it=items[i]||items[0];document.getElementById('title').textContent=it.kind+' · '+it.title;document.getElementById('name').textContent=it.name;document.getElementById('uploaded').textContent=it.uploaded;document.getElementById('preview').innerHTML=(it.missing?'미첨부 증빙입니다.<br>수정요청 대상':'영수증/PDF 미리보기 영역<br>'+it.title);}show(0);<\/script></body></html>`;
+    const w=window.open('', 'expenseEvidenceViewer', 'width=1200,height=900,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+    if(!w){ msg('팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 시도하세요.', 'warn'); return; }
+    w.document.open(); w.document.write(viewer); w.document.close(); w.focus();
+    msg('증빙 뷰어를 열었습니다. 듀얼 모니터에서 다른 화면으로 이동해 검토할 수 있습니다.', 'ok');
+  };
+  window.adminPrintStatement = function(mode){
+    const trip=trips[currentId];
+    if(!trip){ msg('출력할 신청건이 없습니다.', 'warn'); return; }
+    openPrintPreview([trip], mode || 'all', '건별');
+  };
+  document.addEventListener('DOMContentLoaded',()=>{ renderDetail(currentId); adminUpdateSelectedSummary(); });
+  if(document.readyState !== 'loading'){ renderDetail(currentId); adminUpdateSelectedSummary(); }
+})();
+</script>
+
+</body>
+</html>
 
