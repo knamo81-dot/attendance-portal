@@ -1424,6 +1424,21 @@
     }
   }
 </style>
+
+<style id="admin-console-head-removed-final">
+  /* 포탈 브릿지를 사용하므로 관리자 검토 화면의 내부 상단 콘솔 영역은 제거되었습니다. */
+  .admin-review-layout{
+    margin-top:0 !important;
+  }
+  html.portal-embedded .admin-view{
+    padding-top:0 !important;
+  }
+  html.portal-embedded .admin-list-panel,
+  html.portal-embedded .admin-detail-panel{
+    top:12px !important;
+    max-height:calc(100vh - 30px) !important;
+  }
+</style>
 </head>
 <body>
   <header>
@@ -1639,55 +1654,7 @@
     </div>
 
     <div class="admin-view">
-      <section class="section admin-console-head">
-        <div class="admin-head-main">
-          <div>
-            <h2>관리팀 검토 콘솔</h2>
-            <p>신청건을 선택하면 우측 검토 상세에서 이동거리, 유류비, 법인카드, 개인지급, 증빙을 한 번에 확인합니다.</p>
-          </div>
-        </div>
-
-        <div class="admin-toolbar">
-          <div>
-            <label>정렬 기준</label>
-            <select id="adminSort" onchange="adminSortChanged()">
-              <option value="applicant">신청자별</option>
-              <option value="requestDate">신청일순</option>
-              <option value="tripDate">출장일순</option>
-              <option value="status">상태순</option>
-            </select>
-          </div>
-          <div>
-            <label>상태 필터</label>
-            <select id="adminStatusFilter" onchange="adminFilterChanged()">
-              <option value="all">전체</option>
-              <option value="검토대기">검토대기</option>
-              <option value="수정요청">수정요청</option>
-              <option value="지출결의완료">지출결의완료</option>
-              <option value="지급완료">지급완료</option>
-            </select>
-          </div>
-          <div class="admin-search-wrap">
-            <label>검색</label>
-            <input id="adminSearch" type="search" placeholder="신청자, 출장지, 항목 검색" oninput="adminFilterChanged()" />
-          </div>
-        </div>
-
-        <div class="admin-selected-summary">
-          <div><span>선택건수</span><b id="adminSelectedCount">0건</b></div>
-          <div><span>총액</span><b id="adminSelectedTotal">0원</b></div>
-          <div><span>법인카드</span><b id="adminSelectedCorp">0원</b></div>
-          <div><span>개인지급</span><b id="adminSelectedPersonal">0원</b></div>
-          <div class="admin-bulk-actions">
-            <button type="button" class="btn-sub" onclick="adminBulkAction('전체 출력')">전체출력</button>
-            <button type="button" class="btn-ghost" onclick="adminBulkAction('법인카드 출력')">법인카드출력</button>
-            <button type="button" class="btn-ghost" onclick="adminBulkAction('개인지급 출력')">개인지급출력</button>
-            <button type="button" onclick="adminBulkAction('지출결의 완료')">지출결의 완료</button>
-          </div>
-        </div>
-      </section>
-
-      <div class="admin-review-layout">
+<div class="admin-review-layout">
         <section class="section admin-list-panel">
           <div class="section-title-row">
             <h2>신청자별 제출 목록</h2>
@@ -2158,10 +2125,14 @@
     document.querySelectorAll('.admin-trip-row input[type="checkbox"]:checked').forEach(cb=>{
       const row=cb.closest('.admin-trip-row'); count++; total+=Number(row.dataset.total||0); corp+=Number(row.dataset.corp||0); personal+=Number(row.dataset.personal||0);
     });
-    document.getElementById('adminSelectedCount').textContent=count+'건';
-    document.getElementById('adminSelectedTotal').textContent=won(total);
-    document.getElementById('adminSelectedCorp').textContent=won(corp);
-    document.getElementById('adminSelectedPersonal').textContent=won(personal);
+    const selectedCountEl = document.getElementById('adminSelectedCount');
+    const selectedTotalEl = document.getElementById('adminSelectedTotal');
+    const selectedCorpEl = document.getElementById('adminSelectedCorp');
+    const selectedPersonalEl = document.getElementById('adminSelectedPersonal');
+    if(selectedCountEl) selectedCountEl.textContent=count+'건';
+    if(selectedTotalEl) selectedTotalEl.textContent=won(total);
+    if(selectedCorpEl) selectedCorpEl.textContent=won(corp);
+    if(selectedPersonalEl) selectedPersonalEl.textContent=won(personal);
   };
   window.adminFilterChanged = function(){
     const q=(document.getElementById('adminSearch')?.value||'').toLowerCase();
