@@ -2988,6 +2988,7 @@
 })();
 </script>
 
+
 <script id="travel-expense-multitenant-integration">
 (function(){
   if (window.__travelExpenseMultitenantInstalled) return;
@@ -2997,21 +2998,35 @@
     try { return fn(); } catch(e){ return fallback; }
   }
 
-  const SUPABASE_URL =
-    safeGet(()=>window.EXELO_SUPABASE_URL, '') ||
-    safeGet(()=>window.SUPABASE_URL, '') ||
-    safeGet(()=>window.parent && window.parent.EXELO_SUPABASE_URL, '') ||
-    safeGet(()=>window.parent && window.parent.SUPABASE_URL, '');
+  function getSupabaseClient(){
+    // 포탈에서 이미 생성된 Supabase 클라이언트를 최우선 사용합니다.
+    const parentClient = safeGet(()=>window.parent && window.parent.supabase, null);
+    if (parentClient && typeof parentClient.from === 'function') return parentClient;
 
-  const SUPABASE_ANON_KEY =
-    safeGet(()=>window.EXELO_SUPABASE_ANON_KEY, '') ||
-    safeGet(()=>window.SUPABASE_ANON_KEY, '') ||
-    safeGet(()=>window.parent && window.parent.EXELO_SUPABASE_ANON_KEY, '') ||
-    safeGet(()=>window.parent && window.parent.SUPABASE_ANON_KEY, '');
+    const ownClient = safeGet(()=>window.supabase, null);
+    if (ownClient && typeof ownClient.from === 'function') return ownClient;
 
-  const db = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase)
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
+    // 단독 페이지 테스트용: URL/KEY가 전역으로 제공된 경우만 새로 생성합니다.
+    const url =
+      safeGet(()=>window.EXELO_SUPABASE_URL, '') ||
+      safeGet(()=>window.SUPABASE_URL, '') ||
+      safeGet(()=>window.parent && window.parent.EXELO_SUPABASE_URL, '') ||
+      safeGet(()=>window.parent && window.parent.SUPABASE_URL, '');
+
+    const key =
+      safeGet(()=>window.EXELO_SUPABASE_ANON_KEY, '') ||
+      safeGet(()=>window.SUPABASE_ANON_KEY, '') ||
+      safeGet(()=>window.parent && window.parent.EXELO_SUPABASE_ANON_KEY, '') ||
+      safeGet(()=>window.parent && window.parent.SUPABASE_ANON_KEY, '');
+
+    const lib = safeGet(()=>window.supabase, null);
+    if (url && key && lib && typeof lib.createClient === 'function') {
+      return lib.createClient(url, key);
+    }
+    return null;
+  }
+
+  const db = getSupabaseClient();
 
   const state = {
     portalSession: null,
@@ -3023,9 +3038,20 @@
   };
 
   function $(id){ return document.getElementById(id); }
-  function setValue(id, value){ const el = $(id); if(el) el.value = value || ''; }
-  function getValue(id){ const el = $(id); return el ? el.value : ''; }
-  function today(){ return new Date().toISOString().slice(0,10); }
+  function setValue(id, value){
+    const el = $(id);
+    if(el) el.value = value || '';
+  }
+  function getValue(id){
+    const el = $(id);
+    return el ? el.value : '';
+  }
+  function today(){
+    return new Date().toISOString().slice(0,10);
+  }
+  function toNumber(v){
+    return Number(v || 0) || 0;
+  }
 
   function readPortalSession(){
     const candidates = [
@@ -3047,16 +3073,23 @@
 
   function normalizeSession(raw){
     raw = raw || {};
-    const user = raw.user || raw.currentUser || raw.profile || raw;
-    const employee = raw.employee || raw.employeeInfo || raw.matchedEmployee || raw.staff || {};
+    const user = raw.user || raw.currentUser || raw.profile || raw.currentUserProfile || raw;
+    const employee = raw.employee || raw.employeeInfo || raw.matchedEmployee || raw.staff || raw.employeeProfile || {};
     const company = raw.company || raw.activeCompany || {};
+
     return {
       raw,
       userId: pick(user, ['id','user_id','userId']),
       email: pick(user, ['email','user_email','userEmail']),
       name: pick(employee, ['name','employee_name','employeeName']) || pick(user, ['name','display_name','displayName']),
       employeeNo: pick(employee, ['employee_no','employeeNo']) || pick(user, ['employee_no','employeeNo']),
-      companyId: raw.activeCompanyId || raw.companyId || raw.company_id || pick(company, ['id','company_id','companyId']) || pick(user, ['company_id','companyId']),
+      companyId:
+        raw.activeCompanyId ||
+        raw.companyId ||
+        raw.company_id ||
+        pick(company, ['id','company_id','companyId']) ||
+        pick(user, ['company_id','companyId']) ||
+        pick(employee, ['company_id','companyId']),
       divisionCode: pick(employee, ['division_code','divisionCode']),
       divisionName: pick(employee, ['division_name','divisionName']),
       teamCode: pick(employee, ['team_code','teamCode']),
@@ -3066,12 +3099,15 @@
 
   async function fetchProfileFromDb(base){
     if(!db) return base;
+
     let userRow = null;
     if(base.email){
-      const { data } = await db.from('users').select('*').eq('email', base.email).maybeSingle();
+      const { data, error } = await db.from('users').select('*').eq('email', base.email).maybeSingle();
+      if(error) console.warn('[TravelExpense] users by email warning', error);
       userRow = data || null;
     } else if(base.userId){
-      const { data } = await db.from('users').select('*').eq('id', base.userId).maybeSingle();
+      const { data, error } = await db.from('users').select('*').eq('id', base.userId).maybeSingle();
+      if(error) console.warn('[TravelExpense] users by id warning', error);
       userRow = data || null;
     }
 
@@ -3080,11 +3116,12 @@
 
     let employeeRow = null;
     if(companyId && employeeNo){
-      const { data } = await db.from('employees')
+      const { data, error } = await db.from('employees')
         .select('*')
         .eq('company_id', companyId)
         .eq('employee_no', employeeNo)
         .maybeSingle();
+      if(error) console.warn('[TravelExpense] employees warning', error);
       employeeRow = data || null;
     }
 
@@ -3093,20 +3130,24 @@
 
     let divisionRow = null;
     let teamRow = null;
+
     if(companyId && divisionCode){
-      const { data } = await db.from('divisions')
+      const { data, error } = await db.from('divisions')
         .select('*')
         .eq('company_id', companyId)
         .eq('division_code', divisionCode)
         .maybeSingle();
+      if(error) console.warn('[TravelExpense] divisions warning', error);
       divisionRow = data || null;
     }
+
     if(companyId && teamCode){
-      const { data } = await db.from('teams')
+      const { data, error } = await db.from('teams')
         .select('*')
         .eq('company_id', companyId)
         .eq('team_code', teamCode)
         .maybeSingle();
+      if(error) console.warn('[TravelExpense] teams warning', error);
       teamRow = data || null;
     }
 
@@ -3147,7 +3188,7 @@
         sort_order: index + 1,
         from_place: inputs[0] ? inputs[0].value : '',
         to_place: inputs[1] ? inputs[1].value : '',
-        distance_km: Number(inputs[2] ? inputs[2].value : 0) || 0
+        distance_km: toNumber(inputs[2] ? inputs[2].value : 0)
       };
     }).filter(r => r.from_place || r.to_place || r.distance_km);
   }
@@ -3159,7 +3200,7 @@
       return {
         item_type: selects[0] ? selects[0].value : '',
         pay_type: selects[1] ? selects[1].value : '',
-        amount: Number(amountInput ? amountInput.value : 0) || 0,
+        amount: toNumber(amountInput ? amountInput.value : 0),
         memo: ''
       };
     }).filter(i => i.item_type || i.pay_type || i.amount);
@@ -3177,7 +3218,7 @@
 
   async function saveRequest(status){
     if(!db){
-      alert('Supabase 연결 정보가 없어 저장할 수 없습니다. 포탈 공통 Supabase 설정을 먼저 확인해주세요.');
+      alert('Supabase 클라이언트를 찾지 못했습니다. 포탈 공통 연결 상태를 확인해주세요.');
       return null;
     }
     if(!state.companyId){
@@ -3241,6 +3282,7 @@
 
   async function loadMyRequests(){
     if(!db || !state.companyId) return;
+
     let query = db.from('travel_expense_requests')
       .select('*')
       .eq('company_id', state.companyId)
@@ -3280,6 +3322,7 @@
 
   async function loadAdminRequests(){
     if(!db || !state.companyId) return;
+
     const { data, error } = await db.from('travel_expense_requests')
       .select('*')
       .eq('company_id', state.companyId)
@@ -3329,9 +3372,9 @@
   }
 
   function updateAdminSummary(selected){
-    const total = selected.reduce((s, r)=>s + Number(r.total || 0),0);
-    const corp = selected.reduce((s, r)=>s + Number(r.corp || 0),0);
-    const personal = selected.reduce((s, r)=>s + Number(r.personal || 0),0);
+    const total = selected.reduce((s, r)=>s + toNumber(r.total),0);
+    const corp = selected.reduce((s, r)=>s + toNumber(r.corp),0);
+    const personal = selected.reduce((s, r)=>s + toNumber(r.personal),0);
     if($('adminSelectedCount')) $('adminSelectedCount').textContent = selected.length + '건';
     if($('adminSelectedTotal')) $('adminSelectedTotal').textContent = money(total);
     if($('adminSelectedCorp')) $('adminSelectedCorp').textContent = money(corp);
@@ -3399,7 +3442,12 @@
     applyProfile(profile);
     await loadMyRequests();
     await loadAdminRequests();
-    console.log('[TravelExpense] multitenant ready', { companyId: state.companyId, employeeNo: state.employeeNo, db: !!db });
+    console.log('[TravelExpense] multitenant ready', {
+      companyId: state.companyId,
+      employeeNo: state.employeeNo,
+      hasDbClient: !!db,
+      dbSource: safeGet(()=>window.parent && window.parent.supabase && typeof window.parent.supabase.from === 'function', false) ? 'parent.supabase' : 'local'
+    });
   }
 
   document.addEventListener('DOMContentLoaded', init);
