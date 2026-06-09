@@ -2991,572 +2991,255 @@
 
 <script id="travel-expense-multitenant-integration">
 (function(){
-  if (window.__travelExpenseMultitenantInstalled) return;
+  if(window.__travelExpenseMultitenantInstalled) return;
   window.__travelExpenseMultitenantInstalled = true;
 
-  function safeGet(fn, fallback){
-    try { return fn(); } catch(e){ return fallback; }
-  }
+  const safe=(fn,d=null)=>{try{return fn()}catch(e){return d}};
+  const hasClient=o=>!!(o&&typeof o.from==='function');
+  const isNumericId=v=>v!==undefined&&v!==null&&v!==''&&/^\d+$/.test(String(v));
 
-  function hasFromClient(obj){
-    return !!(obj && typeof obj.from === 'function');
-  }
-
-  function scanForSupabaseClient(scope){
+  function findClient(scope){
     if(!scope) return null;
-
-    const directNames = [
-      'supabaseClient',
-      'supabase_client',
-      'sb',
-      'db',
-      'database',
-      'portalSupabase',
-      'portalSupabaseClient',
-      'EXELO_SUPABASE',
-      'EXELO_DB',
-      '__supabaseClient',
-      '__SUPABASE_CLIENT__',
-      'client'
-    ];
-
-    for(const name of directNames){
-      const value = safeGet(()=>scope[name], null);
-      if(hasFromClient(value)) return { client:value, source:name };
-    }
-
-    const containers = [
-      'portal',
-      'Portal',
-      'portalApp',
-      'PortalApp',
-      'portalSession',
-      '__PORTAL__',
-      '__PORTAL_STATE__',
-      'app',
-      'App'
-    ];
-
-    for(const name of containers){
-      const box = safeGet(()=>scope[name], null);
-      if(hasFromClient(box)) return { client:box, source:name };
-      if(box && typeof box === 'object'){
-        for(const key of Object.keys(box)){
-          const value = safeGet(()=>box[key], null);
-          if(hasFromClient(value)) return { client:value, source:name + '.' + key };
-        }
+    const names=['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];
+    for(const n of names){const v=safe(()=>scope[n]); if(hasClient(v)) return {client:v,source:n};}
+    const boxes=['portal','Portal','portalApp','PortalApp','portalSession','__PORTAL__','__PORTAL_STATE__','app','App'];
+    for(const n of boxes){
+      const b=safe(()=>scope[n]);
+      if(hasClient(b)) return {client:b,source:n};
+      if(b&&typeof b==='object'){
+        for(const k of Object.keys(b)){const v=safe(()=>b[k]); if(hasClient(v)) return {client:v,source:n+'.'+k};}
       }
     }
-
-    // 마지막으로 window 전역 중 Supabase client 형태(.from 함수)를 가진 객체를 탐색합니다.
-    const keys = safeGet(()=>Object.keys(scope), []);
-    for(const key of keys){
-      if(key === 'supabase') continue; // supabase-js 라이브러리는 client가 아님
-      const value = safeGet(()=>scope[key], null);
-      if(hasFromClient(value)) return { client:value, source:'window.' + key };
-    }
-
-    return null;
-  }
-
-  function createClientFromGlobalConfig(){
-    const lib =
-      safeGet(()=>window.supabase, null) ||
-      safeGet(()=>window.parent && window.parent.supabase, null);
-
-    if(!lib || typeof lib.createClient !== 'function') return null;
-
-    const configSources = [
-      safeGet(()=>window.APP_CONFIG, null),
-      safeGet(()=>window.appConfig, null),
-      safeGet(()=>window.CONFIG, null),
-      safeGet(()=>window.parent && window.parent.APP_CONFIG, null),
-      safeGet(()=>window.parent && window.parent.appConfig, null),
-      safeGet(()=>window.parent && window.parent.CONFIG, null),
-      safeGet(()=>window.portalSession, null),
-      safeGet(()=>window.parent && window.parent.portalSession, null)
-    ].filter(Boolean);
-
-    let url =
-      safeGet(()=>window.EXELO_SUPABASE_URL, '') ||
-      safeGet(()=>window.SUPABASE_URL, '') ||
-      safeGet(()=>window.parent && window.parent.EXELO_SUPABASE_URL, '') ||
-      safeGet(()=>window.parent && window.parent.SUPABASE_URL, '');
-
-    let key =
-      safeGet(()=>window.EXELO_SUPABASE_ANON_KEY, '') ||
-      safeGet(()=>window.SUPABASE_ANON_KEY, '') ||
-      safeGet(()=>window.parent && window.parent.EXELO_SUPABASE_ANON_KEY, '') ||
-      safeGet(()=>window.parent && window.parent.SUPABASE_ANON_KEY, '');
-
-    const urlKeys = ['supabaseUrl','SUPABASE_URL','url','projectUrl','supabase_url'];
-    const keyKeys = ['supabaseAnonKey','SUPABASE_ANON_KEY','anonKey','key','supabase_anon_key'];
-
-    for(const cfg of configSources){
-      if(!url){
-        for(const k of urlKeys){
-          if(cfg && cfg[k]) { url = cfg[k]; break; }
-        }
-      }
-      if(!key){
-        for(const k of keyKeys){
-          if(cfg && cfg[k]) { key = cfg[k]; break; }
-        }
-      }
-    }
-
-    if(url && key){
-      return { client: lib.createClient(url, key), source:'createClient(global-config)' };
+    for(const k of safe(()=>Object.keys(scope),[])){
+      if(k==='supabase') continue;
+      const v=safe(()=>scope[k]);
+      if(hasClient(v)) return {client:v,source:'window.'+k};
     }
     return null;
   }
 
-  function getSupabaseClient(){
-    const parentFound = scanForSupabaseClient(safeGet(()=>window.parent, null));
-    if(parentFound) return parentFound;
-
-    const ownFound = scanForSupabaseClient(window);
-    if(ownFound) return ownFound;
-
-    const created = createClientFromGlobalConfig();
-    if(created) return created;
-
-    return { client:null, source:'not-found' };
+  function makeClient(){
+    const lib=safe(()=>window.supabase)||safe(()=>window.parent&&window.parent.supabase);
+    if(!lib||typeof lib.createClient!=='function') return null;
+    const configs=[safe(()=>window.APP_CONFIG),safe(()=>window.appConfig),safe(()=>window.CONFIG),safe(()=>window.parent&&window.parent.APP_CONFIG),safe(()=>window.parent&&window.parent.appConfig),safe(()=>window.parent&&window.parent.CONFIG)].filter(Boolean);
+    let url=safe(()=>window.EXELO_SUPABASE_URL,'')||safe(()=>window.SUPABASE_URL,'')||safe(()=>window.parent&&window.parent.EXELO_SUPABASE_URL,'')||safe(()=>window.parent&&window.parent.SUPABASE_URL,'');
+    let key=safe(()=>window.EXELO_SUPABASE_ANON_KEY,'')||safe(()=>window.SUPABASE_ANON_KEY,'')||safe(()=>window.parent&&window.parent.EXELO_SUPABASE_ANON_KEY,'')||safe(()=>window.parent&&window.parent.SUPABASE_ANON_KEY,'');
+    for(const c of configs){url=url||c.supabaseUrl||c.SUPABASE_URL||c.supabase_url||c.projectUrl||''; key=key||c.supabaseAnonKey||c.SUPABASE_ANON_KEY||c.supabase_anon_key||c.anonKey||'';}
+    return url&&key?{client:lib.createClient(url,key),source:'createClient(global-config)'}:null;
   }
 
-  const dbInfo = getSupabaseClient();
-  const db = dbInfo.client;
+  const dbInfo=findClient(safe(()=>window.parent))||findClient(window)||makeClient()||{client:null,source:'not-found'};
+  const db=dbInfo.client;
+  const state={portalSession:null,companyId:null,userId:null,employeeNo:null,profile:null};
 
-  const state = {
-    portalSession: null,
-    companyId: null,
-    userId: null,
-    employeeNo: null,
-    profile: null,
-    currentRequestId: null
-  };
+  const $=id=>document.getElementById(id);
+  const setVal=(id,v)=>{const e=$(id); if(e)e.value=v||''};
+  const getVal=id=>{const e=$(id); return e?e.value:''};
+  const today=()=>new Date().toISOString().slice(0,10);
+  const num=v=>Number(v||0)||0;
+  const moneyNum=t=>Number(String(t||'').replace(/[^\d.-]/g,''))||0;
+  const pick=(o,ks)=>{for(const k of ks){if(o&&o[k]!==undefined&&o[k]!==null&&o[k]!=='')return o[k]} return ''};
 
-  function $(id){ return document.getElementById(id); }
-  function setValue(id, value){ const el = $(id); if(el) el.value = value || ''; }
-  function getValue(id){ const el = $(id); return el ? el.value : ''; }
-  function today(){ return new Date().toISOString().slice(0,10); }
-  function toNumber(v){ return Number(v || 0) || 0; }
-
-  function readPortalSession(){
-    const candidates = [
-      safeGet(()=>window.portalSession, null),
-      safeGet(()=>window.parent && window.parent.portalSession, null),
-      safeGet(()=>window.parent && window.parent.__PORTAL_SESSION__, null),
-      safeGet(()=>JSON.parse(sessionStorage.getItem('portalSession') || 'null'), null),
-      safeGet(()=>JSON.parse(localStorage.getItem('portalSession') || 'null'), null)
-    ];
-    return candidates.find(Boolean) || null;
+  function readSession(){
+    return [
+      safe(()=>window.portalSession),
+      safe(()=>window.parent&&window.parent.portalSession),
+      safe(()=>window.parent&&window.parent.__PORTAL_SESSION__),
+      safe(()=>JSON.parse(sessionStorage.getItem('portalSession')||'null')),
+      safe(()=>JSON.parse(localStorage.getItem('portalSession')||'null'))
+    ].find(Boolean)||null;
   }
 
-  function pick(obj, keys){
-    for(const key of keys){
-      if(obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
-    }
-    return '';
-  }
-
-  function normalizeSession(raw){
-    raw = raw || {};
-    const user = raw.user || raw.currentUser || raw.profile || raw.currentUserProfile || raw;
-    const employee = raw.employee || raw.employeeInfo || raw.matchedEmployee || raw.staff || raw.employeeProfile || {};
-    const company = raw.company || raw.activeCompany || {};
-
+  function normalize(raw){
+    raw=raw||{};
+    const u=raw.user||raw.currentUser||raw.profile||raw.currentUserProfile||raw;
+    const e=raw.employee||raw.employeeInfo||raw.matchedEmployee||raw.staff||raw.employeeProfile||{};
+    const c=raw.company||raw.activeCompany||{};
     return {
-      raw,
-      userId: pick(user, ['id','user_id','userId']),
-      email: pick(user, ['email','user_email','userEmail']),
-      name: pick(employee, ['name','employee_name','employeeName']) || pick(user, ['name','display_name','displayName']),
-      employeeNo: pick(employee, ['employee_no','employeeNo']) || pick(user, ['employee_no','employeeNo']),
-      companyId:
-        raw.activeCompanyId ||
-        raw.companyId ||
-        raw.company_id ||
-        pick(company, ['id','company_id','companyId']) ||
-        pick(user, ['company_id','companyId']) ||
-        pick(employee, ['company_id','companyId']),
-      divisionCode: pick(employee, ['division_code','divisionCode']),
-      divisionName: pick(employee, ['division_name','divisionName']),
-      teamCode: pick(employee, ['team_code','teamCode']),
-      teamName: pick(employee, ['team_name','teamName'])
+      userId:pick(u,['id','user_id','userId']),
+      authUserId:pick(u,['auth_user_id','authUserId'])||raw.auth_user_id||raw.authUserId,
+      email:pick(u,['email','user_email','userEmail']),
+      name:pick(e,['name','employee_name','employeeName'])||pick(u,['name','display_name','displayName']),
+      employeeNo:pick(e,['employee_no','employeeNo'])||pick(u,['employee_no','employeeNo']),
+      companyId:raw.activeCompanyId||raw.companyId||raw.company_id||pick(c,['id','company_id','companyId'])||pick(u,['company_id','companyId'])||pick(e,['company_id','companyId']),
+      divisionCode:pick(e,['division_code','divisionCode']),
+      divisionName:pick(e,['division_name','divisionName']),
+      teamCode:pick(e,['team_code','teamCode']),
+      teamName:pick(e,['team_name','teamName'])
     };
   }
 
-  async function fetchProfileFromDb(base){
+  async function fetchProfile(base){
     if(!db) return base;
-
-    let userRow = null;
+    let userRow=null;
     if(base.email){
-      const { data, error } = await db.from('users').select('*').eq('email', base.email).maybeSingle();
-      if(error) console.warn('[TravelExpense] users by email warning', error);
-      userRow = data || null;
-    } else if(base.userId){
-      const { data, error } = await db.from('users').select('*').eq('id', base.userId).maybeSingle();
-      if(error) console.warn('[TravelExpense] users by id warning', error);
-      userRow = data || null;
+      const r=await db.from('users').select('*').eq('email',base.email).maybeSingle();
+      if(r.error) console.warn('[TravelExpense] users warning',r.error);
+      userRow=r.data||null;
+    }else if(isNumericId(base.userId)){
+      const r=await db.from('users').select('*').eq('id',Number(base.userId)).maybeSingle();
+      if(r.error) console.warn('[TravelExpense] users id warning',r.error);
+      userRow=r.data||null;
     }
 
-    const companyId = base.companyId || pick(userRow, ['company_id','companyId']);
-    const employeeNo = base.employeeNo || pick(userRow, ['employee_no','employeeNo']);
-
-    let employeeRow = null;
-    if(companyId && employeeNo){
-      const { data, error } = await db.from('employees')
-        .select('*')
-        .eq('company_id', companyId)
-        .eq('employee_no', employeeNo)
-        .maybeSingle();
-      if(error) console.warn('[TravelExpense] employees warning', error);
-      employeeRow = data || null;
+    const companyId=base.companyId||pick(userRow,['company_id','companyId']);
+    const employeeNo=base.employeeNo||pick(userRow,['employee_no','employeeNo']);
+    let employeeRow=null;
+    if(companyId&&employeeNo){
+      const r=await db.from('employees').select('*').eq('company_id',companyId).eq('employee_no',employeeNo).maybeSingle();
+      if(r.error) console.warn('[TravelExpense] employees warning',r.error);
+      employeeRow=r.data||null;
     }
 
-    const divisionCode = base.divisionCode || pick(employeeRow, ['division_code','divisionCode']);
-    const teamCode = base.teamCode || pick(employeeRow, ['team_code','teamCode']);
-
-    let divisionRow = null;
-    let teamRow = null;
-
-    if(companyId && divisionCode){
-      const { data, error } = await db.from('divisions')
-        .select('*')
-        .eq('company_id', companyId)
-        .eq('division_code', divisionCode)
-        .maybeSingle();
-      if(error) console.warn('[TravelExpense] divisions warning', error);
-      divisionRow = data || null;
+    const divisionCode=base.divisionCode||pick(employeeRow,['division_code','divisionCode']);
+    const teamCode=base.teamCode||pick(employeeRow,['team_code','teamCode']);
+    let divisionRow=null, teamRow=null;
+    if(companyId&&divisionCode){
+      const r=await db.from('divisions').select('*').eq('company_id',companyId).eq('division_code',divisionCode).maybeSingle();
+      if(r.error) console.warn('[TravelExpense] divisions warning',r.error);
+      divisionRow=r.data||null;
     }
-
-    if(companyId && teamCode){
-      const { data, error } = await db.from('teams')
-        .select('*')
-        .eq('company_id', companyId)
-        .eq('team_code', teamCode)
-        .maybeSingle();
-      if(error) console.warn('[TravelExpense] teams warning', error);
-      teamRow = data || null;
+    if(companyId&&teamCode){
+      const r=await db.from('teams').select('*').eq('company_id',companyId).eq('team_code',teamCode).maybeSingle();
+      if(r.error) console.warn('[TravelExpense] teams warning',r.error);
+      teamRow=r.data||null;
     }
-
     return {
       ...base,
-      userId: base.userId || pick(userRow, ['id','user_id','userId']),
-      companyId,
-      employeeNo,
-      name: base.name || pick(employeeRow, ['name','employee_name','employeeName']) || pick(userRow, ['name']),
+      userId:base.userId||pick(userRow,['id','user_id','userId']),
+      authUserId:base.authUserId||pick(userRow,['auth_user_id','authUserId']),
+      companyId, employeeNo,
+      name:base.name||pick(employeeRow,['name','employee_name','employeeName'])||pick(userRow,['name']),
       divisionCode,
-      divisionName: base.divisionName || pick(divisionRow, ['division_name','divisionName']) || divisionCode,
+      divisionName:base.divisionName||pick(divisionRow,['division_name','divisionName'])||divisionCode,
       teamCode,
-      teamName: base.teamName || pick(teamRow, ['team_name','teamName']) || teamCode
+      teamName:base.teamName||pick(teamRow,['team_name','teamName'])||teamCode
     };
   }
 
-  function applyProfile(profile){
-    state.profile = profile || {};
-    state.companyId = profile.companyId || '';
-    state.userId = profile.userId || null;
-    state.employeeNo = profile.employeeNo || '';
-
-    setValue('applicantName', profile.name || '');
-    setValue('applicantDivision', profile.divisionName || profile.divisionCode || '');
-    setValue('applicantTeam', profile.teamName || profile.teamCode || '');
-    setValue('requestDate', getValue('requestDate') || today());
-
-    ['applicantName','applicantDivision','applicantTeam','requestDate','voucherDateDisplay','paymentDueDateDisplay'].forEach(id=>{
-      const el = $(id);
-      if(el) el.readOnly = true;
-    });
+  function applyProfile(p){
+    state.profile=p||{}; state.companyId=p.companyId||''; state.userId=p.userId||null; state.employeeNo=p.employeeNo||'';
+    setVal('applicantName',p.name||''); setVal('applicantDivision',p.divisionName||p.divisionCode||''); setVal('applicantTeam',p.teamName||p.teamCode||''); setVal('requestDate',getVal('requestDate')||today());
+    ['applicantName','applicantDivision','applicantTeam','requestDate','voucherDateDisplay','paymentDueDateDisplay'].forEach(id=>{const e=$(id); if(e)e.readOnly=true;});
   }
 
   function collectRoutes(){
-    return Array.from(document.querySelectorAll('#routeSegments .route-row')).map((row, index)=>{
-      const inputs = row.querySelectorAll('input');
-      return {
-        sort_order: index + 1,
-        from_place: inputs[0] ? inputs[0].value : '',
-        to_place: inputs[1] ? inputs[1].value : '',
-        distance_km: toNumber(inputs[2] ? inputs[2].value : 0)
-      };
-    }).filter(r => r.from_place || r.to_place || r.distance_km);
+    return Array.from(document.querySelectorAll('#routeSegments .route-row')).map((row,i)=>{
+      const inputs=row.querySelectorAll('input');
+      return {sort_order:i+1,from_place:inputs[0]?.value||'',to_place:inputs[1]?.value||'',distance_km:num(inputs[2]?.value)};
+    }).filter(r=>r.from_place||r.to_place||r.distance_km);
   }
 
   function collectItems(){
     return Array.from(document.querySelectorAll('#costList .cost-row')).map(row=>{
-      const selects = row.querySelectorAll('select');
-      const amountInput = row.querySelector('input[type="number"]');
-      return {
-        item_type: selects[0] ? selects[0].value : '',
-        pay_type: selects[1] ? selects[1].value : '',
-        amount: toNumber(amountInput ? amountInput.value : 0),
-        memo: ''
-      };
-    }).filter(i => i.item_type || i.pay_type || i.amount);
+      const sels=row.querySelectorAll('select');
+      const amount=row.querySelector('input[type="number"]');
+      return {item_type:sels[0]?.value||'',pay_type:sels[1]?.value||'',amount:num(amount?.value),memo:''};
+    }).filter(i=>i.item_type||i.pay_type||i.amount);
   }
 
-  function currentAmounts(){
-    const parseMoney = text => Number(String(text || '').replace(/[^\d.-]/g,'')) || 0;
-    return {
-      total_amount: parseMoney(($('totalCost') || {}).textContent),
-      corp_card_amount: parseMoney(($('corpCost') || {}).textContent),
-      personal_amount: parseMoney(($('personalCost') || {}).textContent),
-      fuel_amount: parseMoney(($('fuelCost') || {}).textContent)
-    };
+  function amounts(){
+    return {total_amount:moneyNum($('totalCost')?.textContent),corp_card_amount:moneyNum($('corpCost')?.textContent),personal_amount:moneyNum($('personalCost')?.textContent),fuel_amount:moneyNum($('fuelCost')?.textContent)};
   }
 
   async function saveRequest(status){
-    if(!db){
-      console.error('[TravelExpense] Supabase client not found', {
-        windowKeys: safeGet(()=>Object.keys(window).filter(k=>/supabase|client|db|portal|config/i.test(k)).slice(0,80), []),
-        parentKeys: safeGet(()=>Object.keys(window.parent).filter(k=>/supabase|client|db|portal|config/i.test(k)).slice(0,80), []),
-        portalSession: state.portalSession
-      });
-      alert('Supabase 클라이언트를 찾지 못했습니다. F12 콘솔의 [TravelExpense] Supabase client not found 로그를 확인해 주세요.');
-      return null;
-    }
-    if(!state.companyId){
-      alert('회사 정보(company_id)를 확인하지 못했습니다. 다시 로그인 후 시도해주세요.');
-      return null;
-    }
+    if(!db){console.error('[TravelExpense] Supabase client not found',{dbSource:dbInfo.source,portalSession:state.portalSession}); alert('Supabase 클라이언트를 찾지 못했습니다. F12 콘솔 로그를 확인해 주세요.'); return null;}
+    if(!state.companyId){alert('회사 정보(company_id)를 확인하지 못했습니다. 다시 로그인 후 시도해주세요.'); return null;}
+    if(typeof calcAll==='function') calcAll();
 
-    if(typeof calcAll === 'function') calcAll();
-
-    const profile = state.profile || {};
-    const payload = {
-      company_id: state.companyId,
-      applicant_employee_no: profile.employeeNo || state.employeeNo || '',
-      applicant_name: profile.name || getValue('applicantName'),
-      division_code: profile.divisionCode || '',
-      division_name: profile.divisionName || getValue('applicantDivision'),
-      team_code: profile.teamCode || '',
-      team_name: profile.teamName || getValue('applicantTeam'),
-      trip_type: getValue('tripType') || '출장',
-      trip_date: getValue('tripDate') || null,
-      transport: getValue('transport') || '자차',
-      request_date: getValue('requestDate') || today(),
-      voucher_date: getValue('voucherDateDisplay') || null,
-      payment_due_date: getValue('paymentDueDateDisplay') || null,
+    const p=state.profile||{};
+    const payload={
+      company_id:state.companyId,
+      applicant_employee_no:p.employeeNo||state.employeeNo||'',
+      applicant_name:p.name||getVal('applicantName'),
+      division_code:p.divisionCode||'',
+      division_name:p.divisionName||getVal('applicantDivision'),
+      team_code:p.teamCode||'',
+      team_name:p.teamName||getVal('applicantTeam'),
+      trip_type:getVal('tripType')||'출장',
+      trip_date:getVal('tripDate')||null,
+      transport:getVal('transport')||'자차',
+      request_date:getVal('requestDate')||today(),
+      voucher_date:getVal('voucherDateDisplay')||null,
+      payment_due_date:getVal('paymentDueDateDisplay')||null,
       status,
-      created_by_user_id: state.userId || null,
-      ...currentAmounts()
+      ...amounts()
     };
+    // users.id는 bigint입니다. UUID(auth_user_id)는 created_by_user_id에 넣지 않습니다.
+    if(isNumericId(p.userId||state.userId)) payload.created_by_user_id=Number(p.userId||state.userId);
 
-    const { data: request, error } = await db.from('travel_expense_requests')
-      .insert(payload)
-      .select('id')
-      .single();
+    const r=await db.from('travel_expense_requests').insert(payload).select('id').single();
+    if(r.error){console.error('[TravelExpense] request save error',r.error,payload); alert('출장비 신청 저장 중 오류가 발생했습니다: '+r.error.message); return null;}
+    const requestId=r.data.id;
 
-    if(error){
-      console.error('[TravelExpense] request save error', error);
-      alert('출장비 신청 저장 중 오류가 발생했습니다: ' + error.message);
-      return null;
-    }
+    const routes=collectRoutes().map(x=>({...x,company_id:state.companyId,request_id:requestId}));
+    if(routes.length){const rr=await db.from('travel_expense_routes').insert(routes); if(rr.error)console.error('[TravelExpense] route save error',rr.error);}
+    const items=collectItems().map(x=>({...x,company_id:state.companyId,request_id:requestId}));
+    if(items.length){const ir=await db.from('travel_expense_items').insert(items); if(ir.error)console.error('[TravelExpense] item save error',ir.error);}
 
-    const requestId = request.id;
-    state.currentRequestId = requestId;
-
-    const routes = collectRoutes().map(r => ({...r, company_id: state.companyId, request_id: requestId}));
-    if(routes.length){
-      const { error: routeError } = await db.from('travel_expense_routes').insert(routes);
-      if(routeError) console.error('[TravelExpense] route save error', routeError);
-    }
-
-    const items = collectItems().map(i => ({...i, company_id: state.companyId, request_id: requestId}));
-    if(items.length){
-      const { error: itemError } = await db.from('travel_expense_items').insert(items);
-      if(itemError) console.error('[TravelExpense] item save error', itemError);
-    }
-
-    await loadMyRequests();
-    await loadAdminRequests();
-    alert(status === '임시저장' ? '임시저장되었습니다.' : '제출되었습니다.');
+    await loadMyRequests(); await loadAdminRequests();
+    alert(status==='임시저장'?'임시저장되었습니다.':'제출되었습니다.');
     return requestId;
   }
 
   async function loadMyRequests(){
-    if(!db || !state.companyId) return;
-
-    let query = db.from('travel_expense_requests')
-      .select('*')
-      .eq('company_id', state.companyId)
-      .order('created_at', { ascending:false });
-
-    if(state.employeeNo){
-      query = query.eq('applicant_employee_no', state.employeeNo);
-    }
-
-    const { data, error } = await query;
-    if(error){
-      console.error('[TravelExpense] my requests load error', error);
-      return;
-    }
-
-    const container = document.querySelector('.submission-scroll');
-    if(!container) return;
-    if(!data || !data.length){
-      container.innerHTML = '<div class="notice empty-state">제출 내역이 없습니다.</div>';
-      return;
-    }
-
-    container.innerHTML = data.map(row => `
-      <div class="list-card" data-request-id="${row.id}">
-        <div class="list-top">
-          <div class="list-title">${row.trip_type || '출장'} · ${row.trip_date || '-'}</div>
-          <span class="status s-wait">${row.status || '-'}</span>
-        </div>
-        <div class="meta">
-          신청자: ${row.applicant_name || '-'}<br>
-          본부/팀: ${row.division_name || '-'} / ${row.team_name || '-'}<br>
-          총액: ${money(row.total_amount || 0)} · 개인지급: ${money(row.personal_amount || 0)}
-        </div>
-      </div>
-    `).join('');
+    if(!db||!state.companyId)return;
+    let q=db.from('travel_expense_requests').select('*').eq('company_id',state.companyId).order('created_at',{ascending:false});
+    if(state.employeeNo) q=q.eq('applicant_employee_no',state.employeeNo);
+    const r=await q; if(r.error){console.error('[TravelExpense] my requests load error',r.error); return;}
+    const c=document.querySelector('.submission-scroll'); if(!c)return;
+    if(!r.data||!r.data.length){c.innerHTML='<div class="notice empty-state">제출 내역이 없습니다.</div>';return;}
+    c.innerHTML=r.data.map(row=>`<div class="list-card" data-request-id="${row.id}"><div class="list-top"><div class="list-title">${row.trip_type||'출장'} · ${row.trip_date||'-'}</div><span class="status s-wait">${row.status||'-'}</span></div><div class="meta">신청자: ${row.applicant_name||'-'}<br>본부/팀: ${row.division_name||'-'} / ${row.team_name||'-'}<br>총액: ${money(row.total_amount||0)} · 개인지급: ${money(row.personal_amount||0)}</div></div>`).join('');
   }
 
   async function loadAdminRequests(){
-    if(!db || !state.companyId) return;
-
-    const { data, error } = await db.from('travel_expense_requests')
-      .select('*')
-      .eq('company_id', state.companyId)
-      .order('created_at', { ascending:false });
-
-    if(error){
-      console.error('[TravelExpense] admin requests load error', error);
-      return;
-    }
-
-    const badge = $('adminVisibleCount');
-    if(badge) badge.textContent = (data ? data.length : 0) + '건';
-
-    const panel = document.querySelector('.admin-list-panel');
-    if(!panel) return;
-    let holder = panel.querySelector('.admin-request-list');
-    if(!holder){
-      holder = document.createElement('div');
-      holder.className = 'admin-request-list';
-      const oldEmpty = panel.querySelector('.empty-state');
-      if(oldEmpty) oldEmpty.replaceWith(holder);
-      else panel.appendChild(holder);
-    }
-
-    if(!data || !data.length){
-      holder.innerHTML = '<div class="notice empty-state">제출된 정산서가 없습니다.</div>';
-      updateAdminSummary([]);
-      return;
-    }
-
-    holder.innerHTML = data.map(row => `
-      <div class="admin-trip-row" data-request-id="${row.id}" onclick="window.selectTravelExpenseAdminRequest && window.selectTravelExpenseAdminRequest('${row.id}')">
-        <input type="checkbox" onclick="event.stopPropagation(); window.updateTravelExpenseAdminBulk && window.updateTravelExpenseAdminBulk();" data-total="${row.total_amount || 0}" data-corp="${row.corp_card_amount || 0}" data-personal="${row.personal_amount || 0}">
-        <div class="admin-trip-main">
-          <div class="admin-trip-title-row">
-            <b>${row.applicant_name || '-'} · ${row.trip_type || '출장'}</b>
-            <span class="status s-wait">${row.status || '-'}</span>
-          </div>
-          <div class="admin-trip-meta">${row.division_name || '-'} / ${row.team_name || '-'} · ${row.trip_date || '-'}</div>
-          <div class="admin-trip-amounts">총액 ${money(row.total_amount || 0)} · 법인 ${money(row.corp_card_amount || 0)} · 개인 ${money(row.personal_amount || 0)}</div>
-        </div>
-      </div>
-    `).join('');
-
-    window.__travelExpenseAdminRows = data;
-    updateAdminSummary([]);
+    if(!db||!state.companyId)return;
+    const r=await db.from('travel_expense_requests').select('*').eq('company_id',state.companyId).order('created_at',{ascending:false});
+    if(r.error){console.error('[TravelExpense] admin requests load error',r.error); return;}
+    const badge=$('adminVisibleCount'); if(badge)badge.textContent=(r.data?r.data.length:0)+'건';
+    const panel=document.querySelector('.admin-list-panel'); if(!panel)return;
+    let holder=panel.querySelector('.admin-request-list');
+    if(!holder){holder=document.createElement('div'); holder.className='admin-request-list'; const old=panel.querySelector('.empty-state'); if(old)old.replaceWith(holder); else panel.appendChild(holder);}
+    if(!r.data||!r.data.length){holder.innerHTML='<div class="notice empty-state">제출된 정산서가 없습니다.</div>'; updateAdminSummary([]); return;}
+    holder.innerHTML=r.data.map(row=>`<div class="admin-trip-row" data-request-id="${row.id}" onclick="window.selectTravelExpenseAdminRequest&&window.selectTravelExpenseAdminRequest('${row.id}')"><input type="checkbox" onclick="event.stopPropagation();window.updateTravelExpenseAdminBulk&&window.updateTravelExpenseAdminBulk();" data-total="${row.total_amount||0}" data-corp="${row.corp_card_amount||0}" data-personal="${row.personal_amount||0}"><div class="admin-trip-main"><div class="admin-trip-title-row"><b>${row.applicant_name||'-'} · ${row.trip_type||'출장'}</b><span class="status s-wait">${row.status||'-'}</span></div><div class="admin-trip-meta">${row.division_name||'-'} / ${row.team_name||'-'} · ${row.trip_date||'-'}</div><div class="admin-trip-amounts">총액 ${money(row.total_amount||0)} · 법인 ${money(row.corp_card_amount||0)} · 개인 ${money(row.personal_amount||0)}</div></div></div>`).join('');
+    window.__travelExpenseAdminRows=r.data; updateAdminSummary([]);
   }
 
   function updateAdminSummary(selected){
-    const total = selected.reduce((s, r)=>s + toNumber(r.total),0);
-    const corp = selected.reduce((s, r)=>s + toNumber(r.corp),0);
-    const personal = selected.reduce((s, r)=>s + toNumber(r.personal),0);
-    if($('adminSelectedCount')) $('adminSelectedCount').textContent = selected.length + '건';
-    if($('adminSelectedTotal')) $('adminSelectedTotal').textContent = money(total);
-    if($('adminSelectedCorp')) $('adminSelectedCorp').textContent = money(corp);
-    if($('adminSelectedPersonal')) $('adminSelectedPersonal').textContent = money(personal);
+    const total=selected.reduce((s,r)=>s+num(r.total),0), corp=selected.reduce((s,r)=>s+num(r.corp),0), personal=selected.reduce((s,r)=>s+num(r.personal),0);
+    if($('adminSelectedCount'))$('adminSelectedCount').textContent=selected.length+'건';
+    if($('adminSelectedTotal'))$('adminSelectedTotal').textContent=money(total);
+    if($('adminSelectedCorp'))$('adminSelectedCorp').textContent=money(corp);
+    if($('adminSelectedPersonal'))$('adminSelectedPersonal').textContent=money(personal);
   }
 
-  window.updateTravelExpenseAdminBulk = function(){
-    const selected = Array.from(document.querySelectorAll('.admin-request-list input[type="checkbox"]:checked')).map(chk => ({
-      total: chk.dataset.total,
-      corp: chk.dataset.corp,
-      personal: chk.dataset.personal
-    }));
-    updateAdminSummary(selected);
-  };
-
-  window.selectTravelExpenseAdminRequest = function(id){
-    const rows = window.__travelExpenseAdminRows || [];
-    const row = rows.find(r => r.id === id);
+  window.updateTravelExpenseAdminBulk=function(){const selected=Array.from(document.querySelectorAll('.admin-request-list input[type="checkbox"]:checked')).map(chk=>({total:chk.dataset.total,corp:chk.dataset.corp,personal:chk.dataset.personal})); updateAdminSummary(selected);};
+  window.selectTravelExpenseAdminRequest=function(id){
+    const row=(window.__travelExpenseAdminRows||[]).find(r=>r.id===id);
     document.querySelectorAll('.admin-trip-row.active').forEach(el=>el.classList.remove('active'));
-    const active = document.querySelector(`.admin-trip-row[data-request-id="${id}"]`);
-    if(active) active.classList.add('active');
-
-    const panel = $('adminDetailPanel');
-    if(!panel || !row) return;
-    panel.innerHTML = `
-      <div class="admin-detail-top">
-        <div class="admin-detail-title">
-          <h2>${row.applicant_name || '-'} 정산서</h2>
-          <p>${row.division_name || '-'} / ${row.team_name || '-'} · ${row.trip_date || '-'}</p>
-        </div>
-      </div>
-      <div class="admin-mini-summary">
-        <div class="admin-mini-card"><small>총액</small><b>${money(row.total_amount || 0)}</b></div>
-        <div class="admin-mini-card"><small>법인카드</small><b>${money(row.corp_card_amount || 0)}</b></div>
-        <div class="admin-mini-card"><small>개인지급</small><b>${money(row.personal_amount || 0)}</b></div>
-        <div class="admin-mini-card"><small>상태</small><b>${row.status || '-'}</b></div>
-      </div>
-      <div class="admin-review-section">
-        <h3>기본 정보</h3>
-        <div class="admin-section-body admin-info-grid">
-          <div class="admin-info-item"><span>신청자</span><b>${row.applicant_name || '-'}</b></div>
-          <div class="admin-info-item"><span>본부</span><b>${row.division_name || '-'}</b></div>
-          <div class="admin-info-item"><span>팀</span><b>${row.team_name || '-'}</b></div>
-          <div class="admin-info-item"><span>구분</span><b>${row.trip_type || '-'}</b></div>
-          <div class="admin-info-item"><span>출장일</span><b>${row.trip_date || '-'}</b></div>
-          <div class="admin-info-item"><span>이동수단</span><b>${row.transport || '-'}</b></div>
-        </div>
-      </div>
-    `;
+    const active=document.querySelector(`.admin-trip-row[data-request-id="${id}"]`); if(active)active.classList.add('active');
+    const panel=$('adminDetailPanel'); if(!panel||!row)return;
+    panel.innerHTML=`<div class="admin-detail-top"><div class="admin-detail-title"><h2>${row.applicant_name||'-'} 정산서</h2><p>${row.division_name||'-'} / ${row.team_name||'-'} · ${row.trip_date||'-'}</p></div></div><div class="admin-mini-summary"><div class="admin-mini-card"><small>총액</small><b>${money(row.total_amount||0)}</b></div><div class="admin-mini-card"><small>법인카드</small><b>${money(row.corp_card_amount||0)}</b></div><div class="admin-mini-card"><small>개인지급</small><b>${money(row.personal_amount||0)}</b></div><div class="admin-mini-card"><small>상태</small><b>${row.status||'-'}</b></div></div>`;
   };
 
-  window.saveTravelExpenseDraft = function(){ return saveRequest('임시저장'); };
-  window.submitTravelExpense = function(){ return saveRequest('검토대기'); };
-
-  const originalNewRequest = window.newRequest;
-  window.newRequest = function(){
-    if(typeof originalNewRequest === 'function') originalNewRequest();
-    state.currentRequestId = null;
-  };
+  window.saveTravelExpenseDraft=()=>saveRequest('임시저장');
+  window.submitTravelExpense=()=>saveRequest('검토대기');
 
   async function init(){
-    state.portalSession = readPortalSession();
-    const base = normalizeSession(state.portalSession);
-    const profile = await fetchProfileFromDb(base);
+    state.portalSession=readSession();
+    const profile=await fetchProfile(normalize(state.portalSession));
     applyProfile(profile);
-    await loadMyRequests();
-    await loadAdminRequests();
-    console.log('[TravelExpense] multitenant ready', {
-      companyId: state.companyId,
-      employeeNo: state.employeeNo,
-      hasDbClient: !!db,
-      dbSource: dbInfo.source
-    });
+    await loadMyRequests(); await loadAdminRequests();
+    console.log('[TravelExpense] multitenant ready',{companyId:state.companyId,employeeNo:state.employeeNo,hasDbClient:!!db,dbSource:dbInfo.source});
   }
+  document.addEventListener('DOMContentLoaded',init);
+  if(document.readyState!=='loading')init();
 
-  document.addEventListener('DOMContentLoaded', init);
-  if(document.readyState !== 'loading') init();
-
-  window.addEventListener('message', function(event){
-    const data = event.data || {};
-    const tabId = data.tabId || data.id || data.value || data.tab;
-    if(data.type && !String(data.type).includes('TAB')) return;
-    if(tabId === 'expense-user' || tabId === 'user' || tabId === 'applicant'){
-      if(typeof setMode === 'function') setMode('user');
-    }
-    if(tabId === 'expense-admin' || tabId === 'admin' || tabId === 'review'){
-      if(typeof setMode === 'function') setMode('admin');
-    }
+  window.addEventListener('message',function(event){
+    const data=event.data||{}, tabId=data.tabId||data.id||data.value||data.tab;
+    if(data.type&&!String(data.type).includes('TAB'))return;
+    if(['expense-user','user','applicant'].includes(tabId)&&typeof setMode==='function')setMode('user');
+    if(['expense-admin','admin','review'].includes(tabId)&&typeof setMode==='function')setMode('admin');
   });
 })();
 </script>
