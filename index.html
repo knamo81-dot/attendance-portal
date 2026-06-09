@@ -2359,6 +2359,7 @@ body.auth-loading .top-user-bar {
             <button type="button" id="attendanceNavBtn" class="nav-btn" data-portal-src="attendance/index.html" title="근태">근태</button>
             <button type="button" id="researchStaffNavBtn" class="nav-btn" data-portal-src="research-staff/index.html" title="인력운영현황">인력</button>
             <button type="button" id="suppliesNavBtn" class="nav-btn" data-portal-src="reagent/index.html" title="시약">시약</button>
+            <button type="button" id="travelExpenseNavBtn" class="nav-btn" data-portal-src="travel-expense/index.html" title="출장비정산">출장</button>
             <button type="button" id="aicNavBtn" class="nav-btn" data-portal-src="aic/index.html" title="AIC">AIC</button>
             <button type="button" id="mealNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
             <button type="button" id="docsNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
@@ -3018,6 +3019,12 @@ body.auth-loading .top-user-bar {
       desc: '제품 신청, 취합, 정리 업무를 관리합니다.',
       gradient: 'linear-gradient(135deg, #173a7a 0%, #2251a3 100%)'
     },
+    'travel-expense/index.html': {
+      top: 'Expense Management',
+      title: '출장비 정산',
+      desc: '출장비 신청, 증빙 업로드, 관리팀 검토 및 지출결의 작성을 관리합니다.',
+      gradient: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #38bdf8 100%)'
+    },
     'aic/index.html': {
       top: 'Global Communication',
       title: 'AI Communication',
@@ -3070,6 +3077,7 @@ body.auth-loading .top-user-bar {
       { id: 'summary', label: '취합정리' },
       { id: 'products', label: '제품관리' }
     ],
+    'travel-expense/index.html': [],
     'aic/index.html': [],
     'settings.html': [
       { id: 'org', label: '조직관리' },
@@ -3817,8 +3825,8 @@ body.auth-loading .top-user-bar {
     }
   }
 
-  const PORTAL_APP_KEYS = ['wastewater', 'attendance', 'reagent', 'research_staff', 'aic', 'home', 'work'];
-  const PORTAL_COMPANY_APP_KEYS = ['wastewater', 'attendance', 'reagent', 'research_staff'];
+  const PORTAL_APP_KEYS = ['wastewater', 'attendance', 'reagent', 'research_staff', 'travel_expense', 'aic', 'home', 'work'];
+  const PORTAL_COMPANY_APP_KEYS = ['wastewater', 'attendance', 'reagent', 'research_staff', 'travel_expense'];
 
   function normalizePortalRole(role, fallback = 'user') {
     const clean = String(role || '').trim().toLowerCase();
@@ -3836,6 +3844,7 @@ body.auth-loading .top-user-bar {
     if (['attendance', 'attend', '근태'].includes(clean)) return 'attendance';
     if (['reagent', 'reagents', 'supplies', 'glassware', 'reagent_glassware', 'reagent-glassware', '시약', '시약초자'].includes(clean)) return 'reagent';
     if (['research_staff', 'research-staff', 'staff', 'hr', '인력', '인력운영'].includes(clean)) return 'research_staff';
+    if (['travel_expense', 'travel-expense', 'expense', 'expenses', 'business_trip', 'business-trip', '출장', '출장비', '출장비정산'].includes(clean)) return 'travel_expense';
     if (['aic', 'ai_chat', 'ai-chat'].includes(clean)) return 'aic';
     if (['home', 'portal_home', 'portal-main'].includes(clean)) return 'home';
     if (['work', 'workspace', '업무'].includes(clean)) return 'work';
@@ -3854,6 +3863,7 @@ body.auth-loading .top-user-bar {
       attendance: { role: 'user' },
       reagent: { role: 'user' },
       research_staff: { role: 'user' },
+      travel_expense: { role: 'user' },
       aic: { role: 'user' },
       home: { role: 'user' },
       work: { role: 'user' }
@@ -3866,6 +3876,7 @@ body.auth-loading .top-user-bar {
       attendance: { role: 'admin' },
       reagent: { role: 'admin' },
       research_staff: { role: 'admin' },
+      travel_expense: { role: 'admin' },
       aic: { role: 'blocked' },
       home: { role: 'blocked' },
       work: { role: 'blocked' }
