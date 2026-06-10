@@ -4055,5 +4055,186 @@
 })();
 </script>
 
+
+<script id="travel-expense-new-request-reset-fix">
+(function(){
+  if(window.__travelExpenseNewRequestResetFixInstalled) return;
+  window.__travelExpenseNewRequestResetFixInstalled = true;
+
+  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
+
+  function $(id){ return document.getElementById(id); }
+  function setVal(id, value){
+    const el = $(id);
+    if(el) el.value = value ?? '';
+  }
+  function setText(id, value){
+    const el = $(id);
+    if(el) el.textContent = value ?? '';
+  }
+  function today(){
+    return new Date().toISOString().slice(0,10);
+  }
+
+  function getSession(){
+    return safe(()=>window.portalSession) ||
+      safe(()=>window.parent && window.parent.portalSession) ||
+      safe(()=>window.parent && window.parent.__PORTAL_SESSION__) ||
+      safe(()=>JSON.parse(sessionStorage.getItem('portalSession') || 'null')) ||
+      safe(()=>JSON.parse(localStorage.getItem('portalSession') || 'null')) ||
+      {};
+  }
+
+  function pick(obj, keys){
+    for(const key of keys){
+      if(obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
+    }
+    return '';
+  }
+
+  function profileFromSession(){
+    const s = getSession();
+    const user = s.user || s.currentUser || s.profile || s;
+    const emp = s.employee || s.employeeInfo || s.matchedEmployee || s.staff || s.employeeProfile || {};
+    return {
+      name: pick(emp, ['name','employee_name','employeeName']) || pick(user, ['name','display_name','displayName']),
+      division: pick(emp, ['division_name','divisionName']) || pick(emp, ['division_code','divisionCode']),
+      team: pick(emp, ['team_name','teamName']) || pick(emp, ['team_code','teamCode'])
+    };
+  }
+
+  function clearRoutes(){
+    const box = $('routeSegments');
+    if(box) box.innerHTML = '';
+    if(typeof window.updateRoute === 'function') window.updateRoute();
+  }
+
+  function clearItems(){
+    const box = $('costList');
+    if(box) box.innerHTML = '';
+  }
+
+  function clearMoney(){
+    ['fuelCost','totalCost','corpCost','personalCost'].forEach(id => {
+      if($(id) && typeof window.money === 'function') setText(id, window.money(0));
+      else setText(id, '0원');
+    });
+
+    // 좌측 처리 내역 표까지 0원으로 보정
+    document.querySelectorAll('table td, .summary-table td').forEach(td => {
+      if(/^[\d,]+원$/.test((td.textContent || '').trim())) td.textContent = '0원';
+    });
+  }
+
+  function clearActiveCards(){
+    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
+      card.style.borderColor = '';
+      card.style.boxShadow = '';
+      card.classList.remove('active','selected');
+    });
+  }
+
+  function resetEditButtons(){
+    document.body.classList.remove('travel-editing');
+
+    const actions = document.querySelector('.form-panel .actions');
+    if(!actions) return;
+    const buttons = actions.querySelectorAll('button');
+
+    if(buttons[0]){
+      buttons[0].textContent = '임시저장';
+      if(typeof window.saveTravelExpenseDraft === 'function') {
+        buttons[0].onclick = function(){ window.saveTravelExpenseDraft(); };
+      }
+    }
+    if(buttons[1]){
+      buttons[1].textContent = '제출하기';
+      if(typeof window.submitTravelExpense === 'function') {
+        buttons[1].onclick = function(){ window.submitTravelExpense(); };
+      }
+    }
+  }
+
+  window.resetTravelExpenseNewForm = function(){
+    const p = profileFromSession();
+
+    // 1. 기본정보: 신청자/본부/팀은 로그인 정보 유지, 나머지 입력값 초기화
+    setVal('applicantName', p.name || $('applicantName')?.value || '');
+    setVal('applicantDivision', p.division || $('applicantDivision')?.value || '');
+    setVal('applicantTeam', p.team || $('applicantTeam')?.value || '');
+    setVal('tripType', '출장');
+    setVal('tripDate', '');
+    setVal('transport', '자차');
+    setVal('requestDate', today());
+    setVal('voucherDateDisplay', '');
+    setVal('paymentDueDateDisplay', '');
+
+    // 이동경로 초기화
+    clearRoutes();
+
+    // 2. 자차 유류비 자동 계산 초기화
+    setVal('distance', '');
+    setVal('gasPrice', '');
+    setVal('efficiency', '');
+    setVal('roundUnit', '1');
+
+    // 3. 사용금액 입력 초기화
+    clearItems();
+
+    // 4. 정산요약 초기화
+    if(typeof window.calcAll === 'function') {
+      window.calcAll();
+    }
+    clearMoney();
+
+    // 선택/수정모드 초기화
+    clearActiveCards();
+    resetEditButtons();
+
+    // 내부 선택 ID로 추정되는 전역값들도 안전하게 초기화
+    safe(()=>{ window.currentRequestId = null; });
+    safe(()=>{ window.selectedRequestId = null; });
+    safe(()=>{ window.editingRequestId = null; });
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  function patchNewRequest(){
+    const original = window.newRequest;
+    if(typeof original === 'function' && !original.__resetFixPatched){
+      const wrapped = function(){
+        // 기존 함수가 화면 모드/선택 상태를 처리하는 경우를 보존
+        safe(()=>original.apply(this, arguments));
+        setTimeout(window.resetTravelExpenseNewForm, 0);
+        setTimeout(window.resetTravelExpenseNewForm, 80);
+      };
+      wrapped.__resetFixPatched = true;
+      window.newRequest = wrapped;
+    }
+
+    // 버튼이 onclick="newRequest()"가 아니거나 기존 함수가 덮여도 직접 보강
+    document.querySelectorAll('button').forEach(btn => {
+      const label = (btn.textContent || '').trim();
+      if(label.includes('신규 작성') && !btn.dataset.resetFixBound){
+        btn.dataset.resetFixBound = '1';
+        btn.addEventListener('click', function(){
+          setTimeout(window.resetTravelExpenseNewForm, 0);
+          setTimeout(window.resetTravelExpenseNewForm, 80);
+        }, true);
+      }
+    });
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', patchNewRequest);
+  }else{
+    patchNewRequest();
+  }
+
+  setTimeout(patchNewRequest, 300);
+  setTimeout(patchNewRequest, 1000);
+})();
+</script>
+
 </body>
 </html>
