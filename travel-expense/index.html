@@ -1447,6 +1447,23 @@
   .process-month-filter{width:138px!important;height:36px!important;padding:7px 9px!important;border-radius:11px!important;font-size:13px!important;font-weight:800!important;background:#fff!important;}
 </style>
 
+
+<style id="monthly-process-summary-filter-cards-style">
+  .monthly-card-empty{
+    min-height:72px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#64748b;
+    font-weight:800;
+    background:#f8fafc;
+    border:1px dashed #cbd5e1;
+    border-radius:14px;
+    text-align:center;
+    padding:14px;
+  }
+</style>
+
 </head>
 <body>
   <header>
@@ -3806,5 +3823,317 @@
 })();
 </script>
 
+
+<script id="monthly-process-summary-filter-cards-fix">
+(function(){
+  if(window.__monthlyProcessSummaryFilterCardsFixInstalled) return;
+  window.__monthlyProcessSummaryFilterCardsFixInstalled = true;
+
+  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
+  const hasClient = obj => !!(obj && typeof obj.from === 'function');
+
+  function findDb(scope){
+    if(!scope) return null;
+    const names = [
+      'supabaseClient','supabase_client','sb','db','database',
+      'portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB',
+      '__supabaseClient','__SUPABASE_CLIENT__','client'
+    ];
+    for(const name of names){
+      const value = safe(()=>scope[name]);
+      if(hasClient(value)) return value;
+    }
+    for(const key of safe(()=>Object.keys(scope), [])){
+      if(key === 'supabase') continue;
+      const value = safe(()=>scope[key]);
+      if(hasClient(value)) return value;
+    }
+    return null;
+  }
+
+  function getDb(){
+    return findDb(safe(()=>window.parent)) || findDb(window);
+  }
+
+  function pick(obj, keys){
+    for(const key of keys){
+      if(obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
+    }
+    return '';
+  }
+
+  function getSession(){
+    return safe(()=>window.portalSession) ||
+      safe(()=>window.parent && window.parent.portalSession) ||
+      safe(()=>window.parent && window.parent.__PORTAL_SESSION__) ||
+      safe(()=>JSON.parse(sessionStorage.getItem('portalSession') || 'null')) ||
+      safe(()=>JSON.parse(localStorage.getItem('portalSession') || 'null')) ||
+      {};
+  }
+
+  function getProfile(){
+    const s = getSession();
+    const user = s.user || s.currentUser || s.profile || s;
+    const emp = s.employee || s.employeeInfo || s.matchedEmployee || s.staff || s.employeeProfile || {};
+    const company = s.company || s.activeCompany || {};
+    return {
+      companyId: s.activeCompanyId || s.companyId || s.company_id ||
+        pick(company, ['id','company_id','companyId']) ||
+        pick(user, ['company_id','companyId']) ||
+        pick(emp, ['company_id','companyId']) || '',
+      employeeNo: pick(emp, ['employee_no','employeeNo']) || pick(user, ['employee_no','employeeNo']) || ''
+    };
+  }
+
+  function money(value){
+    if(typeof window.money === 'function') return window.money(value || 0);
+    return Math.round(Number(value || 0)).toLocaleString('ko-KR') + '원';
+  }
+
+  function escapeHtml(value){
+    return String(value ?? '').replace(/[&<>"']/g, m => ({
+      '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+    }[m]));
+  }
+
+  function currentMonth(){
+    const input = document.getElementById('processMonthFilter');
+    if(input && input.value) return input.value;
+    return new Date().toISOString().slice(0,7);
+  }
+
+  function monthRange(monthValue){
+    const [year, month] = String(monthValue || currentMonth()).split('-').map(Number);
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 1);
+    return {
+      start: start.toISOString().slice(0,10),
+      end: end.toISOString().slice(0,10)
+    };
+  }
+
+  function rowMonth(row){
+    const base = row.trip_date || row.request_date || row.created_at || '';
+    return String(base).slice(0,7);
+  }
+
+  function isDoneStatus(status){
+    return ['지급완료','지출결의완료','처리완료','완료'].includes(status || '');
+  }
+
+  function editable(status){
+    return status === '임시저장' || status === '검토대기';
+  }
+
+  function updateProcessTable(rows){
+    const summary = {
+      total:{request:0, done:0, pending:0},
+      corp:{request:0, done:0, pending:0},
+      personal:{request:0, done:0, pending:0}
+    };
+
+    rows.forEach(row => {
+      const total = Number(row.total_amount || 0);
+      const corp = Number(row.corp_card_amount || 0);
+      const personal = Number(row.personal_amount || 0);
+      const done = isDoneStatus(row.status);
+
+      summary.total.request += total;
+      summary.corp.request += corp;
+      summary.personal.request += personal;
+
+      if(done){
+        summary.total.done += total;
+        summary.corp.done += corp;
+        summary.personal.done += personal;
+      }else{
+        summary.total.pending += total;
+        summary.corp.pending += corp;
+        summary.personal.pending += personal;
+      }
+    });
+
+    const table = document.querySelector('.process-table tbody');
+    if(!table) return;
+
+    table.innerHTML = `
+      <tr>
+        <td>총금액</td>
+        <td>${money(summary.total.request)}</td>
+        <td>${money(summary.total.done)}</td>
+        <td>${money(summary.total.pending)}</td>
+      </tr>
+      <tr>
+        <td>법인카드</td>
+        <td>${money(summary.corp.request)}</td>
+        <td>${money(summary.corp.done)}</td>
+        <td>${money(summary.corp.pending)}</td>
+      </tr>
+      <tr>
+        <td>개인지급</td>
+        <td>${money(summary.personal.request)}</td>
+        <td>${money(summary.personal.done)}</td>
+        <td>${money(summary.personal.pending)}</td>
+      </tr>
+    `;
+  }
+
+  function cardHtml(row){
+    const status = row.status || '검토대기';
+    const buttons = editable(status)
+      ? `<div class="my-card-actions" onclick="event.stopPropagation()">
+           <button type="button" class="edit-btn" data-edit-id="${row.id}" data-edit-status="${escapeHtml(status)}">수정</button>
+           <button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button>
+         </div>`
+      : '';
+
+    return `
+      <div class="list-card" data-request-id="${row.id}">
+        <div class="list-top">
+          <div class="list-title">${escapeHtml(row.trip_type || '출장')} · ${escapeHtml(row.trip_date || '-')}</div>
+          <span class="status s-wait">${escapeHtml(status)}</span>
+        </div>
+        <div class="meta">
+          신청자: ${escapeHtml(row.applicant_name || '-')}<br>
+          본부/팀: ${escapeHtml(row.division_name || '-')} / ${escapeHtml(row.team_name || '-')}<br>
+          총액: ${money(row.total_amount || 0)} · 개인지급: ${money(row.personal_amount || 0)}
+        </div>
+        ${buttons}
+      </div>
+    `;
+  }
+
+  function updateCards(rows){
+    const box = document.querySelector('.submission-scroll');
+    if(!box) return;
+
+    if(!rows.length){
+      box.innerHTML = '<div class="monthly-card-empty">선택한 월의 제출 내역이 없습니다.</div>';
+      return;
+    }
+
+    box.innerHTML = rows.map(cardHtml).join('');
+  }
+
+  async function fetchMonthlyRows(){
+    const client = getDb();
+    const p = getProfile();
+    const month = currentMonth();
+
+    if(!client || !p.companyId) return [];
+
+    const range = monthRange(month);
+
+    let query = client.from('travel_expense_requests')
+      .select('*')
+      .eq('company_id', p.companyId)
+      .gte('trip_date', range.start)
+      .lt('trip_date', range.end)
+      .order('trip_date', { ascending:false })
+      .order('created_at', { ascending:false });
+
+    if(p.employeeNo) query = query.eq('applicant_employee_no', p.employeeNo);
+
+    let res = await query;
+
+    // trip_date가 빈 데이터가 있을 수 있어 request_date 기준으로 한 번 더 보정
+    // 단, trip_date가 있는 정상 데이터가 대부분이므로 request_date 보정은 JS에서 합침
+    let query2 = client.from('travel_expense_requests')
+      .select('*')
+      .eq('company_id', p.companyId)
+      .is('trip_date', null)
+      .gte('request_date', range.start)
+      .lt('request_date', range.end)
+      .order('request_date', { ascending:false })
+      .order('created_at', { ascending:false });
+
+    if(p.employeeNo) query2 = query2.eq('applicant_employee_no', p.employeeNo);
+
+    let res2 = await query2;
+
+    const rows = [];
+    if(!res.error && Array.isArray(res.data)) rows.push(...res.data);
+    if(!res2.error && Array.isArray(res2.data)) rows.push(...res2.data);
+
+    const seen = new Set();
+    return rows
+      .filter(row => {
+        if(!row || seen.has(row.id)) return false;
+        seen.add(row.id);
+        return rowMonth(row) === month;
+      })
+      .sort((a,b) => String(b.trip_date || b.request_date || b.created_at || '').localeCompare(String(a.trip_date || a.request_date || a.created_at || '')));
+  }
+
+  async function refreshAllMonthly(){
+    const input = document.getElementById('processMonthFilter');
+    if(input && !input.value) input.value = new Date().toISOString().slice(0,7);
+
+    const rows = await fetchMonthlyRows();
+    updateProcessTable(rows);
+    updateCards(rows);
+    return rows;
+  }
+
+  window.refreshMonthlyProcessSummary = refreshAllMonthly;
+  window.refreshTravelExpenseMyCards = refreshAllMonthly;
+
+  // 기존 카드 렌더 함수가 전체 목록을 다시 그린 뒤에도 월 필터가 다시 적용되게 감쌈
+  function patchRefreshFunctions(){
+    ['loadMyRequests','refreshCards','saveTravelExpenseDraft','submitTravelExpense'].forEach(name => {
+      const fn = window[name];
+      if(typeof fn !== 'function' || fn.__monthlyFilterCardsPatched) return;
+
+      const wrapped = async function(){
+        const result = await fn.apply(this, arguments);
+        setTimeout(refreshAllMonthly, 150);
+        setTimeout(refreshAllMonthly, 700);
+        return result;
+      };
+      wrapped.__monthlyFilterCardsPatched = true;
+      window[name] = wrapped;
+    });
+
+    if(typeof window.deleteTravelExpenseRequest === 'function' && !window.deleteTravelExpenseRequest.__monthlyFilterCardsPatched){
+      const originalDelete = window.deleteTravelExpenseRequest;
+      const wrappedDelete = async function(){
+        const result = await originalDelete.apply(this, arguments);
+        setTimeout(refreshAllMonthly, 150);
+        setTimeout(refreshAllMonthly, 700);
+        return result;
+      };
+      wrappedDelete.__monthlyFilterCardsPatched = true;
+      window.deleteTravelExpenseRequest = wrappedDelete;
+    }
+  }
+
+  function bindMonthInput(){
+    const input = document.getElementById('processMonthFilter');
+    if(!input || input.dataset.monthlyCardBound) return;
+
+    input.dataset.monthlyCardBound = '1';
+    if(!input.value) input.value = new Date().toISOString().slice(0,7);
+    input.addEventListener('change', refreshAllMonthly);
+    input.addEventListener('input', refreshAllMonthly);
+  }
+
+  function init(){
+    bindMonthInput();
+    patchRefreshFunctions();
+    refreshAllMonthly();
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', init);
+  }else{
+    init();
+  }
+
+  setTimeout(init, 500);
+  setTimeout(init, 1200);
+})();
+</script>
+
 </body>
 </html>
+
