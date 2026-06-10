@@ -1448,6 +1448,7 @@
 </style>
 
 
+
 <style id="monthly-process-summary-filter-cards-style">
   .monthly-card-empty{
     min-height:72px;
@@ -3824,6 +3825,7 @@
 </script>
 
 
+
 <script id="monthly-process-summary-filter-cards-fix">
 (function(){
   if(window.__monthlyProcessSummaryFilterCardsFixInstalled) return;
@@ -3921,18 +3923,25 @@
     return ['지급완료','지출결의완료','처리완료','완료'].includes(status || '');
   }
 
+  function isDraftStatus(status){
+    return (status || '') === '임시저장';
+  }
+
   function editable(status){
     return status === '임시저장' || status === '검토대기';
   }
 
   function updateProcessTable(rows){
+    // 처리내역 집계에서는 임시저장 제외
+    const summaryRows = rows.filter(row => !isDraftStatus(row.status));
+
     const summary = {
       total:{request:0, done:0, pending:0},
       corp:{request:0, done:0, pending:0},
       personal:{request:0, done:0, pending:0}
     };
 
-    rows.forEach(row => {
+    summaryRows.forEach(row => {
       const total = Number(row.total_amount || 0);
       const corp = Number(row.corp_card_amount || 0);
       const personal = Number(row.personal_amount || 0);
@@ -4004,6 +4013,7 @@
   }
 
   function updateCards(rows){
+    // 내 제출 내역 카드는 임시저장 포함
     const box = document.querySelector('.submission-scroll');
     if(!box) return;
 
@@ -4036,8 +4046,6 @@
 
     let res = await query;
 
-    // trip_date가 빈 데이터가 있을 수 있어 request_date 기준으로 한 번 더 보정
-    // 단, trip_date가 있는 정상 데이터가 대부분이므로 request_date 보정은 JS에서 합침
     let query2 = client.from('travel_expense_requests')
       .select('*')
       .eq('company_id', p.companyId)
@@ -4078,7 +4086,6 @@
   window.refreshMonthlyProcessSummary = refreshAllMonthly;
   window.refreshTravelExpenseMyCards = refreshAllMonthly;
 
-  // 기존 카드 렌더 함수가 전체 목록을 다시 그린 뒤에도 월 필터가 다시 적용되게 감쌈
   function patchRefreshFunctions(){
     ['loadMyRequests','refreshCards','saveTravelExpenseDraft','submitTravelExpense'].forEach(name => {
       const fn = window[name];
@@ -4136,4 +4143,3 @@
 
 </body>
 </html>
-
