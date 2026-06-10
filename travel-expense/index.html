@@ -1440,6 +1440,13 @@
   .my-card-actions .delete-btn{background:#fee2e2!important;color:#b91c1c!important;}
 </style>
 
+
+<style id="monthly-process-summary-style">
+  .process-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;}
+  .process-title-row h2{margin:0!important;}
+  .process-month-filter{width:138px!important;height:36px!important;padding:7px 9px!important;border-radius:11px!important;font-size:13px!important;font-weight:800!important;background:#fff!important;}
+</style>
+
 </head>
 <body>
   <header>
@@ -1462,7 +1469,10 @@
       <div class="layout expense-workspace">
         <aside class="status-panel">
 <section class="section">
-  <h2>처리 내역</h2>
+  <div class="process-title-row">
+    <h2>처리 내역</h2>
+    <input id="processMonthFilter" class="process-month-filter" type="month" title="처리 내역 집계 월 선택" onchange="window.refreshMonthlyProcessSummary && window.refreshMonthlyProcessSummary()" />
+  </div>
 
   <table class="process-table">
     <thead>
@@ -3349,15 +3359,11 @@
   }
 
   function updateProcessTable(amounts){
-    amounts = amounts || computeAmounts();
-    const rows=document.querySelectorAll('.process-table tbody tr');
-    const vals=[amounts.total, amounts.corp, amounts.personal];
-    rows.forEach((tr,i)=>{
-      const tds=tr.querySelectorAll('td');
-      if(tds[1]) tds[1].textContent = won(vals[i] || 0);
-      if(tds[2]) tds[2].textContent = '0원';
-      if(tds[3]) tds[3].textContent = '0원';
-    });
+    // 처리 내역은 선택 카드 1건이 아니라 월별 누적 집계로 표시합니다.
+    if(window.refreshMonthlyProcessSummary){
+      window.refreshMonthlyProcessSummary();
+      return;
+    }
   }
 
   function refreshTotals(){
@@ -3651,6 +3657,152 @@
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
   setTimeout(init, 1000);
+})();
+</script>
+
+
+<script id="monthly-process-summary-controller">
+(function(){
+  if(window.__monthlyProcessSummaryControllerInstalled) return;
+  window.__monthlyProcessSummaryControllerInstalled = true;
+
+  let refreshTimer = null;
+  let lastKey = '';
+  let lastRunAt = 0;
+  const doneStatuses = ['지출결의완료','지급완료','처리완료','검토완료'];
+
+  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
+  const hasClient = obj => !!(obj && typeof obj.from === 'function');
+  function findDb(scope){
+    if(!scope) return null;
+    const names = ['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];
+    for(const name of names){ const v=safe(()=>scope[name]); if(hasClient(v)) return v; }
+    for(const key of safe(()=>Object.keys(scope), [])){ if(key==='supabase') continue; const v=safe(()=>scope[key]); if(hasClient(v)) return v; }
+    return null;
+  }
+  function db(){ return findDb(safe(()=>window.parent)) || findDb(window); }
+  function pick(o, keys){ for(const k of keys){ if(o && o[k] !== undefined && o[k] !== null && o[k] !== '') return o[k]; } return ''; }
+  function session(){
+    return safe(()=>window.portalSession) || safe(()=>window.parent && window.parent.portalSession) || safe(()=>window.parent && window.parent.__PORTAL_SESSION__) || safe(()=>JSON.parse(sessionStorage.getItem('portalSession')||'null')) || safe(()=>JSON.parse(localStorage.getItem('portalSession')||'null')) || {};
+  }
+  function profile(){
+    const s=session();
+    const user=s.user||s.currentUser||s.profile||s;
+    const emp=s.employee||s.employeeInfo||s.matchedEmployee||s.staff||s.employeeProfile||{};
+    const company=s.company||s.activeCompany||{};
+    return {
+      companyId:s.activeCompanyId||s.companyId||s.company_id||pick(company,['id','company_id','companyId'])||pick(user,['company_id','companyId'])||pick(emp,['company_id','companyId'])||'',
+      employeeNo:pick(emp,['employee_no','employeeNo'])||pick(user,['employee_no','employeeNo'])||''
+    };
+  }
+  function won(v){ if(typeof window.money === 'function') return window.money(v||0); return Math.round(Number(v||0)).toLocaleString('ko-KR')+'원'; }
+  function num(v){ return Number(v||0)||0; }
+  function currentMonth(){ return new Date().toISOString().slice(0,7); }
+  function nextMonth(yyyyMm){
+    const [y,m] = yyyyMm.split('-').map(Number);
+    const d = new Date(y, m, 1);
+    return d.toISOString().slice(0,10);
+  }
+  function monthStart(yyyyMm){ return yyyyMm + '-01'; }
+  function setCells(request, done, pending){
+    const rows = document.querySelectorAll('.process-table tbody tr');
+    const vals = [
+      [request.total, done.total, pending.total],
+      [request.corp, done.corp, pending.corp],
+      [request.personal, done.personal, pending.personal]
+    ];
+    rows.forEach((tr,i)=>{
+      const tds = tr.querySelectorAll('td');
+      if(tds[1]) tds[1].textContent = won(vals[i][0]);
+      if(tds[2]) tds[2].textContent = won(vals[i][1]);
+      if(tds[3]) tds[3].textContent = won(vals[i][2]);
+    });
+  }
+  function ensureMonthInput(){
+    const input = document.getElementById('processMonthFilter');
+    if(input && !input.value) input.value = currentMonth();
+    return input;
+  }
+
+  window.refreshMonthlyProcessSummary = async function(){
+    clearTimeout(refreshTimer);
+    return new Promise(resolve => {
+      refreshTimer = setTimeout(async () => {
+        const input = ensureMonthInput();
+        const month = (input && input.value) || currentMonth();
+        const client = db();
+        const p = profile();
+        if(!client || !p.companyId){ setCells({total:0,corp:0,personal:0},{total:0,corp:0,personal:0},{total:0,corp:0,personal:0}); resolve(false); return; }
+
+        const key = p.companyId + '|' + p.employeeNo + '|' + month;
+        const now = Date.now();
+        if(key === lastKey && now - lastRunAt < 180){ resolve(true); return; }
+        lastKey = key; lastRunAt = now;
+
+        let q = client.from('travel_expense_requests')
+          .select('id,status,total_amount,corp_card_amount,personal_amount,request_date,created_at')
+          .eq('company_id', p.companyId)
+          .gte('request_date', monthStart(month))
+          .lt('request_date', nextMonth(month));
+        if(p.employeeNo) q = q.eq('applicant_employee_no', p.employeeNo);
+        const res = await q;
+        if(res.error){ console.error('[TravelExpense] monthly process summary error', res.error); resolve(false); return; }
+
+        const request = {total:0, corp:0, personal:0};
+        const done = {total:0, corp:0, personal:0};
+        (res.data || []).forEach(row => {
+          const total = num(row.total_amount);
+          const corp = num(row.corp_card_amount);
+          const personal = num(row.personal_amount);
+          request.total += total;
+          request.corp += corp;
+          request.personal += personal;
+          if(doneStatuses.includes(row.status || '')){
+            done.total += total;
+            done.corp += corp;
+            done.personal += personal;
+          }
+        });
+        const pending = {
+          total: Math.max(0, request.total - done.total),
+          corp: Math.max(0, request.corp - done.corp),
+          personal: Math.max(0, request.personal - done.personal)
+        };
+        setCells(request, done, pending);
+        resolve(true);
+      }, 80);
+    });
+  };
+
+  function patch(name){
+    const fn = window[name];
+    if(typeof fn !== 'function' || fn.__monthlySummaryPatched) return;
+    const wrapped = async function(){
+      const result = await fn.apply(this, arguments);
+      setTimeout(window.refreshMonthlyProcessSummary, 150);
+      setTimeout(window.refreshMonthlyProcessSummary, 700);
+      return result;
+    };
+    wrapped.__monthlySummaryPatched = true;
+    window[name] = wrapped;
+  }
+
+  function init(){
+    const input = ensureMonthInput();
+    if(input && !input.__monthlyBound){
+      input.__monthlyBound = true;
+      input.addEventListener('change', () => window.refreshMonthlyProcessSummary());
+    }
+    patch('loadMyRequests');
+    patch('saveTravelExpenseDraft');
+    patch('submitTravelExpense');
+    patch('deleteTravelExpenseRequest');
+    patch('startTravelExpenseEdit');
+    window.refreshMonthlyProcessSummary();
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+  setTimeout(init, 500);
+  setTimeout(init, 1500);
 })();
 </script>
 
