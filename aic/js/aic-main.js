@@ -537,6 +537,130 @@
     );
   }
 
+  function normalizeRoleValue(value) {
+    return String(value == null ? '' : value).trim().toLowerCase();
+  }
+
+  function collectRoleValues(source, output) {
+    if (!source) return;
+
+    if (Array.isArray(source)) {
+      source.forEach(function (item) {
+        collectRoleValues(item, output);
+      });
+      return;
+    }
+
+    if (typeof source === 'object') {
+      [
+        'role',
+        'roles',
+        'app_role',
+        'app_roles',
+        'authority',
+        'authorities',
+        'permission',
+        'permissions',
+        'user_role',
+        'user_roles',
+        'userType',
+        'user_type',
+        'account_type',
+        'type'
+      ].forEach(function (key) {
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+          collectRoleValues(source[key], output);
+        }
+      });
+      return;
+    }
+
+    var value = normalizeRoleValue(source);
+    if (value) output.push(value);
+  }
+
+  function getCurrentUserRoleValues() {
+    var session = getPortalSession();
+    var auth = window.aicAuth || {};
+    var user = auth.user || {};
+    var profile = session.profile || {};
+    var values = [];
+
+    [
+      auth,
+      user,
+      profile,
+      session,
+      session.user,
+      session.employee,
+      session.currentEmployee,
+      session.portalSession,
+      window.portalSession,
+      window.currentPortalSession
+    ].forEach(function (source) {
+      collectRoleValues(source, values);
+    });
+
+    return values.filter(Boolean);
+  }
+
+  function isAicSystemAdmin() {
+    var email = String(getCurrentUserEmail() || '').trim().toLowerCase();
+    var session = getPortalSession();
+    var auth = window.aicAuth || {};
+    var user = auth.user || {};
+    var profile = session.profile || {};
+
+    var explicitFlags = [
+      auth.isSystemAdmin,
+      auth.is_system_admin,
+      user.isSystemAdmin,
+      user.is_system_admin,
+      profile.isSystemAdmin,
+      profile.is_system_admin,
+      session.isSystemAdmin,
+      session.is_system_admin,
+      session.isServiceAdmin,
+      session.is_service_admin
+    ];
+
+    if (explicitFlags.some(function (value) { return value === true || value === 'true' || value === 1 || value === '1'; })) {
+      return true;
+    }
+
+    var roleValues = getCurrentUserRoleValues();
+    var systemAdminKeywords = [
+      'system_admin',
+      'system-admin',
+      'systemadmin',
+      'sysadmin',
+      'super_admin',
+      'super-admin',
+      'superadmin',
+      'service_admin',
+      'service-admin',
+      'serviceadmin',
+      'portal_admin',
+      'portal-admin',
+      'portaladmin',
+      '시스템관리자',
+      '서비스관리자'
+    ];
+
+    if (roleValues.some(function (role) {
+      return systemAdminKeywords.some(function (keyword) {
+        return role === keyword || role.indexOf(keyword) >= 0;
+      });
+    })) {
+      return true;
+    }
+
+    // 현재 포탈의 서비스관리자 계정 규칙: 예) zipiz-admin@exelolab.com
+    if (email && /-admin@/i.test(email)) return true;
+
+    return false;
+  }
+
 
   function isCodeLike(value) {
     var text = String(value || '').trim();
@@ -957,6 +1081,8 @@
     options = options || {};
     var sb = getSupabaseClient();
     var companyId = getCompanyId();
+    var currentEmail = String(getCurrentUserEmail() || '').trim();
+    var isSystemAdmin = isAicSystemAdmin();
 
     if (!sb || !companyId) {
       state.dbReady = false;
@@ -968,17 +1094,73 @@
     state.dbLoading = true;
 
     try {
-      var roomsResult = await sb
-        .from('aic_rooms')
-        .select('*')
-        .eq('company_id', companyId)
-        .order('updated_at', { ascending: false })
-        .order('created_at', { ascending: false });
+      var roomRows = [];
+      var roomIds = [];
 
-      if (roomsResult.error) throw roomsResult.error;
+      if (isSystemAdmin) {
+        var roomsResult = await sb
+          .from('aic_rooms')
+          .select('*')
+          .eq('company_id', companyId)
+          .order('updated_at', { ascending: false })
+          .order('created_at', { ascending: false });
 
-      var roomRows = Array.isArray(roomsResult.data) ? roomsResult.data : [];
-      var roomIds = roomRows.map(function (room) { return String(room.id || ''); }).filter(Boolean);
+        if (roomsResult.error) throw roomsResult.error;
+
+        roomRows = Array.isArray(roomsResult.data) ? roomsResult.data : [];
+        roomIds = roomRows.map(function (room) { return String(room.id || ''); }).filter(Boolean);
+      } else {
+        if (!currentEmail) {
+          state.readMap = {};
+          state.readSyncReady = true;
+          state.rooms = [];
+          state.openSlots = [];
+          state.dbReady = true;
+          if (!options.skipRealtime) {
+            subscribeRealtime();
+            subscribeReadRealtime();
+          }
+          render(false);
+          return;
+        }
+
+        var myMembersResult = await sb
+          .from('aic_room_members')
+          .select('room_id')
+          .eq('company_id', companyId)
+          .ilike('user_email', currentEmail);
+
+        if (myMembersResult.error) {
+          myMembersResult = await sb
+            .from('aic_room_members')
+            .select('room_id')
+            .eq('company_id', companyId)
+            .eq('user_email', currentEmail);
+        }
+
+        if (myMembersResult.error) throw myMembersResult.error;
+
+        roomIds = (myMembersResult.data || [])
+          .map(function (member) { return String(member.room_id || ''); })
+          .filter(Boolean);
+
+        roomIds = Array.from(new Set(roomIds));
+
+        if (roomIds.length) {
+          var participantRoomsResult = await sb
+            .from('aic_rooms')
+            .select('*')
+            .eq('company_id', companyId)
+            .in('id', roomIds)
+            .order('updated_at', { ascending: false })
+            .order('created_at', { ascending: false });
+
+          if (participantRoomsResult.error) throw participantRoomsResult.error;
+
+          roomRows = Array.isArray(participantRoomsResult.data) ? participantRoomsResult.data : [];
+          roomIds = roomRows.map(function (room) { return String(room.id || ''); }).filter(Boolean);
+        }
+      }
 
       if (!roomIds.length) {
         state.readMap = {};
