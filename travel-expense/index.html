@@ -3977,5 +3977,99 @@ body.travel-editing .travel-mode-note{display:block;background:#fff7ed;color:#c2
 })();
 </script>
 
+
+<script id="travel-expense-detail-load-dedupe-fix">
+(function(){
+  if(window.__travelExpenseDetailLoadDedupeFixInstalled) return;
+  window.__travelExpenseDetailLoadDedupeFixInstalled = true;
+
+  let lastRequestId = null;
+  let lastStartedAt = 0;
+  let lastPromise = null;
+
+  function clearRouteBoxBeforeLoad(){
+    const box = document.getElementById('routeSegments');
+    if(box) box.innerHTML = '';
+  }
+
+  function cleanupDuplicateRoutes(){
+    const box = document.getElementById('routeSegments');
+    if(!box) return;
+
+    const rows = Array.from(box.querySelectorAll('.route-row'));
+    const seen = new Set();
+
+    rows.forEach(row => {
+      const inputs = row.querySelectorAll('input');
+      const key = [
+        inputs[0] ? inputs[0].value.trim() : '',
+        inputs[1] ? inputs[1].value.trim() : '',
+        inputs[2] ? inputs[2].value.trim() : ''
+      ].join('||');
+
+      if(seen.has(key)){
+        row.remove();
+      }else{
+        seen.add(key);
+      }
+    });
+
+    if(typeof window.updateRoute === 'function'){
+      window.updateRoute();
+    }
+  }
+
+  function install(){
+    const original = window.loadTravelExpenseRequest;
+    if(typeof original !== 'function' || original.__dedupeFixed) return;
+
+    const wrapped = async function(requestId){
+      const now = Date.now();
+
+      // 카드 클릭 시 capture 이벤트 + inline onclick이 연속 호출되는 경우 두 번째 호출 차단
+      if(requestId && requestId === lastRequestId && now - lastStartedAt < 700){
+        return lastPromise;
+      }
+
+      lastRequestId = requestId;
+      lastStartedAt = now;
+
+      clearRouteBoxBeforeLoad();
+
+      lastPromise = Promise.resolve(original.apply(this, arguments))
+        .then(result => {
+          setTimeout(cleanupDuplicateRoutes, 50);
+          setTimeout(cleanupDuplicateRoutes, 200);
+          return result;
+        })
+        .finally(() => {
+          setTimeout(() => {
+            if(lastRequestId === requestId){
+              lastRequestId = null;
+              lastPromise = null;
+            }
+          }, 800);
+        });
+
+      return lastPromise;
+    };
+
+    wrapped.__dedupeFixed = true;
+    window.loadTravelExpenseRequest = wrapped;
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', install);
+  }else{
+    install();
+  }
+
+  // 다른 스크립트가 나중에 loadTravelExpenseRequest를 다시 감싸는 경우 대비
+  setTimeout(install, 300);
+  setTimeout(install, 1000);
+  setTimeout(install, 2000);
+})();
+</script>
+
 </body>
 </html>
