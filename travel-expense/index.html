@@ -1426,15 +1426,45 @@
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<style id="travel-expense-action-policy-style">
-.form-panel .actions.is-hidden{display:none!important}
-.travel-mode-note{display:none;margin:10px 0 0;padding:10px 12px;border-radius:12px;font-size:13px;font-weight:800}
-body.travel-viewing .travel-mode-note{display:block;background:#f8fafc;color:#475569}
-body.travel-editing .travel-mode-note{display:block;background:#fff7ed;color:#c2410c}
-.my-card-actions{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px dashed #e5e9f2}
-.my-card-actions button{min-width:0!important;height:30px!important;padding:0 10px!important;border-radius:9px!important;font-size:12px!important;line-height:1!important}
-.my-card-actions .edit-btn{background:#eef2ff!important;color:#3730a3!important}
-.my-card-actions .delete-btn{background:#fee2e2!important;color:#b91c1c!important}
+
+<style id="travel-expense-rollback-clean-card-handler-style">
+  .form-panel .actions.is-hidden{display:none!important;}
+  .travel-mode-note{
+    display:none;
+    margin:10px 0 0;
+    padding:10px 12px;
+    border-radius:12px;
+    font-size:13px;
+    font-weight:800;
+  }
+  body.travel-viewing .travel-mode-note{
+    display:block;
+    background:#f8fafc;
+    color:#475569;
+  }
+  body.travel-editing .travel-mode-note{
+    display:block;
+    background:#fff7ed;
+    color:#c2410c;
+  }
+  .submission-scroll .list-card{cursor:pointer;}
+  .my-card-actions{
+    display:flex;
+    gap:6px;
+    margin-top:9px;
+    padding-top:8px;
+    border-top:1px dashed #e5e9f2;
+  }
+  .my-card-actions button{
+    min-width:0!important;
+    height:30px!important;
+    padding:0 10px!important;
+    border-radius:9px!important;
+    font-size:12px!important;
+    line-height:1!important;
+  }
+  .my-card-actions .edit-btn{background:#eef2ff!important;color:#3730a3!important;}
+  .my-card-actions .delete-btn{background:#fee2e2!important;color:#b91c1c!important;}
 </style>
 
 </head>
@@ -3692,65 +3722,30 @@ body.travel-editing .travel-mode-note{display:block;background:#fff7ed;color:#c2
 </script>
 
 
-<script id="travel-expense-action-policy-final">
-(function(){
- if(window.__travelExpenseActionPolicyFinalInstalled)return;
- window.__travelExpenseActionPolicyFinalInstalled=true;
- let selectedId=null, selectedStatus='', originalLeft=null, originalRight=null;
- const safe=(fn,d=null)=>{try{return fn()}catch(e){return d}};
- const hasClient=o=>!!(o&&typeof o.from==='function');
- function findDb(scope){if(!scope)return null;const names=['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];for(const n of names){const v=safe(()=>scope[n]);if(hasClient(v))return v}for(const k of safe(()=>Object.keys(scope),[])){if(k==='supabase')continue;const v=safe(()=>scope[k]);if(hasClient(v))return v}return null}
- function db(){return findDb(safe(()=>window.parent))||findDb(window)}
- function pick(o,ks){for(const k of ks){if(o&&o[k]!==undefined&&o[k]!==null&&o[k]!=='')return o[k]}return ''}
- function sess(){return safe(()=>window.portalSession)||safe(()=>window.parent&&window.parent.portalSession)||safe(()=>window.parent&&window.parent.__PORTAL_SESSION__)||safe(()=>JSON.parse(sessionStorage.getItem('portalSession')||'null'))||safe(()=>JSON.parse(localStorage.getItem('portalSession')||'null'))||{}}
- function companyId(){const s=sess(),u=s.user||s.currentUser||s.profile||s,e=s.employee||s.employeeInfo||s.matchedEmployee||{},c=s.company||s.activeCompany||{};return s.activeCompanyId||s.companyId||s.company_id||pick(c,['id','company_id','companyId'])||pick(u,['company_id','companyId'])||pick(e,['company_id','companyId'])||''}
- function employeeNo(){const s=sess(),u=s.user||s.currentUser||s.profile||s,e=s.employee||s.employeeInfo||s.matchedEmployee||{};return pick(e,['employee_no','employeeNo'])||pick(u,['employee_no','employeeNo'])||''}
- const $=id=>document.getElementById(id);
- const val=id=>{const e=$(id);return e?e.value:''};
- const num=v=>Number(v||0)||0;
- const moneyNum=t=>Number(String(t||'').replace(/[^\d.-]/g,''))||0;
- function actions(){return document.querySelector('.form-panel .actions')}
- function buttons(){const a=actions();return a?Array.from(a.querySelectorAll('button')):[]}
- function ensureNote(){const a=actions();if(!a||document.getElementById('travelModeNote'))return;const n=document.createElement('div');n.id='travelModeNote';n.className='travel-mode-note';a.parentElement.insertBefore(n,a)}
- function note(t){ensureNote();const n=$('travelModeNote');if(n)n.textContent=t||''}
- function showActions(show){const a=actions();if(a)a.classList.toggle('is-hidden',!show)}
- function remember(){const b=buttons();if(b[0]&&!originalLeft)originalLeft=b[0].onclick;if(b[1]&&!originalRight)originalRight=b[1].onclick}
- function setBtns(l,r,lh,rh){remember();const b=buttons();if(b[0]){b[0].textContent=l;b[0].onclick=lh}if(b[1]){b[1].textContent=r;b[1].onclick=rh}}
- function modeNew(){selectedId=null;selectedStatus='';document.body.classList.remove('travel-viewing','travel-editing');showActions(true);note('');setBtns('임시저장','제출하기',originalLeft||window.saveTravelExpenseDraft||null,originalRight||window.submitTravelExpense||null)}
- function modeView(st,id){selectedId=id;selectedStatus=st;document.body.classList.add('travel-viewing');document.body.classList.remove('travel-editing');showActions(false);note('조회모드입니다. 수정하려면 카드의 수정 버튼을 눌러주세요.')}
- function modeEdit(st,id){selectedId=id;selectedStatus=st;document.body.classList.remove('travel-viewing');document.body.classList.add('travel-editing');showActions(true);if(st==='임시저장'){note('임시저장 건 수정모드입니다. 계속 작성 후 임시저장 또는 제출할 수 있습니다.');setBtns('임시저장','제출하기',()=>updateCurrent('임시저장','임시저장되었습니다.'),()=>updateCurrent('검토대기','제출되었습니다.'))}else if(st==='검토대기'){note('검토대기 건 수정모드입니다. 변경 후 저장하거나 취소할 수 있습니다.');setBtns('취소','저장',()=>cancelEdit(),()=>updateCurrent('검토대기','저장되었습니다.'))}else{showActions(false);note('해당 상태에서는 수정할 수 없습니다.')}}
- function idFromCard(card){if(!card)return'';if(card.dataset&&card.dataset.requestId)return card.dataset.requestId;const raw=card.getAttribute('onclick')||card.innerHTML||'';const m=raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);return m?m[0]:''}
- function statusFromCard(card){const t=card?card.textContent:'';if(t.includes('지급완료'))return'지급완료';if(t.includes('지출결의완료'))return'지출결의완료';if(t.includes('검토완료'))return'검토완료';if(t.includes('검토중'))return'검토중';if(t.includes('검토대기'))return'검토대기';if(t.includes('임시저장'))return'임시저장';return''}
- function collectRoutes(){return Array.from(document.querySelectorAll('#routeSegments .route-row')).map((row,i)=>{const ins=row.querySelectorAll('input');return{sort_order:i+1,from_place:ins[0]?ins[0].value:'',to_place:ins[1]?ins[1].value:'',distance_km:num(ins[2]?ins[2].value:0)}}).filter(r=>r.from_place||r.to_place||r.distance_km)}
- function collectItems(){return Array.from(document.querySelectorAll('#costList .cost-row')).map(row=>{const s=row.querySelectorAll('select'),a=row.querySelector('input[type="number"]');return{item_type:s[0]?s[0].value:'',pay_type:s[1]?s[1].value:'',amount:num(a?a.value:0),memo:''}}).filter(i=>i.item_type||i.pay_type||i.amount)}
- function payload(st){if(typeof window.calcAll==='function')window.calcAll();return{applicant_name:val('applicantName'),applicant_employee_no:employeeNo(),division_name:val('applicantDivision'),team_name:val('applicantTeam'),trip_type:val('tripType')||'출장',trip_date:val('tripDate')||null,transport:val('transport')||'자차',request_date:val('requestDate')||new Date().toISOString().slice(0,10),voucher_date:val('voucherDateDisplay')||null,payment_due_date:val('paymentDueDateDisplay')||null,status:st,total_amount:moneyNum(($('#totalCost')||{}).textContent),corp_card_amount:moneyNum(($('#corpCost')||{}).textContent),personal_amount:moneyNum(($('#personalCost')||{}).textContent),fuel_amount:moneyNum(($('#fuelCost')||{}).textContent),total_distance_km:num(val('distance')),gas_price:num(val('gasPrice')),fuel_efficiency:num(val('efficiency')),round_unit:num(val('roundUnit'))||1}}
- async function updateCurrent(st,msg){const client=db(),cid=companyId();if(!client||!cid||!selectedId){alert('수정할 신청건을 찾지 못했습니다.');return}const main=await client.from('travel_expense_requests').update(payload(st)).eq('id',selectedId).eq('company_id',cid);if(main.error){console.error('[TravelExpense] update error',main.error);alert('저장 중 오류가 발생했습니다: '+main.error.message);return}await client.from('travel_expense_items').delete().eq('company_id',cid).eq('request_id',selectedId);await client.from('travel_expense_routes').delete().eq('company_id',cid).eq('request_id',selectedId);const routes=collectRoutes().map(r=>({...r,company_id:cid,request_id:selectedId}));if(routes.length)await client.from('travel_expense_routes').insert(routes);const items=collectItems().map(i=>({...i,company_id:cid,request_id:selectedId}));if(items.length)await client.from('travel_expense_items').insert(items);if(typeof window.loadMyRequests==='function')await window.loadMyRequests();if(typeof window.loadAdminRequests==='function')await window.loadAdminRequests();const id=selectedId;setTimeout(decorateCards,200);if(typeof window.loadTravelExpenseRequest==='function')setTimeout(()=>window.loadTravelExpenseRequest(id),250);modeView(st,id);alert(msg||'저장되었습니다.')}
- function cancelEdit(){const id=selectedId,st=selectedStatus;modeView(st,id);if(id&&typeof window.loadTravelExpenseRequest==='function')setTimeout(()=>window.loadTravelExpenseRequest(id),100)}
- window.startTravelExpenseEdit=async function(id,st){if(!id)return;if(st!=='임시저장'&&st!=='검토대기'){modeView(st,id);return}if(typeof window.loadTravelExpenseRequest==='function')await window.loadTravelExpenseRequest(id);modeEdit(st,id);window.scrollTo({top:0,behavior:'smooth'})}
- window.deleteTravelExpenseRequest=async function(id){const client=db(),cid=companyId();if(!client||!cid||!id){alert('삭제할 신청건을 찾지 못했습니다.');return}if(!confirm('선택한 출장비 신청건을 삭제하시겠습니까?'))return;await client.from('travel_expense_items').delete().eq('company_id',cid).eq('request_id',id);await client.from('travel_expense_routes').delete().eq('company_id',cid).eq('request_id',id);await client.from('travel_expense_attachments').delete().eq('company_id',cid).eq('request_id',id);const res=await client.from('travel_expense_requests').delete().eq('id',id).eq('company_id',cid);if(res.error){alert('삭제 중 오류가 발생했습니다: '+res.error.message);return}if(typeof window.loadMyRequests==='function')await window.loadMyRequests();if(typeof window.loadAdminRequests==='function')await window.loadAdminRequests();if(typeof window.resetTravelExpenseNewForm==='function')window.resetTravelExpenseNewForm();else if(typeof window.newRequest==='function')window.newRequest();modeNew();setTimeout(decorateCards,200);alert('삭제되었습니다.')}
- function decorateCards(){document.querySelectorAll('.submission-scroll .list-card').forEach(card=>{const id=idFromCard(card),st=statusFromCard(card);if(id&&!card.dataset.requestId)card.dataset.requestId=id;const old=card.querySelector('.my-card-actions');if(old)old.remove();if(!id||!(st==='임시저장'||st==='검토대기'))return;const box=document.createElement('div');box.className='my-card-actions';box.onclick=e=>e.stopPropagation();box.innerHTML='<button type="button" class="edit-btn">수정</button><button type="button" class="delete-btn">삭제</button>';box.querySelector('.edit-btn').onclick=e=>{e.stopPropagation();window.startTravelExpenseEdit(id,st)};box.querySelector('.delete-btn').onclick=e=>{e.stopPropagation();window.deleteTravelExpenseRequest(id)};card.appendChild(box)})}
- let clickBound=false;
- function bindCardClick(){if(clickBound)return;clickBound=true;document.addEventListener('click',e=>{const card=e.target.closest('.submission-scroll .list-card');if(!card)return;if(e.target.closest('.my-card-actions,button'))return;const id=idFromCard(card),st=statusFromCard(card);if(id)setTimeout(()=>modeView(st,id),120)},true)}
- function bindNew(){document.querySelectorAll('button').forEach(btn=>{const label=(btn.textContent||'').trim();if(label.includes('신규 작성')&&!btn.dataset.actionPolicyBound){btn.dataset.actionPolicyBound='1';btn.addEventListener('click',()=>setTimeout(()=>modeNew(),120),true)}})}
- function patchReload(){['loadMyRequests','submitTravelExpense','saveTravelExpenseDraft'].forEach(name=>{const fn=window[name];if(typeof fn!=='function'||fn.__actionPolicyPatched)return;const wrapped=async function(){const r=await fn.apply(this,arguments);setTimeout(decorateCards,250);return r};wrapped.__actionPolicyPatched=true;window[name]=wrapped})}
- function init(){ensureNote();remember();bindCardClick();bindNew();patchReload();decorateCards();setTimeout(()=>{if(!selectedId)modeNew();decorateCards()},300)}
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
- setTimeout(init,800);setTimeout(decorateCards,1500);
-})();
-</script>
 
-
-<script id="travel-expense-live-card-refresh-fix">
+<script id="travel-expense-rollback-clean-card-handler">
 (function(){
-  if(window.__travelExpenseLiveCardRefreshFixInstalled) return;
-  window.__travelExpenseLiveCardRefreshFixInstalled = true;
+  if(window.__travelExpenseRollbackCleanCardHandlerInstalled) return;
+  window.__travelExpenseRollbackCleanCardHandlerInstalled = true;
+
+  let selectedId = null;
+  let selectedStatus = '';
+  let loadingId = null;
+  let loadingAt = 0;
+  let loadingPromise = null;
+  let originalLeftClick = null;
+  let originalRightClick = null;
 
   const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
   const hasClient = obj => !!(obj && typeof obj.from === 'function');
 
   function findDb(scope){
     if(!scope) return null;
-    const names = ['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];
+    const names = [
+      'supabaseClient','supabase_client','sb','db','database',
+      'portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB',
+      '__supabaseClient','__SUPABASE_CLIENT__','client'
+    ];
     for(const name of names){
       const value = safe(()=>scope[name]);
       if(hasClient(value)) return value;
@@ -3763,7 +3758,7 @@ body.travel-editing .travel-mode-note{display:block;background:#fff7ed;color:#c2
     return null;
   }
 
-  function db(){
+  function getDb(){
     return findDb(safe(()=>window.parent)) || findDb(window);
   }
 
@@ -3774,7 +3769,7 @@ body.travel-editing .travel-mode-note{display:block;background:#fff7ed;color:#c2
     return '';
   }
 
-  function session(){
+  function getSession(){
     return safe(()=>window.portalSession) ||
       safe(()=>window.parent && window.parent.portalSession) ||
       safe(()=>window.parent && window.parent.__PORTAL_SESSION__) ||
@@ -3783,8 +3778,8 @@ body.travel-editing .travel-mode-note{display:block;background:#fff7ed;color:#c2
       {};
   }
 
-  function companyId(){
-    const s = session();
+  function getCompanyId(){
+    const s = getSession();
     const user = s.user || s.currentUser || s.profile || s;
     const emp = s.employee || s.employeeInfo || s.matchedEmployee || {};
     const company = s.company || s.activeCompany || {};
@@ -3794,12 +3789,17 @@ body.travel-editing .travel-mode-note{display:block;background:#fff7ed;color:#c2
       pick(emp, ['company_id','companyId']) || '';
   }
 
-  function employeeNo(){
-    const s = session();
+  function getEmployeeNo(){
+    const s = getSession();
     const user = s.user || s.currentUser || s.profile || s;
     const emp = s.employee || s.employeeInfo || s.matchedEmployee || {};
     return pick(emp, ['employee_no','employeeNo']) || pick(user, ['employee_no','employeeNo']) || '';
   }
+
+  function $(id){ return document.getElementById(id); }
+  function val(id){ const el = $(id); return el ? el.value : ''; }
+  function num(v){ return Number(v || 0) || 0; }
+  function moneyNum(text){ return Number(String(text || '').replace(/[^\d.-]/g,'')) || 0; }
 
   function money(value){
     if(typeof window.money === 'function') return window.money(value || 0);
@@ -3812,40 +3812,283 @@ body.travel-editing .travel-mode-note{display:block;background:#fff7ed;color:#c2
     }[m]));
   }
 
+  function getActions(){ return document.querySelector('.form-panel .actions'); }
+  function getActionButtons(){
+    const actions = getActions();
+    return actions ? Array.from(actions.querySelectorAll('button')) : [];
+  }
+
+  function ensureNote(){
+    const actions = getActions();
+    if(!actions || document.getElementById('travelModeNote')) return;
+    const note = document.createElement('div');
+    note.id = 'travelModeNote';
+    note.className = 'travel-mode-note';
+    actions.parentElement.insertBefore(note, actions);
+  }
+
+  function setNote(text){
+    ensureNote();
+    const note = document.getElementById('travelModeNote');
+    if(note) note.textContent = text || '';
+  }
+
+  function showActions(show){
+    const actions = getActions();
+    if(actions) actions.classList.toggle('is-hidden', !show);
+  }
+
+  function rememberOriginalButtons(){
+    const buttons = getActionButtons();
+    if(buttons[0] && !originalLeftClick) originalLeftClick = buttons[0].onclick;
+    if(buttons[1] && !originalRightClick) originalRightClick = buttons[1].onclick;
+  }
+
+  function setButtons(leftText, rightText, leftHandler, rightHandler){
+    rememberOriginalButtons();
+    const buttons = getActionButtons();
+    if(buttons[0]){
+      buttons[0].textContent = leftText;
+      buttons[0].onclick = leftHandler;
+    }
+    if(buttons[1]){
+      buttons[1].textContent = rightText;
+      buttons[1].onclick = rightHandler;
+    }
+  }
+
+  function modeNew(){
+    selectedId = null;
+    selectedStatus = '';
+    document.body.classList.remove('travel-viewing','travel-editing');
+    showActions(true);
+    setNote('');
+    setButtons(
+      '임시저장',
+      '제출하기',
+      originalLeftClick || window.saveTravelExpenseDraft || null,
+      originalRightClick || window.submitTravelExpense || null
+    );
+  }
+
+  function modeView(id, status){
+    selectedId = id || null;
+    selectedStatus = status || '';
+    document.body.classList.add('travel-viewing');
+    document.body.classList.remove('travel-editing');
+    showActions(false);
+    setNote('조회모드입니다. 수정하려면 카드의 수정 버튼을 눌러주세요.');
+  }
+
+  function modeEdit(id, status){
+    selectedId = id;
+    selectedStatus = status || '';
+    document.body.classList.remove('travel-viewing');
+    document.body.classList.add('travel-editing');
+    showActions(true);
+
+    if(status === '임시저장'){
+      setNote('임시저장 건 수정모드입니다. 계속 작성 후 임시저장 또는 제출할 수 있습니다.');
+      setButtons(
+        '임시저장',
+        '제출하기',
+        () => updateCurrent('임시저장', '임시저장되었습니다.'),
+        () => updateCurrent('검토대기', '제출되었습니다.')
+      );
+      return;
+    }
+
+    if(status === '검토대기'){
+      setNote('검토대기 건 수정모드입니다. 변경 후 저장하거나 취소할 수 있습니다.');
+      setButtons(
+        '취소',
+        '저장',
+        () => cancelEdit(),
+        () => updateCurrent('검토대기', '저장되었습니다.')
+      );
+      return;
+    }
+
+    showActions(false);
+    setNote('해당 상태에서는 수정할 수 없습니다.');
+  }
+
+  function idFromCard(card){
+    if(!card) return '';
+    if(card.dataset && card.dataset.requestId) return card.dataset.requestId;
+    const raw = card.getAttribute('onclick') || card.innerHTML || '';
+    const match = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    return match ? match[0] : '';
+  }
+
+  function statusFromCard(card){
+    const text = card ? card.textContent : '';
+    if(text.includes('지급완료')) return '지급완료';
+    if(text.includes('지출결의완료')) return '지출결의완료';
+    if(text.includes('검토완료')) return '검토완료';
+    if(text.includes('검토중')) return '검토중';
+    if(text.includes('검토대기')) return '검토대기';
+    if(text.includes('임시저장')) return '임시저장';
+    return '';
+  }
+
   function editable(status){
     return status === '임시저장' || status === '검토대기';
   }
 
-  function cardHtml(row){
-    const status = row.status || '검토대기';
-    const title = `${escapeHtml(row.trip_type || '출장')} · ${escapeHtml(row.trip_date || '-')}`;
-    const buttons = editable(status)
-      ? `<div class="my-card-actions" onclick="event.stopPropagation()">
-           <button type="button" class="edit-btn" onclick="event.stopPropagation(); window.startTravelExpenseEdit && window.startTravelExpenseEdit('${row.id}', '${status}')">수정</button>
-           <button type="button" class="delete-btn" onclick="event.stopPropagation(); window.deleteTravelExpenseRequest && window.deleteTravelExpenseRequest('${row.id}')">삭제</button>
-         </div>`
-      : '';
-
-    return `
-      <div class="list-card" data-request-id="${row.id}">
-        <div class="list-top">
-          <div class="list-title">${title}</div>
-          <span class="status s-wait">${escapeHtml(status)}</span>
-        </div>
-        <div class="meta">
-          신청자: ${escapeHtml(row.applicant_name || '-')}<br>
-          본부/팀: ${escapeHtml(row.division_name || '-')} / ${escapeHtml(row.team_name || '-')}<br>
-          총액: ${money(row.total_amount || 0)} · 개인지급: ${money(row.personal_amount || 0)}
-        </div>
-        ${buttons}
-      </div>
-    `;
+  function clearDetailBeforeLoad(){
+    const routeBox = $('routeSegments');
+    if(routeBox) routeBox.innerHTML = '';
+    const costBox = $('costList');
+    if(costBox) costBox.innerHTML = '';
   }
 
-  async function refreshMyCards(){
-    const client = db();
-    const cid = companyId();
-    const eno = employeeNo();
+  function highlightCard(id){
+    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
+      const active = idFromCard(card) === id;
+      card.style.borderColor = active ? '#2563eb' : '';
+      card.style.boxShadow = active ? '0 0 0 2px rgba(37,99,235,.16)' : '';
+    });
+  }
+
+  async function loadDetailOnce(id){
+    if(!id || typeof window.loadTravelExpenseRequest !== 'function') return;
+
+    const now = Date.now();
+    if(loadingId === id && loadingPromise && now - loadingAt < 800){
+      return loadingPromise;
+    }
+
+    loadingId = id;
+    loadingAt = now;
+    clearDetailBeforeLoad();
+
+    loadingPromise = Promise.resolve(window.loadTravelExpenseRequest(id))
+      .finally(() => {
+        setTimeout(() => {
+          if(loadingId === id){
+            loadingId = null;
+            loadingPromise = null;
+          }
+        }, 900);
+      });
+
+    return loadingPromise;
+  }
+
+  function collectRoutes(){
+    return Array.from(document.querySelectorAll('#routeSegments .route-row')).map((row, index) => {
+      const inputs = row.querySelectorAll('input');
+      return {
+        sort_order:index + 1,
+        from_place:inputs[0] ? inputs[0].value : '',
+        to_place:inputs[1] ? inputs[1].value : '',
+        distance_km:num(inputs[2] ? inputs[2].value : 0)
+      };
+    }).filter(r => r.from_place || r.to_place || r.distance_km);
+  }
+
+  function collectItems(){
+    return Array.from(document.querySelectorAll('#costList .cost-row')).map(row => {
+      const selects = row.querySelectorAll('select');
+      const amountInput = row.querySelector('input[type="number"]');
+      return {
+        item_type:selects[0] ? selects[0].value : '',
+        pay_type:selects[1] ? selects[1].value : '',
+        amount:num(amountInput ? amountInput.value : 0),
+        memo:''
+      };
+    }).filter(i => i.item_type || i.pay_type || i.amount);
+  }
+
+  function makePayload(status){
+    if(typeof window.calcAll === 'function') window.calcAll();
+
+    return {
+      applicant_name:val('applicantName'),
+      applicant_employee_no:getEmployeeNo(),
+      division_name:val('applicantDivision'),
+      team_name:val('applicantTeam'),
+      trip_type:val('tripType') || '출장',
+      trip_date:val('tripDate') || null,
+      transport:val('transport') || '자차',
+      request_date:val('requestDate') || new Date().toISOString().slice(0,10),
+      voucher_date:val('voucherDateDisplay') || null,
+      payment_due_date:val('paymentDueDateDisplay') || null,
+      status:status,
+      total_amount:moneyNum(($('#totalCost') || {}).textContent),
+      corp_card_amount:moneyNum(($('#corpCost') || {}).textContent),
+      personal_amount:moneyNum(($('#personalCost') || {}).textContent),
+      fuel_amount:moneyNum(($('#fuelCost') || {}).textContent),
+      total_distance_km:num(val('distance')),
+      gas_price:num(val('gasPrice')),
+      fuel_efficiency:num(val('efficiency')),
+      round_unit:num(val('roundUnit')) || 1
+    };
+  }
+
+  async function updateCurrent(status, message){
+    const client = getDb();
+    const cid = getCompanyId();
+
+    if(!client || !cid || !selectedId){
+      alert('수정할 신청건을 찾지 못했습니다.');
+      return false;
+    }
+
+    const payload = makePayload(status);
+    const result = await client.from('travel_expense_requests')
+      .update(payload)
+      .eq('id', selectedId)
+      .eq('company_id', cid);
+
+    if(result.error){
+      console.error('[TravelExpense] update error', result.error, payload);
+      alert('저장 중 오류가 발생했습니다: ' + result.error.message);
+      return false;
+    }
+
+    await client.from('travel_expense_items').delete().eq('company_id', cid).eq('request_id', selectedId);
+    await client.from('travel_expense_routes').delete().eq('company_id', cid).eq('request_id', selectedId);
+
+    const routes = collectRoutes().map(r => ({...r, company_id:cid, request_id:selectedId}));
+    if(routes.length){
+      const rr = await client.from('travel_expense_routes').insert(routes);
+      if(rr.error) console.warn('[TravelExpense] route update warning', rr.error);
+    }
+
+    const items = collectItems().map(i => ({...i, company_id:cid, request_id:selectedId}));
+    if(items.length){
+      const ii = await client.from('travel_expense_items').insert(items);
+      if(ii.error) console.warn('[TravelExpense] item update warning', ii.error);
+    }
+
+    const id = selectedId;
+    const newStatus = status;
+
+    await refreshCards();
+
+    if(typeof window.loadTravelExpenseRequest === 'function'){
+      setTimeout(() => loadDetailOnce(id).then(() => modeView(id, newStatus)), 150);
+    }else{
+      modeView(id, newStatus);
+    }
+
+    alert(message || '저장되었습니다.');
+    return true;
+  }
+
+  function cancelEdit(){
+    const id = selectedId;
+    const status = selectedStatus;
+    modeView(id, status);
+    if(id) setTimeout(() => loadDetailOnce(id), 100);
+  }
+
+  async function refreshCards(){
+    const client = getDb();
+    const cid = getCompanyId();
+    const eno = getEmployeeNo();
     const box = document.querySelector('.submission-scroll');
 
     if(!client || !cid || !box) return false;
@@ -3860,515 +4103,181 @@ body.travel-editing .travel-mode-note{display:block;background:#fff7ed;color:#c2
     const res = await query;
 
     if(res.error){
-      console.error('[TravelExpense] live card refresh error', res.error);
+      console.error('[TravelExpense] card refresh error', res.error);
       return false;
     }
 
     if(!res.data || !res.data.length){
       box.innerHTML = '<div class="notice empty-state">제출 내역이 없습니다.</div>';
     }else{
-      box.innerHTML = res.data.map(cardHtml).join('');
-    }
+      box.innerHTML = res.data.map(row => {
+        const status = row.status || '검토대기';
+        const actionButtons = editable(status)
+          ? `<div class="my-card-actions" onclick="event.stopPropagation()">
+               <button type="button" class="edit-btn" data-edit-id="${row.id}" data-edit-status="${escapeHtml(status)}">수정</button>
+               <button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button>
+             </div>`
+          : '';
 
-    // 기존 정책 스크립트가 버튼을 다시 보정할 수 있게 지연 호출
-    setTimeout(() => {
-      document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
-        card.style.cursor = 'pointer';
-      });
-    }, 50);
+        return `
+          <div class="list-card" data-request-id="${row.id}">
+            <div class="list-top">
+              <div class="list-title">${escapeHtml(row.trip_type || '출장')} · ${escapeHtml(row.trip_date || '-')}</div>
+              <span class="status s-wait">${escapeHtml(status)}</span>
+            </div>
+            <div class="meta">
+              신청자: ${escapeHtml(row.applicant_name || '-')}<br>
+              본부/팀: ${escapeHtml(row.division_name || '-')} / ${escapeHtml(row.team_name || '-')}<br>
+              총액: ${money(row.total_amount || 0)} · 개인지급: ${money(row.personal_amount || 0)}
+            </div>
+            ${actionButtons}
+          </div>
+        `;
+      }).join('');
+    }
 
     return true;
   }
 
-  window.refreshTravelExpenseMyCards = refreshMyCards;
+  window.startTravelExpenseEdit = async function(id, status){
+    if(!id) return;
 
-  // action policy 내부 view mode를 외부 렌더 카드에서도 호출할 수 있게 최소 구현
-  window.__travelExpenseSetViewMode = function(id, status){
-    const actions = document.querySelector('.form-panel .actions');
-    if(actions) actions.classList.add('is-hidden');
-    document.body.classList.add('travel-viewing');
-    document.body.classList.remove('travel-editing');
-
-    let note = document.getElementById('travelModeNote');
-    if(!note && actions){
-      note = document.createElement('div');
-      note.id = 'travelModeNote';
-      note.className = 'travel-mode-note';
-      actions.parentElement.insertBefore(note, actions);
+    if(!editable(status)){
+      await loadDetailOnce(id);
+      modeView(id, status);
+      return;
     }
-    if(note) note.textContent = '조회모드입니다. 수정하려면 카드의 수정 버튼을 눌러주세요.';
+
+    await loadDetailOnce(id);
+    highlightCard(id);
+    modeEdit(id, status);
+    window.scrollTo({top:0, behavior:'smooth'});
   };
 
-  function patchAsyncFunction(name){
-    const fn = window[name];
-    if(typeof fn !== 'function' || fn.__liveRefreshPatched) return;
+  window.deleteTravelExpenseRequest = async function(id){
+    const client = getDb();
+    const cid = getCompanyId();
 
-    const wrapped = async function(){
-      const result = await fn.apply(this, arguments);
-      setTimeout(refreshMyCards, 200);
-      setTimeout(refreshMyCards, 800);
-      return result;
-    };
-
-    wrapped.__liveRefreshPatched = true;
-    window[name] = wrapped;
-  }
-
-  function patchFunctions(){
-    patchAsyncFunction('saveTravelExpenseDraft');
-    patchAsyncFunction('submitTravelExpense');
-
-    const originalDelete = window.deleteTravelExpenseRequest;
-    if(typeof originalDelete === 'function' && !originalDelete.__liveRefreshPatched){
-      const wrappedDelete = async function(){
-        const result = await originalDelete.apply(this, arguments);
-        setTimeout(refreshMyCards, 150);
-        setTimeout(refreshMyCards, 600);
-        return result;
-      };
-      wrappedDelete.__liveRefreshPatched = true;
-      window.deleteTravelExpenseRequest = wrappedDelete;
+    if(!client || !cid || !id){
+      alert('삭제할 신청건을 찾지 못했습니다.');
+      return;
     }
 
-    const originalStartEdit = window.startTravelExpenseEdit;
-    if(typeof originalStartEdit === 'function' && !originalStartEdit.__liveRefreshPatched){
-      const wrappedStartEdit = async function(){
-        const result = await originalStartEdit.apply(this, arguments);
-        return result;
-      };
-      wrappedStartEdit.__liveRefreshPatched = true;
-      window.startTravelExpenseEdit = wrappedStartEdit;
+    if(!confirm('선택한 출장비 신청건을 삭제하시겠습니까?')) return;
+
+    await client.from('travel_expense_items').delete().eq('company_id', cid).eq('request_id', id);
+    await client.from('travel_expense_routes').delete().eq('company_id', cid).eq('request_id', id);
+    await client.from('travel_expense_attachments').delete().eq('company_id', cid).eq('request_id', id);
+
+    const res = await client.from('travel_expense_requests')
+      .delete()
+      .eq('id', id)
+      .eq('company_id', cid);
+
+    if(res.error){
+      console.error('[TravelExpense] delete error', res.error);
+      alert('삭제 중 오류가 발생했습니다: ' + res.error.message);
+      return;
     }
-  }
 
-  function patchAlertsForSubmitAndDelete(){
-    // 기존 함수 내부에서 alert 후 화면이 멈춰 보이는 것을 막기 위해
-    // 확인창이 닫힌 뒤 카드 영역만 즉시 동기화
-    const originalAlert = window.alert;
-    if(originalAlert && !originalAlert.__travelExpenseRefreshPatched){
-      const patchedAlert = function(message){
-        const result = originalAlert.apply(window, arguments);
-        const text = String(message || '');
-        if(text.includes('제출') || text.includes('저장') || text.includes('삭제')){
-          setTimeout(refreshMyCards, 100);
-          setTimeout(refreshMyCards, 700);
-        }
-        return result;
-      };
-      patchedAlert.__travelExpenseRefreshPatched = true;
-      window.alert = patchedAlert;
+    if(selectedId === id) {
+      selectedId = null;
+      selectedStatus = '';
+      if(typeof window.resetTravelExpenseNewForm === 'function') window.resetTravelExpenseNewForm();
+      else if(typeof window.newRequest === 'function') window.newRequest();
+      modeNew();
     }
-  }
 
-  function init(){
-    patchFunctions();
-    patchAlertsForSubmitAndDelete();
-    setTimeout(refreshMyCards, 300);
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', init);
-  }else{
-    init();
-  }
-
-  setTimeout(init, 800);
-  setTimeout(init, 1500);
-})();
-</script>
-
-
-<script id="travel-expense-detail-load-dedupe-fix">
-(function(){
-  if(window.__travelExpenseDetailLoadDedupeFixInstalled) return;
-  window.__travelExpenseDetailLoadDedupeFixInstalled = true;
-
-  let lastRequestId = null;
-  let lastStartedAt = 0;
-  let lastPromise = null;
-
-  function clearRouteBoxBeforeLoad(){
-    const box = document.getElementById('routeSegments');
-    if(box) box.innerHTML = '';
-  }
-
-  function cleanupDuplicateRoutes(){
-    const box = document.getElementById('routeSegments');
-    if(!box) return;
-
-    const rows = Array.from(box.querySelectorAll('.route-row'));
-    const seen = new Set();
-
-    rows.forEach(row => {
-      const inputs = row.querySelectorAll('input');
-      const key = [
-        inputs[0] ? inputs[0].value.trim() : '',
-        inputs[1] ? inputs[1].value.trim() : '',
-        inputs[2] ? inputs[2].value.trim() : ''
-      ].join('||');
-
-      if(seen.has(key)){
-        row.remove();
-      }else{
-        seen.add(key);
-      }
-    });
-
-    if(typeof window.updateRoute === 'function'){
-      window.updateRoute();
-    }
-  }
-
-  function install(){
-    const original = window.loadTravelExpenseRequest;
-    if(typeof original !== 'function' || original.__dedupeFixed) return;
-
-    const wrapped = async function(requestId){
-      const now = Date.now();
-
-      // 카드 클릭 시 capture 이벤트 + inline onclick이 연속 호출되는 경우 두 번째 호출 차단
-      if(requestId && requestId === lastRequestId && now - lastStartedAt < 700){
-        return lastPromise;
-      }
-
-      lastRequestId = requestId;
-      lastStartedAt = now;
-
-      clearRouteBoxBeforeLoad();
-
-      lastPromise = Promise.resolve(original.apply(this, arguments))
-        .then(result => {
-          setTimeout(cleanupDuplicateRoutes, 50);
-          setTimeout(cleanupDuplicateRoutes, 200);
-          return result;
-        })
-        .finally(() => {
-          setTimeout(() => {
-            if(lastRequestId === requestId){
-              lastRequestId = null;
-              lastPromise = null;
-            }
-          }, 800);
-        });
-
-      return lastPromise;
-    };
-
-    wrapped.__dedupeFixed = true;
-    window.loadTravelExpenseRequest = wrapped;
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', install);
-  }else{
-    install();
-  }
-
-  // 다른 스크립트가 나중에 loadTravelExpenseRequest를 다시 감싸는 경우 대비
-  setTimeout(install, 300);
-  setTimeout(install, 1000);
-  setTimeout(install, 2000);
-})();
-</script>
-
-
-<script id="travel-expense-new-request-reset-fix">
-(function(){
-  if(window.__travelExpenseNewRequestResetFixInstalled) return;
-  window.__travelExpenseNewRequestResetFixInstalled = true;
-
-  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
-  function $(id){ return document.getElementById(id); }
-  function setVal(id, value){ const el = $(id); if(el) el.value = value ?? ''; }
-  function setText(id, value){ const el = $(id); if(el) el.textContent = value ?? ''; }
-  function today(){ return new Date().toISOString().slice(0,10); }
-
-  function getSession(){
-    return safe(()=>window.portalSession) ||
-      safe(()=>window.parent && window.parent.portalSession) ||
-      safe(()=>window.parent && window.parent.__PORTAL_SESSION__) ||
-      safe(()=>JSON.parse(sessionStorage.getItem('portalSession') || 'null')) ||
-      safe(()=>JSON.parse(localStorage.getItem('portalSession') || 'null')) ||
-      {};
-  }
-
-  function pick(obj, keys){
-    for(const key of keys){
-      if(obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
-    }
-    return '';
-  }
-
-  function profileFromSession(){
-    const s = getSession();
-    const user = s.user || s.currentUser || s.profile || s;
-    const emp = s.employee || s.employeeInfo || s.matchedEmployee || s.staff || s.employeeProfile || {};
-    return {
-      name: pick(emp, ['name','employee_name','employeeName']) || pick(user, ['name','display_name','displayName']),
-      division: pick(emp, ['division_name','divisionName']) || pick(emp, ['division_code','divisionCode']),
-      team: pick(emp, ['team_name','teamName']) || pick(emp, ['team_code','teamCode'])
-    };
-  }
-
-  function clearRoutes(){
-    const box = $('routeSegments');
-    if(box) box.innerHTML = '';
-    if(typeof window.updateRoute === 'function') window.updateRoute();
-  }
-
-  function clearItems(){
-    const box = $('costList');
-    if(box) box.innerHTML = '';
-  }
-
-  function clearMoney(){
-    ['fuelCost','totalCost','corpCost','personalCost'].forEach(id => {
-      if($(id) && typeof window.money === 'function') setText(id, window.money(0));
-      else setText(id, '0원');
-    });
-  }
-
-  function clearActiveCards(){
-    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
-      card.style.borderColor = '';
-      card.style.boxShadow = '';
-      card.classList.remove('active','selected');
-    });
-  }
-
-  function resetButtonsToNew(){
-    document.body.classList.remove('travel-viewing','travel-editing');
-    const actions = document.querySelector('.form-panel .actions');
-    if(actions) actions.classList.remove('is-hidden');
-    const note = document.getElementById('travelModeNote');
-    if(note) note.textContent = '';
-
-    const buttons = actions ? actions.querySelectorAll('button') : [];
-    if(buttons[0]){
-      buttons[0].textContent = '임시저장';
-      if(typeof window.saveTravelExpenseDraft === 'function') buttons[0].onclick = function(){ window.saveTravelExpenseDraft(); };
-    }
-    if(buttons[1]){
-      buttons[1].textContent = '제출하기';
-      if(typeof window.submitTravelExpense === 'function') buttons[1].onclick = function(){ window.submitTravelExpense(); };
-    }
-  }
-
-  window.resetTravelExpenseNewForm = function(){
-    const p = profileFromSession();
-
-    setVal('applicantName', p.name || $('applicantName')?.value || '');
-    setVal('applicantDivision', p.division || $('applicantDivision')?.value || '');
-    setVal('applicantTeam', p.team || $('applicantTeam')?.value || '');
-    setVal('tripType', '출장');
-    setVal('tripDate', '');
-    setVal('transport', '자차');
-    setVal('requestDate', today());
-    setVal('voucherDateDisplay', '');
-    setVal('paymentDueDateDisplay', '');
-
-    clearRoutes();
-
-    setVal('distance', '');
-    setVal('gasPrice', '');
-    setVal('efficiency', '');
-    setVal('roundUnit', '1');
-
-    clearItems();
-
-    if(typeof window.calcAll === 'function') window.calcAll();
-    clearMoney();
-
-    clearActiveCards();
-    resetButtonsToNew();
-
-    safe(()=>{ window.currentRequestId = null; });
-    safe(()=>{ window.selectedRequestId = null; });
-    safe(()=>{ window.editingRequestId = null; });
-
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    await refreshCards();
+    alert('삭제되었습니다.');
   };
 
-  function patchNewRequest(){
-    const original = window.newRequest;
-    if(typeof original === 'function' && !original.__resetFixPatched){
-      const wrapped = function(){
-        safe(()=>original.apply(this, arguments));
-        setTimeout(window.resetTravelExpenseNewForm, 0);
-        setTimeout(window.resetTravelExpenseNewForm, 80);
-      };
-      wrapped.__resetFixPatched = true;
-      window.newRequest = wrapped;
-    }
+  function bindClicks(){
+    if(window.__travelExpenseRollbackCleanClickBound) return;
+    window.__travelExpenseRollbackCleanClickBound = true;
 
+    document.addEventListener('click', function(event){
+      const editBtn = event.target.closest('[data-edit-id]');
+      if(editBtn){
+        event.preventDefault();
+        event.stopPropagation();
+        window.startTravelExpenseEdit(editBtn.dataset.editId, editBtn.dataset.editStatus);
+        return;
+      }
+
+      const deleteBtn = event.target.closest('[data-delete-id]');
+      if(deleteBtn){
+        event.preventDefault();
+        event.stopPropagation();
+        window.deleteTravelExpenseRequest(deleteBtn.dataset.deleteId);
+        return;
+      }
+
+      const card = event.target.closest('.submission-scroll .list-card');
+      if(!card) return;
+      if(event.target.closest('.my-card-actions, button')) return;
+
+      const id = idFromCard(card);
+      const status = statusFromCard(card);
+      if(!id) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      loadDetailOnce(id).then(() => {
+        highlightCard(id);
+        modeView(id, status);
+      });
+    }, true);
+  }
+
+  function patchNewButton(){
     document.querySelectorAll('button').forEach(btn => {
       const label = (btn.textContent || '').trim();
-      if(label.includes('신규 작성') && !btn.dataset.resetFixBound){
-        btn.dataset.resetFixBound = '1';
-        btn.addEventListener('click', function(){
-          setTimeout(window.resetTravelExpenseNewForm, 0);
-          setTimeout(window.resetTravelExpenseNewForm, 80);
+      if(label.includes('신규 작성') && !btn.dataset.rollbackCleanNewBound){
+        btn.dataset.rollbackCleanNewBound = '1';
+        btn.addEventListener('click', () => {
+          setTimeout(() => {
+            selectedId = null;
+            selectedStatus = '';
+            modeNew();
+          }, 120);
         }, true);
       }
     });
   }
 
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', patchNewRequest);
-  else patchNewRequest();
+  function patchSaveFunctions(){
+    ['saveTravelExpenseDraft','submitTravelExpense'].forEach(name => {
+      const fn = window[name];
+      if(typeof fn !== 'function' || fn.__rollbackCleanPatched) return;
 
-  setTimeout(patchNewRequest, 300);
-  setTimeout(patchNewRequest, 1000);
-})();
-</script>
-
-
-<script id="travel-expense-card-click-load-final-fix">
-(function(){
-  if(window.__travelExpenseCardClickLoadFinalFixInstalled) return;
-  window.__travelExpenseCardClickLoadFinalFixInstalled = true;
-
-  let loadingId = null;
-  let loadingAt = 0;
-  let loadingPromise = null;
-
-  function getCardId(card){
-    if(!card) return '';
-    if(card.dataset && card.dataset.requestId) return card.dataset.requestId;
-    const raw = card.getAttribute('onclick') || card.innerHTML || '';
-    const match = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-    return match ? match[0] : '';
-  }
-
-  function getCardStatus(card){
-    const text = card ? card.textContent : '';
-    if(text.includes('지급완료')) return '지급완료';
-    if(text.includes('지출결의완료')) return '지출결의완료';
-    if(text.includes('검토완료')) return '검토완료';
-    if(text.includes('검토중')) return '검토중';
-    if(text.includes('검토대기')) return '검토대기';
-    if(text.includes('임시저장')) return '임시저장';
-    return '';
-  }
-
-  function setViewMode(status, requestId){
-    const actions = document.querySelector('.form-panel .actions');
-    if(actions) actions.classList.add('is-hidden');
-
-    document.body.classList.add('travel-viewing');
-    document.body.classList.remove('travel-editing');
-
-    let note = document.getElementById('travelModeNote');
-    if(!note && actions){
-      note = document.createElement('div');
-      note.id = 'travelModeNote';
-      note.className = 'travel-mode-note';
-      actions.parentElement.insertBefore(note, actions);
-    }
-    if(note) note.textContent = '조회모드입니다. 수정하려면 카드의 수정 버튼을 눌러주세요.';
-
-    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
-      const active = getCardId(card) === requestId;
-      card.style.borderColor = active ? '#2563eb' : '';
-      card.style.boxShadow = active ? '0 0 0 2px rgba(37,99,235,.16)' : '';
-    });
-  }
-
-  async function loadDetailOnce(requestId){
-    if(!requestId || typeof window.loadTravelExpenseRequest !== 'function') return;
-
-    const now = Date.now();
-    if(loadingId === requestId && now - loadingAt < 800 && loadingPromise){
-      return loadingPromise;
-    }
-
-    loadingId = requestId;
-    loadingAt = now;
-
-    // 상세 로드 전에 컨테이너를 먼저 비워 중복 append를 원천 차단
-    const routeBox = document.getElementById('routeSegments');
-    if(routeBox) routeBox.innerHTML = '';
-    const costBox = document.getElementById('costList');
-    if(costBox) costBox.innerHTML = '';
-
-    loadingPromise = Promise.resolve(window.loadTravelExpenseRequest(requestId))
-      .finally(() => {
-        setTimeout(() => {
-          if(loadingId === requestId){
-            loadingId = null;
-            loadingPromise = null;
-          }
-        }, 900);
-      });
-
-    return loadingPromise;
-  }
-
-  function bindCardClick(){
-    if(window.__travelExpenseCardClickLoadBound) return;
-    window.__travelExpenseCardClickLoadBound = true;
-
-    document.addEventListener('click', function(event){
-      const card = event.target.closest('.submission-scroll .list-card');
-      if(!card) return;
-
-      // 수정/삭제 버튼은 카드 조회 클릭으로 처리하지 않음
-      if(event.target.closest('.my-card-actions, button')) return;
-
-      const requestId = getCardId(card);
-      const status = getCardStatus(card);
-      if(!requestId) return;
-
-      event.preventDefault();
-      event.stopImmediatePropagation();
-
-      loadDetailOnce(requestId).then(() => {
-        setViewMode(status, requestId);
-      });
-    }, true);
-  }
-
-  function patchEditButton(){
-    const original = window.startTravelExpenseEdit;
-    if(typeof original !== 'function' || original.__cardClickLoadFinalPatched) return;
-
-    const wrapped = async function(requestId, status){
-      if(requestId){
-        await loadDetailOnce(requestId);
-      }
-      return original.apply(this, arguments);
-    };
-
-    wrapped.__cardClickLoadFinalPatched = true;
-    window.startTravelExpenseEdit = wrapped;
-  }
-
-  function patchCards(){
-    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
-      const id = getCardId(card);
-      if(id && !card.dataset.requestId) card.dataset.requestId = id;
-
-      // 이전 파일에서 남은 inline onclick이 있으면 제거하고 delegated click만 사용
-      if(card.getAttribute('onclick')) card.removeAttribute('onclick');
-
-      card.style.cursor = 'pointer';
+      const wrapped = async function(){
+        const result = await fn.apply(this, arguments);
+        setTimeout(refreshCards, 200);
+        setTimeout(refreshCards, 800);
+        return result;
+      };
+      wrapped.__rollbackCleanPatched = true;
+      window[name] = wrapped;
     });
   }
 
   function init(){
-    bindCardClick();
-    patchEditButton();
-    patchCards();
+    ensureNote();
+    rememberOriginalButtons();
+    bindClicks();
+    patchNewButton();
+    patchSaveFunctions();
+    refreshCards().then(() => {
+      if(!selectedId) modeNew();
+    });
   }
 
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', init);
-  }else{
-    init();
-  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 
-  setTimeout(init, 300);
-  setTimeout(init, 1000);
-  setTimeout(init, 2000);
+  setTimeout(init, 800);
 })();
 </script>
 
