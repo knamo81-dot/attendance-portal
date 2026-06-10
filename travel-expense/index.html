@@ -1427,7 +1427,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 
-<style id="travel-expense-rollback-clean-card-handler-style">
+<style id="travel-expense-clean-controller-style">
   .form-panel .actions.is-hidden{display:none!important;}
   .travel-mode-note{
     display:none;
@@ -3291,461 +3291,27 @@
 </script>
 
 
-<script id="travel-expense-card-detail-loader">
+
+<script id="travel-expense-clean-controller">
 (function(){
-  if (window.__travelExpenseCardDetailLoaderInstalled) return;
-  window.__travelExpenseCardDetailLoaderInstalled = true;
-
-  function safe(fn, fallback){
-    try { return fn(); } catch(e){ return fallback; }
-  }
-
-  function hasClient(obj){
-    return !!(obj && typeof obj.from === 'function');
-  }
-
-  function findDb(scope){
-    if(!scope) return null;
-    const names = ['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];
-    for(const name of names){
-      const value = safe(()=>scope[name], null);
-      if(hasClient(value)) return value;
-    }
-    const keys = safe(()=>Object.keys(scope), []);
-    for(const key of keys){
-      if(key === 'supabase') continue;
-      const value = safe(()=>scope[key], null);
-      if(hasClient(value)) return value;
-    }
-    return null;
-  }
-
-  function getDb(){
-    return findDb(safe(()=>window.parent, null)) || findDb(window);
-  }
-
-  function pick(obj, keys){
-    for(const key of keys){
-      if(obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
-    }
-    return '';
-  }
-
-  function getSession(){
-    return (
-      safe(()=>window.portalSession, null) ||
-      safe(()=>window.parent && window.parent.portalSession, null) ||
-      safe(()=>window.parent && window.parent.__PORTAL_SESSION__, null) ||
-      safe(()=>JSON.parse(sessionStorage.getItem('portalSession') || 'null'), null) ||
-      safe(()=>JSON.parse(localStorage.getItem('portalSession') || 'null'), null) ||
-      {}
-    );
-  }
-
-  function getCompanyId(){
-    const session = getSession();
-    const user = session.user || session.currentUser || session.profile || session;
-    const employee = session.employee || session.employeeInfo || session.matchedEmployee || {};
-    const company = session.company || session.activeCompany || {};
-    return (
-      session.activeCompanyId ||
-      session.companyId ||
-      session.company_id ||
-      pick(company, ['id','company_id','companyId']) ||
-      pick(user, ['company_id','companyId']) ||
-      pick(employee, ['company_id','companyId']) ||
-      ''
-    );
-  }
-
-  function setVal(id, value){
-    const el = document.getElementById(id);
-    if(el) el.value = value || '';
-  }
-
-  function setMoney(id, value){
-    const el = document.getElementById(id);
-    if(!el) return;
-    if(typeof window.money === 'function') el.textContent = window.money(value || 0);
-    else el.textContent = Math.round(Number(value || 0)).toLocaleString('ko-KR') + '원';
-  }
-
-  function readRequestIdFromCard(card){
-    if(!card) return '';
-    if(card.dataset && card.dataset.requestId) return card.dataset.requestId;
-    const onclick = card.getAttribute('onclick') || '';
-    const match = onclick.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-    return match ? match[0] : '';
-  }
-
-  function markActive(requestId){
-    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
-      const active = readRequestIdFromCard(card) === requestId;
-      card.style.borderColor = active ? '#2563eb' : '';
-      card.style.boxShadow = active ? '0 0 0 2px rgba(37,99,235,.16)' : '';
-    });
-  }
-
-  async function loadRoutes(db, companyId, requestId){
-    const routeBox = document.getElementById('routeSegments');
-    if(routeBox) routeBox.innerHTML = '';
-
-    const res = await db.from('travel_expense_routes')
-      .select('*')
-      .eq('company_id', companyId)
-      .eq('request_id', requestId)
-      .order('sort_order', { ascending:true });
-
-    if(res.error){
-      console.warn('[TravelExpense] routes load warning', res.error);
-      if(typeof window.updateRoute === 'function') window.updateRoute();
-      return;
-    }
-
-    if(res.data && res.data.length && typeof window.addRouteSegment === 'function'){
-      res.data.forEach(route => window.addRouteSegment(route.from_place || '', route.to_place || '', route.distance_km || ''));
-    }else if(typeof window.updateRoute === 'function'){
-      window.updateRoute();
-    }
-  }
-
-  async function loadItems(db, companyId, requestId){
-    const itemBox = document.getElementById('costList');
-    if(itemBox) itemBox.innerHTML = '';
-
-    const res = await db.from('travel_expense_items')
-      .select('*')
-      .eq('company_id', companyId)
-      .eq('request_id', requestId)
-      .order('created_at', { ascending:true });
-
-    if(res.error){
-      console.warn('[TravelExpense] items load warning', res.error);
-      return;
-    }
-
-    if(res.data && res.data.length && typeof window.addCostRow === 'function'){
-      res.data.forEach(item => window.addCostRow(item.item_type || '', item.pay_type || '', item.amount || ''));
-    }
-  }
-
-  window.loadTravelExpenseRequest = async function(requestId){
-    const db = getDb();
-    const companyId = getCompanyId();
-
-    if(!db){
-      alert('DB 연결 정보를 찾지 못했습니다.');
-      console.error('[TravelExpense] DB client not found');
-      return;
-    }
-    if(!companyId){
-      alert('회사 정보를 확인하지 못했습니다.');
-      return;
-    }
-    if(!requestId){
-      alert('선택한 제출 내역의 ID를 찾지 못했습니다.');
-      return;
-    }
-
-    const res = await db.from('travel_expense_requests')
-      .select('*')
-      .eq('id', requestId)
-      .eq('company_id', companyId)
-      .maybeSingle();
-
-    if(res.error || !res.data){
-      alert('선택한 제출 내역을 불러오지 못했습니다.');
-      console.error('[TravelExpense] detail load error', res.error);
-      return;
-    }
-
-    const row = res.data;
-    markActive(requestId);
-
-    setVal('applicantName', row.applicant_name || '');
-    setVal('applicantDivision', row.division_name || row.division_code || '');
-    setVal('applicantTeam', row.team_name || row.team_code || '');
-    setVal('tripType', row.trip_type || '출장');
-    setVal('tripDate', row.trip_date || '');
-    setVal('transport', row.transport || '자차');
-    setVal('requestDate', row.request_date || '');
-    setVal('voucherDateDisplay', row.voucher_date || '');
-    setVal('paymentDueDateDisplay', row.payment_due_date || '');
-
-    setVal('distance', row.total_distance_km || row.distance_km || '');
-    setVal('gasPrice', row.gas_price || '');
-    setVal('efficiency', row.fuel_efficiency || '');
-    setVal('roundUnit', row.round_unit || 1);
-
-    await loadRoutes(db, companyId, requestId);
-    await loadItems(db, companyId, requestId);
-
-    if(typeof window.toggleFuel === 'function') window.toggleFuel();
-    if(typeof window.calcAll === 'function') window.calcAll();
-
-    setMoney('fuelCost', row.fuel_amount || 0);
-    setMoney('totalCost', row.total_amount || 0);
-    setMoney('corpCost', row.corp_card_amount || 0);
-    setMoney('personalCost', row.personal_amount || 0);
-
-    window.scrollTo({ top:0, behavior:'smooth' });
-  };
-
-  document.addEventListener('click', function(event){
-    const card = event.target.closest('.submission-scroll .list-card');
-    if(!card) return;
-
-    if(event.target.closest('.card-menu, .kebab-btn, .dropdown-menu, button')) return;
-
-    const requestId = readRequestIdFromCard(card);
-    if(requestId){
-      event.preventDefault();
-      window.loadTravelExpenseRequest(requestId);
-    }
-  }, true);
-
-  function prepareCards(){
-    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
-      const id = readRequestIdFromCard(card);
-      if(id && !card.dataset.requestId) card.dataset.requestId = id;
-      card.style.cursor = 'pointer';
-    });
-  }
-
-  const observer = new MutationObserver(prepareCards);
-  function start(){
-    prepareCards();
-    const box = document.querySelector('.submission-scroll');
-    if(box) observer.observe(box, { childList:true, subtree:true });
-  }
-
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-  else start();
-})();
-</script>
-
-
-<script id="travel-expense-fuel-fields-db-fix">
-(function(){
-  if(window.__travelExpenseFuelFieldsDbFixInstalled) return;
-  window.__travelExpenseFuelFieldsDbFixInstalled = true;
-
-  function safe(fn, fallback){ try { return fn(); } catch(e){ return fallback; } }
-  function hasClient(obj){ return !!(obj && typeof obj.from === 'function'); }
-
-  function findDb(scope){
-    if(!scope) return null;
-    const names = ['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];
-    for(const name of names){
-      const value = safe(()=>scope[name], null);
-      if(hasClient(value)) return value;
-    }
-    const keys = safe(()=>Object.keys(scope), []);
-    for(const key of keys){
-      if(key === 'supabase') continue;
-      const value = safe(()=>scope[key], null);
-      if(hasClient(value)) return value;
-    }
-    return null;
-  }
-
-  function getDb(){
-    return findDb(safe(()=>window.parent, null)) || findDb(window);
-  }
-
-  function pick(obj, keys){
-    for(const key of keys){
-      if(obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
-    }
-    return '';
-  }
-
-  function getSession(){
-    return (
-      safe(()=>window.portalSession, null) ||
-      safe(()=>window.parent && window.parent.portalSession, null) ||
-      safe(()=>window.parent && window.parent.__PORTAL_SESSION__, null) ||
-      safe(()=>JSON.parse(sessionStorage.getItem('portalSession') || 'null'), null) ||
-      safe(()=>JSON.parse(localStorage.getItem('portalSession') || 'null'), null) ||
-      {}
-    );
-  }
-
-  function getCompanyId(){
-    const session = getSession();
-    const user = session.user || session.currentUser || session.profile || session;
-    const employee = session.employee || session.employeeInfo || session.matchedEmployee || {};
-    const company = session.company || session.activeCompany || {};
-    return (
-      session.activeCompanyId ||
-      session.companyId ||
-      session.company_id ||
-      pick(company, ['id','company_id','companyId']) ||
-      pick(user, ['company_id','companyId']) ||
-      pick(employee, ['company_id','companyId']) ||
-      ''
-    );
-  }
-
-  function getEmployeeNo(){
-    const session = getSession();
-    const user = session.user || session.currentUser || session.profile || session;
-    const employee = session.employee || session.employeeInfo || session.matchedEmployee || {};
-    return pick(employee, ['employee_no','employeeNo']) || pick(user, ['employee_no','employeeNo']) || '';
-  }
-
-  function value(id){
-    const el = document.getElementById(id);
-    return el ? el.value : '';
-  }
-
-  function setValue(id, val){
-    const el = document.getElementById(id);
-    if(el) el.value = val === null || val === undefined ? '' : val;
-  }
-
-  function fuelPayload(){
-    return {
-      total_distance_km: Number(value('distance') || 0) || 0,
-      gas_price: Number(value('gasPrice') || 0) || 0,
-      fuel_efficiency: Number(value('efficiency') || 0) || 0,
-      round_unit: Number(value('roundUnit') || 1) || 1,
-      fuel_amount: Number(String((document.getElementById('fuelCost') || {}).textContent || '').replace(/[^\d.-]/g,'')) || 0
-    };
-  }
-
-  async function updateLatestFuelFields(){
-    const db = getDb();
-    const companyId = getCompanyId();
-    const employeeNo = getEmployeeNo();
-    if(!db || !companyId || !employeeNo) return;
-
-    const latest = await db.from('travel_expense_requests')
-      .select('id')
-      .eq('company_id', companyId)
-      .eq('applicant_employee_no', employeeNo)
-      .order('created_at', { ascending:false })
-      .limit(1)
-      .maybeSingle();
-
-    if(latest.error || !latest.data) {
-      console.warn('[TravelExpense] latest request lookup warning', latest.error);
-      return;
-    }
-
-    const upd = await db.from('travel_expense_requests')
-      .update(fuelPayload())
-      .eq('id', latest.data.id)
-      .eq('company_id', companyId);
-
-    if(upd.error) console.warn('[TravelExpense] fuel fields update warning', upd.error);
-  }
-
-  async function loadFuelFields(requestId){
-    const db = getDb();
-    const companyId = getCompanyId();
-    if(!db || !companyId || !requestId) return;
-
-    const res = await db.from('travel_expense_requests')
-      .select('total_distance_km, gas_price, fuel_efficiency, round_unit, fuel_amount')
-      .eq('id', requestId)
-      .eq('company_id', companyId)
-      .maybeSingle();
-
-    if(res.error || !res.data) {
-      console.warn('[TravelExpense] fuel fields load warning', res.error);
-      return;
-    }
-
-    const row = res.data;
-    setValue('distance', row.total_distance_km || '');
-    setValue('gasPrice', row.gas_price || '');
-    setValue('efficiency', row.fuel_efficiency || '');
-    setValue('roundUnit', row.round_unit || 1);
-
-    if(typeof window.calcAll === 'function') window.calcAll();
-
-    const fuelEl = document.getElementById('fuelCost');
-    if(fuelEl && typeof window.money === 'function') fuelEl.textContent = window.money(row.fuel_amount || 0);
-  }
-
-  // 기존 저장 함수 래핑: 저장 성공 후 새 컬럼 보정 update
-  function wrapSave(name){
-    const original = window[name];
-    if(typeof original !== 'function' || original.__fuelWrapped) return;
-
-    const wrapped = async function(){
-      const result = await original.apply(this, arguments);
-      setTimeout(updateLatestFuelFields, 250);
-      setTimeout(updateLatestFuelFields, 900);
-      return result;
-    };
-    wrapped.__fuelWrapped = true;
-    window[name] = wrapped;
-  }
-
-  // 기존 카드 상세 로드 함수 래핑: 로드 후 유류 입력값 보정
-  function wrapDetail(){
-    const original = window.loadTravelExpenseRequest;
-    if(typeof original !== 'function' || original.__fuelWrapped) return;
-
-    const wrapped = async function(requestId){
-      const result = await original.apply(this, arguments);
-      await loadFuelFields(requestId);
-      return result;
-    };
-    wrapped.__fuelWrapped = true;
-    window.loadTravelExpenseRequest = wrapped;
-  }
-
-  function init(){
-    wrapSave('submitTravelExpense');
-    wrapSave('saveTravelExpenseDraft');
-    wrapDetail();
-
-    // 카드 클릭 이벤트가 직접 loader를 안 타는 경우 대비
-    document.addEventListener('click', function(event){
-      const card = event.target.closest('.submission-scroll .list-card');
-      if(!card || event.target.closest('.card-menu, .kebab-btn, .dropdown-menu, button')) return;
-      const id = (card.dataset && card.dataset.requestId) || ((card.getAttribute('onclick') || '').match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i) || [])[0];
-      if(id) setTimeout(()=>loadFuelFields(id), 350);
-    }, true);
-  }
-
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
-
-  // 다른 스크립트가 나중에 함수를 덮어쓸 수 있어 한 번 더 래핑
-  setTimeout(init, 500);
-  setTimeout(init, 1500);
-})();
-</script>
-
-
-
-<script id="travel-expense-rollback-clean-card-handler">
-(function(){
-  if(window.__travelExpenseRollbackCleanCardHandlerInstalled) return;
-  window.__travelExpenseRollbackCleanCardHandlerInstalled = true;
+  if(window.__travelExpenseCleanControllerInstalled) return;
+  window.__travelExpenseCleanControllerInstalled = true;
 
   let selectedId = null;
   let selectedStatus = '';
+  let originalSaveDraft = null;
+  let originalSubmit = null;
+  let originalNewRequest = null;
   let loadingId = null;
-  let loadingAt = 0;
   let loadingPromise = null;
-  let originalLeftClick = null;
-  let originalRightClick = null;
+  let loadingAt = 0;
 
   const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
   const hasClient = obj => !!(obj && typeof obj.from === 'function');
 
   function findDb(scope){
     if(!scope) return null;
-    const names = [
-      'supabaseClient','supabase_client','sb','db','database',
-      'portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB',
-      '__supabaseClient','__SUPABASE_CLIENT__','client'
-    ];
+    const names = ['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];
     for(const name of names){
       const value = safe(()=>scope[name]);
       if(hasClient(value)) return value;
@@ -3758,9 +3324,7 @@
     return null;
   }
 
-  function getDb(){
-    return findDb(safe(()=>window.parent)) || findDb(window);
-  }
+  function db(){ return findDb(safe(()=>window.parent)) || findDb(window); }
 
   function pick(obj, keys){
     for(const key of keys){
@@ -3769,7 +3333,7 @@
     return '';
   }
 
-  function getSession(){
+  function session(){
     return safe(()=>window.portalSession) ||
       safe(()=>window.parent && window.parent.portalSession) ||
       safe(()=>window.parent && window.parent.__PORTAL_SESSION__) ||
@@ -3778,75 +3342,77 @@
       {};
   }
 
-  function getCompanyId(){
-    const s = getSession();
+  function profile(){
+    const s = session();
     const user = s.user || s.currentUser || s.profile || s;
-    const emp = s.employee || s.employeeInfo || s.matchedEmployee || {};
+    const emp = s.employee || s.employeeInfo || s.matchedEmployee || s.staff || s.employeeProfile || {};
     const company = s.company || s.activeCompany || {};
-    return s.activeCompanyId || s.companyId || s.company_id ||
-      pick(company, ['id','company_id','companyId']) ||
-      pick(user, ['company_id','companyId']) ||
-      pick(emp, ['company_id','companyId']) || '';
-  }
-
-  function getEmployeeNo(){
-    const s = getSession();
-    const user = s.user || s.currentUser || s.profile || s;
-    const emp = s.employee || s.employeeInfo || s.matchedEmployee || {};
-    return pick(emp, ['employee_no','employeeNo']) || pick(user, ['employee_no','employeeNo']) || '';
+    return {
+      companyId: s.activeCompanyId || s.companyId || s.company_id ||
+        pick(company, ['id','company_id','companyId']) ||
+        pick(user, ['company_id','companyId']) ||
+        pick(emp, ['company_id','companyId']) || '',
+      employeeNo: pick(emp, ['employee_no','employeeNo']) || pick(user, ['employee_no','employeeNo']) || '',
+      name: pick(emp, ['name','employee_name','employeeName']) || pick(user, ['name','display_name','displayName']),
+      division: pick(emp, ['division_name','divisionName']) || pick(emp, ['division_code','divisionCode']),
+      team: pick(emp, ['team_name','teamName']) || pick(emp, ['team_code','teamCode'])
+    };
   }
 
   function $(id){ return document.getElementById(id); }
   function val(id){ const el = $(id); return el ? el.value : ''; }
-  function num(v){ return Number(v || 0) || 0; }
+  function setVal(id, value){ const el = $(id); if(el) el.value = value ?? ''; }
+  function num(value){ return Number(value || 0) || 0; }
   function moneyNum(text){ return Number(String(text || '').replace(/[^\d.-]/g,'')) || 0; }
-
+  function today(){ return new Date().toISOString().slice(0,10); }
   function money(value){
     if(typeof window.money === 'function') return window.money(value || 0);
     return Math.round(Number(value || 0)).toLocaleString('ko-KR') + '원';
   }
-
+  function setMoney(id, value){
+    const el = $(id);
+    if(el) el.textContent = money(value || 0);
+  }
   function escapeHtml(value){
     return String(value ?? '').replace(/[&<>"']/g, m => ({
       '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
     }[m]));
   }
 
-  function getActions(){ return document.querySelector('.form-panel .actions'); }
-  function getActionButtons(){
-    const actions = getActions();
-    return actions ? Array.from(actions.querySelectorAll('button')) : [];
+  function actions(){ return document.querySelector('.form-panel .actions'); }
+  function actionButtons(){
+    const a = actions();
+    return a ? Array.from(a.querySelectorAll('button')) : [];
   }
 
   function ensureNote(){
-    const actions = getActions();
-    if(!actions || document.getElementById('travelModeNote')) return;
+    const a = actions();
+    if(!a || $('travelModeNote')) return;
     const note = document.createElement('div');
     note.id = 'travelModeNote';
     note.className = 'travel-mode-note';
-    actions.parentElement.insertBefore(note, actions);
+    a.parentElement.insertBefore(note, a);
   }
 
   function setNote(text){
     ensureNote();
-    const note = document.getElementById('travelModeNote');
+    const note = $('travelModeNote');
     if(note) note.textContent = text || '';
   }
 
   function showActions(show){
-    const actions = getActions();
-    if(actions) actions.classList.toggle('is-hidden', !show);
+    const a = actions();
+    if(a) a.classList.toggle('is-hidden', !show);
   }
 
-  function rememberOriginalButtons(){
-    const buttons = getActionButtons();
-    if(buttons[0] && !originalLeftClick) originalLeftClick = buttons[0].onclick;
-    if(buttons[1] && !originalRightClick) originalRightClick = buttons[1].onclick;
+  function rememberOriginals(){
+    if(!originalSaveDraft && typeof window.saveTravelExpenseDraft === 'function') originalSaveDraft = window.saveTravelExpenseDraft;
+    if(!originalSubmit && typeof window.submitTravelExpense === 'function') originalSubmit = window.submitTravelExpense;
+    if(!originalNewRequest && typeof window.newRequest === 'function') originalNewRequest = window.newRequest;
   }
 
-  function setButtons(leftText, rightText, leftHandler, rightHandler){
-    rememberOriginalButtons();
-    const buttons = getActionButtons();
+  function setActionButtons(leftText, rightText, leftHandler, rightHandler){
+    const buttons = actionButtons();
     if(buttons[0]){
       buttons[0].textContent = leftText;
       buttons[0].onclick = leftHandler;
@@ -3863,11 +3429,11 @@
     document.body.classList.remove('travel-viewing','travel-editing');
     showActions(true);
     setNote('');
-    setButtons(
+    setActionButtons(
       '임시저장',
       '제출하기',
-      originalLeftClick || window.saveTravelExpenseDraft || null,
-      originalRightClick || window.submitTravelExpense || null
+      function(){ if(originalSaveDraft) originalSaveDraft(); },
+      function(){ if(originalSubmit) originalSubmit(); }
     );
   }
 
@@ -3889,22 +3455,22 @@
 
     if(status === '임시저장'){
       setNote('임시저장 건 수정모드입니다. 계속 작성 후 임시저장 또는 제출할 수 있습니다.');
-      setButtons(
+      setActionButtons(
         '임시저장',
         '제출하기',
-        () => updateCurrent('임시저장', '임시저장되었습니다.'),
-        () => updateCurrent('검토대기', '제출되었습니다.')
+        function(){ updateCurrent('임시저장', '임시저장되었습니다.'); },
+        function(){ updateCurrent('검토대기', '제출되었습니다.'); }
       );
       return;
     }
 
     if(status === '검토대기'){
       setNote('검토대기 건 수정모드입니다. 변경 후 저장하거나 취소할 수 있습니다.');
-      setButtons(
+      setActionButtons(
         '취소',
         '저장',
-        () => cancelEdit(),
-        () => updateCurrent('검토대기', '저장되었습니다.')
+        function(){ cancelEdit(); },
+        function(){ updateCurrent('검토대기', '저장되었습니다.'); }
       );
       return;
     }
@@ -3913,12 +3479,63 @@
     setNote('해당 상태에서는 수정할 수 없습니다.');
   }
 
-  function idFromCard(card){
-    if(!card) return '';
-    if(card.dataset && card.dataset.requestId) return card.dataset.requestId;
-    const raw = card.getAttribute('onclick') || card.innerHTML || '';
-    const match = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-    return match ? match[0] : '';
+  function editable(status){ return status === '임시저장' || status === '검토대기'; }
+
+  function clearForm(keepProfile=true){
+    const p = profile();
+
+    setVal('applicantName', keepProfile ? (p.name || '') : '');
+    setVal('applicantDivision', keepProfile ? (p.division || '') : '');
+    setVal('applicantTeam', keepProfile ? (p.team || '') : '');
+
+    setVal('tripType', '출장');
+    setVal('tripDate', '');
+    setVal('transport', '자차');
+    setVal('requestDate', today());
+    setVal('voucherDateDisplay', '');
+    setVal('paymentDueDateDisplay', '');
+
+    const routeBox = $('routeSegments');
+    if(routeBox) routeBox.innerHTML = '';
+    const costBox = $('costList');
+    if(costBox) costBox.innerHTML = '';
+
+    setVal('distance', '');
+    setVal('gasPrice', '');
+    setVal('efficiency', '');
+    setVal('roundUnit', '1');
+
+    if($('routeLabel')) $('routeLabel').textContent = '-';
+    if($('fullRouteLabel')) $('fullRouteLabel').textContent = '-';
+
+    setMoney('fuelCost', 0);
+    setMoney('totalCost', 0);
+    setMoney('corpCost', 0);
+    setMoney('personalCost', 0);
+
+    if(typeof window.toggleFuel === 'function') window.toggleFuel();
+    if(typeof window.calcAll === 'function') window.calcAll();
+
+    setMoney('fuelCost', 0);
+    setMoney('totalCost', 0);
+    setMoney('corpCost', 0);
+    setMoney('personalCost', 0);
+
+    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
+      card.style.borderColor = '';
+      card.style.boxShadow = '';
+      card.classList.remove('active','selected');
+    });
+  }
+
+  window.resetTravelExpenseNewForm = function(){
+    clearForm(true);
+    modeNew();
+    window.scrollTo({top:0, behavior:'smooth'});
+  };
+
+  function cardId(card){
+    return card && card.dataset ? card.dataset.requestId || '' : '';
   }
 
   function statusFromCard(card){
@@ -3932,49 +3549,166 @@
     return '';
   }
 
-  function editable(status){
-    return status === '임시저장' || status === '검토대기';
-  }
-
-  function clearDetailBeforeLoad(){
-    const routeBox = $('routeSegments');
-    if(routeBox) routeBox.innerHTML = '';
-    const costBox = $('costList');
-    if(costBox) costBox.innerHTML = '';
-  }
-
   function highlightCard(id){
     document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
-      const active = idFromCard(card) === id;
+      const active = cardId(card) === id;
       card.style.borderColor = active ? '#2563eb' : '';
       card.style.boxShadow = active ? '0 0 0 2px rgba(37,99,235,.16)' : '';
     });
   }
 
-  async function loadDetailOnce(id){
-    if(!id || typeof window.loadTravelExpenseRequest !== 'function') return;
+  async function refreshCards(){
+    const client = db();
+    const p = profile();
+    const box = document.querySelector('.submission-scroll');
+
+    if(!client || !p.companyId || !box) return false;
+
+    let query = client.from('travel_expense_requests')
+      .select('*')
+      .eq('company_id', p.companyId)
+      .order('created_at', { ascending:false });
+
+    if(p.employeeNo) query = query.eq('applicant_employee_no', p.employeeNo);
+
+    const res = await query;
+
+    if(res.error){
+      console.error('[TravelExpense] refresh card error', res.error);
+      return false;
+    }
+
+    if(!res.data || !res.data.length){
+      box.innerHTML = '<div class="notice empty-state">제출 내역이 없습니다.</div>';
+      return true;
+    }
+
+    box.innerHTML = res.data.map(row => {
+      const status = row.status || '검토대기';
+      const buttons = editable(status)
+        ? `<div class="my-card-actions" onclick="event.stopPropagation()">
+             <button type="button" class="edit-btn" data-edit-id="${row.id}" data-edit-status="${escapeHtml(status)}">수정</button>
+             <button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button>
+           </div>`
+        : '';
+
+      return `
+        <div class="list-card" data-request-id="${row.id}">
+          <div class="list-top">
+            <div class="list-title">${escapeHtml(row.trip_type || '출장')} · ${escapeHtml(row.trip_date || '-')}</div>
+            <span class="status s-wait">${escapeHtml(status)}</span>
+          </div>
+          <div class="meta">
+            신청자: ${escapeHtml(row.applicant_name || '-')}<br>
+            본부/팀: ${escapeHtml(row.division_name || '-')} / ${escapeHtml(row.team_name || '-')}<br>
+            총액: ${money(row.total_amount || 0)} · 개인지급: ${money(row.personal_amount || 0)}
+          </div>
+          ${buttons}
+        </div>
+      `;
+    }).join('');
+
+    return true;
+  }
+
+  window.loadMyRequests = refreshCards;
+
+  async function loadDetail(id){
+    const client = db();
+    const p = profile();
+
+    if(!client || !p.companyId || !id) return false;
 
     const now = Date.now();
-    if(loadingId === id && loadingPromise && now - loadingAt < 800){
+    if(loadingId === id && loadingPromise && now - loadingAt < 500){
       return loadingPromise;
     }
 
     loadingId = id;
     loadingAt = now;
-    clearDetailBeforeLoad();
 
-    loadingPromise = Promise.resolve(window.loadTravelExpenseRequest(id))
-      .finally(() => {
-        setTimeout(() => {
-          if(loadingId === id){
-            loadingId = null;
-            loadingPromise = null;
-          }
-        }, 900);
-      });
+    loadingPromise = (async function(){
+      clearForm(false);
+
+      const req = await client.from('travel_expense_requests')
+        .select('*')
+        .eq('id', id)
+        .eq('company_id', p.companyId)
+        .maybeSingle();
+
+      if(req.error || !req.data){
+        console.error('[TravelExpense] detail load error', req.error);
+        alert('선택한 제출 내역을 불러오지 못했습니다.');
+        return false;
+      }
+
+      const row = req.data;
+
+      setVal('applicantName', row.applicant_name || '');
+      setVal('applicantDivision', row.division_name || row.division_code || '');
+      setVal('applicantTeam', row.team_name || row.team_code || '');
+      setVal('tripType', row.trip_type || '출장');
+      setVal('tripDate', row.trip_date || '');
+      setVal('transport', row.transport || '자차');
+      setVal('requestDate', row.request_date || '');
+      setVal('voucherDateDisplay', row.voucher_date || '');
+      setVal('paymentDueDateDisplay', row.payment_due_date || '');
+      setVal('distance', row.total_distance_km || row.distance_km || '');
+      setVal('gasPrice', row.gas_price || '');
+      setVal('efficiency', row.fuel_efficiency || '');
+      setVal('roundUnit', row.round_unit || 1);
+
+      const routeBox = $('routeSegments');
+      if(routeBox) routeBox.innerHTML = '';
+
+      const routes = await client.from('travel_expense_routes')
+        .select('*')
+        .eq('company_id', p.companyId)
+        .eq('request_id', id)
+        .order('sort_order', { ascending:true });
+
+      if(!routes.error && routes.data && routes.data.length && typeof window.addRouteSegment === 'function'){
+        routes.data.forEach(route => window.addRouteSegment(route.from_place || '', route.to_place || '', route.distance_km || ''));
+      }else if(typeof window.updateRoute === 'function'){
+        window.updateRoute();
+      }
+
+      const costBox = $('costList');
+      if(costBox) costBox.innerHTML = '';
+
+      const items = await client.from('travel_expense_items')
+        .select('*')
+        .eq('company_id', p.companyId)
+        .eq('request_id', id)
+        .order('created_at', { ascending:true });
+
+      if(!items.error && items.data && items.data.length && typeof window.addCostRow === 'function'){
+        items.data.forEach(item => window.addCostRow(item.item_type || '', item.pay_type || '', item.amount || ''));
+      }
+
+      if(typeof window.toggleFuel === 'function') window.toggleFuel();
+      if(typeof window.calcAll === 'function') window.calcAll();
+
+      setMoney('fuelCost', row.fuel_amount || 0);
+      setMoney('totalCost', row.total_amount || 0);
+      setMoney('corpCost', row.corp_card_amount || 0);
+      setMoney('personalCost', row.personal_amount || 0);
+
+      highlightCard(id);
+      return true;
+    })().finally(() => {
+      setTimeout(() => {
+        if(loadingId === id){
+          loadingId = null;
+          loadingPromise = null;
+        }
+      }, 600);
+    });
 
     return loadingPromise;
   }
+
+  window.loadTravelExpenseRequest = loadDetail;
 
   function collectRoutes(){
     return Array.from(document.querySelectorAll('#routeSegments .route-row')).map((row, index) => {
@@ -4001,21 +3735,21 @@
     }).filter(i => i.item_type || i.pay_type || i.amount);
   }
 
-  function makePayload(status){
+  function payload(status){
     if(typeof window.calcAll === 'function') window.calcAll();
 
     return {
       applicant_name:val('applicantName'),
-      applicant_employee_no:getEmployeeNo(),
+      applicant_employee_no:profile().employeeNo,
       division_name:val('applicantDivision'),
       team_name:val('applicantTeam'),
       trip_type:val('tripType') || '출장',
       trip_date:val('tripDate') || null,
       transport:val('transport') || '자차',
-      request_date:val('requestDate') || new Date().toISOString().slice(0,10),
+      request_date:val('requestDate') || today(),
       voucher_date:val('voucherDateDisplay') || null,
       payment_due_date:val('paymentDueDateDisplay') || null,
-      status:status,
+      status,
       total_amount:moneyNum(($('#totalCost') || {}).textContent),
       corp_card_amount:moneyNum(($('#corpCost') || {}).textContent),
       personal_amount:moneyNum(($('#personalCost') || {}).textContent),
@@ -4028,151 +3762,80 @@
   }
 
   async function updateCurrent(status, message){
-    const client = getDb();
-    const cid = getCompanyId();
+    const client = db();
+    const p = profile();
 
-    if(!client || !cid || !selectedId){
+    if(!client || !p.companyId || !selectedId){
       alert('수정할 신청건을 찾지 못했습니다.');
-      return false;
+      return;
     }
 
-    const payload = makePayload(status);
-    const result = await client.from('travel_expense_requests')
-      .update(payload)
+    const main = await client.from('travel_expense_requests')
+      .update(payload(status))
       .eq('id', selectedId)
-      .eq('company_id', cid);
+      .eq('company_id', p.companyId);
 
-    if(result.error){
-      console.error('[TravelExpense] update error', result.error, payload);
-      alert('저장 중 오류가 발생했습니다: ' + result.error.message);
-      return false;
+    if(main.error){
+      console.error('[TravelExpense] update error', main.error);
+      alert('저장 중 오류가 발생했습니다: ' + main.error.message);
+      return;
     }
 
-    await client.from('travel_expense_items').delete().eq('company_id', cid).eq('request_id', selectedId);
-    await client.from('travel_expense_routes').delete().eq('company_id', cid).eq('request_id', selectedId);
+    await client.from('travel_expense_items').delete().eq('company_id', p.companyId).eq('request_id', selectedId);
+    await client.from('travel_expense_routes').delete().eq('company_id', p.companyId).eq('request_id', selectedId);
 
-    const routes = collectRoutes().map(r => ({...r, company_id:cid, request_id:selectedId}));
-    if(routes.length){
-      const rr = await client.from('travel_expense_routes').insert(routes);
-      if(rr.error) console.warn('[TravelExpense] route update warning', rr.error);
-    }
+    const routes = collectRoutes().map(r => ({...r, company_id:p.companyId, request_id:selectedId}));
+    if(routes.length) await client.from('travel_expense_routes').insert(routes);
 
-    const items = collectItems().map(i => ({...i, company_id:cid, request_id:selectedId}));
-    if(items.length){
-      const ii = await client.from('travel_expense_items').insert(items);
-      if(ii.error) console.warn('[TravelExpense] item update warning', ii.error);
-    }
+    const items = collectItems().map(i => ({...i, company_id:p.companyId, request_id:selectedId}));
+    if(items.length) await client.from('travel_expense_items').insert(items);
 
     const id = selectedId;
-    const newStatus = status;
-
     await refreshCards();
-
-    if(typeof window.loadTravelExpenseRequest === 'function'){
-      setTimeout(() => loadDetailOnce(id).then(() => modeView(id, newStatus)), 150);
-    }else{
-      modeView(id, newStatus);
-    }
-
+    await loadDetail(id);
+    modeView(id, status);
     alert(message || '저장되었습니다.');
-    return true;
   }
 
   function cancelEdit(){
     const id = selectedId;
     const status = selectedStatus;
-    modeView(id, status);
-    if(id) setTimeout(() => loadDetailOnce(id), 100);
-  }
-
-  async function refreshCards(){
-    const client = getDb();
-    const cid = getCompanyId();
-    const eno = getEmployeeNo();
-    const box = document.querySelector('.submission-scroll');
-
-    if(!client || !cid || !box) return false;
-
-    let query = client.from('travel_expense_requests')
-      .select('*')
-      .eq('company_id', cid)
-      .order('created_at', { ascending:false });
-
-    if(eno) query = query.eq('applicant_employee_no', eno);
-
-    const res = await query;
-
-    if(res.error){
-      console.error('[TravelExpense] card refresh error', res.error);
-      return false;
-    }
-
-    if(!res.data || !res.data.length){
-      box.innerHTML = '<div class="notice empty-state">제출 내역이 없습니다.</div>';
-    }else{
-      box.innerHTML = res.data.map(row => {
-        const status = row.status || '검토대기';
-        const actionButtons = editable(status)
-          ? `<div class="my-card-actions" onclick="event.stopPropagation()">
-               <button type="button" class="edit-btn" data-edit-id="${row.id}" data-edit-status="${escapeHtml(status)}">수정</button>
-               <button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button>
-             </div>`
-          : '';
-
-        return `
-          <div class="list-card" data-request-id="${row.id}">
-            <div class="list-top">
-              <div class="list-title">${escapeHtml(row.trip_type || '출장')} · ${escapeHtml(row.trip_date || '-')}</div>
-              <span class="status s-wait">${escapeHtml(status)}</span>
-            </div>
-            <div class="meta">
-              신청자: ${escapeHtml(row.applicant_name || '-')}<br>
-              본부/팀: ${escapeHtml(row.division_name || '-')} / ${escapeHtml(row.team_name || '-')}<br>
-              총액: ${money(row.total_amount || 0)} · 개인지급: ${money(row.personal_amount || 0)}
-            </div>
-            ${actionButtons}
-          </div>
-        `;
-      }).join('');
-    }
-
-    return true;
+    loadDetail(id).then(() => modeView(id, status));
   }
 
   window.startTravelExpenseEdit = async function(id, status){
     if(!id) return;
 
     if(!editable(status)){
-      await loadDetailOnce(id);
+      await loadDetail(id);
       modeView(id, status);
       return;
     }
 
-    await loadDetailOnce(id);
-    highlightCard(id);
+    await loadDetail(id);
     modeEdit(id, status);
     window.scrollTo({top:0, behavior:'smooth'});
   };
 
   window.deleteTravelExpenseRequest = async function(id){
-    const client = getDb();
-    const cid = getCompanyId();
+    const client = db();
+    const p = profile();
 
-    if(!client || !cid || !id){
+    if(!client || !p.companyId || !id){
       alert('삭제할 신청건을 찾지 못했습니다.');
       return;
     }
 
     if(!confirm('선택한 출장비 신청건을 삭제하시겠습니까?')) return;
 
-    await client.from('travel_expense_items').delete().eq('company_id', cid).eq('request_id', id);
-    await client.from('travel_expense_routes').delete().eq('company_id', cid).eq('request_id', id);
-    await client.from('travel_expense_attachments').delete().eq('company_id', cid).eq('request_id', id);
+    await client.from('travel_expense_items').delete().eq('company_id', p.companyId).eq('request_id', id);
+    await client.from('travel_expense_routes').delete().eq('company_id', p.companyId).eq('request_id', id);
+    await client.from('travel_expense_attachments').delete().eq('company_id', p.companyId).eq('request_id', id);
 
     const res = await client.from('travel_expense_requests')
       .delete()
       .eq('id', id)
-      .eq('company_id', cid);
+      .eq('company_id', p.companyId);
 
     if(res.error){
       console.error('[TravelExpense] delete error', res.error);
@@ -4180,21 +3843,15 @@
       return;
     }
 
-    if(selectedId === id) {
-      selectedId = null;
-      selectedStatus = '';
-      if(typeof window.resetTravelExpenseNewForm === 'function') window.resetTravelExpenseNewForm();
-      else if(typeof window.newRequest === 'function') window.newRequest();
-      modeNew();
-    }
-
     await refreshCards();
+    clearForm(true);
+    modeNew();
     alert('삭제되었습니다.');
   };
 
   function bindClicks(){
-    if(window.__travelExpenseRollbackCleanClickBound) return;
-    window.__travelExpenseRollbackCleanClickBound = true;
+    if(window.__travelExpenseCleanControllerClickBound) return;
+    window.__travelExpenseCleanControllerClickBound = true;
 
     document.addEventListener('click', function(event){
       const editBtn = event.target.closest('[data-edit-id]');
@@ -4205,11 +3862,11 @@
         return;
       }
 
-      const deleteBtn = event.target.closest('[data-delete-id]');
-      if(deleteBtn){
+      const delBtn = event.target.closest('[data-delete-id]');
+      if(delBtn){
         event.preventDefault();
         event.stopPropagation();
-        window.deleteTravelExpenseRequest(deleteBtn.dataset.deleteId);
+        window.deleteTravelExpenseRequest(delBtn.dataset.deleteId);
         return;
       }
 
@@ -4217,61 +3874,62 @@
       if(!card) return;
       if(event.target.closest('.my-card-actions, button')) return;
 
-      const id = idFromCard(card);
+      const id = cardId(card);
       const status = statusFromCard(card);
+
       if(!id) return;
 
       event.preventDefault();
       event.stopPropagation();
 
-      loadDetailOnce(id).then(() => {
-        highlightCard(id);
-        modeView(id, status);
-      });
+      loadDetail(id).then(() => modeView(id, status));
     }, true);
   }
 
-  function patchNewButton(){
-    document.querySelectorAll('button').forEach(btn => {
-      const label = (btn.textContent || '').trim();
-      if(label.includes('신규 작성') && !btn.dataset.rollbackCleanNewBound){
-        btn.dataset.rollbackCleanNewBound = '1';
-        btn.addEventListener('click', () => {
-          setTimeout(() => {
-            selectedId = null;
-            selectedStatus = '';
-            modeNew();
-          }, 120);
-        }, true);
-      }
-    });
+  function patchNewRequest(){
+    window.newRequest = function(){
+      clearForm(true);
+      modeNew();
+      window.scrollTo({top:0, behavior:'smooth'});
+    };
   }
 
   function patchSaveFunctions(){
-    ['saveTravelExpenseDraft','submitTravelExpense'].forEach(name => {
-      const fn = window[name];
-      if(typeof fn !== 'function' || fn.__rollbackCleanPatched) return;
-
-      const wrapped = async function(){
-        const result = await fn.apply(this, arguments);
+    if(originalSaveDraft && !originalSaveDraft.__cleanControllerRefreshPatched){
+      const orig = originalSaveDraft;
+      originalSaveDraft = async function(){
+        const result = await orig.apply(this, arguments);
         setTimeout(refreshCards, 200);
         setTimeout(refreshCards, 800);
+        clearForm(true);
+        modeNew();
         return result;
       };
-      wrapped.__rollbackCleanPatched = true;
-      window[name] = wrapped;
-    });
+      originalSaveDraft.__cleanControllerRefreshPatched = true;
+      window.saveTravelExpenseDraft = originalSaveDraft;
+    }
+
+    if(originalSubmit && !originalSubmit.__cleanControllerRefreshPatched){
+      const orig = originalSubmit;
+      originalSubmit = async function(){
+        const result = await orig.apply(this, arguments);
+        setTimeout(refreshCards, 200);
+        setTimeout(refreshCards, 800);
+        clearForm(true);
+        modeNew();
+        return result;
+      };
+      originalSubmit.__cleanControllerRefreshPatched = true;
+      window.submitTravelExpense = originalSubmit;
+    }
   }
 
   function init(){
-    ensureNote();
-    rememberOriginalButtons();
-    bindClicks();
-    patchNewButton();
+    rememberOriginals();
+    patchNewRequest();
     patchSaveFunctions();
-    refreshCards().then(() => {
-      if(!selectedId) modeNew();
-    });
+    bindClicks();
+    refreshCards().then(() => modeNew());
   }
 
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
