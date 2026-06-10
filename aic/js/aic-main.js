@@ -1364,10 +1364,35 @@
   }
 
 
-  async function deleteRoomFromServer(room) {
+  function getCurrentRoomMember(room) {
+    var currentEmail = String(getCurrentUserEmail() || '').trim().toLowerCase();
+    if (!room || !currentEmail) return null;
+
+    return getRoomMembers(room).find(function (member) {
+      return String(member.email || member.user_email || '').trim().toLowerCase() === currentEmail;
+    }) || null;
+  }
+
+  function canLeaveRoom(room) {
+    return !!getCurrentRoomMember(room);
+  }
+
+  async function deleteWholeRoomFromServer(room) {
     var sb = getSupabaseClient();
     var companyId = getCompanyId();
     if (!sb || !companyId || !room) return;
+
+    try {
+      var readsResult = await sb
+        .from('aic_message_reads')
+        .delete()
+        .eq('company_id', companyId)
+        .eq('room_id', room.id);
+
+      if (readsResult.error) console.warn('[AIC LEAVE] read cleanup skipped:', readsResult.error);
+    } catch (error) {
+      console.warn('[AIC LEAVE] read cleanup skipped:', error);
+    }
 
     var messagesResult = await sb
       .from('aic_messages')
@@ -1394,22 +1419,88 @@
     if (roomResult.error) throw roomResult.error;
   }
 
-  async function deleteRoom(roomId) {
+  async function leaveRoomFromServer(room) {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+    var currentEmail = String(getCurrentUserEmail() || '').trim();
+    if (!sb || !companyId || !room || !currentEmail) return { deletedRoom: false };
+
+    var member = getCurrentRoomMember(room);
+    if (!member) {
+      throw new Error('현재 사용자는 이 회의방 참여자가 아닙니다.');
+    }
+
+    try {
+      var readDeleteResult = await sb
+        .from('aic_message_reads')
+        .delete()
+        .eq('company_id', companyId)
+        .eq('room_id', room.id)
+        .ilike('user_email', currentEmail);
+
+      if (readDeleteResult.error) console.warn('[AIC LEAVE] read delete skipped:', readDeleteResult.error);
+    } catch (_) {}
+
+    var deleteQuery = sb
+      .from('aic_room_members')
+      .delete()
+      .eq('company_id', companyId)
+      .eq('room_id', room.id);
+
+    if (member.id) {
+      deleteQuery = deleteQuery.eq('id', member.id);
+    } else {
+      deleteQuery = deleteQuery.ilike('user_email', currentEmail);
+    }
+
+    var memberDeleteResult = await deleteQuery;
+    if (memberDeleteResult.error) {
+      // 일부 Supabase/PostgREST 설정에서 ilike delete가 막히는 경우를 대비한 재시도
+      var fallbackDeleteResult = await sb
+        .from('aic_room_members')
+        .delete()
+        .eq('company_id', companyId)
+        .eq('room_id', room.id)
+        .eq('user_email', currentEmail);
+
+      if (fallbackDeleteResult.error) throw fallbackDeleteResult.error;
+    }
+
+    var remainingResult = await sb
+      .from('aic_room_members')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('room_id', room.id)
+      .limit(1);
+
+    if (remainingResult.error) throw remainingResult.error;
+
+    var hasRemainingMembers = Array.isArray(remainingResult.data) && remainingResult.data.length > 0;
+
+    if (!hasRemainingMembers) {
+      await deleteWholeRoomFromServer(room);
+      return { deletedRoom: true };
+    }
+
+    return { deletedRoom: false };
+  }
+
+  async function leaveRoom(roomId) {
     var room = getRoom(roomId);
     if (!room) return;
 
-    if (!isRoomCreator(room)) {
-      alert('회의방 삭제는 생성자만 할 수 있습니다.');
-      return;
-    }
+    var memberCount = getRoomMembers(room).length;
+    var message = memberCount <= 1
+      ? '이 회의방을 나가시겠습니까?\n마지막 참여자라서 회의방과 메시지가 함께 삭제됩니다.'
+      : '이 회의방을 나가시겠습니까?\n내 회의방 목록에서만 사라지고, 다른 참여자는 계속 사용할 수 있습니다.';
 
-    var ok = confirm('이 회의방을 삭제하시겠습니까?\n회의방, 참여자, 메시지가 함께 삭제됩니다.');
+    var ok = confirm(message);
     if (!ok) return;
 
     try {
-      await deleteRoomFromServer(room);
+      await leaveRoomFromServer(room);
     } catch (error) {
-      alert('회의방 삭제 실패: ' + (error?.message || 'Supabase 권한/테이블을 확인해 주세요.'));
+      alert('회의방 나가기 실패: ' + (error?.message || 'Supabase 권한/테이블을 확인해 주세요.'));
       return;
     }
 
@@ -1421,13 +1512,14 @@
       return slot && slot.roomId !== roomId;
     });
 
+    delete state.readMap[roomId];
+
     if (state.activeSlotIndex >= state.openSlots.length) {
       state.activeSlotIndex = Math.max(0, state.openSlots.length - 1);
     }
 
     render(false);
   }
-
 
   function getRealtimeChannelName() {
     var companyId = getCompanyId();
@@ -1960,7 +2052,7 @@
         '    <div class="aic-room-name">', esc(room.name), '</div>',
         '    <div class="aic-room-right-actions">',
         '      <div class="aic-room-slot', open ? ' open' : '', '">', open ? (tr('aic.open', '열림') + ' ' + (slotIndex + 1)) : '', '</div>',
-        isRoomCreator(room) ? '      <button class="aic-room-delete" type="button" data-delete-room="' + esc(room.id) + '" title="회의방 삭제" aria-label="회의방 삭제">×</button>' : '',
+        canLeaveRoom(room) ? '      <button class="aic-room-delete" type="button" data-leave-room="' + esc(room.id) + '" title="회의방 나가기" aria-label="회의방 나가기">나가기</button>' : '',
         '    </div>',
         '  </div>',
         '  <div class="aic-room-preview-row">',
@@ -1972,16 +2064,16 @@
       ].join('');
     }).join('');
 
-    Array.from(els.roomList.querySelectorAll('[data-delete-room]')).forEach(function (btn) {
+    Array.from(els.roomList.querySelectorAll('[data-leave-room]')).forEach(function (btn) {
       btn.addEventListener('click', function (event) {
         event.stopPropagation();
-        deleteRoom(btn.getAttribute('data-delete-room') || '');
+        leaveRoom(btn.getAttribute('data-leave-room') || '');
       });
     });
 
     Array.from(els.roomList.querySelectorAll('[data-room-id]')).forEach(function (el) {
       el.addEventListener('click', function (event) {
-        if (event.target && event.target.closest('[data-delete-room]')) return;
+        if (event.target && event.target.closest('[data-leave-room]')) return;
         openRoom(el.getAttribute('data-room-id'));
       });
     });
