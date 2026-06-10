@@ -1284,3 +1284,65 @@ input[type="radio"],
     font-size:14px !important;
   }
 }
+
+/* =========================================================
+   AIC Room Leave Button Patch v1
+   - 회의방 목록의 "나가기" 버튼이 기존 토글/공통 버튼 스타일과 겹치지 않도록 분리
+   - 기능 변경 없음: JS의 data-leave-room 버튼 표시만 정상화
+========================================================= */
+.aic-room-right-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.aic-room-leave,
+.aic-room-delete {
+  flex: 0 0 auto;
+  width: auto !important;
+  min-width: auto !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  padding: 0 8px !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 7px !important;
+  background: #ffffff !important;
+  color: #475569 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  cursor: pointer;
+  box-shadow: none !important;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.aic-room-leave:hover,
+.aic-room-delete:hover {
+  border-color: #94a3b8 !important;
+  background: #f8fafc !important;
+  color: #334155 !important;
+}
+
+.aic-room-leave:active,
+.aic-room-delete:active {
+  transform: translateY(1px);
+}
+
+.aic-room-name-row .aic-room-name {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 760px) {
+  .aic-room-leave,
+  .aic-room-delete {
+    height: 24px !important;
+    min-height: 24px !important;
+    padding: 0 9px !important;
+    font-size: 11px !important;
+  }
+}
