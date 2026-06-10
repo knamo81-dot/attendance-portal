@@ -1427,51 +1427,13 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style id="travel-expense-edit-delete-buttons-style">
-  .submission-scroll .list-card{
-    cursor:pointer;
-  }
-  .my-card-actions{
-    display:flex;
-    gap:6px;
-    margin-top:9px;
-    padding-top:8px;
-    border-top:1px dashed #e5e9f2;
-  }
-  .my-card-actions button{
-    min-width:0 !important;
-    height:30px !important;
-    padding:0 10px !important;
-    border-radius:9px !important;
-    font-size:12px !important;
-    line-height:1 !important;
-  }
-  .my-card-actions .edit-btn{
-    background:#eef2ff !important;
-    color:#3730a3 !important;
-  }
-  .my-card-actions .delete-btn{
-    background:#fee2e2 !important;
-    color:#b91c1c !important;
-  }
-  .my-card-actions .cancel-btn{
-    background:#fff7ed !important;
-    color:#c2410c !important;
-  }
-  .edit-mode-badge{
-    display:none;
-    align-items:center;
-    gap:6px;
-    margin-left:auto;
-    padding:7px 10px;
-    border-radius:999px;
-    background:#fff7ed;
-    color:#c2410c;
-    font-size:12px;
-    font-weight:900;
-  }
-  body.travel-editing .edit-mode-badge{
-    display:inline-flex;
-  }
+  .submission-scroll .list-card{cursor:pointer;}
+  .submission-scroll .list-card .my-card-actions{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px dashed #e5e9f2;}
+  .submission-scroll .list-card .my-card-actions button{min-width:0!important;height:30px!important;padding:0 10px!important;border-radius:9px!important;font-size:12px!important;line-height:1!important;}
+  .submission-scroll .list-card .my-card-actions .edit-btn{background:#eef2ff!important;color:#3730a3!important;}
+  .submission-scroll .list-card .my-card-actions .delete-btn{background:#fee2e2!important;color:#b91c1c!important;}
+  .travel-edit-mode-note{display:none;margin-top:10px;padding:10px 12px;border-radius:12px;background:#fff7ed;color:#c2410c;font-size:13px;font-weight:800;}
+  body.travel-editing .travel-edit-mode-note{display:block;}
 </style>
 
 </head>
@@ -3731,13 +3693,15 @@
 
 <script id="travel-expense-edit-delete-buttons">
 (function(){
-  if(window.__travelExpenseEditDeleteButtonsInstalled) return;
-  window.__travelExpenseEditDeleteButtonsInstalled = true;
+  if(window.__travelExpenseEditDeleteButtonsSafeInstalled) return;
+  window.__travelExpenseEditDeleteButtonsSafeInstalled = true;
+
+  let editingRequestId = null;
+  let originalDraftHandler = null;
+  let originalSubmitHandler = null;
 
   const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
   const hasClient = obj => !!(obj && typeof obj.from === 'function');
-  let editingRequestId = null;
-  let selectedRequestId = null;
 
   function findDb(scope){
     if(!scope) return null;
@@ -3746,8 +3710,7 @@
       const value = safe(()=>scope[name]);
       if(hasClient(value)) return value;
     }
-    const keys = safe(()=>Object.keys(scope), []);
-    for(const key of keys){
+    for(const key of safe(()=>Object.keys(scope), [])){
       if(key === 'supabase') continue;
       const value = safe(()=>scope[key]);
       if(hasClient(value)) return value;
@@ -3755,9 +3718,7 @@
     return null;
   }
 
-  function getDb(){
-    return findDb(safe(()=>window.parent)) || findDb(window);
-  }
+  function getDb(){ return findDb(safe(()=>window.parent)) || findDb(window); }
 
   function pick(obj, keys){
     for(const key of keys){
@@ -3767,14 +3728,12 @@
   }
 
   function getSession(){
-    return (
-      safe(()=>window.portalSession) ||
+    return safe(()=>window.portalSession) ||
       safe(()=>window.parent && window.parent.portalSession) ||
       safe(()=>window.parent && window.parent.__PORTAL_SESSION__) ||
       safe(()=>JSON.parse(sessionStorage.getItem('portalSession') || 'null')) ||
       safe(()=>JSON.parse(localStorage.getItem('portalSession') || 'null')) ||
-      {}
-    );
+      {};
   }
 
   function getCompanyId(){
@@ -3782,12 +3741,10 @@
     const user = s.user || s.currentUser || s.profile || s;
     const emp = s.employee || s.employeeInfo || s.matchedEmployee || {};
     const company = s.company || s.activeCompany || {};
-    return (
-      s.activeCompanyId || s.companyId || s.company_id ||
+    return s.activeCompanyId || s.companyId || s.company_id ||
       pick(company, ['id','company_id','companyId']) ||
       pick(user, ['company_id','companyId']) ||
-      pick(emp, ['company_id','companyId']) || ''
-    );
+      pick(emp, ['company_id','companyId']) || '';
   }
 
   function getEmployeeNo(){
@@ -3797,49 +3754,41 @@
     return pick(emp, ['employee_no','employeeNo']) || pick(user, ['employee_no','employeeNo']) || '';
   }
 
-  function getUserNumericId(){
-    const s = getSession();
-    const user = s.user || s.currentUser || s.profile || s;
-    const id = pick(user, ['id','user_id','userId']);
-    return /^\d+$/.test(String(id || '')) ? Number(id) : null;
-  }
-
   function $(id){ return document.getElementById(id); }
   function val(id){ const el = $(id); return el ? el.value : ''; }
-  function setVal(id, value){ const el = $(id); if(el) el.value = value ?? ''; }
   function num(v){ return Number(v || 0) || 0; }
   function moneyNum(text){ return Number(String(text || '').replace(/[^\d.-]/g,'')) || 0; }
 
-  function readRequestIdFromCard(card){
+  function requestIdFromCard(card){
     if(!card) return '';
     if(card.dataset && card.dataset.requestId) return card.dataset.requestId;
-    const onclick = card.getAttribute('onclick') || '';
-    const match = onclick.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-    return match ? match[0] : '';
+    const raw = card.getAttribute('onclick') || card.innerHTML || '';
+    const m = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    return m ? m[0] : '';
   }
 
-  function cardStatus(card){
-    const text = card ? card.textContent : '';
-    if(text.includes('지급완료')) return '지급완료';
-    if(text.includes('지출결의완료')) return '지출결의완료';
-    if(text.includes('검토완료')) return '검토완료';
-    if(text.includes('검토대기')) return '검토대기';
-    if(text.includes('임시저장')) return '임시저장';
+  function statusFromCard(card){
+    const t = card ? card.textContent : '';
+    if(t.includes('지급완료')) return '지급완료';
+    if(t.includes('지출결의완료')) return '지출결의완료';
+    if(t.includes('검토완료')) return '검토완료';
+    if(t.includes('검토대기')) return '검토대기';
+    if(t.includes('임시저장')) return '임시저장';
     return '';
   }
 
-  function isEditableStatus(status){
+  function canEdit(status){
     return status === '임시저장' || status === '검토대기';
   }
 
   function collectRoutes(){
-    return Array.from(document.querySelectorAll('#routeSegments .route-row')).map((row, index)=>{
+    return Array.from(document.querySelectorAll('#routeSegments .route-row')).map((row, i)=>{
       const inputs = row.querySelectorAll('input');
       return {
-        sort_order:index + 1,
-        from_place:inputs[0] ? inputs[0].value : '',
-        to_place:inputs[1] ? inputs[1].value : '',
-        distance_km:num(inputs[2] ? inputs[2].value : 0)
+        sort_order: i + 1,
+        from_place: inputs[0] ? inputs[0].value : '',
+        to_place: inputs[1] ? inputs[1].value : '',
+        distance_km: num(inputs[2] ? inputs[2].value : 0)
       };
     }).filter(r => r.from_place || r.to_place || r.distance_km);
   }
@@ -3849,203 +3798,207 @@
       const selects = row.querySelectorAll('select');
       const amountInput = row.querySelector('input[type="number"]');
       return {
-        item_type:selects[0] ? selects[0].value : '',
-        pay_type:selects[1] ? selects[1].value : '',
-        amount:num(amountInput ? amountInput.value : 0),
-        memo:''
+        item_type: selects[0] ? selects[0].value : '',
+        pay_type: selects[1] ? selects[1].value : '',
+        amount: num(amountInput ? amountInput.value : 0),
+        memo: ''
       };
     }).filter(i => i.item_type || i.pay_type || i.amount);
   }
 
-  function currentAmounts(){
+  function payload(){
+    if(typeof window.calcAll === 'function') window.calcAll();
     return {
-      total_amount:moneyNum(($('totalCost') || {}).textContent),
-      corp_card_amount:moneyNum(($('corpCost') || {}).textContent),
-      personal_amount:moneyNum(($('personalCost') || {}).textContent),
-      fuel_amount:moneyNum(($('fuelCost') || {}).textContent),
-      total_distance_km:num(val('distance')),
-      gas_price:num(val('gasPrice')),
-      fuel_efficiency:num(val('efficiency')),
-      round_unit:num(val('roundUnit')) || 1
+      applicant_name: val('applicantName'),
+      applicant_employee_no: getEmployeeNo(),
+      division_name: val('applicantDivision'),
+      team_name: val('applicantTeam'),
+      trip_type: val('tripType') || '출장',
+      trip_date: val('tripDate') || null,
+      transport: val('transport') || '자차',
+      request_date: val('requestDate') || new Date().toISOString().slice(0,10),
+      voucher_date: val('voucherDateDisplay') || null,
+      payment_due_date: val('paymentDueDateDisplay') || null,
+      total_amount: moneyNum(($('#totalCost') || {}).textContent),
+      corp_card_amount: moneyNum(($('#corpCost') || {}).textContent),
+      personal_amount: moneyNum(($('#personalCost') || {}).textContent),
+      fuel_amount: moneyNum(($('#fuelCost') || {}).textContent),
+      total_distance_km: num(val('distance')),
+      gas_price: num(val('gasPrice')),
+      fuel_efficiency: num(val('efficiency')),
+      round_unit: num(val('roundUnit')) || 1
     };
   }
 
-  function requestPayload(status){
-    const payload = {
-      company_id:getCompanyId(),
-      applicant_employee_no:getEmployeeNo(),
-      applicant_name:val('applicantName'),
-      division_name:val('applicantDivision'),
-      team_name:val('applicantTeam'),
-      trip_type:val('tripType') || '출장',
-      trip_date:val('tripDate') || null,
-      transport:val('transport') || '자차',
-      request_date:val('requestDate') || new Date().toISOString().slice(0,10),
-      voucher_date:val('voucherDateDisplay') || null,
-      payment_due_date:val('paymentDueDateDisplay') || null,
-      status:status || '검토대기',
-      ...currentAmounts()
-    };
-    const uid = getUserNumericId();
-    if(uid) payload.created_by_user_id = uid;
-    return payload;
+  function ensureNote(){
+    const actions = document.querySelector('.form-panel .actions');
+    if(!actions || document.getElementById('travelEditModeNote')) return;
+    const note = document.createElement('div');
+    note.id = 'travelEditModeNote';
+    note.className = 'travel-edit-mode-note';
+    note.textContent = '수정모드입니다. 내용을 변경한 뒤 수정저장을 눌러주세요.';
+    actions.parentElement.insertBefore(note, actions);
   }
 
-  function ensureEditBadge(){
-    const actions = document.querySelector('.form-panel .actions');
-    if(!actions || document.getElementById('editModeBadge')) return;
-    const badge = document.createElement('span');
-    badge.id = 'editModeBadge';
-    badge.className = 'edit-mode-badge';
-    badge.textContent = '수정모드';
-    actions.prepend(badge);
+  function actionButtons(){
+    return Array.from(document.querySelectorAll('.form-panel .actions button'));
   }
 
-  function setFormEditMode(on, requestId){
-    ensureEditBadge();
-    editingRequestId = on ? requestId : null;
-    document.body.classList.toggle('travel-editing', !!on);
+  function enterEditMode(requestId){
+    editingRequestId = requestId;
+    document.body.classList.add('travel-editing');
+    ensureNote();
 
-    const actions = document.querySelector('.form-panel .actions');
-    if(!actions) return;
+    const buttons = actionButtons();
+    if(!buttons.length) return;
 
-    const buttons = actions.querySelectorAll('button');
-    if(buttons[0]) {
-      buttons[0].textContent = on ? '수정취소' : '임시저장';
-      buttons[0].onclick = on ? cancelEditMode : window.saveTravelExpenseDraft;
+    if(!originalDraftHandler) originalDraftHandler = buttons[0].onclick;
+    if(!originalSubmitHandler) originalSubmitHandler = buttons[1] && buttons[1].onclick;
+
+    if(buttons[0]){
+      buttons[0].textContent = '수정취소';
+      buttons[0].onclick = function(){ exitEditMode(true); };
     }
-    if(buttons[1]) {
-      buttons[1].textContent = on ? '수정저장' : '제출하기';
-      buttons[1].onclick = on ? updateSelectedRequest : window.submitTravelExpense;
+    if(buttons[1]){
+      buttons[1].textContent = '수정저장';
+      buttons[1].onclick = function(){ updateRequest(); };
     }
   }
 
-  async function refreshLists(){
+  function exitEditMode(reload){
+    const id = editingRequestId;
+    editingRequestId = null;
+    document.body.classList.remove('travel-editing');
+
+    const buttons = actionButtons();
+    if(buttons[0]){
+      buttons[0].textContent = '임시저장';
+      buttons[0].onclick = originalDraftHandler || window.saveTravelExpenseDraft || null;
+    }
+    if(buttons[1]){
+      buttons[1].textContent = '제출하기';
+      buttons[1].onclick = originalSubmitHandler || window.submitTravelExpense || null;
+    }
+
+    if(reload && id && typeof window.loadTravelExpenseRequest === 'function'){
+      setTimeout(()=>window.loadTravelExpenseRequest(id), 100);
+    }
+  }
+
+  async function refresh(){
     if(typeof window.loadMyRequests === 'function') await window.loadMyRequests();
     if(typeof window.loadAdminRequests === 'function') await window.loadAdminRequests();
-  }
-
-  async function reloadSelected(){
-    const id = selectedRequestId || editingRequestId;
-    if(id && typeof window.loadTravelExpenseRequest === 'function'){
-      setTimeout(()=>window.loadTravelExpenseRequest(id), 300);
-    }
+    setTimeout(decorateCards, 150);
   }
 
   window.startTravelExpenseEdit = async function(requestId){
     if(!requestId) return;
-    selectedRequestId = requestId;
     if(typeof window.loadTravelExpenseRequest === 'function'){
       await window.loadTravelExpenseRequest(requestId);
     }
-    setFormEditMode(true, requestId);
-    window.scrollTo({top:0, behavior:'smooth'});
+    enterEditMode(requestId);
   };
 
-  window.cancelEditMode = function(){
-    setFormEditMode(false, null);
-    reloadSelected();
-  };
-
-  window.updateSelectedRequest = async function(){
-    const db = getDb();
-    const companyId = getCompanyId();
-    if(!db || !companyId || !editingRequestId){
+  async function updateRequest(){
+    const client = getDb();
+    const cid = getCompanyId();
+    if(!client || !cid || !editingRequestId){
       alert('수정할 신청건을 찾지 못했습니다.');
       return;
     }
-    if(typeof window.calcAll === 'function') window.calcAll();
 
-    const payload = requestPayload('검토대기');
-    const result = await db.from('travel_expense_requests')
-      .update(payload)
+    const main = await client.from('travel_expense_requests')
+      .update(payload())
       .eq('id', editingRequestId)
-      .eq('company_id', companyId);
+      .eq('company_id', cid);
 
-    if(result.error){
-      console.error('[TravelExpense] update error', result.error, payload);
-      alert('수정 저장 중 오류가 발생했습니다: ' + result.error.message);
+    if(main.error){
+      console.error('[TravelExpense] update error', main.error);
+      alert('수정 저장 중 오류가 발생했습니다: ' + main.error.message);
       return;
     }
 
-    await db.from('travel_expense_routes').delete().eq('company_id', companyId).eq('request_id', editingRequestId);
-    await db.from('travel_expense_items').delete().eq('company_id', companyId).eq('request_id', editingRequestId);
+    await client.from('travel_expense_items').delete().eq('company_id', cid).eq('request_id', editingRequestId);
+    await client.from('travel_expense_routes').delete().eq('company_id', cid).eq('request_id', editingRequestId);
 
-    const routes = collectRoutes().map(r => ({...r, company_id:companyId, request_id:editingRequestId}));
+    const routes = collectRoutes().map(r => ({...r, company_id: cid, request_id: editingRequestId}));
     if(routes.length){
-      const rr = await db.from('travel_expense_routes').insert(routes);
+      const rr = await client.from('travel_expense_routes').insert(routes);
       if(rr.error) console.warn('[TravelExpense] route update warning', rr.error);
     }
 
-    const items = collectItems().map(i => ({...i, company_id:companyId, request_id:editingRequestId}));
+    const items = collectItems().map(i => ({...i, company_id: cid, request_id: editingRequestId}));
     if(items.length){
-      const ir = await db.from('travel_expense_items').insert(items);
-      if(ir.error) console.warn('[TravelExpense] item update warning', ir.error);
+      const ii = await client.from('travel_expense_items').insert(items);
+      if(ii.error) console.warn('[TravelExpense] item update warning', ii.error);
     }
 
-    setFormEditMode(false, null);
-    await refreshLists();
-    selectedRequestId = payload.id || selectedRequestId;
+    const id = editingRequestId;
+    exitEditMode(false);
+    await refresh();
+    if(typeof window.loadTravelExpenseRequest === 'function') setTimeout(()=>window.loadTravelExpenseRequest(id), 200);
     alert('수정 저장되었습니다.');
-  };
+  }
 
   window.deleteTravelExpenseRequest = async function(requestId){
-    const db = getDb();
-    const companyId = getCompanyId();
-    if(!db || !companyId || !requestId){
+    const client = getDb();
+    const cid = getCompanyId();
+    if(!client || !cid || !requestId){
       alert('삭제할 신청건을 찾지 못했습니다.');
       return;
     }
 
     if(!confirm('선택한 출장비 신청건을 삭제하시겠습니까?')) return;
 
-    await db.from('travel_expense_items').delete().eq('company_id', companyId).eq('request_id', requestId);
-    await db.from('travel_expense_routes').delete().eq('company_id', companyId).eq('request_id', requestId);
-    await db.from('travel_expense_attachments').delete().eq('company_id', companyId).eq('request_id', requestId);
+    await client.from('travel_expense_items').delete().eq('company_id', cid).eq('request_id', requestId);
+    await client.from('travel_expense_routes').delete().eq('company_id', cid).eq('request_id', requestId);
+    await client.from('travel_expense_attachments').delete().eq('company_id', cid).eq('request_id', requestId);
 
-    const res = await db.from('travel_expense_requests').delete().eq('id', requestId).eq('company_id', companyId);
+    const res = await client.from('travel_expense_requests').delete().eq('id', requestId).eq('company_id', cid);
     if(res.error){
       console.error('[TravelExpense] delete error', res.error);
       alert('삭제 중 오류가 발생했습니다: ' + res.error.message);
       return;
     }
 
-    if(editingRequestId === requestId) setFormEditMode(false, null);
-    await refreshLists();
+    if(editingRequestId === requestId) exitEditMode(false);
+    await refresh();
     if(typeof window.newRequest === 'function') window.newRequest();
     alert('삭제되었습니다.');
   };
 
-  function makeButtons(card, requestId, status){
-    if(!requestId || !isEditableStatus(status)) return '';
-    return `
-      <div class="my-card-actions" onclick="event.stopPropagation()">
-        <button type="button" class="edit-btn" onclick="window.startTravelExpenseEdit('${requestId}')">수정</button>
-        <button type="button" class="delete-btn" onclick="window.deleteTravelExpenseRequest('${requestId}')">삭제</button>
-      </div>
-    `;
-  }
-
   function decorateCards(){
     document.querySelectorAll('.submission-scroll .list-card').forEach(card=>{
-      const requestId = readRequestIdFromCard(card);
-      if(requestId && !card.dataset.requestId) card.dataset.requestId = requestId;
-      card.style.cursor = 'pointer';
+      const id = requestIdFromCard(card);
+      const status = statusFromCard(card);
 
-      let actions = card.querySelector('.my-card-actions');
-      if(actions) actions.remove();
+      if(id && !card.dataset.requestId) card.dataset.requestId = id;
 
-      const status = cardStatus(card);
-      if(isEditableStatus(status) && requestId){
-        card.insertAdjacentHTML('beforeend', makeButtons(card, requestId, status));
-      }
+      const old = card.querySelector('.my-card-actions');
+      if(old) old.remove();
+
+      if(!id || !canEdit(status)) return;
+
+      const box = document.createElement('div');
+      box.className = 'my-card-actions';
+      box.onclick = e => e.stopPropagation();
+      box.innerHTML = '<button type="button" class="edit-btn">수정</button><button type="button" class="delete-btn">삭제</button>';
+      box.querySelector('.edit-btn').onclick = e => {
+        e.stopPropagation();
+        window.startTravelExpenseEdit(id);
+      };
+      box.querySelector('.delete-btn').onclick = e => {
+        e.stopPropagation();
+        window.deleteTravelExpenseRequest(id);
+      };
+      card.appendChild(box);
     });
   }
 
-  const observer = new MutationObserver(decorateCards);
+  const observer = new MutationObserver(()=>decorateCards());
 
   function init(){
-    ensureEditBadge();
+    ensureNote();
     decorateCards();
     const box = document.querySelector('.submission-scroll');
     if(box) observer.observe(box, {childList:true, subtree:true});
@@ -4054,8 +4007,9 @@
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  setTimeout(init, 500);
-  setTimeout(init, 1500);
+  setTimeout(init, 300);
+  setTimeout(init, 1000);
+  setTimeout(init, 2000);
 })();
 </script>
 
