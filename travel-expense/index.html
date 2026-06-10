@@ -3827,7 +3827,7 @@ body.travel-editing .travel-mode-note{display:block;background:#fff7ed;color:#c2
       : '';
 
     return `
-      <div class="list-card" data-request-id="${row.id}" onclick="window.loadTravelExpenseRequest && window.loadTravelExpenseRequest('${row.id}'); setTimeout(function(){ if(window.__travelExpenseSetViewMode) window.__travelExpenseSetViewMode('${row.id}', '${status}'); }, 120);">
+      <div class="list-card" data-request-id="${row.id}">
         <div class="list-top">
           <div class="list-title">${title}</div>
           <span class="status s-wait">${escapeHtml(status)}</span>
@@ -4068,6 +4068,307 @@ body.travel-editing .travel-mode-note{display:block;background:#fff7ed;color:#c2
   setTimeout(install, 300);
   setTimeout(install, 1000);
   setTimeout(install, 2000);
+})();
+</script>
+
+
+<script id="travel-expense-new-request-reset-fix">
+(function(){
+  if(window.__travelExpenseNewRequestResetFixInstalled) return;
+  window.__travelExpenseNewRequestResetFixInstalled = true;
+
+  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
+  function $(id){ return document.getElementById(id); }
+  function setVal(id, value){ const el = $(id); if(el) el.value = value ?? ''; }
+  function setText(id, value){ const el = $(id); if(el) el.textContent = value ?? ''; }
+  function today(){ return new Date().toISOString().slice(0,10); }
+
+  function getSession(){
+    return safe(()=>window.portalSession) ||
+      safe(()=>window.parent && window.parent.portalSession) ||
+      safe(()=>window.parent && window.parent.__PORTAL_SESSION__) ||
+      safe(()=>JSON.parse(sessionStorage.getItem('portalSession') || 'null')) ||
+      safe(()=>JSON.parse(localStorage.getItem('portalSession') || 'null')) ||
+      {};
+  }
+
+  function pick(obj, keys){
+    for(const key of keys){
+      if(obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
+    }
+    return '';
+  }
+
+  function profileFromSession(){
+    const s = getSession();
+    const user = s.user || s.currentUser || s.profile || s;
+    const emp = s.employee || s.employeeInfo || s.matchedEmployee || s.staff || s.employeeProfile || {};
+    return {
+      name: pick(emp, ['name','employee_name','employeeName']) || pick(user, ['name','display_name','displayName']),
+      division: pick(emp, ['division_name','divisionName']) || pick(emp, ['division_code','divisionCode']),
+      team: pick(emp, ['team_name','teamName']) || pick(emp, ['team_code','teamCode'])
+    };
+  }
+
+  function clearRoutes(){
+    const box = $('routeSegments');
+    if(box) box.innerHTML = '';
+    if(typeof window.updateRoute === 'function') window.updateRoute();
+  }
+
+  function clearItems(){
+    const box = $('costList');
+    if(box) box.innerHTML = '';
+  }
+
+  function clearMoney(){
+    ['fuelCost','totalCost','corpCost','personalCost'].forEach(id => {
+      if($(id) && typeof window.money === 'function') setText(id, window.money(0));
+      else setText(id, '0원');
+    });
+  }
+
+  function clearActiveCards(){
+    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
+      card.style.borderColor = '';
+      card.style.boxShadow = '';
+      card.classList.remove('active','selected');
+    });
+  }
+
+  function resetButtonsToNew(){
+    document.body.classList.remove('travel-viewing','travel-editing');
+    const actions = document.querySelector('.form-panel .actions');
+    if(actions) actions.classList.remove('is-hidden');
+    const note = document.getElementById('travelModeNote');
+    if(note) note.textContent = '';
+
+    const buttons = actions ? actions.querySelectorAll('button') : [];
+    if(buttons[0]){
+      buttons[0].textContent = '임시저장';
+      if(typeof window.saveTravelExpenseDraft === 'function') buttons[0].onclick = function(){ window.saveTravelExpenseDraft(); };
+    }
+    if(buttons[1]){
+      buttons[1].textContent = '제출하기';
+      if(typeof window.submitTravelExpense === 'function') buttons[1].onclick = function(){ window.submitTravelExpense(); };
+    }
+  }
+
+  window.resetTravelExpenseNewForm = function(){
+    const p = profileFromSession();
+
+    setVal('applicantName', p.name || $('applicantName')?.value || '');
+    setVal('applicantDivision', p.division || $('applicantDivision')?.value || '');
+    setVal('applicantTeam', p.team || $('applicantTeam')?.value || '');
+    setVal('tripType', '출장');
+    setVal('tripDate', '');
+    setVal('transport', '자차');
+    setVal('requestDate', today());
+    setVal('voucherDateDisplay', '');
+    setVal('paymentDueDateDisplay', '');
+
+    clearRoutes();
+
+    setVal('distance', '');
+    setVal('gasPrice', '');
+    setVal('efficiency', '');
+    setVal('roundUnit', '1');
+
+    clearItems();
+
+    if(typeof window.calcAll === 'function') window.calcAll();
+    clearMoney();
+
+    clearActiveCards();
+    resetButtonsToNew();
+
+    safe(()=>{ window.currentRequestId = null; });
+    safe(()=>{ window.selectedRequestId = null; });
+    safe(()=>{ window.editingRequestId = null; });
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  function patchNewRequest(){
+    const original = window.newRequest;
+    if(typeof original === 'function' && !original.__resetFixPatched){
+      const wrapped = function(){
+        safe(()=>original.apply(this, arguments));
+        setTimeout(window.resetTravelExpenseNewForm, 0);
+        setTimeout(window.resetTravelExpenseNewForm, 80);
+      };
+      wrapped.__resetFixPatched = true;
+      window.newRequest = wrapped;
+    }
+
+    document.querySelectorAll('button').forEach(btn => {
+      const label = (btn.textContent || '').trim();
+      if(label.includes('신규 작성') && !btn.dataset.resetFixBound){
+        btn.dataset.resetFixBound = '1';
+        btn.addEventListener('click', function(){
+          setTimeout(window.resetTravelExpenseNewForm, 0);
+          setTimeout(window.resetTravelExpenseNewForm, 80);
+        }, true);
+      }
+    });
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', patchNewRequest);
+  else patchNewRequest();
+
+  setTimeout(patchNewRequest, 300);
+  setTimeout(patchNewRequest, 1000);
+})();
+</script>
+
+
+<script id="travel-expense-card-click-load-final-fix">
+(function(){
+  if(window.__travelExpenseCardClickLoadFinalFixInstalled) return;
+  window.__travelExpenseCardClickLoadFinalFixInstalled = true;
+
+  let loadingId = null;
+  let loadingAt = 0;
+  let loadingPromise = null;
+
+  function getCardId(card){
+    if(!card) return '';
+    if(card.dataset && card.dataset.requestId) return card.dataset.requestId;
+    const raw = card.getAttribute('onclick') || card.innerHTML || '';
+    const match = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    return match ? match[0] : '';
+  }
+
+  function getCardStatus(card){
+    const text = card ? card.textContent : '';
+    if(text.includes('지급완료')) return '지급완료';
+    if(text.includes('지출결의완료')) return '지출결의완료';
+    if(text.includes('검토완료')) return '검토완료';
+    if(text.includes('검토중')) return '검토중';
+    if(text.includes('검토대기')) return '검토대기';
+    if(text.includes('임시저장')) return '임시저장';
+    return '';
+  }
+
+  function setViewMode(status, requestId){
+    const actions = document.querySelector('.form-panel .actions');
+    if(actions) actions.classList.add('is-hidden');
+
+    document.body.classList.add('travel-viewing');
+    document.body.classList.remove('travel-editing');
+
+    let note = document.getElementById('travelModeNote');
+    if(!note && actions){
+      note = document.createElement('div');
+      note.id = 'travelModeNote';
+      note.className = 'travel-mode-note';
+      actions.parentElement.insertBefore(note, actions);
+    }
+    if(note) note.textContent = '조회모드입니다. 수정하려면 카드의 수정 버튼을 눌러주세요.';
+
+    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
+      const active = getCardId(card) === requestId;
+      card.style.borderColor = active ? '#2563eb' : '';
+      card.style.boxShadow = active ? '0 0 0 2px rgba(37,99,235,.16)' : '';
+    });
+  }
+
+  async function loadDetailOnce(requestId){
+    if(!requestId || typeof window.loadTravelExpenseRequest !== 'function') return;
+
+    const now = Date.now();
+    if(loadingId === requestId && now - loadingAt < 800 && loadingPromise){
+      return loadingPromise;
+    }
+
+    loadingId = requestId;
+    loadingAt = now;
+
+    // 상세 로드 전에 컨테이너를 먼저 비워 중복 append를 원천 차단
+    const routeBox = document.getElementById('routeSegments');
+    if(routeBox) routeBox.innerHTML = '';
+    const costBox = document.getElementById('costList');
+    if(costBox) costBox.innerHTML = '';
+
+    loadingPromise = Promise.resolve(window.loadTravelExpenseRequest(requestId))
+      .finally(() => {
+        setTimeout(() => {
+          if(loadingId === requestId){
+            loadingId = null;
+            loadingPromise = null;
+          }
+        }, 900);
+      });
+
+    return loadingPromise;
+  }
+
+  function bindCardClick(){
+    if(window.__travelExpenseCardClickLoadBound) return;
+    window.__travelExpenseCardClickLoadBound = true;
+
+    document.addEventListener('click', function(event){
+      const card = event.target.closest('.submission-scroll .list-card');
+      if(!card) return;
+
+      // 수정/삭제 버튼은 카드 조회 클릭으로 처리하지 않음
+      if(event.target.closest('.my-card-actions, button')) return;
+
+      const requestId = getCardId(card);
+      const status = getCardStatus(card);
+      if(!requestId) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      loadDetailOnce(requestId).then(() => {
+        setViewMode(status, requestId);
+      });
+    }, true);
+  }
+
+  function patchEditButton(){
+    const original = window.startTravelExpenseEdit;
+    if(typeof original !== 'function' || original.__cardClickLoadFinalPatched) return;
+
+    const wrapped = async function(requestId, status){
+      if(requestId){
+        await loadDetailOnce(requestId);
+      }
+      return original.apply(this, arguments);
+    };
+
+    wrapped.__cardClickLoadFinalPatched = true;
+    window.startTravelExpenseEdit = wrapped;
+  }
+
+  function patchCards(){
+    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
+      const id = getCardId(card);
+      if(id && !card.dataset.requestId) card.dataset.requestId = id;
+
+      // 이전 파일에서 남은 inline onclick이 있으면 제거하고 delegated click만 사용
+      if(card.getAttribute('onclick')) card.removeAttribute('onclick');
+
+      card.style.cursor = 'pointer';
+    });
+  }
+
+  function init(){
+    bindCardClick();
+    patchEditButton();
+    patchCards();
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', init);
+  }else{
+    init();
+  }
+
+  setTimeout(init, 300);
+  setTimeout(init, 1000);
+  setTimeout(init, 2000);
 })();
 </script>
 
