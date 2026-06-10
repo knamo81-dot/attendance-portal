@@ -2051,7 +2051,7 @@
         '  <div class="aic-room-name-row">',
         '    <div class="aic-room-name">', esc(room.name), '</div>',
         '    <div class="aic-room-right-actions">',
-        '      <div class="aic-room-slot', open ? ' open' : '', '">', open ? (tr('aic.open', '열림') + ' ' + (slotIndex + 1)) : '', '</div>',
+        open ? '      <div class="aic-room-slot open">' + esc(tr('aic.open', '열림') + ' ' + (slotIndex + 1)) + '</div>' : '',
         canLeaveRoom(room) ? '      <button class="aic-room-leave" type="button" data-leave-room="' + esc(room.id) + '" title="회의방 나가기" aria-label="회의방 나가기">나가기</button>' : '',
         '    </div>',
         '  </div>',
