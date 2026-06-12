@@ -1483,6 +1483,22 @@
   .fuel-date-note.ok{color:#047857;}
 </style>
 
+
+<style id="distance-efficiency-lock-final">
+  #distance[readonly]{
+    background:#f8fafc !important;
+    color:#334155 !important;
+    font-weight:800 !important;
+  }
+  .fuel-required-note{
+    margin-top:6px;
+    font-size:12px;
+    line-height:1.4;
+    color:#64748b;
+    font-weight:700;
+  }
+</style>
+
 </head>
 <body>
   <header>
@@ -4488,6 +4504,151 @@
 
   setTimeout(init, 500);
   setTimeout(init, 1300);
+})();
+</script>
+
+
+<script id="distance-efficiency-lock-final">
+(function(){
+  if(window.__distanceEfficiencyLockFinalInstalled) return;
+  window.__distanceEfficiencyLockFinalInstalled = true;
+
+  function byId(id){ return document.getElementById(id); }
+  function moneyKR(n){ return Math.round(Number(n || 0)).toLocaleString('ko-KR') + '원'; }
+
+  function lockDistance(){
+    const distance = byId('distance');
+    if(!distance) return;
+    distance.readOnly = true;
+    distance.title = '총 이동거리는 이동경로의 구간거리 합계로 자동 계산됩니다.';
+  }
+
+  function ensureEfficiencyNote(){
+    const efficiency = byId('efficiency');
+    if(!efficiency) return null;
+
+    let note = byId('fuelRequiredNote');
+    if(!note){
+      note = document.createElement('div');
+      note.id = 'fuelRequiredNote';
+      note.className = 'fuel-required-note';
+      efficiency.insertAdjacentElement('afterend', note);
+    }
+    return note;
+  }
+
+  function setEfficiencyNote(message, color){
+    const note = ensureEfficiencyNote();
+    if(!note) return;
+    note.textContent = message || '';
+    note.style.color = color || '#64748b';
+  }
+
+  function patchedCalcFuel(){
+    const transport = byId('transport')?.value || '';
+    if(transport !== '자차') return 0;
+
+    const distance = Number(byId('distance')?.value || 0);
+    const gas = Number(byId('gasPrice')?.value || 0);
+    const effRaw = String(byId('efficiency')?.value || '').trim();
+    const eff = Number(effRaw);
+    const unit = Number(byId('roundUnit')?.value || 1);
+
+    if(distance <= 0){
+      setEfficiencyNote('이동경로의 구간거리를 입력하면 총 이동거리가 자동 계산됩니다.');
+      return 0;
+    }
+
+    if(gas <= 0){
+      setEfficiencyNote('출장일 기준 휘발유가가 입력되어야 유류비가 계산됩니다.', '#b91c1c');
+      return 0;
+    }
+
+    if(!effRaw || eff <= 0){
+      setEfficiencyNote('회사 기준연비(km/L)를 입력해야 유류비가 계산됩니다.', '#b91c1c');
+      return 0;
+    }
+
+    setEfficiencyNote('회사 기준연비 기준으로 유류비가 계산됩니다.', '#047857');
+
+    const raw = distance / eff * gas;
+    return Math.round(raw / unit) * unit;
+  }
+
+  function patchedCalcAll(){
+    let total = 0;
+    let corp = 0;
+    let personal = 0;
+
+    document.querySelectorAll('.cost-row').forEach(row=>{
+      const selects = row.querySelectorAll('select');
+      const pay = selects[1]?.value || '';
+      const amountInput = row.querySelector('input[type="number"], input:not(.receipt-input)');
+      const amount = Number(amountInput?.value || 0);
+
+      total += amount;
+      if(pay === '법인카드') corp += amount;
+      else personal += amount;
+    });
+
+    const fuel = patchedCalcFuel();
+    total += fuel;
+    personal += fuel;
+
+    const fuelCost = byId('fuelCost');
+    const totalCost = byId('totalCost');
+    const corpCost = byId('corpCost');
+    const personalCost = byId('personalCost');
+
+    if(fuelCost) fuelCost.textContent = moneyKR(fuel);
+    if(totalCost) totalCost.textContent = moneyKR(total);
+    if(corpCost) corpCost.textContent = moneyKR(corp);
+    if(personalCost) personalCost.textContent = moneyKR(personal);
+  }
+
+  function install(){
+    lockDistance();
+
+    window.calcFuel = patchedCalcFuel;
+    window.calcAll = patchedCalcAll;
+
+    const distance = byId('distance');
+    if(distance){
+      distance.readOnly = true;
+      distance.removeAttribute('oninput');
+    }
+
+    const efficiency = byId('efficiency');
+    if(efficiency && !efficiency.dataset.efficiencyLockBound){
+      efficiency.dataset.efficiencyLockBound = '1';
+      efficiency.addEventListener('input', patchedCalcAll);
+      efficiency.addEventListener('change', patchedCalcAll);
+    }
+
+    const gasPrice = byId('gasPrice');
+    if(gasPrice && !gasPrice.dataset.gasLockBound){
+      gasPrice.dataset.gasLockBound = '1';
+      gasPrice.addEventListener('input', patchedCalcAll);
+      gasPrice.addEventListener('change', patchedCalcAll);
+    }
+
+    const roundUnit = byId('roundUnit');
+    if(roundUnit && !roundUnit.dataset.roundLockBound){
+      roundUnit.dataset.roundLockBound = '1';
+      roundUnit.addEventListener('change', patchedCalcAll);
+    }
+
+    patchedCalcAll();
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', install);
+  }else{
+    install();
+  }
+
+  setTimeout(install, 400);
+  setTimeout(install, 1200);
 })();
 </script>
 
