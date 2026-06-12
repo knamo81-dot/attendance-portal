@@ -1545,21 +1545,11 @@
 
 
 
-<style id="applicant-card-status-final-rule-style">
-  .my-card-actions .recall-btn{
-    background:#fff7ed!important;
-    color:#c2410c!important;
-  }
-  .my-card-actions .edit-btn{
-    background:#eef2ff!important;
-    color:#3730a3!important;
-  }
-  .my-card-actions .delete-btn{
-    background:#fee2e2!important;
-    color:#b91c1c!important;
-  }
+<style id="applicant-card-native-final-rule-style">
+  .my-card-actions .recall-btn{background:#fff7ed!important;color:#c2410c!important;}
+  .my-card-actions .edit-btn{background:#eef2ff!important;color:#3730a3!important;}
+  .my-card-actions .delete-btn{background:#fee2e2!important;color:#b91c1c!important;}
 </style>
-
 </head>
 <body>
   <header>
@@ -3551,7 +3541,7 @@
       showActions(false); note('해당 상태에서는 수정할 수 없습니다.');
     }
   }
-  function editable(status){ return status === '임시저장' || status === '검토대기'; }
+  function editable(status){ return status === '임시저장' || status === '수정요청'; }
 
   function cardStatus(card){
     const t=card ? card.textContent : '';
@@ -3580,7 +3570,12 @@
     if(!r.data || !r.data.length){ box.innerHTML='<div class="notice empty-state">제출 내역이 없습니다.</div>'; return true; }
     box.innerHTML=r.data.map(row=>{
       const status=row.status||'검토대기';
-      const menu=editable(status) ? `<div class="my-card-actions" onclick="event.stopPropagation()"><button type="button" class="edit-btn" data-edit-id="${row.id}" data-edit-status="${esc(status)}">수정</button><button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button></div>` : '';
+      let menu='';
+      if(status === '임시저장' || status === '수정요청'){
+        menu = `<div class="my-card-actions" onclick="event.stopPropagation()"><button type="button" class="edit-btn" data-edit-id="${row.id}" data-edit-status="${esc(status)}">수정</button><button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button></div>`;
+      }else if(status === '검토대기'){
+        menu = `<div class="my-card-actions" onclick="event.stopPropagation()"><button type="button" class="recall-btn" data-recall-id="${row.id}">회수</button><button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button></div>`;
+      }
       return `<div class="list-card" data-request-id="${row.id}"><div class="list-top"><div class="list-title">${esc(row.trip_type||'출장')} · ${esc(row.trip_date||'-')}</div><span class="status s-wait">${esc(status)}</span></div><div class="meta">신청자: ${esc(row.applicant_name||'-')}<br>본부/팀: ${esc(row.division_name||'-')} / ${esc(row.team_name||'-')}<br>총액: ${won(row.total_amount||0)} · 개인지급: ${won(row.personal_amount||0)}</div>${menu}</div>`;
     }).join('');
     return true;
@@ -3699,6 +3694,22 @@
     window.scrollTo({top:0,behavior:'smooth'});
   };
 
+
+  window.recallTravelExpenseRequest = async function(id){
+    const client=db(); const p=profile();
+    if(!client || !p.companyId || !id){ alert('회수할 신청건을 찾지 못했습니다.'); return; }
+    if(!confirm('제출한 검토대기 건을 회수하고 임시저장 상태로 되돌릴까요? 관리팀 검토 목록에서는 제외됩니다.')) return;
+    const res=await client.from('travel_expense_requests')
+      .update({status:'임시저장', submitted_at:null})
+      .eq('company_id',p.companyId)
+      .eq('id',id);
+    if(res.error){ console.error('[TravelExpense] recall error',res.error); alert('회수 중 오류가 발생했습니다: '+res.error.message); return; }
+    await refreshCards();
+    clearForm();
+    modeNew();
+    alert('회수되었습니다. 임시저장 상태로 변경되었습니다.');
+  };
+
   window.deleteTravelExpenseRequest = async function(id){
     const client=db(); const p=profile();
     if(!client || !p.companyId || !id){ alert('삭제할 신청건을 찾지 못했습니다.'); return; }
@@ -3718,6 +3729,8 @@
     if(window.__travelExpenseFinalStableClicksBound) return;
     window.__travelExpenseFinalStableClicksBound=true;
     document.addEventListener('click', function(event){
+      const recall=event.target.closest('[data-recall-id]');
+      if(recall){ event.preventDefault(); event.stopPropagation(); window.recallTravelExpenseRequest(recall.dataset.recallId); return; }
       const edit=event.target.closest('[data-edit-id]');
       if(edit){ event.preventDefault(); event.stopPropagation(); window.startTravelExpenseEdit(edit.dataset.editId, edit.dataset.editStatus); return; }
       const del=event.target.closest('[data-delete-id]');
@@ -4074,12 +4087,18 @@
 
   function cardHtml(row){
     const status = row.status || '검토대기';
-    const buttons = editable(status)
-      ? `<div class="my-card-actions" onclick="event.stopPropagation()">
+    let buttons = '';
+    if(status === '임시저장' || status === '수정요청'){
+      buttons = `<div class="my-card-actions" onclick="event.stopPropagation()">
            <button type="button" class="edit-btn" data-edit-id="${row.id}" data-edit-status="${escapeHtml(status)}">수정</button>
            <button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button>
-         </div>`
-      : '';
+         </div>`;
+    }else if(status === '검토대기'){
+      buttons = `<div class="my-card-actions" onclick="event.stopPropagation()">
+           <button type="button" class="recall-btn" data-recall-id="${row.id}">회수</button>
+           <button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button>
+         </div>`;
+    }
 
     return `
       <div class="list-card" data-request-id="${row.id}">
@@ -5249,239 +5268,6 @@
 })();
 </script>
 
-
-
-<script id="applicant-card-status-final-rule">
-(function(){
-  if(window.__applicantCardStatusFinalRuleInstalled) return;
-  window.__applicantCardStatusFinalRuleInstalled = true;
-
-  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
-
-  function getRequests(){
-    return safe(()=>window.travelExpenses) ||
-           safe(()=>window.expenseRequests) ||
-           safe(()=>window.requests) ||
-           safe(()=>window.mockRequests) ||
-           [];
-  }
-
-  function getReqByCard(card){
-    if(!card) return null;
-
-    const id =
-      card.dataset?.id ||
-      card.getAttribute('data-id') ||
-      card.getAttribute('data-trip-id') ||
-      card.getAttribute('data-request-id') ||
-      '';
-
-    const list = getRequests();
-
-    if(id){
-      const found = list.find(x => String(x.id) === String(id));
-      if(found) return found;
-    }
-
-    const text = card.textContent || '';
-    return list.find(x => {
-      const date = String(x.tripDate || x.trip_date || '');
-      const applicant = String(x.applicant || x.applicantName || x.name || '');
-      return (!date || text.includes(date)) && (!applicant || text.includes(applicant));
-    }) || null;
-  }
-
-  function getStatus(req, card){
-    const raw = String(
-      req?.status ||
-      req?.reviewStatus ||
-      card?.querySelector('.status')?.textContent ||
-      ''
-    ).replace(/\s+/g, '');
-    if(raw.includes('지출결의')) return '지출결의완료';
-    if(raw.includes('검토대기')) return '검토대기';
-    if(raw.includes('수정요청')) return '수정요청';
-    if(raw.includes('임시저장')) return '임시저장';
-    if(raw.includes('승인')) return '승인';
-    return raw;
-  }
-
-  function persistList(){
-    const list = getRequests();
-    const keys = ['travelExpenses','expenseRequests','travel_expenses','travelExpenseRequests','mockTravelExpenses'];
-
-    keys.forEach(key=>{
-      try{
-        const stored = JSON.parse(localStorage.getItem(key) || 'null');
-        if(Array.isArray(stored)){
-          const byId = new Map(list.map(x => [String(x.id), x]));
-          const next = stored
-            .map(x => byId.has(String(x.id)) ? Object.assign({}, x, byId.get(String(x.id))) : x)
-            .filter(x => !x.__deleted);
-          localStorage.setItem(key, JSON.stringify(next));
-        }
-      }catch(e){}
-    });
-  }
-
-  function refreshAll(){
-    [
-      'renderMySubmissions',
-      'renderSubmissions',
-      'loadMyRequests',
-      'refreshMonthlyProcessSummary',
-      'renderAdminList',
-      'renderAdminReviewList',
-      'adminFilterChanged'
-    ].forEach(name=>{
-      if(typeof window[name] === 'function') safe(()=>window[name]());
-    });
-  }
-
-  function editReq(req){
-    if(!req) return;
-
-    if(typeof window.editRequest === 'function') return window.editRequest(req.id);
-    if(typeof window.editTravelExpenseRequest === 'function') return window.editTravelExpenseRequest(req.id);
-    if(typeof window.startEditRequest === 'function') return window.startEditRequest(req.id);
-
-    if(typeof window.loadTravelExpenseRequest === 'function'){
-      window.loadTravelExpenseRequest(req.id);
-      document.body.classList.add('travel-editing');
-      return;
-    }
-
-    if(typeof window.selectRequest === 'function'){
-      window.selectRequest(req.id);
-      document.body.classList.add('travel-editing');
-    }
-  }
-
-  function recallReq(req){
-    if(!req) return;
-    if(!confirm('제출한 검토대기 건을 회수하고 임시저장 상태로 되돌릴까요? 관리팀 검토 목록에서는 제외됩니다.')) return;
-
-    req.status = '임시저장';
-    req.reviewStatus = '임시저장';
-    req.submittedAt = '';
-    req.submitted_at = '';
-
-    persistList();
-    refreshAll();
-    alert('회수되었습니다. 임시저장 상태로 변경되었습니다.');
-  }
-
-  function deleteReq(req){
-    if(!req) return;
-    if(!confirm('이 신청건을 삭제할까요?')) return;
-
-    if(typeof window.deleteRequest === 'function') return window.deleteRequest(req.id);
-    if(typeof window.deleteTravelExpenseRequest === 'function') return window.deleteTravelExpenseRequest(req.id);
-
-    const list = getRequests();
-    const idx = list.findIndex(x => String(x.id) === String(req.id));
-    if(idx >= 0) list.splice(idx, 1);
-
-    persistList();
-    refreshAll();
-  }
-
-  function makeButton(label, cls, fn){
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = cls;
-    btn.textContent = label;
-    btn.addEventListener('click', function(e){
-      e.preventDefault();
-      e.stopPropagation();
-      fn();
-    });
-    return btn;
-  }
-
-  function enforceCardButtons(){
-    document.querySelectorAll('.submission-scroll .list-card').forEach(card=>{
-      const req = getReqByCard(card);
-      if(!req) return;
-
-      const status = getStatus(req, card);
-
-      let actions = card.querySelector('.my-card-actions');
-
-      // 최종 규칙:
-      // 임시저장: 수정/삭제
-      // 검토대기: 회수/삭제
-      // 수정요청: 수정/삭제
-      // 승인/지출결의완료: 버튼 없음
-      if(status === '승인' || status === '지출결의완료'){
-        if(actions) actions.remove();
-        return;
-      }
-
-      if(!['임시저장','검토대기','수정요청'].includes(status)){
-        return;
-      }
-
-      if(!actions){
-        actions = document.createElement('div');
-        actions.className = 'my-card-actions';
-        card.appendChild(actions);
-      }
-
-      actions.innerHTML = '';
-
-      if(status === '임시저장' || status === '수정요청'){
-        actions.appendChild(makeButton('수정', 'edit-btn', ()=>editReq(req)));
-      }
-
-      if(status === '검토대기'){
-        actions.appendChild(makeButton('회수', 'recall-btn', ()=>recallReq(req)));
-      }
-
-      actions.appendChild(makeButton('삭제', 'delete-btn', ()=>deleteReq(req)));
-    });
-
-    // 수정모드 하단에 남아있을 수 있는 제출취소 버튼 제거
-    document.getElementById('submitCancelBtn')?.remove();
-    document.querySelectorAll('.submit-cancel-btn').forEach(el=>el.remove());
-  }
-
-  function patch(name){
-    const fn = window[name];
-    if(typeof fn !== 'function' || fn.__applicantCardStatusFinalRulePatched) return;
-
-    const wrapped = function(){
-      const result = fn.apply(this, arguments);
-      setTimeout(enforceCardButtons, 20);
-      setTimeout(enforceCardButtons, 120);
-      setTimeout(enforceCardButtons, 400);
-      return result;
-    };
-
-    wrapped.__applicantCardStatusFinalRulePatched = true;
-    window[name] = wrapped;
-  }
-
-  [
-    'renderMySubmissions',
-    'renderSubmissions',
-    'loadMyRequests',
-    'newRequest',
-    'clearForm',
-    'loadTravelExpenseRequest',
-    'selectRequest',
-    'saveTravelExpenseDraft',
-    'submitTravelExpense'
-  ].forEach(patch);
-
-  const observer = new MutationObserver(enforceCardButtons);
-  if(document.body) observer.observe(document.body, { childList:true, subtree:true });
-
-  setTimeout(enforceCardButtons, 80);
-  setTimeout(enforceCardButtons, 500);
-  setTimeout(enforceCardButtons, 1300);
-})();
-</script>
 
 </body>
 </html>
