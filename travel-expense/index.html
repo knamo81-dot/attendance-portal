@@ -1466,7 +1466,7 @@
 </style>
 
 
-<style id="opinet-trip-date-fuel-autofill-final">
+<style id="opinet-trip-date-fuel-autofill-watch-final">
   #gasPrice[readonly]{
     background:#f8fafc !important;
     color:#334155 !important;
@@ -1633,7 +1633,7 @@
                 <input id="distance" type="number" value="" oninput="calcAll()" />
               </div>
               <div>
-                <label>당일 휘발유가(원/L)</label>
+                <label>출장일 기준 휘발유가(원/L)</label>
                 <input id="gasPrice" type="number" value="" oninput="calcAll()" />
               </div>
               <div>
@@ -4192,17 +4192,25 @@
 </script>
 
 
-<script id="opinet-trip-date-fuel-autofill-final">
+<script id="opinet-trip-date-fuel-autofill-watch-final">
 (function(){
-  if(window.__opinetTripDateFuelAutofillInstalled) return;
-  window.__opinetTripDateFuelAutofillInstalled = true;
+  if(window.__opinetTripDateFuelAutofillWatchInstalled) return;
+  window.__opinetTripDateFuelAutofillWatchInstalled = true;
 
   const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
   const hasClient = obj => !!(obj && typeof obj.from === 'function');
 
+  let lastTripDate = '';
+  let lastAppliedTripDate = '';
+  let applying = false;
+
   function scanClient(scope){
     if(!scope) return null;
-    const names = ['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];
+    const names = [
+      'supabaseClient','supabase_client','sb','db','database',
+      'portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB',
+      '__supabaseClient','__SUPABASE_CLIENT__','client'
+    ];
 
     for(const name of names){
       const value = safe(()=>scope[name]);
@@ -4225,6 +4233,7 @@
       const value = safe(()=>scope[key]);
       if(hasClient(value)) return value;
     }
+
     return null;
   }
 
@@ -4241,11 +4250,15 @@
       safe(()=>window.parent && window.parent.CONFIG)
     ].filter(Boolean);
 
-    let url = safe(()=>window.EXELO_SUPABASE_URL,'') || safe(()=>window.SUPABASE_URL,'') ||
-      safe(()=>window.parent && window.parent.EXELO_SUPABASE_URL,'') || safe(()=>window.parent && window.parent.SUPABASE_URL,'');
+    let url = safe(()=>window.EXELO_SUPABASE_URL,'') ||
+      safe(()=>window.SUPABASE_URL,'') ||
+      safe(()=>window.parent && window.parent.EXELO_SUPABASE_URL,'') ||
+      safe(()=>window.parent && window.parent.SUPABASE_URL,'');
 
-    let key = safe(()=>window.EXELO_SUPABASE_ANON_KEY,'') || safe(()=>window.SUPABASE_ANON_KEY,'') ||
-      safe(()=>window.parent && window.parent.EXELO_SUPABASE_ANON_KEY,'') || safe(()=>window.parent && window.parent.SUPABASE_ANON_KEY,'');
+    let key = safe(()=>window.EXELO_SUPABASE_ANON_KEY,'') ||
+      safe(()=>window.SUPABASE_ANON_KEY,'') ||
+      safe(()=>window.parent && window.parent.EXELO_SUPABASE_ANON_KEY,'') ||
+      safe(()=>window.parent && window.parent.SUPABASE_ANON_KEY,'');
 
     for(const c of configs){
       url = url || c.supabaseUrl || c.SUPABASE_URL || c.supabase_url || c.projectUrl || '';
@@ -4262,6 +4275,15 @@
 
   function gasInput(){ return document.getElementById('gasPrice'); }
   function tripInput(){ return document.getElementById('tripDate'); }
+
+  function validDate(value){
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+  }
+
+  function getTripDate(){
+    const value = tripInput()?.value || '';
+    return validDate(value) ? value : '';
+  }
 
   function setNote(message, type){
     const input = gasInput();
@@ -4285,11 +4307,6 @@
     input.readOnly = true;
     input.step = '0.01';
     input.title = '출장일 기준 fuel_daily_prices에 저장된 보통휘발유 평균가격이 자동 입력됩니다.';
-  }
-
-  function getTripDate(){
-    const value = tripInput()?.value || '';
-    return /^\\d{4}-\\d{2}-\\d{2}$/.test(value) ? value : '';
   }
 
   async function getFuelByTripDate(tripDate){
@@ -4321,30 +4338,39 @@
   }
 
   async function applyFuelByTripDate(options){
-    const opts = Object.assign({ force:false, reason:'' }, options || {});
+    const opts = Object.assign({ force:false, fromWatch:false }, options || {});
     const input = gasInput();
-    if(!input) return;
+    if(!input || applying) return;
 
     lockGasInput();
 
     const tripDate = getTripDate();
-
     if(!tripDate){
       setNote('출장일을 선택하면 해당 출장일 기준 유가가 자동 입력됩니다.');
       return;
     }
 
-    if(!opts.force && String(input.value || '').trim() !== ''){
+    // 기존 저장건 조회처럼 이미 값이 있고 같은 출장일이면 덮어쓰지 않음.
+    // 단 신규작성/출장일 변경으로 값이 비어 있거나 force면 재조회.
+    if(!opts.force && input.value && lastAppliedTripDate === tripDate){
+      return;
+    }
+
+    // 카드 클릭으로 불러온 저장건은 저장 당시 유가가 있으므로 유지.
+    // 사용자가 출장일을 바꾸거나 신규작성으로 값이 비어 있으면 재조회.
+    if(!opts.force && input.value && !opts.fromWatch){
       setNote('신청 당시 저장된 유가를 표시 중입니다.');
       return;
     }
 
     try{
+      applying = true;
       const fuel = await getFuelByTripDate(tripDate);
       const price = Number(fuel.gasoline_price || 0);
       if(!price) throw new Error('gasoline_price empty');
 
       input.value = String(price);
+      lastAppliedTripDate = tripDate;
 
       if(fuel.matched === 'exact'){
         setNote(`출장일 기준 유가 적용: ${fuel.price_date} / ${price.toLocaleString('ko-KR')}원/L`);
@@ -4355,7 +4381,27 @@
       if(typeof window.calcAll === 'function') window.calcAll();
     }catch(error){
       console.warn('[TravelExpense] 출장일 기준 유가 자동입력 실패', error);
-      setNote(`출장일(${tripDate}) 기준 유가를 불러오지 못했습니다. fuel_daily_prices 데이터를 확인하세요.`, 'error');
+      setNote(`출장일(${tripDate}) 기준 유가를 불러오지 못했습니다. fuel_daily_prices 데이터 또는 읽기 권한을 확인하세요.`, 'error');
+    }finally{
+      applying = false;
+    }
+  }
+
+  function watchTripDate(){
+    const tripDate = getTripDate();
+    const gas = gasInput();
+
+    if(!tripDate) return;
+
+    if(tripDate !== lastTripDate){
+      lastTripDate = tripDate;
+      if(gas) gas.value = '';
+      applyFuelByTripDate({ force:true, fromWatch:true });
+      return;
+    }
+
+    if(gas && !String(gas.value || '').trim()){
+      applyFuelByTripDate({ force:true, fromWatch:true });
     }
   }
 
@@ -4364,33 +4410,31 @@
 
   function patchFunction(name, options){
     const fn = window[name];
-    if(typeof fn !== 'function' || fn.__tripDateFuelAutofillPatched) return;
+    if(typeof fn !== 'function' || fn.__tripDateFuelWatchPatched) return;
 
     const wrapped = function(){
       const result = fn.apply(this, arguments);
-      setTimeout(()=>applyFuelByTripDate(options), 150);
-      setTimeout(()=>applyFuelByTripDate(options), 700);
+      setTimeout(watchTripDate, 180);
+      setTimeout(watchTripDate, 800);
       return result;
     };
 
-    wrapped.__tripDateFuelAutofillPatched = true;
+    wrapped.__tripDateFuelWatchPatched = true;
     window[name] = wrapped;
   }
 
   function bindTripDate(){
     const input = tripInput();
-    if(!input || input.dataset.tripDateFuelBound) return;
+    if(!input || input.dataset.tripDateFuelWatchBound) return;
 
-    input.dataset.tripDateFuelBound = '1';
-    input.addEventListener('change', function(){
-      const gas = gasInput();
-      if(gas) gas.value = '';
-      applyFuelByTripDate({ force:true, reason:'tripDateChange' });
-    });
-    input.addEventListener('input', function(){
-      const gas = gasInput();
-      if(gas) gas.value = '';
-      applyFuelByTripDate({ force:true, reason:'tripDateInput' });
+    input.dataset.tripDateFuelWatchBound = '1';
+    ['change','input','blur'].forEach(eventName => {
+      input.addEventListener(eventName, function(){
+        const gas = gasInput();
+        if(gas) gas.value = '';
+        lastTripDate = '';
+        watchTripDate();
+      });
     });
   }
 
@@ -4398,14 +4442,17 @@
     lockGasInput();
     bindTripDate();
 
-    patchFunction('newRequest', { force:true, reason:'newRequest' });
-    patchFunction('clearForm', { force:true, reason:'clearForm' });
+    patchFunction('newRequest', { force:true });
+    patchFunction('clearForm', { force:true });
+    patchFunction('loadTravelExpenseRequest', { force:false });
+    patchFunction('selectRequest', { force:false });
+    patchFunction('loadDetail', { force:false });
+    patchFunction('modeNew', { force:true });
+    patchFunction('modeEdit', { force:true });
 
-    patchFunction('loadTravelExpenseRequest', { force:false, reason:'viewSaved' });
-    patchFunction('selectRequest', { force:false, reason:'viewSaved' });
-
-    setTimeout(()=>applyFuelByTripDate({ force:false, reason:'initial' }), 500);
-    setTimeout(()=>applyFuelByTripDate({ force:false, reason:'initialDelay' }), 1500);
+    setTimeout(watchTripDate, 300);
+    setTimeout(watchTripDate, 900);
+    setTimeout(watchTripDate, 1800);
   }
 
   if(document.readyState === 'loading'){
@@ -4414,8 +4461,14 @@
     init();
   }
 
-  setTimeout(init, 800);
-  setTimeout(init, 1800);
+  const watcher = setInterval(function(){
+    if(document.body) init();
+    watchTripDate();
+  }, 900);
+
+  window.addEventListener('beforeunload', function(){
+    clearInterval(watcher);
+  });
 })();
 </script>
 
