@@ -1515,6 +1515,13 @@
   .admin-review-checks{display:none!important;}
   .admin-final-actions .btn-danger{background:#fee2e2!important;color:#b91c1c!important;}
 </style>
+
+<style id="admin-status-date-preserve-final-patch">
+  .admin-review-checks{display:none!important;}
+  .admin-final-actions button[data-admin-action="지급완료"],
+  button[onclick*="지급완료"]{display:none!important;}
+</style>
+
 </head>
 <body>
   <header>
@@ -2757,6 +2764,267 @@
     </section>
     ${evidencePages(printTrips, mode)}
   </div>
+
+<script id="admin-status-date-preserve-final-patch">
+(function(){
+  if(window.__adminStatusDatePreserveFinalInstalled) return;
+  window.__adminStatusDatePreserveFinalInstalled = true;
+
+  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
+  const money = window.money || function(n){ return Math.round(Number(n||0)).toLocaleString('ko-KR') + '원'; };
+
+  const STATUS_WAIT = '검토대기';
+  const STATUS_REVISE = '수정요청';
+  const STATUS_APPROVED = '승인';
+  const STATUS_DONE = '지출결의완료';
+
+  function getStore(){
+    return safe(()=>window.travelExpenses) ||
+           safe(()=>window.expenseRequests) ||
+           safe(()=>window.requests) ||
+           safe(()=>window.mockRequests) ||
+           [];
+  }
+
+  function setStore(arr){
+    if(Array.isArray(window.travelExpenses)) window.travelExpenses = arr;
+    else if(Array.isArray(window.expenseRequests)) window.expenseRequests = arr;
+    else if(Array.isArray(window.requests)) window.requests = arr;
+    else if(Array.isArray(window.mockRequests)) window.mockRequests = arr;
+  }
+
+  function getSelected(){
+    const id = window.adminSelectedId || window.selectedAdminId || window.currentAdminId || window.selectedExpenseId;
+    const arr = getStore();
+    return arr.find(x => String(x.id) === String(id)) || window.adminSelectedRequest || window.selectedAdminRequest || null;
+  }
+
+  function selectedId(){
+    const req = getSelected();
+    return req && req.id;
+  }
+
+  function persistRequest(req){
+    if(!req) return;
+
+    const arr = getStore();
+    const idx = arr.findIndex(x => String(x.id) === String(req.id));
+    if(idx >= 0) arr[idx] = Object.assign({}, arr[idx], req);
+
+    setStore(arr);
+
+    // localStorage keys used by previous versions vary; update likely keys safely
+    [
+      'travelExpenses',
+      'expenseRequests',
+      'travel_expenses',
+      'travelExpenseRequests',
+      'mockTravelExpenses'
+    ].forEach(key=>{
+      try{
+        const old = JSON.parse(localStorage.getItem(key) || 'null');
+        if(Array.isArray(old)){
+          const i = old.findIndex(x => String(x.id) === String(req.id));
+          if(i >= 0){
+            old[i] = Object.assign({}, old[i], req);
+            localStorage.setItem(key, JSON.stringify(old));
+          }
+        }
+      }catch(e){}
+    });
+  }
+
+  function readDraftInputs(){
+    return {
+      voucherDate: document.getElementById('adminVoucherDate')?.value || document.getElementById('voucherDate')?.value || '',
+      paymentDueDate: document.getElementById('adminPaymentDueDate')?.value || document.getElementById('paymentDueDate')?.value || '',
+      adminMemo: document.getElementById('adminMemo')?.value || document.getElementById('managerMemo')?.value || ''
+    };
+  }
+
+  function writeDraftInputs(req){
+    const voucher = document.getElementById('adminVoucherDate') || document.getElementById('voucherDate');
+    const payment = document.getElementById('adminPaymentDueDate') || document.getElementById('paymentDueDate');
+    const memo = document.getElementById('adminMemo') || document.getElementById('managerMemo');
+
+    if(voucher && req) voucher.value = req.voucherDate || req.voucher_date || '';
+    if(payment && req) payment.value = req.paymentDueDate || req.payment_due_date || '';
+    if(memo && req) memo.value = req.adminMemo || req.managerMemo || req.memo || '';
+  }
+
+  function applySavedInputs(req, draft){
+    if(!req || !draft) return req;
+
+    req.voucherDate = draft.voucherDate || '';
+    req.voucher_date = draft.voucherDate || '';
+    req.paymentDueDate = draft.paymentDueDate || '';
+    req.payment_due_date = draft.paymentDueDate || '';
+    req.adminMemo = draft.adminMemo || '';
+    req.managerMemo = draft.adminMemo || '';
+    return req;
+  }
+
+  function setStatus(req, status){
+    if(!req) return;
+    req.status = status;
+    req.reviewStatus = status;
+  }
+
+  function refreshAfterAction(req){
+    persistRequest(req);
+    if(typeof window.renderMySubmissions === 'function') safe(()=>window.renderMySubmissions());
+    if(typeof window.refreshMonthlyProcessSummary === 'function') safe(()=>window.refreshMonthlyProcessSummary());
+    if(typeof window.renderAdminList === 'function') safe(()=>window.renderAdminList());
+    if(typeof window.renderAdminReviewList === 'function') safe(()=>window.renderAdminReviewList());
+    if(typeof window.renderAdminDetail === 'function') safe(()=>window.renderAdminDetail(req.id));
+    else if(typeof window.showAdminDetail === 'function') safe(()=>window.showAdminDetail(req.id));
+    else setTimeout(()=>renderButtonsOnly(), 50);
+  }
+
+  function adminAction(action){
+    const req = getSelected();
+    if(!req) return;
+
+    const draft = readDraftInputs();
+
+    if(action === '수정'){
+      applySavedInputs(req, draft);
+      refreshAfterAction(req);
+      return;
+    }
+
+    if(action === '수정요청'){
+      applySavedInputs(req, draft);
+      setStatus(req, STATUS_REVISE);
+      refreshAfterAction(req);
+      return;
+    }
+
+    if(action === '승인'){
+      applySavedInputs(req, draft);
+      setStatus(req, STATUS_APPROVED);
+      refreshAfterAction(req);
+      return;
+    }
+
+    if(action === '지출결의 완료' || action === '지출결의완료'){
+      // 중요: 지출결의 완료 클릭 시 현재 입력 중인 날짜/메모를 함께 저장해야 함
+      applySavedInputs(req, draft);
+      setStatus(req, STATUS_DONE);
+      refreshAfterAction(req);
+      return;
+    }
+
+    if(action === '취소'){
+      // 중요: 취소는 날짜/메모를 저장하지 않고 상태만 이전 단계로 되돌림
+      const current = req.status || req.reviewStatus || STATUS_WAIT;
+      if(current === STATUS_DONE) setStatus(req, STATUS_APPROVED);
+      else if(current === STATUS_APPROVED) setStatus(req, STATUS_WAIT);
+      else if(current === STATUS_REVISE) setStatus(req, STATUS_WAIT);
+      else setStatus(req, STATUS_WAIT);
+      refreshAfterAction(req);
+      return;
+    }
+  }
+
+  function renderButtonsOnly(){
+    const req = getSelected();
+    if(!req) return;
+
+    const status = req.status || req.reviewStatus || STATUS_WAIT;
+    const box = document.querySelector('.admin-final-actions') || document.querySelector('.admin-detail-buttons');
+    if(!box) return;
+
+    box.innerHTML = '';
+
+    function btn(label, cls, action){
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.className = cls || '';
+      b.dataset.adminAction = action || label;
+      b.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        adminAction(action || label);
+      });
+      box.appendChild(b);
+    }
+
+    if(status === STATUS_DONE){
+      btn('수정', 'btn-ghost', '수정');
+      btn('취소', 'btn-danger', '취소');
+    }else if(status === STATUS_APPROVED){
+      btn('수정', 'btn-ghost', '수정');
+      btn('취소', 'btn-danger', '취소');
+      btn('지출결의 완료', '', '지출결의 완료');
+    }else{
+      btn('수정요청', 'btn-ghost', '수정요청');
+      btn('승인', 'btn-sub', '승인');
+    }
+  }
+
+  function cleanupAdminDetail(){
+    document.querySelectorAll('.admin-review-checks').forEach(el=>el.remove());
+    document.querySelectorAll('button').forEach(btn=>{
+      if((btn.textContent || '').trim() === '지급완료') btn.remove();
+    });
+
+    const filter = document.getElementById('adminStatusFilter');
+    if(filter){
+      [...filter.options].forEach(opt=>{
+        if(opt.value === '지급완료' || opt.textContent.trim() === '지급완료') opt.remove();
+      });
+      if(![...filter.options].some(opt=>opt.value === STATUS_APPROVED)){
+        const opt = document.createElement('option');
+        opt.value = STATUS_APPROVED;
+        opt.textContent = STATUS_APPROVED;
+        const done = [...filter.options].find(opt=>opt.value === STATUS_DONE);
+        filter.insertBefore(opt, done || null);
+      }
+    }
+
+    renderButtonsOnly();
+  }
+
+  // Override common action function names so inline onclick also follows corrected behavior
+  window.adminAdminAction = adminAction;
+  window.adminDetailAction = adminAction;
+  window.adminReviewAction = adminAction;
+  window.updateAdminStatus = function(status){ adminAction(status); };
+
+  // Prevent accidental auto-save from date fields. Dates are saved only through 수정/승인/지출결의 완료.
+  document.addEventListener('change', function(e){
+    const id = e.target && e.target.id;
+    if(id === 'adminVoucherDate' || id === 'adminPaymentDueDate' || id === 'voucherDate' || id === 'paymentDueDate'){
+      // no-op: keep the value visible in the input, do not persist here
+    }
+  }, true);
+
+  // Re-apply after any existing render function rebuilds the detail panel
+  ['renderAdminDetail','showAdminDetail','selectAdminRequest','renderAdminReviewList','renderAdminList'].forEach(name=>{
+    const fn = window[name];
+    if(typeof fn === 'function' && !fn.__adminStatusDatePreservePatched){
+      const wrapped = function(){
+        const result = fn.apply(this, arguments);
+        setTimeout(cleanupAdminDetail, 30);
+        setTimeout(cleanupAdminDetail, 180);
+        return result;
+      };
+      wrapped.__adminStatusDatePreservePatched = true;
+      window[name] = wrapped;
+    }
+  });
+
+  const mo = new MutationObserver(()=>cleanupAdminDetail());
+  if(document.body) mo.observe(document.body, { childList:true, subtree:true });
+
+  setTimeout(cleanupAdminDetail, 100);
+  setTimeout(cleanupAdminDetail, 600);
+  setTimeout(cleanupAdminDetail, 1400);
+})();
+</script>
+
 </body>
 </html>`;
   }
