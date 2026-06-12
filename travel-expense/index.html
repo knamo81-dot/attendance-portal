@@ -1520,6 +1520,24 @@
   .admin-review-checks{display:none!important;}
   button[onclick*="지급완료"]{display:none!important;}
 </style>
+
+<style id="revision-request-memo-edit-final">
+  .revision-memo-box{
+    margin-top:10px;
+    padding:10px 12px;
+    border-radius:12px;
+    border:1px solid #fecaca;
+    background:#fef2f2;
+    color:#991b1b;
+    font-size:12px;
+    line-height:1.55;
+    font-weight:800;
+  }
+  .revision-memo-box b{display:block;margin-bottom:4px;color:#7f1d1d;}
+  #applicantRevisionMemo{
+    grid-column:1 / -1;
+  }
+</style>
 </head>
 <body>
   <header>
@@ -3507,17 +3525,21 @@
     }else if(status === '검토대기'){
       note('검토대기 건 수정모드입니다. 변경 후 저장하거나 취소할 수 있습니다.');
       setButtons('취소','저장',()=>selectedId && loadDetail(selectedId).then(()=>modeView(selectedId, selectedStatus)),()=>updateExisting('검토대기','저장되었습니다.'));
+    }else if(status === '수정요청'){
+      note('수정요청 건 수정모드입니다. 관리팀 메모를 확인한 뒤 수정 후 다시 제출하세요.');
+      setButtons('취소','다시 제출',()=>selectedId && loadDetail(selectedId).then(()=>modeView(selectedId, selectedStatus)),()=>updateExisting('검토대기','다시 제출되었습니다.'));
     }else{
       showActions(false); note('해당 상태에서는 수정할 수 없습니다.');
     }
   }
-  function editable(status){ return status === '임시저장' || status === '검토대기'; }
+  function editable(status){ return status === '임시저장' || status === '검토대기' || status === '수정요청'; }
 
   function cardStatus(card){
     const t=card ? card.textContent : '';
     if(t.includes('지출결의완료')) return '지출결의완료';
     if(t.includes('검토완료')) return '검토완료';
     if(t.includes('검토중')) return '검토중';
+    if(t.includes('수정요청')) return '수정요청';
     if(t.includes('검토대기')) return '검토대기';
     if(t.includes('임시저장')) return '임시저장';
     return '';
@@ -3540,8 +3562,10 @@
     if(!r.data || !r.data.length){ box.innerHTML='<div class="notice empty-state">제출 내역이 없습니다.</div>'; return true; }
     box.innerHTML=r.data.map(row=>{
       const status=row.status||'검토대기';
+      const memoText = String(row.memo || '').trim();
+      const memoBox = status === '수정요청' && memoText ? `<div class="revision-memo-box"><b>수정요청 사유</b>${esc(memoText).replace(/\n/g,'<br>')}</div>` : '';
       const menu=editable(status) ? `<div class="my-card-actions" onclick="event.stopPropagation()"><button type="button" class="edit-btn" data-edit-id="${row.id}" data-edit-status="${esc(status)}">수정</button><button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button></div>` : '';
-      return `<div class="list-card" data-request-id="${row.id}"><div class="list-top"><div class="list-title">${esc(row.trip_type||'출장')} · ${esc(row.trip_date||'-')}</div><span class="status s-wait">${esc(status)}</span></div><div class="meta">신청자: ${esc(row.applicant_name||'-')}<br>본부/팀: ${esc(row.division_name||'-')} / ${esc(row.team_name||'-')}<br>총액: ${won(row.total_amount||0)} · 개인지급: ${won(row.personal_amount||0)}</div>${menu}</div>`;
+      return `<div class="list-card" data-request-id="${row.id}"><div class="list-top"><div class="list-title">${esc(row.trip_type||'출장')} · ${esc(row.trip_date||'-')}</div><span class="status s-wait">${esc(status)}</span></div><div class="meta">신청자: ${esc(row.applicant_name||'-')}<br>본부/팀: ${esc(row.division_name||'-')} / ${esc(row.team_name||'-')}<br>총액: ${won(row.total_amount||0)} · 개인지급: ${won(row.personal_amount||0)}</div>${memoBox}${menu}</div>`;
     }).join('');
     return true;
   }
@@ -3569,6 +3593,21 @@
       setVal('requestDate', row.request_date || '');
       setVal('voucherDateDisplay', row.voucher_date || '');
       setVal('paymentDueDateDisplay', row.payment_due_date || '');
+      (function(){
+        const old = document.getElementById('applicantRevisionMemo');
+        if(old) old.remove();
+        const memoText = String(row.memo || '').trim();
+        if(String(row.status || '') === '수정요청' && memoText){
+          const help = document.querySelector('.settlement-help');
+          if(help){
+            const box = document.createElement('div');
+            box.id = 'applicantRevisionMemo';
+            box.className = 'revision-memo-box';
+            box.innerHTML = '<b>수정요청 사유</b>' + esc(memoText).replace(/\n/g,'<br>');
+            help.insertAdjacentElement('afterend', box);
+          }
+        }
+      })();
       setVal('gasPrice', row.gas_price || '');
       setVal('efficiency', row.fuel_efficiency || '');
       setVal('roundUnit', row.round_unit || 1);
@@ -4861,7 +4900,8 @@
         <button type="button" class="btn-danger" onclick="window.adminCancelStatus && window.adminCancelStatus()">취소</button>`;
     }
     if(status === '수정요청'){
-      return `<button type="button" class="btn-sub" onclick="window.adminAdminAction && window.adminAdminAction('승인')">승인</button>`;
+      return `<button type="button" class="btn-ghost" onclick="window.adminSaveReviewChanges && window.adminSaveReviewChanges()">수정</button>
+        <button type="button" class="btn-sub" onclick="window.adminAdminAction && window.adminAdminAction('승인')">승인</button>`;
     }
     return `<button type="button" class="btn-ghost" onclick="window.adminAdminAction && window.adminAdminAction('수정요청')">수정요청</button>
       <button type="button" class="btn-sub" onclick="window.adminAdminAction && window.adminAdminAction('승인')">승인</button>`;
@@ -4905,7 +4945,7 @@
         <div><label>지결작성일</label><input type="date" id="adminVoucherDate" value="${esc(row.voucher_date||'')}" /></div>
         <div><label>입금예정일</label><input type="date" id="adminPaymentDueDate" value="${esc(row.payment_due_date||'')}" /></div>
       </div>
-      <div class="admin-manager-memo"><label>관리팀 메모</label><textarea id="adminManagerMemo" placeholder="검토 메모를 입력하세요.">${esc(row.manager_memo||row.memo||'')}</textarea></div>
+      <div class="admin-manager-memo"><label>관리팀 메모 / 수정요청 사유</label><textarea id="adminManagerMemo" placeholder="수정요청 시 신청자에게 표시될 메모를 입력하세요.">${esc(row.memo||'')}</textarea></div>
       <div class="admin-final-actions">${renderAdminActions(row)}</div>
     </div></div>`;
   }
@@ -4940,7 +4980,7 @@
       status: nextStatus,
       voucher_date: $('adminVoucherDate')?.value || null,
       payment_due_date: $('adminPaymentDueDate')?.value || null,
-      manager_memo: $('adminManagerMemo')?.value || null
+      memo: $('adminManagerMemo')?.value || null
     };
 
     const res = await client.from('travel_expense_requests').update(payload).eq('id', selectedId);
@@ -4958,7 +4998,7 @@
     const payload = {
       voucher_date: $('adminVoucherDate')?.value || null,
       payment_due_date: $('adminPaymentDueDate')?.value || null,
-      manager_memo: $('adminManagerMemo')?.value || null
+      memo: $('adminManagerMemo')?.value || null
     };
     const res = await client.from('travel_expense_requests').update(payload).eq('id', selectedId);
     if(res.error){ alert('검토 결과 수정 중 오류가 발생했습니다: ' + res.error.message); return; }
