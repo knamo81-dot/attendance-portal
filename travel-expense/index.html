@@ -1510,6 +1510,12 @@
   .admin-detail-panel .admin-empty-small{color:#64748b;font-size:13px;font-weight:800;padding:12px;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc;text-align:center;}
 </style>
 
+
+<style id="admin-status-flow-final-style">
+  .admin-review-checks{display:none!important;}
+  .admin-final-actions .btn-danger{background:#fee2e2!important;color:#b91c1c!important;}
+  .admin-final-actions button{min-width:auto!important;}
+</style>
 </head>
 <body>
   <header>
@@ -1747,8 +1753,8 @@
               <option value="all">전체</option>
               <option value="검토대기">검토대기</option>
               <option value="수정요청">수정요청</option>
+              <option value="승인">승인</option>
               <option value="지출결의완료">지출결의완료</option>
-              
             </select>
           </div>
           <div class="admin-search-wrap">
@@ -2200,12 +2206,10 @@
             </div>
           </div>
           <div class="notice" style="margin-bottom:12px;">관리팀이 입력한 지결작성일과 지급예정일은 출장자 입력 화면의 관리팀 처리 일정 영역에 표시됩니다.</div>
-          
           <div class="admin-manager-memo"><label>관리팀 메모</label><textarea>${trip.memo || ''}</textarea></div>
           <div class="admin-final-actions">
             <button type="button" class="btn-ghost" onclick="adminAdminAction('수정요청')">수정요청</button>
             <button type="button" class="btn-sub" onclick="adminAdminAction('승인')">승인</button>
-            <button type="button" onclick="adminAdminAction('지출결의 완료')">지출결의 완료</button>
           </div>
         </div>
       </div>`;
@@ -3506,8 +3510,7 @@
 
   function cardStatus(card){
     const t=card ? card.textContent : '';
-    if(t.includes('지급완료')) return '지급완료';
-    if(t.includes('지출결의완료')) return '지출결의완료';
+        if(t.includes('지출결의완료')) return '지출결의완료';
     if(t.includes('검토완료')) return '검토완료';
     if(t.includes('검토중')) return '검토중';
     if(t.includes('검토대기')) return '검토대기';
@@ -3724,7 +3727,7 @@
   let refreshTimer = null;
   let lastKey = '';
   let lastRunAt = 0;
-  const doneStatuses = ['지출결의완료','지급완료','처리완료','검토완료'];
+  const doneStatuses = ['지출결의완료','처리완료','검토완료'];
 
   const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
   const hasClient = obj => !!(obj && typeof obj.from === 'function');
@@ -3961,7 +3964,7 @@
   }
 
   function isDoneStatus(status){
-    return ['지급완료','지출결의완료','처리완료','완료'].includes(String(status || '').trim());
+    return ['지출결의완료','처리완료','완료'].includes(String(status || '').trim());
   }
 
   function editable(status){
@@ -4840,6 +4843,30 @@
   function renderDocs(row){
     return `<div class="admin-doc-card"><div><b>출장계/외근신청서</b><span>신청자가 업로드한 결재 완료 서류</span></div><button type="button" class="admin-evidence-btn missing" onclick="window.adminOpenEvidenceViewer && window.adminOpenEvidenceViewer('document','출장계/외근신청서')">보기</button></div>`;
   }
+  function normalizedAdminStatus(status){
+    return String(status || '').replace(/\s+/g,'').trim();
+  }
+  function renderAdminActionButtons(row){
+    const status = normalizedAdminStatus(row?.status);
+    if(status === '승인'){
+      return `
+        <button type="button" class="btn-ghost" onclick="window.adminAdminAction && window.adminAdminAction('수정')">수정</button>
+        <button type="button" class="btn-danger" onclick="window.adminAdminAction && window.adminAdminAction('취소')">취소</button>
+        <button type="button" onclick="window.adminAdminAction && window.adminAdminAction('지출결의완료')">지출결의 완료</button>`;
+    }
+    if(status === '지출결의완료'){
+      return `
+        <button type="button" class="btn-ghost" onclick="window.adminAdminAction && window.adminAdminAction('수정')">수정</button>
+        <button type="button" class="btn-danger" onclick="window.adminAdminAction && window.adminAdminAction('취소')">취소</button>`;
+    }
+    if(status === '수정요청'){
+      return `
+        <button type="button" class="btn-sub" onclick="window.adminAdminAction && window.adminAdminAction('승인')">승인</button>`;
+    }
+    return `
+      <button type="button" class="btn-ghost" onclick="window.adminAdminAction && window.adminAdminAction('수정요청')">수정요청</button>
+      <button type="button" class="btn-sub" onclick="window.adminAdminAction && window.adminAdminAction('승인')">승인</button>`;
+  }
   function renderDetail(detail){
     const row = detail.row;
     const panel = $('adminDetailPanel');
@@ -4878,21 +4905,8 @@
         <div><label>지결작성일</label><input type="date" id="adminVoucherDate" value="${esc(row.voucher_date||'')}" onchange="window.adminUpdateSettlementDates && window.adminUpdateSettlementDates('${esc(row.id)}')" /></div>
         <div><label>입금예정일</label><input type="date" id="adminPaymentDueDate" value="${esc(row.payment_due_date||'')}" onchange="window.adminUpdateSettlementDates && window.adminUpdateSettlementDates('${esc(row.id)}')" /></div>
       </div>
-      <div class="admin-review-checks">
-        <label><input type="checkbox"> 이동경로/거리 확인</label>
-        <label><input type="checkbox"> 유류비 계산 확인</label>
-        <label><input type="checkbox"> 법인카드 금액/증빙 확인</label>
-        <label><input type="checkbox"> 개인지급 금액/증빙 확인</label>
-        <label><input type="checkbox"> 출장계/외근신청서 확인</label>
-        <label><input type="checkbox"> 지출결의 첨부자료 준비 완료</label>
-      </div>
       <div class="admin-manager-memo"><label>관리팀 메모</label><textarea id="adminManagerMemo" placeholder="검토 메모를 입력하세요.">${esc(row.manager_memo||row.memo||'')}</textarea></div>
-      <div class="admin-final-actions">
-        <button type="button" class="btn-ghost" onclick="window.adminAdminAction && window.adminAdminAction('수정요청')">수정요청</button>
-        <button type="button" class="btn-sub" onclick="window.adminAdminAction && window.adminAdminAction('승인')">승인</button>
-        <button type="button" onclick="window.adminAdminAction && window.adminAdminAction('지출결의완료')">지출결의 완료</button>
-        <button type="button" onclick="window.adminAdminAction && window.adminAdminAction('지급완료')">지급완료</button>
-      </div>
+      <div class="admin-final-actions">${renderAdminActionButtons(row)}</div>
     </div></div>`;
   }
   async function selectAdminRequest(id, options){
@@ -4916,22 +4930,44 @@
     if($('adminSelectedCorp')) $('adminSelectedCorp').textContent = won(list.reduce((s,r)=>s+num(r.corp_card_amount),0));
     if($('adminSelectedPersonal')) $('adminSelectedPersonal').textContent = won(list.reduce((s,r)=>s+num(r.personal_amount),0));
   }
-  async function updateRequestStatus(status){
+  async function updateRequestStatus(action){
     if(!selectedId){ alert('검토할 신청건을 선택하세요.'); return; }
     const client = db();
     if(!client){ alert('Supabase 연결을 찾지 못했습니다.'); return; }
-    const payload = { status };
+
+    const current = rows.find(r => String(r.id) === String(selectedId));
+    const currentStatus = normalizedAdminStatus(current?.status);
+    let nextStatus = action;
+
+    if(action === '수정'){
+      nextStatus = currentStatus || '승인';
+    }else if(action === '취소'){
+      nextStatus = currentStatus === '지출결의완료' ? '승인' : '검토대기';
+    }else if(action === '지출결의 완료'){
+      nextStatus = '지출결의완료';
+    }
+
+
+    const payload = { status: nextStatus };
     const v = $('adminVoucherDate')?.value || null;
     const p = $('adminPaymentDueDate')?.value || null;
+    const memo = $('adminManagerMemo')?.value || '';
     payload.voucher_date = v;
     payload.payment_due_date = p;
+    payload.manager_memo = memo;
+
     const res = await client.from('travel_expense_requests').update(payload).eq('id', selectedId);
-    if(res.error){ alert('상태 변경 중 오류가 발생했습니다: ' + res.error.message); return; }
+    if(res.error){
+      delete payload.manager_memo;
+      const retry = await client.from('travel_expense_requests').update(payload).eq('id', selectedId);
+      if(retry.error){ alert('상태 변경 중 오류가 발생했습니다: ' + retry.error.message); return; }
+    }
+
     detailCache.delete(selectedId);
     await loadAdminRows();
     await selectAdminRequest(selectedId);
     if(window.refreshMonthlyProcessSummary) window.refreshMonthlyProcessSummary();
-    alert(status + ' 처리되었습니다.');
+    alert((action === '수정' ? '수정 저장' : action === '취소' ? '취소' : nextStatus) + ' 처리되었습니다.');
   }
   async function updateDates(id){
     const client = db();
