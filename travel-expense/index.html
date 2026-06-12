@@ -5080,17 +5080,17 @@
 
 
 
-<script id="travel-expense-client-resolver-final">
+
+<script id="travel-expense-list-refresh-final">
 (function(){
-  if(window.__travelExpenseClientResolverFinalInstalled) return;
-  window.__travelExpenseClientResolverFinalInstalled = true;
+  if(window.__travelExpenseListRefreshFinalInstalled) return;
+  window.__travelExpenseListRefreshFinalInstalled = true;
 
   const DB_TABLE = 'travel_expense_requests';
   const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ console.error(e); return fallback; } };
   const today = () => new Date().toISOString().slice(0,10);
 
   function getDbClient(){
-    // Supabase UMD library(window.supabase.createClient)와 실제 client 변수를 구분
     const candidates = [
       window.travelExpenseClient,
       window.supabaseClient,
@@ -5099,19 +5099,11 @@
       window.sb,
       window.supabase
     ];
-
     for(const c of candidates){
       if(c && typeof c.from === 'function') return c;
     }
-
-    // 전역 변수명으로 선언된 client가 window에 붙지 않는 경우가 있어 eval로 한 번 더 확인
-    try{
-      if(typeof client !== 'undefined' && client && typeof client.from === 'function') return client;
-    }catch(e){}
-    try{
-      if(typeof supabaseClient !== 'undefined' && supabaseClient && typeof supabaseClient.from === 'function') return supabaseClient;
-    }catch(e){}
-
+    try{ if(typeof client !== 'undefined' && client && typeof client.from === 'function') return client; }catch(e){}
+    try{ if(typeof supabaseClient !== 'undefined' && supabaseClient && typeof supabaseClient.from === 'function') return supabaseClient; }catch(e){}
     return null;
   }
 
@@ -5127,14 +5119,26 @@
     return p;
   }
 
+  function dbPayloadOnly(payload){
+    const allowed = new Set([
+      'company_id','applicant_employee_no','applicant_name','division_code','division_name',
+      'team_code','team_name','trip_type','trip_date','transport','request_date',
+      'voucher_date','payment_due_date','status','total_amount','corp_card_amount',
+      'personal_amount','fuel_amount','created_by_user_id','total_distance_km',
+      'gas_price','fuel_efficiency','round_unit','manager_memo'
+    ]);
+    const p = {};
+    Object.keys(payload).forEach(k=>{ if(allowed.has(k)) p[k] = payload[k]; });
+    return cleanPayload(p);
+  }
+
   function patchClient(){
     const db = getDbClient();
-    if(!db || db.__travelExpenseClientResolverPatched) return db;
+    if(!db || db.__travelExpenseListRefreshPatched) return db;
 
     const originalFrom = db.from.bind(db);
     db.from = function(table){
       const builder = originalFrom(table);
-
       if(table === DB_TABLE && builder && !builder.__travelExpensePayloadCleanPatched){
         ['insert','update','upsert'].forEach(method=>{
           if(typeof builder[method] === 'function'){
@@ -5147,11 +5151,9 @@
         });
         builder.__travelExpensePayloadCleanPatched = true;
       }
-
       return builder;
     };
-
-    db.__travelExpenseClientResolverPatched = true;
+    db.__travelExpenseListRefreshPatched = true;
     return db;
   }
 
@@ -5159,7 +5161,6 @@
     if(typeof v === 'number') return v;
     return Number(String(v || '0').replace(/[^\d.-]/g,'')) || 0;
   }
-
   function val(id){ return document.getElementById(id)?.value || ''; }
   function textOf(id){ return document.getElementById(id)?.textContent || ''; }
 
@@ -5190,13 +5191,14 @@
     return window.currentEditId || window.editingId || window.selectedRequestId || window.currentRequestId || window.selectedExpenseId || null;
   }
 
-  function getLocalList(){
-    if(Array.isArray(window.travelExpenses)) return window.travelExpenses;
-    if(Array.isArray(window.expenseRequests)) return window.expenseRequests;
-    if(Array.isArray(window.requests)) return window.requests;
-    if(Array.isArray(window.mockRequests)) return window.mockRequests;
-    window.travelExpenses = [];
-    return window.travelExpenses;
+  function normalizeStatus(s){
+    const v = String(s || '').replace(/\s+/g,'');
+    if(v.includes('지출결의')) return '지출결의완료';
+    if(v.includes('검토대기')) return '검토대기';
+    if(v.includes('수정요청')) return '수정요청';
+    if(v.includes('임시저장')) return '임시저장';
+    if(v.includes('승인')) return '승인';
+    return s || '임시저장';
   }
 
   function buildPayload(status){
@@ -5204,7 +5206,7 @@
     if(typeof window.calcAll === 'function') safe(()=>window.calcAll());
 
     return {
-      company_id: window.activeCompanyId || window.companyId || null,
+      company_id: window.activeCompanyId || window.companyId || window.portalSession?.company_id || window.portalSession?.companyId || null,
       applicant_employee_no: window.portalSession?.employee?.employee_no || window.portalSession?.employee_no || '',
       applicant_name: val('applicantName'),
       division_code: window.portalSession?.employee?.division_code || '',
@@ -5217,12 +5219,12 @@
       request_date: val('requestDate') || today(),
       voucher_date: val('voucherDateDisplay') || null,
       payment_due_date: val('paymentDueDateDisplay') || null,
-      status: status,
+      status: normalizeStatus(status),
       total_amount: moneyNumber(textOf('totalCost')),
       corp_card_amount: moneyNumber(textOf('corpCost')),
       personal_amount: moneyNumber(textOf('personalCost')),
       fuel_amount: moneyNumber(textOf('fuelCost')),
-      created_by_user_id: window.portalSession?.user?.id || window.portalSession?.user_id || null,
+      created_by_user_id: window.portalSession?.user?.id || window.portalSession?.user_id || window.currentUserId || null,
       total_distance_km: Number(val('distance') || 0),
       gas_price: Number(val('gasPrice') || 0),
       fuel_efficiency: Number(val('efficiency') || 0),
@@ -5234,52 +5236,54 @@
     };
   }
 
-  function dbPayloadOnly(payload){
-    const allowed = new Set([
-      'company_id','applicant_employee_no','applicant_name','division_code','division_name',
-      'team_code','team_name','trip_type','trip_date','transport','request_date',
-      'voucher_date','payment_due_date','status','total_amount','corp_card_amount',
-      'personal_amount','fuel_amount','created_by_user_id','total_distance_km',
-      'gas_price','fuel_efficiency','round_unit','manager_memo'
-    ]);
-
-    const p = {};
-    Object.keys(payload).forEach(k=>{
-      if(allowed.has(k)) p[k] = payload[k];
-    });
-    return cleanPayload(p);
-  }
-
-  function localRecord(payload, id){
+  function toLocalRecord(payload, id){
     return {
       id: id || getCurrentId() || String(Date.now()),
+      company_id: payload.company_id,
       companyId: payload.company_id,
+      applicant_employee_no: payload.applicant_employee_no,
       applicant: payload.applicant_name,
       applicantName: payload.applicant_name,
+      applicant_name: payload.applicant_name,
       division: payload.division_name,
       divisionName: payload.division_name,
+      division_name: payload.division_name,
       team: payload.team_name,
       teamName: payload.team_name,
+      team_name: payload.team_name,
       tripType: payload.trip_type,
+      trip_type: payload.trip_type,
       tripDate: payload.trip_date,
+      trip_date: payload.trip_date,
       transport: payload.transport,
       requestDate: payload.request_date,
+      request_date: payload.request_date,
       voucherDate: payload.voucher_date,
+      voucher_date: payload.voucher_date,
       paymentDueDate: payload.payment_due_date,
+      payment_due_date: payload.payment_due_date,
       status: payload.status,
       reviewStatus: payload.status,
       total: payload.total_amount,
       totalAmount: payload.total_amount,
+      total_amount: payload.total_amount,
       corp: payload.corp_card_amount,
       corpCardAmount: payload.corp_card_amount,
+      corp_card_amount: payload.corp_card_amount,
       personal: payload.personal_amount,
       personalAmount: payload.personal_amount,
+      personal_amount: payload.personal_amount,
       fuelAmount: payload.fuel_amount,
+      fuel_amount: payload.fuel_amount,
       distance: payload.total_distance_km,
       totalDistance: payload.total_distance_km,
+      total_distance_km: payload.total_distance_km,
       gasPrice: payload.gas_price,
+      gas_price: payload.gas_price,
       efficiency: payload.fuel_efficiency,
+      fuel_efficiency: payload.fuel_efficiency,
       roundUnit: payload.round_unit,
+      round_unit: payload.round_unit,
       routes: payload._routes || [],
       expenses: payload._expenses || [],
       routeLabel: payload._route_label || '',
@@ -5287,36 +5291,111 @@
     };
   }
 
+  function candidateArrays(){
+    const arrays = [];
+    ['trips','travelExpenses','expenseRequests','requests','mockRequests'].forEach(name=>{
+      if(Array.isArray(window[name])) arrays.push(window[name]);
+    });
+
+    // script 내부 let trips는 window에 안 붙을 수 있으므로 eval로 접근 시도
+    try{ if(typeof trips !== 'undefined' && Array.isArray(trips) && !arrays.includes(trips)) arrays.push(trips); }catch(e){}
+    try{ if(typeof travelExpenses !== 'undefined' && Array.isArray(travelExpenses) && !arrays.includes(travelExpenses)) arrays.push(travelExpenses); }catch(e){}
+    try{ if(typeof expenseRequests !== 'undefined' && Array.isArray(expenseRequests) && !arrays.includes(expenseRequests)) arrays.push(expenseRequests); }catch(e){}
+    return arrays;
+  }
+
+  function upsertEverywhere(record){
+    let arrays = candidateArrays();
+
+    if(!arrays.length){
+      window.trips = [];
+      window.travelExpenses = window.trips;
+      arrays = [window.trips];
+    }
+
+    arrays.forEach(arr=>{
+      const idx = arr.findIndex(x => String(x.id) === String(record.id));
+      if(idx >= 0) arr[idx] = Object.assign({}, arr[idx], record);
+      else arr.unshift(record);
+    });
+
+    window.trips = arrays[0];
+    window.travelExpenses = arrays[0];
+    window.expenseRequests = arrays[0];
+    window.requests = arrays[0];
+
+    ['travelExpenses','expenseRequests','travel_expenses','travelExpenseRequests','mockTravelExpenses','trips'].forEach(key=>{
+      try{ localStorage.setItem(key, JSON.stringify(arrays[0])); }catch(e){}
+    });
+  }
+
+  function syncFromDbRow(row, localPayload){
+    if(!row) return null;
+    return toLocalRecord(Object.assign({}, localPayload, {
+      company_id: row.company_id ?? localPayload.company_id,
+      applicant_employee_no: row.applicant_employee_no ?? localPayload.applicant_employee_no,
+      applicant_name: row.applicant_name ?? localPayload.applicant_name,
+      division_code: row.division_code ?? localPayload.division_code,
+      division_name: row.division_name ?? localPayload.division_name,
+      team_code: row.team_code ?? localPayload.team_code,
+      team_name: row.team_name ?? localPayload.team_name,
+      trip_type: row.trip_type ?? localPayload.trip_type,
+      trip_date: row.trip_date ?? localPayload.trip_date,
+      transport: row.transport ?? localPayload.transport,
+      request_date: row.request_date ?? localPayload.request_date,
+      voucher_date: row.voucher_date ?? localPayload.voucher_date,
+      payment_due_date: row.payment_due_date ?? localPayload.payment_due_date,
+      status: row.status ?? localPayload.status,
+      total_amount: row.total_amount ?? localPayload.total_amount,
+      corp_card_amount: row.corp_card_amount ?? localPayload.corp_card_amount,
+      personal_amount: row.personal_amount ?? localPayload.personal_amount,
+      fuel_amount: row.fuel_amount ?? localPayload.fuel_amount,
+      total_distance_km: row.total_distance_km ?? localPayload.total_distance_km,
+      gas_price: row.gas_price ?? localPayload.gas_price,
+      fuel_efficiency: row.fuel_efficiency ?? localPayload.fuel_efficiency,
+      round_unit: row.round_unit ?? localPayload.round_unit,
+      _routes: localPayload._routes,
+      _expenses: localPayload._expenses,
+      _route_label: localPayload._route_label,
+      _full_route_label: localPayload._full_route_label
+    }), row.id);
+  }
+
   async function saveStatus(status){
     const payload = buildPayload(status);
     const id = getCurrentId();
-    let savedId = id;
     const db = patchClient();
+    let record = toLocalRecord(payload, id);
 
     if(db){
       let result;
       if(id){
-        result = await db.from(DB_TABLE).update(dbPayloadOnly(payload)).eq('id', id).select('id').single();
+        result = await db
+          .from(DB_TABLE)
+          .update(dbPayloadOnly(payload))
+          .eq('id', id)
+          .select('*')
+          .single();
       }else{
-        result = await db.from(DB_TABLE).insert(dbPayloadOnly(payload)).select('id').single();
+        result = await db
+          .from(DB_TABLE)
+          .insert(dbPayloadOnly(payload))
+          .select('*')
+          .single();
       }
 
       if(result.error) throw result.error;
-      savedId = result.data?.id || id;
+      record = syncFromDbRow(result.data, payload) || record;
     }
 
-    const record = localRecord(payload, savedId);
-    const list = getLocalList();
-    const idx = list.findIndex(x => String(x.id) === String(record.id));
-    if(idx >= 0) list[idx] = Object.assign({}, list[idx], record);
-    else list.unshift(record);
-
-    try{ localStorage.setItem('travelExpenses', JSON.stringify(list)); }catch(e){}
+    upsertEverywhere(record);
 
     window.currentEditId = record.id;
     window.editingId = record.id;
+    window.selectedExpenseId = record.id;
 
-    ['renderMySubmissions','refreshMonthlyProcessSummary','renderAdminList','renderAdminReviewList'].forEach(name=>{
+    // 기본 렌더 함수가 특정 배열을 다시 읽도록 먼저 동기화 후 호출
+    ['renderMySubmissions','renderSubmissions','loadMyRequests','refreshMonthlyProcessSummary','renderAdminList','renderAdminReviewList','adminFilterChanged'].forEach(name=>{
       if(typeof window[name] === 'function') safe(()=>window[name]());
     });
 
