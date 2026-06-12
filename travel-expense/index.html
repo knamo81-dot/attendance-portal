@@ -1521,39 +1521,18 @@
   button[onclick*="지급완료"]{display:none!important;}
 </style>
 
-<style id="applicant-revision-actions-and-admin-memo-final-style">
-  .revision-reason-box{
-    margin-top:8px;
-    padding:9px 10px;
-    border-radius:12px;
-    background:#fff7ed;
-    border:1px solid #fed7aa;
-    color:#9a3412;
-    font-size:12px;
-    line-height:1.45;
-    font-weight:800;
-  }
-  .revision-reason-box b{
-    display:block;
-    margin-bottom:3px;
-    color:#c2410c;
-  }
-  .list-card[data-status="수정요청"] .my-card-actions{
-    display:flex!important;
-  }
-</style>
-
-
-
 <style id="applicant-card-native-final-rule-style">
   .my-card-actions .recall-btn{background:#fff7ed!important;color:#c2410c!important;}
   .my-card-actions .edit-btn{background:#eef2ff!important;color:#3730a3!important;}
   .my-card-actions .delete-btn{background:#fee2e2!important;color:#b91c1c!important;}
 </style>
 
-<style id="db-column-and-card-final-safety-style">
-  .my-card-actions .recall-btn{background:#fff7ed!important;color:#c2410c!important;}
+
+<style id="travel-expense-clean-final-style">
+  .my-card-actions{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px dashed #e5e9f2;}
+  .my-card-actions button{min-width:0!important;height:30px!important;padding:0 10px!important;border-radius:9px!important;font-size:12px!important;line-height:1!important;}
   .my-card-actions .edit-btn{background:#eef2ff!important;color:#3730a3!important;}
+  .my-card-actions .recall-btn{background:#fff7ed!important;color:#c2410c!important;}
   .my-card-actions .delete-btn{background:#fee2e2!important;color:#b91c1c!important;}
 </style>
 
@@ -5098,243 +5077,67 @@
 </script>
 
 
-<script id="applicant-revision-actions-and-admin-memo-final">
+
+<script id="travel-expense-clean-final-controller">
 (function(){
-  if(window.__revisionRequestMemoActionsInstalled) return;
-  window.__revisionRequestMemoActionsInstalled = true;
+  if(window.__travelExpenseCleanFinalControllerInstalled) return;
+  window.__travelExpenseCleanFinalControllerInstalled = true;
 
-  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
+  const DB_TABLE = 'travel_expense_requests';
+  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ console.error(e); return fallback; } };
 
-  function getRequestList(){
-    return safe(()=>window.travelExpenses) ||
-           safe(()=>window.expenseRequests) ||
-           safe(()=>window.requests) ||
-           safe(()=>window.mockRequests) ||
-           [];
+  function normalizeStatus(v){
+    const s = String(v || '').replace(/\s+/g,'');
+    if(s.includes('지출결의')) return '지출결의완료';
+    if(s.includes('검토대기')) return '검토대기';
+    if(s.includes('수정요청')) return '수정요청';
+    if(s.includes('임시저장')) return '임시저장';
+    if(s.includes('승인')) return '승인';
+    return s || '임시저장';
   }
 
-  function getTripIdFromCard(card){
-    return card?.dataset?.id ||
-           card?.getAttribute('data-trip-id') ||
-           card?.getAttribute('data-request-id') ||
-           '';
-  }
+  function cleanPayload(payload){
+    if(Array.isArray(payload)) return payload.map(cleanPayload);
+    if(!payload || typeof payload !== 'object') return payload;
 
-  function getReqByCard(card){
-    const id = getTripIdFromCard(card);
-    const list = getRequestList();
-    if(id) {
-      const found = list.find(x => String(x.id) === String(id));
-      if(found) return found;
+    const p = Object.assign({}, payload);
+
+    // 실제 travel_expense_requests 컬럼 기준
+    if(Object.prototype.hasOwnProperty.call(p, 'memo')){
+      if(!Object.prototype.hasOwnProperty.call(p, 'manager_memo')) p.manager_memo = p.memo;
+      delete p.memo;
     }
+    delete p.submittedAtRemovedRemoved;
+    delete p.submittedAtRemoved;
 
-    const title = card?.querySelector('.list-title')?.textContent || card?.textContent || '';
-    return list.find(x => title.includes(x.tripDate || '') && title.includes(x.applicant || x.applicantName || '')) || null;
+    return p;
   }
 
-  function isRevision(req, card){
-    const status = String(req?.status || req?.reviewStatus || card?.querySelector('.status')?.textContent || '');
-    return status.includes('수정요청');
-  }
-
-  function getAdminMemo(req){
-    return String(
-      req?.adminMemo ||
-      req?.managerMemo ||
-      req?.reviewMemo ||
-      req?.revisionMemo ||
-      req?.rejectReason ||
-      req?.returnReason ||
-      req?.admin_note ||
-      req?.review_note ||
-      ''
-    ).trim();
-  }
-
-  function addCardActions(card, req){
-    if(!card || !req || !isRevision(req, card)) return;
-
-    card.dataset.status = '수정요청';
-
-    if(!card.querySelector('.revision-reason-box')){
-      const memo = getAdminMemo(req);
-      if(memo){
-        const box = document.createElement('div');
-        box.className = 'revision-reason-box';
-        box.innerHTML = `<b>수정요청 사유</b><span></span>`;
-        box.querySelector('span').textContent = memo;
-        const meta = card.querySelector('.meta') || card;
-        meta.insertAdjacentElement('afterend', box);
-      }
-    }
-
-    if(!card.querySelector('.my-card-actions')){
-      const actions = document.createElement('div');
-      actions.className = 'my-card-actions';
-
-      const edit = document.createElement('button');
-      edit.type = 'button';
-      edit.className = 'edit-btn';
-      edit.textContent = '수정';
-      edit.addEventListener('click', function(e){
-        e.preventDefault();
-        e.stopPropagation();
-        if(typeof window.editRequest === 'function') return window.editRequest(req.id);
-        if(typeof window.editTravelExpenseRequest === 'function') return window.editTravelExpenseRequest(req.id);
-        if(typeof window.startEditRequest === 'function') return window.startEditRequest(req.id);
-        if(typeof window.loadTravelExpenseRequest === 'function') {
-          window.loadTravelExpenseRequest(req.id);
-          document.body.classList.add('travel-editing');
-        }
-      });
-
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'delete-btn';
-      del.textContent = '삭제';
-      del.addEventListener('click', function(e){
-        e.preventDefault();
-        e.stopPropagation();
-        if(!confirm('이 수정요청 건을 삭제할까요?')) return;
-        if(typeof window.deleteRequest === 'function') return window.deleteRequest(req.id);
-        if(typeof window.deleteTravelExpenseRequest === 'function') return window.deleteTravelExpenseRequest(req.id);
-        const list = getRequestList();
-        const idx = list.findIndex(x => String(x.id) === String(req.id));
-        if(idx >= 0) list.splice(idx, 1);
-        if(typeof window.renderMySubmissions === 'function') window.renderMySubmissions();
-        if(typeof window.refreshMonthlyProcessSummary === 'function') window.refreshMonthlyProcessSummary();
-      });
-
-      actions.appendChild(edit);
-      actions.appendChild(del);
-      card.appendChild(actions);
-    }
-  }
-
-  function enhanceApplicantCards(){
-    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
-      const req = getReqByCard(card);
-      if(req && isRevision(req, card)) addCardActions(card, req);
-    });
-  }
-
-  function patchRenderer(name){
-    const fn = window[name];
-    if(typeof fn !== 'function' || fn.__revisionActionPatched) return;
-
-    const wrapped = function(){
-      const result = fn.apply(this, arguments);
-      setTimeout(enhanceApplicantCards, 30);
-      setTimeout(enhanceApplicantCards, 180);
-      return result;
-    };
-    wrapped.__revisionActionPatched = true;
-    window[name] = wrapped;
-  }
-
-  // Admin save: keep memo only in memory/local state; do not send memo/manager_memo columns to Supabase.
-  function readAdminMemoInput(){
-    return document.getElementById('adminMemo')?.value ||
-           document.getElementById('managerMemo')?.value ||
-           document.querySelector('.admin-manager-memo textarea')?.value ||
-           '';
-  }
-
-  function getSelectedAdminReq(){
-    const id = window.adminSelectedId || window.selectedAdminId || window.currentAdminId || window.selectedExpenseId;
-    const list = getRequestList();
-    return list.find(x => String(x.id) === String(id)) ||
-           window.adminSelectedRequest ||
-           window.selectedAdminRequest ||
-           null;
-  }
-
-  const oldAdminAction = window.adminAdminAction || window.adminDetailAction || window.adminReviewAction;
-  window.adminAdminAction = window.adminDetailAction = window.adminReviewAction = async function(action){
-    const req = getSelectedAdminReq();
-    const memo = readAdminMemoInput();
-    if(req && memo){
-      req.adminMemo = memo;
-      req.reviewMemo = memo;
-      req.revisionMemo = memo;
-    }
-
-    if(typeof oldAdminAction === 'function'){
-      return oldAdminAction.call(this, action);
-    }
-  };
-
-  ['renderMySubmissions','renderSubmissions','loadMyRequests','renderAdminDetail','renderAdminReviewList'].forEach(patchRenderer);
-
-  const mo = new MutationObserver(() => enhanceApplicantCards());
-  if(document.body) mo.observe(document.body, { childList:true, subtree:true });
-
-  setTimeout(enhanceApplicantCards, 100);
-  setTimeout(enhanceApplicantCards, 700);
-  setTimeout(enhanceApplicantCards, 1500);
-})();
-</script>
-
-
-
-<script id="db-column-and-card-final-safety">
-(function(){
-  if(window.__dbColumnAndCardFinalSafetyInstalled) return;
-  window.__dbColumnAndCardFinalSafetyInstalled = true;
-
-  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
-
-  // Supabase schema safety:
-  // travel_expense_requests has manager_memo, but has NO memo / submittedAtRemovedRemoved / submittedAtRemoved.
-  function sanitizeTravelExpensePayload(payload){
-    if(!payload || typeof payload !== 'object' || Array.isArray(payload)) return payload;
-    const clean = Object.assign({}, payload);
-
-    if(Object.prototype.hasOwnProperty.call(clean, 'memo')){
-      if(!Object.prototype.hasOwnProperty.call(clean, 'manager_memo')){
-        clean.manager_memo = clean.memo;
-      }
-      delete clean.memo;
-    }
-
-    delete clean.submittedAtRemovedRemoved;
-    delete clean.submittedAtRemoved;
-
-    return clean;
-  }
-
-  function sanitizeArrayOrObject(value){
-    if(Array.isArray(value)) return value.map(v => sanitizeTravelExpensePayload(v));
-    return sanitizeTravelExpensePayload(value);
-  }
-
-  // Patch Supabase table operations only for travel_expense_requests, without changing other tables.
-  function patchSupabaseClient(){
-    if(!window.supabase || window.supabase.__travelExpenseSchemaSafetyPatched) return;
+  function patchSupabase(){
+    if(!window.supabase || window.supabase.__travelExpenseCleanPayloadPatched) return;
 
     const originalFrom = window.supabase.from.bind(window.supabase);
-    window.supabase.from = function(tableName){
-      const builder = originalFrom(tableName);
+    window.supabase.from = function(table){
+      const builder = originalFrom(table);
 
-      if(tableName === 'travel_expense_requests' && builder && !builder.__travelExpenseBuilderPatched){
-        ['insert','update','upsert'].forEach(methodName => {
-          if(typeof builder[methodName] === 'function'){
-            const originalMethod = builder[methodName].bind(builder);
-            builder[methodName] = function(payload, ...args){
-              return originalMethod(sanitizeArrayOrObject(payload), ...args);
+      if(table === DB_TABLE && builder && !builder.__travelExpenseCleanBuilderPatched){
+        ['insert','update','upsert'].forEach(method=>{
+          if(typeof builder[method] === 'function'){
+            const original = builder[method].bind(builder);
+            builder[method] = function(payload, ...args){
+              return original(cleanPayload(payload), ...args);
             };
           }
         });
-        builder.__travelExpenseBuilderPatched = true;
+        builder.__travelExpenseCleanBuilderPatched = true;
       }
-
       return builder;
     };
 
-    window.supabase.__travelExpenseSchemaSafetyPatched = true;
+    window.supabase.__travelExpenseCleanPayloadPatched = true;
   }
 
-  function getRequests(){
+  function requestList(){
     return safe(()=>window.travelExpenses) ||
            safe(()=>window.expenseRequests) ||
            safe(()=>window.requests) ||
@@ -5342,16 +5145,10 @@
            [];
   }
 
-  function getReqByCard(card){
+  function requestFromCard(card){
     if(!card) return null;
-
-    const id = card.dataset?.id ||
-               card.getAttribute('data-id') ||
-               card.getAttribute('data-trip-id') ||
-               card.getAttribute('data-request-id') ||
-               '';
-
-    const list = getRequests();
+    const id = card.dataset?.id || card.getAttribute('data-id') || card.getAttribute('data-trip-id') || card.getAttribute('data-request-id') || '';
+    const list = requestList();
 
     if(id){
       const found = list.find(x => String(x.id) === String(id));
@@ -5359,31 +5156,20 @@
     }
 
     const txt = card.textContent || '';
-    return list.find(x => {
+    return list.find(x=>{
       const date = String(x.tripDate || x.trip_date || '');
-      const applicant = String(x.applicant || x.applicantName || x.name || '');
+      const applicant = String(x.applicant || x.applicantName || x.applicant_name || x.name || '');
       return (!date || txt.includes(date)) && (!applicant || txt.includes(applicant));
     }) || null;
-  }
-
-  function normalizeStatus(value){
-    const raw = String(value || '').replace(/\s+/g,'');
-    if(raw.includes('지출결의')) return '지출결의완료';
-    if(raw.includes('검토대기')) return '검토대기';
-    if(raw.includes('수정요청')) return '수정요청';
-    if(raw.includes('임시저장')) return '임시저장';
-    if(raw.includes('승인')) return '승인';
-    return raw;
   }
 
   function statusOf(req, card){
     return normalizeStatus(req?.status || req?.reviewStatus || card?.querySelector('.status')?.textContent);
   }
 
-  function persistList(){
-    const list = getRequests();
+  function persistLocal(){
+    const list = requestList();
     const keys = ['travelExpenses','expenseRequests','travel_expenses','travelExpenseRequests','mockTravelExpenses'];
-
     keys.forEach(key=>{
       try{
         const stored = JSON.parse(localStorage.getItem(key) || 'null');
@@ -5398,21 +5184,25 @@
     });
   }
 
-  async function updateRequestStatus(req, status){
+  async function setStatus(req, status){
     if(!req) return;
+    const next = normalizeStatus(status);
 
-    req.status = status;
-    req.reviewStatus = status;
+    req.status = next;
+    req.reviewStatus = next;
 
-    // 회수는 DB에 status만 업데이트. submittedAtRemovedRemoved은 DB 컬럼이 아니므로 절대 보내지 않음.
+    patchSupabase();
+
     if(window.supabase && req.id){
-      await window.supabase
-        .from('travel_expense_requests')
-        .update({ status: status })
+      const result = await window.supabase
+        .from(DB_TABLE)
+        .update({ status: next })
         .eq('id', req.id);
+
+      if(result && result.error) throw result.error;
     }
 
-    persistList();
+    persistLocal();
   }
 
   function refreshAll(){
@@ -5450,10 +5240,10 @@
 
   async function recallReq(req){
     if(!req) return;
-    if(!confirm('제출한 검토대기 건을 회수하고 임시저장 상태로 되돌릴까요? 관리팀 검토 목록에서는 제외됩니다.')) return;
+    if(!confirm('제출한 검토대기 건을 회수하고 임시저장 상태로 되돌릴까요?')) return;
 
     try{
-      await updateRequestStatus(req, '임시저장');
+      await setStatus(req, '임시저장');
       refreshAll();
       alert('회수되었습니다. 임시저장 상태로 변경되었습니다.');
     }catch(err){
@@ -5468,40 +5258,35 @@
     if(typeof window.deleteRequest === 'function') return window.deleteRequest(req.id);
     if(typeof window.deleteTravelExpenseRequest === 'function') return window.deleteTravelExpenseRequest(req.id);
 
-    const list = getRequests();
+    const list = requestList();
     const idx = list.findIndex(x => String(x.id) === String(req.id));
     if(idx >= 0) list.splice(idx, 1);
 
-    persistList();
+    persistLocal();
     refreshAll();
   }
 
-  function makeButton(label, cls, fn){
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = cls;
-    btn.textContent = label;
-    btn.addEventListener('click', function(e){
+  function btn(label, cls, handler){
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = cls;
+    b.textContent = label;
+    b.addEventListener('click', e=>{
       e.preventDefault();
       e.stopPropagation();
-      fn();
+      handler();
     });
-    return btn;
+    return b;
   }
 
-  function enforceApplicantCardButtons(){
+  function enforceApplicantCards(){
     document.querySelectorAll('.submission-scroll .list-card').forEach(card=>{
-      const req = getReqByCard(card);
+      const req = requestFromCard(card);
       if(!req) return;
 
       const status = statusOf(req, card);
       let actions = card.querySelector('.my-card-actions');
 
-      // 최종 규칙
-      // 임시저장: 수정/삭제
-      // 검토대기: 회수/삭제
-      // 수정요청: 수정/삭제
-      // 승인/지출결의완료: 버튼 없음
       if(status === '승인' || status === '지출결의완료'){
         if(actions) actions.remove();
         return;
@@ -5520,14 +5305,14 @@
       actions.innerHTML = '';
 
       if(status === '임시저장' || status === '수정요청'){
-        actions.appendChild(makeButton('수정', 'edit-btn', ()=>editReq(req)));
+        actions.appendChild(btn('수정', 'edit-btn', ()=>editReq(req)));
       }
 
       if(status === '검토대기'){
-        actions.appendChild(makeButton('회수', 'recall-btn', ()=>recallReq(req)));
+        actions.appendChild(btn('회수', 'recall-btn', ()=>recallReq(req)));
       }
 
-      actions.appendChild(makeButton('삭제', 'delete-btn', ()=>deleteReq(req)));
+      actions.appendChild(btn('삭제', 'delete-btn', ()=>deleteReq(req)));
     });
 
     document.getElementById('submitCancelBtn')?.remove();
@@ -5536,102 +5321,33 @@
 
   function patchRender(name){
     const fn = window[name];
-    if(typeof fn !== 'function' || fn.__dbColumnAndCardFinalPatched) return;
+    if(typeof fn !== 'function' || fn.__travelExpenseCleanFinalPatched) return;
 
     const wrapped = function(){
-      patchSupabaseClient();
+      patchSupabase();
       const result = fn.apply(this, arguments);
-      setTimeout(enforceApplicantCardButtons, 20);
-      setTimeout(enforceApplicantCardButtons, 120);
-      setTimeout(enforceApplicantCardButtons, 400);
+      setTimeout(enforceApplicantCards, 30);
+      setTimeout(enforceApplicantCards, 180);
+      setTimeout(enforceApplicantCards, 500);
       return result;
     };
-    wrapped.__dbColumnAndCardFinalPatched = true;
+    wrapped.__travelExpenseCleanFinalPatched = true;
     window[name] = wrapped;
   }
 
-  [
-    'renderMySubmissions',
-    'renderSubmissions',
-    'loadMyRequests',
-    'newRequest',
-    'clearForm',
-    'loadTravelExpenseRequest',
-    'selectRequest',
-    'saveTravelExpenseDraft',
-    'submitTravelExpense'
-  ].forEach(patchRender);
+  ['renderMySubmissions','renderSubmissions','loadMyRequests','newRequest','clearForm','loadTravelExpenseRequest','selectRequest','saveTravelExpenseDraft','submitTravelExpense'].forEach(patchRender);
 
-  patchSupabaseClient();
+  patchSupabase();
 
-  const observer = new MutationObserver(()=>{
-    patchSupabaseClient();
-    enforceApplicantCardButtons();
+  const mo = new MutationObserver(()=>{
+    patchSupabase();
+    enforceApplicantCards();
   });
-  if(document.body) observer.observe(document.body, { childList:true, subtree:true });
+  if(document.body) mo.observe(document.body, { childList:true, subtree:true });
 
-  setTimeout(()=>{ patchSupabaseClient(); enforceApplicantCardButtons(); }, 80);
-  setTimeout(()=>{ patchSupabaseClient(); enforceApplicantCardButtons(); }, 500);
-  setTimeout(()=>{ patchSupabaseClient(); enforceApplicantCardButtons(); }, 1300);
-})();
-</script>
-
-
-<script id="schema-cache-safe-final-strong">
-(function(){
-  if(window.__schemaCacheSafeFinalStrongInstalled) return;
-  window.__schemaCacheSafeFinalStrongInstalled = true;
-
-  function cleanPayload(payload){
-    if(Array.isArray(payload)) return payload.map(cleanPayload);
-    if(!payload || typeof payload !== 'object') return payload;
-
-    const cleaned = Object.assign({}, payload);
-
-    // DB 실제 컬럼 기준
-    if(Object.prototype.hasOwnProperty.call(cleaned, 'memo')){
-      if(!Object.prototype.hasOwnProperty.call(cleaned, 'manager_memo')){
-        cleaned.manager_memo = cleaned.memo;
-      }
-      delete cleaned.memo;
-    }
-
-    delete cleaned.submitted_at;
-    delete cleaned.submittedAt;
-
-    return cleaned;
-  }
-
-  function patch(){
-    if(!window.supabase || window.supabase.__schemaCacheSafeFinalStrongPatched) return;
-
-    const originalFrom = window.supabase.from.bind(window.supabase);
-
-    window.supabase.from = function(table){
-      const builder = originalFrom(table);
-
-      if(table === 'travel_expense_requests' && builder && !builder.__schemaCacheSafeFinalStrongBuilderPatched){
-        ['insert','update','upsert'].forEach(method=>{
-          if(typeof builder[method] === 'function'){
-            const original = builder[method].bind(builder);
-            builder[method] = function(payload, ...args){
-              return original(cleanPayload(payload), ...args);
-            };
-          }
-        });
-        builder.__schemaCacheSafeFinalStrongBuilderPatched = true;
-      }
-
-      return builder;
-    };
-
-    window.supabase.__schemaCacheSafeFinalStrongPatched = true;
-  }
-
-  patch();
-  setTimeout(patch, 0);
-  setTimeout(patch, 300);
-  document.addEventListener('DOMContentLoaded', patch);
+  setTimeout(()=>{patchSupabase(); enforceApplicantCards();}, 80);
+  setTimeout(()=>{patchSupabase(); enforceApplicantCards();}, 500);
+  setTimeout(()=>{patchSupabase(); enforceApplicantCards();}, 1300);
 })();
 </script>
 
