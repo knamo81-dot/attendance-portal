@@ -1466,7 +1466,7 @@
 </style>
 
 
-<style id="opinet-latest-fuel-autofill-style">
+<style id="opinet-fuel-autofill-safe-final">
   #gasPrice[readonly]{
     background:#f8fafc !important;
     color:#334155 !important;
@@ -1474,10 +1474,10 @@
   }
   .opinet-fuel-note{
     margin-top:6px;
-    color:#64748b;
     font-size:12px;
-    font-weight:700;
     line-height:1.35;
+    color:#64748b;
+    font-weight:700;
   }
 </style>
 
@@ -2731,188 +2731,6 @@
     </section>
     ${evidencePages(printTrips, mode)}
   </div>
-
-<script id="opinet-latest-fuel-autofill-final">
-(function(){
-  if(window.__opinetLatestFuelAutofillFinalInstalled) return;
-  window.__opinetLatestFuelAutofillFinalInstalled = true;
-
-  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
-  const hasClient = obj => !!(obj && typeof obj.from === 'function');
-
-  function findDb(scope){
-    if(!scope) return null;
-    const names = [
-      'supabaseClient','supabase_client','sb','db','database',
-      'portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB',
-      '__supabaseClient','__SUPABASE_CLIENT__','client'
-    ];
-    for(const name of names){
-      const value = safe(()=>scope[name]);
-      if(hasClient(value)) return value;
-    }
-    const boxes=['portal','Portal','portalApp','PortalApp','portalSession','__PORTAL__','__PORTAL_STATE__','app','App'];
-    for(const name of boxes){
-      const box=safe(()=>scope[name]);
-      if(hasClient(box)) return box;
-      if(box && typeof box === 'object'){
-        for(const key of safe(()=>Object.keys(box), [])){
-          const value=safe(()=>box[key]);
-          if(hasClient(value)) return value;
-        }
-      }
-    }
-    for(const key of safe(()=>Object.keys(scope), [])){
-      if(key === 'supabase') continue;
-      const value = safe(()=>scope[key]);
-      if(hasClient(value)) return value;
-    }
-    return null;
-  }
-
-  function makeClient(){
-    const lib = safe(()=>window.supabase) || safe(()=>window.parent && window.parent.supabase);
-    if(!lib || typeof lib.createClient !== 'function') return null;
-
-    const configs = [
-      safe(()=>window.APP_CONFIG), safe(()=>window.appConfig), safe(()=>window.CONFIG),
-      safe(()=>window.parent && window.parent.APP_CONFIG), safe(()=>window.parent && window.parent.appConfig), safe(()=>window.parent && window.parent.CONFIG)
-    ].filter(Boolean);
-
-    let url = safe(()=>window.EXELO_SUPABASE_URL,'') || safe(()=>window.SUPABASE_URL,'') || safe(()=>window.parent && window.parent.EXELO_SUPABASE_URL,'') || safe(()=>window.parent && window.parent.SUPABASE_URL,'');
-    let key = safe(()=>window.EXELO_SUPABASE_ANON_KEY,'') || safe(()=>window.SUPABASE_ANON_KEY,'') || safe(()=>window.parent && window.parent.EXELO_SUPABASE_ANON_KEY,'') || safe(()=>window.parent && window.parent.SUPABASE_ANON_KEY,'');
-
-    for(const c of configs){
-      url = url || c.supabaseUrl || c.SUPABASE_URL || c.supabase_url || c.projectUrl || '';
-      key = key || c.supabaseAnonKey || c.SUPABASE_ANON_KEY || c.supabase_anon_key || c.anonKey || '';
-    }
-
-    if(url && key) return lib.createClient(url, key);
-    return null;
-  }
-
-  function getDb(){
-    return findDb(safe(()=>window.parent)) || findDb(window) || makeClient();
-  }
-
-  function gasInput(){ return document.getElementById('gasPrice'); }
-
-  function setNote(message, isError){
-    const input = gasInput();
-    if(!input) return;
-    let note = document.getElementById('opinetFuelNote');
-    if(!note){
-      note = document.createElement('div');
-      note.id = 'opinetFuelNote';
-      note.className = 'opinet-fuel-note';
-      input.insertAdjacentElement('afterend', note);
-    }
-    note.textContent = message || '';
-    note.style.color = isError ? '#b91c1c' : '#64748b';
-  }
-
-  function lockGasInput(){
-    const input = gasInput();
-    if(!input) return;
-    input.readOnly = true;
-    input.step = '0.01';
-    input.title = '오피넷 API로 저장된 최신 보통휘발유 평균가격이 자동 입력됩니다.';
-  }
-
-  async function queryLatestFrom(client, sourceName){
-    const { data, error } = await client
-      .from(sourceName)
-      .select('price_date, gasoline_price')
-      .order('price_date', { ascending:false })
-      .limit(1)
-      .maybeSingle();
-    if(error) throw error;
-    return data;
-  }
-
-  async function fetchLatestFuelPrice(){
-    const client = getDb();
-    if(!client) throw new Error('Supabase client not found');
-
-    // View가 있으면 우선 사용, 없거나 권한 문제가 있으면 테이블 직접 조회
-    try{
-      const viewData = await queryLatestFrom(client, 'vw_latest_fuel_price');
-      if(viewData) return viewData;
-    }catch(viewError){
-      console.warn('[TravelExpense] vw_latest_fuel_price failed, fallback to table', viewError);
-    }
-
-    const tableData = await queryLatestFrom(client, 'fuel_daily_prices');
-    if(!tableData) throw new Error('fuel_daily_prices is empty');
-    return tableData;
-  }
-
-  async function applyLatestFuelPrice(options){
-    const opts = Object.assign({ force:false }, options || {});
-    const input = gasInput();
-    if(!input) return null;
-
-    lockGasInput();
-
-    // 카드 조회/수정 중 이미 저장된 유가가 있으면 최신 유가로 덮어쓰지 않음
-    if(!opts.force && String(input.value || '').trim() !== ''){
-      setNote('저장된 신청 당시 유가를 표시 중입니다.', false);
-      return null;
-    }
-
-    try{
-      const latest = await fetchLatestFuelPrice();
-      const price = Number(latest.gasoline_price || 0);
-      if(price > 0){
-        input.value = String(price);
-        setNote(`오피넷 저장 유가 자동 적용: ${latest.price_date} / ${price.toLocaleString('ko-KR')}원/L`, false);
-        if(typeof window.calcAll === 'function') window.calcAll();
-      }else{
-        throw new Error('gasoline_price is empty');
-      }
-      return latest;
-    }catch(error){
-      console.warn('[TravelExpense] latest fuel price load failed', error);
-      setNote('최신 유가를 불러오지 못했습니다. fuel_daily_prices 조회 권한 또는 데이터를 확인하세요.', true);
-      return null;
-    }
-  }
-
-  window.loadLatestFuelPriceToTravelExpense = applyLatestFuelPrice;
-
-  function patchFunction(name, options){
-    const fn = window[name];
-    if(typeof fn !== 'function' || fn.__opinetFuelPatched) return;
-    const wrapped = function(){
-      const result = fn.apply(this, arguments);
-      setTimeout(()=>applyLatestFuelPrice(options), 80);
-      setTimeout(()=>applyLatestFuelPrice(options), 400);
-      return result;
-    };
-    wrapped.__opinetFuelPatched = true;
-    window[name] = wrapped;
-  }
-
-  function init(){
-    lockGasInput();
-    patchFunction('newRequest', { force:true });
-    patchFunction('clearForm', { force:true });
-    // 신규 화면에서 유가가 비어 있을 때 최신값 자동 적용
-    setTimeout(()=>applyLatestFuelPrice({ force:false }), 300);
-    setTimeout(()=>applyLatestFuelPrice({ force:false }), 1200);
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', init);
-  }else{
-    init();
-  }
-
-  setTimeout(init, 800);
-  setTimeout(init, 2200);
-})();
-</script>
-
 </body>
 </html>`;
   }
@@ -4373,6 +4191,214 @@
 })();
 </script>
 
+
+<script id="opinet-fuel-autofill-safe-final">
+(function(){
+  if(window.__opinetFuelAutofillSafeFinalInstalled) return;
+  window.__opinetFuelAutofillSafeFinalInstalled = true;
+
+  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
+  const hasClient = obj => !!(obj && typeof obj.from === 'function');
+
+  function scanClient(scope){
+    if(!scope) return null;
+
+    const names = [
+      'supabaseClient','supabase_client','sb','db','database',
+      'portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB',
+      '__supabaseClient','__SUPABASE_CLIENT__','client'
+    ];
+
+    for(const name of names){
+      const value = safe(()=>scope[name]);
+      if(hasClient(value)) return value;
+    }
+
+    const boxes = [
+      'portal','Portal','portalApp','PortalApp','portalSession',
+      '__PORTAL__','__PORTAL_STATE__','app','App'
+    ];
+
+    for(const name of boxes){
+      const box = safe(()=>scope[name]);
+      if(hasClient(box)) return box;
+      if(box && typeof box === 'object'){
+        for(const key of safe(()=>Object.keys(box), [])){
+          const value = safe(()=>box[key]);
+          if(hasClient(value)) return value;
+        }
+      }
+    }
+
+    for(const key of safe(()=>Object.keys(scope), [])){
+      if(key === 'supabase') continue;
+      const value = safe(()=>scope[key]);
+      if(hasClient(value)) return value;
+    }
+
+    return null;
+  }
+
+  function createClientFromKnownConfig(){
+    const lib = safe(()=>window.supabase) || safe(()=>window.parent && window.parent.supabase);
+    if(!lib || typeof lib.createClient !== 'function') return null;
+
+    const configs = [
+      safe(()=>window.APP_CONFIG),
+      safe(()=>window.appConfig),
+      safe(()=>window.CONFIG),
+      safe(()=>window.parent && window.parent.APP_CONFIG),
+      safe(()=>window.parent && window.parent.appConfig),
+      safe(()=>window.parent && window.parent.CONFIG)
+    ].filter(Boolean);
+
+    let url = safe(()=>window.EXELO_SUPABASE_URL,'') ||
+      safe(()=>window.SUPABASE_URL,'') ||
+      safe(()=>window.parent && window.parent.EXELO_SUPABASE_URL,'') ||
+      safe(()=>window.parent && window.parent.SUPABASE_URL,'');
+
+    let key = safe(()=>window.EXELO_SUPABASE_ANON_KEY,'') ||
+      safe(()=>window.SUPABASE_ANON_KEY,'') ||
+      safe(()=>window.parent && window.parent.EXELO_SUPABASE_ANON_KEY,'') ||
+      safe(()=>window.parent && window.parent.SUPABASE_ANON_KEY,'');
+
+    for(const c of configs){
+      url = url || c.supabaseUrl || c.SUPABASE_URL || c.supabase_url || c.projectUrl || '';
+      key = key || c.supabaseAnonKey || c.SUPABASE_ANON_KEY || c.supabase_anon_key || c.anonKey || '';
+    }
+
+    if(url && key) return lib.createClient(url, key);
+    return null;
+  }
+
+  function getClient(){
+    return scanClient(safe(()=>window.parent)) || scanClient(window) || createClientFromKnownConfig();
+  }
+
+  function gasInput(){
+    return document.getElementById('gasPrice');
+  }
+
+  function setNote(message, type){
+    const input = gasInput();
+    if(!input) return;
+
+    let note = document.getElementById('opinetFuelNote');
+    if(!note){
+      note = document.createElement('div');
+      note.id = 'opinetFuelNote';
+      note.className = 'opinet-fuel-note';
+      input.insertAdjacentElement('afterend', note);
+    }
+
+    note.textContent = message || '';
+    note.style.color = type === 'error' ? '#b91c1c' : '#64748b';
+  }
+
+  function lockGasInput(){
+    const input = gasInput();
+    if(!input) return;
+    input.readOnly = true;
+    input.step = '0.01';
+    input.title = 'fuel_daily_prices에 저장된 최신 보통휘발유 평균가격이 자동 입력됩니다.';
+  }
+
+  async function selectLatest(client, table){
+    const { data, error } = await client
+      .from(table)
+      .select('price_date, gasoline_price')
+      .order('price_date', { ascending:false })
+      .limit(1)
+      .maybeSingle();
+
+    if(error) throw error;
+    return data;
+  }
+
+  async function getLatestFuel(){
+    const client = getClient();
+    if(!client) throw new Error('Supabase client not found');
+
+    try{
+      const fromView = await selectLatest(client, 'vw_latest_fuel_price');
+      if(fromView) return fromView;
+    }catch(viewError){
+      console.warn('[TravelExpense] vw_latest_fuel_price 조회 실패, fuel_daily_prices로 재시도', viewError);
+    }
+
+    const fromTable = await selectLatest(client, 'fuel_daily_prices');
+    if(!fromTable) throw new Error('fuel_daily_prices empty');
+    return fromTable;
+  }
+
+  async function applyLatestFuel(options){
+    const opts = Object.assign({ force:false }, options || {});
+    const input = gasInput();
+    if(!input) return;
+
+    lockGasInput();
+
+    // 기존 저장건을 조회한 경우에는 신청 당시 저장된 유가를 덮어쓰지 않음
+    if(!opts.force && String(input.value || '').trim() !== ''){
+      setNote('신청 당시 저장된 유가를 표시 중입니다.');
+      return;
+    }
+
+    try{
+      const latest = await getLatestFuel();
+      const price = Number(latest.gasoline_price || 0);
+
+      if(!price) throw new Error('gasoline_price empty');
+
+      input.value = String(price);
+      setNote(`최신 저장 유가 적용: ${latest.price_date} / ${price.toLocaleString('ko-KR')}원/L`);
+
+      if(typeof window.calcAll === 'function') window.calcAll();
+    }catch(error){
+      console.warn('[TravelExpense] 최신 유가 자동입력 실패', error);
+      setNote('최신 유가를 불러오지 못했습니다. fuel_daily_prices 읽기 권한 또는 데이터를 확인하세요.', 'error');
+    }
+  }
+
+  window.loadLatestFuelPriceToTravelExpense = applyLatestFuel;
+
+  function patchFunction(name, options){
+    const fn = window[name];
+    if(typeof fn !== 'function' || fn.__opinetFuelAutofillPatched) return;
+
+    const wrapped = function(){
+      const result = fn.apply(this, arguments);
+      setTimeout(()=>applyLatestFuel(options), 120);
+      setTimeout(()=>applyLatestFuel(options), 600);
+      return result;
+    };
+
+    wrapped.__opinetFuelAutofillPatched = true;
+    window[name] = wrapped;
+  }
+
+  function init(){
+    lockGasInput();
+
+    // 신규작성/폼초기화 이후에는 최신 유가를 강제 입력
+    patchFunction('newRequest', { force:true });
+    patchFunction('clearForm', { force:true });
+
+    // 최초 로딩 시 비어 있으면 최신 유가 입력
+    setTimeout(()=>applyLatestFuel({ force:false }), 400);
+    setTimeout(()=>applyLatestFuel({ force:false }), 1400);
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', init);
+  }else{
+    init();
+  }
+
+  setTimeout(init, 700);
+  setTimeout(init, 1800);
+})();
+</script>
 
 </body>
 </html>
