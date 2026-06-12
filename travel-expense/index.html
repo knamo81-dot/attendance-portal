@@ -3707,7 +3707,7 @@
     if(!client || !p.companyId || !id){ alert('회수할 신청건을 찾지 못했습니다.'); return; }
     if(!confirm('제출한 검토대기 건을 회수하고 임시저장 상태로 되돌릴까요? 관리팀 검토 목록에서는 제외됩니다.')) return;
     const res=await client.from('travel_expense_requests')
-      .update({status:'임시저장', submitted_at:null})
+      .update({status:'임시저장', })
       .eq('company_id',p.companyId)
       .eq('id',id);
     if(res.error){ console.error('[TravelExpense] recall error',res.error); alert('회수 중 오류가 발생했습니다: '+res.error.message); return; }
@@ -5285,7 +5285,7 @@
   const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
 
   // Supabase schema safety:
-  // travel_expense_requests has manager_memo, but has NO memo / submitted_at / submittedAt.
+  // travel_expense_requests has manager_memo, but has NO memo / submittedAtRemovedRemoved / submittedAtRemoved.
   function sanitizeTravelExpensePayload(payload){
     if(!payload || typeof payload !== 'object' || Array.isArray(payload)) return payload;
     const clean = Object.assign({}, payload);
@@ -5297,8 +5297,8 @@
       delete clean.memo;
     }
 
-    delete clean.submitted_at;
-    delete clean.submittedAt;
+    delete clean.submittedAtRemovedRemoved;
+    delete clean.submittedAtRemoved;
 
     return clean;
   }
@@ -5404,7 +5404,7 @@
     req.status = status;
     req.reviewStatus = status;
 
-    // 회수는 DB에 status만 업데이트. submitted_at은 DB 컬럼이 아니므로 절대 보내지 않음.
+    // 회수는 DB에 status만 업데이트. submittedAtRemovedRemoved은 DB 컬럼이 아니므로 절대 보내지 않음.
     if(window.supabase && req.id){
       await window.supabase
         .from('travel_expense_requests')
@@ -5573,6 +5573,65 @@
   setTimeout(()=>{ patchSupabaseClient(); enforceApplicantCardButtons(); }, 80);
   setTimeout(()=>{ patchSupabaseClient(); enforceApplicantCardButtons(); }, 500);
   setTimeout(()=>{ patchSupabaseClient(); enforceApplicantCardButtons(); }, 1300);
+})();
+</script>
+
+
+<script id="schema-cache-safe-final-strong">
+(function(){
+  if(window.__schemaCacheSafeFinalStrongInstalled) return;
+  window.__schemaCacheSafeFinalStrongInstalled = true;
+
+  function cleanPayload(payload){
+    if(Array.isArray(payload)) return payload.map(cleanPayload);
+    if(!payload || typeof payload !== 'object') return payload;
+
+    const cleaned = Object.assign({}, payload);
+
+    // DB 실제 컬럼 기준
+    if(Object.prototype.hasOwnProperty.call(cleaned, 'memo')){
+      if(!Object.prototype.hasOwnProperty.call(cleaned, 'manager_memo')){
+        cleaned.manager_memo = cleaned.memo;
+      }
+      delete cleaned.memo;
+    }
+
+    delete cleaned.submitted_at;
+    delete cleaned.submittedAt;
+
+    return cleaned;
+  }
+
+  function patch(){
+    if(!window.supabase || window.supabase.__schemaCacheSafeFinalStrongPatched) return;
+
+    const originalFrom = window.supabase.from.bind(window.supabase);
+
+    window.supabase.from = function(table){
+      const builder = originalFrom(table);
+
+      if(table === 'travel_expense_requests' && builder && !builder.__schemaCacheSafeFinalStrongBuilderPatched){
+        ['insert','update','upsert'].forEach(method=>{
+          if(typeof builder[method] === 'function'){
+            const original = builder[method].bind(builder);
+            builder[method] = function(payload, ...args){
+              return original(cleanPayload(payload), ...args);
+            };
+          }
+        });
+        builder.__schemaCacheSafeFinalStrongBuilderPatched = true;
+      }
+
+      return builder;
+    };
+
+    window.supabase.__schemaCacheSafeFinalStrongPatched = true;
+  }
+
+  patch();
+  setTimeout(patch, 0);
+  setTimeout(patch, 300);
+  document.addEventListener('DOMContentLoaded', patch);
 })();
 </script>
 
