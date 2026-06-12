@@ -1544,7 +1544,8 @@
 </style>
 
 
-<style id="pending-card-final-flow-style">
+
+<style id="applicant-card-status-final-rule-style">
   .my-card-actions .recall-btn{
     background:#fff7ed!important;
     color:#c2410c!important;
@@ -5249,10 +5250,11 @@
 </script>
 
 
-<script id="pending-card-final-flow">
+
+<script id="applicant-card-status-final-rule">
 (function(){
-  if(window.__pendingCardFinalFlowInstalled) return;
-  window.__pendingCardFinalFlowInstalled = true;
+  if(window.__applicantCardStatusFinalRuleInstalled) return;
+  window.__applicantCardStatusFinalRuleInstalled = true;
 
   const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
 
@@ -5267,11 +5269,12 @@
   function getReqByCard(card){
     if(!card) return null;
 
-    const id = card.dataset?.id ||
-               card.getAttribute('data-id') ||
-               card.getAttribute('data-trip-id') ||
-               card.getAttribute('data-request-id') ||
-               '';
+    const id =
+      card.dataset?.id ||
+      card.getAttribute('data-id') ||
+      card.getAttribute('data-trip-id') ||
+      card.getAttribute('data-request-id') ||
+      '';
 
     const list = getRequests();
 
@@ -5280,42 +5283,39 @@
       if(found) return found;
     }
 
-    const txt = card.textContent || '';
+    const text = card.textContent || '';
     return list.find(x => {
       const date = String(x.tripDate || x.trip_date || '');
-      const title = String(x.title || x.purpose || x.tripPurpose || x.routeLabel || '');
       const applicant = String(x.applicant || x.applicantName || x.name || '');
-      return (!date || txt.includes(date)) &&
-             (!title || txt.includes(title) || !title) &&
-             (!applicant || txt.includes(applicant) || !applicant);
+      return (!date || text.includes(date)) && (!applicant || text.includes(applicant));
     }) || null;
   }
 
-  function statusOf(req, card){
-    return String(
+  function getStatus(req, card){
+    const raw = String(
       req?.status ||
       req?.reviewStatus ||
       card?.querySelector('.status')?.textContent ||
       ''
-    ).trim();
+    ).replace(/\s+/g, '');
+    if(raw.includes('지출결의')) return '지출결의완료';
+    if(raw.includes('검토대기')) return '검토대기';
+    if(raw.includes('수정요청')) return '수정요청';
+    if(raw.includes('임시저장')) return '임시저장';
+    if(raw.includes('승인')) return '승인';
+    return raw;
   }
 
-  function persistRequestList(){
+  function persistList(){
     const list = getRequests();
-    const keys = [
-      'travelExpenses',
-      'expenseRequests',
-      'travel_expenses',
-      'travelExpenseRequests',
-      'mockTravelExpenses'
-    ];
+    const keys = ['travelExpenses','expenseRequests','travel_expenses','travelExpenseRequests','mockTravelExpenses'];
 
     keys.forEach(key=>{
       try{
-        const old = JSON.parse(localStorage.getItem(key) || 'null');
-        if(Array.isArray(old)){
+        const stored = JSON.parse(localStorage.getItem(key) || 'null');
+        if(Array.isArray(stored)){
           const byId = new Map(list.map(x => [String(x.id), x]));
-          const next = old
+          const next = stored
             .map(x => byId.has(String(x.id)) ? Object.assign({}, x, byId.get(String(x.id))) : x)
             .filter(x => !x.__deleted);
           localStorage.setItem(key, JSON.stringify(next));
@@ -5359,7 +5359,6 @@
 
   function recallReq(req){
     if(!req) return;
-
     if(!confirm('제출한 검토대기 건을 회수하고 임시저장 상태로 되돌릴까요? 관리팀 검토 목록에서는 제외됩니다.')) return;
 
     req.status = '임시저장';
@@ -5367,15 +5366,13 @@
     req.submittedAt = '';
     req.submitted_at = '';
 
-    persistRequestList();
+    persistList();
     refreshAll();
-
     alert('회수되었습니다. 임시저장 상태로 변경되었습니다.');
   }
 
   function deleteReq(req){
     if(!req) return;
-
     if(!confirm('이 신청건을 삭제할까요?')) return;
 
     if(typeof window.deleteRequest === 'function') return window.deleteRequest(req.id);
@@ -5385,11 +5382,11 @@
     const idx = list.findIndex(x => String(x.id) === String(req.id));
     if(idx >= 0) list.splice(idx, 1);
 
-    persistRequestList();
+    persistList();
     refreshAll();
   }
 
-  function makeBtn(label, cls, handler){
+  function makeButton(label, cls, fn){
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = cls;
@@ -5397,33 +5394,34 @@
     btn.addEventListener('click', function(e){
       e.preventDefault();
       e.stopPropagation();
-      handler();
+      fn();
     });
     return btn;
   }
 
-  function ensureCardButtons(){
+  function enforceCardButtons(){
     document.querySelectorAll('.submission-scroll .list-card').forEach(card=>{
       const req = getReqByCard(card);
       if(!req) return;
 
-      const status = statusOf(req, card);
+      const status = getStatus(req, card);
 
-      // 조회만 가능한 상태는 버튼 제거
-      if(status === '승인' || status === '지출결의완료' || status === '지출결의 완료'){
-        const old = card.querySelector('.my-card-actions');
-        if(old) old.remove();
+      let actions = card.querySelector('.my-card-actions');
+
+      // 최종 규칙:
+      // 임시저장: 수정/삭제
+      // 검토대기: 회수/삭제
+      // 수정요청: 수정/삭제
+      // 승인/지출결의완료: 버튼 없음
+      if(status === '승인' || status === '지출결의완료'){
+        if(actions) actions.remove();
         return;
       }
 
-      // 이번 최종 규칙
-      // 임시저장: 수정/삭제
-      // 검토대기: 회수/삭제
-      // 수정요청: 수정/삭제 유지
-      const allowed = ['임시저장','검토대기','수정요청'];
-      if(!allowed.includes(status)) return;
+      if(!['임시저장','검토대기','수정요청'].includes(status)){
+        return;
+      }
 
-      let actions = card.querySelector('.my-card-actions');
       if(!actions){
         actions = document.createElement('div');
         actions.className = 'my-card-actions';
@@ -5433,40 +5431,34 @@
       actions.innerHTML = '';
 
       if(status === '임시저장' || status === '수정요청'){
-        actions.appendChild(makeBtn('수정', 'edit-btn', ()=>editReq(req)));
+        actions.appendChild(makeButton('수정', 'edit-btn', ()=>editReq(req)));
       }
 
       if(status === '검토대기'){
-        actions.appendChild(makeBtn('회수', 'recall-btn', ()=>recallReq(req)));
+        actions.appendChild(makeButton('회수', 'recall-btn', ()=>recallReq(req)));
       }
 
-      actions.appendChild(makeBtn('삭제', 'delete-btn', ()=>deleteReq(req)));
+      actions.appendChild(makeButton('삭제', 'delete-btn', ()=>deleteReq(req)));
     });
-  }
 
-  function removeOldSubmitCancel(){
+    // 수정모드 하단에 남아있을 수 있는 제출취소 버튼 제거
     document.getElementById('submitCancelBtn')?.remove();
     document.querySelectorAll('.submit-cancel-btn').forEach(el=>el.remove());
   }
 
-  function apply(){
-    removeOldSubmitCancel();
-    ensureCardButtons();
-  }
-
-  function patchRender(name){
+  function patch(name){
     const fn = window[name];
-    if(typeof fn !== 'function' || fn.__pendingCardFinalFlowPatched) return;
+    if(typeof fn !== 'function' || fn.__applicantCardStatusFinalRulePatched) return;
 
     const wrapped = function(){
       const result = fn.apply(this, arguments);
-      setTimeout(apply, 30);
-      setTimeout(apply, 180);
-      setTimeout(apply, 500);
+      setTimeout(enforceCardButtons, 20);
+      setTimeout(enforceCardButtons, 120);
+      setTimeout(enforceCardButtons, 400);
       return result;
     };
 
-    wrapped.__pendingCardFinalFlowPatched = true;
+    wrapped.__applicantCardStatusFinalRulePatched = true;
     window[name] = wrapped;
   }
 
@@ -5480,17 +5472,16 @@
     'selectRequest',
     'saveTravelExpenseDraft',
     'submitTravelExpense'
-  ].forEach(patchRender);
+  ].forEach(patch);
 
-  const mo = new MutationObserver(apply);
-  if(document.body) mo.observe(document.body, { childList:true, subtree:true });
+  const observer = new MutationObserver(enforceCardButtons);
+  if(document.body) observer.observe(document.body, { childList:true, subtree:true });
 
-  setTimeout(apply, 100);
-  setTimeout(apply, 700);
-  setTimeout(apply, 1500);
+  setTimeout(enforceCardButtons, 80);
+  setTimeout(enforceCardButtons, 500);
+  setTimeout(enforceCardButtons, 1300);
 })();
 </script>
 
 </body>
 </html>
-
