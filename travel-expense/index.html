@@ -1748,7 +1748,7 @@
               <option value="검토대기">검토대기</option>
               <option value="수정요청">수정요청</option>
               <option value="지출결의완료">지출결의완료</option>
-              <option value="지급완료">지급완료</option>
+              
             </select>
           </div>
           <div class="admin-search-wrap">
@@ -2200,20 +2200,12 @@
             </div>
           </div>
           <div class="notice" style="margin-bottom:12px;">관리팀이 입력한 지결작성일과 지급예정일은 출장자 입력 화면의 관리팀 처리 일정 영역에 표시됩니다.</div>
-          <div class="admin-review-checks">
-            <label><input type="checkbox"> 이동경로/거리 확인</label>
-            <label><input type="checkbox"> 유류비 계산 확인</label>
-            <label><input type="checkbox"> 법인카드 금액/증빙 확인</label>
-            <label><input type="checkbox"> 개인지급 금액/증빙 확인</label>
-            <label><input type="checkbox"> 출장계/외근신청서 확인</label>
-            <label><input type="checkbox"> 지출결의 첨부자료 준비 완료</label>
-          </div>
+          
           <div class="admin-manager-memo"><label>관리팀 메모</label><textarea>${trip.memo || ''}</textarea></div>
           <div class="admin-final-actions">
             <button type="button" class="btn-ghost" onclick="adminAdminAction('수정요청')">수정요청</button>
             <button type="button" class="btn-sub" onclick="adminAdminAction('승인')">승인</button>
             <button type="button" onclick="adminAdminAction('지출결의 완료')">지출결의 완료</button>
-            <button type="button" onclick="adminAdminAction('지급완료')">지급완료</button>
           </div>
         </div>
       </div>`;
