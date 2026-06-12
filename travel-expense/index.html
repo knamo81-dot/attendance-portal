@@ -1466,7 +1466,7 @@
 </style>
 
 
-<style id="opinet-fuel-autofill-safe-final">
+<style id="opinet-trip-date-fuel-autofill-final">
   #gasPrice[readonly]{
     background:#f8fafc !important;
     color:#334155 !important;
@@ -4192,35 +4192,25 @@
 </script>
 
 
-<script id="opinet-fuel-autofill-safe-final">
+<script id="opinet-trip-date-fuel-autofill-final">
 (function(){
-  if(window.__opinetFuelAutofillSafeFinalInstalled) return;
-  window.__opinetFuelAutofillSafeFinalInstalled = true;
+  if(window.__opinetTripDateFuelAutofillInstalled) return;
+  window.__opinetTripDateFuelAutofillInstalled = true;
 
   const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
   const hasClient = obj => !!(obj && typeof obj.from === 'function');
 
   function scanClient(scope){
     if(!scope) return null;
-
-    const names = [
-      'supabaseClient','supabase_client','sb','db','database',
-      'portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB',
-      '__supabaseClient','__SUPABASE_CLIENT__','client'
-    ];
+    const names = ['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];
 
     for(const name of names){
       const value = safe(()=>scope[name]);
       if(hasClient(value)) return value;
     }
 
-    const boxes = [
-      'portal','Portal','portalApp','PortalApp','portalSession',
-      '__PORTAL__','__PORTAL_STATE__','app','App'
-    ];
-
-    for(const name of boxes){
-      const box = safe(()=>scope[name]);
+    for(const boxName of ['portal','Portal','portalApp','PortalApp','portalSession','__PORTAL__','__PORTAL_STATE__','app','App']){
+      const box = safe(()=>scope[boxName]);
       if(hasClient(box)) return box;
       if(box && typeof box === 'object'){
         for(const key of safe(()=>Object.keys(box), [])){
@@ -4235,7 +4225,6 @@
       const value = safe(()=>scope[key]);
       if(hasClient(value)) return value;
     }
-
     return null;
   }
 
@@ -4252,15 +4241,11 @@
       safe(()=>window.parent && window.parent.CONFIG)
     ].filter(Boolean);
 
-    let url = safe(()=>window.EXELO_SUPABASE_URL,'') ||
-      safe(()=>window.SUPABASE_URL,'') ||
-      safe(()=>window.parent && window.parent.EXELO_SUPABASE_URL,'') ||
-      safe(()=>window.parent && window.parent.SUPABASE_URL,'');
+    let url = safe(()=>window.EXELO_SUPABASE_URL,'') || safe(()=>window.SUPABASE_URL,'') ||
+      safe(()=>window.parent && window.parent.EXELO_SUPABASE_URL,'') || safe(()=>window.parent && window.parent.SUPABASE_URL,'');
 
-    let key = safe(()=>window.EXELO_SUPABASE_ANON_KEY,'') ||
-      safe(()=>window.SUPABASE_ANON_KEY,'') ||
-      safe(()=>window.parent && window.parent.EXELO_SUPABASE_ANON_KEY,'') ||
-      safe(()=>window.parent && window.parent.SUPABASE_ANON_KEY,'');
+    let key = safe(()=>window.EXELO_SUPABASE_ANON_KEY,'') || safe(()=>window.SUPABASE_ANON_KEY,'') ||
+      safe(()=>window.parent && window.parent.EXELO_SUPABASE_ANON_KEY,'') || safe(()=>window.parent && window.parent.SUPABASE_ANON_KEY,'');
 
     for(const c of configs){
       url = url || c.supabaseUrl || c.SUPABASE_URL || c.supabase_url || c.projectUrl || '';
@@ -4275,9 +4260,8 @@
     return scanClient(safe(()=>window.parent)) || scanClient(window) || createClientFromKnownConfig();
   }
 
-  function gasInput(){
-    return document.getElementById('gasPrice');
-  }
+  function gasInput(){ return document.getElementById('gasPrice'); }
+  function tripInput(){ return document.getElementById('tripDate'); }
 
   function setNote(message, type){
     const input = gasInput();
@@ -4300,93 +4284,128 @@
     if(!input) return;
     input.readOnly = true;
     input.step = '0.01';
-    input.title = 'fuel_daily_prices에 저장된 최신 보통휘발유 평균가격이 자동 입력됩니다.';
+    input.title = '출장일 기준 fuel_daily_prices에 저장된 보통휘발유 평균가격이 자동 입력됩니다.';
   }
 
-  async function selectLatest(client, table){
-    const { data, error } = await client
-      .from(table)
+  function getTripDate(){
+    const value = tripInput()?.value || '';
+    return /^\\d{4}-\\d{2}-\\d{2}$/.test(value) ? value : '';
+  }
+
+  async function getFuelByTripDate(tripDate){
+    const client = getClient();
+    if(!client) throw new Error('Supabase client not found');
+    if(!tripDate) throw new Error('tripDate empty');
+
+    const exact = await client
+      .from('fuel_daily_prices')
       .select('price_date, gasoline_price')
+      .eq('price_date', tripDate)
+      .maybeSingle();
+
+    if(exact.error) throw exact.error;
+    if(exact.data) return { ...exact.data, matched: 'exact' };
+
+    const previous = await client
+      .from('fuel_daily_prices')
+      .select('price_date, gasoline_price')
+      .lte('price_date', tripDate)
       .order('price_date', { ascending:false })
       .limit(1)
       .maybeSingle();
 
-    if(error) throw error;
-    return data;
+    if(previous.error) throw previous.error;
+    if(previous.data) return { ...previous.data, matched: 'previous' };
+
+    throw new Error('no fuel price for trip date');
   }
 
-  async function getLatestFuel(){
-    const client = getClient();
-    if(!client) throw new Error('Supabase client not found');
-
-    try{
-      const fromView = await selectLatest(client, 'vw_latest_fuel_price');
-      if(fromView) return fromView;
-    }catch(viewError){
-      console.warn('[TravelExpense] vw_latest_fuel_price 조회 실패, fuel_daily_prices로 재시도', viewError);
-    }
-
-    const fromTable = await selectLatest(client, 'fuel_daily_prices');
-    if(!fromTable) throw new Error('fuel_daily_prices empty');
-    return fromTable;
-  }
-
-  async function applyLatestFuel(options){
-    const opts = Object.assign({ force:false }, options || {});
+  async function applyFuelByTripDate(options){
+    const opts = Object.assign({ force:false, reason:'' }, options || {});
     const input = gasInput();
     if(!input) return;
 
     lockGasInput();
 
-    // 기존 저장건을 조회한 경우에는 신청 당시 저장된 유가를 덮어쓰지 않음
+    const tripDate = getTripDate();
+
+    if(!tripDate){
+      setNote('출장일을 선택하면 해당 출장일 기준 유가가 자동 입력됩니다.');
+      return;
+    }
+
     if(!opts.force && String(input.value || '').trim() !== ''){
       setNote('신청 당시 저장된 유가를 표시 중입니다.');
       return;
     }
 
     try{
-      const latest = await getLatestFuel();
-      const price = Number(latest.gasoline_price || 0);
-
+      const fuel = await getFuelByTripDate(tripDate);
+      const price = Number(fuel.gasoline_price || 0);
       if(!price) throw new Error('gasoline_price empty');
 
       input.value = String(price);
-      setNote(`최신 저장 유가 적용: ${latest.price_date} / ${price.toLocaleString('ko-KR')}원/L`);
+
+      if(fuel.matched === 'exact'){
+        setNote(`출장일 기준 유가 적용: ${fuel.price_date} / ${price.toLocaleString('ko-KR')}원/L`);
+      }else{
+        setNote(`출장일(${tripDate}) 유가가 없어 직전 저장 유가 적용: ${fuel.price_date} / ${price.toLocaleString('ko-KR')}원/L`);
+      }
 
       if(typeof window.calcAll === 'function') window.calcAll();
     }catch(error){
-      console.warn('[TravelExpense] 최신 유가 자동입력 실패', error);
-      setNote('최신 유가를 불러오지 못했습니다. fuel_daily_prices 읽기 권한 또는 데이터를 확인하세요.', 'error');
+      console.warn('[TravelExpense] 출장일 기준 유가 자동입력 실패', error);
+      setNote(`출장일(${tripDate}) 기준 유가를 불러오지 못했습니다. fuel_daily_prices 데이터를 확인하세요.`, 'error');
     }
   }
 
-  window.loadLatestFuelPriceToTravelExpense = applyLatestFuel;
+  window.loadTripDateFuelPriceToTravelExpense = applyFuelByTripDate;
+  window.loadLatestFuelPriceToTravelExpense = applyFuelByTripDate;
 
   function patchFunction(name, options){
     const fn = window[name];
-    if(typeof fn !== 'function' || fn.__opinetFuelAutofillPatched) return;
+    if(typeof fn !== 'function' || fn.__tripDateFuelAutofillPatched) return;
 
     const wrapped = function(){
       const result = fn.apply(this, arguments);
-      setTimeout(()=>applyLatestFuel(options), 120);
-      setTimeout(()=>applyLatestFuel(options), 600);
+      setTimeout(()=>applyFuelByTripDate(options), 150);
+      setTimeout(()=>applyFuelByTripDate(options), 700);
       return result;
     };
 
-    wrapped.__opinetFuelAutofillPatched = true;
+    wrapped.__tripDateFuelAutofillPatched = true;
     window[name] = wrapped;
+  }
+
+  function bindTripDate(){
+    const input = tripInput();
+    if(!input || input.dataset.tripDateFuelBound) return;
+
+    input.dataset.tripDateFuelBound = '1';
+    input.addEventListener('change', function(){
+      const gas = gasInput();
+      if(gas) gas.value = '';
+      applyFuelByTripDate({ force:true, reason:'tripDateChange' });
+    });
+    input.addEventListener('input', function(){
+      const gas = gasInput();
+      if(gas) gas.value = '';
+      applyFuelByTripDate({ force:true, reason:'tripDateInput' });
+    });
   }
 
   function init(){
     lockGasInput();
+    bindTripDate();
 
-    // 신규작성/폼초기화 이후에는 최신 유가를 강제 입력
-    patchFunction('newRequest', { force:true });
-    patchFunction('clearForm', { force:true });
+    patchFunction('newRequest', { force:true, reason:'newRequest' });
+    patchFunction('clearForm', { force:true, reason:'clearForm' });
 
-    // 최초 로딩 시 비어 있으면 최신 유가 입력
-    setTimeout(()=>applyLatestFuel({ force:false }), 400);
-    setTimeout(()=>applyLatestFuel({ force:false }), 1400);
+    patchFunction('loadTravelExpenseRequest', { force:false, reason:'viewSaved' });
+    patchFunction('selectRequest', { force:false, reason:'viewSaved' });
+
+    setTimeout(()=>applyFuelByTripDate({ force:false, reason:'initial' }), 500);
+    setTimeout(()=>applyFuelByTripDate({ force:false, reason:'initialDelay' }), 1500);
   }
 
   if(document.readyState === 'loading'){
@@ -4395,7 +4414,7 @@
     init();
   }
 
-  setTimeout(init, 700);
+  setTimeout(init, 800);
   setTimeout(init, 1800);
 })();
 </script>
