@@ -1521,23 +1521,28 @@
   button[onclick*="지급완료"]{display:none!important;}
 </style>
 
-<style id="revision-request-memo-edit-final">
-  .revision-memo-box{
-    margin-top:10px;
-    padding:10px 12px;
+<style id="applicant-revision-actions-and-admin-memo-final-style">
+  .revision-reason-box{
+    margin-top:8px;
+    padding:9px 10px;
     border-radius:12px;
-    border:1px solid #fecaca;
-    background:#fef2f2;
-    color:#991b1b;
+    background:#fff7ed;
+    border:1px solid #fed7aa;
+    color:#9a3412;
     font-size:12px;
-    line-height:1.55;
+    line-height:1.45;
     font-weight:800;
   }
-  .revision-memo-box b{display:block;margin-bottom:4px;color:#7f1d1d;}
-  #applicantRevisionMemo{
-    grid-column:1 / -1;
+  .revision-reason-box b{
+    display:block;
+    margin-bottom:3px;
+    color:#c2410c;
+  }
+  .list-card[data-status="수정요청"] .my-card-actions{
+    display:flex!important;
   }
 </style>
+
 </head>
 <body>
   <header>
@@ -3241,7 +3246,7 @@
     return Array.from(document.querySelectorAll('#costList .cost-row')).map(row=>{
       const sels=row.querySelectorAll('select');
       const amount=row.querySelector('input[type="number"]');
-      return {item_type:sels[0]?.value||'',pay_type:sels[1]?.value||'',amount:num(amount?.value),memo:''};
+      return {item_type:sels[0]?.value||'',pay_type:sels[1]?.value||'',amount:num(amount?.value),};
     }).filter(i=>i.item_type||i.pay_type||i.amount);
   }
 
@@ -3525,21 +3530,17 @@
     }else if(status === '검토대기'){
       note('검토대기 건 수정모드입니다. 변경 후 저장하거나 취소할 수 있습니다.');
       setButtons('취소','저장',()=>selectedId && loadDetail(selectedId).then(()=>modeView(selectedId, selectedStatus)),()=>updateExisting('검토대기','저장되었습니다.'));
-    }else if(status === '수정요청'){
-      note('수정요청 건 수정모드입니다. 관리팀 메모를 확인한 뒤 수정 후 다시 제출하세요.');
-      setButtons('취소','다시 제출',()=>selectedId && loadDetail(selectedId).then(()=>modeView(selectedId, selectedStatus)),()=>updateExisting('검토대기','다시 제출되었습니다.'));
     }else{
       showActions(false); note('해당 상태에서는 수정할 수 없습니다.');
     }
   }
-  function editable(status){ return status === '임시저장' || status === '검토대기' || status === '수정요청'; }
+  function editable(status){ return status === '임시저장' || status === '검토대기'; }
 
   function cardStatus(card){
     const t=card ? card.textContent : '';
     if(t.includes('지출결의완료')) return '지출결의완료';
     if(t.includes('검토완료')) return '검토완료';
     if(t.includes('검토중')) return '검토중';
-    if(t.includes('수정요청')) return '수정요청';
     if(t.includes('검토대기')) return '검토대기';
     if(t.includes('임시저장')) return '임시저장';
     return '';
@@ -3562,10 +3563,8 @@
     if(!r.data || !r.data.length){ box.innerHTML='<div class="notice empty-state">제출 내역이 없습니다.</div>'; return true; }
     box.innerHTML=r.data.map(row=>{
       const status=row.status||'검토대기';
-      const memoText = String(row.memo || '').trim();
-      const memoBox = status === '수정요청' && memoText ? `<div class="revision-memo-box"><b>수정요청 사유</b>${esc(memoText).replace(/\n/g,'<br>')}</div>` : '';
       const menu=editable(status) ? `<div class="my-card-actions" onclick="event.stopPropagation()"><button type="button" class="edit-btn" data-edit-id="${row.id}" data-edit-status="${esc(status)}">수정</button><button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button></div>` : '';
-      return `<div class="list-card" data-request-id="${row.id}"><div class="list-top"><div class="list-title">${esc(row.trip_type||'출장')} · ${esc(row.trip_date||'-')}</div><span class="status s-wait">${esc(status)}</span></div><div class="meta">신청자: ${esc(row.applicant_name||'-')}<br>본부/팀: ${esc(row.division_name||'-')} / ${esc(row.team_name||'-')}<br>총액: ${won(row.total_amount||0)} · 개인지급: ${won(row.personal_amount||0)}</div>${memoBox}${menu}</div>`;
+      return `<div class="list-card" data-request-id="${row.id}"><div class="list-top"><div class="list-title">${esc(row.trip_type||'출장')} · ${esc(row.trip_date||'-')}</div><span class="status s-wait">${esc(status)}</span></div><div class="meta">신청자: ${esc(row.applicant_name||'-')}<br>본부/팀: ${esc(row.division_name||'-')} / ${esc(row.team_name||'-')}<br>총액: ${won(row.total_amount||0)} · 개인지급: ${won(row.personal_amount||0)}</div>${menu}</div>`;
     }).join('');
     return true;
   }
@@ -3593,21 +3592,6 @@
       setVal('requestDate', row.request_date || '');
       setVal('voucherDateDisplay', row.voucher_date || '');
       setVal('paymentDueDateDisplay', row.payment_due_date || '');
-      (function(){
-        const old = document.getElementById('applicantRevisionMemo');
-        if(old) old.remove();
-        const memoText = String(row.memo || '').trim();
-        if(String(row.status || '') === '수정요청' && memoText){
-          const help = document.querySelector('.settlement-help');
-          if(help){
-            const box = document.createElement('div');
-            box.id = 'applicantRevisionMemo';
-            box.className = 'revision-memo-box';
-            box.innerHTML = '<b>수정요청 사유</b>' + esc(memoText).replace(/\n/g,'<br>');
-            help.insertAdjacentElement('afterend', box);
-          }
-        }
-      })();
       setVal('gasPrice', row.gas_price || '');
       setVal('efficiency', row.fuel_efficiency || '');
       setVal('roundUnit', row.round_unit || 1);
@@ -3642,7 +3626,7 @@
     return Array.from(document.querySelectorAll('#costList .cost-row')).map(row=>{
       const sels=row.querySelectorAll('select');
       const amountInput=row.querySelector('input[type="number"]');
-      return {item_type:sels[0]?sels[0].value:'', pay_type:sels[1]?sels[1].value:'', amount:n(amountInput?amountInput.value:0), memo:''};
+      return {item_type:sels[0]?sels[0].value:'', pay_type:sels[1]?sels[1].value:'', amount:n(amountInput?amountInput.value:0),};
     }).filter(i=>i.item_type||i.pay_type||i.amount);
   }
 
@@ -4900,8 +4884,7 @@
         <button type="button" class="btn-danger" onclick="window.adminCancelStatus && window.adminCancelStatus()">취소</button>`;
     }
     if(status === '수정요청'){
-      return `<button type="button" class="btn-ghost" onclick="window.adminSaveReviewChanges && window.adminSaveReviewChanges()">수정</button>
-        <button type="button" class="btn-sub" onclick="window.adminAdminAction && window.adminAdminAction('승인')">승인</button>`;
+      return `<button type="button" class="btn-sub" onclick="window.adminAdminAction && window.adminAdminAction('승인')">승인</button>`;
     }
     return `<button type="button" class="btn-ghost" onclick="window.adminAdminAction && window.adminAdminAction('수정요청')">수정요청</button>
       <button type="button" class="btn-sub" onclick="window.adminAdminAction && window.adminAdminAction('승인')">승인</button>`;
@@ -4945,7 +4928,7 @@
         <div><label>지결작성일</label><input type="date" id="adminVoucherDate" value="${esc(row.voucher_date||'')}" /></div>
         <div><label>입금예정일</label><input type="date" id="adminPaymentDueDate" value="${esc(row.payment_due_date||'')}" /></div>
       </div>
-      <div class="admin-manager-memo"><label>관리팀 메모 / 수정요청 사유</label><textarea id="adminManagerMemo" placeholder="수정요청 시 신청자에게 표시될 메모를 입력하세요.">${esc(row.memo||'')}</textarea></div>
+      <div class="admin-manager-memo"><label>관리팀 메모</label><textarea id="adminManagerMemo" placeholder="검토 메모를 입력하세요.">${esc(row.manager_memo||row.memo||'')}</textarea></div>
       <div class="admin-final-actions">${renderAdminActions(row)}</div>
     </div></div>`;
   }
@@ -4980,7 +4963,6 @@
       status: nextStatus,
       voucher_date: $('adminVoucherDate')?.value || null,
       payment_due_date: $('adminPaymentDueDate')?.value || null,
-      memo: $('adminManagerMemo')?.value || null
     };
 
     const res = await client.from('travel_expense_requests').update(payload).eq('id', selectedId);
@@ -4998,7 +4980,6 @@
     const payload = {
       voucher_date: $('adminVoucherDate')?.value || null,
       payment_due_date: $('adminPaymentDueDate')?.value || null,
-      memo: $('adminManagerMemo')?.value || null
     };
     const res = await client.from('travel_expense_requests').update(payload).eq('id', selectedId);
     if(res.error){ alert('검토 결과 수정 중 오류가 발생했습니다: ' + res.error.message); return; }
@@ -5070,6 +5051,184 @@
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
   setTimeout(init, 700);
   setTimeout(init, 1800);
+})();
+</script>
+
+
+<script id="applicant-revision-actions-and-admin-memo-final">
+(function(){
+  if(window.__revisionRequestMemoActionsInstalled) return;
+  window.__revisionRequestMemoActionsInstalled = true;
+
+  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
+
+  function getRequestList(){
+    return safe(()=>window.travelExpenses) ||
+           safe(()=>window.expenseRequests) ||
+           safe(()=>window.requests) ||
+           safe(()=>window.mockRequests) ||
+           [];
+  }
+
+  function getTripIdFromCard(card){
+    return card?.dataset?.id ||
+           card?.getAttribute('data-trip-id') ||
+           card?.getAttribute('data-request-id') ||
+           '';
+  }
+
+  function getReqByCard(card){
+    const id = getTripIdFromCard(card);
+    const list = getRequestList();
+    if(id) {
+      const found = list.find(x => String(x.id) === String(id));
+      if(found) return found;
+    }
+
+    const title = card?.querySelector('.list-title')?.textContent || card?.textContent || '';
+    return list.find(x => title.includes(x.tripDate || '') && title.includes(x.applicant || x.applicantName || '')) || null;
+  }
+
+  function isRevision(req, card){
+    const status = String(req?.status || req?.reviewStatus || card?.querySelector('.status')?.textContent || '');
+    return status.includes('수정요청');
+  }
+
+  function getAdminMemo(req){
+    return String(
+      req?.adminMemo ||
+      req?.managerMemo ||
+      req?.reviewMemo ||
+      req?.revisionMemo ||
+      req?.rejectReason ||
+      req?.returnReason ||
+      req?.admin_note ||
+      req?.review_note ||
+      ''
+    ).trim();
+  }
+
+  function addCardActions(card, req){
+    if(!card || !req || !isRevision(req, card)) return;
+
+    card.dataset.status = '수정요청';
+
+    if(!card.querySelector('.revision-reason-box')){
+      const memo = getAdminMemo(req);
+      if(memo){
+        const box = document.createElement('div');
+        box.className = 'revision-reason-box';
+        box.innerHTML = `<b>수정요청 사유</b><span></span>`;
+        box.querySelector('span').textContent = memo;
+        const meta = card.querySelector('.meta') || card;
+        meta.insertAdjacentElement('afterend', box);
+      }
+    }
+
+    if(!card.querySelector('.my-card-actions')){
+      const actions = document.createElement('div');
+      actions.className = 'my-card-actions';
+
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'edit-btn';
+      edit.textContent = '수정';
+      edit.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if(typeof window.editRequest === 'function') return window.editRequest(req.id);
+        if(typeof window.editTravelExpenseRequest === 'function') return window.editTravelExpenseRequest(req.id);
+        if(typeof window.startEditRequest === 'function') return window.startEditRequest(req.id);
+        if(typeof window.loadTravelExpenseRequest === 'function') {
+          window.loadTravelExpenseRequest(req.id);
+          document.body.classList.add('travel-editing');
+        }
+      });
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'delete-btn';
+      del.textContent = '삭제';
+      del.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if(!confirm('이 수정요청 건을 삭제할까요?')) return;
+        if(typeof window.deleteRequest === 'function') return window.deleteRequest(req.id);
+        if(typeof window.deleteTravelExpenseRequest === 'function') return window.deleteTravelExpenseRequest(req.id);
+        const list = getRequestList();
+        const idx = list.findIndex(x => String(x.id) === String(req.id));
+        if(idx >= 0) list.splice(idx, 1);
+        if(typeof window.renderMySubmissions === 'function') window.renderMySubmissions();
+        if(typeof window.refreshMonthlyProcessSummary === 'function') window.refreshMonthlyProcessSummary();
+      });
+
+      actions.appendChild(edit);
+      actions.appendChild(del);
+      card.appendChild(actions);
+    }
+  }
+
+  function enhanceApplicantCards(){
+    document.querySelectorAll('.submission-scroll .list-card').forEach(card => {
+      const req = getReqByCard(card);
+      if(req && isRevision(req, card)) addCardActions(card, req);
+    });
+  }
+
+  function patchRenderer(name){
+    const fn = window[name];
+    if(typeof fn !== 'function' || fn.__revisionActionPatched) return;
+
+    const wrapped = function(){
+      const result = fn.apply(this, arguments);
+      setTimeout(enhanceApplicantCards, 30);
+      setTimeout(enhanceApplicantCards, 180);
+      return result;
+    };
+    wrapped.__revisionActionPatched = true;
+    window[name] = wrapped;
+  }
+
+  // Admin save: keep memo only in memory/local state; do not send memo/manager_memo columns to Supabase.
+  function readAdminMemoInput(){
+    return document.getElementById('adminMemo')?.value ||
+           document.getElementById('managerMemo')?.value ||
+           document.querySelector('.admin-manager-memo textarea')?.value ||
+           '';
+  }
+
+  function getSelectedAdminReq(){
+    const id = window.adminSelectedId || window.selectedAdminId || window.currentAdminId || window.selectedExpenseId;
+    const list = getRequestList();
+    return list.find(x => String(x.id) === String(id)) ||
+           window.adminSelectedRequest ||
+           window.selectedAdminRequest ||
+           null;
+  }
+
+  const oldAdminAction = window.adminAdminAction || window.adminDetailAction || window.adminReviewAction;
+  window.adminAdminAction = window.adminDetailAction = window.adminReviewAction = async function(action){
+    const req = getSelectedAdminReq();
+    const memo = readAdminMemoInput();
+    if(req && memo){
+      req.adminMemo = memo;
+      req.reviewMemo = memo;
+      req.revisionMemo = memo;
+    }
+
+    if(typeof oldAdminAction === 'function'){
+      return oldAdminAction.call(this, action);
+    }
+  };
+
+  ['renderMySubmissions','renderSubmissions','loadMyRequests','renderAdminDetail','renderAdminReviewList'].forEach(patchRenderer);
+
+  const mo = new MutationObserver(() => enhanceApplicantCards());
+  if(document.body) mo.observe(document.body, { childList:true, subtree:true });
+
+  setTimeout(enhanceApplicantCards, 100);
+  setTimeout(enhanceApplicantCards, 700);
+  setTimeout(enhanceApplicantCards, 1500);
 })();
 </script>
 
