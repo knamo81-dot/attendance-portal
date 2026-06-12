@@ -1511,11 +1511,6 @@
 </style>
 
 
-<style id="admin-status-flow-save-only-final">
-  .admin-review-checks{display:none!important;}
-  .admin-final-actions .btn-danger{background:#fee2e2!important;color:#b91c1c!important;}
-</style>
-
 <style id="admin-status-date-preserve-final-patch">
   .admin-review-checks{display:none!important;}
   .admin-final-actions button[data-admin-action="지급완료"],
@@ -1761,6 +1756,7 @@
               <option value="수정요청">수정요청</option>
               <option value="승인">승인</option>
               <option value="지출결의완료">지출결의완료</option>
+              
             </select>
           </div>
           <div class="admin-search-wrap">
@@ -1777,7 +1773,6 @@
           <div class="admin-bulk-actions">
             <button type="button" class="btn-sub" onclick="adminBulkAction('전체 출력')">전체출력</button>
             <button type="button" class="btn-ghost" onclick="adminBulkAction('법인카드 출력')">법인카드출력</button>
-            <button type="button" class="btn-ghost" onclick="adminBulkAction('개인지급 출력')">개인지급출력</button>
             <button type="button" onclick="adminBulkAction('지출결의 완료')">지출결의 완료</button>
           </div>
         </div>
@@ -2212,6 +2207,14 @@
             </div>
           </div>
           <div class="notice" style="margin-bottom:12px;">관리팀이 입력한 지결작성일과 지급예정일은 출장자 입력 화면의 관리팀 처리 일정 영역에 표시됩니다.</div>
+          <div class="admin-review-checks">
+            <label><input type="checkbox"> 이동경로/거리 확인</label>
+            <label><input type="checkbox"> 유류비 계산 확인</label>
+            <label><input type="checkbox"> 법인카드 금액/증빙 확인</label>
+            <label><input type="checkbox"> 개인지급 금액/증빙 확인</label>
+            <label><input type="checkbox"> 출장계/외근신청서 확인</label>
+            <label><input type="checkbox"> 지출결의 첨부자료 준비 완료</label>
+          </div>
           <div class="admin-manager-memo"><label>관리팀 메모</label><textarea>${trip.memo || ''}</textarea></div>
           <div class="admin-final-actions">
             <button type="button" class="btn-ghost" onclick="adminAdminAction('수정요청')">수정요청</button>
@@ -2764,267 +2767,6 @@
     </section>
     ${evidencePages(printTrips, mode)}
   </div>
-
-<script id="admin-status-date-preserve-final-patch">
-(function(){
-  if(window.__adminStatusDatePreserveFinalInstalled) return;
-  window.__adminStatusDatePreserveFinalInstalled = true;
-
-  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
-  const money = window.money || function(n){ return Math.round(Number(n||0)).toLocaleString('ko-KR') + '원'; };
-
-  const STATUS_WAIT = '검토대기';
-  const STATUS_REVISE = '수정요청';
-  const STATUS_APPROVED = '승인';
-  const STATUS_DONE = '지출결의완료';
-
-  function getStore(){
-    return safe(()=>window.travelExpenses) ||
-           safe(()=>window.expenseRequests) ||
-           safe(()=>window.requests) ||
-           safe(()=>window.mockRequests) ||
-           [];
-  }
-
-  function setStore(arr){
-    if(Array.isArray(window.travelExpenses)) window.travelExpenses = arr;
-    else if(Array.isArray(window.expenseRequests)) window.expenseRequests = arr;
-    else if(Array.isArray(window.requests)) window.requests = arr;
-    else if(Array.isArray(window.mockRequests)) window.mockRequests = arr;
-  }
-
-  function getSelected(){
-    const id = window.adminSelectedId || window.selectedAdminId || window.currentAdminId || window.selectedExpenseId;
-    const arr = getStore();
-    return arr.find(x => String(x.id) === String(id)) || window.adminSelectedRequest || window.selectedAdminRequest || null;
-  }
-
-  function selectedId(){
-    const req = getSelected();
-    return req && req.id;
-  }
-
-  function persistRequest(req){
-    if(!req) return;
-
-    const arr = getStore();
-    const idx = arr.findIndex(x => String(x.id) === String(req.id));
-    if(idx >= 0) arr[idx] = Object.assign({}, arr[idx], req);
-
-    setStore(arr);
-
-    // localStorage keys used by previous versions vary; update likely keys safely
-    [
-      'travelExpenses',
-      'expenseRequests',
-      'travel_expenses',
-      'travelExpenseRequests',
-      'mockTravelExpenses'
-    ].forEach(key=>{
-      try{
-        const old = JSON.parse(localStorage.getItem(key) || 'null');
-        if(Array.isArray(old)){
-          const i = old.findIndex(x => String(x.id) === String(req.id));
-          if(i >= 0){
-            old[i] = Object.assign({}, old[i], req);
-            localStorage.setItem(key, JSON.stringify(old));
-          }
-        }
-      }catch(e){}
-    });
-  }
-
-  function readDraftInputs(){
-    return {
-      voucherDate: document.getElementById('adminVoucherDate')?.value || document.getElementById('voucherDate')?.value || '',
-      paymentDueDate: document.getElementById('adminPaymentDueDate')?.value || document.getElementById('paymentDueDate')?.value || '',
-      adminMemo: document.getElementById('adminMemo')?.value || document.getElementById('managerMemo')?.value || ''
-    };
-  }
-
-  function writeDraftInputs(req){
-    const voucher = document.getElementById('adminVoucherDate') || document.getElementById('voucherDate');
-    const payment = document.getElementById('adminPaymentDueDate') || document.getElementById('paymentDueDate');
-    const memo = document.getElementById('adminMemo') || document.getElementById('managerMemo');
-
-    if(voucher && req) voucher.value = req.voucherDate || req.voucher_date || '';
-    if(payment && req) payment.value = req.paymentDueDate || req.payment_due_date || '';
-    if(memo && req) memo.value = req.adminMemo || req.managerMemo || req.memo || '';
-  }
-
-  function applySavedInputs(req, draft){
-    if(!req || !draft) return req;
-
-    req.voucherDate = draft.voucherDate || '';
-    req.voucher_date = draft.voucherDate || '';
-    req.paymentDueDate = draft.paymentDueDate || '';
-    req.payment_due_date = draft.paymentDueDate || '';
-    req.adminMemo = draft.adminMemo || '';
-    req.managerMemo = draft.adminMemo || '';
-    return req;
-  }
-
-  function setStatus(req, status){
-    if(!req) return;
-    req.status = status;
-    req.reviewStatus = status;
-  }
-
-  function refreshAfterAction(req){
-    persistRequest(req);
-    if(typeof window.renderMySubmissions === 'function') safe(()=>window.renderMySubmissions());
-    if(typeof window.refreshMonthlyProcessSummary === 'function') safe(()=>window.refreshMonthlyProcessSummary());
-    if(typeof window.renderAdminList === 'function') safe(()=>window.renderAdminList());
-    if(typeof window.renderAdminReviewList === 'function') safe(()=>window.renderAdminReviewList());
-    if(typeof window.renderAdminDetail === 'function') safe(()=>window.renderAdminDetail(req.id));
-    else if(typeof window.showAdminDetail === 'function') safe(()=>window.showAdminDetail(req.id));
-    else setTimeout(()=>renderButtonsOnly(), 50);
-  }
-
-  function adminAction(action){
-    const req = getSelected();
-    if(!req) return;
-
-    const draft = readDraftInputs();
-
-    if(action === '수정'){
-      applySavedInputs(req, draft);
-      refreshAfterAction(req);
-      return;
-    }
-
-    if(action === '수정요청'){
-      applySavedInputs(req, draft);
-      setStatus(req, STATUS_REVISE);
-      refreshAfterAction(req);
-      return;
-    }
-
-    if(action === '승인'){
-      applySavedInputs(req, draft);
-      setStatus(req, STATUS_APPROVED);
-      refreshAfterAction(req);
-      return;
-    }
-
-    if(action === '지출결의 완료' || action === '지출결의완료'){
-      // 중요: 지출결의 완료 클릭 시 현재 입력 중인 날짜/메모를 함께 저장해야 함
-      applySavedInputs(req, draft);
-      setStatus(req, STATUS_DONE);
-      refreshAfterAction(req);
-      return;
-    }
-
-    if(action === '취소'){
-      // 중요: 취소는 날짜/메모를 저장하지 않고 상태만 이전 단계로 되돌림
-      const current = req.status || req.reviewStatus || STATUS_WAIT;
-      if(current === STATUS_DONE) setStatus(req, STATUS_APPROVED);
-      else if(current === STATUS_APPROVED) setStatus(req, STATUS_WAIT);
-      else if(current === STATUS_REVISE) setStatus(req, STATUS_WAIT);
-      else setStatus(req, STATUS_WAIT);
-      refreshAfterAction(req);
-      return;
-    }
-  }
-
-  function renderButtonsOnly(){
-    const req = getSelected();
-    if(!req) return;
-
-    const status = req.status || req.reviewStatus || STATUS_WAIT;
-    const box = document.querySelector('.admin-final-actions') || document.querySelector('.admin-detail-buttons');
-    if(!box) return;
-
-    box.innerHTML = '';
-
-    function btn(label, cls, action){
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = label;
-      b.className = cls || '';
-      b.dataset.adminAction = action || label;
-      b.addEventListener('click', function(e){
-        e.preventDefault();
-        e.stopPropagation();
-        adminAction(action || label);
-      });
-      box.appendChild(b);
-    }
-
-    if(status === STATUS_DONE){
-      btn('수정', 'btn-ghost', '수정');
-      btn('취소', 'btn-danger', '취소');
-    }else if(status === STATUS_APPROVED){
-      btn('수정', 'btn-ghost', '수정');
-      btn('취소', 'btn-danger', '취소');
-      btn('지출결의 완료', '', '지출결의 완료');
-    }else{
-      btn('수정요청', 'btn-ghost', '수정요청');
-      btn('승인', 'btn-sub', '승인');
-    }
-  }
-
-  function cleanupAdminDetail(){
-    document.querySelectorAll('.admin-review-checks').forEach(el=>el.remove());
-    document.querySelectorAll('button').forEach(btn=>{
-      if((btn.textContent || '').trim() === '지급완료') btn.remove();
-    });
-
-    const filter = document.getElementById('adminStatusFilter');
-    if(filter){
-      [...filter.options].forEach(opt=>{
-        if(opt.value === '지급완료' || opt.textContent.trim() === '지급완료') opt.remove();
-      });
-      if(![...filter.options].some(opt=>opt.value === STATUS_APPROVED)){
-        const opt = document.createElement('option');
-        opt.value = STATUS_APPROVED;
-        opt.textContent = STATUS_APPROVED;
-        const done = [...filter.options].find(opt=>opt.value === STATUS_DONE);
-        filter.insertBefore(opt, done || null);
-      }
-    }
-
-    renderButtonsOnly();
-  }
-
-  // Override common action function names so inline onclick also follows corrected behavior
-  window.adminAdminAction = adminAction;
-  window.adminDetailAction = adminAction;
-  window.adminReviewAction = adminAction;
-  window.updateAdminStatus = function(status){ adminAction(status); };
-
-  // Prevent accidental auto-save from date fields. Dates are saved only through 수정/승인/지출결의 완료.
-  document.addEventListener('change', function(e){
-    const id = e.target && e.target.id;
-    if(id === 'adminVoucherDate' || id === 'adminPaymentDueDate' || id === 'voucherDate' || id === 'paymentDueDate'){
-      // no-op: keep the value visible in the input, do not persist here
-    }
-  }, true);
-
-  // Re-apply after any existing render function rebuilds the detail panel
-  ['renderAdminDetail','showAdminDetail','selectAdminRequest','renderAdminReviewList','renderAdminList'].forEach(name=>{
-    const fn = window[name];
-    if(typeof fn === 'function' && !fn.__adminStatusDatePreservePatched){
-      const wrapped = function(){
-        const result = fn.apply(this, arguments);
-        setTimeout(cleanupAdminDetail, 30);
-        setTimeout(cleanupAdminDetail, 180);
-        return result;
-      };
-      wrapped.__adminStatusDatePreservePatched = true;
-      window[name] = wrapped;
-    }
-  });
-
-  const mo = new MutationObserver(()=>cleanupAdminDetail());
-  if(document.body) mo.observe(document.body, { childList:true, subtree:true });
-
-  setTimeout(cleanupAdminDetail, 100);
-  setTimeout(cleanupAdminDetail, 600);
-  setTimeout(cleanupAdminDetail, 1400);
-})();
-</script>
-
 </body>
 </html>`;
   }
@@ -5113,25 +4855,6 @@
   function renderDocs(row){
     return `<div class="admin-doc-card"><div><b>출장계/외근신청서</b><span>신청자가 업로드한 결재 완료 서류</span></div><button type="button" class="admin-evidence-btn missing" onclick="window.adminOpenEvidenceViewer && window.adminOpenEvidenceViewer('document','출장계/외근신청서')">보기</button></div>`;
   }
-
-  function renderAdminActions(row){
-    const status = String(row?.status || '검토대기');
-    if(status === '승인'){
-      return `<button type="button" class="btn-ghost" onclick="window.adminSaveReviewChanges && window.adminSaveReviewChanges()">수정</button>
-        <button type="button" class="btn-danger" onclick="window.adminCancelStatus && window.adminCancelStatus()">취소</button>
-        <button type="button" onclick="window.adminAdminAction && window.adminAdminAction('지출결의완료')">지출결의 완료</button>`;
-    }
-    if(status === '지출결의완료'){
-      return `<button type="button" class="btn-ghost" onclick="window.adminSaveReviewChanges && window.adminSaveReviewChanges()">수정</button>
-        <button type="button" class="btn-danger" onclick="window.adminCancelStatus && window.adminCancelStatus()">취소</button>`;
-    }
-    if(status === '수정요청'){
-      return `<button type="button" class="btn-sub" onclick="window.adminAdminAction && window.adminAdminAction('승인')">승인</button>`;
-    }
-    return `<button type="button" class="btn-ghost" onclick="window.adminAdminAction && window.adminAdminAction('수정요청')">수정요청</button>
-      <button type="button" class="btn-sub" onclick="window.adminAdminAction && window.adminAdminAction('승인')">승인</button>`;
-  }
-
   function renderDetail(detail){
     const row = detail.row;
     const panel = $('adminDetailPanel');
@@ -5167,11 +4890,24 @@
     <div class="admin-review-section"><h3>⑤ 첨부자료</h3><div class="admin-section-body admin-doc-list">${renderDocs(row)}</div></div>
     <div class="admin-review-section"><h3>⑥ 검토 결과</h3><div class="admin-section-body">
       <div class="admin-schedule-grid">
-        <div><label>지결작성일</label><input type="date" id="adminVoucherDate" value="${esc(row.voucher_date||'')}" /></div>
-        <div><label>입금예정일</label><input type="date" id="adminPaymentDueDate" value="${esc(row.payment_due_date||'')}" /></div>
+        <div><label>지결작성일</label><input type="date" id="adminVoucherDate" value="${esc(row.voucher_date||'')}" onchange="window.adminUpdateSettlementDates && window.adminUpdateSettlementDates('${esc(row.id)}')" /></div>
+        <div><label>입금예정일</label><input type="date" id="adminPaymentDueDate" value="${esc(row.payment_due_date||'')}" onchange="window.adminUpdateSettlementDates && window.adminUpdateSettlementDates('${esc(row.id)}')" /></div>
+      </div>
+      <div class="admin-review-checks">
+        <label><input type="checkbox"> 이동경로/거리 확인</label>
+        <label><input type="checkbox"> 유류비 계산 확인</label>
+        <label><input type="checkbox"> 법인카드 금액/증빙 확인</label>
+        <label><input type="checkbox"> 개인지급 금액/증빙 확인</label>
+        <label><input type="checkbox"> 출장계/외근신청서 확인</label>
+        <label><input type="checkbox"> 지출결의 첨부자료 준비 완료</label>
       </div>
       <div class="admin-manager-memo"><label>관리팀 메모</label><textarea id="adminManagerMemo" placeholder="검토 메모를 입력하세요.">${esc(row.manager_memo||row.memo||'')}</textarea></div>
-      <div class="admin-final-actions">${renderAdminActions(row)}</div>
+      <div class="admin-final-actions">
+        <button type="button" class="btn-ghost" onclick="window.adminAdminAction && window.adminAdminAction('수정요청')">수정요청</button>
+        <button type="button" class="btn-sub" onclick="window.adminAdminAction && window.adminAdminAction('승인')">승인</button>
+        <button type="button" onclick="window.adminAdminAction && window.adminAdminAction('지출결의완료')">지출결의 완료</button>
+        <button type="button" onclick="window.adminAdminAction && window.adminAdminAction('지급완료')">지급완료</button>
+      </div>
     </div></div>`;
   }
   async function selectAdminRequest(id, options){
@@ -5200,6 +4936,10 @@
     const client = db();
     if(!client){ alert('Supabase 연결을 찾지 못했습니다.'); return; }
     const payload = { status };
+    const v = $('adminVoucherDate')?.value || null;
+    const p = $('adminPaymentDueDate')?.value || null;
+    payload.voucher_date = v;
+    payload.payment_due_date = p;
     const res = await client.from('travel_expense_requests').update(payload).eq('id', selectedId);
     if(res.error){ alert('상태 변경 중 오류가 발생했습니다: ' + res.error.message); return; }
     detailCache.delete(selectedId);
@@ -5207,40 +4947,6 @@
     await selectAdminRequest(selectedId);
     if(window.refreshMonthlyProcessSummary) window.refreshMonthlyProcessSummary();
     alert(status + ' 처리되었습니다.');
-  }
-  async function saveReviewChanges(){
-    if(!selectedId){ alert('수정할 신청건을 선택하세요.'); return; }
-    const client = db();
-    if(!client){ alert('Supabase 연결을 찾지 못했습니다.'); return; }
-    const payload = {
-      voucher_date: $('adminVoucherDate')?.value || null,
-      payment_due_date: $('adminPaymentDueDate')?.value || null,
-      manager_memo: $('adminManagerMemo')?.value || null
-    };
-    const res = await client.from('travel_expense_requests').update(payload).eq('id', selectedId);
-    if(res.error){ alert('검토 결과 수정 중 오류가 발생했습니다: ' + res.error.message); return; }
-    detailCache.delete(selectedId);
-    await loadAdminRows();
-    await selectAdminRequest(selectedId);
-    if(window.refreshMonthlyProcessSummary) window.refreshMonthlyProcessSummary();
-    alert('수정 내용이 저장되었습니다.');
-  }
-  async function cancelStatus(){
-    if(!selectedId){ alert('취소할 신청건을 선택하세요.'); return; }
-    const row = rows.find(r => String(r.id) === String(selectedId));
-    const currentStatus = String(row?.status || '검토대기');
-    const nextStatus = currentStatus === '지출결의완료' ? '승인' : '검토대기';
-    if(!confirm(`현재 상태를 ${nextStatus}(으)로 되돌릴까요?
-입력만 하고 수정 저장하지 않은 지결작성일/입금예정일/메모는 저장되지 않습니다.`)) return;
-    const client = db();
-    if(!client){ alert('Supabase 연결을 찾지 못했습니다.'); return; }
-    const res = await client.from('travel_expense_requests').update({ status: nextStatus }).eq('id', selectedId);
-    if(res.error){ alert('상태 취소 중 오류가 발생했습니다: ' + res.error.message); return; }
-    detailCache.delete(selectedId);
-    await loadAdminRows();
-    await selectAdminRequest(selectedId);
-    if(window.refreshMonthlyProcessSummary) window.refreshMonthlyProcessSummary();
-    alert('상태가 취소되었습니다.');
   }
   async function updateDates(id){
     const client = db();
@@ -5272,9 +4978,7 @@
   window.adminUpdateSelectedSummary = updateAdminSelectedSummary;
   window.adminFilterChanged = renderAdminList;
   window.adminSortChanged = renderAdminList;
-  window.adminUpdateSettlementDates = function(){ /* 날짜 자동 저장 방지: 수정 버튼으로만 저장 */ };
-  window.adminSaveReviewChanges = saveReviewChanges;
-  window.adminCancelStatus = cancelStatus;
+  window.adminUpdateSettlementDates = updateDates;
   window.adminAdminAction = updateRequestStatus;
   window.adminOpenEvidenceViewer = function(type, name){ alert(`${name || '증빙'} 보기 기능은 파일 업로드 저장 연동 후 실제 파일을 새 창/모달로 열도록 연결하면 됩니다.`); };
   window.adminPrintStatement = printStatement;
@@ -5287,6 +4991,253 @@
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
   setTimeout(init, 700);
   setTimeout(init, 1800);
+})();
+</script>
+
+
+<script id="admin-status-date-preserve-final-patch">
+(function(){
+  if(window.__adminStatusDatePreserveFinalInstalled) return;
+  window.__adminStatusDatePreserveFinalInstalled = true;
+
+  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
+  const STATUS_WAIT = '검토대기';
+  const STATUS_REVISE = '수정요청';
+  const STATUS_APPROVED = '승인';
+  const STATUS_DONE = '지출결의완료';
+
+  function allRequests(){
+    return safe(()=>window.travelExpenses) ||
+           safe(()=>window.expenseRequests) ||
+           safe(()=>window.requests) ||
+           safe(()=>window.mockRequests) ||
+           safe(()=>window.TRAVEL_EXPENSES) ||
+           [];
+  }
+
+  function selectedRequest(){
+    const id = window.adminSelectedId || window.selectedAdminId || window.currentAdminId || window.selectedExpenseId;
+    const list = allRequests();
+    return list.find(x => String(x.id) === String(id)) ||
+           window.adminSelectedRequest ||
+           window.selectedAdminRequest ||
+           window.currentAdminRequest ||
+           null;
+  }
+
+  function saveToLocal(req){
+    if(!req) return;
+    const keys = [
+      'travelExpenses',
+      'expenseRequests',
+      'travel_expenses',
+      'travelExpenseRequests',
+      'mockTravelExpenses'
+    ];
+
+    for(const key of keys){
+      try{
+        const old = JSON.parse(localStorage.getItem(key) || 'null');
+        if(Array.isArray(old)){
+          const idx = old.findIndex(x => String(x.id) === String(req.id));
+          if(idx >= 0){
+            old[idx] = Object.assign({}, old[idx], req);
+            localStorage.setItem(key, JSON.stringify(old));
+          }
+        }
+      }catch(e){}
+    }
+  }
+
+  function readAdminInputs(){
+    return {
+      voucherDate: document.getElementById('adminVoucherDate')?.value ||
+                   document.getElementById('voucherDate')?.value ||
+                   document.querySelector('input[title*="지결"]')?.value ||
+                   '',
+      paymentDueDate: document.getElementById('adminPaymentDueDate')?.value ||
+                      document.getElementById('paymentDueDate')?.value ||
+                      document.querySelector('input[title*="입금"]')?.value ||
+                      '',
+      memo: document.getElementById('adminMemo')?.value ||
+            document.getElementById('managerMemo')?.value ||
+            document.querySelector('.admin-manager-memo textarea')?.value ||
+            ''
+    };
+  }
+
+  function applyInputs(req){
+    const draft = readAdminInputs();
+    req.voucherDate = draft.voucherDate;
+    req.voucher_date = draft.voucherDate;
+    req.paymentDueDate = draft.paymentDueDate;
+    req.payment_due_date = draft.paymentDueDate;
+    req.adminMemo = draft.memo;
+    req.managerMemo = draft.memo;
+    req.memo = draft.memo;
+  }
+
+  function setStatus(req, status){
+    req.status = status;
+    req.reviewStatus = status;
+  }
+
+  function persistAndRefresh(req){
+    saveToLocal(req);
+
+    [
+      'renderMySubmissions',
+      'refreshMonthlyProcessSummary',
+      'renderAdminList',
+      'renderAdminReviewList'
+    ].forEach(name => {
+      if(typeof window[name] === 'function') safe(()=>window[name]());
+    });
+
+    if(typeof window.renderAdminDetail === 'function') safe(()=>window.renderAdminDetail(req.id));
+    else if(typeof window.showAdminDetail === 'function') safe(()=>window.showAdminDetail(req.id));
+
+    setTimeout(cleanup, 40);
+    setTimeout(cleanup, 200);
+  }
+
+  function action(name){
+    const req = selectedRequest();
+    if(!req) return;
+
+    const current = req.status || req.reviewStatus || STATUS_WAIT;
+
+    if(name === '수정'){
+      applyInputs(req);
+      persistAndRefresh(req);
+      return;
+    }
+
+    if(name === '수정요청'){
+      applyInputs(req);
+      setStatus(req, STATUS_REVISE);
+      persistAndRefresh(req);
+      return;
+    }
+
+    if(name === '승인'){
+      applyInputs(req);
+      setStatus(req, STATUS_APPROVED);
+      persistAndRefresh(req);
+      return;
+    }
+
+    if(name === '지출결의 완료' || name === '지출결의완료'){
+      // 현재 입력 중인 지결작성일/입금예정일을 유지하면서 상태 변경
+      applyInputs(req);
+      setStatus(req, STATUS_DONE);
+      persistAndRefresh(req);
+      return;
+    }
+
+    if(name === '취소'){
+      // 취소는 날짜/메모 미저장. 상태만 이전 단계로 되돌림.
+      if(current === STATUS_DONE) setStatus(req, STATUS_APPROVED);
+      else if(current === STATUS_APPROVED || current === STATUS_REVISE) setStatus(req, STATUS_WAIT);
+      else setStatus(req, STATUS_WAIT);
+      persistAndRefresh(req);
+      return;
+    }
+  }
+
+  function buildButtons(){
+    const req = selectedRequest();
+    if(!req) return;
+
+    const box = document.querySelector('.admin-final-actions');
+    if(!box) return;
+
+    const status = req.status || req.reviewStatus || STATUS_WAIT;
+    box.innerHTML = '';
+
+    function add(label, cls){
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = cls || '';
+      btn.dataset.adminAction = label;
+      btn.textContent = label;
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        action(label);
+      });
+      box.appendChild(btn);
+    }
+
+    if(status === STATUS_DONE){
+      add('수정', 'btn-ghost');
+      add('취소', 'btn-danger');
+    }else if(status === STATUS_APPROVED){
+      add('수정', 'btn-ghost');
+      add('취소', 'btn-danger');
+      add('지출결의 완료', '');
+    }else{
+      add('수정요청', 'btn-ghost');
+      add('승인', 'btn-sub');
+    }
+  }
+
+  function cleanup(){
+    // 체크리스트 제거
+    document.querySelectorAll('.admin-review-checks').forEach(el => el.remove());
+
+    // 지급완료 제거
+    document.querySelectorAll('button').forEach(btn => {
+      if((btn.textContent || '').trim() === '지급완료') btn.remove();
+    });
+
+    // 상태 필터 정리
+    const filter = document.getElementById('adminStatusFilter');
+    if(filter){
+      [...filter.options].forEach(opt => {
+        if(opt.value === '지급완료' || opt.textContent.trim() === '지급완료') opt.remove();
+      });
+      if(![...filter.options].some(opt => opt.value === STATUS_APPROVED)){
+        const opt = document.createElement('option');
+        opt.value = STATUS_APPROVED;
+        opt.textContent = STATUS_APPROVED;
+        const doneOpt = [...filter.options].find(o => o.value === STATUS_DONE);
+        filter.insertBefore(opt, doneOpt || null);
+      }
+    }
+
+    buildButtons();
+  }
+
+  // 기존 inline onclick 이름들을 덮어써서 동일 로직 사용
+  window.adminAdminAction = action;
+  window.adminDetailAction = action;
+  window.adminReviewAction = action;
+  window.updateAdminStatus = function(status){ action(status); };
+
+  // 렌더 함수 후 정리
+  ['renderAdminDetail','showAdminDetail','selectAdminRequest','renderAdminReviewList','renderAdminList'].forEach(name => {
+    const fn = window[name];
+    if(typeof fn === 'function' && !fn.__adminStatusPatched){
+      const wrapped = function(){
+        const result = fn.apply(this, arguments);
+        setTimeout(cleanup, 30);
+        setTimeout(cleanup, 160);
+        return result;
+      };
+      wrapped.__adminStatusPatched = true;
+      window[name] = wrapped;
+    }
+  });
+
+  if(document.body){
+    const mo = new MutationObserver(() => cleanup());
+    mo.observe(document.body, { childList:true, subtree:true });
+  }
+
+  setTimeout(cleanup, 80);
+  setTimeout(cleanup, 500);
+  setTimeout(cleanup, 1200);
 })();
 </script>
 
