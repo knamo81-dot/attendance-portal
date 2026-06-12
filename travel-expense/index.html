@@ -5078,276 +5078,265 @@
 
 
 
-<script id="travel-expense-clean-final-controller">
+
+<script id="travel-expense-save-submit-native-fix">
 (function(){
-  if(window.__travelExpenseCleanFinalControllerInstalled) return;
-  window.__travelExpenseCleanFinalControllerInstalled = true;
+  if(window.__travelExpenseSaveSubmitNativeFixInstalled) return;
+  window.__travelExpenseSaveSubmitNativeFixInstalled = true;
 
   const DB_TABLE = 'travel_expense_requests';
   const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ console.error(e); return fallback; } };
-
-  function normalizeStatus(v){
-    const s = String(v || '').replace(/\s+/g,'');
-    if(s.includes('지출결의')) return '지출결의완료';
-    if(s.includes('검토대기')) return '검토대기';
-    if(s.includes('수정요청')) return '수정요청';
-    if(s.includes('임시저장')) return '임시저장';
-    if(s.includes('승인')) return '승인';
-    return s || '임시저장';
-  }
+  const today = () => new Date().toISOString().slice(0,10);
 
   function cleanPayload(payload){
-    if(Array.isArray(payload)) return payload.map(cleanPayload);
-    if(!payload || typeof payload !== 'object') return payload;
-
-    const p = Object.assign({}, payload);
-
-    // 실제 travel_expense_requests 컬럼 기준
+    const p = Object.assign({}, payload || {});
     if(Object.prototype.hasOwnProperty.call(p, 'memo')){
       if(!Object.prototype.hasOwnProperty.call(p, 'manager_memo')) p.manager_memo = p.memo;
       delete p.memo;
     }
-    delete p.submittedAtRemovedRemoved;
-    delete p.submittedAtRemoved;
-
+    delete p.submitted_at;
+    delete p.submittedAt;
+    delete p.submitted_removed;
     return p;
   }
 
   function patchSupabase(){
-    if(!window.supabase || window.supabase.__travelExpenseCleanPayloadPatched) return;
-
+    if(!window.supabase || window.supabase.__travelExpenseSaveSubmitPatched) return;
     const originalFrom = window.supabase.from.bind(window.supabase);
     window.supabase.from = function(table){
       const builder = originalFrom(table);
-
-      if(table === DB_TABLE && builder && !builder.__travelExpenseCleanBuilderPatched){
+      if(table === DB_TABLE && builder && !builder.__travelExpenseSaveSubmitBuilderPatched){
         ['insert','update','upsert'].forEach(method=>{
           if(typeof builder[method] === 'function'){
             const original = builder[method].bind(builder);
             builder[method] = function(payload, ...args){
-              return original(cleanPayload(payload), ...args);
+              const clean = Array.isArray(payload) ? payload.map(cleanPayload) : cleanPayload(payload);
+              return original(clean, ...args);
             };
           }
         });
-        builder.__travelExpenseCleanBuilderPatched = true;
+        builder.__travelExpenseSaveSubmitBuilderPatched = true;
       }
       return builder;
     };
-
-    window.supabase.__travelExpenseCleanPayloadPatched = true;
+    window.supabase.__travelExpenseSaveSubmitPatched = true;
   }
 
-  function requestList(){
-    return safe(()=>window.travelExpenses) ||
-           safe(()=>window.expenseRequests) ||
-           safe(()=>window.requests) ||
-           safe(()=>window.mockRequests) ||
-           [];
+  function moneyNumber(v){
+    if(typeof v === 'number') return v;
+    return Number(String(v || '0').replace(/[^\d.-]/g,'')) || 0;
   }
 
-  function requestFromCard(card){
-    if(!card) return null;
-    const id = card.dataset?.id || card.getAttribute('data-id') || card.getAttribute('data-trip-id') || card.getAttribute('data-request-id') || '';
-    const list = requestList();
+  function getText(id){ return document.getElementById(id)?.textContent || ''; }
+  function val(id){ return document.getElementById(id)?.value || ''; }
 
-    if(id){
-      const found = list.find(x => String(x.id) === String(id));
-      if(found) return found;
-    }
-
-    const txt = card.textContent || '';
-    return list.find(x=>{
-      const date = String(x.tripDate || x.trip_date || '');
-      const applicant = String(x.applicant || x.applicantName || x.applicant_name || x.name || '');
-      return (!date || txt.includes(date)) && (!applicant || txt.includes(applicant));
-    }) || null;
+  function getRows(){
+    const expenses = [];
+    document.querySelectorAll('#costList .cost-row').forEach(row=>{
+      const selects = row.querySelectorAll('select');
+      const inputs = row.querySelectorAll('input');
+      const item = selects[0]?.value || '';
+      const payType = selects[1]?.value || '';
+      const amount = Number(inputs[0]?.value || 0);
+      expenses.push({ item, payType, amount });
+    });
+    return expenses;
   }
 
-  function statusOf(req, card){
-    return normalizeStatus(req?.status || req?.reviewStatus || card?.querySelector('.status')?.textContent);
+  function getRoutes(){
+    const routes = [];
+    document.querySelectorAll('#routeSegments .route-row').forEach(row=>{
+      const inputs = row.querySelectorAll('input');
+      routes.push({
+        from: inputs[0]?.value || '',
+        to: inputs[1]?.value || '',
+        distance: Number(inputs[2]?.value || 0)
+      });
+    });
+    return routes;
   }
 
-  function persistLocal(){
-    const list = requestList();
-    const keys = ['travelExpenses','expenseRequests','travel_expenses','travelExpenseRequests','mockTravelExpenses'];
-    keys.forEach(key=>{
-      try{
-        const stored = JSON.parse(localStorage.getItem(key) || 'null');
-        if(Array.isArray(stored)){
-          const byId = new Map(list.map(x => [String(x.id), x]));
-          const next = stored
-            .map(x => byId.has(String(x.id)) ? Object.assign({}, x, byId.get(String(x.id))) : x)
-            .filter(x => !x.__deleted);
-          localStorage.setItem(key, JSON.stringify(next));
-        }
-      }catch(e){}
+  function currentId(){
+    return window.currentEditId || window.editingId || window.selectedRequestId || window.currentRequestId || window.selectedExpenseId || null;
+  }
+
+  function localList(){
+    if(Array.isArray(window.travelExpenses)) return window.travelExpenses;
+    if(Array.isArray(window.expenseRequests)) return window.expenseRequests;
+    if(Array.isArray(window.requests)) return window.requests;
+    if(Array.isArray(window.mockRequests)) return window.mockRequests;
+    window.travelExpenses = [];
+    return window.travelExpenses;
+  }
+
+  function buildPayload(status){
+    if(typeof window.calcAll === 'function') safe(()=>window.calcAll());
+    if(typeof window.updateRoute === 'function') safe(()=>window.updateRoute());
+
+    const totalAmount = moneyNumber(getText('totalCost'));
+    const corpAmount = moneyNumber(getText('corpCost'));
+    const personalAmount = moneyNumber(getText('personalCost'));
+    const fuelAmount = moneyNumber(getText('fuelCost'));
+    const routes = getRoutes();
+    const expenses = getRows();
+
+    return cleanPayload({
+      company_id: window.activeCompanyId || window.companyId || null,
+      applicant_employee_no: window.portalSession?.employee?.employee_no || window.portalSession?.employee_no || '',
+      applicant_name: val('applicantName'),
+      division_code: window.portalSession?.employee?.division_code || '',
+      division_name: val('applicantDivision'),
+      team_code: window.portalSession?.employee?.team_code || '',
+      team_name: val('applicantTeam'),
+      trip_type: val('tripType'),
+      trip_date: val('tripDate'),
+      transport: val('transport'),
+      request_date: val('requestDate') || today(),
+      voucher_date: val('voucherDateDisplay') || null,
+      payment_due_date: val('paymentDueDateDisplay') || null,
+      status,
+      total_amount: totalAmount,
+      corp_card_amount: corpAmount,
+      personal_amount: personalAmount,
+      fuel_amount: fuelAmount,
+      created_by_user_id: window.portalSession?.user?.id || window.portalSession?.user_id || null,
+      total_distance_km: Number(val('distance') || 0),
+      gas_price: Number(val('gasPrice') || 0),
+      fuel_efficiency: Number(val('efficiency') || 0),
+      round_unit: Number(val('roundUnit') || 1),
+
+      // 로컬 표시용 추가 필드(DB에는 별도 테이블이 없으면 Supabase wrapper가 그대로 보낼 수 있음)
+      // 따라서 DB 저장 payload에는 아래 필드를 보내지 않도록 save 함수에서 분리함.
+      _routes: routes,
+      _expenses: expenses,
+      _route_label: getText('routeLabel'),
+      _full_route_label: getText('fullRouteLabel')
     });
   }
 
-  async function setStatus(req, status){
-    if(!req) return;
-    const next = normalizeStatus(status);
+  function toLocalRecord(dbPayload, id){
+    return {
+      id: id || currentId() || String(Date.now()),
+      companyId: dbPayload.company_id,
+      applicant: dbPayload.applicant_name,
+      applicantName: dbPayload.applicant_name,
+      division: dbPayload.division_name,
+      divisionName: dbPayload.division_name,
+      team: dbPayload.team_name,
+      teamName: dbPayload.team_name,
+      tripType: dbPayload.trip_type,
+      tripDate: dbPayload.trip_date,
+      transport: dbPayload.transport,
+      requestDate: dbPayload.request_date,
+      voucherDate: dbPayload.voucher_date,
+      paymentDueDate: dbPayload.payment_due_date,
+      status: dbPayload.status,
+      reviewStatus: dbPayload.status,
+      total: dbPayload.total_amount,
+      totalAmount: dbPayload.total_amount,
+      corp: dbPayload.corp_card_amount,
+      corpCardAmount: dbPayload.corp_card_amount,
+      personal: dbPayload.personal_amount,
+      personalAmount: dbPayload.personal_amount,
+      fuelAmount: dbPayload.fuel_amount,
+      distance: dbPayload.total_distance_km,
+      totalDistance: dbPayload.total_distance_km,
+      gasPrice: dbPayload.gas_price,
+      efficiency: dbPayload.fuel_efficiency,
+      roundUnit: dbPayload.round_unit,
+      routes: dbPayload._routes || [],
+      expenses: dbPayload._expenses || [],
+      routeLabel: dbPayload._route_label || '',
+      fullRouteLabel: dbPayload._full_route_label || ''
+    };
+  }
 
-    req.status = next;
-    req.reviewStatus = next;
+  function dbPayloadOnly(payload){
+    const p = Object.assign({}, payload);
+    delete p._routes;
+    delete p._expenses;
+    delete p._route_label;
+    delete p._full_route_label;
+    // 실제 DB 컬럼 목록 기준, 없는 컬럼 방지
+    const allowed = new Set([
+      'company_id','applicant_employee_no','applicant_name','division_code','division_name',
+      'team_code','team_name','trip_type','trip_date','transport','request_date',
+      'voucher_date','payment_due_date','status','total_amount','corp_card_amount',
+      'personal_amount','fuel_amount','created_by_user_id','total_distance_km',
+      'gas_price','fuel_efficiency','round_unit','manager_memo'
+    ]);
+    Object.keys(p).forEach(k=>{ if(!allowed.has(k)) delete p[k]; });
+    return cleanPayload(p);
+  }
 
+  async function saveWithStatus(status){
     patchSupabase();
 
-    if(window.supabase && req.id){
-      const result = await window.supabase
-        .from(DB_TABLE)
-        .update({ status: next })
-        .eq('id', req.id);
+    const payload = buildPayload(status);
+    const id = currentId();
+    let savedId = id;
 
-      if(result && result.error) throw result.error;
+    if(window.supabase){
+      let result;
+      if(id){
+        result = await window.supabase
+          .from(DB_TABLE)
+          .update(dbPayloadOnly(payload))
+          .eq('id', id)
+          .select('id')
+          .single();
+      }else{
+        result = await window.supabase
+          .from(DB_TABLE)
+          .insert(dbPayloadOnly(payload))
+          .select('id')
+          .single();
+      }
+
+      if(result.error) throw result.error;
+      savedId = result.data?.id || id;
     }
 
-    persistLocal();
+    const record = toLocalRecord(payload, savedId);
+    const list = localList();
+    const idx = list.findIndex(x => String(x.id) === String(record.id));
+    if(idx >= 0) list[idx] = Object.assign({}, list[idx], record);
+    else list.unshift(record);
+
+    try{ localStorage.setItem('travelExpenses', JSON.stringify(list)); }catch(e){}
+
+    window.currentEditId = record.id;
+    window.editingId = record.id;
+
+    if(typeof window.renderMySubmissions === 'function') safe(()=>window.renderMySubmissions());
+    if(typeof window.refreshMonthlyProcessSummary === 'function') safe(()=>window.refreshMonthlyProcessSummary());
+    if(typeof window.renderAdminList === 'function') safe(()=>window.renderAdminList());
+    if(typeof window.renderAdminReviewList === 'function') safe(()=>window.renderAdminReviewList());
+
+    return record;
   }
 
-  function refreshAll(){
-    [
-      'renderMySubmissions',
-      'renderSubmissions',
-      'loadMyRequests',
-      'refreshMonthlyProcessSummary',
-      'renderAdminList',
-      'renderAdminReviewList',
-      'adminFilterChanged'
-    ].forEach(name=>{
-      if(typeof window[name] === 'function') safe(()=>window[name]());
-    });
-  }
-
-  function editReq(req){
-    if(!req) return;
-
-    if(typeof window.editRequest === 'function') return window.editRequest(req.id);
-    if(typeof window.editTravelExpenseRequest === 'function') return window.editTravelExpenseRequest(req.id);
-    if(typeof window.startEditRequest === 'function') return window.startEditRequest(req.id);
-
-    if(typeof window.loadTravelExpenseRequest === 'function'){
-      window.loadTravelExpenseRequest(req.id);
-      document.body.classList.add('travel-editing');
-      return;
-    }
-
-    if(typeof window.selectRequest === 'function'){
-      window.selectRequest(req.id);
-      document.body.classList.add('travel-editing');
-    }
-  }
-
-  async function recallReq(req){
-    if(!req) return;
-    if(!confirm('제출한 검토대기 건을 회수하고 임시저장 상태로 되돌릴까요?')) return;
-
+  window.saveTravelExpenseDraft = async function(){
     try{
-      await setStatus(req, '임시저장');
-      refreshAll();
-      alert('회수되었습니다. 임시저장 상태로 변경되었습니다.');
+      await saveWithStatus('임시저장');
+      alert('임시저장되었습니다.');
     }catch(err){
-      alert('회수 중 오류가 발생했습니다: ' + (err?.message || err));
+      console.error('[TravelExpense] draft save error', err);
+      alert('임시저장 중 오류가 발생했습니다: ' + (err?.message || err));
     }
-  }
+  };
 
-  function deleteReq(req){
-    if(!req) return;
-    if(!confirm('이 신청건을 삭제할까요?')) return;
-
-    if(typeof window.deleteRequest === 'function') return window.deleteRequest(req.id);
-    if(typeof window.deleteTravelExpenseRequest === 'function') return window.deleteTravelExpenseRequest(req.id);
-
-    const list = requestList();
-    const idx = list.findIndex(x => String(x.id) === String(req.id));
-    if(idx >= 0) list.splice(idx, 1);
-
-    persistLocal();
-    refreshAll();
-  }
-
-  function btn(label, cls, handler){
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = cls;
-    b.textContent = label;
-    b.addEventListener('click', e=>{
-      e.preventDefault();
-      e.stopPropagation();
-      handler();
-    });
-    return b;
-  }
-
-  function enforceApplicantCards(){
-    document.querySelectorAll('.submission-scroll .list-card').forEach(card=>{
-      const req = requestFromCard(card);
-      if(!req) return;
-
-      const status = statusOf(req, card);
-      let actions = card.querySelector('.my-card-actions');
-
-      if(status === '승인' || status === '지출결의완료'){
-        if(actions) actions.remove();
-        return;
-      }
-
-      if(!['임시저장','검토대기','수정요청'].includes(status)){
-        return;
-      }
-
-      if(!actions){
-        actions = document.createElement('div');
-        actions.className = 'my-card-actions';
-        card.appendChild(actions);
-      }
-
-      actions.innerHTML = '';
-
-      if(status === '임시저장' || status === '수정요청'){
-        actions.appendChild(btn('수정', 'edit-btn', ()=>editReq(req)));
-      }
-
-      if(status === '검토대기'){
-        actions.appendChild(btn('회수', 'recall-btn', ()=>recallReq(req)));
-      }
-
-      actions.appendChild(btn('삭제', 'delete-btn', ()=>deleteReq(req)));
-    });
-
-    document.getElementById('submitCancelBtn')?.remove();
-    document.querySelectorAll('.submit-cancel-btn').forEach(el=>el.remove());
-  }
-
-  function patchRender(name){
-    const fn = window[name];
-    if(typeof fn !== 'function' || fn.__travelExpenseCleanFinalPatched) return;
-
-    const wrapped = function(){
-      patchSupabase();
-      const result = fn.apply(this, arguments);
-      setTimeout(enforceApplicantCards, 30);
-      setTimeout(enforceApplicantCards, 180);
-      setTimeout(enforceApplicantCards, 500);
-      return result;
-    };
-    wrapped.__travelExpenseCleanFinalPatched = true;
-    window[name] = wrapped;
-  }
-
-  ['renderMySubmissions','renderSubmissions','loadMyRequests','newRequest','clearForm','loadTravelExpenseRequest','selectRequest','saveTravelExpenseDraft','submitTravelExpense'].forEach(patchRender);
+  window.submitTravelExpense = async function(){
+    try{
+      await saveWithStatus('검토대기');
+      alert('제출되었습니다.');
+    }catch(err){
+      console.error('[TravelExpense] submit error', err);
+      alert('제출 중 오류가 발생했습니다: ' + (err?.message || err));
+    }
+  };
 
   patchSupabase();
-
-  const mo = new MutationObserver(()=>{
-    patchSupabase();
-    enforceApplicantCards();
-  });
-  if(document.body) mo.observe(document.body, { childList:true, subtree:true });
-
-  setTimeout(()=>{patchSupabase(); enforceApplicantCards();}, 80);
-  setTimeout(()=>{patchSupabase(); enforceApplicantCards();}, 500);
-  setTimeout(()=>{patchSupabase(); enforceApplicantCards();}, 1300);
 })();
 </script>
 
