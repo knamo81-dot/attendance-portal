@@ -1499,6 +1499,17 @@
   }
 </style>
 
+
+<style id="admin-console-standard-from-reference-final">
+  .admin-request-list{overflow:auto;padding-right:4px;}
+  .admin-request-list::-webkit-scrollbar{width:8px;}
+  .admin-request-list::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:999px;}
+  .admin-trip-row input[type="checkbox"]{cursor:pointer;}
+  .admin-detail-panel .admin-review-section{scroll-margin-top:14px;}
+  .admin-detail-panel textarea{width:100%;}
+  .admin-detail-panel .admin-empty-small{color:#64748b;font-size:13px;font-weight:800;padding:12px;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc;text-align:center;}
+</style>
+
 </head>
 <body>
   <header>
@@ -4649,6 +4660,330 @@
 
   setTimeout(install, 400);
   setTimeout(install, 1200);
+})();
+</script>
+
+
+<script id="admin-console-standard-from-reference-final">
+(function(){
+  if(window.__travelExpenseAdminStandardFinalInstalled) return;
+  window.__travelExpenseAdminStandardFinalInstalled = true;
+
+  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
+  const hasClient = obj => !!(obj && typeof obj.from === 'function');
+  let rows = [];
+  let selectedId = '';
+  let detailCache = new Map();
+
+  function findDb(scope){
+    if(!scope) return null;
+    const names = ['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];
+    for(const name of names){ const value = safe(()=>scope[name]); if(hasClient(value)) return value; }
+    for(const boxName of ['portal','Portal','portalApp','PortalApp','portalSession','__PORTAL__','__PORTAL_STATE__','app','App']){
+      const box = safe(()=>scope[boxName]);
+      if(hasClient(box)) return box;
+      if(box && typeof box === 'object'){
+        for(const key of safe(()=>Object.keys(box), [])){ const value = safe(()=>box[key]); if(hasClient(value)) return value; }
+      }
+    }
+    for(const key of safe(()=>Object.keys(scope), [])){
+      if(key === 'supabase') continue;
+      const value = safe(()=>scope[key]);
+      if(hasClient(value)) return value;
+    }
+    return null;
+  }
+  function db(){ return findDb(safe(()=>window.parent)) || findDb(window); }
+  function $(id){ return document.getElementById(id); }
+  function esc(value){ return String(value ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+  function won(value){
+    if(typeof window.money === 'function') return window.money(value || 0);
+    return Math.round(Number(value || 0)).toLocaleString('ko-KR') + '원';
+  }
+  function num(value){ return Number(value || 0) || 0; }
+  function pick(obj, keys){ for(const k of keys){ if(obj && obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k]; } return ''; }
+  function session(){
+    return safe(()=>window.portalSession) || safe(()=>window.parent && window.parent.portalSession) || safe(()=>window.parent && window.parent.__PORTAL_SESSION__) || safe(()=>JSON.parse(sessionStorage.getItem('portalSession') || 'null')) || safe(()=>JSON.parse(localStorage.getItem('portalSession') || 'null')) || {};
+  }
+  function profile(){
+    const s = session();
+    const user = s.user || s.currentUser || s.profile || s;
+    const emp = s.employee || s.employeeInfo || s.matchedEmployee || s.staff || s.employeeProfile || {};
+    const company = s.company || s.activeCompany || {};
+    return {
+      companyId: s.activeCompanyId || s.companyId || s.company_id || pick(company,['id','company_id','companyId']) || pick(user,['company_id','companyId']) || pick(emp,['company_id','companyId']) || '',
+      employeeNo: pick(emp,['employee_no','employeeNo']) || pick(user,['employee_no','employeeNo']) || ''
+    };
+  }
+  function statusClass(status){
+    status = String(status || '');
+    if(status.includes('수정')) return 's-reject';
+    if(status.includes('완료') || status.includes('지급')) return 's-ok';
+    return 's-wait';
+  }
+  function requestTitle(row){
+    const type = row.trip_type || '출장';
+    const date = row.trip_date || '-';
+    const route = row.route_label || row.route_text || '';
+    return route || `${type} · ${date}`;
+  }
+  function filteredRows(){
+    const q = String($('adminSearch')?.value || '').toLowerCase().trim();
+    const st = $('adminStatusFilter')?.value || 'all';
+    let list = rows.filter(row => String(row.status || '') !== '임시저장');
+    if(st !== 'all') list = list.filter(row => String(row.status || '') === st);
+    if(q){
+      list = list.filter(row => (`${row.applicant_name||''} ${row.division_name||''} ${row.team_name||''} ${row.trip_type||''} ${row.trip_date||''} ${row.transport||''} ${row.status||''}`).toLowerCase().includes(q));
+    }
+    const sort = $('adminSort')?.value || 'applicant';
+    const by = (fn) => list.sort((a,b)=>String(fn(a)||'').localeCompare(String(fn(b)||''), 'ko'));
+    if(sort === 'requestDate') by(r => r.request_date || r.created_at || '');
+    else if(sort === 'tripDate') by(r => r.trip_date || '');
+    else if(sort === 'status') by(r => r.status || '');
+    else by(r => (r.applicant_name || '') + (r.trip_date || ''));
+    if(sort === 'requestDate' || sort === 'tripDate') list.reverse();
+    return list;
+  }
+  function groupByApplicant(list){
+    const map = new Map();
+    list.forEach(row => {
+      const key = row.applicant_name || '미지정';
+      if(!map.has(key)) map.set(key, []);
+      map.get(key).push(row);
+    });
+    return [...map.entries()];
+  }
+  function renderAdminList(){
+    const panel = document.querySelector('.admin-list-panel');
+    if(!panel) return;
+    let holder = panel.querySelector('.admin-request-list');
+    if(!holder){
+      holder = document.createElement('div');
+      holder.className = 'admin-request-list';
+      const old = panel.querySelector('.empty-state');
+      if(old) old.replaceWith(holder); else panel.appendChild(holder);
+    }
+    const list = filteredRows();
+    const badge = $('adminVisibleCount');
+    if(badge) badge.textContent = list.length + '건';
+    if(!list.length){
+      holder.innerHTML = '<div class="notice empty-state">제출된 정산서가 없습니다.</div>';
+      updateAdminSelectedSummary();
+      return;
+    }
+    holder.innerHTML = groupByApplicant(list).map(([applicant, group]) => {
+      const total = group.reduce((s,r)=>s+num(r.total_amount),0);
+      const team = group[0]?.team_name || group[0]?.division_name || '-';
+      return `<div class="admin-applicant-group" data-group="${esc(applicant)}">
+        <div class="admin-group-head"><div><b>${esc(applicant)}</b><span>${esc(team)}</span></div><div>합계 <b>${won(total)}</b></div></div>
+        ${group.map(row => `<div class="admin-trip-row ${row.id===selectedId?'active':''}" data-request-id="${esc(row.id)}" data-applicant="${esc(row.applicant_name||'')}" data-status="${esc(row.status||'')}" data-title="${esc(requestTitle(row))}" data-total="${num(row.total_amount)}" data-corp="${num(row.corp_card_amount)}" data-personal="${num(row.personal_amount)}" onclick="window.selectTravelExpenseAdminRequest && window.selectTravelExpenseAdminRequest('${esc(row.id)}')">
+          <input type="checkbox" onclick="event.stopPropagation();window.updateTravelExpenseAdminBulk && window.updateTravelExpenseAdminBulk();" />
+          <div class="admin-trip-main">
+            <div class="admin-trip-title-row"><b>${esc(requestTitle(row))}</b><span class="status ${statusClass(row.status)}">${esc(row.status||'-')}</span></div>
+            <div class="admin-trip-meta">${esc(row.trip_date||'-')} · ${esc(row.division_name||'-')} / ${esc(row.team_name||'-')} · ${esc(row.transport||'-')}</div>
+            <div class="admin-trip-amounts">총 ${won(row.total_amount)} · 법인 ${won(row.corp_card_amount)} · 개인 ${won(row.personal_amount)} · 거리 ${num(row.total_distance_km)}km</div>
+          </div>
+        </div>`).join('')}
+      </div>`;
+    }).join('');
+    updateAdminSelectedSummary();
+  }
+  async function loadAdminRows(){
+    const client = db();
+    const p = profile();
+    if(!client || !p.companyId) return;
+    const res = await client.from('travel_expense_requests').select('*').eq('company_id', p.companyId).order('created_at', { ascending:false });
+    if(res.error){ console.error('[TravelExpense] admin list load failed', res.error); return; }
+    rows = Array.isArray(res.data) ? res.data : [];
+    window.__travelExpenseAdminRows = rows;
+    renderAdminList();
+    if(selectedId && rows.some(r=>r.id===selectedId)) selectAdminRequest(selectedId, {silent:true});
+  }
+  async function loadDetail(id){
+    if(detailCache.has(id)) return detailCache.get(id);
+    const client = db();
+    const p = profile();
+    const row = rows.find(r => String(r.id) === String(id));
+    if(!client || !p.companyId || !row) return {row, routes:[], items:[]};
+    const [routesRes, itemsRes] = await Promise.all([
+      client.from('travel_expense_routes').select('*').eq('company_id', p.companyId).eq('request_id', id).order('sort_order', { ascending:true }),
+      client.from('travel_expense_items').select('*').eq('company_id', p.companyId).eq('request_id', id).order('created_at', { ascending:true })
+    ]);
+    if(routesRes.error) console.warn('[TravelExpense] routes load failed', routesRes.error);
+    if(itemsRes.error) console.warn('[TravelExpense] items load failed', itemsRes.error);
+    const detail = { row, routes: routesRes.data || [], items: itemsRes.data || [] };
+    detailCache.set(id, detail);
+    return detail;
+  }
+  function renderRoutes(detail){
+    const routes = detail.routes || [];
+    if(!routes.length){
+      return `<div class="admin-empty-small">입력된 이동경로가 없습니다.</div>`;
+    }
+    const rowsHtml = routes.map((r,i)=>`<tr><td class="center">${i+1}</td><td>${esc(r.from_place||'-')}</td><td>${esc(r.to_place||'-')}</td><td class="amount">${num(r.distance_km)} km</td></tr>`).join('');
+    const path = [routes[0]?.from_place, ...routes.map(r=>r.to_place)].filter(Boolean).join(' → ');
+    return `<div class="admin-table-wrap"><table class="admin-check-table"><thead><tr><th>No</th><th>출발지</th><th>도착지</th><th>거리</th></tr></thead><tbody>${rowsHtml}</tbody></table></div><div class="admin-total-line"><span>거리계산 경로</span><b>${esc(path || '-')}</b></div>`;
+  }
+  function renderFuel(row){
+    if((row.transport || '자차') !== '자차') return '<div class="admin-empty-small">자차 이동 건이 아닙니다.</div>';
+    return `<div class="admin-fuel-formula">
+      <div class="admin-info-item"><span>총 이동거리</span><b>${num(row.total_distance_km)} km</b></div>
+      <div class="admin-info-item"><span>출장일 기준 유가</span><b>${num(row.gas_price).toLocaleString('ko-KR')}원/L</b></div>
+      <div class="admin-info-item"><span>회사 기준연비</span><b>${num(row.fuel_efficiency)} km/L</b></div>
+      <div class="admin-info-item"><span>계산 유류비</span><b>${won(row.fuel_amount)}</b></div>
+    </div>
+    <div class="notice">계산식: 총 이동거리 ÷ 회사 기준연비 × 출장일 기준 유가 = ${won(row.fuel_amount)}</div>`;
+  }
+  function renderItems(detail){
+    const row = detail.row;
+    const items = detail.items || [];
+    const itemRows = items.map((item,i)=>`<tr><td>${esc(item.pay_type||'-')}</td><td>${esc(item.item_type||'-')}</td><td class="amount">${won(item.amount)}</td><td class="center"><button type="button" class="admin-evidence-btn" onclick="window.adminOpenEvidenceViewer && window.adminOpenEvidenceViewer('receipt','${esc(item.item_type||'증빙')}')">보기</button></td></tr>`);
+    if(num(row.fuel_amount) > 0){
+      itemRows.push(`<tr><td>개인지급</td><td>자차 유류비</td><td class="amount">${won(row.fuel_amount)}</td><td class="center"><span class="status s-ok">자동계산</span></td></tr>`);
+    }
+    if(!itemRows.length) return '<div class="admin-empty-small">입력된 사용내역이 없습니다.</div>';
+    return `<div class="admin-table-wrap"><table class="admin-check-table"><thead><tr><th>구분</th><th>항목</th><th>금액</th><th>증빙</th></tr></thead><tbody>${itemRows.join('')}</tbody></table></div>
+      <div class="admin-total-line"><span>사용금액 합계</span><b>${won(row.total_amount)}</b></div>`;
+  }
+  function renderDocs(row){
+    return `<div class="admin-doc-card"><div><b>출장계/외근신청서</b><span>신청자가 업로드한 결재 완료 서류</span></div><button type="button" class="admin-evidence-btn missing" onclick="window.adminOpenEvidenceViewer && window.adminOpenEvidenceViewer('document','출장계/외근신청서')">보기</button></div>`;
+  }
+  function renderDetail(detail){
+    const row = detail.row;
+    const panel = $('adminDetailPanel');
+    if(!panel || !row) return;
+    panel.innerHTML = `<div class="admin-detail-top">
+      <div class="admin-detail-title"><h2>${esc(row.applicant_name||'-')} 정산서</h2><p>${esc(row.division_name||'-')} · ${esc(row.team_name||'-')} · ${esc(row.trip_date||'-')} · ${esc(row.transport||'-')}</p></div>
+      <div class="admin-detail-buttons">
+        <button type="button" onclick="window.adminPrintStatement && window.adminPrintStatement('all')">전체출력</button>
+        <button type="button" class="btn-ghost" onclick="window.adminPrintStatement && window.adminPrintStatement('corp')">법인카드출력</button>
+        <button type="button" class="btn-ghost" onclick="window.adminPrintStatement && window.adminPrintStatement('personal')">개인지급출력</button>
+      </div>
+    </div>
+    <div class="admin-mini-summary">
+      <div class="admin-mini-card"><small>상태</small><b>${esc(row.status||'-')}</b></div>
+      <div class="admin-mini-card"><small>총액</small><b>${won(row.total_amount)}</b></div>
+      <div class="admin-mini-card"><small>법인카드</small><b>${won(row.corp_card_amount)}</b></div>
+      <div class="admin-mini-card"><small>개인지급</small><b>${won(row.personal_amount)}</b></div>
+    </div>
+    <div class="admin-review-section"><h3>① 기본정보</h3><div class="admin-section-body admin-info-grid admin-basic-info-grid">
+      <div class="admin-info-item"><span>신청자</span><b>${esc(row.applicant_name||'-')}</b></div>
+      <div class="admin-info-item"><span>본부</span><b>${esc(row.division_name||'-')}</b></div>
+      <div class="admin-info-item"><span>팀</span><b>${esc(row.team_name||'-')}</b></div>
+      <div class="admin-info-item"><span>출장/외근 구분</span><b>${esc(row.trip_type||'-')}</b></div>
+      <div class="admin-info-item"><span>출장일</span><b>${esc(row.trip_date||'-')}</b></div>
+      <div class="admin-info-item"><span>이동수단</span><b>${esc(row.transport||'-')}</b></div>
+      <div class="admin-info-item"><span>신청일</span><b>${esc(row.request_date||'-')}</b></div>
+      <div class="admin-info-item"><span>지결작성일</span><b>${esc(row.voucher_date||'미입력')}</b></div>
+      <div class="admin-info-item"><span>입금예정일</span><b>${esc(row.payment_due_date||'미입력')}</b></div>
+    </div></div>
+    <div class="admin-review-section"><h3>② 이동경로</h3><div class="admin-section-body">${renderRoutes(detail)}</div></div>
+    <div class="admin-review-section"><h3>③ 자차 유류비</h3><div class="admin-section-body">${renderFuel(row)}</div></div>
+    <div class="admin-review-section"><h3>④ 사용내역 및 증빙</h3><div class="admin-section-body">${renderItems(detail)}</div></div>
+    <div class="admin-review-section"><h3>⑤ 첨부자료</h3><div class="admin-section-body admin-doc-list">${renderDocs(row)}</div></div>
+    <div class="admin-review-section"><h3>⑥ 검토 결과</h3><div class="admin-section-body">
+      <div class="admin-schedule-grid">
+        <div><label>지결작성일</label><input type="date" id="adminVoucherDate" value="${esc(row.voucher_date||'')}" onchange="window.adminUpdateSettlementDates && window.adminUpdateSettlementDates('${esc(row.id)}')" /></div>
+        <div><label>입금예정일</label><input type="date" id="adminPaymentDueDate" value="${esc(row.payment_due_date||'')}" onchange="window.adminUpdateSettlementDates && window.adminUpdateSettlementDates('${esc(row.id)}')" /></div>
+      </div>
+      <div class="admin-review-checks">
+        <label><input type="checkbox"> 이동경로/거리 확인</label>
+        <label><input type="checkbox"> 유류비 계산 확인</label>
+        <label><input type="checkbox"> 법인카드 금액/증빙 확인</label>
+        <label><input type="checkbox"> 개인지급 금액/증빙 확인</label>
+        <label><input type="checkbox"> 출장계/외근신청서 확인</label>
+        <label><input type="checkbox"> 지출결의 첨부자료 준비 완료</label>
+      </div>
+      <div class="admin-manager-memo"><label>관리팀 메모</label><textarea id="adminManagerMemo" placeholder="검토 메모를 입력하세요.">${esc(row.manager_memo||row.memo||'')}</textarea></div>
+      <div class="admin-final-actions">
+        <button type="button" class="btn-ghost" onclick="window.adminAdminAction && window.adminAdminAction('수정요청')">수정요청</button>
+        <button type="button" class="btn-sub" onclick="window.adminAdminAction && window.adminAdminAction('승인')">승인</button>
+        <button type="button" onclick="window.adminAdminAction && window.adminAdminAction('지출결의완료')">지출결의 완료</button>
+        <button type="button" onclick="window.adminAdminAction && window.adminAdminAction('지급완료')">지급완료</button>
+      </div>
+    </div></div>`;
+  }
+  async function selectAdminRequest(id, options){
+    selectedId = String(id || '');
+    document.querySelectorAll('.admin-trip-row.active').forEach(el=>el.classList.remove('active'));
+    const active = document.querySelector(`.admin-trip-row[data-request-id="${CSS.escape(selectedId)}"]`);
+    if(active) active.classList.add('active');
+    const detail = await loadDetail(selectedId);
+    renderDetail(detail);
+  }
+  function selectedRowsFromChecks(){
+    return [...document.querySelectorAll('.admin-request-list .admin-trip-row input[type="checkbox"]:checked')].map(cb => {
+      const row = cb.closest('.admin-trip-row');
+      return rows.find(r => String(r.id) === String(row?.dataset.requestId));
+    }).filter(Boolean);
+  }
+  function updateAdminSelectedSummary(){
+    const list = selectedRowsFromChecks();
+    if($('adminSelectedCount')) $('adminSelectedCount').textContent = list.length + '건';
+    if($('adminSelectedTotal')) $('adminSelectedTotal').textContent = won(list.reduce((s,r)=>s+num(r.total_amount),0));
+    if($('adminSelectedCorp')) $('adminSelectedCorp').textContent = won(list.reduce((s,r)=>s+num(r.corp_card_amount),0));
+    if($('adminSelectedPersonal')) $('adminSelectedPersonal').textContent = won(list.reduce((s,r)=>s+num(r.personal_amount),0));
+  }
+  async function updateRequestStatus(status){
+    if(!selectedId){ alert('검토할 신청건을 선택하세요.'); return; }
+    const client = db();
+    if(!client){ alert('Supabase 연결을 찾지 못했습니다.'); return; }
+    const payload = { status };
+    const v = $('adminVoucherDate')?.value || null;
+    const p = $('adminPaymentDueDate')?.value || null;
+    payload.voucher_date = v;
+    payload.payment_due_date = p;
+    const res = await client.from('travel_expense_requests').update(payload).eq('id', selectedId);
+    if(res.error){ alert('상태 변경 중 오류가 발생했습니다: ' + res.error.message); return; }
+    detailCache.delete(selectedId);
+    await loadAdminRows();
+    await selectAdminRequest(selectedId);
+    if(window.refreshMonthlyProcessSummary) window.refreshMonthlyProcessSummary();
+    alert(status + ' 처리되었습니다.');
+  }
+  async function updateDates(id){
+    const client = db();
+    if(!client || !id) return;
+    const payload = { voucher_date: $('adminVoucherDate')?.value || null, payment_due_date: $('adminPaymentDueDate')?.value || null };
+    const res = await client.from('travel_expense_requests').update(payload).eq('id', id);
+    if(res.error){ alert('처리일정 저장 중 오류가 발생했습니다: ' + res.error.message); return; }
+    const row = rows.find(r => String(r.id) === String(id));
+    if(row){ row.voucher_date = payload.voucher_date; row.payment_due_date = payload.payment_due_date; }
+    detailCache.delete(id);
+  }
+  function printStatement(mode){
+    const selected = selectedRowsFromChecks();
+    const targetRows = selected.length ? selected : rows.filter(r => String(r.id) === String(selectedId));
+    if(!targetRows.length){ alert('출력할 신청건을 선택하세요.'); return; }
+    const title = mode === 'corp' ? '법인카드 정산서' : mode === 'personal' ? '개인지급 정산서' : '출장비 정산서';
+    const body = targetRows.map(r => `<h2>${esc(title)}</h2><p>${esc(r.applicant_name||'-')} · ${esc(r.trip_date||'-')} · ${esc(r.division_name||'-')} / ${esc(r.team_name||'-')}</p><table border="1" cellspacing="0" cellpadding="6" style="width:100%;border-collapse:collapse"><tr><th>총액</th><th>법인카드</th><th>개인지급</th><th>상태</th></tr><tr><td>${won(r.total_amount)}</td><td>${won(r.corp_card_amount)}</td><td>${won(r.personal_amount)}</td><td>${esc(r.status||'-')}</td></tr></table><hr/>`).join('');
+    const w = window.open('', '_blank');
+    if(!w){ alert('팝업이 차단되었습니다.'); return; }
+    w.document.write(`<html><head><title>${esc(title)}</title></head><body>${body}<script>window.print()<\/script></body></html>`);
+    w.document.close();
+  }
+
+  window.travelExpenseAdminRefresh = loadAdminRows;
+  window.loadTravelExpenseAdminRequests = loadAdminRows;
+  window.selectTravelExpenseAdminRequest = selectAdminRequest;
+  window.adminSelectDetailById = selectAdminRequest;
+  window.updateTravelExpenseAdminBulk = updateAdminSelectedSummary;
+  window.adminUpdateSelectedSummary = updateAdminSelectedSummary;
+  window.adminFilterChanged = renderAdminList;
+  window.adminSortChanged = renderAdminList;
+  window.adminUpdateSettlementDates = updateDates;
+  window.adminAdminAction = updateRequestStatus;
+  window.adminOpenEvidenceViewer = function(type, name){ alert(`${name || '증빙'} 보기 기능은 파일 업로드 저장 연동 후 실제 파일을 새 창/모달로 열도록 연결하면 됩니다.`); };
+  window.adminPrintStatement = printStatement;
+  window.adminBulkAction = function(action){
+    if(String(action).includes('지출결의')){ updateRequestStatus('지출결의완료'); return; }
+    printStatement(String(action).includes('법인카드') ? 'corp' : String(action).includes('개인지급') ? 'personal' : 'all');
+  };
+
+  function init(){ loadAdminRows(); }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+  setTimeout(init, 700);
+  setTimeout(init, 1800);
 })();
 </script>
 
