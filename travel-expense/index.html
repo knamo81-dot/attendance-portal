@@ -1466,7 +1466,7 @@
 </style>
 
 
-<style id="trip-date-fuel-price-stable-final">
+<style id="trip-date-fuel-price-no-flicker-final">
   #gasPrice[readonly]{
     background:#f8fafc !important;
     color:#334155 !important;
@@ -4194,17 +4194,18 @@
 </script>
 
 
-<script id="trip-date-fuel-price-stable-final">
+<script id="trip-date-fuel-price-no-flicker-final">
 (function(){
-  if(window.__tripDateFuelPriceStableFinalInstalled) return;
-  window.__tripDateFuelPriceStableFinalInstalled = true;
+  if(window.__tripDateFuelPriceNoFlickerInstalled) return;
+  window.__tripDateFuelPriceNoFlickerInstalled = true;
 
   const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
   const hasClient = obj => !!(obj && typeof obj.from === 'function');
 
-  let lastSeenTripDate = null;
-  let lastLoadedTripDate = null;
-  let loadingForDate = null;
+  let lastTripDate = '';
+  let lastStatusKey = '';
+  let loadingDate = '';
+  const failedDates = new Set();
 
   function scanClient(scope){
     if(!scope) return null;
@@ -4279,19 +4280,18 @@
   function gasEl(){ return document.getElementById('gasPrice'); }
   function tripEl(){ return document.getElementById('tripDate'); }
 
-  function validDate(value){
+  function isValidDate(value){
     return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
   }
 
-  function currentTripDate(){
-    const value = tripEl()?.value || '';
-    return validDate(value) ? value : '';
+  function getTripDate(){
+    const v = tripEl()?.value || '';
+    return isValidDate(v) ? v : '';
   }
 
   function noteEl(){
     const input = gasEl();
     if(!input) return null;
-
     let note = document.getElementById('fuelDatePriceNote');
     if(!note){
       note = document.createElement('div');
@@ -4303,18 +4303,14 @@
   }
 
   function setNote(message, mode){
+    const key = `${mode || ''}|${message || ''}`;
+    if(key === lastStatusKey) return;
+    lastStatusKey = key;
+
     const note = noteEl();
     if(!note) return;
     note.className = 'fuel-date-note' + (mode ? ' ' + mode : '');
     note.textContent = message || '';
-  }
-
-  function clearFuel(message){
-    const input = gasEl();
-    if(input) input.value = '';
-    lastLoadedTripDate = null;
-    if(typeof window.calcAll === 'function') window.calcAll();
-    setNote(message || '출장일을 선택하면 해당 출장일 기준 유가가 자동 입력됩니다.');
   }
 
   function lockGas(){
@@ -4325,11 +4321,18 @@
     input.title = '출장일 기준 fuel_daily_prices 가격이 자동 입력됩니다.';
   }
 
+  function setGas(value){
+    const input = gasEl();
+    if(!input) return;
+    const next = value === null || value === undefined ? '' : String(value);
+    if(input.value !== next) input.value = next;
+    if(typeof window.calcAll === 'function') window.calcAll();
+  }
+
   async function queryFuel(tripDate){
     const client = getClient();
     if(!client) throw new Error('Supabase client not found');
 
-    // 1) 출장일 정확히 일치
     const exact = await client
       .from('fuel_daily_prices')
       .select('price_date, gasoline_price')
@@ -4339,7 +4342,6 @@
     if(exact.error) throw exact.error;
     if(exact.data) return { ...exact.data, matchType:'exact' };
 
-    // 2) 출장일 데이터가 없는 경우, 출장일 이전 중 가장 가까운 값
     const previous = await client
       .from('fuel_daily_prices')
       .select('price_date, gasoline_price')
@@ -4354,130 +4356,108 @@
     return null;
   }
 
-  async function loadFuelForTripDate(tripDate, force){
-    const input = gasEl();
-    if(!input) return;
-
-    lockGas();
-
+  async function loadFuel(tripDate, force){
     if(!tripDate){
-      clearFuel('출장일을 선택하면 해당 출장일 기준 유가가 자동 입력됩니다.');
-      lastSeenTripDate = '';
-      loadingForDate = null;
+      setGas('');
+      setNote('출장일을 선택하면 해당 출장일 기준 유가가 자동 입력됩니다.');
       return;
     }
 
-    if(!force && lastLoadedTripDate === tripDate && input.value) return;
-    if(loadingForDate === tripDate) return;
+    if(!force && failedDates.has(tripDate)) return;
+    if(loadingDate === tripDate) return;
 
-    loadingForDate = tripDate;
+    const input = gasEl();
+    if(!force && input && input.value && lastTripDate === tripDate) return;
+
+    loadingDate = tripDate;
     setNote(`출장일(${tripDate}) 기준 유가를 조회 중입니다...`);
 
     try{
       const fuel = await queryFuel(tripDate);
 
       if(!fuel){
-        clearFuel(`출장일(${tripDate}) 또는 이전 날짜의 유가 데이터가 없습니다. fuel_daily_prices에 해당 날짜 유가를 입력해 주세요.`);
+        failedDates.add(tripDate);
+        setGas('');
+        setNote(`출장일(${tripDate}) 또는 이전 날짜의 유가 데이터가 없습니다. fuel_daily_prices에 해당 날짜 유가를 입력해 주세요.`, 'error');
         return;
       }
 
       const price = Number(fuel.gasoline_price || 0);
       if(!price){
-        clearFuel(`출장일(${tripDate}) 기준 유가가 0원으로 저장되어 있습니다. fuel_daily_prices 값을 확인해 주세요.`);
+        failedDates.add(tripDate);
+        setGas('');
+        setNote(`출장일(${tripDate}) 기준 유가가 0원으로 저장되어 있습니다. fuel_daily_prices 값을 확인해 주세요.`, 'error');
         return;
       }
 
-      input.value = String(price);
-      lastLoadedTripDate = tripDate;
+      setGas(price);
+      failedDates.delete(tripDate);
 
       if(fuel.matchType === 'exact'){
         setNote(`출장일 기준 유가 적용: ${fuel.price_date} / ${price.toLocaleString('ko-KR')}원/L`, 'ok');
       }else{
         setNote(`출장일(${tripDate}) 유가가 없어 직전 저장 유가 적용: ${fuel.price_date} / ${price.toLocaleString('ko-KR')}원/L`, 'ok');
       }
-
-      if(typeof window.calcAll === 'function') window.calcAll();
     }catch(error){
       console.warn('[TravelExpense] 출장일 기준 유가 조회 실패', error);
-      clearFuel(`출장일(${tripDate}) 기준 유가를 불러오지 못했습니다. fuel_daily_prices 읽기 권한 또는 테이블 데이터를 확인해 주세요.`);
-      const note = noteEl();
-      if(note) note.classList.add('error');
+      failedDates.add(tripDate);
+      setGas('');
+      setNote(`출장일(${tripDate}) 기준 유가를 불러오지 못했습니다. fuel_daily_prices 읽기 권한 또는 RLS 정책을 확인해 주세요.`, 'error');
     }finally{
-      loadingForDate = null;
+      loadingDate = '';
     }
   }
 
-  function inspectTripDate(){
+  function handleTripDateChanged(force){
     lockGas();
 
-    const tripDate = currentTripDate();
+    const tripDate = getTripDate();
 
-    // 신규작성 등으로 출장일이 비워지면 이전 출장일 기준 유가/메시지를 즉시 제거
     if(!tripDate){
-      if(lastSeenTripDate !== ''){
-        lastSeenTripDate = '';
-        clearFuel('출장일을 선택하면 해당 출장일 기준 유가가 자동 입력됩니다.');
-      }else{
-        setNote('출장일을 선택하면 해당 출장일 기준 유가가 자동 입력됩니다.');
-      }
+      lastTripDate = '';
+      failedDates.clear();
+      setGas('');
+      setNote('출장일을 선택하면 해당 출장일 기준 유가가 자동 입력됩니다.');
       return;
     }
 
-    if(tripDate !== lastSeenTripDate){
-      lastSeenTripDate = tripDate;
-      const input = gasEl();
-      if(input) input.value = '';
-      lastLoadedTripDate = null;
-      loadFuelForTripDate(tripDate, true);
-      return;
-    }
-
-    const input = gasEl();
-    if(input && !String(input.value || '').trim()){
-      loadFuelForTripDate(tripDate, true);
+    if(force || tripDate !== lastTripDate){
+      lastTripDate = tripDate;
+      setGas('');
+      loadFuel(tripDate, true);
     }
   }
 
   function bindTripDate(){
     const input = tripEl();
-    if(!input || input.dataset.tripDateFuelStableBound) return;
+    if(!input || input.dataset.tripDateFuelNoFlickerBound) return;
 
-    input.dataset.tripDateFuelStableBound = '1';
-
-    ['change','input','blur'].forEach(evt => {
-      input.addEventListener(evt, function(){
-        lastSeenTripDate = null;
-        inspectTripDate();
-      });
-    });
+    input.dataset.tripDateFuelNoFlickerBound = '1';
+    input.addEventListener('change', ()=>handleTripDateChanged(true));
+    input.addEventListener('input', ()=>handleTripDateChanged(true));
+    input.addEventListener('blur', ()=>handleTripDateChanged(false));
   }
 
   function patchFunction(name){
     const fn = window[name];
-    if(typeof fn !== 'function' || fn.__tripDateFuelStablePatched) return;
+    if(typeof fn !== 'function' || fn.__tripDateFuelNoFlickerPatched) return;
 
     const wrapped = function(){
       const result = fn.apply(this, arguments);
 
-      // 함수가 폼을 변경한 직후 재검사
-      setTimeout(()=>{
-        lastSeenTripDate = null;
-        inspectTripDate();
-      }, 120);
-      setTimeout(()=>{
-        inspectTripDate();
-      }, 700);
+      // 신규작성 등으로 출장일이 초기화된 뒤 1회만 검사
+      setTimeout(()=>handleTripDateChanged(true), 180);
+      setTimeout(()=>handleTripDateChanged(false), 650);
 
       return result;
     };
 
-    wrapped.__tripDateFuelStablePatched = true;
+    wrapped.__tripDateFuelNoFlickerPatched = true;
     window[name] = wrapped;
   }
 
   window.loadFuelPriceByTripDate = function(){
-    const tripDate = currentTripDate();
-    return loadFuelForTripDate(tripDate, true);
+    handleTripDateChanged(true);
   };
   window.loadTripDateFuelPriceToTravelExpense = window.loadFuelPriceByTripDate;
   window.loadLatestFuelPriceToTravelExpense = window.loadFuelPriceByTripDate;
@@ -4496,7 +4476,8 @@
       'modeEdit'
     ].forEach(patchFunction);
 
-    inspectTripDate();
+    // 최초 1회만 검사. 반복 interval 없음.
+    handleTripDateChanged(false);
   }
 
   if(document.readyState === 'loading'){
@@ -4505,12 +4486,8 @@
     init();
   }
 
-  setTimeout(init, 400);
-  setTimeout(init, 1200);
-  setTimeout(init, 2200);
-
-  const timer = setInterval(init, 1000);
-  window.addEventListener('beforeunload', ()=>clearInterval(timer));
+  setTimeout(init, 500);
+  setTimeout(init, 1300);
 })();
 </script>
 
