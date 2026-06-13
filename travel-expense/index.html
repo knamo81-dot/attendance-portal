@@ -1426,6 +1426,203 @@
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+
+<script id="travel-document-upload-final-controller">
+(function(){
+  if(window.__travelDocumentUploadFinalInstalled) return;
+  window.__travelDocumentUploadFinalInstalled = true;
+
+  const pendingFiles = [];
+  const uploadedDocs = [];
+  const bucketCandidates = ['travel-expense','travel_expense','travel-expense-attachments','travel_expense_attachments','expense-documents','documents'];
+
+  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
+  const hasClient = obj => !!(obj && typeof obj.from === 'function');
+  function findDb(scope){
+    if(!scope) return null;
+    const names=['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];
+    for(const name of names){ const v=safe(()=>scope[name]); if(hasClient(v)) return v; }
+    for(const key of safe(()=>Object.keys(scope), [])){ if(key==='supabase') continue; const v=safe(()=>scope[key]); if(hasClient(v)) return v; }
+    return null;
+  }
+  function db(){ return findDb(safe(()=>window.parent)) || findDb(window); }
+  function pick(o,keys){ for(const k of keys){ if(o && o[k] !== undefined && o[k] !== null && o[k] !== '') return o[k]; } return ''; }
+  function profile(){
+    const s=safe(()=>window.portalSession)||safe(()=>window.parent&&window.parent.portalSession)||safe(()=>window.parent&&window.parent.__PORTAL_SESSION__)||safe(()=>JSON.parse(sessionStorage.getItem('portalSession')||'null'))||safe(()=>JSON.parse(localStorage.getItem('portalSession')||'null'))||{};
+    const user=s.user||s.currentUser||s.profile||s;
+    const emp=s.employee||s.employeeInfo||s.matchedEmployee||s.staff||s.employeeProfile||{};
+    const company=s.company||s.activeCompany||{};
+    return {
+      companyId:s.activeCompanyId||s.companyId||s.company_id||pick(company,['id','company_id','companyId'])||pick(user,['company_id','companyId'])||pick(emp,['company_id','companyId'])||'',
+      employeeNo:pick(emp,['employee_no','employeeNo'])||pick(user,['employee_no','employeeNo'])||''
+    };
+  }
+  function fmtSize(size){
+    const n=Number(size||0);
+    if(n>=1024*1024) return (n/1024/1024).toFixed(1)+'MB';
+    if(n>=1024) return Math.round(n/1024)+'KB';
+    return n+'B';
+  }
+  function cleanName(name){ return String(name||'file').replace(/[\/:*?"<>|#%&{}$!`'@+=]/g,'_').slice(0,120); }
+  function listEl(){ return document.getElementById('travelDocumentList'); }
+  function inputEl(){ return document.getElementById('travelDocumentInput'); }
+
+  function render(){
+    const el=listEl(); if(!el) return;
+    const rows=[];
+    uploadedDocs.forEach((d,i)=>{
+      const name=d.file_name||d.name||d.filename||d.original_name||'첨부파일';
+      rows.push(`<div class="travel-document-row" data-uploaded-index="${i}"><div><b>${escapeHtml(name)}</b><span>업로드 완료</span></div><button type="button" data-doc-open="${i}">보기</button></div>`);
+    });
+    pendingFiles.forEach((f,i)=>{
+      rows.push(`<div class="travel-document-row" data-pending-index="${i}"><div><b>${escapeHtml(f.name)}</b><span>${fmtSize(f.size)} · 저장 시 업로드</span></div><button type="button" class="danger" data-doc-remove="${i}">삭제</button></div>`);
+    });
+    el.innerHTML = rows.length ? rows.join('') : '<div class="travel-document-empty">첨부된 파일이 없습니다.</div>';
+  }
+  function escapeHtml(v){ return String(v ?? '').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  function bind(){
+    const input=inputEl();
+    if(input && !input.__travelDocumentBound){
+      input.__travelDocumentBound=true;
+      input.addEventListener('change', ()=>{
+        Array.from(input.files||[]).forEach(file=>pendingFiles.push(file));
+        input.value='';
+        render();
+      });
+    }
+    const list=listEl();
+    if(list && !list.__travelDocumentBound){
+      list.__travelDocumentBound=true;
+      list.addEventListener('click', async e=>{
+        const remove=e.target.closest('[data-doc-remove]');
+        if(remove){ pendingFiles.splice(Number(remove.dataset.docRemove),1); render(); return; }
+        const open=e.target.closest('[data-doc-open]');
+        if(open){ await openUploadedDoc(uploadedDocs[Number(open.dataset.docOpen)]); }
+      });
+    }
+    render();
+  }
+
+  async function openUploadedDoc(doc){
+    const client=db(); if(!client || !doc) return;
+    const bucket=doc.storage_bucket||doc.bucket||doc.bucket_id||window.TRAVEL_EXPENSE_BUCKET||'travel-expense';
+    const path=doc.file_path||doc.path||doc.storage_path||doc.url||'';
+    if(!path){ alert('파일 경로를 찾지 못했습니다.'); return; }
+    if(/^https?:/i.test(path)){ window.open(path, '_blank'); return; }
+    try{
+      const signed=await client.storage.from(bucket).createSignedUrl(path, 60*10);
+      const url=signed?.data?.signedUrl;
+      if(url){ window.open(url, '_blank'); return; }
+    }catch(_){}
+    try{
+      const pub=client.storage.from(bucket).getPublicUrl(path);
+      const url=pub?.data?.publicUrl;
+      if(url) window.open(url, '_blank');
+    }catch(_){ alert('파일을 열 수 없습니다.'); }
+  }
+
+  async function uploadFileToStorage(client, companyId, requestId, file){
+    const base=`${companyId}/${requestId}/approval/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${cleanName(file.name)}`;
+    const candidates = window.TRAVEL_EXPENSE_BUCKET ? [window.TRAVEL_EXPENSE_BUCKET].concat(bucketCandidates) : bucketCandidates;
+    let lastError=null;
+    for(const bucket of [...new Set(candidates)]){
+      try{
+        const res=await client.storage.from(bucket).upload(base, file, { upsert:true, contentType:file.type || 'application/octet-stream' });
+        if(!res.error) return { bucket, path: res.data?.path || base };
+        lastError=res.error;
+      }catch(e){ lastError=e; }
+    }
+    throw lastError || new Error('Storage upload failed');
+  }
+
+  async function insertAttachmentMeta(client, meta){
+    const variants=[
+      {company_id:meta.company_id, request_id:meta.request_id, attachment_type:'approval_document', file_name:meta.file_name, file_path:meta.file_path, storage_bucket:meta.storage_bucket, mime_type:meta.mime_type, file_size:meta.file_size, uploaded_at:new Date().toISOString()},
+      {company_id:meta.company_id, request_id:meta.request_id, type:'approval_document', name:meta.file_name, path:meta.file_path, bucket:meta.storage_bucket, mime_type:meta.mime_type, size_bytes:meta.file_size},
+      {company_id:meta.company_id, request_id:meta.request_id, file_name:meta.file_name, file_path:meta.file_path, mime_type:meta.mime_type, file_size:meta.file_size},
+      {company_id:meta.company_id, request_id:meta.request_id, file_name:meta.file_name, file_path:meta.file_path}
+    ];
+    let lastError=null;
+    for(const row of variants){
+      try{
+        const res=await client.from('travel_expense_attachments').insert(row).select('*').maybeSingle();
+        if(!res.error) return res.data || row;
+        lastError=res.error;
+      }catch(e){ lastError=e; }
+    }
+    throw lastError || new Error('Attachment metadata insert failed');
+  }
+
+  window.uploadTravelExpenseDocuments = async function(requestId){
+    if(!pendingFiles.length) return true;
+    const client=db(); const p=profile();
+    if(!client || !p.companyId || !requestId){ alert('첨부파일 업로드 정보를 확인하지 못했습니다.'); return false; }
+    const files=pendingFiles.splice(0, pendingFiles.length);
+    const completed=[];
+    try{
+      for(const file of files){
+        const stored=await uploadFileToStorage(client, p.companyId, requestId, file);
+        const meta={company_id:p.companyId, request_id:requestId, file_name:file.name, file_path:stored.path, storage_bucket:stored.bucket, mime_type:file.type||'', file_size:file.size||0};
+        const saved=await insertAttachmentMeta(client, meta);
+        completed.push(saved);
+      }
+      uploadedDocs.push(...completed);
+      render();
+      return true;
+    }catch(e){
+      console.error('[TravelExpense] document upload error', e);
+      pendingFiles.unshift(...files.slice(completed.length));
+      render();
+      alert('첨부파일 업로드 중 오류가 발생했습니다. Supabase Storage bucket 또는 attachments 테이블을 확인해 주세요: '+(e?.message||e));
+      return false;
+    }
+  };
+
+  window.loadTravelExpenseDocumentList = async function(requestId){
+    uploadedDocs.splice(0, uploadedDocs.length);
+    pendingFiles.splice(0, pendingFiles.length);
+    const input=inputEl(); if(input) input.value='';
+    const client=db(); const p=profile();
+    if(client && p.companyId && requestId){
+      try{
+        const res=await client.from('travel_expense_attachments').select('*').eq('company_id',p.companyId).eq('request_id',requestId).order('created_at',{ascending:true});
+        if(!res.error && Array.isArray(res.data)) uploadedDocs.push(...res.data);
+      }catch(e){ console.warn('[TravelExpense] document list load warning', e); }
+    }
+    render();
+  };
+
+  window.resetTravelExpenseDocumentUpload = function(){
+    pendingFiles.splice(0, pendingFiles.length);
+    uploadedDocs.splice(0, uploadedDocs.length);
+    const input=inputEl(); if(input) input.value='';
+    render();
+  };
+
+  function patchInitialSave(name){
+    const fn=window[name];
+    if(typeof fn !== 'function' || fn.__travelDocumentUploadPatched) return;
+    const wrapped=async function(){
+      const id=await fn.apply(this, arguments);
+      if(id) await window.uploadTravelExpenseDocuments(String(id));
+      return id;
+    };
+    wrapped.__travelDocumentUploadPatched=true;
+    window[name]=wrapped;
+  }
+
+  function init(){
+    bind();
+    // 기존 save 함수가 stable controller에 캡처되기 전에 신규 저장 첨부 업로드를 연결합니다.
+    patchInitialSave('saveTravelExpenseDraft');
+    patchInitialSave('submitTravelExpense');
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+
+
 <script id="travel-expense-single-card-render-helper">
 (function(){
   if(window.__travelExpenseSingleCardRenderHelperInstalled) return;
@@ -1550,6 +1747,22 @@
   .my-card-actions .edit-btn{background:#eef2ff!important;color:#3730a3!important;}
   .my-card-actions .recall-btn{background:#fff7ed!important;color:#c2410c!important;}
   .my-card-actions .delete-btn{background:#fee2e2!important;color:#b91c1c!important;}
+</style>
+
+
+<style id="travel-document-upload-final-style">
+  .travel-document-upload{padding:0!important;border:0!important;background:transparent!important;}
+  .travel-document-input{display:none!important;}
+  .travel-document-drop{display:block!important;margin:0!important;border:1.5px dashed #b9c4d8;border-radius:14px;padding:14px;background:#fafcff;color:#6b7280;font-size:13px;line-height:1.55;cursor:pointer;}
+  .travel-document-drop strong{color:#1f2937;}
+  .travel-document-drop:hover{border-color:#2563eb;background:#f8fbff;}
+  .travel-document-list{margin-top:10px;display:grid;gap:7px;font-size:12px;color:#475569;}
+  .travel-document-row{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid #e5e9f2;background:#fff;border-radius:12px;padding:9px 10px;}
+  .travel-document-row b{font-size:12px;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .travel-document-row span{color:#64748b;white-space:nowrap;}
+  .travel-document-row button{min-width:0!important;height:28px!important;padding:0 8px!important;border-radius:8px!important;font-size:11px!important;background:#eef2ff!important;color:#3730a3!important;}
+  .travel-document-row button.danger{background:#fee2e2!important;color:#b91c1c!important;}
+  .travel-document-empty{padding:10px 12px;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc;color:#64748b;font-weight:700;}
 </style>
 
 </head>
@@ -1690,9 +1903,13 @@
             </div>
 
             <h3>결재 완료 서류 업로드</h3>
-            <div class="upload">
-              <strong>출장계/외근신청서 PDF 또는 캡처</strong><br/>
-              파일 선택 영역 미리보기 · 실제 개발 시 드래그앤드롭/모바일 사진 업로드 적용
+            <div class="upload travel-document-upload" id="travelDocumentUploadBox">
+              <input id="travelDocumentInput" class="travel-document-input" type="file" accept="image/*,.pdf" multiple />
+              <label class="travel-document-drop" for="travelDocumentInput">
+                <strong>출장계/외근신청서 PDF 또는 캡처</strong><br/>
+                <span>클릭해서 파일 선택 또는 모바일 사진 업로드</span>
+              </label>
+              <div id="travelDocumentList" class="travel-document-list">첨부된 파일이 없습니다.</div>
             </div>
           </section>
 
@@ -3510,6 +3727,7 @@
     setVal('distance',''); setVal('gasPrice',''); setVal('efficiency',''); setVal('roundUnit','1');
     setText('routeLabel','-'); setText('fullRouteLabel','-');
     if(typeof window.toggleFuel === 'function') window.toggleFuel();
+    if(typeof window.resetTravelExpenseDocumentUpload === 'function') window.resetTravelExpenseDocumentUpload();
     refreshTotals();
     document.querySelectorAll('.submission-scroll .list-card').forEach(card=>{card.style.borderColor='';card.style.boxShadow='';});
   }
@@ -3559,6 +3777,7 @@
         const id = await originalDraft();
         if(id){
           selectedId = String(id);
+          if(typeof window.uploadTravelExpenseDocuments === 'function') await window.uploadTravelExpenseDocuments(selectedId);
           selectedStatus = '임시저장';
           await refreshCards();
           modeEdit(selectedId,'임시저장');
@@ -3571,6 +3790,7 @@
         const id = await originalSubmit();
         if(id){
           selectedId = String(id);
+          if(typeof window.uploadTravelExpenseDocuments === 'function') await window.uploadTravelExpenseDocuments(selectedId);
           selectedStatus = '검토대기';
           await refreshCards();
           await loadDetail(selectedId);
@@ -3678,6 +3898,7 @@
         items.data.forEach(item=>window.addCostRow(item.item_type||'', item.pay_type||'', item.amount||''));
       }
       if(typeof window.toggleFuel === 'function') window.toggleFuel();
+      if(typeof window.loadTravelExpenseDocumentList === 'function') await window.loadTravelExpenseDocumentList(id);
 
       // 카드 선택/수정 진입 시 저장값만 표시하지 않고,
       // 현재 출장일 기준 유가와 안내문을 같은 조회 결과로 다시 동기화합니다.
@@ -3742,6 +3963,7 @@
       if(routes.length){ const rr=await client.from('travel_expense_routes').insert(routes); if(rr.error) console.warn('[TravelExpense] route update warning', rr.error); }
       const items=collectItems().map(i=>({...i, company_id:p.companyId, request_id:selectedId}));
       if(items.length){ const ir=await client.from('travel_expense_items').insert(items); if(ir.error) console.warn('[TravelExpense] item update warning', ir.error); }
+      if(typeof window.uploadTravelExpenseDocuments === 'function') await window.uploadTravelExpenseDocuments(selectedId);
       const id=selectedId;
       await refreshCards();
       await loadDetail(id);
