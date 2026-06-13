@@ -1565,6 +1565,31 @@
     return ins.data || row;
   }
 
+  function ensureReceiptList(row){
+    if(!row) return null;
+    let el = row.querySelector('[data-receipt-list]');
+    if(!el){
+      el = document.createElement('div');
+      el.className = 'receipt-file-list';
+      el.setAttribute('data-receipt-list','');
+      row.appendChild(el);
+    }
+    return el;
+  }
+
+  function renderReceiptNames(row, files){
+    const el = ensureReceiptList(row);
+    if(!el) return;
+    const names = (files || []).map(f => typeof f === 'string' ? f : (f && (f.file_name || f.name)) || '').filter(Boolean);
+    if(!names.length){
+      el.classList.remove('has-files');
+      el.innerHTML = '';
+      return;
+    }
+    el.classList.add('has-files');
+    el.innerHTML = `<div class="receipt-file-list-title">첨부파일</div><ul>${names.map(n=>`<li>${escapeHtml(n)}</li>`).join('')}</ul>`;
+  }
+
   function collectReceiptInputs(){
     return Array.from(document.querySelectorAll('#costList .cost-row')).map((row, index)=>{
       const input=row.querySelector('input.receipt-input');
@@ -1598,9 +1623,10 @@
       }
       info.input.dataset.travelUploadedKey = key;
       if(info.btn){
-        info.btn.textContent = `업로드 ${info.files.length}건`;
+        info.btn.textContent = '영수증 첨부';
         info.btn.classList.add('attached');
       }
+      renderReceiptNames(info.row, info.files);
     }
     return done;
   }
@@ -1612,7 +1638,9 @@
     (receipts || []).forEach(r=>{
       if(r.item_id){
         const k=String(r.item_id);
-        byItem.set(k, (byItem.get(k)||0)+1);
+        const arr = byItem.get(k) || [];
+        arr.push(r);
+        byItem.set(k, arr);
       }else{
         noItem.push(r);
       }
@@ -1621,11 +1649,16 @@
       const input=row.querySelector('input.receipt-input');
       const btn=row.querySelector('.receipt-btn');
       if(!btn) return;
-      const count = (itemIds[index] ? (byItem.get(String(itemIds[index]))||0) : 0) + (index===0 ? noItem.length : 0);
-      if(count>0){
-        btn.textContent = `첨부 ${count}건`;
+      const matched = itemIds[index] ? (byItem.get(String(itemIds[index])) || []) : [];
+      const files = matched.concat(index===0 ? noItem : []);
+      btn.textContent = '영수증 첨부';
+      if(files.length){
         btn.classList.add('attached');
-        if(input) input.dataset.travelUploadedKey = `server:${count}`;
+        if(input) input.dataset.travelUploadedKey = `server:${files.length}`;
+        renderReceiptNames(row, files);
+      }else{
+        btn.classList.remove('attached');
+        renderReceiptNames(row, []);
       }
     });
   }
@@ -1678,6 +1711,7 @@
     uploadedDocs.splice(0, uploadedDocs.length);
     const input=inputEl(); if(input) input.value='';
     document.querySelectorAll('input.receipt-input').forEach(input=>{ input.dataset.travelUploadedKey=''; });
+    document.querySelectorAll('[data-receipt-list]').forEach(el=>{ el.classList.remove('has-files'); el.innerHTML=''; });
     render();
   };
 
@@ -1845,6 +1879,23 @@
   .travel-document-row button{min-width:0!important;height:28px!important;padding:0 8px!important;border-radius:8px!important;font-size:11px!important;background:#eef2ff!important;color:#3730a3!important;}
   .travel-document-row button.danger{background:#fee2e2!important;color:#b91c1c!important;}
   .travel-document-empty{padding:10px 12px;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc;color:#64748b;font-weight:700;}
+
+  .receipt-file-list{
+    grid-column:1 / -1;
+    display:none;
+    margin-top:2px;
+    padding:9px 10px;
+    border:1px dashed #cbd5e1;
+    border-radius:12px;
+    background:#f8fafc;
+    color:#475569;
+    font-size:12px;
+    line-height:1.55;
+  }
+  .receipt-file-list.has-files{display:block;}
+  .receipt-file-list-title{font-weight:900;color:#334155;margin-bottom:3px;}
+  .receipt-file-list ul{margin:0;padding-left:18px;}
+  .receipt-file-list li{margin:2px 0;word-break:break-all;}
 </style>
 
 <!-- receipt item_id mapping + safe storage filename final -->
@@ -2238,6 +2289,7 @@
         <button class="receipt-btn" type="button" onclick="this.previousElementSibling.click()">영수증 첨부</button>
       </div>
       <button class="btn-danger" onclick="this.closest('.cost-row').remove();calcAll()">삭제</button>
+      <div class="receipt-file-list" data-receipt-list></div>
     `;
     costList.appendChild(row);
     calcAll();
@@ -2246,15 +2298,31 @@
 
   function handleReceiptUpload(input){
     const btn = input.nextElementSibling;
-    const count = input.files ? input.files.length : 0;
-    if(count > 0){
-      btn.textContent = `첨부 ${count}건`;
-      btn.classList.add('attached');
-    }else{
+    const row = input.closest('.cost-row');
+    const files = Array.from(input.files || []);
+    if(btn){
       btn.textContent = '영수증 첨부';
-      btn.classList.remove('attached');
+      btn.classList.toggle('attached', files.length > 0);
+    }
+    let list = row ? row.querySelector('[data-receipt-list]') : null;
+    if(row && !list){
+      list = document.createElement('div');
+      list.className = 'receipt-file-list';
+      list.setAttribute('data-receipt-list','');
+      row.appendChild(list);
+    }
+    if(list){
+      if(files.length){
+        const esc = v => String(v ?? '').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+        list.classList.add('has-files');
+        list.innerHTML = `<div class="receipt-file-list-title">첨부파일</div><ul>${files.map(f=>`<li>${esc(f.name)}</li>`).join('')}</ul>`;
+      }else{
+        list.classList.remove('has-files');
+        list.innerHTML = '';
+      }
     }
   }
+
 
   function calcFuel(){
     const transport = document.getElementById('transport').value;
