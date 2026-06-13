@@ -6133,13 +6133,17 @@
   }
   function tripDate(detail){ return detail.row.trip_date || detail.row.tripDate || detail.row.request_date || ''; }
   function distanceKm(detail){ return num(detail.row.total_distance_km || detail.row.distance_km || detail.routes.reduce((s,x)=>s+num(x.distance_km),0)); }
-  function totalsFor(detail){
-    const items = detail.items || [];
-    const fuel = fuelAmount(detail);
-    const corp = num(detail.row.corp_card_amount || items.filter(isCorp).reduce((s,i)=>s+itemAmount(i),0));
-    const personalItems = items.filter(isPersonal).reduce((s,i)=>s+itemAmount(i),0);
-    const personal = num(detail.row.personal_amount || personalItems + fuel);
-    const total = num(detail.row.total_amount || corp + personal);
+  function totalsFor(detail, mode='all'){
+    const allItems = detail.items || [];
+    const items = mode === 'corp' ? allItems.filter(isCorp) : mode === 'personal' ? allItems.filter(isPersonal) : allItems;
+    const fuel = mode === 'corp' ? 0 : fuelAmount(detail);
+    const corpItems = allItems.filter(isCorp).reduce((s,i)=>s+itemAmount(i),0);
+    const personalItems = allItems.filter(isPersonal).reduce((s,i)=>s+itemAmount(i),0);
+    const corpAll = num(detail.row.corp_card_amount || corpItems);
+    const personalAll = num(detail.row.personal_amount || personalItems + fuelAmount(detail));
+    const corp = mode === 'personal' ? 0 : (mode === 'corp' ? corpItems || corpAll : corpAll);
+    const personal = mode === 'corp' ? 0 : (mode === 'personal' ? personalItems + fuel : personalAll);
+    const total = mode === 'corp' ? corp : mode === 'personal' ? personal : num(detail.row.total_amount || corp + personal);
     return {
       lodging: classifyAmount(items, '숙박'),
       fuel,
@@ -6149,25 +6153,25 @@
       corp, personal, total, km: distanceKm(detail)
     };
   }
-  function sumTotals(details){
-    return details.reduce((a,d)=>{ const t=totalsFor(d); Object.keys(a).forEach(k=>a[k]+=num(t[k])); return a; }, {lodging:0,fuel:0,transit:0,meal:0,etc:0,corp:0,personal:0,total:0,km:0});
+  function sumTotals(details, mode='all'){
+    return details.reduce((a,d)=>{ const t=totalsFor(d, mode); Object.keys(a).forEach(k=>a[k]+=num(t[k])); return a; }, {lodging:0,fuel:0,transit:0,meal:0,etc:0,corp:0,personal:0,total:0,km:0});
   }
-  function domesticRows(details){
-    return details.map(d=>{ const r=d.row||{}; const t=totalsFor(d); return `<tr>
+  function domesticRows(details, mode='all'){
+    return details.map(d=>{ const r=d.row||{}; const t=totalsFor(d, mode); return `<tr>
       <td>${esc(r.applicant_name || r.applicant || '-')}</td><td>${esc(tripDate(d) || '-')}</td><td>${esc(r.return_date || r.end_date || tripDate(d) || '-')}</td>
       <td class="num">${dashWon(t.lodging)}</td><td class="num">${dashWon(t.fuel)}</td><td class="num">${dashWon(t.transit)}</td><td class="num">${dashWon(t.meal)}</td><td class="num">${dashWon(t.etc)}</td><td class="num">${won(t.total)}</td><td class="num">${t.km ? t.km+'km' : '-'}</td><td>${esc(routeText(d))}</td>
     </tr>`; }).join('');
   }
   function domesticStatement(details, mode){
     const today = new Date().toISOString().slice(0,10);
-    const t = sumTotals(details);
+    const t = sumTotals(details, mode);
     const dept = details[0]?.row?.division_name || details[0]?.row?.department_name || '글로벌R&D팀';
     return `<section class="statement-page">
       <h1 class="statement-title">국내출장비 정산서</h1>
       <div class="statement-sub"><b>[ 부서명 : ${esc(dept)} ]</b><b>출력구분 : ${esc(modeLabel(mode))} / 출력일 : ${esc(today)}</b></div>
       <table class="statement-table"><colgroup><col style="width:9%"><col style="width:10%"><col style="width:10%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:12%"></colgroup>
         <thead><tr><th>성 명</th><th>출발일</th><th>도착일</th><th>숙박비</th><th>유류비</th><th>대중교통</th><th>식비</th><th>기타<br>(주차비 등)</th><th>계</th><th>출장지<br>거리(KM)</th><th>비 고</th></tr></thead>
-        <tbody>${domesticRows(details)}
+        <tbody>${domesticRows(details, mode)}
           <tr class="sum-row"><td class="label-cell" colspan="3">합 계</td><td class="num">${dashWon(t.lodging)}</td><td class="num">${dashWon(t.fuel)}</td><td class="num">${dashWon(t.transit)}</td><td class="num">${dashWon(t.meal)}</td><td class="num">${dashWon(t.etc)}</td><td class="num">${won(t.total)}</td><td class="num">${t.km?t.km+'km':'-'}</td><td>-</td></tr>
           <tr><td class="label-cell" rowspan="2">정산금액</td><td class="pay-label" colspan="2">법인카드</td><td></td><td></td><td></td><td></td><td class="num">${dashWon(t.corp)}</td><td class="num">${dashWon(t.corp)}</td><td></td><td></td></tr>
           <tr><td class="pay-label" colspan="2">현 금<br><span>개인카드/현금/유류비</span></td><td></td><td class="num">${dashWon(t.fuel)}</td><td class="num">${dashWon(t.transit)}</td><td></td><td class="num">${dashWon(t.personal)}</td><td class="num">${dashWon(t.personal)}</td><td></td><td></td></tr>
@@ -6241,7 +6245,7 @@
   async function buildBody(client, details, mode){
     let body = await docsSection(client, details);
     body += domesticStatement(details, mode);
-    body += fuelSection(details);
+    if(mode !== 'corp') body += fuelSection(details);
     if(mode === 'all' || mode === 'corp') body += await evidenceSection(client, details, 'corp');
     if(mode === 'all' || mode === 'personal') body += await evidenceSection(client, details, 'personal');
     return body;
