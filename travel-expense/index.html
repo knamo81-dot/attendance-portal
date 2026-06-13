@@ -1426,6 +1426,20 @@
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+<script id="travel-expense-single-card-render-helper">
+(function(){
+  if(window.__travelExpenseSingleCardRenderHelperInstalled) return;
+  window.__travelExpenseSingleCardRenderHelperInstalled = true;
+  window.__travelExpenseSetSubmissionHtml = function(box, html){
+    if(!box) return;
+    html = String(html || '');
+    if(box.__travelExpenseLastHtml === html || box.innerHTML === html) return;
+    box.__travelExpenseLastHtml = html;
+    box.innerHTML = html;
+  };
+})();
+</script>
+
 
 
 <style id="travel-expense-final-stable-controller-style">
@@ -3299,8 +3313,8 @@
     if(state.employeeNo) q=q.eq('applicant_employee_no',state.employeeNo);
     const r=await q; if(r.error){console.error('[TravelExpense] my requests load error',r.error); return;}
     const c=document.querySelector('.submission-scroll'); if(!c)return;
-    if(!r.data||!r.data.length){c.innerHTML='<div class="notice empty-state">제출 내역이 없습니다.</div>';return;}
-    c.innerHTML=r.data.map(row=>{
+    if(!r.data||!r.data.length){window.__travelExpenseSetSubmissionHtml(c, '<div class="notice empty-state">제출 내역이 없습니다.</div>');return;}
+    window.__travelExpenseSetSubmissionHtml(c, r.data.map(row=>{
       const status=row.status||'검토대기';
       let menu='';
       if(status === '임시저장' || status === '수정요청'){
@@ -3309,7 +3323,7 @@
         menu = `<div class="my-card-actions" data-action-key="recall|delete" data-request-id="${row.id}" onclick="event.stopPropagation()"><button type="button" class="recall-btn" data-recall-id="${row.id}">회수</button><button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button></div>`;
       }
       return `<div class="list-card" data-request-id="${row.id}" data-status="${status}"><div class="list-top"><div class="list-title">${row.trip_type||'출장'} · ${row.trip_date||'-'}</div><span class="status s-wait">${status}</span></div><div class="meta">신청자: ${row.applicant_name||'-'}<br>본부/팀: ${row.division_name||'-'} / ${row.team_name||'-'}<br>총액: ${money(row.total_amount||0)} · 개인지급: ${money(row.personal_amount||0)}</div>${menu}</div>`;
-    }).join('');
+    }).join(''));
   }
 
   async function loadAdminRequests(){
@@ -3611,8 +3625,8 @@
     if(p.employeeNo) q=q.eq('applicant_employee_no', p.employeeNo);
     const r=await q;
     if(r.error){ console.error('[TravelExpense] card refresh error', r.error); return false; }
-    if(!r.data || !r.data.length){ box.innerHTML='<div class="notice empty-state">제출 내역이 없습니다.</div>'; return true; }
-    box.innerHTML=r.data.map(row=>{
+    if(!r.data || !r.data.length){ window.__travelExpenseSetSubmissionHtml(box, '<div class="notice empty-state">제출 내역이 없습니다.</div>'); return true; }
+    window.__travelExpenseSetSubmissionHtml(box, r.data.map(row=>{
       const status=row.status||'검토대기';
       let menu='';
       if(status === '임시저장' || status === '수정요청'){
@@ -3621,7 +3635,7 @@
         menu = `<div class="my-card-actions" data-action-key="recall|delete" data-request-id="${row.id}" onclick="event.stopPropagation()"><button type="button" class="recall-btn" data-recall-id="${row.id}">회수</button><button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button></div>`;
       }
       return `<div class="list-card" data-request-id="${row.id}" data-status="${esc(status)}"><div class="list-top"><div class="list-title">${esc(row.trip_type||'출장')} · ${esc(row.trip_date||'-')}</div><span class="status s-wait">${esc(status)}</span></div><div class="meta">신청자: ${esc(row.applicant_name||'-')}<br>본부/팀: ${esc(row.division_name||'-')} / ${esc(row.team_name||'-')}<br>총액: ${won(row.total_amount||0)} · 개인지급: ${won(row.personal_amount||0)}</div>${menu}</div>`;
-    }).join('');
+    }).join(''));
     return true;
   }
   window.loadMyRequests = refreshCards;
@@ -3814,7 +3828,7 @@
     setTimeout(()=>{ refreshCards(); modeNew(); refreshTotals(); }, 300);
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
-  setTimeout(init, 1000);
+  // 중복 초기화 제거: DOM 재렌더 깜빡임 방지
 })();
 </script>
 
@@ -4164,11 +4178,11 @@
     if(!box) return;
 
     if(!rows.length){
-      box.innerHTML = '<div class="monthly-card-empty">선택한 월의 제출 내역이 없습니다.</div>';
+      window.__travelExpenseSetSubmissionHtml(box, '<div class="monthly-card-empty">선택한 월의 제출 내역이 없습니다.</div>');
       return;
     }
 
-    box.innerHTML = rows.map(cardHtml).join('');
+    window.__travelExpenseSetSubmissionHtml(box, rows.map(cardHtml).join(''));
   }
 
   async function fetchMonthlyRows(){
@@ -4225,7 +4239,7 @@
 
     const rows = await fetchMonthlyRows();
     updateProcessTable(rows);
-    updateCards(rows);
+    // 내 제출내역 카드 렌더링은 loadMyRequests/refreshCards 단일 렌더러에서만 처리합니다.
     return rows;
   }
 
@@ -4315,9 +4329,7 @@
     init();
   }
 
-  setTimeout(init, 500);
-  setTimeout(init, 1200);
-  setTimeout(init, 2500);
+  // 중복 초기화 제거: 카드/버튼 깜빡임 방지
 })();
 </script>
 
@@ -5138,124 +5150,8 @@
 
 <script id="travel-expense-card-rule-no-db-touch">
 (function(){
-  if(window.__travelExpenseCardRuleNoDbTouchInstalled) return;
+  // 통합 렌더링 적용: 카드 버튼은 렌더러에서 한 번에 생성하므로 후처리 패치는 사용하지 않습니다.
   window.__travelExpenseCardRuleNoDbTouchInstalled = true;
-
-  function normalizeStatus(value){
-    const raw = String(value || '').replace(/\s+/g,'');
-    if(raw.includes('지출결의')) return '지출결의완료';
-    if(raw.includes('검토대기')) return '검토대기';
-    if(raw.includes('수정요청')) return '수정요청';
-    if(raw.includes('임시저장')) return '임시저장';
-    if(raw.includes('승인')) return '승인';
-    return raw;
-  }
-
-  function getId(card){
-    return card.dataset.requestId || card.dataset.id || card.getAttribute('data-request-id') || card.getAttribute('data-id') || '';
-  }
-
-  function getStatus(card){
-    const statusEl = card.querySelector('.status');
-    return normalizeStatus(card.dataset.status || (statusEl && statusEl.textContent) || '');
-  }
-
-  function makeButton(label, className, handler){
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = className;
-    b.textContent = label;
-    b.addEventListener('click', function(e){
-      e.preventDefault();
-      e.stopPropagation();
-      handler();
-    });
-    return b;
-  }
-
-  function desiredActionKey(status){
-    if(status === '승인' || status === '지출결의완료') return '';
-    if(status === '임시저장' || status === '수정요청') return 'edit|delete';
-    if(status === '검토대기') return 'recall|delete';
-    return '';
-  }
-
-  function applyCardRules(){
-    document.querySelectorAll('.submission-scroll .list-card').forEach(function(card){
-      const id = getId(card);
-      const status = getStatus(card);
-      const key = desiredActionKey(status);
-      let actions = card.querySelector('.my-card-actions');
-
-      if(!key){
-        if(actions) actions.remove();
-        return;
-      }
-
-      // 기존 버전은 매번 innerHTML을 비우고 버튼을 다시 붙였습니다.
-      // MutationObserver와 결합되면 무한 DOM 변경 루프가 발생해 페이지가 멈출 수 있습니다.
-      if(actions && actions.dataset.actionKey === key && actions.dataset.requestId === id) return;
-
-      if(!actions){
-        actions = document.createElement('div');
-        actions.className = 'my-card-actions';
-        actions.addEventListener('click', function(e){ e.stopPropagation(); });
-        card.appendChild(actions);
-      }
-
-      actions.replaceChildren();
-      actions.dataset.actionKey = key;
-      actions.dataset.requestId = id;
-
-      if(key.includes('edit')){
-        actions.appendChild(makeButton('수정', 'edit-btn', function(){
-          if(typeof window.startTravelExpenseEdit === 'function') window.startTravelExpenseEdit(id, status);
-        }));
-      }
-
-      if(key.includes('recall')){
-        actions.appendChild(makeButton('회수', 'recall-btn', function(){
-          if(typeof window.recallTravelExpenseRequest === 'function') window.recallTravelExpenseRequest(id);
-        }));
-      }
-
-      if(key.includes('delete')){
-        actions.appendChild(makeButton('삭제', 'delete-btn', function(){
-          if(typeof window.deleteTravelExpenseRequest === 'function') window.deleteTravelExpenseRequest(id);
-        }));
-      }
-    });
-  }
-
-  function scheduleApply(){
-    clearTimeout(scheduleApply._timer);
-    scheduleApply._timer = setTimeout(applyCardRules, 80);
-  }
-
-  function wrap(name){
-    const original = window[name];
-    if(typeof original !== 'function' || original.__cardRuleNoDbTouchWrapped) return;
-    const wrapped = function(){
-      const result = original.apply(this, arguments);
-      if(result && typeof result.then === 'function'){
-        result.finally(scheduleApply);
-      } else {
-        scheduleApply();
-      }
-      return result;
-    };
-    wrapped.__cardRuleNoDbTouchWrapped = true;
-    window[name] = wrapped;
-  }
-
-  ['refreshCards','loadMyRequests','refreshTravelExpenseMyCards','loadDetail','modeView','modeNew','startTravelExpenseEdit'].forEach(wrap);
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', scheduleApply, { once:true });
-  } else {
-    scheduleApply();
-  }
-  window.applyTravelExpenseCardRules = applyCardRules;
 })();
 </script>
 
