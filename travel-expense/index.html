@@ -3678,6 +3678,13 @@
         items.data.forEach(item=>window.addCostRow(item.item_type||'', item.pay_type||'', item.amount||''));
       }
       if(typeof window.toggleFuel === 'function') window.toggleFuel();
+
+      // 카드 선택/수정 진입 시 저장값만 표시하지 않고,
+      // 현재 출장일 기준 유가와 안내문을 같은 조회 결과로 다시 동기화합니다.
+      if(typeof window.loadFuelPriceByTripDate === 'function'){
+        try{ await window.loadFuelPriceByTripDate(true); }catch(_){}
+      }
+
       refreshTotals();
       highlight(id);
       return true;
@@ -4345,6 +4352,7 @@
   let lastTripDate = '';
   let lastStatusKey = '';
   let loadingDate = '';
+  let requestSeq = 0;
   const failedDates = new Set();
 
   function scanClient(scope){
@@ -4442,8 +4450,11 @@
     return note;
   }
 
-  function setNote(message, mode){
-    const key = `${mode || ''}|${message || ''}`;
+  function setNote(message, mode, tripDate){
+    // 선택된 출장일이 바뀐 뒤 늦게 도착한 이전 조회 결과는 안내문에 반영하지 않습니다.
+    if(tripDate && getTripDate() && getTripDate() !== tripDate) return;
+
+    const key = `${tripDate || ''}|${mode || ''}|${message || ''}`;
     if(key === lastStatusKey) return;
     lastStatusKey = key;
 
@@ -4451,6 +4462,7 @@
     if(!note) return;
     note.className = 'fuel-date-note' + (mode ? ' ' + mode : '');
     note.textContent = message || '';
+    if(tripDate) note.dataset.tripDate = tripDate;
   }
 
   function lockGas(){
@@ -4461,11 +4473,22 @@
     input.title = '출장일 기준 fuel_daily_prices 가격이 자동 입력됩니다.';
   }
 
-  function setGas(value){
+  function setGas(value, meta){
     const input = gasEl();
     if(!input) return;
     const next = value === null || value === undefined ? '' : String(value);
     if(input.value !== next) input.value = next;
+
+    if(meta){
+      input.dataset.tripDate = meta.tripDate || '';
+      input.dataset.priceDate = meta.priceDate || '';
+      input.dataset.matchType = meta.matchType || '';
+    }else{
+      delete input.dataset.tripDate;
+      delete input.dataset.priceDate;
+      delete input.dataset.matchType;
+    }
+
     if(typeof window.calcAll === 'function') window.calcAll();
   }
 
@@ -4497,54 +4520,68 @@
   }
 
   async function loadFuel(tripDate, force){
+    const seq = ++requestSeq;
+
     if(!tripDate){
+      lastTripDate = '';
+      loadingDate = '';
+      failedDates.clear();
       setGas('');
       setNote('출장일을 선택하면 해당 출장일 기준 유가가 자동 입력됩니다.');
-      return;
+      return null;
     }
 
-    if(!force && failedDates.has(tripDate)) return;
-    if(loadingDate === tripDate) return;
+    if(!force && failedDates.has(tripDate)) return null;
+    if(!force && loadingDate === tripDate) return null;
 
     const input = gasEl();
-    if(!force && input && input.value && lastTripDate === tripDate) return;
+    if(!force && input && input.dataset.tripDate === tripDate && input.dataset.priceDate){
+      return null;
+    }
 
     loadingDate = tripDate;
-    setNote(`출장일(${tripDate}) 기준 유가를 조회 중입니다...`);
+    setNote(`출장일(${tripDate}) 기준 유가를 조회 중입니다...`, '', tripDate);
 
     try{
       const fuel = await queryFuel(tripDate);
 
+      // 이전 출장일 조회가 늦게 완료된 경우 input/note를 절대 덮어쓰지 않습니다.
+      if(seq !== requestSeq || getTripDate() !== tripDate) return null;
+
       if(!fuel){
         failedDates.add(tripDate);
         setGas('');
-        setNote(`출장일(${tripDate}) 또는 이전 날짜의 유가 데이터가 없습니다. fuel_daily_prices에 해당 날짜 유가를 입력해 주세요.`, 'error');
-        return;
+        setNote(`출장일(${tripDate}) 또는 이전 날짜의 유가 데이터가 없습니다. fuel_daily_prices에 해당 날짜 유가를 입력해 주세요.`, 'error', tripDate);
+        return null;
       }
 
       const price = Number(fuel.gasoline_price || 0);
       if(!price){
         failedDates.add(tripDate);
         setGas('');
-        setNote(`출장일(${tripDate}) 기준 유가가 0원으로 저장되어 있습니다. fuel_daily_prices 값을 확인해 주세요.`, 'error');
-        return;
+        setNote(`출장일(${tripDate}) 기준 유가가 0원으로 저장되어 있습니다. fuel_daily_prices 값을 확인해 주세요.`, 'error', tripDate);
+        return null;
       }
 
-      setGas(price);
+      setGas(price, { tripDate, priceDate:fuel.price_date, matchType:fuel.matchType });
       failedDates.delete(tripDate);
 
       if(fuel.matchType === 'exact'){
-        setNote(`출장일 기준 유가 적용: ${fuel.price_date} / ${price.toLocaleString('ko-KR')}원/L`, 'ok');
+        setNote(`출장일 기준 유가 적용: ${fuel.price_date} / ${price.toLocaleString('ko-KR')}원/L`, 'ok', tripDate);
       }else{
-        setNote(`출장일(${tripDate}) 유가가 없어 직전 저장 유가 적용: ${fuel.price_date} / ${price.toLocaleString('ko-KR')}원/L`, 'ok');
+        setNote(`출장일(${tripDate}) 유가가 없어 직전 저장 유가 적용: ${fuel.price_date} / ${price.toLocaleString('ko-KR')}원/L`, 'ok', tripDate);
       }
+
+      return fuel;
     }catch(error){
+      if(seq !== requestSeq || getTripDate() !== tripDate) return null;
       console.warn('[TravelExpense] 출장일 기준 유가 조회 실패', error);
       failedDates.add(tripDate);
       setGas('');
-      setNote(`출장일(${tripDate}) 기준 유가를 불러오지 못했습니다. fuel_daily_prices 읽기 권한 또는 RLS 정책을 확인해 주세요.`, 'error');
+      setNote(`출장일(${tripDate}) 기준 유가를 불러오지 못했습니다. fuel_daily_prices 읽기 권한 또는 RLS 정책을 확인해 주세요.`, 'error', tripDate);
+      return null;
     }finally{
-      loadingDate = '';
+      if(seq === requestSeq) loadingDate = '';
     }
   }
 
@@ -4554,18 +4591,17 @@
     const tripDate = getTripDate();
 
     if(!tripDate){
-      lastTripDate = '';
-      failedDates.clear();
-      setGas('');
-      setNote('출장일을 선택하면 해당 출장일 기준 유가가 자동 입력됩니다.');
-      return;
+      requestSeq++;
+      return loadFuel('', true);
     }
 
     if(force || tripDate !== lastTripDate){
       lastTripDate = tripDate;
       setGas('');
-      loadFuel(tripDate, true);
+      return loadFuel(tripDate, true);
     }
+
+    return loadFuel(tripDate, false);
   }
 
   function bindTripDate(){
@@ -4585,9 +4621,11 @@
     const wrapped = function(){
       const result = fn.apply(this, arguments);
 
-      // 신규작성 등으로 출장일이 초기화된 뒤 1회만 검사
-      setTimeout(()=>handleTripDateChanged(true), 180);
-      setTimeout(()=>handleTripDateChanged(false), 650);
+      // 카드 선택/신규작성/수정 진입 후 실제 폼 값 기준으로 유가 input과 안내문을 한 번에 다시 맞춥니다.
+      Promise.resolve(result).finally(()=>{
+        setTimeout(()=>handleTripDateChanged(true), 80);
+        setTimeout(()=>handleTripDateChanged(false), 380);
+      });
 
       return result;
     };
@@ -4596,8 +4634,8 @@
     window[name] = wrapped;
   }
 
-  window.loadFuelPriceByTripDate = function(){
-    handleTripDateChanged(true);
+  window.loadFuelPriceByTripDate = function(force=true){
+    return handleTripDateChanged(force !== false);
   };
   window.loadTripDateFuelPriceToTravelExpense = window.loadFuelPriceByTripDate;
   window.loadLatestFuelPriceToTravelExpense = window.loadFuelPriceByTripDate;
@@ -4613,10 +4651,10 @@
       'selectRequest',
       'loadDetail',
       'modeNew',
-      'modeEdit'
+      'modeEdit',
+      'startTravelExpenseEdit'
     ].forEach(patchFunction);
 
-    // 최초 1회만 검사. 반복 interval 없음.
     handleTripDateChanged(false);
   }
 
