@@ -1465,25 +1465,17 @@
     if(n>=1024) return Math.round(n/1024)+'KB';
     return n+'B';
   }
-  function cleanName(name){ return String(name||'file').replace(/[\\/:*?"<>|#%&{}$!`'@+=]/g,'_').slice(0,120); }
-  function safeFileExt(file){
-    const name = String(file?.name || '');
-    const m = name.match(/\.([A-Za-z0-9]{1,12})$/);
-    if(m) return '.' + m[1].toLowerCase();
-    const mime = String(file?.type || '').toLowerCase();
-    const map = {
-      'application/pdf': '.pdf',
-      'image/jpeg': '.jpg',
-      'image/jpg': '.jpg',
-      'image/png': '.png',
-      'image/webp': '.webp',
-      'image/gif': '.gif',
-      'application/zip': '.zip'
-    };
-    return map[mime] || '';
+  function safeExt(name, type){
+    const raw = String(name || '').split('.').pop().toLowerCase();
+    const ext = /^[a-z0-9]{1,8}$/.test(raw) ? raw : '';
+    if(ext) return ext;
+    if(String(type||'').includes('pdf')) return 'pdf';
+    if(String(type||'').includes('png')) return 'png';
+    if(String(type||'').includes('jpeg') || String(type||'').includes('jpg')) return 'jpg';
+    return 'bin';
   }
-  function storageSafeFileName(file){
-    return `${Date.now()}_${Math.random().toString(36).slice(2,10)}${safeFileExt(file)}`;
+  function safeStorageName(file){
+    return `${Date.now()}_${Math.random().toString(36).slice(2,10)}.${safeExt(file && file.name, file && file.type)}`;
   }
   function escapeHtml(v){ return String(v ?? '').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
   function listEl(){ return document.getElementById('travelDocumentList'); }
@@ -1543,9 +1535,8 @@
 
   async function uploadOne(client, p, requestId, file, type, itemId=null){
     const folder = type === 'receipt' ? 'receipts' : 'approval';
-    // Storage object key는 영문/숫자 기반 안전 파일명만 사용합니다.
-    // 원본 한글 파일명은 아래 file_name 컬럼에 그대로 저장합니다.
-    const path = `${p.companyId}/${requestId}/${folder}/${storageSafeFileName(file)}`;
+    // Storage object key에는 한글/공백/특수문자를 넣지 않습니다. 원본 파일명은 DB file_name에만 저장합니다.
+    const path = `${p.companyId}/${requestId}/${folder}/${safeStorageName(file)}`;
 
     const up = await client.storage.from(STORAGE_BUCKET).upload(path, file, {
       upsert:true,
@@ -1582,14 +1573,28 @@
     }).filter(x=>x.input && x.files.length);
   }
 
+  async function getSavedItemIds(client, p, requestId){
+    try{
+      const res = await client.from('travel_expense_items')
+        .select('id')
+        .eq('company_id', p.companyId)
+        .eq('request_id', requestId)
+        .order('created_at', { ascending:true });
+      if(!res.error && Array.isArray(res.data)) return res.data.map(x=>x.id);
+    }catch(e){ console.warn('[TravelExpense] item id load warning', e); }
+    return [];
+  }
+
   async function uploadReceipts(client, p, requestId){
     const inputs = collectReceiptInputs();
+    const itemIds = await getSavedItemIds(client, p, requestId);
     const done=[];
     for(const info of inputs){
       const key = filesKey(info.files);
       if(key && info.input.dataset.travelUploadedKey === key) continue;
+      const itemId = itemIds[info.index] || null;
       for(const file of info.files){
-        done.push(await uploadOne(client, p, requestId, file, 'receipt', null));
+        done.push(await uploadOne(client, p, requestId, file, 'receipt', itemId));
       }
       info.input.dataset.travelUploadedKey = key;
       if(info.btn){
@@ -1598,6 +1603,31 @@
       }
     }
     return done;
+  }
+
+  function markReceiptButtons(receipts, itemIds){
+    const rows = Array.from(document.querySelectorAll('#costList .cost-row'));
+    const byItem = new Map();
+    const noItem = [];
+    (receipts || []).forEach(r=>{
+      if(r.item_id){
+        const k=String(r.item_id);
+        byItem.set(k, (byItem.get(k)||0)+1);
+      }else{
+        noItem.push(r);
+      }
+    });
+    rows.forEach((row,index)=>{
+      const input=row.querySelector('input.receipt-input');
+      const btn=row.querySelector('.receipt-btn');
+      if(!btn) return;
+      const count = (itemIds[index] ? (byItem.get(String(itemIds[index]))||0) : 0) + (index===0 ? noItem.length : 0);
+      if(count>0){
+        btn.textContent = `첨부 ${count}건`;
+        btn.classList.add('attached');
+        if(input) input.dataset.travelUploadedKey = `server:${count}`;
+      }
+    });
   }
 
   window.uploadTravelExpenseDocuments = async function(requestId){
@@ -1628,12 +1658,15 @@
     uploadedDocs.splice(0, uploadedDocs.length);
     pendingDocs.splice(0, pendingDocs.length);
     const input=inputEl(); if(input) input.value='';
+    document.querySelectorAll('input.receipt-input').forEach(input=>{ input.dataset.travelUploadedKey=''; });
     const client=db(); const p=profile();
     if(client && p.companyId && requestId){
       try{
         const res=await client.from('travel_expense_attachments').select('*').eq('company_id',p.companyId).eq('request_id',requestId).order('created_at',{ascending:true});
+        const itemIds = await getSavedItemIds(client, p, requestId);
         if(!res.error && Array.isArray(res.data)){
           uploadedDocs.push(...res.data.filter(x => (x.file_type||'') === 'approval_document'));
+          markReceiptButtons(res.data.filter(x => (x.file_type||'') === 'receipt'), itemIds);
         }
       }catch(e){ console.warn('[TravelExpense] document list load warning', e); }
     }
@@ -1814,6 +1847,7 @@
   .travel-document-empty{padding:10px 12px;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc;color:#64748b;font-weight:700;}
 </style>
 
+<!-- receipt item_id mapping + safe storage filename final -->
 </head>
 <body>
   <header>
