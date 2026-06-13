@@ -5564,13 +5564,15 @@
     const p = profile();
     const row = rows.find(r => String(r.id) === String(id));
     if(!client || !p.companyId || !row) return {row, routes:[], items:[]};
-    const [routesRes, itemsRes] = await Promise.all([
+    const [routesRes, itemsRes, attachmentsRes] = await Promise.all([
       client.from('travel_expense_routes').select('*').eq('company_id', p.companyId).eq('request_id', id).order('sort_order', { ascending:true }),
-      client.from('travel_expense_items').select('*').eq('company_id', p.companyId).eq('request_id', id).order('created_at', { ascending:true })
+      client.from('travel_expense_items').select('*').eq('company_id', p.companyId).eq('request_id', id).order('created_at', { ascending:true }),
+      client.from('travel_expense_attachments').select('*').eq('company_id', p.companyId).eq('request_id', id).order('created_at', { ascending:true })
     ]);
     if(routesRes.error) console.warn('[TravelExpense] routes load failed', routesRes.error);
     if(itemsRes.error) console.warn('[TravelExpense] items load failed', itemsRes.error);
-    const detail = { row, routes: routesRes.data || [], items: itemsRes.data || [] };
+    if(attachmentsRes.error) console.warn('[TravelExpense] attachments load failed', attachmentsRes.error);
+    const detail = { row, routes: routesRes.data || [], items: itemsRes.data || [], attachments: attachmentsRes.data || [] };
     detailCache.set(id, detail);
     return detail;
   }
@@ -5596,7 +5598,13 @@
   function renderItems(detail){
     const row = detail.row;
     const items = detail.items || [];
-    const itemRows = items.map((item,i)=>`<tr><td>${esc(item.pay_type||'-')}</td><td>${esc(item.item_type||'-')}</td><td class="amount">${won(item.amount)}</td><td class="center"><button type="button" class="admin-evidence-btn" onclick="window.adminOpenEvidenceViewer && window.adminOpenEvidenceViewer('receipt','${esc(item.item_type||'증빙')}')">보기</button></td></tr>`);
+    const receiptMap = new Map((detail.attachments || []).filter(a => (a.file_type||'') === 'receipt' && a.item_id).map(a => [String(a.item_id), a]));
+    const itemRows = items.map((item,i)=>{
+      const receipt = receiptMap.get(String(item.id));
+      const btnClass = receipt ? 'admin-evidence-btn' : 'admin-evidence-btn missing';
+      const btnText = receipt ? '보기' : '미첨부';
+      return `<tr><td>${esc(item.pay_type||'-')}</td><td>${esc(item.item_type||'-')}</td><td class="amount">${won(item.amount)}</td><td class="center"><button type="button" class="${btnClass}" onclick="window.adminOpenEvidenceViewer && window.adminOpenEvidenceViewer('receipt','${esc(item.id||'')}','${esc(item.item_type||'증빙')}')">${btnText}</button></td></tr>`;
+    });
     if(num(row.fuel_amount) > 0){
       itemRows.push(`<tr><td>개인지급</td><td>자차 유류비</td><td class="amount">${won(row.fuel_amount)}</td><td class="center"><span class="status s-ok">자동계산</span></td></tr>`);
     }
@@ -5605,7 +5613,12 @@
       <div class="admin-total-line"><span>사용금액 합계</span><b>${won(row.total_amount)}</b></div>`;
   }
   function renderDocs(row){
-    return `<div class="admin-doc-card"><div><b>출장계/외근신청서</b><span>신청자가 업로드한 결재 완료 서류</span></div><button type="button" class="admin-evidence-btn missing" onclick="window.adminOpenEvidenceViewer && window.adminOpenEvidenceViewer('document','출장계/외근신청서')">보기</button></div>`;
+    const detail = selectedId && detailCache.get(selectedId);
+    const docs = (detail?.attachments || []).filter(a => (a.file_type||'') === 'approval_document');
+    if(!docs.length){
+      return `<div class="admin-doc-card"><div><b>출장계/외근신청서</b><span>신청자가 업로드한 결재 완료 서류 없음</span></div><button type="button" class="admin-evidence-btn missing" onclick="window.adminOpenEvidenceViewer && window.adminOpenEvidenceViewer('document','출장계/외근신청서')">미첨부</button></div>`;
+    }
+    return docs.map((doc,i)=>`<div class="admin-doc-card"><div><b>출장계/외근신청서</b><span>${esc(doc.file_name||'첨부파일')}<br/>업로드 완료</span></div><button type="button" class="admin-evidence-btn" onclick="window.adminOpenEvidenceViewer && window.adminOpenEvidenceViewer('document','${esc(doc.id||'')}','출장계/외근신청서')">보기</button></div>`).join('');
   }
 
   function renderAdminActions(row){
@@ -5776,7 +5789,64 @@
   window.adminSaveReviewChanges = saveReviewChanges;
   window.adminCancelStatus = cancelStatus;
   window.adminAdminAction = updateRequestStatus;
-  window.adminOpenEvidenceViewer = function(type, name){ alert(`${name || '증빙'} 보기 기능은 파일 업로드 저장 연동 후 실제 파일을 새 창/모달로 열도록 연결하면 됩니다.`); };
+  window.adminOpenEvidenceViewer = async function(type, name, label){
+    const client = db();
+    if(!client){ alert('Supabase 연결을 찾지 못했습니다.'); return; }
+    if(!selectedId){ alert('검토할 신청건을 먼저 선택하세요.'); return; }
+
+    let detail = detailCache.get(selectedId);
+    if(!detail || !Array.isArray(detail.attachments)){
+      detailCache.delete(selectedId);
+      detail = await loadDetail(selectedId);
+    }
+
+    const attachments = detail?.attachments || [];
+    let targets = [];
+
+    if(type === 'document'){
+      targets = attachments.filter(a => (a.file_type||'') === 'approval_document');
+      if(name && name !== '출장계/외근신청서'){
+        const byId = targets.find(a => String(a.id) === String(name));
+        if(byId) targets = [byId];
+      }
+    }else if(type === 'receipt'){
+      targets = attachments.filter(a => (a.file_type||'') === 'receipt');
+      if(name){
+        const byItem = targets.filter(a => String(a.item_id||'') === String(name));
+        const byId = targets.filter(a => String(a.id||'') === String(name));
+        targets = byItem.length ? byItem : (byId.length ? byId : targets);
+      }
+    }else if(type === 'corp'){
+      targets = attachments.filter(a => (a.file_type||'') === 'receipt');
+    }else if(type === 'personal'){
+      targets = attachments.filter(a => (a.file_type||'') === 'receipt');
+    }else{
+      targets = attachments;
+    }
+
+    if(!targets.length){
+      alert((label || name || '증빙') + ' 첨부파일이 없습니다.');
+      return;
+    }
+
+    for(const doc of targets){
+      const path = doc.file_path || doc.path || doc.storage_path || doc.url || '';
+      if(!path) continue;
+      if(/^https?:/i.test(path)){
+        window.open(path, '_blank');
+        continue;
+      }
+      const signed = await client.storage.from('travel-expense').createSignedUrl(path, 60 * 10);
+      if(signed.error){
+        console.error('[TravelExpense] admin file open error', signed.error);
+        alert('파일 보기 URL 생성 중 오류가 발생했습니다: ' + signed.error.message);
+        return;
+      }
+      if(signed.data?.signedUrl){
+        window.open(signed.data.signedUrl, '_blank');
+      }
+    }
+  };
   window.adminPrintStatement = printStatement;
   window.adminBulkAction = function(action){
     if(String(action).includes('지출결의')){ updateRequestStatus('지출결의완료'); return; }
