@@ -1430,6 +1430,7 @@
 
 <style id="travel-expense-final-stable-controller-style">
   .form-panel .actions.is-hidden{display:none!important;}
+  .form-panel .actions button:disabled{opacity:.55!important;cursor:not-allowed!important;}
   .travel-mode-note{display:none;margin:10px 0 0;padding:10px 12px;border-radius:12px;font-size:13px;font-weight:800;}
   body.travel-viewing .travel-mode-note{display:block;background:#f8fafc;color:#475569;}
   body.travel-editing .travel-mode-note{display:block;background:#fff7ed;color:#c2410c;}
@@ -3492,6 +3493,25 @@
 
   function actions(){ return document.querySelector('.form-panel .actions'); }
   function buttons(){ const a=actions(); return a ? Array.from(a.querySelectorAll('button')) : []; }
+  function setActionButtonsDisabled(disabled){
+    buttons().forEach(btn=>{
+      btn.disabled = !!disabled;
+      if(disabled){
+        if(!btn.dataset.originalText) btn.dataset.originalText = btn.textContent || '';
+        if(!String(btn.textContent || '').includes('중')) btn.textContent = (btn.textContent || '처리') + ' 중...';
+      }else if(btn.dataset.originalText){
+        btn.textContent = btn.dataset.originalText;
+        delete btn.dataset.originalText;
+      }
+    });
+  }
+  async function runWithActionLock(fn){
+    if(isSaving) return null;
+    isSaving = true;
+    setActionButtonsDisabled(true);
+    try{ return await fn(); }
+    finally{ setActionButtonsDisabled(false); isSaving = false; }
+  }
   function ensureNote(){
     const a=actions(); if(!a || $('travelModeNote')) return;
     const note=document.createElement('div'); note.id='travelModeNote'; note.className='travel-mode-note'; a.parentElement.insertBefore(note,a);
@@ -3507,7 +3527,35 @@
     selectedId=null; selectedStatus='';
     document.body.classList.remove('travel-viewing','travel-editing');
     showActions(true); note('');
-    setButtons('임시저장','제출하기',()=>originalDraft && originalDraft(),()=>originalSubmit && originalSubmit());
+    setButtons(
+      '임시저장',
+      '제출하기',
+      ()=>runWithActionLock(async()=>{
+        if(selectedId) return updateExisting('임시저장','임시저장되었습니다.');
+        if(!originalDraft) return null;
+        const id = await originalDraft();
+        if(id){
+          selectedId = String(id);
+          selectedStatus = '임시저장';
+          await refreshCards();
+          modeEdit(selectedId,'임시저장');
+        }
+        return id;
+      }),
+      ()=>runWithActionLock(async()=>{
+        if(selectedId) return updateExisting('검토대기','제출되었습니다.');
+        if(!originalSubmit) return null;
+        const id = await originalSubmit();
+        if(id){
+          selectedId = String(id);
+          selectedStatus = '검토대기';
+          await refreshCards();
+          await loadDetail(selectedId);
+          modeView(selectedId,'검토대기');
+        }
+        return id;
+      })
+    );
   }
   function modeView(id,status){
     selectedId=id||null; selectedStatus=status||'';
@@ -3518,12 +3566,12 @@
     selectedId=id; selectedStatus=status||'';
     document.body.classList.remove('travel-viewing'); document.body.classList.add('travel-editing');
     showActions(true);
-    if(status === '임시저장'){
-      note('임시저장 건 수정모드입니다. 계속 작성 후 임시저장 또는 제출할 수 있습니다.');
-      setButtons('임시저장','제출하기',()=>updateExisting('임시저장','임시저장되었습니다.'),()=>updateExisting('검토대기','제출되었습니다.'));
+    if(status === '임시저장' || status === '수정요청'){
+      note((status === '수정요청' ? '수정요청 건 수정모드입니다. 수정 후 임시저장 또는 제출할 수 있습니다.' : '임시저장 건 수정모드입니다. 계속 작성 후 임시저장 또는 제출할 수 있습니다.'));
+      setButtons('임시저장','제출하기',()=>runWithActionLock(()=>updateExisting('임시저장','임시저장되었습니다.')),()=>runWithActionLock(()=>updateExisting('검토대기','제출되었습니다.')));
     }else if(status === '검토대기'){
       note('검토대기 건 수정모드입니다. 변경 후 저장하거나 취소할 수 있습니다.');
-      setButtons('취소','저장',()=>selectedId && loadDetail(selectedId).then(()=>modeView(selectedId, selectedStatus)),()=>updateExisting('검토대기','저장되었습니다.'));
+      setButtons('취소','저장',()=>selectedId && loadDetail(selectedId).then(()=>modeView(selectedId, selectedStatus)),()=>runWithActionLock(()=>updateExisting('검토대기','저장되었습니다.')));
     }else{
       showActions(false); note('해당 상태에서는 수정할 수 없습니다.');
     }
@@ -3630,8 +3678,6 @@
   }
 
   async function updateExisting(status, message){
-    if(isSaving) return;
-    isSaving=true;
     try{
       const client=db(); const p=profile();
       if(!client || !p.companyId || !selectedId){ alert('수정할 신청건을 찾지 못했습니다.'); return; }
@@ -3671,7 +3717,7 @@
       await loadDetail(id);
       modeView(id,status);
       alert(message||'저장되었습니다.');
-    }finally{ isSaving=false; }
+    }finally{ }
   }
 
   window.startTravelExpenseEdit = async function(id,status){
