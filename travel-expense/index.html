@@ -3300,7 +3300,16 @@
     const r=await q; if(r.error){console.error('[TravelExpense] my requests load error',r.error); return;}
     const c=document.querySelector('.submission-scroll'); if(!c)return;
     if(!r.data||!r.data.length){c.innerHTML='<div class="notice empty-state">제출 내역이 없습니다.</div>';return;}
-    c.innerHTML=r.data.map(row=>`<div class="list-card" data-request-id="${row.id}"><div class="list-top"><div class="list-title">${row.trip_type||'출장'} · ${row.trip_date||'-'}</div><span class="status s-wait">${row.status||'-'}</span></div><div class="meta">신청자: ${row.applicant_name||'-'}<br>본부/팀: ${row.division_name||'-'} / ${row.team_name||'-'}<br>총액: ${money(row.total_amount||0)} · 개인지급: ${money(row.personal_amount||0)}</div></div>`).join('');
+    c.innerHTML=r.data.map(row=>{
+      const status=row.status||'검토대기';
+      let menu='';
+      if(status === '임시저장' || status === '수정요청'){
+        menu = `<div class="my-card-actions" data-action-key="edit|delete" data-request-id="${row.id}" onclick="event.stopPropagation()"><button type="button" class="edit-btn" data-edit-id="${row.id}" data-edit-status="${status}">수정</button><button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button></div>`;
+      }else if(status === '검토대기'){
+        menu = `<div class="my-card-actions" data-action-key="recall|delete" data-request-id="${row.id}" onclick="event.stopPropagation()"><button type="button" class="recall-btn" data-recall-id="${row.id}">회수</button><button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button></div>`;
+      }
+      return `<div class="list-card" data-request-id="${row.id}" data-status="${status}"><div class="list-top"><div class="list-title">${row.trip_type||'출장'} · ${row.trip_date||'-'}</div><span class="status s-wait">${status}</span></div><div class="meta">신청자: ${row.applicant_name||'-'}<br>본부/팀: ${row.division_name||'-'} / ${row.team_name||'-'}<br>총액: ${money(row.total_amount||0)} · 개인지급: ${money(row.personal_amount||0)}</div>${menu}</div>`;
+    }).join('');
   }
 
   async function loadAdminRequests(){
@@ -3607,11 +3616,11 @@
       const status=row.status||'검토대기';
       let menu='';
       if(status === '임시저장' || status === '수정요청'){
-        menu = `<div class="my-card-actions" onclick="event.stopPropagation()"><button type="button" class="edit-btn" data-edit-id="${row.id}" data-edit-status="${esc(status)}">수정</button><button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button></div>`;
+        menu = `<div class="my-card-actions" data-action-key="edit|delete" data-request-id="${row.id}" onclick="event.stopPropagation()"><button type="button" class="edit-btn" data-edit-id="${row.id}" data-edit-status="${esc(status)}">수정</button><button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button></div>`;
       }else if(status === '검토대기'){
-        menu = `<div class="my-card-actions" onclick="event.stopPropagation()"><button type="button" class="recall-btn" data-recall-id="${row.id}">회수</button><button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button></div>`;
+        menu = `<div class="my-card-actions" data-action-key="recall|delete" data-request-id="${row.id}" onclick="event.stopPropagation()"><button type="button" class="recall-btn" data-recall-id="${row.id}">회수</button><button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button></div>`;
       }
-      return `<div class="list-card" data-request-id="${row.id}"><div class="list-top"><div class="list-title">${esc(row.trip_type||'출장')} · ${esc(row.trip_date||'-')}</div><span class="status s-wait">${esc(status)}</span></div><div class="meta">신청자: ${esc(row.applicant_name||'-')}<br>본부/팀: ${esc(row.division_name||'-')} / ${esc(row.team_name||'-')}<br>총액: ${won(row.total_amount||0)} · 개인지급: ${won(row.personal_amount||0)}</div>${menu}</div>`;
+      return `<div class="list-card" data-request-id="${row.id}" data-status="${esc(status)}"><div class="list-top"><div class="list-title">${esc(row.trip_type||'출장')} · ${esc(row.trip_date||'-')}</div><span class="status s-wait">${esc(status)}</span></div><div class="meta">신청자: ${esc(row.applicant_name||'-')}<br>본부/팀: ${esc(row.division_name||'-')} / ${esc(row.team_name||'-')}<br>총액: ${won(row.total_amount||0)} · 개인지급: ${won(row.personal_amount||0)}</div>${menu}</div>`;
     }).join('');
     return true;
   }
@@ -4122,12 +4131,12 @@
     const status = row.status || '검토대기';
     let buttons = '';
     if(status === '임시저장' || status === '수정요청'){
-      buttons = `<div class="my-card-actions" onclick="event.stopPropagation()">
+      buttons = `<div class="my-card-actions" data-action-key="edit|delete" data-request-id="${row.id}" onclick="event.stopPropagation()">
            <button type="button" class="edit-btn" data-edit-id="${row.id}" data-edit-status="${escapeHtml(status)}">수정</button>
            <button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button>
          </div>`;
     }else if(status === '검토대기'){
-      buttons = `<div class="my-card-actions" onclick="event.stopPropagation()">
+      buttons = `<div class="my-card-actions" data-action-key="recall|delete" data-request-id="${row.id}" onclick="event.stopPropagation()">
            <button type="button" class="recall-btn" data-recall-id="${row.id}">회수</button>
            <button type="button" class="delete-btn" data-delete-id="${row.id}">삭제</button>
          </div>`;
