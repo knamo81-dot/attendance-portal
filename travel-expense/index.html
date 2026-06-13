@@ -2440,15 +2440,25 @@
       <button class="btn-danger" onclick="this.closest('.cost-row').remove();calcAll()">삭제</button>
       <div class="receipt-file-list" data-receipt-list></div>
     `;
-    costList.appefunction handleReceiptUpload(input){
+    costList.appendChild(row);
+    calcAll();
+  }
+
+
+  function handleReceiptUpload(input){
     if(window.__travelHandleReceiptUpload){
       return window.__travelHandleReceiptUpload(input);
     }
-  }ist.innerHTML = '';
-      }
+    const btn = input.nextElementSibling;
+    const count = input.files ? input.files.length : 0;
+    if(count > 0){
+      btn.textContent = '영수증 첨부';
+      btn.classList.add('attached');
+    }else{
+      btn.textContent = '영수증 첨부';
+      btn.classList.remove('attached');
     }
   }
-
 
   function calcFuel(){
     const transport = document.getElementById('transport').value;
