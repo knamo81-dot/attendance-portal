@@ -1432,12 +1432,13 @@
   if(window.__travelDocumentUploadFinalInstalled) return;
   window.__travelDocumentUploadFinalInstalled = true;
 
-  const pendingFiles = [];
+  const STORAGE_BUCKET = 'travel-expense';
+  const pendingDocs = [];
   const uploadedDocs = [];
-  const bucketCandidates = ['travel-expense','travel_expense','travel-expense-attachments','travel_expense_attachments','expense-documents','documents'];
 
   const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
   const hasClient = obj => !!(obj && typeof obj.from === 'function');
+
   function findDb(scope){
     if(!scope) return null;
     const names=['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];
@@ -1457,15 +1458,20 @@
       employeeNo:pick(emp,['employee_no','employeeNo'])||pick(user,['employee_no','employeeNo'])||''
     };
   }
+
   function fmtSize(size){
     const n=Number(size||0);
     if(n>=1024*1024) return (n/1024/1024).toFixed(1)+'MB';
     if(n>=1024) return Math.round(n/1024)+'KB';
     return n+'B';
   }
-  function cleanName(name){ return String(name||'file').replace(/[\/:*?"<>|#%&{}$!`'@+=]/g,'_').slice(0,120); }
+  function cleanName(name){ return String(name||'file').replace(/[\\/:*?"<>|#%&{}$!`'@+=]/g,'_').slice(0,120); }
+  function escapeHtml(v){ return String(v ?? '').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
   function listEl(){ return document.getElementById('travelDocumentList'); }
   function inputEl(){ return document.getElementById('travelDocumentInput'); }
+
+  function fileKey(file){ return [file.name,file.size,file.lastModified].join('|'); }
+  function filesKey(files){ return Array.from(files||[]).map(fileKey).join('||'); }
 
   function render(){
     const el=listEl(); if(!el) return;
@@ -1474,19 +1480,18 @@
       const name=d.file_name||d.name||d.filename||d.original_name||'첨부파일';
       rows.push(`<div class="travel-document-row" data-uploaded-index="${i}"><div><b>${escapeHtml(name)}</b><span>업로드 완료</span></div><button type="button" data-doc-open="${i}">보기</button></div>`);
     });
-    pendingFiles.forEach((f,i)=>{
+    pendingDocs.forEach((f,i)=>{
       rows.push(`<div class="travel-document-row" data-pending-index="${i}"><div><b>${escapeHtml(f.name)}</b><span>${fmtSize(f.size)} · 저장 시 업로드</span></div><button type="button" class="danger" data-doc-remove="${i}">삭제</button></div>`);
     });
     el.innerHTML = rows.length ? rows.join('') : '<div class="travel-document-empty">첨부된 파일이 없습니다.</div>';
   }
-  function escapeHtml(v){ return String(v ?? '').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
   function bind(){
     const input=inputEl();
     if(input && !input.__travelDocumentBound){
       input.__travelDocumentBound=true;
       input.addEventListener('change', ()=>{
-        Array.from(input.files||[]).forEach(file=>pendingFiles.push(file));
+        Array.from(input.files||[]).forEach(file=>pendingDocs.push(file));
         input.value='';
         render();
       });
@@ -1496,7 +1501,7 @@
       list.__travelDocumentBound=true;
       list.addEventListener('click', async e=>{
         const remove=e.target.closest('[data-doc-remove]');
-        if(remove){ pendingFiles.splice(Number(remove.dataset.docRemove),1); render(); return; }
+        if(remove){ pendingDocs.splice(Number(remove.dataset.docRemove),1); render(); return; }
         const open=e.target.closest('[data-doc-open]');
         if(open){ await openUploadedDoc(uploadedDocs[Number(open.dataset.docOpen)]); }
       });
@@ -1506,119 +1511,142 @@
 
   async function openUploadedDoc(doc){
     const client=db(); if(!client || !doc) return;
-    const bucket=doc.storage_bucket||doc.bucket||doc.bucket_id||window.TRAVEL_EXPENSE_BUCKET||'travel-expense';
     const path=doc.file_path||doc.path||doc.storage_path||doc.url||'';
     if(!path){ alert('파일 경로를 찾지 못했습니다.'); return; }
     if(/^https?:/i.test(path)){ window.open(path, '_blank'); return; }
     try{
-      const signed=await client.storage.from(bucket).createSignedUrl(path, 60*10);
+      const signed=await client.storage.from(STORAGE_BUCKET).createSignedUrl(path, 60*10);
       const url=signed?.data?.signedUrl;
       if(url){ window.open(url, '_blank'); return; }
-    }catch(_){}
-    try{
-      const pub=client.storage.from(bucket).getPublicUrl(path);
-      const url=pub?.data?.publicUrl;
-      if(url) window.open(url, '_blank');
-    }catch(_){ alert('파일을 열 수 없습니다.'); }
+    }catch(e){ console.warn('[TravelExpense] signed url warning', e); }
+    alert('파일을 열 수 없습니다. Storage 정책 또는 파일 경로를 확인해 주세요.');
   }
 
-  async function uploadFileToStorage(client, companyId, requestId, file){
-    const base=`${companyId}/${requestId}/approval/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${cleanName(file.name)}`;
-    const candidates = window.TRAVEL_EXPENSE_BUCKET ? [window.TRAVEL_EXPENSE_BUCKET].concat(bucketCandidates) : bucketCandidates;
-    let lastError=null;
-    for(const bucket of [...new Set(candidates)]){
-      try{
-        const res=await client.storage.from(bucket).upload(base, file, { upsert:true, contentType:file.type || 'application/octet-stream' });
-        if(!res.error) return { bucket, path: res.data?.path || base };
-        lastError=res.error;
-      }catch(e){ lastError=e; }
+  async function uploadOne(client, p, requestId, file, type, itemId=null){
+    const folder = type === 'receipt' ? 'receipts' : 'approval';
+    const path = `${p.companyId}/${requestId}/${folder}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${cleanName(file.name)}`;
+
+    const up = await client.storage.from(STORAGE_BUCKET).upload(path, file, {
+      upsert:true,
+      contentType:file.type || 'application/octet-stream'
+    });
+    if(up.error){
+      console.error('[TravelExpense] storage upload error', {bucket:STORAGE_BUCKET, path, error:up.error});
+      throw up.error;
     }
-    throw lastError || new Error('Storage upload failed');
+
+    const row = {
+      company_id:p.companyId,
+      request_id:requestId,
+      item_id:itemId || null,
+      file_name:file.name,
+      file_path:up.data?.path || path,
+      file_type:type,
+      file_size:file.size || 0
+    };
+
+    const ins = await client.from('travel_expense_attachments').insert(row).select('*').maybeSingle();
+    if(ins.error){
+      console.error('[TravelExpense] attachment metadata insert error', {row, error:ins.error});
+      throw ins.error;
+    }
+    return ins.data || row;
   }
 
-  async function insertAttachmentMeta(client, meta){
-    const variants=[
-      {company_id:meta.company_id, request_id:meta.request_id, attachment_type:'approval_document', file_name:meta.file_name, file_path:meta.file_path, storage_bucket:meta.storage_bucket, mime_type:meta.mime_type, file_size:meta.file_size, uploaded_at:new Date().toISOString()},
-      {company_id:meta.company_id, request_id:meta.request_id, type:'approval_document', name:meta.file_name, path:meta.file_path, bucket:meta.storage_bucket, mime_type:meta.mime_type, size_bytes:meta.file_size},
-      {company_id:meta.company_id, request_id:meta.request_id, file_name:meta.file_name, file_path:meta.file_path, mime_type:meta.mime_type, file_size:meta.file_size},
-      {company_id:meta.company_id, request_id:meta.request_id, file_name:meta.file_name, file_path:meta.file_path}
-    ];
-    let lastError=null;
-    for(const row of variants){
-      try{
-        const res=await client.from('travel_expense_attachments').insert(row).select('*').maybeSingle();
-        if(!res.error) return res.data || row;
-        lastError=res.error;
-      }catch(e){ lastError=e; }
+  function collectReceiptInputs(){
+    return Array.from(document.querySelectorAll('#costList .cost-row')).map((row, index)=>{
+      const input=row.querySelector('input.receipt-input');
+      const btn=row.querySelector('.receipt-btn');
+      return {row,index,input,btn,files:Array.from((input&&input.files)||[])};
+    }).filter(x=>x.input && x.files.length);
+  }
+
+  async function uploadReceipts(client, p, requestId){
+    const inputs = collectReceiptInputs();
+    const done=[];
+    for(const info of inputs){
+      const key = filesKey(info.files);
+      if(key && info.input.dataset.travelUploadedKey === key) continue;
+      for(const file of info.files){
+        done.push(await uploadOne(client, p, requestId, file, 'receipt', null));
+      }
+      info.input.dataset.travelUploadedKey = key;
+      if(info.btn){
+        info.btn.textContent = `업로드 ${info.files.length}건`;
+        info.btn.classList.add('attached');
+      }
     }
-    throw lastError || new Error('Attachment metadata insert failed');
+    return done;
   }
 
   window.uploadTravelExpenseDocuments = async function(requestId){
-    if(!pendingFiles.length) return true;
     const client=db(); const p=profile();
     if(!client || !p.companyId || !requestId){ alert('첨부파일 업로드 정보를 확인하지 못했습니다.'); return false; }
-    const files=pendingFiles.splice(0, pendingFiles.length);
+
+    const docs = pendingDocs.splice(0, pendingDocs.length);
     const completed=[];
     try{
-      for(const file of files){
-        const stored=await uploadFileToStorage(client, p.companyId, requestId, file);
-        const meta={company_id:p.companyId, request_id:requestId, file_name:file.name, file_path:stored.path, storage_bucket:stored.bucket, mime_type:file.type||'', file_size:file.size||0};
-        const saved=await insertAttachmentMeta(client, meta);
+      for(const file of docs){
+        const saved = await uploadOne(client, p, requestId, file, 'approval_document', null);
         completed.push(saved);
       }
+      const receipts = await uploadReceipts(client, p, requestId);
       uploadedDocs.push(...completed);
       render();
       return true;
     }catch(e){
-      console.error('[TravelExpense] document upload error', e);
-      pendingFiles.unshift(...files.slice(completed.length));
+      console.error('[TravelExpense] attachment upload error', e);
+      if(docs.length) pendingDocs.unshift(...docs.slice(completed.length));
       render();
-      alert('첨부파일 업로드 중 오류가 발생했습니다. Supabase Storage bucket 또는 attachments 테이블을 확인해 주세요: '+(e?.message||e));
+      alert('첨부파일 업로드 중 오류가 발생했습니다. travel-expense Storage bucket, Storage 정책, travel_expense_attachments 테이블을 확인해 주세요: '+(e?.message||e));
       return false;
     }
   };
 
   window.loadTravelExpenseDocumentList = async function(requestId){
     uploadedDocs.splice(0, uploadedDocs.length);
-    pendingFiles.splice(0, pendingFiles.length);
+    pendingDocs.splice(0, pendingDocs.length);
     const input=inputEl(); if(input) input.value='';
     const client=db(); const p=profile();
     if(client && p.companyId && requestId){
       try{
         const res=await client.from('travel_expense_attachments').select('*').eq('company_id',p.companyId).eq('request_id',requestId).order('created_at',{ascending:true});
-        if(!res.error && Array.isArray(res.data)) uploadedDocs.push(...res.data);
+        if(!res.error && Array.isArray(res.data)){
+          uploadedDocs.push(...res.data.filter(x => (x.file_type||'') === 'approval_document'));
+        }
       }catch(e){ console.warn('[TravelExpense] document list load warning', e); }
     }
     render();
   };
 
   window.resetTravelExpenseDocumentUpload = function(){
-    pendingFiles.splice(0, pendingFiles.length);
+    pendingDocs.splice(0, pendingDocs.length);
     uploadedDocs.splice(0, uploadedDocs.length);
     const input=inputEl(); if(input) input.value='';
+    document.querySelectorAll('input.receipt-input').forEach(input=>{ input.dataset.travelUploadedKey=''; });
     render();
   };
 
-  function patchInitialSave(name){
+  function patchSave(name){
     const fn=window[name];
-    if(typeof fn !== 'function' || fn.__travelDocumentUploadPatched) return;
+    if(typeof fn !== 'function' || fn.__travelAttachmentUploadPatched) return;
     const wrapped=async function(){
       const id=await fn.apply(this, arguments);
       if(id) await window.uploadTravelExpenseDocuments(String(id));
       return id;
     };
-    wrapped.__travelDocumentUploadPatched=true;
+    wrapped.__travelAttachmentUploadPatched=true;
     window[name]=wrapped;
   }
 
   function init(){
     bind();
-    // 기존 save 함수가 stable controller에 캡처되기 전에 신규 저장 첨부 업로드를 연결합니다.
-    patchInitialSave('saveTravelExpenseDraft');
-    patchInitialSave('submitTravelExpense');
+    patchSave('saveTravelExpenseDraft');
+    patchSave('submitTravelExpense');
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
+  setTimeout(init, 500);
+  setTimeout(init, 1500);
 })();
 </script>
 
