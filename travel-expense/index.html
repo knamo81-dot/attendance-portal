@@ -5101,10 +5101,11 @@
   }
 
   function getStatus(card){
-    return normalizeStatus(card.dataset.status || (card.querySelector('.status') && card.querySelector('.status').textContent) || card.textContent);
+    const statusEl = card.querySelector('.status');
+    return normalizeStatus(card.dataset.status || (statusEl && statusEl.textContent) || '');
   }
 
-  function button(label, className, onClick){
+  function makeButton(label, className, handler){
     const b = document.createElement('button');
     b.type = 'button';
     b.className = className;
@@ -5112,48 +5113,68 @@
     b.addEventListener('click', function(e){
       e.preventDefault();
       e.stopPropagation();
-      onClick();
+      handler();
     });
     return b;
+  }
+
+  function desiredActionKey(status){
+    if(status === '승인' || status === '지출결의완료') return '';
+    if(status === '임시저장' || status === '수정요청') return 'edit|delete';
+    if(status === '검토대기') return 'recall|delete';
+    return '';
   }
 
   function applyCardRules(){
     document.querySelectorAll('.submission-scroll .list-card').forEach(function(card){
       const id = getId(card);
       const status = getStatus(card);
+      const key = desiredActionKey(status);
       let actions = card.querySelector('.my-card-actions');
 
-      if(status === '승인' || status === '지출결의완료'){
+      if(!key){
         if(actions) actions.remove();
         return;
       }
 
-      if(!['임시저장','검토대기','수정요청'].includes(status)) return;
+      // 기존 버전은 매번 innerHTML을 비우고 버튼을 다시 붙였습니다.
+      // MutationObserver와 결합되면 무한 DOM 변경 루프가 발생해 페이지가 멈출 수 있습니다.
+      if(actions && actions.dataset.actionKey === key && actions.dataset.requestId === id) return;
 
       if(!actions){
         actions = document.createElement('div');
         actions.className = 'my-card-actions';
+        actions.addEventListener('click', function(e){ e.stopPropagation(); });
         card.appendChild(actions);
       }
 
-      actions.innerHTML = '';
+      actions.replaceChildren();
+      actions.dataset.actionKey = key;
+      actions.dataset.requestId = id;
 
-      if(status === '임시저장' || status === '수정요청'){
-        actions.appendChild(button('수정', 'edit-btn', function(){
+      if(key.includes('edit')){
+        actions.appendChild(makeButton('수정', 'edit-btn', function(){
           if(typeof window.startTravelExpenseEdit === 'function') window.startTravelExpenseEdit(id, status);
         }));
       }
 
-      if(status === '검토대기'){
-        actions.appendChild(button('회수', 'recall-btn', function(){
+      if(key.includes('recall')){
+        actions.appendChild(makeButton('회수', 'recall-btn', function(){
           if(typeof window.recallTravelExpenseRequest === 'function') window.recallTravelExpenseRequest(id);
         }));
       }
 
-      actions.appendChild(button('삭제', 'delete-btn', function(){
-        if(typeof window.deleteTravelExpenseRequest === 'function') window.deleteTravelExpenseRequest(id);
-      }));
+      if(key.includes('delete')){
+        actions.appendChild(makeButton('삭제', 'delete-btn', function(){
+          if(typeof window.deleteTravelExpenseRequest === 'function') window.deleteTravelExpenseRequest(id);
+        }));
+      }
     });
+  }
+
+  function scheduleApply(){
+    clearTimeout(scheduleApply._timer);
+    scheduleApply._timer = setTimeout(applyCardRules, 80);
   }
 
   function wrap(name){
@@ -5161,22 +5182,25 @@
     if(typeof original !== 'function' || original.__cardRuleNoDbTouchWrapped) return;
     const wrapped = function(){
       const result = original.apply(this, arguments);
-      setTimeout(applyCardRules, 50);
-      setTimeout(applyCardRules, 250);
-      setTimeout(applyCardRules, 800);
+      if(result && typeof result.then === 'function'){
+        result.finally(scheduleApply);
+      } else {
+        scheduleApply();
+      }
       return result;
     };
     wrapped.__cardRuleNoDbTouchWrapped = true;
     window[name] = wrapped;
   }
 
-  ['refreshCards','loadDetail','modeView','modeNew','startTravelExpenseEdit'].forEach(wrap);
+  ['refreshCards','loadMyRequests','refreshTravelExpenseMyCards','loadDetail','modeView','modeNew','startTravelExpenseEdit'].forEach(wrap);
 
-  const mo = new MutationObserver(applyCardRules);
-  if(document.body) mo.observe(document.body, {childList:true, subtree:true});
-
-  setTimeout(applyCardRules, 200);
-  setTimeout(applyCardRules, 800);
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', scheduleApply, { once:true });
+  } else {
+    scheduleApply();
+  }
+  window.applyTravelExpenseCardRules = applyCardRules;
 })();
 </script>
 
