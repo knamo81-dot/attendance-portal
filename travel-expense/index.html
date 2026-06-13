@@ -5765,174 +5765,371 @@
     if(row){ row.voucher_date = payload.voucher_date; row.payment_due_date = payload.payment_due_date; }
     detailCache.delete(id);
   }
-  function printModeLabel(mode){
-    return mode === 'corp' ? '법인카드출력' : mode === 'personal' ? '개인지급출력' : '전체출력';
-  }
-  function printTitle(mode){
-    return mode === 'corp' ? '법인카드 정산 출력' : mode === 'personal' ? '개인지급 정산 출력' : '출장비 정산 전체 출력';
-  }
-  function fileExt(file){
-    const raw = String(file?.file_name || file?.file_path || '').split('?')[0].split('.').pop().toLowerCase();
-    return raw || '';
-  }
-  function isImageAttachment(file){
-    return ['jpg','jpeg','png','gif','webp','bmp'].includes(fileExt(file));
-  }
-  function isPdfAttachment(file){
-    return fileExt(file) === 'pdf';
-  }
-  async function signedAttachmentUrl(client, file){
-    const path = file?.file_path || file?.path || file?.storage_path || file?.url || '';
-    if(!path) return '';
-    if(/^https?:/i.test(path)) return path;
-    const signed = await client.storage.from('travel-expense').createSignedUrl(path, 60 * 30);
-    if(signed.error){ console.warn('[TravelExpense] print signed url failed', signed.error); return ''; }
-    return signed.data?.signedUrl || '';
-  }
-  function renderPrintFile(file, url){
-    const name = esc(file?.file_name || '첨부파일');
-    if(!url){
-      return `<div class="print-file-card"><b>${name}</b><div class="print-file-missing">파일 URL을 생성하지 못했습니다.</div></div>`;
-    }
-    if(isImageAttachment(file)){
-      return `<div class="print-file-card"><div class="print-file-name">${name}</div><img class="print-image" src="${esc(url)}" /></div>`;
-    }
-    if(isPdfAttachment(file)){
-      return `<div class="print-file-card"><div class="print-file-name">${name}</div><iframe class="print-pdf" src="${esc(url)}"></iframe><div class="print-file-link">PDF가 보이지 않으면 새 창에서 열어 인쇄하세요.</div></div>`;
-    }
-    return `<div class="print-file-card"><div class="print-file-name">${name}</div><a href="${esc(url)}" target="_blank">첨부파일 열기</a></div>`;
-  }
-  function payTypeOf(item){
-    return String(item?.pay_type || item?.payment_type || item?.pay || '').trim();
-  }
-  function isCorpItem(item){
-    return payTypeOf(item) === '법인카드';
-  }
-  function itemTitle(item){
-    return item?.item_type || item?.category || item?.title || '-';
-  }
-  function routeLabel(routes){
-    if(!routes || !routes.length) return '-';
-    return [routes[0]?.from_place, ...routes.map(r=>r.to_place)].filter(Boolean).join(' → ') || '-';
-  }
-  function makeSummaryCards(row){
-    return `<div class="summary-cards">
-      <div><small>총액</small><b>${won(row.total_amount)}</b></div>
-      <div><small>법인카드</small><b>${won(row.corp_card_amount)}</b></div>
-      <div><small>개인지급</small><b>${won(row.personal_amount)}</b></div>
-      <div><small>이동거리</small><b>${num(row.total_distance_km)} km</b></div>
-    </div>`;
-  }
-  function makeFuelSection(detail){
-    const row = detail.row || {};
-    const routes = detail.routes || [];
-    const totalKm = num(row.total_distance_km) || routes.reduce((s,r)=>s+num(r.distance_km),0);
-    const gas = num(row.gas_price);
-    const eff = num(row.fuel_efficiency);
-    const fuel = num(row.fuel_amount);
-    const routeRows = routes.length ? routes.map((r,i)=>{
-      const km = num(r.distance_km);
-      const segFuel = totalKm && fuel ? Math.round(fuel * (km / totalKm)) : 0;
-      return `<tr><td>${i+1}</td><td>${esc(r.from_place||'-')}</td><td>${esc(r.to_place||'-')}</td><td class="num">${km} km</td><td class="num">${won(segFuel)}</td></tr>`;
-    }).join('') : `<tr><td colspan="5" class="empty-cell">입력된 이동구간이 없습니다.</td></tr>`;
-    return `<section class="print-section page-break-avoid">
-      <h2>3. 유류비 계산내역</h2>
-      <div class="fuel-formula">
-        <div><small>이동경로</small><b>${esc(routeLabel(routes))}</b></div>
-        <div><small>총 이동거리</small><b>${totalKm} km</b></div>
-        <div><small>출장일 기준 유가</small><b>${gas.toLocaleString('ko-KR')}원/L</b></div>
-        <div><small>기준연비</small><b>${eff} km/L</b></div>
-        <div><small>유류비</small><b>${won(fuel)}</b></div>
-      </div>
-      <div class="formula-note">계산식: 총 이동거리 ÷ 회사 기준연비 × 출장일 기준 유가 = ${won(fuel)}</div>
-      <table class="print-table"><thead><tr><th>No</th><th>출발지</th><th>도착지</th><th>거리</th><th>구간 유류비</th></tr></thead><tbody>${routeRows}</tbody></table>
-    </section>`;
-  }
-  async function makeAttachmentSection(client, detail){
-    const docs = (detail.attachments || []).filter(a => (a.file_type||'') === 'approval_document');
-    const cards = [];
-    for(const doc of docs){
-      cards.push(renderPrintFile(doc, await signedAttachmentUrl(client, doc)));
-    }
-    return `<section class="print-section print-doc-section">
-      <h2>1. 출장계 / 외근신청서</h2>
-      ${cards.length ? cards.join('') : '<div class="empty-box">첨부된 출장계/외근신청서가 없습니다.</div>'}
-    </section>`;
-  }
-  async function makeEvidenceSection(client, detail, type, sectionNo){
-    const items = (detail.items || []).filter(item => type === 'corp' ? isCorpItem(item) : !isCorpItem(item));
-    const receipts = (detail.attachments || []).filter(a => (a.file_type||'') === 'receipt');
-    const receiptByItem = new Map();
-    receipts.forEach(r => {
-      const key = String(r.item_id || '');
-      if(!receiptByItem.has(key)) receiptByItem.set(key, []);
-      receiptByItem.get(key).push(r);
-    });
-    const title = type === 'corp' ? `${sectionNo}. 법인카드 증빙` : `${sectionNo}. 개인지급 증빙`;
-    const itemRows = items.length ? items.map((item,i)=>{
-      const count = (receiptByItem.get(String(item.id)) || []).length;
-      return `<tr><td>${i+1}</td><td>${esc(itemTitle(item))}</td><td>${esc(payTypeOf(item)||'-')}</td><td class="num">${won(item.amount)}</td><td>${count ? count + '건' : '미첨부'}</td></tr>`;
-    }).join('') : `<tr><td colspan="5" class="empty-cell">해당 사용내역이 없습니다.</td></tr>`;
-    const receiptCards = [];
-    for(const item of items){
-      const files = receiptByItem.get(String(item.id)) || [];
-      for(const file of files){
-        const url = await signedAttachmentUrl(client, file);
-        receiptCards.push(`<div class="receipt-group-title">${esc(itemTitle(item))} · ${won(item.amount)}</div>${renderPrintFile(file, url)}`);
-      }
-    }
-    const total = items.reduce((s,i)=>s+num(i.amount),0);
-    return `<section class="print-section evidence-section">
-      <h2>${title}</h2>
-      <table class="print-table"><thead><tr><th>No</th><th>항목</th><th>구분</th><th>금액</th><th>영수증</th></tr></thead><tbody>${itemRows}</tbody><tfoot><tr><td colspan="3">합계</td><td class="num">${won(total)}</td><td></td></tr></tfoot></table>
-      <div class="receipt-area">${receiptCards.length ? receiptCards.join('') : '<div class="empty-box">첨부된 영수증이 없습니다.</div>'}</div>
-    </section>`;
-  }
-  async function makePrintTripHtml(client, detail, mode){
-    const row = detail.row || {};
-    const docs = await makeAttachmentSection(client, detail);
-    const summary = `<section class="print-section page-break-avoid"><h2>2. 출장비 정산서</h2>${makeSummaryCards(row)}</section>`;
-    const fuel = makeFuelSection(detail);
-    const sections = [docs, summary, fuel];
-    if(mode === 'all' || mode === 'corp') sections.push(await makeEvidenceSection(client, detail, 'corp', 4));
-    if(mode === 'all') sections.push(await makeEvidenceSection(client, detail, 'personal', 5));
-    if(mode === 'personal') sections.push(await makeEvidenceSection(client, detail, 'personal', 4));
-    return `<article class="print-trip">${sections.join('')}</article>`;
-  }
-  function makePrintDocument(title, mode, body){
-    const today = new Date().toLocaleDateString('ko-KR');
-    return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
-      *{box-sizing:border-box} body{margin:0;background:#f3f4f6;color:#111827;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif;} .toolbar{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:#111827;color:white;} .toolbar button{border:0;border-radius:10px;padding:9px 12px;font-weight:800;cursor:pointer;margin-left:6px;} .wrap{max-width:980px;margin:18px auto 40px;padding:0 12px;} .print-title{background:white;border:1px solid #d1d5db;border-radius:14px;padding:16px 18px;margin-bottom:14px;} .print-title h1{margin:0;font-size:22px;text-align:center;} .print-title p{margin:8px 0 0;text-align:right;color:#6b7280;font-size:12px;} .print-trip{background:white;border:1px solid #d1d5db;border-radius:14px;padding:18px;margin-bottom:18px;} .print-section{border:1px solid #d1d5db;border-radius:12px;padding:14px;margin-bottom:14px;background:#fff;} .print-section h2{font-size:16px;margin:0 0 12px;border-bottom:2px solid #111827;padding-bottom:8px;} .summary-cards,.fuel-formula{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;} .fuel-formula{grid-template-columns:2fr repeat(4,1fr);} .summary-cards div,.fuel-formula div{border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#f9fafb;} small{display:block;color:#6b7280;font-size:11px;font-weight:800;margin-bottom:4px;} b{font-size:15px;} .print-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px;} .print-table th,.print-table td{border:1px solid #d1d5db;padding:8px;vertical-align:top;} .print-table th{background:#f3f4f6;} .print-table tfoot td{font-weight:900;background:#f9fafb;} .num{text-align:right;white-space:nowrap;} .empty-cell{text-align:center;color:#6b7280;font-weight:800;} .empty-box{border:1px dashed #cbd5e1;border-radius:12px;padding:18px;text-align:center;color:#6b7280;background:#f8fafc;font-weight:800;} .formula-note{margin:10px 0;padding:10px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;font-size:12px;font-weight:800;color:#92400e;} .print-file-card{border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin:10px 0;break-inside:avoid;background:#fff;} .print-file-name{font-weight:900;margin-bottom:8px;} .print-image{display:block;max-width:100%;max-height:980px;margin:0 auto;border:1px solid #e5e7eb;} .print-pdf{width:100%;height:980px;border:1px solid #e5e7eb;border-radius:8px;background:#f8fafc;} .print-file-link,.print-file-missing{font-size:12px;color:#6b7280;margin-top:6px;} .receipt-group-title{font-weight:900;margin:12px 0 4px;color:#374151;} .receipt-area{margin-top:12px;} @media print{body{background:white}.toolbar{display:none}.wrap{max-width:none;margin:0;padding:0}.print-title,.print-trip{border:0;border-radius:0;padding:0;margin:0 0 10mm}.print-section{page-break-inside:avoid;border-color:#9ca3af}.print-doc-section,.evidence-section{page-break-before:always}.print-pdf{height:250mm}.print-image{max-height:250mm}.page-break-avoid{page-break-inside:avoid}}
-    </style></head><body><div class="toolbar"><div>${esc(title)} · ${esc(printModeLabel(mode))} · ${esc(today)}</div><div><button onclick="window.print()">인쇄/PDF</button><button onclick="window.close()">닫기</button></div></div><div class="wrap"><div class="print-title"><h1>${esc(title)}</h1><p>출력구분: ${esc(printModeLabel(mode))} / 출력일: ${esc(today)}</p></div>${body}</div></body></html>`;
-  }
   async function printStatement(mode){
-    mode = mode || 'all';
-    const client = db();
-    if(!client){ alert('Supabase 연결을 찾지 못했습니다.'); return; }
     const selected = selectedRowsFromChecks();
     const targetRows = selected.length ? selected : rows.filter(r => String(r.id) === String(selectedId));
     if(!targetRows.length){ alert('출력할 신청건을 선택하세요.'); return; }
-    const details = [];
-    for(const r of targetRows){
-      const id = String(r.id);
-      let detail = detailCache.get(id);
-      if(!detail || !Array.isArray(detail.items) || !Array.isArray(detail.attachments)){
-        detailCache.delete(id);
-        detail = await loadDetail(id);
+
+    const client = db();
+    const p = profile();
+    if(!client || !p.companyId){
+      alert('Supabase 연결 정보를 찾지 못했습니다.');
+      return;
+    }
+
+    const modeKey = mode === 'corp' ? 'corp' : mode === 'personal' ? 'personal' : 'all';
+    const title = modeKey === 'corp' ? '법인카드 출장비 정산서' : modeKey === 'personal' ? '개인지급 출장비 정산서' : '전체 출장비 정산서';
+    const outputDate = today();
+
+    async function fetchPrintDetail(row){
+      const id = String(row.id || '');
+      if(!id) return { request: row, routes: [], items: [], attachments: [] };
+
+      let request = row;
+      try{
+        const req = await client.from('travel_expense_requests')
+          .select('*')
+          .eq('company_id', p.companyId)
+          .eq('id', id)
+          .maybeSingle();
+        if(!req.error && req.data) request = req.data;
+      }catch(_){}
+
+      const [routesRes, itemsRes, attachmentsRes] = await Promise.all([
+        client.from('travel_expense_routes').select('*').eq('company_id', p.companyId).eq('request_id', id).order('sort_order', { ascending:true }),
+        client.from('travel_expense_items').select('*').eq('company_id', p.companyId).eq('request_id', id).order('created_at', { ascending:true }),
+        client.from('travel_expense_attachments').select('*').eq('company_id', p.companyId).eq('request_id', id).order('created_at', { ascending:true })
+      ]);
+
+      return {
+        request,
+        routes: routesRes.error ? [] : (routesRes.data || []),
+        items: itemsRes.error ? [] : (itemsRes.data || []),
+        attachments: attachmentsRes.error ? [] : (attachmentsRes.data || [])
+      };
+    }
+
+    async function signedAttachment(doc){
+      const path = doc.file_path || doc.path || doc.storage_path || doc.url || '';
+      if(!path) return Object.assign({}, doc, { signed_url:'' });
+      if(/^https?:/i.test(path)) return Object.assign({}, doc, { signed_url:path });
+      try{
+        const signed = await client.storage.from('travel-expense').createSignedUrl(path, 60 * 30);
+        return Object.assign({}, doc, { signed_url: signed?.data?.signedUrl || '' });
+      }catch(e){
+        console.warn('[TravelExpense] print signed url warning', e);
+        return Object.assign({}, doc, { signed_url:'' });
       }
-      details.push(detail);
     }
-    const title = printTitle(mode);
-    let body = '';
-    for(const detail of details){
-      body += await makePrintTripHtml(client, detail, mode);
+
+    function payType(item){
+      return String(item.pay_type || item.payment_type || item.use_type || '').trim();
     }
-    const w = window.open('', '_blank', 'width=1200,height=920,resizable=yes,scrollbars=yes');
-    if(!w){ alert('팝업이 차단되었습니다.'); return; }
-    w.document.open();
-    w.document.write(makePrintDocument(title, mode, body));
-    w.document.close();
-    w.focus();
+    function itemName(item){
+      return String(item.item_type || item.category || item.name || item.expense_type || '').trim();
+    }
+    function itemAmount(item){
+      return n(item.amount || item.price || item.cost || 0);
+    }
+    function isCorpItem(item){ return payType(item) === '법인카드'; }
+    function isPersonalItem(item){ return !isCorpItem(item); }
+    function isMeal(name){ return /식대|식비|식사|식품|음식/.test(name); }
+    function isLodging(name){ return /숙박|호텔|숙소/.test(name); }
+    function isTransit(name){ return /대중교통|교통|버스|택시|기차|철도|지하철|항공|KTX|SRT/i.test(name); }
+    function routeLabel(routes){
+      const labels = (routes || []).map(r => [r.from_place, r.to_place].filter(Boolean).join(' → ')).filter(Boolean);
+      return labels.length ? labels.join(' / ') : '-';
+    }
+    function totalDistance(routes, request){
+      const routeDistance = (routes || []).reduce((s,r)=>s+n(r.distance_km || r.distance || 0),0);
+      return routeDistance || n(request.total_distance_km || request.distance_km || request.distance || 0);
+    }
+    function calcFuel(request, routes){
+      const distance = totalDistance(routes, request);
+      const gas = n(request.gas_price || request.fuel_price || 0);
+      const eff = n(request.fuel_efficiency || request.efficiency || 0) || 1;
+      const unit = n(request.round_unit || 1) || 1;
+      if(String(request.transport || '자차') !== '자차') return 0;
+      return Math.round((distance / eff * gas) / unit) * unit;
+    }
+    function groupAmounts(items, request, routes){
+      const filtered = (items || []).filter(item => {
+        if(modeKey === 'corp') return isCorpItem(item);
+        if(modeKey === 'personal') return isPersonalItem(item);
+        return true;
+      });
+
+      const result = { lodging:0, fuel:0, transit:0, meal:0, other:0, total:0, corp:0, personal:0 };
+      filtered.forEach(item => {
+        const name = itemName(item);
+        const amount = itemAmount(item);
+        if(isLodging(name)) result.lodging += amount;
+        else if(isMeal(name)) result.meal += amount;
+        else if(isTransit(name)) result.transit += amount;
+        else result.other += amount;
+
+        if(isCorpItem(item)) result.corp += amount;
+        else result.personal += amount;
+      });
+
+      const fuel = modeKey === 'corp' ? 0 : calcFuel(request, routes);
+      result.fuel = fuel;
+      result.personal += fuel;
+      result.total = result.lodging + result.fuel + result.transit + result.meal + result.other;
+      return result;
+    }
+    function outputLabel(){
+      if(modeKey === 'corp') return '법인카드';
+      if(modeKey === 'personal') return '개인지급';
+      return '전체';
+    }
+    function fileKind(name){
+      const lower = String(name || '').toLowerCase();
+      if(/\.(png|jpe?g|gif|webp)$/i.test(lower)) return 'image';
+      if(/\.pdf$/i.test(lower)) return 'pdf';
+      return 'file';
+    }
+    function evidenceCard(doc, fallbackTitle){
+      const name = doc.file_name || doc.name || fallbackTitle || '첨부파일';
+      const url = doc.signed_url || '';
+      const kind = fileKind(name);
+      let preview = '<div class="print-preview-empty">첨부파일 미리보기</div>';
+      if(url && kind === 'image') preview = `<img src="${esc(url)}" alt="${esc(name)}" />`;
+      else if(url && kind === 'pdf') preview = `<iframe src="${esc(url)}"></iframe>`;
+      else if(url) preview = `<div class="print-preview-empty"><a href="${esc(url)}" target="_blank">파일 열기</a></div>`;
+
+      return `<article class="print-evidence-card">
+        <div class="print-evidence-head"><b>${esc(name)}</b>${url ? `<a href="${esc(url)}" target="_blank">새 창으로 보기</a>` : ''}</div>
+        <div class="print-preview-box">${preview}</div>
+        <table class="print-file-meta"><tr><th>파일명</th><td>${esc(name)}</td></tr></table>
+      </article>`;
+    }
+    function itemReceipts(item, attachments){
+      const itemId = String(item.id || '');
+      return (attachments || []).filter(a => String(a.file_type || '') === 'receipt' && (!itemId || String(a.item_id || '') === itemId));
+    }
+    function receiptsForItems(items, attachments){
+      const ids = new Set((items || []).map(i => String(i.id || '')).filter(Boolean));
+      return (attachments || []).filter(a => String(a.file_type || '') === 'receipt' && ids.has(String(a.item_id || '')));
+    }
+    function renderDocumentSection(detail){
+      const docs = (detail.attachments || []).filter(a => String(a.file_type || '') === 'approval_document');
+      return `<section class="print-section print-page-break-after">
+        <h2>1. 출장계 / 외근신청서</h2>
+        <div class="print-note">신청자가 업로드한 결재 완료 서류입니다.</div>
+        ${docs.length ? `<div class="print-evidence-grid">${docs.map((d,i)=>evidenceCard(d, '출장계/외근신청서 '+(i+1))).join('')}</div>` : '<div class="print-empty">첨부된 출장계/외근신청서가 없습니다.</div>'}
+      </section>`;
+    }
+    function renderSettlementTable(detail, amounts){
+      const r = detail.request || {};
+      const routes = detail.routes || [];
+      const distance = totalDistance(routes, r);
+      const tripDate = r.trip_date || r.date || '-';
+      const routeText = routeLabel(routes);
+      const dept = r.division_name || r.division_code || r.department || '-';
+      const output = outputLabel();
+
+      const row = `<tr>
+        <td>${esc(r.applicant_name || '-')}</td>
+        <td>${esc(tripDate)}</td>
+        <td>${esc(tripDate)}</td>
+        <td class="num">${amounts.lodging ? won(amounts.lodging) : '-'}</td>
+        <td class="num">${amounts.fuel ? won(amounts.fuel) : '-'}</td>
+        <td class="num">${amounts.transit ? won(amounts.transit) : '-'}</td>
+        <td class="num">${amounts.meal ? won(amounts.meal) : '-'}</td>
+        <td class="num">${amounts.other ? won(amounts.other) : '-'}</td>
+        <td class="num">${won(amounts.total)}</td>
+        <td class="num">${distance ? esc(distance + 'km') : '-'}</td>
+        <td>${esc(routeText)}</td>
+      </tr>`;
+
+      return `<section class="print-section">
+        <div class="print-title-row">
+          <h1>국내출장비 정산서</h1>
+          <div class="print-date">출력구분 : ${esc(output)} / 출력일 : ${esc(outputDate)}</div>
+        </div>
+        <div class="print-dept">[ 부서명 : ${esc(dept)} ]</div>
+        <table class="domestic-table">
+          <thead>
+            <tr>
+              <th>성 명</th>
+              <th>출발일</th>
+              <th>도착일</th>
+              <th>숙박비</th>
+              <th>유류비</th>
+              <th>대중교통</th>
+              <th>식비</th>
+              <th>기타<br>(주차비 등)</th>
+              <th>계</th>
+              <th>출장지<br>거리(KM)</th>
+              <th>비 고</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${row}
+            <tr class="sum-row">
+              <td colspan="3">합 계</td>
+              <td class="num">${amounts.lodging ? won(amounts.lodging) : '-'}</td>
+              <td class="num">${amounts.fuel ? won(amounts.fuel) : '-'}</td>
+              <td class="num">${amounts.transit ? won(amounts.transit) : '-'}</td>
+              <td class="num">${amounts.meal ? won(amounts.meal) : '-'}</td>
+              <td class="num">${amounts.other ? won(amounts.other) : '-'}</td>
+              <td class="num">${won(amounts.total)}</td>
+              <td class="num">${distance ? esc(distance + 'km') : '-'}</td>
+              <td>-</td>
+            </tr>
+            <tr>
+              <th rowspan="2">정산금액</th>
+              <th colspan="2">법인카드</th>
+              <td colspan="5" class="num">${modeKey === 'personal' ? '-' : won(amounts.corp)}</td>
+              <td class="num">${modeKey === 'personal' ? '-' : won(amounts.corp)}</td>
+              <td colspan="2"></td>
+            </tr>
+            <tr>
+              <th colspan="2">현금<br><small>개인카드/현금/유류비</small></th>
+              <td colspan="5" class="num">${modeKey === 'corp' ? '-' : won(amounts.personal)}</td>
+              <td class="num">${modeKey === 'corp' ? '-' : won(amounts.personal)}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>`;
+    }
+    function renderFuelSection(detail, amounts){
+      if(modeKey === 'corp') return '';
+      const r = detail.request || {};
+      const routes = detail.routes || [];
+      const distance = totalDistance(routes, r);
+      const gas = n(r.gas_price || r.fuel_price || 0);
+      const eff = n(r.fuel_efficiency || r.efficiency || 0) || 1;
+      const routeRows = routes.length ? routes.map((rt,i)=>{
+        const km = n(rt.distance_km || rt.distance || 0);
+        const fuel = gas && eff ? Math.round((km / eff * gas) / (n(r.round_unit || 1) || 1)) * (n(r.round_unit || 1) || 1) : 0;
+        return `<tr><td>${i+1}</td><td>${esc(r.applicant_name || '-')}</td><td>${esc(r.trip_date || '-')}</td><td>${esc((rt.from_place || '-') + ' → ' + (rt.to_place || '-'))}</td><td class="num">${km}km</td><td class="num">${esc(eff + 'km/L')}</td><td class="num">${gas ? esc(gas.toLocaleString('ko-KR') + '원/L') : '-'}</td><td class="num">${won(fuel)}</td><td>구간거리 ÷ 기준연비 × 당일 유가</td></tr>`;
+      }).join('') : `<tr><td>1</td><td>${esc(r.applicant_name || '-')}</td><td>${esc(r.trip_date || '-')}</td><td>${esc(routeLabel(routes))}</td><td class="num">${distance}km</td><td class="num">${esc(eff + 'km/L')}</td><td class="num">${gas ? esc(gas.toLocaleString('ko-KR') + '원/L') : '-'}</td><td class="num">${won(amounts.fuel)}</td><td>총거리 ÷ 기준연비 × 당일 유가</td></tr>`;
+
+      return `<section class="print-section">
+        <h2>3. 유류비 계산내역</h2>
+        <table class="print-table">
+          <thead><tr><th>순번</th><th>성명</th><th>출장일</th><th>이동구간</th><th>구간거리</th><th>기준연비</th><th>당일 유가</th><th>구간 유류비</th><th>비고</th></tr></thead>
+          <tbody>${routeRows}</tbody>
+        </table>
+      </section>`;
+    }
+    function renderEvidenceSection(detail, payMode, sectionNo){
+      const isCorp = payMode === 'corp';
+      const title = isCorp ? '법인카드 증빙' : '개인지급 증빙';
+      const desc = isCorp ? '법인카드 사용내역과 영수증입니다.' : '개인카드·현금·유류비 사용내역과 영수증입니다.';
+      const items = (detail.items || []).filter(item => isCorp ? isCorpItem(item) : isPersonalItem(item));
+      const attachments = detail.attachments || [];
+      const itemRows = items.map((item,i)=>{
+        const receipts = itemReceipts(item, attachments);
+        return `<tr>
+          <td>${i+1}</td>
+          <td>${esc(itemName(item) || '-')}</td>
+          <td>${esc(payType(item) || '-')}</td>
+          <td class="num">${won(itemAmount(item))}</td>
+          <td>${esc(receipts.map(r => r.file_name || '첨부파일').join(', ') || '-')}</td>
+        </tr>`;
+      }).join('');
+
+      const relatedReceipts = receiptsForItems(items, attachments);
+      const orphanReceipts = (attachments || []).filter(a => String(a.file_type || '') === 'receipt' && !String(a.item_id || '').trim());
+      const cards = relatedReceipts.concat(isCorp ? [] : orphanReceipts);
+
+      return `<section class="print-section">
+        <h2>${sectionNo}. ${esc(title)}</h2>
+        <div class="print-note">${esc(desc)}</div>
+        ${items.length ? `<table class="print-table"><thead><tr><th>순번</th><th>항목</th><th>사용구분</th><th>금액</th><th>영수증</th></tr></thead><tbody>${itemRows}</tbody></table>` : '<div class="print-empty">해당 사용내역이 없습니다.</div>'}
+        ${cards.length ? `<div class="print-evidence-grid">${cards.map((d,i)=>evidenceCard(d, title + ' ' + (i+1))).join('')}</div>` : '<div class="print-empty">첨부된 영수증이 없습니다.</div>'}
+      </section>`;
+    }
+    function renderOne(detail){
+      const signedDocs = detail.attachments || [];
+      const amounts = groupAmounts(detail.items || [], detail.request || {}, detail.routes || []);
+      const sections = [];
+      sections.push(renderDocumentSection(Object.assign({}, detail, { attachments: signedDocs })));
+      sections.push(renderSettlementTable(detail, amounts));
+      sections.push(renderFuelSection(detail, amounts));
+      if(modeKey !== 'personal') sections.push(renderEvidenceSection(detail, 'corp', modeKey === 'corp' ? 3 : 4));
+      if(modeKey !== 'corp') sections.push(renderEvidenceSection(detail, 'personal', modeKey === 'personal' ? 4 : 5));
+      return `<article class="print-document">${sections.join('')}</article>`;
+    }
+
+    try{
+      const details = [];
+      for(const row of targetRows){
+        const detail = await fetchPrintDetail(row);
+        const signed = [];
+        for(const doc of detail.attachments || []){
+          signed.push(await signedAttachment(doc));
+        }
+        detail.attachments = signed;
+        details.push(detail);
+      }
+
+      const body = details.map(renderOne).join('<div class="print-request-break"></div>');
+      const w = window.open('', '_blank');
+      if(!w){ alert('팝업이 차단되었습니다.'); return; }
+      w.document.write(`<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>${esc(title)}</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#f3f6fb;color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",Arial,sans-serif;}
+  .print-topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 22px;background:#fff;border-bottom:1px solid #dbe3ef;}
+  .print-topbar b{font-size:16px}
+  .print-topbar button{border:0;border-radius:12px;padding:11px 14px;font-weight:900;cursor:pointer;background:#2563eb;color:#fff}
+  .print-topbar button.secondary{background:#eef2ff;color:#3730a3}
+  .print-document{max-width:1120px;margin:18px auto;padding:0 16px;}
+  .print-section{background:#fff;border:1px solid #d7e0ee;border-radius:14px;padding:20px 28px;margin-bottom:18px;}
+  .print-section h2{font-size:20px;margin:0 0 14px;border-bottom:2px solid #111827;padding-bottom:10px;}
+  .print-title-row{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:16px;}
+  h1{margin:0;text-align:center;font-size:28px;letter-spacing:-.04em;flex:1;}
+  .print-date{font-size:13px;font-weight:900;white-space:nowrap;}
+  .print-dept{font-weight:900;margin-bottom:10px;}
+  .domestic-table,.print-table,.print-file-meta{width:100%;border-collapse:collapse;table-layout:fixed;}
+  .domestic-table th,.domestic-table td,.print-table th,.print-table td,.print-file-meta th,.print-file-meta td{border:1px solid #111827;padding:10px 8px;font-size:13px;vertical-align:middle;}
+  .domestic-table th,.print-table th,.print-file-meta th{background:#e5e7eb;text-align:center;font-weight:900;}
+  .domestic-table td{text-align:center;}
+  .domestic-table .num,.print-table .num{text-align:right;white-space:nowrap;}
+  .sum-row td{background:#eef7e9;font-weight:900;}
+  small{color:#475569;font-size:11px;}
+  .print-note{border:1px solid #d8e2f1;background:#f8fafc;border-radius:12px;padding:12px 14px;margin-bottom:14px;color:#475569;font-size:13px;line-height:1.6;}
+  .print-empty{border:1px dashed #cbd5e1;background:#f8fafc;border-radius:12px;padding:22px;text-align:center;color:#64748b;font-weight:800;}
+  .print-evidence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px;}
+  .print-evidence-card{border:1px solid #d8e2f1;border-radius:14px;padding:14px;break-inside:avoid;background:#fff;}
+  .print-evidence-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px;}
+  .print-evidence-head a{font-size:12px;text-decoration:none;color:#2563eb;font-weight:900;}
+  .print-preview-box{height:250px;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc;overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:10px;}
+  .print-preview-box img{width:100%;height:100%;object-fit:contain;background:#fff;}
+  .print-preview-box iframe{width:100%;height:100%;border:0;background:#fff;}
+  .print-preview-empty{text-align:center;color:#64748b;font-weight:900;}
+  .print-file-meta th{width:80px;}
+  .print-request-break{page-break-after:always;}
+  .print-page-break-after{page-break-after:auto;}
+  @media print{
+    body{background:#fff;}
+    .print-topbar{display:none;}
+    .print-document{max-width:none;margin:0;padding:0;}
+    .print-section{border:0;border-radius:0;margin:0 0 14px;padding:12mm 10mm;box-shadow:none;page-break-inside:auto;}
+    .print-evidence-card{page-break-inside:avoid;}
+    .print-request-break{page-break-after:always;}
+  }
+</style>
+</head>
+<body>
+  <div class="print-topbar"><b>${esc(title)} 미리보기</b><div><button onclick="window.print()">인쇄/PDF</button> <button class="secondary" onclick="window.close()">닫기</button></div></div>
+  ${body}
+</body>
+</html>`);
+      w.document.close();
+    }catch(e){
+      console.error('[TravelExpense] print error', e);
+      alert('출력 데이터를 만드는 중 오류가 발생했습니다: ' + (e?.message || e));
+    }
   }
 
   window.travelExpenseAdminRefresh = loadAdminRows;
