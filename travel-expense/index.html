@@ -1492,10 +1492,10 @@
     const rows=[];
     uploadedDocs.forEach((d,i)=>{
       const name=d.file_name||d.name||d.filename||d.original_name||'첨부파일';
-      rows.push(`<div class="travel-document-row" data-uploaded-index="${i}"><div><b>${escapeHtml(name)}</b><span>업로드 완료</span></div><button type="button" data-doc-open="${i}">보기</button></div>`);
+      rows.push(`<div class="travel-document-row" data-uploaded-index="${i}"><div><b>${escapeHtml(name)}</b><span>업로드 완료</span></div><span class="travel-document-actions"><button type="button" data-doc-open-uploaded="${i}">보기</button><button type="button" class="danger" data-doc-remove-uploaded="${i}">삭제</button></span></div>`);
     });
     pendingDocs.forEach((f,i)=>{
-      rows.push(`<div class="travel-document-row" data-pending-index="${i}"><div><b>${escapeHtml(f.name)}</b><span>${fmtSize(f.size)} · 저장 시 업로드</span></div><button type="button" class="danger" data-doc-remove="${i}">삭제</button></div>`);
+      rows.push(`<div class="travel-document-row" data-pending-index="${i}"><div><b>${escapeHtml(f.name)}</b><span>${fmtSize(f.size)} · 저장 시 업로드</span></div><span class="travel-document-actions"><button type="button" data-doc-open-pending="${i}">미리보기</button><button type="button" class="danger" data-doc-remove-pending="${i}">삭제</button></span></div>`);
     });
     el.innerHTML = rows.length ? rows.join('') : '<div class="travel-document-empty">첨부된 파일이 없습니다.</div>';
   }
@@ -1514,13 +1514,51 @@
     if(list && !list.__travelDocumentBound){
       list.__travelDocumentBound=true;
       list.addEventListener('click', async e=>{
-        const remove=e.target.closest('[data-doc-remove]');
-        if(remove){ pendingDocs.splice(Number(remove.dataset.docRemove),1); render(); return; }
-        const open=e.target.closest('[data-doc-open]');
-        if(open){ await openUploadedDoc(uploadedDocs[Number(open.dataset.docOpen)]); }
+        const removePending=e.target.closest('[data-doc-remove-pending]');
+        if(removePending){ pendingDocs.splice(Number(removePending.dataset.docRemovePending),1); render(); return; }
+        const openPending=e.target.closest('[data-doc-open-pending]');
+        if(openPending){ openPendingDoc(pendingDocs[Number(openPending.dataset.docOpenPending)]); return; }
+        const removeUploaded=e.target.closest('[data-doc-remove-uploaded]');
+        if(removeUploaded){ await deleteUploadedDoc(Number(removeUploaded.dataset.docRemoveUploaded)); return; }
+        const openUploaded=e.target.closest('[data-doc-open-uploaded]');
+        if(openUploaded){ await openUploadedDoc(uploadedDocs[Number(openUploaded.dataset.docOpenUploaded)]); return; }
       });
     }
     render();
+  }
+
+  function openPendingDoc(file){
+    if(!file) return;
+    const url = URL.createObjectURL(file);
+    window.open(url, '_blank');
+    setTimeout(()=>URL.revokeObjectURL(url), 60*1000);
+  }
+
+  async function deleteUploadedDoc(index){
+    const doc = uploadedDocs[index];
+    if(!doc) return;
+    if(!confirm('첨부된 결재완료 서류를 삭제할까요?')) return;
+    const client=db();
+    if(!client){ alert('Supabase 연결을 확인하지 못했습니다.'); return; }
+    const path=doc.file_path||doc.path||doc.storage_path||'';
+    try{
+      if(path){
+        const rm=await client.storage.from(STORAGE_BUCKET).remove([path]);
+        if(rm.error) throw rm.error;
+      }
+      if(doc.id){
+        const del=await client.from('travel_expense_attachments').delete().eq('id', doc.id);
+        if(del.error) throw del.error;
+      }else if(path){
+        const del=await client.from('travel_expense_attachments').delete().eq('file_path', path);
+        if(del.error) throw del.error;
+      }
+      uploadedDocs.splice(index,1);
+      render();
+    }catch(e){
+      console.error('[TravelExpense] approval document delete error', e);
+      alert('첨부파일 삭제 중 오류가 발생했습니다: ' + (e?.message || e));
+    }
   }
 
   async function openUploadedDoc(doc){
@@ -1996,6 +2034,7 @@
   .travel-document-row span{color:#64748b;white-space:nowrap;}
   .travel-document-row button{min-width:0!important;height:28px!important;padding:0 8px!important;border-radius:8px!important;font-size:11px!important;background:#eef2ff!important;color:#3730a3!important;}
   .travel-document-row button.danger{background:#fee2e2!important;color:#b91c1c!important;}
+  .travel-document-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto;}
   .travel-document-empty{padding:10px 12px;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc;color:#64748b;font-weight:700;}
 
   .receipt-file-list{
