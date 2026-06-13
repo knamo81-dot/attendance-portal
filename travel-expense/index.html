@@ -2047,7 +2047,7 @@
   }
 </style>
 
-<!-- receipt item_id mapping + safe storage filename final -->
+<!-- receipt item_id mapping + safe storage filename final / receipt preserve on edit final -->
 </head>
 <body>
   <header>
@@ -4244,12 +4244,68 @@
       };
       const main=await client.from('travel_expense_requests').update(payload).eq('company_id',p.companyId).eq('id',selectedId);
       if(main.error){ console.error('[TravelExpense] update error', main.error, payload); alert('저장 중 오류가 발생했습니다: '+main.error.message); return; }
+      // 수정 저장 시 비용항목을 재생성하더라도 기존 영수증 첨부가 사라지지 않도록 보존/재매핑합니다.
+      // 기존 item_id가 FK cascade로 삭제될 수 있으므로 먼저 첨부의 item_id를 분리한 뒤, 새 item_id로 다시 연결합니다.
+      let oldItemRows=[];
+      let oldReceiptRows=[];
+      try{
+        const oldItemsRes = await client.from('travel_expense_items')
+          .select('id,item_type,pay_type,amount,created_at')
+          .eq('company_id',p.companyId)
+          .eq('request_id',selectedId)
+          .order('created_at',{ascending:true});
+        if(!oldItemsRes.error && Array.isArray(oldItemsRes.data)) oldItemRows = oldItemsRes.data;
+      }catch(e){ console.warn('[TravelExpense] old item load warning', e); }
+      try{
+        const oldAttRes = await client.from('travel_expense_attachments')
+          .select('*')
+          .eq('company_id',p.companyId)
+          .eq('request_id',selectedId)
+          .eq('file_type','receipt');
+        if(!oldAttRes.error && Array.isArray(oldAttRes.data)) oldReceiptRows = oldAttRes.data;
+      }catch(e){ console.warn('[TravelExpense] old receipt load warning', e); }
+      const oldIndexByItemId = new Map(oldItemRows.map((item,idx)=>[String(item.id),idx]));
+      const receiptRowsWithItem = oldReceiptRows.filter(a=>a.item_id);
+      if(receiptRowsWithItem.length){
+        try{
+          const detachRes = await client.from('travel_expense_attachments')
+            .update({item_id:null})
+            .in('id', receiptRowsWithItem.map(a=>a.id));
+          if(detachRes.error) console.warn('[TravelExpense] receipt detach warning', detachRes.error);
+        }catch(e){ console.warn('[TravelExpense] receipt detach failed', e); }
+      }
+
       await client.from('travel_expense_items').delete().eq('company_id',p.companyId).eq('request_id',selectedId);
       await client.from('travel_expense_routes').delete().eq('company_id',p.companyId).eq('request_id',selectedId);
       const routes=collectRoutes().map(r=>({...r, company_id:p.companyId, request_id:selectedId}));
       if(routes.length){ const rr=await client.from('travel_expense_routes').insert(routes); if(rr.error) console.warn('[TravelExpense] route update warning', rr.error); }
       const items=collectItems().map(i=>({...i, company_id:p.companyId, request_id:selectedId}));
-      if(items.length){ const ir=await client.from('travel_expense_items').insert(items); if(ir.error) console.warn('[TravelExpense] item update warning', ir.error); }
+      let newItemRows=[];
+      if(items.length){
+        const ir=await client.from('travel_expense_items').insert(items).select('id,item_type,pay_type,amount,created_at');
+        if(ir.error) console.warn('[TravelExpense] item update warning', ir.error);
+        else if(Array.isArray(ir.data)) newItemRows = ir.data;
+      }
+      // 기존 영수증은 같은 행 순서 기준으로 새 비용항목 id에 다시 연결합니다.
+      const receiptIdsByNewIndex = new Map();
+      oldReceiptRows.forEach(att=>{
+        if(!att.item_id) return;
+        const oldIndex = oldIndexByItemId.get(String(att.item_id));
+        if(oldIndex === undefined || !newItemRows[oldIndex]) return;
+        const arr = receiptIdsByNewIndex.get(oldIndex) || [];
+        arr.push(att.id);
+        receiptIdsByNewIndex.set(oldIndex, arr);
+      });
+      for(const [idx, attachmentIds] of receiptIdsByNewIndex.entries()){
+        const newItemId = newItemRows[idx]?.id;
+        if(!newItemId || !attachmentIds.length) continue;
+        try{
+          const remapRes = await client.from('travel_expense_attachments')
+            .update({item_id:newItemId})
+            .in('id', attachmentIds);
+          if(remapRes.error) console.warn('[TravelExpense] receipt remap warning', remapRes.error);
+        }catch(e){ console.warn('[TravelExpense] receipt remap failed', e); }
+      }
       if(typeof window.uploadTravelExpenseDocuments === 'function') await window.uploadTravelExpenseDocuments(selectedId);
       const id=selectedId;
       await refreshCards();
