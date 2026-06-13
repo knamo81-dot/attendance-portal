@@ -1469,9 +1469,12 @@
     const raw = String(name || '').split('.').pop().toLowerCase();
     const ext = /^[a-z0-9]{1,8}$/.test(raw) ? raw : '';
     if(ext) return ext;
-    if(String(type||'').includes('pdf')) return 'pdf';
-    if(String(type||'').includes('png')) return 'png';
-    if(String(type||'').includes('jpeg') || String(type||'').includes('jpg')) return 'jpg';
+    const mime=String(type||'');
+    if(mime.includes('pdf')) return 'pdf';
+    if(mime.includes('png')) return 'png';
+    if(mime.includes('jpeg') || mime.includes('jpg')) return 'jpg';
+    if(mime.includes('gif')) return 'gif';
+    if(mime.includes('webp')) return 'webp';
     return 'bin';
   }
   function safeStorageName(file){
@@ -1535,7 +1538,6 @@
 
   async function uploadOne(client, p, requestId, file, type, itemId=null){
     const folder = type === 'receipt' ? 'receipts' : 'approval';
-    // Storage object key에는 한글/공백/특수문자를 넣지 않습니다. 원본 파일명은 DB file_name에만 저장합니다.
     const path = `${p.companyId}/${requestId}/${folder}/${safeStorageName(file)}`;
 
     const up = await client.storage.from(STORAGE_BUCKET).upload(path, file, {
@@ -1565,6 +1567,14 @@
     return ins.data || row;
   }
 
+  function getRowPending(row){
+    if(!row.__pendingReceiptFiles) row.__pendingReceiptFiles = [];
+    return row.__pendingReceiptFiles;
+  }
+  function getRowServer(row){
+    if(!row.__serverReceiptFiles) row.__serverReceiptFiles = [];
+    return row.__serverReceiptFiles;
+  }
   function ensureReceiptList(row){
     if(!row) return null;
     let el = row.querySelector('[data-receipt-list]');
@@ -1576,26 +1586,135 @@
     }
     return el;
   }
-
-  function renderReceiptNames(row, files){
+  function receiptDisplayName(item){
+    if(!item) return '';
+    if(item.kind === 'pending') return item.file?.name || '';
+    if(item.kind === 'server') return item.file_name || item.name || item.filename || '첨부파일';
+    return item.file_name || item.name || '';
+  }
+  function receiptDisplaySize(item){
+    if(!item) return '';
+    const size = item.kind === 'pending' ? item.file?.size : item.file_size;
+    return size ? fmtSize(size) : '';
+  }
+  function allReceiptItems(row){
+    const server = getRowServer(row).map(x => ({...x, kind:'server'}));
+    const pending = getRowPending(row).map(file => ({kind:'pending', file}));
+    return server.concat(pending);
+  }
+  function renderReceiptNames(row){
     const el = ensureReceiptList(row);
+    const btn = row?.querySelector('.receipt-btn');
     if(!el) return;
-    const names = (files || []).map(f => typeof f === 'string' ? f : (f && (f.file_name || f.name)) || '').filter(Boolean);
-    if(!names.length){
+    const items = row ? allReceiptItems(row) : [];
+    if(btn){
+      btn.textContent = '영수증 첨부';
+      btn.classList.toggle('attached', items.length > 0);
+    }
+    if(!items.length){
       el.classList.remove('has-files');
       el.innerHTML = '';
       return;
     }
     el.classList.add('has-files');
-    el.innerHTML = `<div class="receipt-file-list-title">첨부파일</div><ul>${names.map(n=>`<li>${escapeHtml(n)}</li>`).join('')}</ul>`;
+    el.innerHTML = `
+      <div class="receipt-file-list-title">첨부파일</div>
+      <ul>
+        ${items.map((item,i)=>{
+          const kind = item.kind === 'server' ? 'server' : 'pending';
+          const name = receiptDisplayName(item);
+          const size = receiptDisplaySize(item);
+          return `<li>
+            <span class="receipt-file-name">${escapeHtml(name)}${size ? ` <em>${escapeHtml(size)}</em>` : ''}</span>
+            <span class="receipt-file-actions">
+              <button type="button" data-receipt-open="${i}">보기</button>
+              <button type="button" class="danger" data-receipt-delete="${i}">삭제</button>
+            </span>
+          </li>`;
+        }).join('')}
+      </ul>`;
   }
 
-  function collectReceiptInputs(){
+  window.__travelHandleReceiptUpload = window.handleReceiptUpload = function(input){
+    const row = input && input.closest ? input.closest('.cost-row') : null;
+    if(!row) return;
+    const files = Array.from(input.files || []);
+    if(files.length){
+      getRowPending(row).push(...files);
+    }
+    input.value = '';
+    renderReceiptNames(row);
+  };
+
+  async function openReceiptItem(row, item){
+    if(!item) return;
+    if(item.kind === 'pending'){
+      const file = item.file;
+      if(!file) return;
+      const url = URL.createObjectURL(file);
+      window.open(url, '_blank');
+      setTimeout(()=>URL.revokeObjectURL(url), 60*1000);
+      return;
+    }
+    await openUploadedDoc(item);
+  }
+
+  async function deleteReceiptItem(row, item, index){
+    if(!row || !item) return;
+    if(item.kind === 'pending'){
+      getRowPending(row).splice(index - getRowServer(row).length, 1);
+      renderReceiptNames(row);
+      return;
+    }
+
+    if(!confirm('첨부된 영수증 파일을 삭제할까요?')) return;
+
+    const client = db();
+    if(!client){ alert('Supabase 연결을 확인하지 못했습니다.'); return; }
+
+    const path = item.file_path || item.path || item.storage_path || '';
+    try{
+      if(path){
+        const rm = await client.storage.from(STORAGE_BUCKET).remove([path]);
+        if(rm.error) throw rm.error;
+      }
+      if(item.id){
+        const del = await client.from('travel_expense_attachments').delete().eq('id', item.id);
+        if(del.error) throw del.error;
+      }else if(path){
+        const del = await client.from('travel_expense_attachments').delete().eq('file_path', path);
+        if(del.error) throw del.error;
+      }
+      const arr = getRowServer(row);
+      const serverIndex = arr.findIndex(x => (item.id && x.id === item.id) || (path && x.file_path === path));
+      if(serverIndex >= 0) arr.splice(serverIndex,1);
+      renderReceiptNames(row);
+    }catch(e){
+      console.error('[TravelExpense] receipt delete error', e);
+      alert('영수증 삭제 중 오류가 발생했습니다: ' + (e?.message || e));
+    }
+  }
+
+  document.addEventListener('click', async function(e){
+    const openBtn = e.target.closest('[data-receipt-open]');
+    const delBtn = e.target.closest('[data-receipt-delete]');
+    if(!openBtn && !delBtn) return;
+    const row = e.target.closest('.cost-row');
+    if(!row) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const index = Number((openBtn || delBtn).dataset.receiptOpen ?? (openBtn || delBtn).dataset.receiptDelete);
+    const item = allReceiptItems(row)[index];
+    if(openBtn) await openReceiptItem(row, item);
+    if(delBtn) await deleteReceiptItem(row, item, index);
+  });
+
+  function collectReceiptRows(){
     return Array.from(document.querySelectorAll('#costList .cost-row')).map((row, index)=>{
       const input=row.querySelector('input.receipt-input');
       const btn=row.querySelector('.receipt-btn');
-      return {row,index,input,btn,files:Array.from((input&&input.files)||[])};
-    }).filter(x=>x.input && x.files.length);
+      return {row,index,input,btn,files:getRowPending(row)};
+    }).filter(x=>x.files && x.files.length);
   }
 
   async function getSavedItemIds(client, p, requestId){
@@ -1611,22 +1730,20 @@
   }
 
   async function uploadReceipts(client, p, requestId){
-    const inputs = collectReceiptInputs();
+    const rows = collectReceiptRows();
     const itemIds = await getSavedItemIds(client, p, requestId);
     const done=[];
-    for(const info of inputs){
-      const key = filesKey(info.files);
-      if(key && info.input.dataset.travelUploadedKey === key) continue;
+    for(const info of rows){
       const itemId = itemIds[info.index] || null;
-      for(const file of info.files){
-        done.push(await uploadOne(client, p, requestId, file, 'receipt', itemId));
+      const files = [...info.files];
+      for(const file of files){
+        const saved = await uploadOne(client, p, requestId, file, 'receipt', itemId);
+        done.push(saved);
+        getRowServer(info.row).push(saved);
       }
-      info.input.dataset.travelUploadedKey = key;
-      if(info.btn){
-        info.btn.textContent = '영수증 첨부';
-        info.btn.classList.add('attached');
-      }
-      renderReceiptNames(info.row, info.files);
+      getRowPending(info.row).splice(0, getRowPending(info.row).length);
+      if(info.input) info.input.dataset.travelUploadedKey = filesKey(files);
+      renderReceiptNames(info.row);
     }
     return done;
   }
@@ -1646,20 +1763,12 @@
       }
     });
     rows.forEach((row,index)=>{
-      const input=row.querySelector('input.receipt-input');
-      const btn=row.querySelector('.receipt-btn');
-      if(!btn) return;
+      row.__pendingReceiptFiles = [];
       const matched = itemIds[index] ? (byItem.get(String(itemIds[index])) || []) : [];
-      const files = matched.concat(index===0 ? noItem : []);
-      btn.textContent = '영수증 첨부';
-      if(files.length){
-        btn.classList.add('attached');
-        if(input) input.dataset.travelUploadedKey = `server:${files.length}`;
-        renderReceiptNames(row, files);
-      }else{
-        btn.classList.remove('attached');
-        renderReceiptNames(row, []);
-      }
+      row.__serverReceiptFiles = matched.concat(index===0 ? noItem : []);
+      const input=row.querySelector('input.receipt-input');
+      if(input) input.dataset.travelUploadedKey = row.__serverReceiptFiles.length ? `server:${row.__serverReceiptFiles.length}` : '';
+      renderReceiptNames(row);
     });
   }
 
@@ -1674,7 +1783,7 @@
         const saved = await uploadOne(client, p, requestId, file, 'approval_document', null);
         completed.push(saved);
       }
-      const receipts = await uploadReceipts(client, p, requestId);
+      await uploadReceipts(client, p, requestId);
       uploadedDocs.push(...completed);
       render();
       return true;
@@ -1692,6 +1801,7 @@
     pendingDocs.splice(0, pendingDocs.length);
     const input=inputEl(); if(input) input.value='';
     document.querySelectorAll('input.receipt-input').forEach(input=>{ input.dataset.travelUploadedKey=''; });
+    document.querySelectorAll('#costList .cost-row').forEach(row=>{ row.__pendingReceiptFiles=[]; row.__serverReceiptFiles=[]; });
     const client=db(); const p=profile();
     if(client && p.companyId && requestId){
       try{
@@ -1702,6 +1812,8 @@
           markReceiptButtons(res.data.filter(x => (x.file_type||'') === 'receipt'), itemIds);
         }
       }catch(e){ console.warn('[TravelExpense] document list load warning', e); }
+    }else{
+      document.querySelectorAll('#costList .cost-row').forEach(row=>renderReceiptNames(row));
     }
     render();
   };
@@ -1710,8 +1822,13 @@
     pendingDocs.splice(0, pendingDocs.length);
     uploadedDocs.splice(0, uploadedDocs.length);
     const input=inputEl(); if(input) input.value='';
-    document.querySelectorAll('input.receipt-input').forEach(input=>{ input.dataset.travelUploadedKey=''; });
-    document.querySelectorAll('[data-receipt-list]').forEach(el=>{ el.classList.remove('has-files'); el.innerHTML=''; });
+    document.querySelectorAll('#costList .cost-row').forEach(row=>{
+      row.__pendingReceiptFiles=[];
+      row.__serverReceiptFiles=[];
+      const input=row.querySelector('input.receipt-input');
+      if(input) input.dataset.travelUploadedKey='';
+      renderReceiptNames(row);
+    });
     render();
   };
 
@@ -1731,6 +1848,7 @@
     bind();
     patchSave('saveTravelExpenseDraft');
     patchSave('submitTravelExpense');
+    document.querySelectorAll('#costList .cost-row').forEach(row=>renderReceiptNames(row));
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
   setTimeout(init, 500);
@@ -1896,6 +2014,37 @@
   .receipt-file-list-title{font-weight:900;color:#334155;margin-bottom:3px;}
   .receipt-file-list ul{margin:0;padding-left:18px;}
   .receipt-file-list li{margin:2px 0;word-break:break-all;}
+
+  .receipt-file-list ul{margin:0;padding:0;list-style:none;display:grid;gap:5px;}
+  .receipt-file-list li{
+    margin:0;
+    word-break:break-all;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:6px 7px;
+    border:1px solid #e5e9f2;
+    border-radius:10px;
+    background:#fff;
+  }
+  .receipt-file-name{min-width:0;flex:1;color:#334155;font-weight:700;}
+  .receipt-file-name em{font-style:normal;color:#94a3b8;font-weight:700;margin-left:4px;white-space:nowrap;}
+  .receipt-file-actions{display:flex;gap:5px;flex:0 0 auto;}
+  .receipt-file-actions button{
+    min-width:0!important;
+    height:26px!important;
+    padding:0 8px!important;
+    border-radius:8px!important;
+    font-size:11px!important;
+    line-height:1!important;
+    background:#eef2ff!important;
+    color:#3730a3!important;
+  }
+  .receipt-file-actions button.danger{
+    background:#fee2e2!important;
+    color:#b91c1c!important;
+  }
 </style>
 
 <!-- receipt item_id mapping + safe storage filename final -->
@@ -2291,34 +2440,11 @@
       <button class="btn-danger" onclick="this.closest('.cost-row').remove();calcAll()">삭제</button>
       <div class="receipt-file-list" data-receipt-list></div>
     `;
-    costList.appendChild(row);
-    calcAll();
-  }
-
-
-  function handleReceiptUpload(input){
-    const btn = input.nextElementSibling;
-    const row = input.closest('.cost-row');
-    const files = Array.from(input.files || []);
-    if(btn){
-      btn.textContent = '영수증 첨부';
-      btn.classList.toggle('attached', files.length > 0);
+    costList.appefunction handleReceiptUpload(input){
+    if(window.__travelHandleReceiptUpload){
+      return window.__travelHandleReceiptUpload(input);
     }
-    let list = row ? row.querySelector('[data-receipt-list]') : null;
-    if(row && !list){
-      list = document.createElement('div');
-      list.className = 'receipt-file-list';
-      list.setAttribute('data-receipt-list','');
-      row.appendChild(list);
-    }
-    if(list){
-      if(files.length){
-        const esc = v => String(v ?? '').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-        list.classList.add('has-files');
-        list.innerHTML = `<div class="receipt-file-list-title">첨부파일</div><ul>${files.map(f=>`<li>${esc(f.name)}</li>`).join('')}</ul>`;
-      }else{
-        list.classList.remove('has-files');
-        list.innerHTML = '';
+  }ist.innerHTML = '';
       }
     }
   }
