@@ -1528,16 +1528,8 @@
 </style>
 
 
-<style id="travel-expense-clean-final-style">
-  .my-card-actions{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px dashed #e5e9f2;}
-  .my-card-actions button{min-width:0!important;height:30px!important;padding:0 10px!important;border-radius:9px!important;font-size:12px!important;line-height:1!important;}
-  .my-card-actions .edit-btn{background:#eef2ff!important;color:#3730a3!important;}
-  .my-card-actions .recall-btn{background:#fff7ed!important;color:#c2410c!important;}
-  .my-card-actions .delete-btn{background:#fee2e2!important;color:#b91c1c!important;}
-</style>
 
-
-<style id="travel-expense-card-rule-only-style">
+<style id="travel-expense-card-rule-no-db-touch-style">
   .my-card-actions{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px dashed #e5e9f2;}
   .my-card-actions button{min-width:0!important;height:30px!important;padding:0 10px!important;border-radius:9px!important;font-size:12px!important;line-height:1!important;}
   .my-card-actions .edit-btn{background:#eef2ff!important;color:#3730a3!important;}
@@ -5088,308 +5080,47 @@
 
 
 
-<script id="travel-expense-save-submit-native-fix">
+
+<script id="travel-expense-card-rule-no-db-touch">
 (function(){
-  if(window.__travelExpenseSaveSubmitNativeFixInstalled) return;
-  window.__travelExpenseSaveSubmitNativeFixInstalled = true;
+  if(window.__travelExpenseCardRuleNoDbTouchInstalled) return;
+  window.__travelExpenseCardRuleNoDbTouchInstalled = true;
 
-  const DB_TABLE = 'travel_expense_requests';
-  const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ console.error(e); return fallback; } };
-  const today = () => new Date().toISOString().slice(0,10);
-
-  function cleanPayload(payload){
-    const p = Object.assign({}, payload || {});
-    if(Object.prototype.hasOwnProperty.call(p, 'memo')){
-      if(!Object.prototype.hasOwnProperty.call(p, 'manager_memo')) p.manager_memo = p.memo;
-      delete p.memo;
-    }
-    delete p.submitted_at;
-    delete p.submittedAt;
-    delete p.submitted_removed;
-    return p;
+  function normalizeStatus(value){
+    const raw = String(value || '').replace(/\s+/g,'');
+    if(raw.includes('지출결의')) return '지출결의완료';
+    if(raw.includes('검토대기')) return '검토대기';
+    if(raw.includes('수정요청')) return '수정요청';
+    if(raw.includes('임시저장')) return '임시저장';
+    if(raw.includes('승인')) return '승인';
+    return raw;
   }
 
-  function patchSupabase(){
-    if(!window.supabase || window.supabase.__travelExpenseSaveSubmitPatched) return;
-    const originalFrom = window.supabase.from.bind(window.supabase);
-    window.supabase.from = function(table){
-      const builder = originalFrom(table);
-      if(table === DB_TABLE && builder && !builder.__travelExpenseSaveSubmitBuilderPatched){
-        ['insert','update','upsert'].forEach(method=>{
-          if(typeof builder[method] === 'function'){
-            const original = builder[method].bind(builder);
-            builder[method] = function(payload, ...args){
-              const clean = Array.isArray(payload) ? payload.map(cleanPayload) : cleanPayload(payload);
-              return original(clean, ...args);
-            };
-          }
-        });
-        builder.__travelExpenseSaveSubmitBuilderPatched = true;
-      }
-      return builder;
-    };
-    window.supabase.__travelExpenseSaveSubmitPatched = true;
+  function getId(card){
+    return card.dataset.requestId || card.dataset.id || card.getAttribute('data-request-id') || card.getAttribute('data-id') || '';
   }
 
-  function moneyNumber(v){
-    if(typeof v === 'number') return v;
-    return Number(String(v || '0').replace(/[^\d.-]/g,'')) || 0;
+  function getStatus(card){
+    return normalizeStatus(card.dataset.status || (card.querySelector('.status') && card.querySelector('.status').textContent) || card.textContent);
   }
 
-  function getText(id){ return document.getElementById(id)?.textContent || ''; }
-  function val(id){ return document.getElementById(id)?.value || ''; }
-
-  function getRows(){
-    const expenses = [];
-    document.querySelectorAll('#costList .cost-row').forEach(row=>{
-      const selects = row.querySelectorAll('select');
-      const inputs = row.querySelectorAll('input');
-      const item = selects[0]?.value || '';
-      const payType = selects[1]?.value || '';
-      const amount = Number(inputs[0]?.value || 0);
-      expenses.push({ item, payType, amount });
-    });
-    return expenses;
-  }
-
-  function getRoutes(){
-    const routes = [];
-    document.querySelectorAll('#routeSegments .route-row').forEach(row=>{
-      const inputs = row.querySelectorAll('input');
-      routes.push({
-        from: inputs[0]?.value || '',
-        to: inputs[1]?.value || '',
-        distance: Number(inputs[2]?.value || 0)
-      });
-    });
-    return routes;
-  }
-
-  function currentId(){
-    return window.currentEditId || window.editingId || window.selectedRequestId || window.currentRequestId || window.selectedExpenseId || null;
-  }
-
-  function localList(){
-    if(Array.isArray(window.travelExpenses)) return window.travelExpenses;
-    if(Array.isArray(window.expenseRequests)) return window.expenseRequests;
-    if(Array.isArray(window.requests)) return window.requests;
-    if(Array.isArray(window.mockRequests)) return window.mockRequests;
-    window.travelExpenses = [];
-    return window.travelExpenses;
-  }
-
-  function buildPayload(status){
-    if(typeof window.calcAll === 'function') safe(()=>window.calcAll());
-    if(typeof window.updateRoute === 'function') safe(()=>window.updateRoute());
-
-    const totalAmount = moneyNumber(getText('totalCost'));
-    const corpAmount = moneyNumber(getText('corpCost'));
-    const personalAmount = moneyNumber(getText('personalCost'));
-    const fuelAmount = moneyNumber(getText('fuelCost'));
-    const routes = getRoutes();
-    const expenses = getRows();
-
-    return cleanPayload({
-      company_id: window.activeCompanyId || window.companyId || null,
-      applicant_employee_no: window.portalSession?.employee?.employee_no || window.portalSession?.employee_no || '',
-      applicant_name: val('applicantName'),
-      division_code: window.portalSession?.employee?.division_code || '',
-      division_name: val('applicantDivision'),
-      team_code: window.portalSession?.employee?.team_code || '',
-      team_name: val('applicantTeam'),
-      trip_type: val('tripType'),
-      trip_date: val('tripDate'),
-      transport: val('transport'),
-      request_date: val('requestDate') || today(),
-      voucher_date: val('voucherDateDisplay') || null,
-      payment_due_date: val('paymentDueDateDisplay') || null,
-      status,
-      total_amount: totalAmount,
-      corp_card_amount: corpAmount,
-      personal_amount: personalAmount,
-      fuel_amount: fuelAmount,
-      created_by_user_id: window.portalSession?.user?.id || window.portalSession?.user_id || null,
-      total_distance_km: Number(val('distance') || 0),
-      gas_price: Number(val('gasPrice') || 0),
-      fuel_efficiency: Number(val('efficiency') || 0),
-      round_unit: Number(val('roundUnit') || 1),
-
-      // 로컬 표시용 추가 필드(DB에는 별도 테이블이 없으면 Supabase wrapper가 그대로 보낼 수 있음)
-      // 따라서 DB 저장 payload에는 아래 필드를 보내지 않도록 save 함수에서 분리함.
-      _routes: routes,
-      _expenses: expenses,
-      _route_label: getText('routeLabel'),
-      _full_route_label: getText('fullRouteLabel')
-    });
-  }
-
-  function toLocalRecord(dbPayload, id){
-    return {
-      id: id || currentId() || String(Date.now()),
-      companyId: dbPayload.company_id,
-      applicant: dbPayload.applicant_name,
-      applicantName: dbPayload.applicant_name,
-      division: dbPayload.division_name,
-      divisionName: dbPayload.division_name,
-      team: dbPayload.team_name,
-      teamName: dbPayload.team_name,
-      tripType: dbPayload.trip_type,
-      tripDate: dbPayload.trip_date,
-      transport: dbPayload.transport,
-      requestDate: dbPayload.request_date,
-      voucherDate: dbPayload.voucher_date,
-      paymentDueDate: dbPayload.payment_due_date,
-      status: dbPayload.status,
-      reviewStatus: dbPayload.status,
-      total: dbPayload.total_amount,
-      totalAmount: dbPayload.total_amount,
-      corp: dbPayload.corp_card_amount,
-      corpCardAmount: dbPayload.corp_card_amount,
-      personal: dbPayload.personal_amount,
-      personalAmount: dbPayload.personal_amount,
-      fuelAmount: dbPayload.fuel_amount,
-      distance: dbPayload.total_distance_km,
-      totalDistance: dbPayload.total_distance_km,
-      gasPrice: dbPayload.gas_price,
-      efficiency: dbPayload.fuel_efficiency,
-      roundUnit: dbPayload.round_unit,
-      routes: dbPayload._routes || [],
-      expenses: dbPayload._expenses || [],
-      routeLabel: dbPayload._route_label || '',
-      fullRouteLabel: dbPayload._full_route_label || ''
-    };
-  }
-
-  function dbPayloadOnly(payload){
-    const p = Object.assign({}, payload);
-    delete p._routes;
-    delete p._expenses;
-    delete p._route_label;
-    delete p._full_route_label;
-    // 실제 DB 컬럼 목록 기준, 없는 컬럼 방지
-    const allowed = new Set([
-      'company_id','applicant_employee_no','applicant_name','division_code','division_name',
-      'team_code','team_name','trip_type','trip_date','transport','request_date',
-      'voucher_date','payment_due_date','status','total_amount','corp_card_amount',
-      'personal_amount','fuel_amount','created_by_user_id','total_distance_km',
-      'gas_price','fuel_efficiency','round_unit','manager_memo'
-    ]);
-    Object.keys(p).forEach(k=>{ if(!allowed.has(k)) delete p[k]; });
-    return cleanPayload(p);
-  }
-
-  async function saveWithStatus(status){
-    patchSupabase();
-
-    const payload = buildPayload(status);
-    const id = currentId();
-    let savedId = id;
-
-    if(window.supabase){
-      let result;
-      if(id){
-        result = await window.supabase
-          .from(DB_TABLE)
-          .update(dbPayloadOnly(payload))
-          .eq('id', id)
-          .select('id')
-          .single();
-      }else{
-        result = await window.supabase
-          .from(DB_TABLE)
-          .insert(dbPayloadOnly(payload))
-          .select('id')
-          .single();
-      }
-
-      if(result.error) throw result.error;
-      savedId = result.data?.id || id;
-    }
-
-    const record = toLocalRecord(payload, savedId);
-    const list = localList();
-    const idx = list.findIndex(x => String(x.id) === String(record.id));
-    if(idx >= 0) list[idx] = Object.assign({}, list[idx], record);
-    else list.unshift(record);
-
-    try{ localStorage.setItem('travelExpenses', JSON.stringify(list)); }catch(e){}
-
-    window.currentEditId = record.id;
-    window.editingId = record.id;
-
-    if(typeof window.renderMySubmissions === 'function') safe(()=>window.renderMySubmissions());
-    if(typeof window.refreshMonthlyProcessSummary === 'function') safe(()=>window.refreshMonthlyProcessSummary());
-    if(typeof window.renderAdminList === 'function') safe(()=>window.renderAdminList());
-    if(typeof window.renderAdminReviewList === 'function') safe(()=>window.renderAdminReviewList());
-
-    return record;
-  }
-
-  window.saveTravelExpenseDraft = async function(){
-    try{
-      await saveWithStatus('임시저장');
-      alert('임시저장되었습니다.');
-    }catch(err){
-      console.error('[TravelExpense] draft save error', err);
-      alert('임시저장 중 오류가 발생했습니다: ' + (err?.message || err));
-    }
-  };
-
-  window.submitTravelExpense = async function(){
-    try{
-      await saveWithStatus('검토대기');
-      alert('제출되었습니다.');
-    }catch(err){
-      console.error('[TravelExpense] submit error', err);
-      alert('제출 중 오류가 발생했습니다: ' + (err?.message || err));
-    }
-  };
-
-  patchSupabase();
-})();
-</script>
-
-
-<script id="travel-expense-card-rule-only">
-(function(){
-  if(window.__travelExpenseCardRuleOnlyInstalled) return;
-  window.__travelExpenseCardRuleOnlyInstalled = true;
-
-  function statusNorm(s){
-    const v = String(s || '').replace(/\s+/g,'');
-    if(v.includes('지출결의')) return '지출결의완료';
-    if(v.includes('검토대기')) return '검토대기';
-    if(v.includes('수정요청')) return '수정요청';
-    if(v.includes('임시저장')) return '임시저장';
-    if(v.includes('승인')) return '승인';
-    return v;
-  }
-
-  function makeBtn(label, cls, handler){
+  function button(label, className, onClick){
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = cls;
+    b.className = className;
     b.textContent = label;
     b.addEventListener('click', function(e){
       e.preventDefault();
       e.stopPropagation();
-      handler();
+      onClick();
     });
     return b;
   }
 
-  function cardId(card){
-    return card.dataset?.requestId || card.dataset?.id || card.getAttribute('data-request-id') || card.getAttribute('data-id') || '';
-  }
-
-  function cardStatus(card){
-    return statusNorm(card.dataset?.status || card.querySelector('.status')?.textContent || card.textContent);
-  }
-
-  function enforce(){
+  function applyCardRules(){
     document.querySelectorAll('.submission-scroll .list-card').forEach(function(card){
-      const id = cardId(card);
-      const status = cardStatus(card);
+      const id = getId(card);
+      const status = getStatus(card);
       let actions = card.querySelector('.my-card-actions');
 
       if(status === '승인' || status === '지출결의완료'){
@@ -5408,45 +5139,44 @@
       actions.innerHTML = '';
 
       if(status === '임시저장' || status === '수정요청'){
-        actions.appendChild(makeBtn('수정', 'edit-btn', function(){
+        actions.appendChild(button('수정', 'edit-btn', function(){
           if(typeof window.startTravelExpenseEdit === 'function') window.startTravelExpenseEdit(id, status);
         }));
       }
 
       if(status === '검토대기'){
-        actions.appendChild(makeBtn('회수', 'recall-btn', function(){
+        actions.appendChild(button('회수', 'recall-btn', function(){
           if(typeof window.recallTravelExpenseRequest === 'function') window.recallTravelExpenseRequest(id);
         }));
       }
 
-      actions.appendChild(makeBtn('삭제', 'delete-btn', function(){
+      actions.appendChild(button('삭제', 'delete-btn', function(){
         if(typeof window.deleteTravelExpenseRequest === 'function') window.deleteTravelExpenseRequest(id);
       }));
     });
   }
 
   function wrap(name){
-    const fn = window[name];
-    if(typeof fn !== 'function' || fn.__cardRuleOnlyWrapped) return;
-    const wrapped = async function(){
-      const result = await fn.apply(this, arguments);
-      setTimeout(enforce, 30);
-      setTimeout(enforce, 200);
-      setTimeout(enforce, 600);
+    const original = window[name];
+    if(typeof original !== 'function' || original.__cardRuleNoDbTouchWrapped) return;
+    const wrapped = function(){
+      const result = original.apply(this, arguments);
+      setTimeout(applyCardRules, 50);
+      setTimeout(applyCardRules, 250);
+      setTimeout(applyCardRules, 800);
       return result;
     };
-    wrapped.__cardRuleOnlyWrapped = true;
+    wrapped.__cardRuleNoDbTouchWrapped = true;
     window[name] = wrapped;
   }
 
   ['refreshCards','loadDetail','modeView','modeNew','startTravelExpenseEdit'].forEach(wrap);
 
-  const mo = new MutationObserver(enforce);
-  if(document.body) mo.observe(document.body, { childList:true, subtree:true });
+  const mo = new MutationObserver(applyCardRules);
+  if(document.body) mo.observe(document.body, {childList:true, subtree:true});
 
-  setTimeout(enforce, 200);
-  setTimeout(enforce, 800);
-  setTimeout(enforce, 1600);
+  setTimeout(applyCardRules, 200);
+  setTimeout(applyCardRules, 800);
 })();
 </script>
 
