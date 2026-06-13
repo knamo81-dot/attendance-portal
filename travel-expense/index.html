@@ -1435,6 +1435,9 @@
   const STORAGE_BUCKET = 'travel-expense';
   const pendingDocs = [];
   const uploadedDocs = [];
+  // 서버에 이미 저장된 첨부파일 삭제는 즉시 반영하지 않고 저장/제출 시 일괄 반영합니다.
+  const deletedDocs = [];
+  const deletedReceipts = [];
 
   const safe = (fn, fallback=null) => { try { return fn(); } catch(e){ return fallback; } };
   const hasClient = obj => !!(obj && typeof obj.from === 'function');
@@ -1537,28 +1540,13 @@
   async function deleteUploadedDoc(index){
     const doc = uploadedDocs[index];
     if(!doc) return;
-    if(!confirm('첨부된 결재완료 서류를 삭제할까요?')) return;
-    const client=db();
-    if(!client){ alert('Supabase 연결을 확인하지 못했습니다.'); return; }
-    const path=doc.file_path||doc.path||doc.storage_path||'';
-    try{
-      if(path){
-        const rm=await client.storage.from(STORAGE_BUCKET).remove([path]);
-        if(rm.error) throw rm.error;
-      }
-      if(doc.id){
-        const del=await client.from('travel_expense_attachments').delete().eq('id', doc.id);
-        if(del.error) throw del.error;
-      }else if(path){
-        const del=await client.from('travel_expense_attachments').delete().eq('file_path', path);
-        if(del.error) throw del.error;
-      }
-      uploadedDocs.splice(index,1);
-      render();
-    }catch(e){
-      console.error('[TravelExpense] approval document delete error', e);
-      alert('첨부파일 삭제 중 오류가 발생했습니다: ' + (e?.message || e));
-    }
+    if(!confirm('첨부된 결재완료 서류를 삭제 표시할까요? 저장/제출을 눌러야 서버에서 삭제됩니다.')) return;
+
+    // 즉시 Storage/DB에서 삭제하지 않습니다.
+    // 이동경로/사용금액과 동일하게 화면에서만 제거하고 저장/제출 시 삭제 반영합니다.
+    deletedDocs.push(doc);
+    uploadedDocs.splice(index,1);
+    render();
   }
 
   async function openUploadedDoc(doc){
@@ -1705,32 +1693,17 @@
       return;
     }
 
-    if(!confirm('첨부된 영수증 파일을 삭제할까요?')) return;
+    if(!confirm('첨부된 영수증 파일을 삭제 표시할까요? 저장/제출을 눌러야 서버에서 삭제됩니다.')) return;
 
-    const client = db();
-    if(!client){ alert('Supabase 연결을 확인하지 못했습니다.'); return; }
+    // 즉시 Storage/DB에서 삭제하지 않습니다.
+    // 이동경로/사용금액과 동일하게 화면에서만 제거하고 저장/제출 시 삭제 반영합니다.
+    deletedReceipts.push(item);
 
+    const arr = getRowServer(row);
     const path = item.file_path || item.path || item.storage_path || '';
-    try{
-      if(path){
-        const rm = await client.storage.from(STORAGE_BUCKET).remove([path]);
-        if(rm.error) throw rm.error;
-      }
-      if(item.id){
-        const del = await client.from('travel_expense_attachments').delete().eq('id', item.id);
-        if(del.error) throw del.error;
-      }else if(path){
-        const del = await client.from('travel_expense_attachments').delete().eq('file_path', path);
-        if(del.error) throw del.error;
-      }
-      const arr = getRowServer(row);
-      const serverIndex = arr.findIndex(x => (item.id && x.id === item.id) || (path && x.file_path === path));
-      if(serverIndex >= 0) arr.splice(serverIndex,1);
-      renderReceiptNames(row);
-    }catch(e){
-      console.error('[TravelExpense] receipt delete error', e);
-      alert('영수증 삭제 중 오류가 발생했습니다: ' + (e?.message || e));
-    }
+    const serverIndex = arr.findIndex(x => (item.id && x.id === item.id) || (path && x.file_path === path));
+    if(serverIndex >= 0) arr.splice(serverIndex,1);
+    renderReceiptNames(row);
   }
 
   document.addEventListener('click', async function(e){
@@ -1810,6 +1783,32 @@
     });
   }
 
+  async function commitDeletedAttachment(client, item){
+    if(!client || !item) return;
+    const path = item.file_path || item.path || item.storage_path || '';
+    if(path){
+      const rm = await client.storage.from(STORAGE_BUCKET).remove([path]);
+      if(rm.error) throw rm.error;
+    }
+    if(item.id){
+      const del = await client.from('travel_expense_attachments').delete().eq('id', item.id);
+      if(del.error) throw del.error;
+    }else if(path){
+      const del = await client.from('travel_expense_attachments').delete().eq('file_path', path);
+      if(del.error) throw del.error;
+    }
+  }
+
+  async function commitDeletedAttachments(client){
+    const targets = deletedDocs.concat(deletedReceipts);
+    if(!targets.length) return;
+    for(const item of targets){
+      await commitDeletedAttachment(client, item);
+    }
+    deletedDocs.splice(0, deletedDocs.length);
+    deletedReceipts.splice(0, deletedReceipts.length);
+  }
+
   window.uploadTravelExpenseDocuments = async function(requestId){
     const client=db(); const p=profile();
     if(!client || !p.companyId || !requestId){ alert('첨부파일 업로드 정보를 확인하지 못했습니다.'); return false; }
@@ -1822,6 +1821,7 @@
         completed.push(saved);
       }
       await uploadReceipts(client, p, requestId);
+      await commitDeletedAttachments(client);
       uploadedDocs.push(...completed);
       render();
       return true;
@@ -1837,6 +1837,8 @@
   window.loadTravelExpenseDocumentList = async function(requestId){
     uploadedDocs.splice(0, uploadedDocs.length);
     pendingDocs.splice(0, pendingDocs.length);
+    deletedDocs.splice(0, deletedDocs.length);
+    deletedReceipts.splice(0, deletedReceipts.length);
     const input=inputEl(); if(input) input.value='';
     document.querySelectorAll('input.receipt-input').forEach(input=>{ input.dataset.travelUploadedKey=''; });
     document.querySelectorAll('#costList .cost-row').forEach(row=>{ row.__pendingReceiptFiles=[]; row.__serverReceiptFiles=[]; });
@@ -1859,6 +1861,8 @@
   window.resetTravelExpenseDocumentUpload = function(){
     pendingDocs.splice(0, pendingDocs.length);
     uploadedDocs.splice(0, uploadedDocs.length);
+    deletedDocs.splice(0, deletedDocs.length);
+    deletedReceipts.splice(0, deletedReceipts.length);
     const input=inputEl(); if(input) input.value='';
     document.querySelectorAll('#costList .cost-row').forEach(row=>{
       row.__pendingReceiptFiles=[];
