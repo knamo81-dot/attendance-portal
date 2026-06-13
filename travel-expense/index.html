@@ -1466,6 +1466,25 @@
     return n+'B';
   }
   function cleanName(name){ return String(name||'file').replace(/[\\/:*?"<>|#%&{}$!`'@+=]/g,'_').slice(0,120); }
+  function safeFileExt(file){
+    const name = String(file?.name || '');
+    const m = name.match(/\.([A-Za-z0-9]{1,12})$/);
+    if(m) return '.' + m[1].toLowerCase();
+    const mime = String(file?.type || '').toLowerCase();
+    const map = {
+      'application/pdf': '.pdf',
+      'image/jpeg': '.jpg',
+      'image/jpg': '.jpg',
+      'image/png': '.png',
+      'image/webp': '.webp',
+      'image/gif': '.gif',
+      'application/zip': '.zip'
+    };
+    return map[mime] || '';
+  }
+  function storageSafeFileName(file){
+    return `${Date.now()}_${Math.random().toString(36).slice(2,10)}${safeFileExt(file)}`;
+  }
   function escapeHtml(v){ return String(v ?? '').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
   function listEl(){ return document.getElementById('travelDocumentList'); }
   function inputEl(){ return document.getElementById('travelDocumentInput'); }
@@ -1524,7 +1543,9 @@
 
   async function uploadOne(client, p, requestId, file, type, itemId=null){
     const folder = type === 'receipt' ? 'receipts' : 'approval';
-    const path = `${p.companyId}/${requestId}/${folder}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${cleanName(file.name)}`;
+    // Storage object key는 영문/숫자 기반 안전 파일명만 사용합니다.
+    // 원본 한글 파일명은 아래 file_name 컬럼에 그대로 저장합니다.
+    const path = `${p.companyId}/${requestId}/${folder}/${storageSafeFileName(file)}`;
 
     const up = await client.storage.from(STORAGE_BUCKET).upload(path, file, {
       upsert:true,
