@@ -2091,6 +2091,19 @@
 </style>
 
 <!-- receipt item_id mapping + safe storage filename final / receipt preserve on edit final -->
+
+<script id="travel-fuel-price-two-decimal-helper">
+(function(){
+  if(window.__travelFuelPriceTwoDecimalHelperInstalled) return;
+  window.__travelFuelPriceTwoDecimalHelperInstalled = true;
+  window.formatFuelPriceTwoDecimals = function(value){
+    const n = Number(value || 0);
+    if(!Number.isFinite(n) || n <= 0) return '-';
+    return n.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '원/L';
+  };
+})();
+</script>
+
 </head>
 <body>
   <header>
@@ -5175,9 +5188,9 @@
       failedDates.delete(tripDate);
 
       if(fuel.matchType === 'exact'){
-        setNote(`출장일 기준 유가 적용: ${fuel.price_date} / ${price.toLocaleString('ko-KR')}원/L`, 'ok', tripDate);
+        setNote(`출장일 기준 유가 적용: ${fuel.price_date} / ${formatFuelPriceTwoDecimals(price)}`, 'ok', tripDate);
       }else{
-        setNote(`출장일(${tripDate}) 유가가 없어 직전 저장 유가 적용: ${fuel.price_date} / ${price.toLocaleString('ko-KR')}원/L`, 'ok', tripDate);
+        setNote(`출장일(${tripDate}) 유가가 없어 직전 저장 유가 적용: ${fuel.price_date} / ${formatFuelPriceTwoDecimals(price)}`, 'ok', tripDate);
       }
 
       return fuel;
@@ -5589,7 +5602,7 @@
     if((row.transport || '자차') !== '자차') return '<div class="admin-empty-small">자차 이동 건이 아닙니다.</div>';
     return `<div class="admin-fuel-formula">
       <div class="admin-info-item"><span>총 이동거리</span><b>${num(row.total_distance_km)} km</b></div>
-      <div class="admin-info-item"><span>출장일 기준 유가</span><b>${num(row.gas_price).toLocaleString('ko-KR')}원/L</b></div>
+      <div class="admin-info-item"><span>출장일 기준 유가</span><b>${formatFuelPriceTwoDecimals(num(row.gas_price))}</b></div>
       <div class="admin-info-item"><span>회사 기준연비</span><b>${num(row.fuel_efficiency)} km/L</b></div>
       <div class="admin-info-item"><span>계산 유류비</span><b>${won(row.fuel_amount)}</b></div>
     </div>
@@ -5840,7 +5853,7 @@
       <div class="fuel-formula">
         <div><small>이동경로</small><b>${esc(routeLabel(routes))}</b></div>
         <div><small>총 이동거리</small><b>${totalKm} km</b></div>
-        <div><small>출장일 기준 유가</small><b>${gas.toLocaleString('ko-KR')}원/L</b></div>
+        <div><small>출장일 기준 유가</small><b>${formatFuelPriceTwoDecimals(gas)}</b></div>
         <div><small>기준연비</small><b>${eff} km/L</b></div>
         <div><small>유류비</small><b>${won(fuel)}</b></div>
       </div>
@@ -6223,7 +6236,7 @@
       const routes = d.routes && d.routes.length ? d.routes : [{from_place:'-', to_place:routeText(d), distance_km:distanceKm(d)}];
       routes.forEach(route => {
         const km = num(route.distance_km); const fuel = eff && price ? Math.round(km / eff * price) : (routes.length === 1 ? fuelAmount(d) : 0);
-        rows.push(`<tr><td>${rows.length+1}</td><td>${esc(r.applicant_name||'-')}</td><td>${esc(tripDate(d)||'-')}</td><td class="left">${esc(route.from_place||'-')} → ${esc(route.to_place||'-')}</td><td class="num">${km}km</td><td class="num">${eff?eff+'km/L':'-'}</td><td class="num">${price?Math.round(price).toLocaleString('ko-KR')+'원/L':'-'}</td><td class="num">${dashWon(fuel)}</td><td>총거리 ÷ 기준연비 × 당일 유가</td></tr>`);
+        rows.push(`<tr><td>${rows.length+1}</td><td>${esc(r.applicant_name||'-')}</td><td>${esc(tripDate(d)||'-')}</td><td class="left">${esc(route.from_place||'-')} → ${esc(route.to_place||'-')}</td><td class="num">${km}km</td><td class="num">${eff?eff+'km/L':'-'}</td><td class="num">${price?formatFuelPriceTwoDecimals(price):'-'}</td><td class="num">${dashWon(fuel)}</td><td>총거리 ÷ 기준연비 × 당일 유가</td></tr>`);
       });
     });
     if(!rows.length) return '';
