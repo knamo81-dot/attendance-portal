@@ -3157,7 +3157,7 @@
   .evidence-meta.compact-meta th,.evidence-meta.compact-meta td{padding:7px 8px;font-size:12px;}
   .evidence-meta.compact-meta th{width:72px;}
   @media print{
-    body{background:#fff}.print-toolbar{display:none}.print-shell{max-width:none;padding:0}.statement-page,.evidence-page{border:0;box-shadow:none;border-radius:0;margin:0;page-break-after:always;padding:14mm}.statement-page:last-child,.evidence-page:last-child{page-break-after:auto}
+    body{background:#fff}.print-toolbar{display:none}.print-shell{max-width:none;padding:0}.statement-page,.evidence-page{border:0;box-shadow:none;border-radius:0;margin:0;padding:12mm;break-after:page;page-break-after:always}.statement-page:last-child,.evidence-page:last-child{break-after:auto;page-break-after:auto}.evidence-card,.evidence-item,.receipt-card,.print-file-card,.pdf-page{break-inside:avoid;page-break-inside:avoid}
     .statement-title{font-size:25px}.statement-table{font-size:11px}.statement-table th,.statement-table td{padding:7px 5px}.fake-receipt{height:190mm}.itemized-evidence-grid{grid-template-columns:repeat(2,1fr);gap:10px}.fake-receipt.compact{height:72mm}.evidence-item-card{padding:10px}.evidence-section-title{margin-bottom:10px}.evidence-section-title h2{font-size:20px}
   }
 
@@ -3341,7 +3341,7 @@
   <div class="print-shell">
     <div class="print-toolbar">
       <b>${titlePrefix || label} 출장비 정산서 미리보기 · ${applicantLabel}</b>
-      <div><button class="secondary" onclick="window.print()">인쇄/PDF</button><button class="secondary" onclick="window.close()">닫기</button></div>
+      <div><button class="secondary" onclick="printWhenReady()">인쇄/PDF</button><button class="secondary" onclick="window.close()">닫기</button></div>
     </div>
     <section class="statement-page">
       <div class="statement-title">국내출장비 정산서</div>
@@ -5881,7 +5881,7 @@
       return `<div class="print-file-card"><div class="print-file-name">${name}</div><img class="print-image" src="${esc(url)}" /></div>`;
     }
     if(isPdfAttachment(file)){
-      return `<div class="print-file-card"><div class="print-file-name">${name}</div><iframe class="print-pdf" src="${esc(url)}"></iframe><div class="print-file-link">PDF가 보이지 않으면 새 창에서 열어 인쇄하세요.</div></div>`;
+      return `<div class="print-file-card pdf-file-card"><div class="print-file-name">${name}</div><div class="pdf-render-card" data-pdf-url="${esc(url)}"><div class="pdf-loading">PDF 원본 렌더링 준비 중입니다.</div><a class="pdf-open-link" href="${esc(url)}" target="_blank">원본 PDF 새 창에서 열기</a></div></div>`;
     }
     return `<div class="print-file-card"><div class="print-file-name">${name}</div><a href="${esc(url)}" target="_blank">첨부파일 열기</a></div>`;
   }
@@ -5985,8 +5985,48 @@
   function makePrintDocument(title, mode, body){
     const today = new Date().toLocaleDateString('ko-KR');
     return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
-      *{box-sizing:border-box} body{margin:0;background:#f3f4f6;color:#111827;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif;} .toolbar{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:#111827;color:white;} .toolbar button{border:0;border-radius:10px;padding:9px 12px;font-weight:800;cursor:pointer;margin-left:6px;} .wrap{max-width:980px;margin:18px auto 40px;padding:0 12px;} .print-title{background:white;border:1px solid #d1d5db;border-radius:14px;padding:16px 18px;margin-bottom:14px;} .print-title h1{margin:0;font-size:22px;text-align:center;} .print-title p{margin:8px 0 0;text-align:right;color:#6b7280;font-size:12px;} .print-trip{background:white;border:1px solid #d1d5db;border-radius:14px;padding:18px;margin-bottom:18px;} .print-section{border:1px solid #d1d5db;border-radius:12px;padding:14px;margin-bottom:14px;background:#fff;} .print-section h2{font-size:16px;margin:0 0 12px;border-bottom:2px solid #111827;padding-bottom:8px;} .summary-cards,.fuel-formula{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;} .fuel-formula{grid-template-columns:2fr repeat(4,1fr);} .summary-cards div,.fuel-formula div{border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#f9fafb;} small{display:block;color:#6b7280;font-size:11px;font-weight:800;margin-bottom:4px;} b{font-size:15px;} .print-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px;} .print-table th,.print-table td{border:1px solid #d1d5db;padding:8px;vertical-align:top;} .print-table th{background:#f3f4f6;} .print-table tfoot td{font-weight:900;background:#f9fafb;} .num{text-align:right;white-space:nowrap;} .empty-cell{text-align:center;color:#6b7280;font-weight:800;} .empty-box{border:1px dashed #cbd5e1;border-radius:12px;padding:18px;text-align:center;color:#6b7280;background:#f8fafc;font-weight:800;} .formula-note{margin:10px 0;padding:10px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;font-size:12px;font-weight:800;color:#92400e;} .print-file-card{border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin:10px 0;break-inside:avoid;background:#fff;} .print-file-name{font-weight:900;margin-bottom:8px;} .print-image{display:block;max-width:100%;max-height:980px;margin:0 auto;border:1px solid #e5e7eb;} .print-pdf{width:100%;height:980px;border:1px solid #e5e7eb;border-radius:8px;background:#f8fafc;} .print-file-link,.print-file-missing{font-size:12px;color:#6b7280;margin-top:6px;} .receipt-group-title{font-weight:900;margin:12px 0 4px;color:#374151;} .receipt-area{margin-top:12px;} @media print{body{background:white}.toolbar{display:none}.wrap{max-width:none;margin:0;padding:0}.print-title,.print-trip{border:0;border-radius:0;padding:0;margin:0 0 10mm}.print-section{page-break-inside:avoid;border-color:#9ca3af}.print-doc-section,.evidence-section{page-break-before:always}.print-pdf{height:250mm}.print-image{max-height:250mm}.page-break-avoid{page-break-inside:avoid}}
-    </style></head><body><div class="toolbar"><div>${esc(title)} · ${esc(printModeLabel(mode))} · ${esc(today)}</div><div><button onclick="window.print()">인쇄/PDF</button><button onclick="window.close()">닫기</button></div></div><div class="wrap"><div class="print-title"><h1>${esc(title)}</h1><p>출력구분: ${esc(printModeLabel(mode))} / 출력일: ${esc(today)}</p></div>${body}</div></body></html>`;
+      *{box-sizing:border-box} body{margin:0;background:#f3f4f6;color:#111827;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif;} .toolbar{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:#111827;color:white;} .toolbar button{border:0;border-radius:10px;padding:9px 12px;font-weight:800;cursor:pointer;margin-left:6px;} .wrap{max-width:980px;margin:18px auto 40px;padding:0 12px;} .print-title{background:white;border:1px solid #d1d5db;border-radius:14px;padding:16px 18px;margin-bottom:14px;} .print-title h1{margin:0;font-size:22px;text-align:center;} .print-title p{margin:8px 0 0;text-align:right;color:#6b7280;font-size:12px;} .print-trip{background:white;border:1px solid #d1d5db;border-radius:14px;padding:18px;margin-bottom:18px;} .print-section{border:1px solid #d1d5db;border-radius:12px;padding:14px;margin-bottom:14px;background:#fff;} .print-section h2{font-size:16px;margin:0 0 12px;border-bottom:2px solid #111827;padding-bottom:8px;} .summary-cards,.fuel-formula{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;} .fuel-formula{grid-template-columns:2fr repeat(4,1fr);} .summary-cards div,.fuel-formula div{border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#f9fafb;} small{display:block;color:#6b7280;font-size:11px;font-weight:800;margin-bottom:4px;} b{font-size:15px;} .print-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px;} .print-table th,.print-table td{border:1px solid #d1d5db;padding:8px;vertical-align:top;} .print-table th{background:#f3f4f6;} .print-table tfoot td{font-weight:900;background:#f9fafb;} .num{text-align:right;white-space:nowrap;} .empty-cell{text-align:center;color:#6b7280;font-weight:800;} .empty-box{border:1px dashed #cbd5e1;border-radius:12px;padding:18px;text-align:center;color:#6b7280;background:#f8fafc;font-weight:800;} .formula-note{margin:10px 0;padding:10px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;font-size:12px;font-weight:800;color:#92400e;} .print-file-card{border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin:10px 0;break-inside:avoid;background:#fff;} .print-file-name{font-weight:900;margin-bottom:8px;} .print-image{display:block;max-width:100%;height:auto;max-height:240mm;object-fit:contain;margin:0 auto;border:1px solid #e5e7eb;} .pdf-render-card{width:100%;min-height:160px;border:1px solid #e5e7eb;border-radius:8px;background:#f8fafc;padding:10px;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center}.pdf-loading{font-weight:900;color:#64748b}.pdf-open-link{font-size:12px;color:#2563eb;font-weight:900;text-decoration:none}.pdf-page{break-inside:avoid;page-break-inside:avoid;margin:8px auto 12px;text-align:center}.pdf-canvas{display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid #e5e7eb;background:#fff} .print-file-link,.print-file-missing{font-size:12px;color:#6b7280;margin-top:6px;} .receipt-group-title{font-weight:900;margin:12px 0 4px;color:#374151;} .receipt-area{margin-top:12px;} @media print{body{background:white}.toolbar{display:none}.wrap{max-width:none;margin:0;padding:0}.print-title,.print-trip{border:0;border-radius:0;padding:0;margin:0 0 10mm}.print-section{break-inside:auto;page-break-inside:auto;border-color:#9ca3af}.print-section:not(:last-child){break-after:page;page-break-after:always}.print-section:last-child{break-after:auto;page-break-after:auto}.print-file-card,.receipt-card,.evidence-item,.pdf-page{break-inside:avoid;page-break-inside:avoid}.print-doc-section,.evidence-section{break-before:page;page-break-before:always}.pdf-render-card{min-height:40mm}.print-image{max-height:240mm}.page-break-avoid{page-break-inside:avoid}}
+    </style></head><body><div class="toolbar"><div>${esc(title)} · ${esc(printModeLabel(mode))} · ${esc(today)}</div><div><button onclick="printWhenReady()">인쇄/PDF</button><button onclick="window.close()">닫기</button></div></div><div class="wrap"><div class="print-title"><h1>${esc(title)}</h1><p>출력구분: ${esc(printModeLabel(mode))} / 출력일: ${esc(today)}</p></div>${body}</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>
+<script>
+(function(){
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.pdf-render-card[data-pdf-url]'));
+  function setFallback(box, msg){
+    var url = box.getAttribute('data-pdf-url') || '#';
+    box.innerHTML = '<div class="file-placeholder">' + (msg || 'PDF 원본 파일입니다.') + '<br><small>브라우저 인쇄 미리보기에서 PDF 뷰어를 직접 출력하지 않고 원본 파일 링크로 표시합니다.</small><br><a class="pdf-open-link" href="' + url.replace(/"/g,'&quot;') + '" target="_blank">원본 PDF 새 창에서 열기</a></div>';
+  }
+  async function renderOne(box){
+    var url = box.getAttribute('data-pdf-url');
+    if(!url){ setFallback(box, 'PDF URL을 찾지 못했습니다.'); return; }
+    if(!window.pdfjsLib){ setFallback(box, 'PDF 렌더러를 불러오지 못했습니다.'); return; }
+    try{
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      var pdf = await window.pdfjsLib.getDocument({url:url}).promise;
+      box.innerHTML = '';
+      for(var p=1; p<=pdf.numPages; p++){
+        var page = await pdf.getPage(p);
+        var viewport = page.getViewport({scale:1.35});
+        var canvas = document.createElement('canvas');
+        canvas.className = 'pdf-canvas';
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+        await page.render({canvasContext:canvas.getContext('2d'), viewport:viewport}).promise;
+        var wrap = document.createElement('div');
+        wrap.className = 'pdf-page';
+        wrap.appendChild(canvas);
+        box.appendChild(wrap);
+      }
+    }catch(e){
+      console.warn('[TravelExpense] PDF render failed', e);
+      setFallback(box, 'PDF 미리보기 렌더링에 실패했습니다.');
+    }
+  }
+  window.__travelExpensePdfRenderReady = Promise.all(boxes.map(renderOne));
+  window.printWhenReady = function(){
+    Promise.resolve(window.__travelExpensePdfRenderReady).finally(function(){ setTimeout(function(){ window.print(); }, 250); });
+  };
+})();
+<\/script></body></html>`;
   }
   async function printStatement(mode){
     mode = mode || 'all';
@@ -6330,7 +6370,7 @@
     const ext = String(name).split('.').pop().toLowerCase();
     let preview = `<div class="file-placeholder">첨부파일 미리보기<br><small>${name}</small></div>`;
     if(url && ['png','jpg','jpeg','gif','webp'].includes(ext)) preview = `<img class="receipt-img" src="${esc(url)}" alt="${name}">`;
-    else if(url && ext === 'pdf') preview = `<iframe class="receipt-pdf" src="${esc(url)}"></iframe>`;
+    else if(url && ext === 'pdf') preview = `<div class="pdf-render-card" data-pdf-url="${esc(url)}"><div class="pdf-loading">PDF 원본 렌더링 준비 중입니다.</div><a class="pdf-open-link" href="${esc(url)}" target="_blank">원본 PDF 새 창에서 열기</a></div>`;
     else if(url) preview = `<div class="file-placeholder"><a href="${esc(url)}" target="_blank">첨부파일 열기</a><br><small>${name}</small></div>`;
     return `<div class="receipt-card"><div class="receipt-name">${name}</div>${preview}</div>`;
   }
@@ -6340,7 +6380,8 @@
       const docs = (d.attachments||[]).filter(a => (a.file_type||'') === 'approval_document');
       for(const doc of docs){ cards.push(fileBlock(doc, await signedUrl(client, doc))); }
     }
-    return `<section class="evidence-page"><h2>출장계 / 외근신청서</h2>${cards.length ? cards.join('') : '<div class="empty-box">첨부된 출장계/외근신청서가 없습니다.</div>'}</section>`;
+    if(!cards.length) return '';
+    return `<section class="evidence-page doc-evidence-page"><h2>출장계 / 외근신청서</h2>${cards.join('')}</section>`;
   }
   async function evidenceSection(client, details, kind){
     const isCorpMode = kind === 'corp';
@@ -6362,12 +6403,53 @@
         cards.push(`<div class="evidence-item"><div class="evidence-head"><b>유류비</b><strong>${won(fuelAmount(d))}</strong></div><div class="evidence-meta-line"><span>자동계산</span><span>${esc(d.row?.applicant_name||'-')}</span><span>${esc(tripDate(d)||'-')}</span></div><div class="file-placeholder">유류비 자동계산 내역<br><small>유류비 계산내역 섹션 참조</small></div></div>`);
       }
     }
-    return `<section class="evidence-page"><div class="section-title-row-print"><div><h2>${title}</h2><p>${isCorpMode?'법인카드 지출결의용 증빙입니다.':'개인지급 지출결의용 증빙입니다.'}</p></div><div class="section-total"><span>합계</span><b>${dashWon(total)}</b></div></div><div class="evidence-grid">${cards.length ? cards.join('') : '<div class="empty-box">해당 증빙 내역이 없습니다.</div>'}</div></section>`;
+    if(!cards.length) return '';
+    return `<section class="evidence-page"><div class="section-title-row-print"><div><h2>${title}</h2><p>${isCorpMode?'법인카드 지출결의용 증빙입니다.':'개인지급 지출결의용 증빙입니다.'}</p></div><div class="section-total"><span>합계</span><b>${dashWon(total)}</b></div></div><div class="evidence-grid">${cards.join('')}</div></section>`;
   }
   function printDocument(title, mode, body){
     return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
-      *{box-sizing:border-box} body{margin:0;background:#eef2f7;color:#111827;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",Arial,sans-serif}.print-shell{max-width:1200px;margin:0 auto;padding:22px}.toolbar{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;gap:12px;margin:-22px -22px 18px;padding:14px 22px;background:rgba(255,255,255,.95);border-bottom:1px solid #dbe3ef}.toolbar b{font-size:18px}.toolbar button{border:0;border-radius:12px;padding:10px 13px;font-weight:900;cursor:pointer;background:#2563eb;color:#fff;margin-left:6px}.toolbar button.secondary{background:#eef2ff;color:#3730a3}.statement-page,.evidence-page{background:#fff;border:1px solid #d8e0ed;border-radius:18px;box-shadow:0 12px 30px rgba(15,23,42,.08);padding:28px;margin-bottom:20px}.statement-title{text-align:center;font-size:30px;font-weight:900;margin:0 0 18px}.statement-sub{display:flex;justify-content:space-between;gap:12px;font-size:14px;margin-bottom:10px}.statement-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px}.statement-table th,.statement-table td{border:1px solid #111827;padding:10px 8px;text-align:center;vertical-align:middle;word-break:keep-all}.statement-table th{background:#e5e7eb;color:#334155;font-weight:900}.statement-table .sum-row td{background:#eef6e8;font-weight:900}.num{text-align:right!important;font-variant-numeric:tabular-nums}.left{text-align:left!important;white-space:normal}.label-cell{font-weight:900;background:#fff}.pay-label{font-weight:900;background:#f8fafc}.pay-label span{font-size:11px;color:#64748b}.evidence-page h2{margin:0 0 14px;font-size:22px}.fuel-table{font-size:12px}.section-title-row-print{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;border-bottom:2px solid #111827;padding-bottom:12px;margin-bottom:16px}.section-title-row-print h2{margin:0 0 6px}.section-title-row-print p{margin:0;color:#64748b;font-weight:700;font-size:13px}.section-total{min-width:150px;border:1px solid #dbe3ef;border-radius:12px;background:#f8fafc;padding:11px;text-align:right}.section-total span{display:block;color:#64748b;font-size:12px;font-weight:900;margin-bottom:5px}.section-total b{font-size:18px}.evidence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.evidence-item{border:1px solid #dbe3ef;border-radius:16px;padding:14px;break-inside:avoid}.evidence-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.evidence-head b,.evidence-head strong{font-size:16px}.evidence-meta-line{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.evidence-meta-line span{border:1px solid #e5e9f2;background:#f8fafc;border-radius:999px;padding:5px 8px;color:#475569;font-size:11px;font-weight:800}.receipt-card{border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin-top:10px;break-inside:avoid}.receipt-name{font-weight:900;margin-bottom:8px}.receipt-img{display:block;max-width:100%;max-height:900px;margin:0 auto;border:1px solid #e5e7eb}.receipt-pdf{width:100%;height:820px;border:1px solid #e5e7eb;border-radius:8px}.file-placeholder,.empty-box{border:1px dashed #cbd5e1;border-radius:12px;padding:28px;text-align:center;color:#64748b;background:#f8fafc;font-weight:800;line-height:1.6}.empty-box.small{padding:16px;font-size:12px}.print-trip{margin-bottom:20px}@media print{body{background:#fff}.toolbar{display:none}.print-shell{max-width:none;padding:0}.statement-page,.evidence-page{border:0;box-shadow:none;border-radius:0;margin:0;page-break-after:always;padding:14mm}.statement-page:last-child,.evidence-page:last-child{page-break-after:auto}.statement-title{font-size:25px}.statement-table{font-size:11px}.statement-table th,.statement-table td{padding:7px 5px}.evidence-grid{grid-template-columns:repeat(2,1fr);gap:10px}.receipt-pdf{height:250mm}.receipt-img{max-height:250mm}}
-    </style></head><body><div class="print-shell"><div class="toolbar"><b>${esc(title)} · ${esc(modeLabel(mode))}</b><div><button onclick="window.print()">인쇄/PDF</button><button class="secondary" onclick="window.close()">닫기</button></div></div>${body}</div></body></html>`;
+      *{box-sizing:border-box} body{margin:0;background:#eef2f7;color:#111827;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",Arial,sans-serif}.print-shell{max-width:1200px;margin:0 auto;padding:22px}.toolbar{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;gap:12px;margin:-22px -22px 18px;padding:14px 22px;background:rgba(255,255,255,.95);border-bottom:1px solid #dbe3ef}.toolbar b{font-size:18px}.toolbar button{border:0;border-radius:12px;padding:10px 13px;font-weight:900;cursor:pointer;background:#2563eb;color:#fff;margin-left:6px}.toolbar button.secondary{background:#eef2ff;color:#3730a3}.statement-page,.evidence-page{background:#fff;border:1px solid #d8e0ed;border-radius:18px;box-shadow:0 12px 30px rgba(15,23,42,.08);padding:28px;margin-bottom:20px}.statement-title{text-align:center;font-size:30px;font-weight:900;margin:0 0 18px}.statement-sub{display:flex;justify-content:space-between;gap:12px;font-size:14px;margin-bottom:10px}.statement-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px}.statement-table th,.statement-table td{border:1px solid #111827;padding:10px 8px;text-align:center;vertical-align:middle;word-break:keep-all}.statement-table th{background:#e5e7eb;color:#334155;font-weight:900}.statement-table .sum-row td{background:#eef6e8;font-weight:900}.num{text-align:right!important;font-variant-numeric:tabular-nums}.left{text-align:left!important;white-space:normal}.label-cell{font-weight:900;background:#fff}.pay-label{font-weight:900;background:#f8fafc}.pay-label span{font-size:11px;color:#64748b}.evidence-page h2{margin:0 0 14px;font-size:22px}.fuel-table{font-size:12px}.section-title-row-print{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;border-bottom:2px solid #111827;padding-bottom:12px;margin-bottom:16px}.section-title-row-print h2{margin:0 0 6px}.section-title-row-print p{margin:0;color:#64748b;font-weight:700;font-size:13px}.section-total{min-width:150px;border:1px solid #dbe3ef;border-radius:12px;background:#f8fafc;padding:11px;text-align:right}.section-total span{display:block;color:#64748b;font-size:12px;font-weight:900;margin-bottom:5px}.section-total b{font-size:18px}.evidence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.evidence-item{border:1px solid #dbe3ef;border-radius:16px;padding:14px;break-inside:avoid}.evidence-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.evidence-head b,.evidence-head strong{font-size:16px}.evidence-meta-line{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.evidence-meta-line span{border:1px solid #e5e9f2;background:#f8fafc;border-radius:999px;padding:5px 8px;color:#475569;font-size:11px;font-weight:800}.receipt-card{border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin-top:10px;break-inside:avoid}.receipt-name{font-weight:900;margin-bottom:8px}.receipt-img{display:block;max-width:100%;height:auto;max-height:240mm;object-fit:contain;margin:0 auto;border:1px solid #e5e7eb}.pdf-render-card{width:100%;min-height:160px;border:1px solid #e5e7eb;border-radius:8px;background:#f8fafc;padding:10px;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center}.pdf-loading{font-weight:900;color:#64748b}.pdf-open-link{font-size:12px;color:#2563eb;font-weight:900;text-decoration:none}.pdf-page{break-inside:avoid;page-break-inside:avoid;margin:8px auto 12px;text-align:center}.pdf-canvas{display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid #e5e7eb;background:#fff}.file-placeholder,.empty-box{border:1px dashed #cbd5e1;border-radius:12px;padding:28px;text-align:center;color:#64748b;background:#f8fafc;font-weight:800;line-height:1.6}.empty-box.small{padding:16px;font-size:12px}.print-trip{margin-bottom:20px}@media print{body{background:#fff}.toolbar{display:none}.print-shell{max-width:none;padding:0}.statement-page,.evidence-page{border:0;box-shadow:none;border-radius:0;margin:0;padding:12mm;break-after:page;page-break-after:always}.statement-page:last-child,.evidence-page:last-child{break-after:auto;page-break-after:auto}.evidence-card,.evidence-item,.receipt-card,.print-file-card,.pdf-page{break-inside:avoid;page-break-inside:avoid}.statement-title{font-size:25px}.statement-table{font-size:11px}.statement-table th,.statement-table td{padding:7px 5px}.evidence-grid{grid-template-columns:repeat(2,1fr);gap:10px}.pdf-render-card{min-height:40mm}.receipt-img{max-height:240mm}}
+    </style></head><body><div class="print-shell"><div class="toolbar"><b>${esc(title)} · ${esc(modeLabel(mode))}</b><div><button onclick="printWhenReady()">인쇄/PDF</button><button class="secondary" onclick="window.close()">닫기</button></div></div>${body}</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>
+<script>
+(function(){
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.pdf-render-card[data-pdf-url]'));
+  function setFallback(box, msg){
+    var url = box.getAttribute('data-pdf-url') || '#';
+    box.innerHTML = '<div class="file-placeholder">' + (msg || 'PDF 원본 파일입니다.') + '<br><small>브라우저 인쇄 미리보기에서 PDF 뷰어를 직접 출력하지 않고 원본 파일 링크로 표시합니다.</small><br><a class="pdf-open-link" href="' + url.replace(/"/g,'&quot;') + '" target="_blank">원본 PDF 새 창에서 열기</a></div>';
+  }
+  async function renderOne(box){
+    var url = box.getAttribute('data-pdf-url');
+    if(!url){ setFallback(box, 'PDF URL을 찾지 못했습니다.'); return; }
+    if(!window.pdfjsLib){ setFallback(box, 'PDF 렌더러를 불러오지 못했습니다.'); return; }
+    try{
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      var pdf = await window.pdfjsLib.getDocument({url:url}).promise;
+      box.innerHTML = '';
+      for(var p=1; p<=pdf.numPages; p++){
+        var page = await pdf.getPage(p);
+        var viewport = page.getViewport({scale:1.35});
+        var canvas = document.createElement('canvas');
+        canvas.className = 'pdf-canvas';
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+        await page.render({canvasContext:canvas.getContext('2d'), viewport:viewport}).promise;
+        var wrap = document.createElement('div');
+        wrap.className = 'pdf-page';
+        wrap.appendChild(canvas);
+        box.appendChild(wrap);
+      }
+    }catch(e){
+      console.warn('[TravelExpense] PDF render failed', e);
+      setFallback(box, 'PDF 미리보기 렌더링에 실패했습니다.');
+    }
+  }
+  window.__travelExpensePdfRenderReady = Promise.all(boxes.map(renderOne));
+  window.printWhenReady = function(){
+    Promise.resolve(window.__travelExpensePdfRenderReady).finally(function(){ setTimeout(function(){ window.print(); }, 250); });
+  };
+})();
+<\/script></body></html>`;
   }
   async function buildBody(client, details, mode){
     let body = await docsSection(client, details);
