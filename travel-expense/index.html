@@ -2800,7 +2800,7 @@
             </div>
           </div>
           <div class="notice" style="margin-bottom:12px;">관리팀이 입력한 지결작성일과 지급예정일은 출장자 입력 화면의 관리팀 처리 일정 영역에 표시됩니다.</div>
-          <div class="admin-manager-memo"><label>관리팀 메모</label><textarea>${trip.memo || ''}</textarea></div>
+          <div class="admin-manager-memo"><label>관리팀 메모</label><textarea id="adminManagerMemo" placeholder="검토 메모를 입력하세요.">${esc(trip.manager_memo||trip.memo||'')}</textarea></div>
           <div class="admin-final-actions">
             <button type="button" class="btn-ghost" onclick="adminAdminAction('수정요청')">수정요청</button>
             <button type="button" class="btn-sub" onclick="adminAdminAction('승인')">승인</button>
@@ -5713,6 +5713,13 @@
     if($('adminSelectedCorp')) $('adminSelectedCorp').textContent = won(list.reduce((s,r)=>s+num(r.corp_card_amount),0));
     if($('adminSelectedPersonal')) $('adminSelectedPersonal').textContent = won(list.reduce((s,r)=>s+num(r.personal_amount),0));
   }
+  function getAdminManagerMemoValue(){
+    const direct = $('adminManagerMemo');
+    if(direct) return direct.value || '';
+    const memoBox = document.querySelector('.admin-detail-panel .admin-manager-memo textarea') ||
+      document.querySelector('.admin-manager-memo textarea');
+    return memoBox ? (memoBox.value || '') : '';
+  }
   async function updateRequestStatus(status){
     if(!selectedId){ alert('검토할 신청건을 선택하세요.'); return; }
     const client = db();
@@ -5723,7 +5730,7 @@
       status: nextStatus,
       voucher_date: $('adminVoucherDate')?.value || null,
       payment_due_date: $('adminPaymentDueDate')?.value || null,
-      manager_memo: $('adminManagerMemo')?.value || '',
+      manager_memo: getAdminManagerMemoValue(),
     };
 
     const res = await client.from('travel_expense_requests').update(payload).eq('id', selectedId);
@@ -5749,7 +5756,7 @@
     const payload = {
       voucher_date: $('adminVoucherDate')?.value || null,
       payment_due_date: $('adminPaymentDueDate')?.value || null,
-      manager_memo: $('adminManagerMemo')?.value || '',
+      manager_memo: getAdminManagerMemoValue(),
     };
     const res = await client.from('travel_expense_requests').update(payload).eq('id', selectedId);
     if(res.error){ alert('검토 결과 수정 중 오류가 발생했습니다: ' + res.error.message); return; }
@@ -5779,7 +5786,7 @@
   async function updateDates(id){
     const client = db();
     if(!client || !id) return;
-    const payload = { voucher_date: $('adminVoucherDate')?.value || null, payment_due_date: $('adminPaymentDueDate')?.value || null, manager_memo: $('adminManagerMemo')?.value || '' };
+    const payload = { voucher_date: $('adminVoucherDate')?.value || null, payment_due_date: $('adminPaymentDueDate')?.value || null, manager_memo: getAdminManagerMemoValue() };
     const res = await client.from('travel_expense_requests').update(payload).eq('id', id);
     if(res.error){ alert('처리일정 저장 중 오류가 발생했습니다: ' + res.error.message); return; }
     const row = rows.find(r => String(r.id) === String(id));
