@@ -6470,8 +6470,8 @@
   }
   async function evidenceSection(client, details, kind){
     const isCorpMode = kind === 'corp';
-    const title = isCorpMode ? '법인카드 증빙' : '개인지급 증빙';
-    const cards = [];
+    const title = isCorpMode ? '법인카드 증빙 사용내역' : '개인지급 증빙 사용내역';
+    const rows = [];
     let total = 0;
     for(const d of details){
       const map = receiptsByItem(d);
@@ -6479,21 +6479,66 @@
       for(const item of filtered){
         total += itemAmount(item);
         const files = map.get(String(item.id)) || [];
-        const previews = [];
-        for(const f of files) previews.push(fileBlock(f, await signedUrl(client, f)));
-        cards.push(`<div class="evidence-item"><div class="evidence-head"><b>${esc(itemKind(item)||'-')}</b><strong>${won(itemAmount(item))}</strong></div><div class="evidence-meta-line"><span>${esc(payType(item)||'-')}</span><span>${esc(d.row?.applicant_name||'-')}</span><span>${esc(tripDate(d)||'-')}</span></div>${previews.length ? previews.join('') : '<div class="empty-box small">첨부된 영수증이 없습니다.</div>'}</div>`);
+        rows.push(`<tr><td>${rows.length+1}</td><td class="left">${esc(itemKind(item)||'-')}</td><td>${esc(payType(item)||'-')}</td><td>${esc(d.row?.applicant_name||'-')}</td><td>${esc(tripDate(d)||'-')}</td><td class="num">${won(itemAmount(item))}</td><td>${files.length ? '첨부 '+files.length+'건' : '미첨부'}</td></tr>`);
       }
       if(!isCorpMode && fuelAmount(d) > 0){
         total += fuelAmount(d);
-        cards.push(`<div class="evidence-item"><div class="evidence-head"><b>유류비</b><strong>${won(fuelAmount(d))}</strong></div><div class="evidence-meta-line"><span>자동계산</span><span>${esc(d.row?.applicant_name||'-')}</span><span>${esc(tripDate(d)||'-')}</span></div><div class="file-placeholder">유류비 자동계산 내역<br><small>유류비 계산내역 섹션 참조</small></div></div>`);
+        rows.push(`<tr><td>${rows.length+1}</td><td class="left">유류비</td><td>자동계산</td><td>${esc(d.row?.applicant_name||'-')}</td><td>${esc(tripDate(d)||'-')}</td><td class="num">${won(fuelAmount(d))}</td><td>유류비 계산내역 참조</td></tr>`);
+      }
+    }
+    if(!rows.length) return '';
+    return `<section class="evidence-page evidence-summary-page">
+      <div class="section-title-row-print"><div><h2>${title}</h2><p>${isCorpMode?'법인카드 지출결의용 사용내역입니다.':'개인지급 지출결의용 사용내역입니다.'} 영수증 원본은 다음 섹션에서 크게 출력됩니다.</p></div><div class="section-total"><span>합계</span><b>${dashWon(total)}</b></div></div>
+      <table class="statement-table usage-table"><thead><tr><th>순번</th><th>항목</th><th>구분</th><th>신청자</th><th>출장일</th><th>금액</th><th>영수증</th></tr></thead><tbody>${rows.join('')}</tbody></table>
+    </section>`;
+  }
+
+  function receiptOriginalFileBlock(file, url, item, detail, index, kind){
+    const name = esc(file?.file_name || '영수증');
+    const itemName = esc(itemKind(item)||'-');
+    const pay = esc(payType(item) || (kind === 'corp' ? '법인카드' : '개인지급'));
+    const amount = won(itemAmount(item));
+    const applicant = esc(detail?.row?.applicant_name || '-');
+    const date = esc(tripDate(detail) || '-');
+    const ext = String(name).split('.').pop().toLowerCase();
+    let body = `<div class="file-placeholder">영수증 원본 파일<br><small>${name}</small></div>`;
+    if(url && ['png','jpg','jpeg','gif','webp'].includes(ext)){
+      body = `<img class="receipt-original-img" src="${esc(url)}" alt="${name}">`;
+    }else if(url && ext === 'pdf'){
+      body = `<div class="pdf-render-card receipt-original-render" data-pdf-url="${esc(url)}" data-pdf-crop="receipt"><div class="pdf-loading">영수증 원본 확대 렌더링 준비 중입니다.</div><a class="pdf-open-link" href="${esc(url)}" target="_blank">원본 PDF 새 창에서 열기</a></div>`;
+    }else if(url){
+      body = `<div class="file-placeholder"><a href="${esc(url)}" target="_blank">첨부파일 열기</a><br><small>${name}</small></div>`;
+    }
+    return `<div class="receipt-original-card">
+      <div class="receipt-original-head"><div><h3>영수증 ${index+1}. ${itemName}</h3><p>${pay} · ${applicant} · ${date} · ${amount}</p></div><div class="receipt-original-file-name">${name}</div></div>
+      ${body}
+    </div>`;
+  }
+
+  async function receiptOriginalSection(client, details, kind){
+    const isCorpMode = kind === 'corp';
+    const title = isCorpMode ? '법인카드 영수증 원본' : '개인지급 영수증 원본';
+    const cards = [];
+    for(const d of details){
+      const map = receiptsByItem(d);
+      const filtered = (d.items||[]).filter(item => isCorpMode ? isCorp(item) : isPersonal(item));
+      for(const item of filtered){
+        const files = map.get(String(item.id)) || [];
+        for(const f of files){
+          cards.push(receiptOriginalFileBlock(f, await signedUrl(client, f), item, d, cards.length, kind));
+        }
       }
     }
     if(!cards.length) return '';
-    return `<section class="evidence-page"><div class="section-title-row-print"><div><h2>${title}</h2><p>${isCorpMode?'법인카드 지출결의용 증빙입니다.':'개인지급 지출결의용 증빙입니다.'}</p></div><div class="section-total"><span>합계</span><b>${dashWon(total)}</b></div></div><div class="evidence-grid">${cards.join('')}</div></section>`;
+    return `<section class="evidence-page receipt-original-section">
+      <div class="section-title-row-print"><div><h2>${title}</h2><p>스캔 PDF는 여백을 자동 감지해 영수증 영역을 확대 출력합니다. 원본이 이미지인 경우 페이지 폭에 맞춰 크게 표시합니다.</p></div><div class="section-total"><span>첨부</span><b>${cards.length}건</b></div></div>
+      ${cards.join('')}
+    </section>`;
   }
+
   function printDocument(title, mode, body){
     return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
-      *{box-sizing:border-box} body{margin:0;background:#eef2f7;color:#111827;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",Arial,sans-serif}.print-shell{max-width:1200px;margin:0 auto;padding:22px}.toolbar{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;gap:12px;margin:-22px -22px 18px;padding:14px 22px;background:rgba(255,255,255,.95);border-bottom:1px solid #dbe3ef}.toolbar b{font-size:18px}.toolbar button{border:0;border-radius:12px;padding:10px 13px;font-weight:900;cursor:pointer;background:#2563eb;color:#fff;margin-left:6px}.toolbar button.secondary{background:#eef2ff;color:#3730a3}.statement-page,.evidence-page{background:#fff;border:1px solid #d8e0ed;border-radius:18px;box-shadow:0 12px 30px rgba(15,23,42,.08);padding:28px;margin-bottom:20px}.statement-title{text-align:center;font-size:30px;font-weight:900;margin:0 0 18px}.statement-sub{display:flex;justify-content:space-between;gap:12px;font-size:14px;margin-bottom:10px}.statement-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px}.statement-table th,.statement-table td{border:1px solid #111827;padding:10px 8px;text-align:center;vertical-align:middle;word-break:keep-all}.statement-table th{background:#e5e7eb;color:#334155;font-weight:900}.statement-table .sum-row td{background:#eef6e8;font-weight:900}.num{text-align:right!important;font-variant-numeric:tabular-nums}.left{text-align:left!important;white-space:normal}.label-cell{font-weight:900;background:#fff}.pay-label{font-weight:900;background:#f8fafc}.pay-label span{font-size:11px;color:#64748b}.evidence-page h2{margin:0 0 14px;font-size:22px}.fuel-table{font-size:12px}.section-title-row-print{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;border-bottom:2px solid #111827;padding-bottom:12px;margin-bottom:16px}.section-title-row-print h2{margin:0 0 6px}.section-title-row-print p{margin:0;color:#64748b;font-weight:700;font-size:13px}.section-total{min-width:150px;border:1px solid #dbe3ef;border-radius:12px;background:#f8fafc;padding:11px;text-align:right}.section-total span{display:block;color:#64748b;font-size:12px;font-weight:900;margin-bottom:5px}.section-total b{font-size:18px}.evidence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.evidence-item{border:1px solid #dbe3ef;border-radius:16px;padding:14px;break-inside:avoid}.evidence-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.evidence-head b,.evidence-head strong{font-size:16px}.evidence-meta-line{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.evidence-meta-line span{border:1px solid #e5e9f2;background:#f8fafc;border-radius:999px;padding:5px 8px;color:#475569;font-size:11px;font-weight:800}.receipt-card{border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin-top:10px;break-inside:avoid}.receipt-name{font-weight:900;margin-bottom:8px}.receipt-img{display:block;max-width:100%;height:auto;max-height:240mm;object-fit:contain;margin:0 auto;border:1px solid #e5e7eb}.pdf-render-card{width:100%;min-height:160px;border:1px solid #e5e7eb;border-radius:8px;background:#f8fafc;padding:10px;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center}.pdf-loading{font-weight:900;color:#64748b}.pdf-open-link{font-size:12px;color:#2563eb;font-weight:900;text-decoration:none}.pdf-page{break-inside:avoid;page-break-inside:avoid;margin:8px auto 12px;text-align:center}.pdf-canvas{display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid #e5e7eb;background:#fff}.file-placeholder,.empty-box{border:1px dashed #cbd5e1;border-radius:12px;padding:28px;text-align:center;color:#64748b;background:#f8fafc;font-weight:800;line-height:1.6}.empty-box.small{padding:16px;font-size:12px}.print-trip{margin-bottom:20px}@media print{body{background:#fff}.toolbar{display:none}.print-shell{max-width:none;padding:0}.statement-page,.evidence-page{border:0;box-shadow:none;border-radius:0;margin:0;padding:12mm;break-after:page;page-break-after:always}.statement-page:last-child,.evidence-page:last-child{break-after:auto;page-break-after:auto}.evidence-card,.evidence-item,.receipt-card,.print-file-card,.pdf-page{break-inside:avoid;page-break-inside:avoid}.statement-title{font-size:25px}.statement-table{font-size:11px}.statement-table th,.statement-table td{padding:7px 5px}.evidence-grid{grid-template-columns:repeat(2,1fr);gap:10px}.pdf-render-card{min-height:40mm}.receipt-img{max-height:240mm}}
+      *{box-sizing:border-box} body{margin:0;background:#eef2f7;color:#111827;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",Arial,sans-serif}.print-shell{max-width:1200px;margin:0 auto;padding:22px}.toolbar{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;gap:12px;margin:-22px -22px 18px;padding:14px 22px;background:rgba(255,255,255,.95);border-bottom:1px solid #dbe3ef}.toolbar b{font-size:18px}.toolbar button{border:0;border-radius:12px;padding:10px 13px;font-weight:900;cursor:pointer;background:#2563eb;color:#fff;margin-left:6px}.toolbar button.secondary{background:#eef2ff;color:#3730a3}.statement-page,.evidence-page{background:#fff;border:1px solid #d8e0ed;border-radius:18px;box-shadow:0 12px 30px rgba(15,23,42,.08);padding:28px;margin-bottom:20px}.statement-title{text-align:center;font-size:30px;font-weight:900;margin:0 0 18px}.statement-sub{display:flex;justify-content:space-between;gap:12px;font-size:14px;margin-bottom:10px}.statement-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px}.statement-table th,.statement-table td{border:1px solid #111827;padding:10px 8px;text-align:center;vertical-align:middle;word-break:keep-all}.statement-table th{background:#e5e7eb;color:#334155;font-weight:900}.statement-table .sum-row td{background:#eef6e8;font-weight:900}.num{text-align:right!important;font-variant-numeric:tabular-nums}.left{text-align:left!important;white-space:normal}.label-cell{font-weight:900;background:#fff}.pay-label{font-weight:900;background:#f8fafc}.pay-label span{font-size:11px;color:#64748b}.evidence-page h2{margin:0 0 14px;font-size:22px}.fuel-table{font-size:12px}.section-title-row-print{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;border-bottom:2px solid #111827;padding-bottom:12px;margin-bottom:16px}.section-title-row-print h2{margin:0 0 6px}.section-title-row-print p{margin:0;color:#64748b;font-weight:700;font-size:13px}.section-total{min-width:150px;border:1px solid #dbe3ef;border-radius:12px;background:#f8fafc;padding:11px;text-align:right}.section-total span{display:block;color:#64748b;font-size:12px;font-weight:900;margin-bottom:5px}.section-total b{font-size:18px}.evidence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.evidence-item{border:1px solid #dbe3ef;border-radius:16px;padding:14px;break-inside:avoid}.evidence-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.evidence-head b,.evidence-head strong{font-size:16px}.evidence-meta-line{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.evidence-meta-line span{border:1px solid #e5e9f2;background:#f8fafc;border-radius:999px;padding:5px 8px;color:#475569;font-size:11px;font-weight:800}.receipt-card{border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin-top:10px;break-inside:avoid}.receipt-name{font-weight:900;margin-bottom:8px}.receipt-img{display:block;max-width:100%;height:auto;max-height:240mm;object-fit:contain;margin:0 auto;border:1px solid #e5e7eb}.usage-table th:nth-child(1){width:7%}.usage-table th:nth-child(2){width:24%}.usage-table th:nth-child(3){width:14%}.usage-table th:nth-child(4){width:12%}.usage-table th:nth-child(5){width:12%}.usage-table th:nth-child(6){width:14%}.usage-table th:nth-child(7){width:17%}.receipt-original-section{break-before:page;page-break-before:always}.receipt-original-card{border:1px solid #dbe3ef;border-radius:18px;padding:16px;margin:14px 0 20px;background:#fff;break-inside:avoid;page-break-inside:avoid}.receipt-original-card:not(:last-child){break-after:page;page-break-after:always}.receipt-original-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:1px solid #e5e7eb;margin-bottom:14px;padding-bottom:10px}.receipt-original-head h3{margin:0 0 5px;font-size:18px}.receipt-original-head p{margin:0;color:#64748b;font-size:12px;font-weight:800}.receipt-original-file-name{font-size:12px;color:#64748b;font-weight:900;text-align:right;max-width:260px;word-break:break-all}.receipt-original-img{display:block;max-width:100%;width:auto;max-height:none;margin:0 auto;border:1px solid #e5e7eb;background:#fff}.receipt-original-render{min-height:220mm;background:#fff}.receipt-crop-page{break-inside:avoid;page-break-inside:avoid;text-align:center;margin:0 auto 10px}.receipt-crop-canvas{display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid #e5e7eb;background:#fff}.pdf-render-card{width:100%;min-height:160px;border:1px solid #e5e7eb;border-radius:8px;background:#f8fafc;padding:10px;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center}.pdf-loading{font-weight:900;color:#64748b}.pdf-open-link{font-size:12px;color:#2563eb;font-weight:900;text-decoration:none}.pdf-page{break-inside:avoid;page-break-inside:avoid;margin:8px auto 12px;text-align:center}.pdf-canvas{display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid #e5e7eb;background:#fff}.file-placeholder,.empty-box{border:1px dashed #cbd5e1;border-radius:12px;padding:28px;text-align:center;color:#64748b;background:#f8fafc;font-weight:800;line-height:1.6}.empty-box.small{padding:16px;font-size:12px}.print-trip{margin-bottom:20px}@media print{body{background:#fff}.toolbar{display:none}.print-shell{max-width:none;padding:0}.statement-page,.evidence-page{border:0;box-shadow:none;border-radius:0;margin:0;padding:12mm;break-after:page;page-break-after:always}.statement-page:last-child,.evidence-page:last-child{break-after:auto;page-break-after:auto}.evidence-card,.evidence-item,.receipt-card,.print-file-card,.pdf-page,.receipt-original-card,.receipt-crop-page{break-inside:avoid;page-break-inside:avoid}.receipt-original-card:not(:last-child){break-after:page;page-break-after:always}.receipt-original-card:last-child{break-after:auto;page-break-after:auto}.statement-title{font-size:25px}.statement-table{font-size:11px}.statement-table th,.statement-table td{padding:7px 5px}.evidence-grid{grid-template-columns:repeat(2,1fr);gap:10px}.pdf-render-card{min-height:40mm}.receipt-img{max-height:240mm}}
     </style></head><body><div class="print-shell"><div class="toolbar"><b>${esc(title)} · ${esc(modeLabel(mode))}</b><div><button onclick="printWhenReady()">인쇄/PDF</button><button class="secondary" onclick="window.close()">닫기</button></div></div>${body}</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>
 <script>
@@ -6503,8 +6548,43 @@
     var url = box.getAttribute('data-pdf-url') || '#';
     box.innerHTML = '<div class="file-placeholder">' + (msg || 'PDF 원본 파일입니다.') + '<br><small>브라우저 인쇄 미리보기에서 PDF 뷰어를 직접 출력하지 않고 원본 파일 링크로 표시합니다.</small><br><a class="pdf-open-link" href="' + url.replace(/"/g,'&quot;') + '" target="_blank">원본 PDF 새 창에서 열기</a></div>';
   }
+  function cropCanvasByContent(source){
+    var ctx = source.getContext('2d');
+    var w = source.width, h = source.height;
+    var data;
+    try{ data = ctx.getImageData(0, 0, w, h).data; }catch(e){ return source; }
+    var minX=w, minY=h, maxX=0, maxY=0, found=false;
+    var step = Math.max(1, Math.floor(Math.min(w,h)/900));
+    for(var y=0; y<h; y+=step){
+      for(var x=0; x<w; x+=step){
+        var i=(y*w+x)*4, r=data[i], g=data[i+1], b=data[i+2], a=data[i+3];
+        if(a > 20 && (r < 238 || g < 238 || b < 238)){
+          found=true;
+          if(x<minX) minX=x; if(x>maxX) maxX=x;
+          if(y<minY) minY=y; if(y>maxY) maxY=y;
+        }
+      }
+    }
+    if(!found) return source;
+    var margin = Math.round(Math.max(w,h) * 0.025);
+    minX = Math.max(0, minX - margin);
+    minY = Math.max(0, minY - margin);
+    maxX = Math.min(w, maxX + margin);
+    maxY = Math.min(h, maxY + margin);
+    var cw = Math.max(1, maxX - minX);
+    var ch = Math.max(1, maxY - minY);
+    if(cw > w * 0.94 && ch > h * 0.94) return source;
+    if(cw < w * 0.05 || ch < h * 0.05) return source;
+    var out = document.createElement('canvas');
+    out.className = 'receipt-crop-canvas';
+    out.width = cw;
+    out.height = ch;
+    out.getContext('2d').drawImage(source, minX, minY, cw, ch, 0, 0, cw, ch);
+    return out;
+  }
   async function renderOne(box){
     var url = box.getAttribute('data-pdf-url');
+    var shouldCrop = box.getAttribute('data-pdf-crop') === 'receipt';
     if(!url){ setFallback(box, 'PDF URL을 찾지 못했습니다.'); return; }
     if(!window.pdfjsLib){ setFallback(box, 'PDF 렌더러를 불러오지 못했습니다.'); return; }
     try{
@@ -6513,15 +6593,17 @@
       box.innerHTML = '';
       for(var p=1; p<=pdf.numPages; p++){
         var page = await pdf.getPage(p);
-        var viewport = page.getViewport({scale:1.35});
+        var viewport = page.getViewport({scale: shouldCrop ? 2.45 : 1.35});
         var canvas = document.createElement('canvas');
-        canvas.className = 'pdf-canvas';
+        canvas.className = shouldCrop ? 'receipt-crop-canvas' : 'pdf-canvas';
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
         await page.render({canvasContext:canvas.getContext('2d'), viewport:viewport}).promise;
+        var outputCanvas = shouldCrop ? cropCanvasByContent(canvas) : canvas;
+        outputCanvas.className = shouldCrop ? 'receipt-crop-canvas' : 'pdf-canvas';
         var wrap = document.createElement('div');
-        wrap.className = 'pdf-page';
-        wrap.appendChild(canvas);
+        wrap.className = shouldCrop ? 'receipt-crop-page' : 'pdf-page';
+        wrap.appendChild(outputCanvas);
         box.appendChild(wrap);
       }
     }catch(e){
@@ -6540,8 +6622,14 @@
     let body = await docsSection(client, details);
     body += domesticStatement(details, mode);
     if(mode !== 'corp') body += fuelSection(details);
-    if(mode === 'all' || mode === 'corp') body += await evidenceSection(client, details, 'corp');
-    if(mode === 'all' || mode === 'personal') body += await evidenceSection(client, details, 'personal');
+    if(mode === 'all' || mode === 'corp'){
+      body += await evidenceSection(client, details, 'corp');
+      body += await receiptOriginalSection(client, details, 'corp');
+    }
+    if(mode === 'all' || mode === 'personal'){
+      body += await evidenceSection(client, details, 'personal');
+      body += await receiptOriginalSection(client, details, 'personal');
+    }
     return body;
   }
   async function printByIds(ids, mode, scopeLabel){
