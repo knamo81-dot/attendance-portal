@@ -6133,25 +6133,61 @@
   }
   function tripDate(detail){ return detail.row.trip_date || detail.row.tripDate || detail.row.request_date || ''; }
   function distanceKm(detail){ return num(detail.row.total_distance_km || detail.row.distance_km || detail.routes.reduce((s,x)=>s+num(x.distance_km),0)); }
-  function totalsFor(detail, mode='all'){
+  function categoryTotals(items){
+    const target = items || [];
+    const lodging = classifyAmount(target, '숙박');
+    const fuelItem = target.filter(i => itemKind(i).includes('유류')).reduce((s,i)=>s+itemAmount(i),0);
+    const transit = target.filter(i => itemKind(i).includes('대중') || itemKind(i).includes('교통')).reduce((s,i)=>s+itemAmount(i),0);
+    const meal = target.filter(i => itemKind(i).includes('식대') || itemKind(i).includes('식비')).reduce((s,i)=>s+itemAmount(i),0);
+    const etc = etcAmount(target);
+    return { lodging, fuel: fuelItem, transit, meal, etc, total: lodging + fuelItem + transit + meal + etc };
+  }
+  function paymentCategoryTotals(detail, kind){
     const allItems = detail.items || [];
-    const items = mode === 'corp' ? allItems.filter(isCorp) : mode === 'personal' ? allItems.filter(isPersonal) : allItems;
-    const fuel = mode === 'corp' ? 0 : fuelAmount(detail);
-    const corpItems = allItems.filter(isCorp).reduce((s,i)=>s+itemAmount(i),0);
-    const personalItems = allItems.filter(isPersonal).reduce((s,i)=>s+itemAmount(i),0);
-    const corpAll = num(detail.row.corp_card_amount || corpItems);
-    const personalAll = num(detail.row.personal_amount || personalItems + fuelAmount(detail));
-    const corp = mode === 'personal' ? 0 : (mode === 'corp' ? corpItems || corpAll : corpAll);
-    const personal = mode === 'corp' ? 0 : (mode === 'personal' ? personalItems + fuel : personalAll);
-    const total = mode === 'corp' ? corp : mode === 'personal' ? personal : num(detail.row.total_amount || corp + personal);
-    return {
-      lodging: classifyAmount(items, '숙박'),
-      fuel,
-      transit: items.filter(i => itemKind(i).includes('대중') || itemKind(i).includes('교통')).reduce((s,i)=>s+itemAmount(i),0),
-      meal: items.filter(i => itemKind(i).includes('식대') || itemKind(i).includes('식비')).reduce((s,i)=>s+itemAmount(i),0),
-      etc: etcAmount(items),
-      corp, personal, total, km: distanceKm(detail)
-    };
+    const items = kind === 'corp' ? allItems.filter(isCorp) : allItems.filter(isPersonal);
+    const t = categoryTotals(items);
+    if(kind === 'personal'){
+      const autoFuel = fuelAmount(detail);
+      if(autoFuel){
+        t.fuel += autoFuel;
+        t.total += autoFuel;
+      }
+    }
+    return t;
+  }
+  function sumPaymentTotals(details, kind){
+    return details.reduce((a,d)=>{
+      const t = paymentCategoryTotals(d, kind);
+      ['lodging','fuel','transit','meal','etc','total'].forEach(k => a[k] += num(t[k]));
+      return a;
+    }, {lodging:0,fuel:0,transit:0,meal:0,etc:0,total:0});
+  }
+  function totalsFor(detail, mode='all'){
+    const row = detail.row || {};
+    const corpCat = paymentCategoryTotals(detail, 'corp');
+    const personalCat = paymentCategoryTotals(detail, 'personal');
+    let out;
+    if(mode === 'corp'){
+      out = {...corpCat, corp: corpCat.total, personal: 0};
+      if(!out.total && num(row.corp_card_amount)) out.total = out.corp = num(row.corp_card_amount);
+    }else if(mode === 'personal'){
+      out = {...personalCat, corp: 0, personal: personalCat.total};
+      if(!out.total && num(row.personal_amount)) out.total = out.personal = num(row.personal_amount);
+    }else{
+      out = {
+        lodging: corpCat.lodging + personalCat.lodging,
+        fuel: corpCat.fuel + personalCat.fuel,
+        transit: corpCat.transit + personalCat.transit,
+        meal: corpCat.meal + personalCat.meal,
+        etc: corpCat.etc + personalCat.etc,
+        corp: corpCat.total || num(row.corp_card_amount),
+        personal: personalCat.total || num(row.personal_amount),
+        total: corpCat.total + personalCat.total
+      };
+      if(!out.total) out.total = num(row.total_amount || out.corp + out.personal);
+    }
+    out.km = distanceKm(detail);
+    return out;
   }
   function sumTotals(details, mode='all'){
     return details.reduce((a,d)=>{ const t=totalsFor(d, mode); Object.keys(a).forEach(k=>a[k]+=num(t[k])); return a; }, {lodging:0,fuel:0,transit:0,meal:0,etc:0,corp:0,personal:0,total:0,km:0});
@@ -6165,6 +6201,8 @@
   function domesticStatement(details, mode){
     const today = new Date().toISOString().slice(0,10);
     const t = sumTotals(details, mode);
+    const corpPay = mode === 'personal' ? {lodging:0,fuel:0,transit:0,meal:0,etc:0,total:0} : sumPaymentTotals(details, 'corp');
+    const personalPay = mode === 'corp' ? {lodging:0,fuel:0,transit:0,meal:0,etc:0,total:0} : sumPaymentTotals(details, 'personal');
     const dept = details[0]?.row?.division_name || details[0]?.row?.department_name || '글로벌R&D팀';
     return `<section class="statement-page">
       <h1 class="statement-title">국내출장비 정산서</h1>
@@ -6173,8 +6211,8 @@
         <thead><tr><th>성 명</th><th>출발일</th><th>도착일</th><th>숙박비</th><th>유류비</th><th>대중교통</th><th>식비</th><th>기타<br>(주차비 등)</th><th>계</th><th>출장지<br>거리(KM)</th><th>비 고</th></tr></thead>
         <tbody>${domesticRows(details, mode)}
           <tr class="sum-row"><td class="label-cell" colspan="3">합 계</td><td class="num">${dashWon(t.lodging)}</td><td class="num">${dashWon(t.fuel)}</td><td class="num">${dashWon(t.transit)}</td><td class="num">${dashWon(t.meal)}</td><td class="num">${dashWon(t.etc)}</td><td class="num">${won(t.total)}</td><td class="num">${t.km?t.km+'km':'-'}</td><td>-</td></tr>
-          <tr><td class="label-cell" rowspan="2">정산금액</td><td class="pay-label" colspan="2">법인카드</td><td></td><td></td><td></td><td></td><td class="num">${dashWon(t.corp)}</td><td class="num">${dashWon(t.corp)}</td><td></td><td></td></tr>
-          <tr><td class="pay-label" colspan="2">현 금<br><span>개인카드/현금/유류비</span></td><td></td><td class="num">${dashWon(t.fuel)}</td><td class="num">${dashWon(t.transit)}</td><td></td><td class="num">${dashWon(t.personal)}</td><td class="num">${dashWon(t.personal)}</td><td></td><td></td></tr>
+          <tr><td class="label-cell" rowspan="2">정산금액</td><td class="pay-label" colspan="2">법인카드</td><td class="num">${dashWon(corpPay.lodging)}</td><td class="num">${dashWon(corpPay.fuel)}</td><td class="num">${dashWon(corpPay.transit)}</td><td class="num">${dashWon(corpPay.meal)}</td><td class="num">${dashWon(corpPay.etc)}</td><td class="num">${dashWon(corpPay.total)}</td><td></td><td></td></tr>
+          <tr><td class="pay-label" colspan="2">현 금<br><span>개인카드/현금/유류비</span></td><td class="num">${dashWon(personalPay.lodging)}</td><td class="num">${dashWon(personalPay.fuel)}</td><td class="num">${dashWon(personalPay.transit)}</td><td class="num">${dashWon(personalPay.meal)}</td><td class="num">${dashWon(personalPay.etc)}</td><td class="num">${dashWon(personalPay.total)}</td><td></td><td></td></tr>
         </tbody></table>
     </section>`;
   }
