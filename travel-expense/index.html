@@ -1530,11 +1530,84 @@
     render();
   }
 
+  function openFilePreviewWindow(title, url, fileName){
+    if(!url){ alert('미리보기 URL을 확인하지 못했습니다.'); return; }
+    const safeTitle = escapeHtml(title || '첨부자료 미리보기');
+    const safeFileName = escapeHtml(fileName || '첨부파일');
+    const safeUrl = escapeHtml(url);
+    const lower = String(fileName || url || '').toLowerCase().split('?')[0];
+    const isImage = /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(lower);
+    const viewer = isImage
+      ? `<img class="preview-image" src="${safeUrl}" alt="${safeFileName}">`
+      : `<iframe class="preview-frame" src="${safeUrl}" title="${safeFileName}"></iframe>`;
+
+    const w = window.open('', 'travelFilePreview', 'width=1200,height=920,resizable=yes,scrollbars=yes');
+    if(!w){ alert('팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 시도해주세요.'); return; }
+
+    w.document.open();
+    w.document.write(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${safeTitle}</title>
+  <style>
+    :root{--bg:#f3f6fb;--card:#fff;--line:#dbe3ef;--text:#0f172a;--muted:#64748b;--main:#2563eb;}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif;background:var(--bg);color:var(--text);}
+    .topbar{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:16px 22px;display:flex;align-items:center;justify-content:space-between;gap:14px;}
+    .title{min-width:0}
+    .title h1{margin:0 0 4px;font-size:20px;font-weight:900;letter-spacing:-.04em;}
+    .title p{margin:0;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+    button,.btn{border:0;border-radius:12px;padding:11px 14px;font-weight:900;cursor:pointer;background:var(--main);color:#fff;text-decoration:none;font-size:14px;}
+    .btn-sub{background:#eef2ff;color:#3730a3;}
+    .btn-ghost{background:#f1f5f9;color:#334155;}
+    main{max-width:1180px;margin:0 auto;padding:22px;}
+    .preview-card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 10px 30px rgba(15,23,42,.08);padding:18px;}
+    .file-name{font-weight:900;font-size:16px;margin-bottom:12px;word-break:break-all;}
+    .viewer-shell{background:#f8fafc;border:1px solid var(--line);border-radius:14px;overflow:hidden;min-height:calc(100vh - 190px);}
+    .preview-frame{width:100%;height:calc(100vh - 210px);min-height:720px;border:0;display:block;background:#fff;}
+    .preview-image{display:block;max-width:100%;height:auto;margin:0 auto;background:#fff;}
+    @media print{
+      .topbar{display:none!important}
+      body{background:#fff!important}
+      main{max-width:none;padding:0}
+      .preview-card{border:0;box-shadow:none;border-radius:0;padding:0}
+      .file-name{display:none}
+      .viewer-shell{border:0;border-radius:0;min-height:auto}
+      .preview-frame{height:100vh;min-height:100vh}
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="title">
+      <h1>${safeTitle}</h1>
+      <p>${safeFileName}</p>
+    </div>
+    <div class="actions">
+      <button type="button" onclick="window.print()">인쇄/PDF</button>
+      <a class="btn btn-sub" href="${safeUrl}" target="_blank" rel="noopener">원본열기</a>
+      <button class="btn-ghost" type="button" onclick="window.close()">닫기</button>
+    </div>
+  </div>
+  <main>
+    <section class="preview-card">
+      <div class="file-name">${safeFileName}</div>
+      <div class="viewer-shell">${viewer}</div>
+    </section>
+  </main>
+</body>
+</html>`);
+    w.document.close();
+    w.focus();
+  }
+
   function openPendingDoc(file){
     if(!file) return;
     const url = URL.createObjectURL(file);
-    window.open(url, '_blank');
-    setTimeout(()=>URL.revokeObjectURL(url), 60*1000);
+    openFilePreviewWindow('첨부자료 미리보기', url, file.name || '첨부파일');
   }
 
   async function deleteUploadedDoc(index){
@@ -1552,12 +1625,13 @@
   async function openUploadedDoc(doc){
     const client=db(); if(!client || !doc) return;
     const path=doc.file_path||doc.path||doc.storage_path||doc.url||'';
+    const fileName=doc.file_name||doc.name||doc.filename||doc.original_name||'첨부파일';
     if(!path){ alert('파일 경로를 찾지 못했습니다.'); return; }
-    if(/^https?:/i.test(path)){ window.open(path, '_blank'); return; }
+    if(/^https?:/i.test(path)){ openFilePreviewWindow('첨부자료 미리보기', path, fileName); return; }
     try{
       const signed=await client.storage.from(STORAGE_BUCKET).createSignedUrl(path, 60*10);
       const url=signed?.data?.signedUrl;
-      if(url){ window.open(url, '_blank'); return; }
+      if(url){ openFilePreviewWindow('첨부자료 미리보기', url, fileName); return; }
     }catch(e){ console.warn('[TravelExpense] signed url warning', e); }
     alert('파일을 열 수 없습니다. Storage 정책 또는 파일 경로를 확인해 주세요.');
   }
@@ -1678,8 +1752,7 @@
       const file = item.file;
       if(!file) return;
       const url = URL.createObjectURL(file);
-      window.open(url, '_blank');
-      setTimeout(()=>URL.revokeObjectURL(url), 60*1000);
+      openFilePreviewWindow('영수증 미리보기', url, file.name || '영수증');
       return;
     }
     await openUploadedDoc(item);
