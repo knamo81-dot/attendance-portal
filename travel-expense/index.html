@@ -2364,7 +2364,6 @@
             <button type="button" class="btn-sub" onclick="adminBulkAction('전체 출력')">전체출력</button>
             <button type="button" class="btn-ghost" onclick="adminBulkAction('법인카드 출력')">법인카드출력</button>
             <button type="button" class="btn-ghost" onclick="adminBulkAction('개인지급 출력')">개인지급출력</button>
-            <button type="button" onclick="adminBulkAction('지출결의 완료')">지출결의 완료</button>
           </div>
         </div>
       </section>
@@ -6080,10 +6079,16 @@
   }
 
   function checkedIds(){
-    const checked = Array.from(document.querySelectorAll('.admin-trip-row input[type="checkbox"]:checked')).map(input => input.closest('.admin-trip-row')?.dataset?.requestId).filter(Boolean);
-    if(checked.length) return [...new Set(checked.map(String))];
+    const checked = Array.from(document.querySelectorAll('.admin-trip-row input[type="checkbox"]:checked'))
+      .map(input => input.closest('.admin-trip-row')?.dataset?.requestId)
+      .filter(Boolean);
+    return [...new Set(checked.map(String))];
+  }
+  function activeRequestId(){
     const active = document.querySelector('.admin-trip-row.active')?.dataset?.requestId;
-    return active ? [String(active)] : [];
+    if(active) return String(active);
+    if(typeof window.__travelExpenseSelectedAdminId !== 'undefined' && window.__travelExpenseSelectedAdminId) return String(window.__travelExpenseSelectedAdminId);
+    return '';
   }
   function cachedRow(id){
     const list = Array.isArray(window.__travelExpenseAdminRows) ? window.__travelExpenseAdminRows : [];
@@ -6301,12 +6306,15 @@
     if(mode === 'all' || mode === 'personal') body += await evidenceSection(client, details, 'personal');
     return body;
   }
-  async function printStatement(mode){
+  async function printByIds(ids, mode, scopeLabel){
     mode = mode || 'all';
+    ids = Array.from(new Set((ids || []).map(String).filter(Boolean)));
     const client = db();
     if(!client){ alert('Supabase 연결을 찾지 못했습니다.'); return; }
-    const ids = checkedIds();
-    if(!ids.length){ alert('출력할 신청건을 선택하세요.'); return; }
+    if(!ids.length){
+      alert(scopeLabel === 'selected' ? '출력할 신청건을 먼저 체크하세요.' : '출력할 정산서를 선택하세요.');
+      return;
+    }
     const popup = window.open('', '_blank', 'width=1200,height=920,resizable=yes,scrollbars=yes');
     if(!popup){ alert('팝업이 차단되었습니다. 브라우저 팝업을 허용해 주세요.'); return; }
     popup.document.open();
@@ -6315,7 +6323,8 @@
     try{
       const details = [];
       for(const id of ids) details.push(await loadDetail(client, id));
-      const title = mode === 'corp' ? '법인카드 출장비 정산서' : mode === 'personal' ? '개인지급 출장비 정산서' : '전체 출장비 정산서';
+      const prefix = ids.length > 1 ? '묶음 ' : '';
+      const title = prefix + (mode === 'corp' ? '법인카드 출장비 정산서' : mode === 'personal' ? '개인지급 출장비 정산서' : '전체 출장비 정산서');
       const body = await buildBody(client, details, mode);
       popup.document.open(); popup.document.write(printDocument(title, mode, body)); popup.document.close(); popup.focus();
     }catch(e){
@@ -6323,13 +6332,21 @@
       popup.document.body.innerHTML = '<pre style="white-space:pre-wrap;color:#b91c1c">출력 생성 중 오류가 발생했습니다.\n' + esc(e && e.message ? e.message : e) + '</pre>';
     }
   }
+  async function printStatement(mode){
+    const id = activeRequestId();
+    if(!id){ alert('출력할 정산서를 선택하세요.'); return; }
+    return printByIds([id], mode || 'all', 'single');
+  }
+  async function printCheckedStatement(mode){
+    const ids = checkedIds();
+    if(!ids.length){ alert('출력할 신청건을 먼저 체크하세요.'); return; }
+    return printByIds(ids, mode || 'all', 'selected');
+  }
   window.adminPrintStatement = printStatement;
   window.adminBulkAction = function(action){
-    if(String(action).includes('지출결의')){
-      if(typeof window.adminAdminAction === 'function') return window.adminAdminAction('지출결의완료');
-      alert('지출결의 완료 처리 함수를 찾지 못했습니다.'); return;
-    }
-    return printStatement(String(action).includes('법인카드') ? 'corp' : String(action).includes('개인지급') ? 'personal' : 'all');
+    const label = String(action || '');
+    if(label.includes('지출결의')) return;
+    return printCheckedStatement(label.includes('법인카드') ? 'corp' : label.includes('개인지급') ? 'personal' : 'all');
   };
 })();
 </script>
