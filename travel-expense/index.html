@@ -1530,6 +1530,7 @@
     render();
   }
 
+
   function openFilePreviewWindow(title, url, fileName){
     if(!url){ alert('미리보기 URL을 확인하지 못했습니다.'); return; }
     const safeTitle = escapeHtml(title || '첨부자료 미리보기');
@@ -1603,11 +1604,13 @@
     w.document.close();
     w.focus();
   }
+  window.openTravelExpenseFilePreview = openFilePreviewWindow;
 
   function openPendingDoc(file){
     if(!file) return;
     const url = URL.createObjectURL(file);
     openFilePreviewWindow('첨부자료 미리보기', url, file.name || '첨부파일');
+    setTimeout(()=>URL.revokeObjectURL(url), 60*1000);
   }
 
   async function deleteUploadedDoc(index){
@@ -1625,7 +1628,7 @@
   async function openUploadedDoc(doc){
     const client=db(); if(!client || !doc) return;
     const path=doc.file_path||doc.path||doc.storage_path||doc.url||'';
-    const fileName=doc.file_name||doc.name||doc.filename||doc.original_name||'첨부파일';
+    const fileName = doc.file_name || doc.name || doc.filename || doc.original_name || '첨부파일';
     if(!path){ alert('파일 경로를 찾지 못했습니다.'); return; }
     if(/^https?:/i.test(path)){ openFilePreviewWindow('첨부자료 미리보기', path, fileName); return; }
     try{
@@ -1753,6 +1756,7 @@
       if(!file) return;
       const url = URL.createObjectURL(file);
       openFilePreviewWindow('영수증 미리보기', url, file.name || '영수증');
+      setTimeout(()=>URL.revokeObjectURL(url), 60*1000);
       return;
     }
     await openUploadedDoc(item);
@@ -6261,8 +6265,13 @@
     for(const doc of targets){
       const path = doc.file_path || doc.path || doc.storage_path || doc.url || '';
       if(!path) continue;
+      const fileName = doc.file_name || doc.name || doc.filename || label || '첨부파일';
       if(/^https?:/i.test(path)){
-        window.open(path, '_blank');
+        if(typeof window.openTravelExpenseFilePreview === 'function'){
+          window.openTravelExpenseFilePreview(label || '증빙 미리보기', path, fileName);
+        }else{
+          window.open(path, '_blank');
+        }
         continue;
       }
       const signed = await client.storage.from('travel-expense').createSignedUrl(path, 60 * 10);
@@ -6272,7 +6281,12 @@
         return;
       }
       if(signed.data?.signedUrl){
-        window.open(signed.data.signedUrl, '_blank');
+        const fileName = doc.file_name || doc.name || doc.filename || label || '첨부파일';
+        if(typeof window.openTravelExpenseFilePreview === 'function'){
+          window.openTravelExpenseFilePreview(label || '증빙 미리보기', signed.data.signedUrl, fileName);
+        }else{
+          window.open(signed.data.signedUrl, '_blank');
+        }
       }
     }
   };
