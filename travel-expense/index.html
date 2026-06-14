@@ -6122,7 +6122,7 @@
     if(direct) return direct;
     const km = num(r.total_distance_km || r.distance_km || detail.routes.reduce((s,x)=>s+num(x.distance_km),0));
     const eff = num(r.fuel_efficiency || r.company_fuel_efficiency || r.fuel_efficiency_km_l);
-    const price = num(r.fuel_price || r.gasoline_price || r.applied_fuel_price);
+    const price = num(r.gas_price || r.fuel_price || r.gasoline_price || r.applied_fuel_price);
     if(km && eff && price) return Math.round(km / eff * price);
     return 0;
   }
@@ -6219,7 +6219,7 @@
   function fuelSection(details){
     const rows = [];
     details.forEach(d => {
-      const r = d.row || {}; const price = num(r.fuel_price || r.gasoline_price || r.applied_fuel_price); const eff = num(r.fuel_efficiency || r.company_fuel_efficiency || r.fuel_efficiency_km_l);
+      const r = d.row || {}; const price = num(r.gas_price || r.fuel_price || r.gasoline_price || r.applied_fuel_price); const eff = num(r.fuel_efficiency || r.company_fuel_efficiency || r.fuel_efficiency_km_l);
       const routes = d.routes && d.routes.length ? d.routes : [{from_place:'-', to_place:routeText(d), distance_km:distanceKm(d)}];
       routes.forEach(route => {
         const km = num(route.distance_km); const fuel = eff && price ? Math.round(km / eff * price) : (routes.length === 1 ? fuelAmount(d) : 0);
