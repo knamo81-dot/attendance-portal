@@ -5885,6 +5885,24 @@
     }
     return `<div class="print-file-card"><div class="print-file-name">${name}</div><a href="${esc(url)}" target="_blank">첨부파일 열기</a></div>`;
   }
+
+  function renderReceiptOriginalFile(file, url, item, index, type){
+    const name = esc(file?.file_name || '영수증');
+    const itemName = esc(itemTitle(item));
+    const amount = won(item?.amount);
+    const pay = esc(payTypeOf(item) || (type === 'corp' ? '법인카드' : '개인지급'));
+    const receiptNo = index + 1;
+    if(!url){
+      return `<div class="receipt-original-card"><div class="receipt-original-head"><div><h3>영수증 ${receiptNo}. ${itemName}</h3><p>${pay} · ${amount} · ${name}</p></div></div><div class="print-file-missing">파일 URL을 생성하지 못했습니다.</div></div>`;
+    }
+    if(isImageAttachment(file)){
+      return `<div class="receipt-original-card"><div class="receipt-original-head"><div><h3>영수증 ${receiptNo}. ${itemName}</h3><p>${pay} · ${amount} · ${name}</p></div></div><img class="receipt-original-image" src="${esc(url)}" crossorigin="anonymous" /></div>`;
+    }
+    if(isPdfAttachment(file)){
+      return `<div class="receipt-original-card"><div class="receipt-original-head"><div><h3>영수증 ${receiptNo}. ${itemName}</h3><p>${pay} · ${amount} · ${name}</p></div></div><div class="pdf-render-card receipt-original-render" data-pdf-url="${esc(url)}" data-pdf-crop="receipt"><div class="pdf-loading">영수증 원본 확대 렌더링 준비 중입니다.</div><a class="pdf-open-link" href="${esc(url)}" target="_blank">원본 PDF 새 창에서 열기</a></div></div>`;
+    }
+    return `<div class="receipt-original-card"><div class="receipt-original-head"><div><h3>영수증 ${receiptNo}. ${itemName}</h3><p>${pay} · ${amount} · ${name}</p></div></div><a href="${esc(url)}" target="_blank">첨부파일 열기</a></div>`;
+  }
   function payTypeOf(item){
     return String(item?.pay_type || item?.payment_type || item?.pay || '').trim();
   }
@@ -5951,41 +5969,69 @@
       if(!receiptByItem.has(key)) receiptByItem.set(key, []);
       receiptByItem.get(key).push(r);
     });
-    const title = type === 'corp' ? `${sectionNo}. 법인카드 증빙` : `${sectionNo}. 개인지급 증빙`;
+    const title = type === 'corp' ? `${sectionNo}. 법인카드 증빙 사용내역` : `${sectionNo}. 개인지급 증빙 사용내역`;
     const itemRows = items.length ? items.map((item,i)=>{
       const count = (receiptByItem.get(String(item.id)) || []).length;
-      return `<tr><td>${i+1}</td><td>${esc(itemTitle(item))}</td><td>${esc(payTypeOf(item)||'-')}</td><td class="num">${won(item.amount)}</td><td>${count ? count + '건' : '미첨부'}</td></tr>`;
+      return `<tr><td>${i+1}</td><td>${esc(itemTitle(item))}</td><td>${esc(payTypeOf(item)||'-')}</td><td class="num">${won(item.amount)}</td><td>${count ? '첨부 ' + count + '건' : '미첨부'}</td></tr>`;
     }).join('') : `<tr><td colspan="5" class="empty-cell">해당 사용내역이 없습니다.</td></tr>`;
-    const receiptCards = [];
+    const total = items.reduce((s,i)=>s+num(i.amount),0);
+    return `<section class="print-section evidence-section page-break-avoid">
+      <h2>${title}</h2>
+      <table class="print-table"><thead><tr><th>No</th><th>항목</th><th>구분</th><th>금액</th><th>영수증</th></tr></thead><tbody>${itemRows}</tbody><tfoot><tr><td colspan="3">합계</td><td class="num">${won(total)}</td><td></td></tr></tfoot></table>
+      <div class="formula-note">영수증 원본은 다음 영수증 원본 섹션에서 확대 출력됩니다.</div>
+    </section>`;
+  }
+  async function makeReceiptOriginalSection(client, detail, type, sectionNo){
+    const items = (detail.items || []).filter(item => type === 'corp' ? isCorpItem(item) : !isCorpItem(item));
+    const receipts = (detail.attachments || []).filter(a => (a.file_type||'') === 'receipt');
+    const receiptByItem = new Map();
+    receipts.forEach(r => {
+      const key = String(r.item_id || '');
+      if(!receiptByItem.has(key)) receiptByItem.set(key, []);
+      receiptByItem.get(key).push(r);
+    });
+    const cards = [];
     for(const item of items){
       const files = receiptByItem.get(String(item.id)) || [];
       for(const file of files){
         const url = await signedAttachmentUrl(client, file);
-        receiptCards.push(`<div class="receipt-group-title">${esc(itemTitle(item))} · ${won(item.amount)}</div>${renderPrintFile(file, url)}`);
+        cards.push(renderReceiptOriginalFile(file, url, item, cards.length, type));
       }
     }
-    const total = items.reduce((s,i)=>s+num(i.amount),0);
-    return `<section class="print-section evidence-section">
+    if(!cards.length) return '';
+    const title = type === 'corp' ? `${sectionNo}. 법인카드 영수증 원본` : `${sectionNo}. 개인지급 영수증 원본`;
+    return `<section class="print-section receipt-original-section">
       <h2>${title}</h2>
-      <table class="print-table"><thead><tr><th>No</th><th>항목</th><th>구분</th><th>금액</th><th>영수증</th></tr></thead><tbody>${itemRows}</tbody><tfoot><tr><td colspan="3">합계</td><td class="num">${won(total)}</td><td></td></tr></tfoot></table>
-      <div class="receipt-area">${receiptCards.length ? receiptCards.join('') : '<div class="empty-box">첨부된 영수증이 없습니다.</div>'}</div>
+      <div class="receipt-original-note">스캔 PDF 안의 영수증 영역을 자동으로 찾아 확대 출력합니다. 자동 추출이 어려운 파일은 원본 페이지 기준으로 표시됩니다.</div>
+      ${cards.join('')}
     </section>`;
   }
+
   async function makePrintTripHtml(client, detail, mode){
     const row = detail.row || {};
     const docs = await makeAttachmentSection(client, detail);
     const summary = `<section class="print-section page-break-avoid"><h2>2. 출장비 정산서</h2>${makeSummaryCards(row)}</section>`;
     const fuel = makeFuelSection(detail);
     const sections = [docs, summary, fuel];
-    if(mode === 'all' || mode === 'corp') sections.push(await makeEvidenceSection(client, detail, 'corp', 4));
-    if(mode === 'all') sections.push(await makeEvidenceSection(client, detail, 'personal', 5));
-    if(mode === 'personal') sections.push(await makeEvidenceSection(client, detail, 'personal', 4));
-    return `<article class="print-trip">${sections.join('')}</article>`;
+    if(mode === 'all'){
+      sections.push(await makeEvidenceSection(client, detail, 'corp', 4));
+      sections.push(await makeReceiptOriginalSection(client, detail, 'corp', 5));
+      sections.push(await makeEvidenceSection(client, detail, 'personal', 6));
+      sections.push(await makeReceiptOriginalSection(client, detail, 'personal', 7));
+    }else if(mode === 'corp'){
+      sections.push(await makeEvidenceSection(client, detail, 'corp', 4));
+      sections.push(await makeReceiptOriginalSection(client, detail, 'corp', 5));
+    }else if(mode === 'personal'){
+      sections.push(await makeEvidenceSection(client, detail, 'personal', 4));
+      sections.push(await makeReceiptOriginalSection(client, detail, 'personal', 5));
+    }
+    return `<article class="print-trip">${sections.filter(Boolean).join('')}</article>`;
   }
+
   function makePrintDocument(title, mode, body){
     const today = new Date().toLocaleDateString('ko-KR');
     return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
-      *{box-sizing:border-box} body{margin:0;background:#f3f4f6;color:#111827;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif;} .toolbar{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:#111827;color:white;} .toolbar button{border:0;border-radius:10px;padding:9px 12px;font-weight:800;cursor:pointer;margin-left:6px;} .wrap{max-width:980px;margin:18px auto 40px;padding:0 12px;} .print-title{background:white;border:1px solid #d1d5db;border-radius:14px;padding:16px 18px;margin-bottom:14px;} .print-title h1{margin:0;font-size:22px;text-align:center;} .print-title p{margin:8px 0 0;text-align:right;color:#6b7280;font-size:12px;} .print-trip{background:white;border:1px solid #d1d5db;border-radius:14px;padding:18px;margin-bottom:18px;} .print-section{border:1px solid #d1d5db;border-radius:12px;padding:14px;margin-bottom:14px;background:#fff;} .print-section h2{font-size:16px;margin:0 0 12px;border-bottom:2px solid #111827;padding-bottom:8px;} .summary-cards,.fuel-formula{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;} .fuel-formula{grid-template-columns:2fr repeat(4,1fr);} .summary-cards div,.fuel-formula div{border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#f9fafb;} small{display:block;color:#6b7280;font-size:11px;font-weight:800;margin-bottom:4px;} b{font-size:15px;} .print-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px;} .print-table th,.print-table td{border:1px solid #d1d5db;padding:8px;vertical-align:top;} .print-table th{background:#f3f4f6;} .print-table tfoot td{font-weight:900;background:#f9fafb;} .num{text-align:right;white-space:nowrap;} .empty-cell{text-align:center;color:#6b7280;font-weight:800;} .empty-box{border:1px dashed #cbd5e1;border-radius:12px;padding:18px;text-align:center;color:#6b7280;background:#f8fafc;font-weight:800;} .formula-note{margin:10px 0;padding:10px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;font-size:12px;font-weight:800;color:#92400e;} .print-file-card{border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin:10px 0;break-inside:avoid;background:#fff;} .print-file-name{font-weight:900;margin-bottom:8px;} .print-image{display:block;max-width:100%;height:auto;max-height:240mm;object-fit:contain;margin:0 auto;border:1px solid #e5e7eb;} .pdf-render-card{width:100%;min-height:160px;border:1px solid #e5e7eb;border-radius:8px;background:#f8fafc;padding:10px;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center}.pdf-loading{font-weight:900;color:#64748b}.pdf-open-link{font-size:12px;color:#2563eb;font-weight:900;text-decoration:none}.pdf-page{break-inside:avoid;page-break-inside:avoid;margin:8px auto 12px;text-align:center}.pdf-canvas{display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid #e5e7eb;background:#fff} .print-file-link,.print-file-missing{font-size:12px;color:#6b7280;margin-top:6px;} .receipt-group-title{font-weight:900;margin:12px 0 4px;color:#374151;} .receipt-area{margin-top:12px;} @media print{body{background:white}.toolbar{display:none}.wrap{max-width:none;margin:0;padding:0}.print-title,.print-trip{border:0;border-radius:0;padding:0;margin:0 0 10mm}.print-section{break-inside:auto;page-break-inside:auto;border-color:#9ca3af}.print-section:not(:last-child){break-after:page;page-break-after:always}.print-section:last-child{break-after:auto;page-break-after:auto}.print-file-card,.receipt-card,.evidence-item,.pdf-page{break-inside:avoid;page-break-inside:avoid}.print-doc-section,.evidence-section{break-before:page;page-break-before:always}.pdf-render-card{min-height:40mm}.print-image{max-height:240mm}.page-break-avoid{page-break-inside:avoid}}
+      *{box-sizing:border-box} body{margin:0;background:#f3f4f6;color:#111827;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif;} .toolbar{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:#111827;color:white;} .toolbar button{border:0;border-radius:10px;padding:9px 12px;font-weight:800;cursor:pointer;margin-left:6px;} .wrap{max-width:980px;margin:18px auto 40px;padding:0 12px;} .print-title{background:white;border:1px solid #d1d5db;border-radius:14px;padding:16px 18px;margin-bottom:14px;} .print-title h1{margin:0;font-size:22px;text-align:center;} .print-title p{margin:8px 0 0;text-align:right;color:#6b7280;font-size:12px;} .print-trip{background:white;border:1px solid #d1d5db;border-radius:14px;padding:18px;margin-bottom:18px;} .print-section{border:1px solid #d1d5db;border-radius:12px;padding:14px;margin-bottom:14px;background:#fff;} .print-section h2{font-size:16px;margin:0 0 12px;border-bottom:2px solid #111827;padding-bottom:8px;} .summary-cards,.fuel-formula{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;} .fuel-formula{grid-template-columns:2fr repeat(4,1fr);} .summary-cards div,.fuel-formula div{border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#f9fafb;} small{display:block;color:#6b7280;font-size:11px;font-weight:800;margin-bottom:4px;} b{font-size:15px;} .print-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px;} .print-table th,.print-table td{border:1px solid #d1d5db;padding:8px;vertical-align:top;} .print-table th{background:#f3f4f6;} .print-table tfoot td{font-weight:900;background:#f9fafb;} .num{text-align:right;white-space:nowrap;} .empty-cell{text-align:center;color:#6b7280;font-weight:800;} .empty-box{border:1px dashed #cbd5e1;border-radius:12px;padding:18px;text-align:center;color:#6b7280;background:#f8fafc;font-weight:800;} .formula-note{margin:10px 0;padding:10px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;font-size:12px;font-weight:800;color:#92400e;} .print-file-card{border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin:10px 0;break-inside:avoid;background:#fff;} .receipt-original-note{border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;font-weight:800;line-height:1.55}.receipt-original-card{border:1px solid #dbe3ef;border-radius:14px;padding:14px;margin:12px 0 18px;background:#fff;break-inside:avoid;page-break-inside:avoid}.receipt-original-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:1px solid #e5e7eb;margin-bottom:12px;padding-bottom:10px}.receipt-original-head h3{margin:0 0 4px;font-size:16px}.receipt-original-head p{margin:0;color:#64748b;font-size:12px;font-weight:800}.receipt-original-image{display:block;max-width:100%;width:auto;max-height:none;margin:0 auto;border:1px solid #e5e7eb;background:#fff}.receipt-original-render{min-height:180mm;background:#fff}.receipt-crop-page{break-inside:avoid;page-break-inside:avoid;text-align:center;margin:0 auto 10px}.receipt-crop-canvas{display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid #e5e7eb;background:#fff} .print-file-name{font-weight:900;margin-bottom:8px;} .print-image{display:block;max-width:100%;height:auto;max-height:240mm;object-fit:contain;margin:0 auto;border:1px solid #e5e7eb;} .pdf-render-card{width:100%;min-height:160px;border:1px solid #e5e7eb;border-radius:8px;background:#f8fafc;padding:10px;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center}.pdf-loading{font-weight:900;color:#64748b}.pdf-open-link{font-size:12px;color:#2563eb;font-weight:900;text-decoration:none}.pdf-page{break-inside:avoid;page-break-inside:avoid;margin:8px auto 12px;text-align:center}.pdf-canvas{display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid #e5e7eb;background:#fff} .print-file-link,.print-file-missing{font-size:12px;color:#6b7280;margin-top:6px;} .receipt-group-title{font-weight:900;margin:12px 0 4px;color:#374151;} .receipt-area{margin-top:12px;} @media print{body{background:white}.toolbar{display:none}.wrap{max-width:none;margin:0;padding:0}.print-title,.print-trip{border:0;border-radius:0;padding:0;margin:0 0 10mm}.print-section{break-inside:auto;page-break-inside:auto;border-color:#9ca3af}.print-section:not(:last-child){break-after:page;page-break-after:always}.print-section:last-child{break-after:auto;page-break-after:auto}.receipt-original-section{break-before:page;page-break-before:always}.receipt-original-card:not(:last-child){break-after:page;page-break-after:always}.receipt-original-card:last-child{break-after:auto;page-break-after:auto}.print-file-card,.receipt-card,.evidence-item,.pdf-page,.receipt-original-card,.receipt-crop-page{break-inside:avoid;page-break-inside:avoid}.print-doc-section,.evidence-section{break-before:page;page-break-before:always}.pdf-render-card{min-height:40mm}.print-image{max-height:240mm}.page-break-avoid{page-break-inside:avoid}}
     </style></head><body><div class="toolbar"><div>${esc(title)} · ${esc(printModeLabel(mode))} · ${esc(today)}</div><div><button onclick="printWhenReady()">인쇄/PDF</button><button onclick="window.close()">닫기</button></div></div><div class="wrap"><div class="print-title"><h1>${esc(title)}</h1><p>출력구분: ${esc(printModeLabel(mode))} / 출력일: ${esc(today)}</p></div>${body}</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>
 <script>
@@ -5995,8 +6041,45 @@
     var url = box.getAttribute('data-pdf-url') || '#';
     box.innerHTML = '<div class="file-placeholder">' + (msg || 'PDF 원본 파일입니다.') + '<br><small>브라우저 인쇄 미리보기에서 PDF 뷰어를 직접 출력하지 않고 원본 파일 링크로 표시합니다.</small><br><a class="pdf-open-link" href="' + url.replace(/"/g,'&quot;') + '" target="_blank">원본 PDF 새 창에서 열기</a></div>';
   }
+  function cropCanvasByContent(source){
+    var ctx = source.getContext('2d');
+    var w = source.width, h = source.height;
+    var data;
+    try{ data = ctx.getImageData(0, 0, w, h).data; }catch(e){ return source; }
+    var minX=w, minY=h, maxX=0, maxY=0;
+    var found=false;
+    var step = Math.max(1, Math.floor(Math.min(w,h)/900));
+    for(var y=0; y<h; y+=step){
+      for(var x=0; x<w; x+=step){
+        var i=(y*w+x)*4;
+        var r=data[i], g=data[i+1], b=data[i+2], a=data[i+3];
+        if(a > 20 && (r < 238 || g < 238 || b < 238)){
+          found=true;
+          if(x<minX) minX=x; if(x>maxX) maxX=x;
+          if(y<minY) minY=y; if(y>maxY) maxY=y;
+        }
+      }
+    }
+    if(!found) return source;
+    var margin = Math.round(Math.max(w,h) * 0.025);
+    minX = Math.max(0, minX - margin);
+    minY = Math.max(0, minY - margin);
+    maxX = Math.min(w, maxX + margin);
+    maxY = Math.min(h, maxY + margin);
+    var cw = Math.max(1, maxX - minX);
+    var ch = Math.max(1, maxY - minY);
+    if(cw > w * 0.92 && ch > h * 0.92) return source;
+    if(cw < w * 0.06 || ch < h * 0.06) return source;
+    var out = document.createElement('canvas');
+    out.className = 'receipt-crop-canvas';
+    out.width = cw;
+    out.height = ch;
+    out.getContext('2d').drawImage(source, minX, minY, cw, ch, 0, 0, cw, ch);
+    return out;
+  }
   async function renderOne(box){
     var url = box.getAttribute('data-pdf-url');
+    var shouldCrop = box.getAttribute('data-pdf-crop') === 'receipt';
     if(!url){ setFallback(box, 'PDF URL을 찾지 못했습니다.'); return; }
     if(!window.pdfjsLib){ setFallback(box, 'PDF 렌더러를 불러오지 못했습니다.'); return; }
     try{
@@ -6005,15 +6088,17 @@
       box.innerHTML = '';
       for(var p=1; p<=pdf.numPages; p++){
         var page = await pdf.getPage(p);
-        var viewport = page.getViewport({scale:1.35});
+        var viewport = page.getViewport({scale: shouldCrop ? 2.35 : 1.35});
         var canvas = document.createElement('canvas');
-        canvas.className = 'pdf-canvas';
+        canvas.className = shouldCrop ? 'receipt-crop-canvas' : 'pdf-canvas';
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
         await page.render({canvasContext:canvas.getContext('2d'), viewport:viewport}).promise;
+        var outputCanvas = shouldCrop ? cropCanvasByContent(canvas) : canvas;
+        if(shouldCrop) outputCanvas.className = 'receipt-crop-canvas';
         var wrap = document.createElement('div');
-        wrap.className = 'pdf-page';
-        wrap.appendChild(canvas);
+        wrap.className = shouldCrop ? 'receipt-crop-page' : 'pdf-page';
+        wrap.appendChild(outputCanvas);
         box.appendChild(wrap);
       }
     }catch(e){
