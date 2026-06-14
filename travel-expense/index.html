@@ -2344,7 +2344,6 @@
             <select id="adminStatusFilter" onchange="adminFilterChanged()">
               <option value="all">전체</option>
               <option value="검토대기">검토대기</option>
-              <option value="수정요청">수정요청</option>
               <option value="승인">승인</option>
               <option value="지출결의완료">지출결의완료</option>
             </select>
@@ -5501,7 +5500,7 @@
   function filteredRows(){
     const q = String($('adminSearch')?.value || '').toLowerCase().trim();
     const st = $('adminStatusFilter')?.value || 'all';
-    let list = rows.filter(row => String(row.status || '') !== '임시저장');
+    let list = rows.filter(row => !['임시저장','수정요청'].includes(String(row.status || '')));
     if(st !== 'all') list = list.filter(row => String(row.status || '') === st);
     if(q){
       list = list.filter(row => (`${row.applicant_name||''} ${row.division_name||''} ${row.team_name||''} ${row.trip_type||''} ${row.trip_date||''} ${row.transport||''} ${row.status||''}`).toLowerCase().includes(q));
@@ -5724,13 +5723,22 @@
       status: nextStatus,
       voucher_date: $('adminVoucherDate')?.value || null,
       payment_due_date: $('adminPaymentDueDate')?.value || null,
+      manager_memo: $('adminManagerMemo')?.value || '',
     };
 
     const res = await client.from('travel_expense_requests').update(payload).eq('id', selectedId);
     if(res.error){ alert('상태 변경 중 오류가 발생했습니다: ' + res.error.message); return; }
     detailCache.delete(selectedId);
+    const changedId = selectedId;
     await loadAdminRows();
-    await selectAdminRequest(selectedId);
+    if(nextStatus === '수정요청'){
+      selectedId = '';
+      const panel = $('adminDetailPanel');
+      if(panel) panel.innerHTML = '<div class="admin-detail-empty">검토할 정산서를 선택하세요.</div>';
+      updateAdminSelectedSummary();
+    }else{
+      await selectAdminRequest(changedId);
+    }
     if(window.refreshMonthlyProcessSummary) window.refreshMonthlyProcessSummary();
     alert(nextStatus + ' 처리되었습니다.');
   }
@@ -5741,6 +5749,7 @@
     const payload = {
       voucher_date: $('adminVoucherDate')?.value || null,
       payment_due_date: $('adminPaymentDueDate')?.value || null,
+      manager_memo: $('adminManagerMemo')?.value || '',
     };
     const res = await client.from('travel_expense_requests').update(payload).eq('id', selectedId);
     if(res.error){ alert('검토 결과 수정 중 오류가 발생했습니다: ' + res.error.message); return; }
@@ -5770,11 +5779,11 @@
   async function updateDates(id){
     const client = db();
     if(!client || !id) return;
-    const payload = { voucher_date: $('adminVoucherDate')?.value || null, payment_due_date: $('adminPaymentDueDate')?.value || null };
+    const payload = { voucher_date: $('adminVoucherDate')?.value || null, payment_due_date: $('adminPaymentDueDate')?.value || null, manager_memo: $('adminManagerMemo')?.value || '' };
     const res = await client.from('travel_expense_requests').update(payload).eq('id', id);
     if(res.error){ alert('처리일정 저장 중 오류가 발생했습니다: ' + res.error.message); return; }
     const row = rows.find(r => String(r.id) === String(id));
-    if(row){ row.voucher_date = payload.voucher_date; row.payment_due_date = payload.payment_due_date; }
+    if(row){ row.voucher_date = payload.voucher_date; row.payment_due_date = payload.payment_due_date; row.manager_memo = payload.manager_memo; }
     detailCache.delete(id);
   }
   function printModeLabel(mode){
