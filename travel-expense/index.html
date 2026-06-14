@@ -3373,135 +3373,6 @@
     </section>
     ${evidencePages(printTrips, mode)}
   </div>
-
-
-<script id="travel-expense-cross-screen-refresh-final">
-(function(){
-  if(window.__travelExpenseCrossScreenRefreshFinalInstalled) return;
-  window.__travelExpenseCrossScreenRefreshFinalInstalled = true;
-
-  const safeCall = async function(fn, ...args){
-    try{
-      if(typeof fn === 'function') return await fn.apply(window, args);
-    }catch(e){
-      console.warn('[TravelExpense] cross screen refresh warning', e);
-    }
-    return null;
-  };
-
-  function getCurrentApplicantRequestId(){
-    const activeCard = document.querySelector('.submission-scroll .list-card[style*="37, 99, 235"], .submission-scroll .list-card[style*="#2563eb"]');
-    if(activeCard && activeCard.dataset && activeCard.dataset.requestId) return activeCard.dataset.requestId;
-    return window.__travelExpenseCurrentApplicantRequestId || '';
-  }
-
-  async function refreshApplicantScreen(options){
-    const keepDetail = !!(options && options.keepDetail);
-    await safeCall(window.loadMyRequests || window.refreshCards);
-    await safeCall(window.refreshMonthlyProcessSummary || window.refreshTravelExpenseMyCards);
-    const id = keepDetail ? getCurrentApplicantRequestId() : '';
-    if(id && typeof window.loadTravelExpenseRequest === 'function'){
-      await safeCall(window.loadTravelExpenseRequest, id);
-    }
-  }
-
-  async function refreshAdminScreen(){
-    await safeCall(window.travelExpenseAdminRefresh || window.loadTravelExpenseAdminRequests);
-    await safeCall(window.refreshMonthlyProcessSummary || window.refreshTravelExpenseMyCards);
-  }
-
-  async function refreshBothScreens(options){
-    await refreshApplicantScreen(options || {});
-    await refreshAdminScreen();
-  }
-
-  function scheduleRefreshBoth(options){
-    [80, 250, 700, 1300].forEach(ms => setTimeout(() => refreshBothScreens(options), ms));
-  }
-
-  function wrapAsyncFunction(name, after){
-    const original = window[name];
-    if(typeof original !== 'function' || original.__travelExpenseCrossScreenRefreshWrapped) return false;
-    const wrapped = async function(){
-      const result = await original.apply(this, arguments);
-      try{ await after(result, arguments); }catch(e){ console.warn('[TravelExpense] refresh wrapper warning', e); }
-      return result;
-    };
-    wrapped.__travelExpenseCrossScreenRefreshWrapped = true;
-    window[name] = wrapped;
-    return true;
-  }
-
-  function wrapSyncFunction(name, after){
-    const original = window[name];
-    if(typeof original !== 'function' || original.__travelExpenseCrossScreenRefreshWrapped) return false;
-    const wrapped = function(){
-      const result = original.apply(this, arguments);
-      try{ after(result, arguments); }catch(e){ console.warn('[TravelExpense] refresh wrapper warning', e); }
-      return result;
-    };
-    wrapped.__travelExpenseCrossScreenRefreshWrapped = true;
-    window[name] = wrapped;
-    return true;
-  }
-
-  function patchFunctions(){
-    wrapAsyncFunction('saveTravelExpenseDraft', async () => { await refreshBothScreens({keepDetail:true}); scheduleRefreshBoth({keepDetail:true}); });
-    wrapAsyncFunction('submitTravelExpense', async () => { await refreshBothScreens({keepDetail:true}); scheduleRefreshBoth({keepDetail:true}); });
-    wrapAsyncFunction('recallTravelExpenseRequest', async () => { await refreshBothScreens({keepDetail:false}); scheduleRefreshBoth({keepDetail:false}); });
-    wrapAsyncFunction('deleteTravelExpenseRequest', async () => { await refreshBothScreens({keepDetail:false}); scheduleRefreshBoth({keepDetail:false}); });
-    wrapAsyncFunction('adminAdminAction', async () => { await refreshBothScreens({keepDetail:true}); scheduleRefreshBoth({keepDetail:true}); });
-    wrapAsyncFunction('adminSaveReviewChanges', async () => { await refreshBothScreens({keepDetail:true}); scheduleRefreshBoth({keepDetail:true}); });
-    wrapAsyncFunction('adminCancelStatus', async () => { await refreshBothScreens({keepDetail:true}); scheduleRefreshBoth({keepDetail:true}); });
-    wrapSyncFunction('adminBulkAction', () => { scheduleRefreshBoth({keepDetail:true}); });
-
-    if(typeof window.setMode === 'function' && !window.setMode.__travelExpenseCrossScreenRefreshWrapped){
-      const originalSetMode = window.setMode;
-      const wrappedSetMode = function(mode, btn){
-        const result = originalSetMode.apply(this, arguments);
-        const normalized = mode === 'admin' ? 'admin' : 'user';
-        if(normalized === 'admin'){
-          setTimeout(refreshAdminScreen, 80);
-          setTimeout(refreshAdminScreen, 500);
-        }else{
-          setTimeout(() => refreshApplicantScreen({keepDetail:true}), 80);
-          setTimeout(() => refreshApplicantScreen({keepDetail:true}), 500);
-        }
-        return result;
-      };
-      wrappedSetMode.__travelExpenseCrossScreenRefreshWrapped = true;
-      window.setMode = wrappedSetMode;
-    }
-  }
-
-  document.addEventListener('click', function(event){
-    const card = event.target.closest && event.target.closest('.submission-scroll .list-card');
-    if(card && card.dataset && card.dataset.requestId){
-      window.__travelExpenseCurrentApplicantRequestId = card.dataset.requestId;
-    }
-
-    const text = String((event.target && event.target.textContent) || '').trim();
-    if(text.includes('제출하기') || text.includes('임시저장') || text.includes('회수') || text.includes('삭제') || text.includes('수정요청') || text.includes('승인') || text.includes('저장')){
-      scheduleRefreshBoth({keepDetail:true});
-    }
-  }, true);
-
-  window.refreshTravelExpenseScreens = refreshBothScreens;
-  window.refreshTravelExpenseApplicantScreen = refreshApplicantScreen;
-  window.refreshTravelExpenseAdminScreen = refreshAdminScreen;
-
-  function init(){
-    patchFunctions();
-    scheduleRefreshBoth({keepDetail:false});
-  }
-
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
-  setTimeout(init, 500);
-  setTimeout(init, 1500);
-})();
-</script>
-
 </body>
 </html>`;
   }
@@ -6548,6 +6419,140 @@
     if(label.includes('지출결의')) return;
     return printCheckedStatement(label.includes('법인카드') ? 'corp' : label.includes('개인지급') ? 'personal' : 'all');
   };
+})();
+</script>
+
+
+<script id="travel-expense-screen-sync-final-safe">
+(function(){
+  if(window.__travelExpenseScreenSyncFinalSafeInstalled) return;
+  window.__travelExpenseScreenSyncFinalSafeInstalled = true;
+
+  function safe(fn, fallback){ try { return fn(); } catch(e){ return fallback; } }
+  function hasClient(v){ return !!(v && typeof v.from === 'function'); }
+  function findDb(scope){
+    if(!scope) return null;
+    var names=['supabaseClient','supabase_client','sb','db','database','portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB','__supabaseClient','__SUPABASE_CLIENT__','client'];
+    for(var i=0;i<names.length;i++){ var v=safe(function(){ return scope[names[i]]; }, null); if(hasClient(v)) return v; }
+    var keys=safe(function(){ return Object.keys(scope); }, []);
+    for(var k=0;k<keys.length;k++){
+      if(keys[k] === 'supabase') continue;
+      var value=safe(function(){ return scope[keys[k]]; }, null);
+      if(hasClient(value)) return value;
+    }
+    return null;
+  }
+  function client(){ return findDb(safe(function(){ return window.parent; }, null)) || findDb(window); }
+  function pick(o, keys){
+    for(var i=0;i<keys.length;i++){
+      var v=o && o[keys[i]];
+      if(v !== undefined && v !== null && v !== '') return v;
+    }
+    return '';
+  }
+  function session(){
+    return safe(function(){ return window.portalSession; }, null)
+      || safe(function(){ return window.parent && window.parent.portalSession; }, null)
+      || safe(function(){ return window.parent && window.parent.__PORTAL_SESSION__; }, null)
+      || safe(function(){ return JSON.parse(sessionStorage.getItem('portalSession') || 'null'); }, null)
+      || safe(function(){ return JSON.parse(localStorage.getItem('portalSession') || 'null'); }, null)
+      || {};
+  }
+  function profile(){
+    var s=session();
+    var user=s.user||s.currentUser||s.profile||s;
+    var emp=s.employee||s.employeeInfo||s.matchedEmployee||s.staff||s.employeeProfile||{};
+    var company=s.company||s.activeCompany||{};
+    return {
+      companyId:s.activeCompanyId||s.companyId||s.company_id||pick(company,['id','company_id','companyId'])||pick(user,['company_id','companyId'])||pick(emp,['company_id','companyId'])||'',
+      employeeNo:pick(emp,['employee_no','employeeNo'])||pick(user,['employee_no','employeeNo'])||''
+    };
+  }
+  function money(v){ return (Number(v||0)).toLocaleString('ko-KR')+'원'; }
+  function esc(v){ return String(v == null ? '' : v).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); }
+
+  async function refreshApplicant(){
+    var db=client(); var p=profile();
+    if(!db || !p.companyId) return;
+    var box=document.querySelector('.submission-scroll');
+    if(!box) return;
+    var q=db.from('travel_expense_requests').select('*').eq('company_id', p.companyId).order('created_at', {ascending:false});
+    if(p.employeeNo) q=q.eq('applicant_employee_no', p.employeeNo);
+    var res=await q;
+    if(res.error){ console.warn('[TravelExpense] applicant refresh failed', res.error); return; }
+    var rows=Array.isArray(res.data) ? res.data : [];
+    if(!rows.length){ box.innerHTML='<div class="notice empty-state">제출 내역이 없습니다.</div>'; return; }
+    box.innerHTML=rows.map(function(row){
+      var status=row.status||'검토대기';
+      var menu='';
+      if(status === '임시저장' || status === '수정요청'){
+        menu='<div class="my-card-actions" data-action-key="edit|delete" data-request-id="'+esc(row.id)+'" onclick="event.stopPropagation()"><button type="button" class="edit-btn" data-edit-id="'+esc(row.id)+'" data-edit-status="'+esc(status)+'">수정</button><button type="button" class="delete-btn" data-delete-id="'+esc(row.id)+'">삭제</button></div>';
+      }else if(status === '검토대기'){
+        menu='<div class="my-card-actions" data-action-key="recall|delete" data-request-id="'+esc(row.id)+'" onclick="event.stopPropagation()"><button type="button" class="recall-btn" data-recall-id="'+esc(row.id)+'">회수</button><button type="button" class="delete-btn" data-delete-id="'+esc(row.id)+'">삭제</button></div>';
+      }
+      var memo='';
+      if(status === '수정요청' && row.manager_memo){
+        memo='<div class="manager-memo-card"><b>관리팀 수정요청 메모</b><span>'+esc(row.manager_memo)+'</span></div>';
+      }
+      return '<div class="list-card" data-request-id="'+esc(row.id)+'" data-status="'+esc(status)+'"><div class="list-top"><div class="list-title">'+esc(row.trip_type||'출장')+' · '+esc(row.trip_date||'-')+'</div><span class="status s-wait">'+esc(status)+'</span></div><div class="meta">신청자: '+esc(row.applicant_name||'-')+'<br>본부/팀: '+esc(row.division_name||'-')+' / '+esc(row.team_name||'-')+'<br>총액: '+money(row.total_amount||0)+' · 개인지급: '+money(row.personal_amount||0)+'</div>'+memo+menu+'</div>';
+    }).join('');
+  }
+
+  async function refreshAdmin(){
+    if(typeof window.travelExpenseAdminRefresh === 'function'){
+      try { await window.travelExpenseAdminRefresh(); } catch(e){ console.warn('[TravelExpense] admin refresh failed', e); }
+    }else if(typeof window.loadTravelExpenseAdminRequests === 'function'){
+      try { await window.loadTravelExpenseAdminRequests(); } catch(e){ console.warn('[TravelExpense] admin refresh failed', e); }
+    }
+  }
+
+  var timer=null;
+  function refreshAll(delay){
+    clearTimeout(timer);
+    timer=setTimeout(function(){
+      Promise.resolve(refreshApplicant()).then(refreshAdmin).catch(function(e){ console.warn('[TravelExpense] screen refresh failed', e); });
+    }, delay == null ? 250 : delay);
+  }
+
+  function wrap(name){
+    var original=window[name];
+    if(typeof original !== 'function' || original.__screenSyncWrapped) return;
+    window[name]=function(){
+      var result=original.apply(this, arguments);
+      Promise.resolve(result).finally(function(){ refreshAll(350); refreshAll(1000); });
+      return result;
+    };
+    window[name].__screenSyncWrapped=true;
+  }
+
+  function install(){
+    ['submitTravelExpense','saveTravelExpenseDraft','adminAdminAction','adminSaveReviewChanges','adminCancelStatus'].forEach(wrap);
+    if(typeof window.setMode === 'function' && !window.setMode.__screenSyncWrapped){
+      var old=window.setMode;
+      window.setMode=function(mode, btn){
+        var result=old.apply(this, arguments);
+        if(mode === 'admin') setTimeout(refreshAdmin, 120);
+        else setTimeout(refreshApplicant, 120);
+        return result;
+      };
+      window.setMode.__screenSyncWrapped=true;
+    }
+    refreshAll(700);
+  }
+
+  document.addEventListener('click', function(e){
+    var txt=String((e.target && e.target.textContent) || '').trim();
+    if(/제출하기|임시저장|수정요청|승인|저장|취소|회수|삭제/.test(txt)) refreshAll(900);
+  }, true);
+
+  window.refreshTravelExpenseScreens=function(){ refreshAll(0); };
+  window.refreshTravelExpenseApplicantScreen=refreshApplicant;
+  window.refreshTravelExpenseAdminScreen=refreshAdmin;
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
+  else install();
+  setTimeout(install, 600);
+  setTimeout(install, 1600);
 })();
 </script>
 </body>
