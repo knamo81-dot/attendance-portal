@@ -2736,12 +2736,7 @@
           <h2>${trip.title}</h2>
           <p>${trip.applicant} · ${trip.division || '연구본부'} · ${trip.team || trip.dept} · ${trip.tripDate} · ${trip.routeText}</p>
         </div>
-        <div class="admin-detail-buttons">
-          <button type="button" onclick="adminPrintStatement('all')">전체출력</button>
-          <button type="button" class="btn-ghost" onclick="adminPrintStatement('corp')">법인카드출력</button>
-          <button type="button" class="btn-ghost" onclick="adminPrintStatement('personal')">개인지급출력</button>
-        </div>
-      </div>
+</div>
       <div class="admin-mini-summary">
         <div class="admin-mini-card"><small>상태</small><b>${trip.status}</b></div>
         <div class="admin-mini-card"><small>총액</small><b>${won(t.total)}</b></div>
@@ -5711,12 +5706,7 @@
     if(!panel || !row) return;
     panel.innerHTML = `<div class="admin-detail-top">
       <div class="admin-detail-title"><h2>${esc(row.applicant_name||'-')} 정산서</h2><p>${esc(row.division_name||'-')} · ${esc(row.team_name||'-')} · ${esc(row.trip_date||'-')} · ${esc(row.transport||'-')}</p></div>
-      <div class="admin-detail-buttons">
-        <button type="button" onclick="window.adminPrintStatement && window.adminPrintStatement('all')">전체출력</button>
-        <button type="button" class="btn-ghost" onclick="window.adminPrintStatement && window.adminPrintStatement('corp')">법인카드출력</button>
-        <button type="button" class="btn-ghost" onclick="window.adminPrintStatement && window.adminPrintStatement('personal')">개인지급출력</button>
-      </div>
-    </div>
+</div>
     <div class="admin-mini-summary">
       <div class="admin-mini-card"><small>상태</small><b>${esc(row.status||'-')}</b></div>
       <div class="admin-mini-card"><small>총액</small><b>${won(row.total_amount)}</b></div>
