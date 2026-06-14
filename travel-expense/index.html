@@ -2364,7 +2364,6 @@
             <button type="button" class="btn-sub" onclick="adminBulkAction('전체 출력')">전체출력</button>
             <button type="button" class="btn-ghost" onclick="adminBulkAction('법인카드 출력')">법인카드출력</button>
             <button type="button" class="btn-ghost" onclick="adminBulkAction('개인지급 출력')">개인지급출력</button>
-            <button type="button" onclick="adminBulkAction('지출결의 완료')">지출결의 완료</button>
           </div>
         </div>
       </section>
@@ -3353,6 +3352,21 @@
     </section>
     ${evidencePages(printTrips, mode)}
   </div>
+
+<script id="travel-expense-print-scope-fixed-dom-cleanup">
+(function(){
+  function cleanupBulkButtons(){
+    document.querySelectorAll('.admin-bulk-actions button').forEach(function(btn){
+      if(String(btn.textContent || '').replace(/\s+/g,'').includes('지출결의완료') || String(btn.textContent || '').replace(/\s+/g,'').includes('지출결의')){
+        btn.remove();
+      }
+    });
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', cleanupBulkButtons); else cleanupBulkButtons();
+  setTimeout(cleanupBulkButtons, 500);
+  setTimeout(cleanupBulkButtons, 1500);
+})();
+</script>
 </body>
 </html>`;
   }
@@ -6080,8 +6094,12 @@
   }
 
   function checkedIds(){
-    const checked = Array.from(document.querySelectorAll('.admin-trip-row input[type="checkbox"]:checked')).map(input => input.closest('.admin-trip-row')?.dataset?.requestId).filter(Boolean);
-    if(checked.length) return [...new Set(checked.map(String))];
+    const checked = Array.from(document.querySelectorAll('.admin-trip-row input[type="checkbox"]:checked'))
+      .map(input => input.closest('.admin-trip-row')?.dataset?.requestId)
+      .filter(Boolean);
+    return [...new Set(checked.map(String))];
+  }
+  function activeIds(){
     const active = document.querySelector('.admin-trip-row.active')?.dataset?.requestId;
     return active ? [String(active)] : [];
   }
@@ -6301,11 +6319,11 @@
     if(mode === 'all' || mode === 'personal') body += await evidenceSection(client, details, 'personal');
     return body;
   }
-  async function printStatement(mode){
+  async function printStatement(mode, idsOverride){
     mode = mode || 'all';
     const client = db();
     if(!client){ alert('Supabase 연결을 찾지 못했습니다.'); return; }
-    const ids = checkedIds();
+    const ids = Array.isArray(idsOverride) ? [...new Set(idsOverride.map(String).filter(Boolean))] : activeIds();
     if(!ids.length){ alert('출력할 신청건을 선택하세요.'); return; }
     const popup = window.open('', '_blank', 'width=1200,height=920,resizable=yes,scrollbars=yes');
     if(!popup){ alert('팝업이 차단되었습니다. 브라우저 팝업을 허용해 주세요.'); return; }
@@ -6323,14 +6341,39 @@
       popup.document.body.innerHTML = '<pre style="white-space:pre-wrap;color:#b91c1c">출력 생성 중 오류가 발생했습니다.\n' + esc(e && e.message ? e.message : e) + '</pre>';
     }
   }
-  window.adminPrintStatement = printStatement;
+  function modeFromAction(action){
+    const text = String(action || '');
+    return text.includes('법인카드') ? 'corp' : text.includes('개인지급') ? 'personal' : 'all';
+  }
+  async function printCurrentStatement(mode){
+    const ids = activeIds();
+    if(!ids.length){ alert('오른쪽 상세화면에서 출력할 신청건을 선택하세요.'); return; }
+    return printStatement(mode, ids);
+  }
+  async function printCheckedStatement(mode){
+    const ids = checkedIds();
+    if(!ids.length){ alert('왼쪽 제출목록에서 출력할 신청건을 체크하세요.'); return; }
+    return printStatement(mode, ids);
+  }
+  window.adminPrintStatement = printCurrentStatement;
   window.adminBulkAction = function(action){
-    if(String(action).includes('지출결의')){
-      if(typeof window.adminAdminAction === 'function') return window.adminAdminAction('지출결의완료');
-      alert('지출결의 완료 처리 함수를 찾지 못했습니다.'); return;
-    }
-    return printStatement(String(action).includes('법인카드') ? 'corp' : String(action).includes('개인지급') ? 'personal' : 'all');
+    return printCheckedStatement(modeFromAction(action));
   };
+})();
+</script>
+
+<script id="travel-expense-print-scope-fixed-dom-cleanup">
+(function(){
+  function cleanupBulkButtons(){
+    document.querySelectorAll('.admin-bulk-actions button').forEach(function(btn){
+      if(String(btn.textContent || '').replace(/\s+/g,'').includes('지출결의완료') || String(btn.textContent || '').replace(/\s+/g,'').includes('지출결의')){
+        btn.remove();
+      }
+    });
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', cleanupBulkButtons); else cleanupBulkButtons();
+  setTimeout(cleanupBulkButtons, 500);
+  setTimeout(cleanupBulkButtons, 1500);
 })();
 </script>
 </body>
