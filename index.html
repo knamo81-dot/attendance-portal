@@ -3114,10 +3114,15 @@ body.auth-loading .top-user-bar {
   function getPortalAppRoleForTabs(appKey) {
     const session = window.portalSession || window.currentPortalSession || {};
     const appRoles = session.appRoles || session.app_roles || {};
+    const appRole = appRoles?.[appKey];
     const role =
-      appRoles?.[appKey]?.role ||
-      appRoles?.[appKey]?.role_key ||
+      (typeof appRole === 'string' ? appRole : '') ||
+      appRole?.role ||
+      appRole?.role_key ||
+      appRole?.permission ||
+      appRole?.permission_key ||
       session?.appRoles?.[appKey]?.role ||
+      session?.app_roles?.[appKey]?.role ||
       '';
 
     const normalized = String(role || '').trim().toLowerCase();
@@ -3128,24 +3133,75 @@ body.auth-loading .top-user-bar {
     return normalized || 'user';
   }
 
+  function isPortalOperatorRole(role) {
+    const normalized = String(role || '').trim().toLowerCase();
+    return normalized === 'admin' || normalized === 'operator';
+  }
+
   function isReagentRequestTab(tab) {
     const id = String(tab?.id || '').trim().toLowerCase();
     const label = String(tab?.label || '').replace(/\s+/g, '').trim();
     return id === 'request' || id === 'product-request' || label === '제품신청' || label === '신청';
   }
 
+  function isTravelExpenseApplicantTab(tab) {
+    const id = String(tab?.id || '').trim().toLowerCase();
+    const label = String(tab?.label || '').replace(/\s+/g, '').trim();
+    return (
+      id === 'user' ||
+      id === 'applicant' ||
+      id === 'request' ||
+      id === 'expense-user' ||
+      id === 'travel-user' ||
+      label === '출장자입력화면' ||
+      label === '출장자입력' ||
+      label === '신청'
+    );
+  }
+
+  function isTravelExpenseAdminTab(tab) {
+    const id = String(tab?.id || '').trim().toLowerCase();
+    const label = String(tab?.label || '').replace(/\s+/g, '').trim();
+    return (
+      id === 'admin' ||
+      id === 'review' ||
+      id === 'manager' ||
+      id === 'expense-admin' ||
+      id === 'travel-admin' ||
+      label === '관리팀검토화면' ||
+      label === '관리팀검토' ||
+      label === '검토화면'
+    );
+  }
+
   function filterPortalTabsByAppRole(tabs) {
     const normalizedTabs = normalizePortalTabs(tabs);
     const currentSrc = normalizePortalSrc(frame?.getAttribute('src') || frame?.src || '');
-    if (currentSrc !== 'reagent/index.html') return normalizedTabs;
 
-    const reagentRole = getPortalAppRoleForTabs('reagent');
-    const canOperate = reagentRole === 'admin' || reagentRole === 'operator';
+    if (currentSrc === 'reagent/index.html') {
+      const reagentRole = getPortalAppRoleForTabs('reagent');
+      const canOperate = isPortalOperatorRole(reagentRole);
 
-    if (canOperate) return normalizedTabs;
+      if (canOperate) return normalizedTabs;
 
-    const requestTabs = normalizedTabs.filter(isReagentRequestTab);
-    return requestTabs.length ? requestTabs : [{ id: 'request', label: '제품신청' }];
+      const requestTabs = normalizedTabs.filter(isReagentRequestTab);
+      return requestTabs.length ? requestTabs : [{ id: 'request', label: '제품신청' }];
+    }
+
+    if (currentSrc === 'travel-expense/index.html') {
+      const travelRole = getPortalAppRoleForTabs('travel_expense');
+      const canReview = isPortalOperatorRole(travelRole);
+
+      if (canReview) return normalizedTabs;
+
+      const applicantTabs = normalizedTabs.filter(function (tab) {
+        return isTravelExpenseApplicantTab(tab) || !isTravelExpenseAdminTab(tab);
+      });
+
+      return applicantTabs.length ? applicantTabs : [{ id: 'user', label: '출장자 입력 화면' }];
+    }
+
+    return normalizedTabs;
   }
 
   function getPortalTabSignature(tabs) {
