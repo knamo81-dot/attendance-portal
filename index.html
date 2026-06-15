@@ -3319,6 +3319,17 @@ body.auth-loading .top-user-bar {
 
   function sendPortalTabChange(tabId) {
     if (!frame || !frame.contentWindow || !tabId) return;
+
+    const currentSrc = normalizePortalSrc(frame.getAttribute('src') || frame.src || '');
+    if (currentSrc === 'travel-expense/index.html' && isTravelExpenseAdminTab({ id: tabId, label: tabId })) {
+      const travelRole = getPortalAppRoleForTabs('travel_expense');
+      if (!isPortalOperatorRole(travelRole)) {
+        const fallbackTab = currentPortalTabs.find(isTravelExpenseApplicantTab) || currentPortalTabs[0] || { id: 'expense-user', label: '출장자 입력 화면' };
+        setPortalSubtabActive(fallbackTab.id, false);
+        tabId = fallbackTab.id;
+      }
+    }
+
     const tab = currentPortalTabs.find(function (item) { return item.id === tabId; }) || null;
 
     try {
