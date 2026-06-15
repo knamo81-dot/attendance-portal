@@ -2218,7 +2218,7 @@
   <main>
     <div class="tabs">
       <button class="tab active" onclick="setMode('user', this)">출장자 입력 화면</button>
-      <button class="tab" onclick="setMode('admin', this)">관리팀 검토 화면</button>
+      <button class="tab" data-travel-admin-tab="1" onclick="setMode('admin', this)">관리팀 검토 화면</button>
     </div>
 
     <div class="user-view">
@@ -2714,7 +2714,17 @@
   }
 
   function setMode(mode, btn){
-    const normalizedMode = mode === 'admin' ? 'admin' : 'user';
+    const requestedMode = mode === 'admin' ? 'admin' : 'user';
+    const canUseAdmin = typeof window.hasTravelExpenseAdminAccess === 'function'
+      ? window.hasTravelExpenseAdminAccess()
+      : false;
+    const normalizedMode = (requestedMode === 'admin' && canUseAdmin) ? 'admin' : 'user';
+
+    if(requestedMode === 'admin' && !canUseAdmin){
+      if(typeof window.applyTravelExpenseAccessControl === 'function') window.applyTravelExpenseAccessControl();
+      alert('관리팀 검토 화면은 운영자/관리자만 사용할 수 있습니다.');
+    }
+
     document.body.classList.toggle('admin', normalizedMode === 'admin');
 
     document.querySelectorAll('.tab').forEach(t=>{
@@ -2723,11 +2733,12 @@
       t.classList.toggle('active', isTarget);
     });
 
-    if(btn && btn.classList){
+    if(btn && btn.classList && normalizedMode === requestedMode){
       document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
       btn.classList.add('active');
     }
 
+    if(typeof window.applyTravelExpenseAccessControl === 'function') window.applyTravelExpenseAccessControl();
     notifyPortalActiveTab(normalizedMode);
   }
 
@@ -3691,6 +3702,16 @@
     { id: 'expense-admin', label: '관리팀 검토 화면' }
   ];
 
+  function canUseAdminTab(){
+    return typeof window.hasTravelExpenseAdminAccess === 'function'
+      ? window.hasTravelExpenseAdminAccess()
+      : false;
+  }
+
+  function availableTabs(){
+    return canUseAdminTab() ? PORTAL_TABS : PORTAL_TABS.filter(tab => tab.id !== 'expense-admin');
+  }
+
   function isEmbedded(){
     try { return window.parent && window.parent !== window; }
     catch (_) { return true; }
@@ -3709,8 +3730,8 @@
     try {
       window.parent.postMessage({
         type: 'portal-tabs-ready',
-        tabs: PORTAL_TABS,
-        activeTabId: currentTabId(),
+        tabs: availableTabs(),
+        activeTabId: canUseAdminTab() ? currentTabId() : 'expense-user',
         source: 'travel-expense'
       }, '*');
     } catch (_) {}
@@ -3721,6 +3742,11 @@
     if(!id) return;
 
     if(['expense-admin','admin','review','manager','관리팀 검토 화면','관리팀검토화면'].includes(id)){
+      if(!canUseAdminTab()){
+        if(typeof window.setMode === 'function') window.setMode('user', null);
+        publishTabs();
+        return;
+      }
       if(typeof window.setMode === 'function') window.setMode('admin', null);
       return;
     }
@@ -3954,7 +3980,7 @@
     const items=collectItems().map(x=>({...x,company_id:state.companyId,request_id:requestId}));
     if(items.length){const ir=await db.from('travel_expense_items').insert(items); if(ir.error)console.error('[TravelExpense] item save error',ir.error);}
 
-    await loadMyRequests(); await loadAdminRequests();
+    await loadMyRequests(); if(typeof window.hasTravelExpenseAdminAccess !== 'function' || window.hasTravelExpenseAdminAccess()) await loadAdminRequests();
     alert(status==='임시저장'?'임시저장되었습니다.':'제출되었습니다.');
     return requestId;
   }
@@ -3979,6 +4005,10 @@
   }
 
   async function loadAdminRequests(){
+    if(typeof window.hasTravelExpenseAdminAccess === 'function' && !window.hasTravelExpenseAdminAccess()){
+      const badge=$('adminVisibleCount'); if(badge) badge.textContent='0건';
+      return;
+    }
     if(!db||!state.companyId)return;
     const r=await db.from('travel_expense_requests').select('*').eq('company_id',state.companyId).order('created_at',{ascending:false});
     if(r.error){console.error('[TravelExpense] admin requests load error',r.error); return;}
@@ -4015,7 +4045,7 @@
     state.portalSession=readSession();
     const profile=await fetchProfile(normalize(state.portalSession));
     applyProfile(profile);
-    await loadMyRequests(); await loadAdminRequests();
+    await loadMyRequests(); if(typeof window.hasTravelExpenseAdminAccess !== 'function' || window.hasTravelExpenseAdminAccess()) await loadAdminRequests();
     console.log('[TravelExpense] multitenant ready',{companyId:state.companyId,employeeNo:state.employeeNo,hasDbClient:!!db,dbSource:dbInfo.source});
   }
   document.addEventListener('DOMContentLoaded',init);
@@ -6889,5 +6919,202 @@
   setTimeout(install, 1600);
 })();
 </script>
+
+<script id="travel-expense-role-access-controller">
+(function(){
+  if(window.__travelExpenseRoleAccessControllerInstalled) return;
+  window.__travelExpenseRoleAccessControllerInstalled = true;
+
+  const ADMIN_ROLES = new Set(['admin','operator','owner','service_admin','system_admin','관리자','운영자','실무자']);
+
+  function safe(fn, fallback){
+    try { return fn(); } catch(_) { return fallback; }
+  }
+
+  function readSession(){
+    return [
+      safe(()=>window.portalSession, null),
+      safe(()=>window.parent && window.parent.portalSession, null),
+      safe(()=>window.parent && window.parent.__PORTAL_SESSION__, null),
+      safe(()=>JSON.parse(sessionStorage.getItem('portalSession') || 'null'), null),
+      safe(()=>JSON.parse(localStorage.getItem('portalSession') || 'null'), null)
+    ].find(Boolean) || {};
+  }
+
+  function norm(v){
+    return String(v == null ? '' : v).trim().toLowerCase();
+  }
+
+  function isAdminRole(v){
+    const raw = String(v == null ? '' : v).trim();
+    const lower = raw.toLowerCase();
+    return ADMIN_ROLES.has(raw) || ADMIN_ROLES.has(lower);
+  }
+
+  function collectRoleValues(obj, out, depth){
+    if(!obj || depth > 5) return;
+    if(Array.isArray(obj)){
+      obj.forEach(item => collectRoleValues(item, out, depth + 1));
+      return;
+    }
+    if(typeof obj !== 'object') return;
+
+    const appKeys = ['travel_expense','travelExpense','expense','business_trip','출장비정산','출장'];
+    const roleKeys = ['role','role_key','roleName','role_name','permission','permission_key','level','access','authority'];
+
+    appKeys.forEach(key => {
+      const app = obj[key];
+      if(!app) return;
+      if(typeof app === 'string') out.push(app);
+      else if(typeof app === 'object'){
+        roleKeys.forEach(rk => { if(app[rk] != null) out.push(app[rk]); });
+        if(app.value != null) out.push(app.value);
+      }
+    });
+
+    const appId = norm(obj.app_id || obj.appId || obj.app_key || obj.appKey || obj.app || obj.service || obj.module || obj.code || obj.name);
+    const looksTravel = ['travel_expense','travelexpense','expense','business_trip','출장비정산','출장'].some(k => appId.includes(k));
+    if(looksTravel){
+      roleKeys.forEach(rk => { if(obj[rk] != null) out.push(obj[rk]); });
+      if(obj.value != null) out.push(obj.value);
+    }
+
+    ['appRoles','app_roles','userAppRoles','user_app_roles','roles','permissions','authorities','apps','accessMap','roleMap'].forEach(key => {
+      if(obj[key]) collectRoleValues(obj[key], out, depth + 1);
+    });
+  }
+
+  window.hasTravelExpenseAdminAccess = function(){
+    const s = readSession();
+    const values = [];
+    collectRoleValues(s, values, 0);
+
+    const candidates = [
+      s.travel_expense_role,
+      s.travelExpenseRole,
+      s.expenseRole,
+      s.role,
+      s.user_role,
+      s.userRole,
+      safe(()=>s.user && s.user.role, ''),
+      safe(()=>s.currentUser && s.currentUser.role, ''),
+      safe(()=>s.profile && s.profile.role, ''),
+      safe(()=>s.employee && s.employee.role, ''),
+      safe(()=>s.employeeInfo && s.employeeInfo.role, ''),
+      safe(()=>s.matchedEmployee && s.matchedEmployee.role, '')
+    ];
+    candidates.forEach(v => { if(v) values.push(v); });
+
+    return values.some(isAdminRole);
+  };
+
+  window.applyTravelExpenseAccessControl = function(){
+    const canAdmin = window.hasTravelExpenseAdminAccess();
+    document.querySelectorAll('[data-travel-admin-tab="1"], .tab').forEach(el => {
+      const txt = String(el.textContent || '').trim();
+      const onclickText = String(el.getAttribute('onclick') || '');
+      const isAdminTab = el.getAttribute('data-travel-admin-tab') === '1'
+        || txt.includes('관리팀 검토')
+        || onclickText.includes("setMode('admin'")
+        || onclickText.includes('setMode("admin"');
+      if(isAdminTab){
+        el.style.display = canAdmin ? '' : 'none';
+        el.setAttribute('aria-hidden', canAdmin ? 'false' : 'true');
+      }
+    });
+
+    if(!canAdmin && document.body.classList.contains('admin')){
+      document.body.classList.remove('admin');
+      document.querySelectorAll('.tab').forEach(t => {
+        const onclickText = String(t.getAttribute('onclick') || '');
+        const isUserTab = onclickText.includes("setMode('user'") || onclickText.includes('setMode("user"');
+        t.classList.toggle('active', isUserTab);
+      });
+    }
+
+    publishTravelExpenseTabs();
+  };
+
+  function publishTravelExpenseTabs(){
+    try {
+      if(!window.parent || window.parent === window) return;
+      const canAdmin = window.hasTravelExpenseAdminAccess();
+      const tabs = [{ id:'expense-user', label:'출장자 입력 화면' }];
+      if(canAdmin) tabs.push({ id:'expense-admin', label:'관리팀 검토 화면' });
+      window.parent.postMessage({
+        type:'portal-tabs-ready',
+        tabs,
+        activeTabId: canAdmin && document.body.classList.contains('admin') ? 'expense-admin' : 'expense-user',
+        source:'travel-expense'
+      }, '*');
+    } catch(_) {}
+  }
+
+  function wrapSetMode(){
+    if(typeof window.setMode !== 'function' || window.setMode.__travelAccessWrapped) return;
+    const original = window.setMode;
+    window.setMode = function(mode, btn){
+      if(mode === 'admin' && !window.hasTravelExpenseAdminAccess()){
+        window.applyTravelExpenseAccessControl();
+        alert('관리팀 검토 화면은 운영자/관리자만 사용할 수 있습니다.');
+        return original.call(this, 'user', null);
+      }
+      const result = original.apply(this, arguments);
+      window.applyTravelExpenseAccessControl();
+      return result;
+    };
+    window.setMode.__travelAccessWrapped = true;
+  }
+
+  function guardFunction(name){
+    const original = window[name];
+    if(typeof original !== 'function' || original.__travelAdminGuardWrapped) return;
+    window[name] = function(){
+      if(!window.hasTravelExpenseAdminAccess()){
+        window.applyTravelExpenseAccessControl();
+        alert('관리팀 검토 기능은 운영자/관리자만 사용할 수 있습니다.');
+        return null;
+      }
+      return original.apply(this, arguments);
+    };
+    window[name].__travelAdminGuardWrapped = true;
+  }
+
+  function install(){
+    wrapSetMode();
+    [
+      'loadTravelExpenseAdminRequests',
+      'travelExpenseAdminRefresh',
+      'selectTravelExpenseAdminRequest',
+      'adminSelectDetailById',
+      'adminAdminAction',
+      'adminSaveReviewChanges',
+      'adminCancelStatus',
+      'adminPrintStatement',
+      'adminOpenEvidenceViewer',
+      'adminBulkAction'
+    ].forEach(guardFunction);
+    window.applyTravelExpenseAccessControl();
+  }
+
+  window.addEventListener('message', function(event){
+    const data = event && event.data ? event.data : {};
+    const tabId = String(data.tabId || data.id || data.value || data.tab || data.activeTabId || data.activeTab || '').trim();
+    const isAdminTab = ['expense-admin','admin','review','manager','관리팀 검토 화면','관리팀검토화면'].includes(tabId);
+    if(isAdminTab && !window.hasTravelExpenseAdminAccess()){
+      event.stopImmediatePropagation();
+      if(typeof window.setMode === 'function') window.setMode('user', null);
+      window.applyTravelExpenseAccessControl();
+    }
+  }, true);
+
+  document.addEventListener('DOMContentLoaded', install);
+  if(document.readyState !== 'loading') install();
+  setTimeout(install, 300);
+  setTimeout(install, 1000);
+  setTimeout(install, 2000);
+})();
+</script>
+
 </body>
 </html>
