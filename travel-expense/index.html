@@ -6494,10 +6494,12 @@
     const t = sumTotals(details, mode);
     const corpPay = mode === 'personal' ? {lodging:0,fuel:0,transit:0,meal:0,etc:0,total:0} : sumPaymentTotals(details, 'corp');
     const personalPay = mode === 'corp' ? {lodging:0,fuel:0,transit:0,meal:0,etc:0,total:0} : sumPaymentTotals(details, 'personal');
-    const dept = details[0]?.row?.division_name || details[0]?.row?.department_name || '글로벌R&D팀';
+    const dept = details[0]?.row?.division_name || details[0]?.row?.department_name || '중앙연구소';
+    const team = details[0]?.row?.team_name || details[0]?.row?.team || '글로벌R&D팀';
+    const deptLabel = [dept, team].filter(Boolean).join(' / ');
     return `<section class="statement-page">
       <h1 class="statement-title">국내출장비 정산서</h1>
-      <div class="statement-sub"><b>[ 부서명 : ${esc(dept)} ]</b><b>출력구분 : ${esc(modeLabel(mode))} / 출력일 : ${esc(today)}</b></div>
+      <div class="statement-sub"><b>[ 부서명 : ${esc(deptLabel)} ]</b><b>출력구분 : ${esc(modeLabel(mode))} / 출력일 : ${esc(today)}</b></div>
       <table class="statement-table"><colgroup><col style="width:9%"><col style="width:10%"><col style="width:10%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:12%"></colgroup>
         <thead><tr><th>성 명</th><th>출발일</th><th>도착일</th><th>숙박비</th><th>유류비</th><th>대중교통</th><th>식비</th><th>기타<br>(주차비 등)</th><th>계</th><th>출장지<br>거리(KM)</th><th>비 고</th></tr></thead>
         <tbody>${domesticRows(details, mode)}
