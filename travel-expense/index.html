@@ -2722,7 +2722,7 @@
 
     if(requestedMode === 'admin' && !canUseAdmin){
       if(typeof window.applyTravelExpenseAccessControl === 'function') window.applyTravelExpenseAccessControl();
-      alert('관리팀 검토 화면은 운영자/관리자만 사용할 수 있습니다.');
+      // 권한이 없으면 안내 팝업 없이 출장자 입력 화면으로 유지합니다.
     }
 
     document.body.classList.toggle('admin', normalizedMode === 'admin');
@@ -7056,7 +7056,7 @@
     window.setMode = function(mode, btn){
       if(mode === 'admin' && !window.hasTravelExpenseAdminAccess()){
         window.applyTravelExpenseAccessControl();
-        alert('관리팀 검토 화면은 운영자/관리자만 사용할 수 있습니다.');
+        // 권한이 없으면 안내 팝업 없이 출장자 입력 화면으로 전환합니다.
         return original.call(this, 'user', null);
       }
       const result = original.apply(this, arguments);
@@ -7072,7 +7072,7 @@
     window[name] = function(){
       if(!window.hasTravelExpenseAdminAccess()){
         window.applyTravelExpenseAccessControl();
-        alert('관리팀 검토 기능은 운영자/관리자만 사용할 수 있습니다.');
+        // 권한이 없으면 관리자 기능은 조용히 차단합니다.
         return null;
       }
       return original.apply(this, arguments);
@@ -7105,6 +7105,7 @@
       event.stopImmediatePropagation();
       if(typeof window.setMode === 'function') window.setMode('user', null);
       window.applyTravelExpenseAccessControl();
+      if(typeof publishTravelExpenseTabs === 'function') publishTravelExpenseTabs();
     }
   }, true);
 
