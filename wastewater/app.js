@@ -2105,12 +2105,6 @@ document.getElementById('app').innerHTML=`<div class="app-shell">
   <div class="portal-eyebrow">Integrated Operations Platform</div>
   <h1 class="portal-title">폐수/폐기물 운영일지</h1>
 </div>
-<div class="stats">
-<div class="card stat-box"><div class="stat-label">누적 당일 용수사용량</div><div class="stat-value">${formatNum(stats.totalWaterUse,2)} m³</div></div>
-<div class="card stat-box"><div class="stat-label">누적 위탁량</div><div class="stat-value">${formatNum(stats.totalEntrusted,2)} m³</div></div>
-<div class="card stat-box"><div class="stat-label">초과 발생 일수</div><div class="stat-value">${stats.overCount}일</div></div>
-<div class="card stat-box"><div class="stat-label">최근 상태</div><div class="stat-value">${stats.latestStatusClass==='danger'?`<span class="inline-badge locked">${stats.latestStatus}</span>`:`<span class="inline-badge ok">${stats.latestStatus}</span>`}</div></div>
-</div>
 <div class="tabs-wrap">
   <div class="tabs-main">
     <button class="tab-btn ${currentTab==='daily'?'active':''}" onclick="switchTab('daily')">일일 입력</button>
