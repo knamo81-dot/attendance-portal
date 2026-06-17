@@ -1599,6 +1599,177 @@
       <div class="viewer-shell">${viewer}</div>
     </section>
   </main>
+
+
+<!-- =========================================================
+  Mobile list/detail navigation patch: travel expense applicant screen
+  - PC 화면은 기존 좌우 레이아웃 유지
+  - 모바일에서는 목록 화면과 상세/작성 화면을 전환
+========================================================= -->
+<style id="travel-expense-mobile-list-detail-patch">
+  .mobile-expense-back-section{
+    display:none;
+  }
+
+  @media(max-width:760px){
+    body.travel-mobile-list .user-view .form-panel{
+      display:none !important;
+    }
+
+    body.travel-mobile-list .user-view .status-panel{
+      display:block !important;
+      position:static !important;
+      height:auto !important;
+      min-width:0 !important;
+      overflow:visible !important;
+    }
+
+    body.travel-mobile-detail .user-view .status-panel{
+      display:none !important;
+    }
+
+    body.travel-mobile-detail .user-view .form-panel{
+      display:block !important;
+      min-width:0 !important;
+    }
+
+    body.travel-mobile-detail .mobile-expense-back-section{
+      display:flex !important;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin:0 0 12px;
+      padding:12px 14px;
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:#fff;
+      box-shadow:0 8px 20px rgba(15,23,42,.06);
+    }
+
+    .mobile-expense-back-section button{
+      min-width:auto !important;
+      padding:10px 12px !important;
+      border-radius:11px !important;
+      background:#f1f5f9 !important;
+      color:#334155 !important;
+      font-size:13px !important;
+      white-space:nowrap !important;
+    }
+
+    .mobile-expense-back-section span{
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      color:#64748b;
+      font-size:13px;
+      font-weight:900;
+    }
+
+    body.travel-mobile-list .user-view .expense-workspace,
+    body.travel-mobile-detail .user-view .expense-workspace{
+      grid-template-columns:1fr !important;
+      display:block !important;
+    }
+
+    body.travel-mobile-list .user-view .submission-scroll,
+    body.travel-mobile-detail .user-view .submission-scroll{
+      overflow:visible !important;
+      padding-right:0 !important;
+    }
+  }
+</style>
+
+<script id="travel-expense-mobile-list-detail-controller">
+(function(){
+  if(window.__travelExpenseMobileListDetailInstalled) return;
+  window.__travelExpenseMobileListDetailInstalled = true;
+
+  const MOBILE_QUERY = '(max-width: 760px)';
+  const mq = window.matchMedia ? window.matchMedia(MOBILE_QUERY) : null;
+
+  function isMobile(){
+    return mq ? mq.matches : window.innerWidth <= 760;
+  }
+
+  function ensureBackButton(){
+    const formPanel = document.querySelector('.user-view .form-panel');
+    if(!formPanel || formPanel.querySelector('.mobile-expense-back-section')) return;
+    formPanel.insertAdjacentHTML('afterbegin', `
+      <div class="mobile-expense-back-section">
+        <button type="button" onclick="window.travelExpenseShowMobileList()">← 목록으로</button>
+        <span>출장비 정산 상세</span>
+      </div>
+    `);
+  }
+
+  function setView(view, options){
+    ensureBackButton();
+
+    const target = view === 'detail' ? 'detail' : 'list';
+    document.body.classList.toggle('travel-mobile-list', target === 'list');
+    document.body.classList.toggle('travel-mobile-detail', target === 'detail');
+
+    if(options && options.scroll !== false && isMobile()){
+      setTimeout(function(){ window.scrollTo({ top:0, behavior:'smooth' }); }, 0);
+    }
+  }
+
+  window.travelExpenseSetMobileView = setView;
+  window.travelExpenseShowMobileList = function(){ setView('list'); };
+  window.travelExpenseShowMobileDetail = function(){ setView('detail'); };
+
+  function installNewRequestWrapper(){
+    if(typeof window.newRequest !== 'function' || window.newRequest.__mobileListDetailWrapped) return;
+    const original = window.newRequest;
+    window.newRequest = function(){
+      const result = original.apply(this, arguments);
+      if(isMobile()) setView('detail');
+      return result;
+    };
+    window.newRequest.__mobileListDetailWrapped = true;
+  }
+
+  function init(){
+    ensureBackButton();
+    installNewRequestWrapper();
+
+    if(isMobile()){
+      if(!document.body.classList.contains('travel-mobile-detail')){
+        setView('list', {scroll:false});
+      }
+    }else{
+      document.body.classList.remove('travel-mobile-list','travel-mobile-detail');
+    }
+  }
+
+  document.addEventListener('click', function(event){
+    const card = event.target && event.target.closest ? event.target.closest('.user-view .submission-scroll .list-card') : null;
+    if(!card) return;
+
+    // 카드 내부 메뉴/버튼/입력 요소 클릭은 기존 기능을 우선합니다.
+    if(event.target.closest('button,a,input,select,textarea,.card-menu,.dropdown-menu')) return;
+
+    if(isMobile()){
+      setTimeout(function(){ setView('detail'); }, 80);
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', init);
+  if(document.readyState !== 'loading') init();
+
+  setTimeout(init, 300);
+  setTimeout(init, 1000);
+  setTimeout(init, 2000);
+
+  if(mq && mq.addEventListener){
+    mq.addEventListener('change', init);
+  }else{
+    window.addEventListener('resize', function(){ setTimeout(init, 80); });
+  }
+})();
+</script>
+
 </body>
 </html>`);
     w.document.close();
