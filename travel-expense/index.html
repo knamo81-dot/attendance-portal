@@ -1294,6 +1294,40 @@
     text-overflow:ellipsis;
   }
 }
+
+
+/* =========================================================
+   Mobile input zoom prevent + safe form density
+   - iOS/Safari and some Android browsers zoom input fields
+     when font-size is below 16px
+   - Mobile only. Desktop/PC layout untouched.
+========================================================= */
+@media (max-width:760px){
+  input,
+  select,
+  textarea{
+    font-size:16px !important;
+    line-height:1.45 !important;
+    -webkit-text-size-adjust:100% !important;
+    text-size-adjust:100% !important;
+  }
+
+  input[type="date"],
+  input[type="number"],
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  select,
+  textarea{
+    font-size:16px !important;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"]{
+    width:auto !important;
+    font-size:initial !important;
+  }
+}
 </style>
 
 <style id="admin-final-adjustments">
@@ -7254,6 +7288,36 @@
     window.newRequest.__mobileListDetailWrapped = true;
   }
 
+  function returnToListAfterSaveSubmit(){
+    if(!isMobileWidth()) return;
+    setTimeout(function(){
+      applyView('list');
+      try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(e){ window.scrollTo(0,0); }
+    }, 120);
+  }
+
+  function patchSaveSubmit(){
+    ['saveTravelExpenseDraft','submitTravelExpense'].forEach(function(name){
+      var fn = window[name];
+      if(typeof fn !== 'function' || fn.__mobileListReturnWrapped) return;
+
+      var original = fn;
+      var wrapped = function(){
+        try{
+          var result = original.apply(this, arguments);
+          return Promise.resolve(result).then(function(value){
+            returnToListAfterSaveSubmit();
+            return value;
+          });
+        }catch(error){
+          throw error;
+        }
+      };
+      wrapped.__mobileListReturnWrapped = true;
+      window[name] = wrapped;
+    });
+  }
+
   document.addEventListener('click', function(event){
     patchNewRequest();
 
@@ -7278,6 +7342,7 @@
   function init(){
     ensureBackButton();
     patchNewRequest();
+    patchSaveSubmit();
     if(isMobileWidth()) applyView(currentView || 'list');
     else applyView('desktop');
   }
@@ -7287,6 +7352,8 @@
   setTimeout(init, 300);
   setTimeout(init, 1000);
   setTimeout(patchNewRequest, 2000);
+  setTimeout(patchSaveSubmit, 2000);
+  setTimeout(patchSaveSubmit, 3500);
 
   if(mq && mq.addEventListener) mq.addEventListener('change', init);
   else window.addEventListener('resize', function(){ setTimeout(init, 80); });
