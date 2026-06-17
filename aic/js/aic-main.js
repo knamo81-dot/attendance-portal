@@ -177,8 +177,8 @@
 
   function getViewerLanguage() {
     var lang = String(
-      getCurrentLang() ||
       state.settings.defaultLang ||
+      getCurrentLang() ||
       'ko'
     ).toLowerCase();
 
@@ -192,8 +192,10 @@
     var sourceLang = msg?.source_lang || detectTextLanguage(original);
     var viewerLang = getViewerLanguage();
 
-    // 내 언어와 원문 언어가 같으면 원문을 보여주고,
-    // 다르면 번역문을 보여줍니다.
+    // 내가 보낸 메시지는 모든 표시 모드에서 원문을 우선 보여줍니다.
+    if (msg && msg.type === 'me') return original || translated;
+
+    // 상대방 메시지는 내 개인설정 언어 기준으로 번역문을 보여줍니다.
     if (sourceLang === viewerLang) return original || translated;
     return translated || original;
   }
@@ -244,12 +246,27 @@
     }
   }
 
+  function normalizeSettings(settings) {
+    var next = Object.assign({}, CONFIG.defaultSettings, settings || {});
+
+    // 개인 설정 화면에서는 내 언어와 표시 방식만 관리합니다.
+    // 번역 방향/톤/자동번역 여부는 내부 기본값으로 고정합니다.
+    next.direction = 'auto';
+    next.tone = 'business';
+    next.autoTranslate = true;
+
+    if (next.defaultLang !== 'en') next.defaultLang = 'ko';
+    if (['original', 'translated', 'both'].indexOf(next.display) < 0) next.display = 'both';
+
+    return next;
+  }
+
   function loadSettings() {
     try {
       var raw = localStorage.getItem('aic_user_settings');
-      if (raw) return Object.assign({}, CONFIG.defaultSettings, JSON.parse(raw));
+      if (raw) return normalizeSettings(JSON.parse(raw));
     } catch (_) {}
-    return Object.assign({}, CONFIG.defaultSettings);
+    return normalizeSettings(CONFIG.defaultSettings);
   }
 
   function saveSettingsToLocal() {
@@ -2082,31 +2099,50 @@
   function buildMessage(room, msg) {
     var displayMode = state.settings.display || 'both';
     var sender = getMessageSenderName(room, msg);
+    var original = String(msg?.original || '');
+    var translated = String(msg?.translated || '');
+    var isMine = msg && msg.type === 'me';
     var preferredText = getPreferredMessageText(msg);
 
     if (displayMode === 'original') {
       return [
-        '<div class="aic-message ', msg.type === 'me' ? 'me' : 'other', '">',
+        '<div class="aic-message ', isMine ? 'me' : 'other', '">',
         '  <div class="aic-message-name">', esc(sender), '</div>',
-        '  <div class="aic-message-original">', esc(msg.original), '</div>',
+        '  <div class="aic-message-original">', esc(original), '</div>',
+        buildMessageFooter(msg),
         '</div>'
       ].join('');
     }
 
     if (displayMode === 'translated') {
       return [
-        '<div class="aic-message ', msg.type === 'me' ? 'me' : 'other', '">',
+        '<div class="aic-message ', isMine ? 'me' : 'other', '">',
         '  <div class="aic-message-name">', esc(sender), '</div>',
-        '  <div class="aic-message-original">', esc(preferredText), '</div>',
+        '  <div class="aic-message-original">', esc(isMine ? original : preferredText), '</div>',
+        buildMessageFooter(msg),
         '</div>'
       ].join('');
     }
 
+    if (isMine) {
+      return [
+        '<div class="aic-message me">',
+        '  <div class="aic-message-name">', esc(sender), '</div>',
+        '  <div class="aic-message-original">', esc(original), '</div>',
+        buildMessageFooter(msg),
+        '</div>'
+      ].join('');
+    }
+
+    var sourceLang = msg?.source_lang || detectTextLanguage(original);
+    var viewerLang = getViewerLanguage();
+    var showTranslated = translated && sourceLang !== viewerLang;
+
     return [
-      '<div class="aic-message ', msg.type === 'me' ? 'me' : 'other', '">',
+      '<div class="aic-message other">',
       '  <div class="aic-message-name">', esc(sender), '</div>',
-      '  <div class="aic-message-original">', esc(msg.original), '</div>',
-      '  <div class="aic-message-translated">', esc(msg.translated), '</div>',
+      '  <div class="aic-message-original">', esc(original), '</div>',
+      showTranslated ? '  <div class="aic-message-translated">' + esc(translated) + '</div>' : '',
       buildMessageFooter(msg),
       '</div>'
     ].join('');
@@ -2682,11 +2718,12 @@
   function openSettingsModal() {
     if (!els.settingsModal) return;
 
-    els.setDefaultLang.value = state.settings.defaultLang;
-    els.setDirection.value = state.settings.direction;
-    els.setTone.value = state.settings.tone;
-    els.setDisplay.value = state.settings.display;
-    els.autoSwitch.classList.toggle('on', !!state.settings.autoTranslate);
+    state.settings = normalizeSettings(state.settings);
+    if (els.setDefaultLang) els.setDefaultLang.value = state.settings.defaultLang;
+    if (els.setDirection) els.setDirection.value = state.settings.direction;
+    if (els.setTone) els.setTone.value = state.settings.tone;
+    if (els.setDisplay) els.setDisplay.value = state.settings.display;
+    if (els.autoSwitch) els.autoSwitch.classList.toggle('on', !!state.settings.autoTranslate);
     els.settingsModal.hidden = false;
   }
 
@@ -2695,11 +2732,12 @@
   }
 
   function saveSettings() {
-    state.settings.defaultLang = els.setDefaultLang.value;
-    state.settings.direction = els.setDirection.value;
-    state.settings.tone = els.setTone.value;
-    state.settings.display = els.setDisplay.value;
-    state.settings.autoTranslate = els.autoSwitch.classList.contains('on');
+    state.settings.defaultLang = els.setDefaultLang ? els.setDefaultLang.value : state.settings.defaultLang;
+    state.settings.display = els.setDisplay ? els.setDisplay.value : state.settings.display;
+    state.settings.direction = 'auto';
+    state.settings.tone = 'business';
+    state.settings.autoTranslate = true;
+    state.settings = normalizeSettings(state.settings);
 
     saveSettingsToLocal();
     closeSettingsModal();
