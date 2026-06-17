@@ -2259,10 +2259,7 @@
         '  </div>',
         '  <div class="aic-messages" data-message-box="', i, '">', messages, '</div>',
         '  <div class="aic-chat-input">',
-        '    <select class="module-select" data-lang-slot="', i, '">',
-        '      <option value="ko"', state.settings.defaultLang === 'ko' ? ' selected' : '', '>', tr('aic.korean', '한국어'), '</option>',
-        '      <option value="en"', state.settings.defaultLang === 'en' ? ' selected' : '', '>English</option>',
-        '    </select>',
+        '    ',
         '    <input class="module-input" data-input-slot="', i, '" placeholder="', tr('aic.inputPlaceholder', '메시지를 입력하세요'), '" />',
         '    <button class="module-btn accent aic-send-btn" data-send-slot="', i, '" type="button">', tr('aic.send', '전송'), '</button>',
         '  </div>',
@@ -2355,7 +2352,6 @@
     if (!room) return;
 
     var input = els.slots.querySelector('[data-input-slot="' + slotIndex + '"]');
-    var lang = els.slots.querySelector('[data-lang-slot="' + slotIndex + '"]');
     var text = input ? input.value.trim() : '';
 
     if (!text) return;
