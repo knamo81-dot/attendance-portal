@@ -1,21 +1,33 @@
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
-function json(res, status, body) {
-  res.status(status).setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(body));
-}
+    'zh-cn': 'zh',
+    'zh-tw': 'zh',
 
-function safeText(value, fallback = '') {
-  if (value === null || value === undefined) return fallback;
-  return String(value).trim();
-}
+    vietnamese: 'vi',
+    viet: 'vi',
 
-function normalizeLang(value) {
-  const lang = safeText(value, '').toLowerCase();
-  if (lang.startsWith('ko') || lang === 'kr' || lang === 'korean') return 'ko';
-  if (lang.startsWith('en') || lang === 'english') return 'en';
-  return '';
+    thai: 'th',
+    french: 'fr',
+    german: 'de',
+    spanish: 'es',
+    italian: 'it',
+    portuguese: 'pt',
+    russian: 'ru',
+    arabic: 'ar',
+    hindi: 'hi',
+    indonesian: 'id',
+    malay: 'ms'
+  };
+
+  if (aliases[lang]) return aliases[lang];
+
+  const head = lang.split('-')[0];
+  const supported = [
+    'ko', 'en', 'ja', 'zh',
+    'vi', 'th', 'fr', 'de', 'es', 'it', 'pt',
+    'ru', 'ar', 'hi', 'id', 'ms'
+  ];
+
+  return supported.includes(head) ? head : '';
 }
 
 function detectTextLanguage(text) {
@@ -23,15 +35,42 @@ function detectTextLanguage(text) {
   if (!value) return 'auto';
 
   const koreanCount = (value.match(/[가-힣]/g) || []).length;
+  const japaneseCount = (value.match(/[\u3040-\u30ff]/g) || []).length;
+  const chineseCount = (value.match(/[\u3400-\u9fff]/g) || []).length;
+  const thaiCount = (value.match(/[\u0e00-\u0e7f]/g) || []).length;
+  const arabicCount = (value.match(/[\u0600-\u06ff]/g) || []).length;
   const latinCount = (value.match(/[A-Za-z]/g) || []).length;
 
   if (koreanCount > 0 && koreanCount >= latinCount * 0.25) return 'ko';
+  if (japaneseCount > 0) return 'ja';
+  if (chineseCount > 0) return 'zh';
+  if (thaiCount > 0) return 'th';
+  if (arabicCount > 0) return 'ar';
   if (latinCount > 0) return 'en';
+
   return 'auto';
 }
 
 function langLabel(lang) {
-  return lang === 'ko' ? 'Korean' : 'English';
+  const map = {
+    ko: 'Korean',
+    en: 'English',
+    ja: 'Japanese',
+    zh: 'Chinese',
+    vi: 'Vietnamese',
+    th: 'Thai',
+    fr: 'French',
+    de: 'German',
+    es: 'Spanish',
+    it: 'Italian',
+    pt: 'Portuguese',
+    ru: 'Russian',
+    ar: 'Arabic',
+    hi: 'Hindi',
+    id: 'Indonesian',
+    ms: 'Malay'
+  };
+  return map[normalizeLang(lang)] || 'the requested language';
 }
 
 function normalizeTone(value) {
@@ -51,26 +90,29 @@ function resolveTranslationPlan(payload) {
   const detected = normalizeLang(payload.detectedSourceLang) || detectTextLanguage(text);
   const requestedSource = normalizeLang(payload.sourceLang);
   let sourceLang = detected || requestedSource || 'auto';
-  let targetLang = normalizeLang(payload.targetLang);
 
+  // 새 구조에서는 targetLang/viewerLang 기준으로 필요한 언어 1개만 번역합니다.
+  let targetLang =
+    normalizeLang(payload.targetLang) ||
+    normalizeLang(payload.viewerLang);
+
+  // 기존 direction 값 호환
   if (direction === 'ko-en') {
     sourceLang = 'ko';
     targetLang = 'en';
   } else if (direction === 'en-ko') {
     sourceLang = 'en';
     targetLang = 'ko';
-  } else {
-    if (sourceLang === 'ko') targetLang = 'en';
-    else if (sourceLang === 'en') targetLang = 'ko';
-    else {
-      sourceLang = requestedSource || 'auto';
-      targetLang = normalizeLang(payload.viewerLang) || 'en';
-    }
   }
 
-  if (!targetLang || targetLang === sourceLang) {
-    targetLang = sourceLang === 'ko' ? 'en' : 'ko';
+  // 기존 클라이언트가 targetLang을 안 보내는 경우에만 ko/en 기본 반대 방향을 사용합니다.
+  if (!targetLang) {
+    if (sourceLang === 'ko') targetLang = 'en';
+    else if (sourceLang === 'en') targetLang = 'ko';
+    else targetLang = 'ko';
   }
+
+  if (!sourceLang) sourceLang = requestedSource || 'auto';
 
   return { sourceLang, targetLang };
 }
@@ -87,7 +129,7 @@ function buildPrompt(payload) {
 
   return [
     'You are an AI translator for an internal R&D collaboration chat.',
-    'Translate the user message between Korean and English.',
+    'Translate the user message to the requested target language.',
     'Return only the translated message. Do not add explanations, markdown, labels, quotes, or alternatives.',
     '',
     `Direction: ${directionText}`,
@@ -156,12 +198,24 @@ module.exports = async function handler(req, res) {
 
     const plan = resolveTranslationPlan(payload);
     const translated = await callOpenAI(payload);
+    const translations = {};
+
+    if (plan.targetLang) {
+      translations[plan.targetLang] = translated;
+    }
 
     return json(res, 200, {
       ok: true,
+
+      // 기존 aic-main.js 호환용
       translated,
+      translation: translated,
+
+      // 신규 다국어 저장 구조용
       sourceLang: plan.sourceLang,
       targetLang: plan.targetLang,
+      translations,
+
       model: OPENAI_MODEL
     });
   } catch (error) {
