@@ -1215,6 +1215,85 @@
       .basic-info-grid{grid-template-columns:1fr;}
     }
 
+
+
+/* =========================================================
+   Mobile list/detail split for applicant screen only
+   - PC/desktop layout is untouched
+   - On mobile/narrow iframe: list screen shows status/submission only
+     and detail screen shows the right-side form only
+========================================================= */
+.travel-mobile-backbar{
+  display:none !important;
+}
+@media (max-width:1100px){
+  body.travel-mobile-list .user-view .form-panel{
+    display:none !important;
+  }
+  body.travel-mobile-list .user-view .status-panel{
+    display:block !important;
+    position:static !important;
+    height:auto !important;
+    min-width:0 !important;
+    width:100% !important;
+    overflow:visible !important;
+  }
+  body.travel-mobile-list .user-view .expense-workspace,
+  body.travel-mobile-detail .user-view .expense-workspace{
+    display:block !important;
+    grid-template-columns:1fr !important;
+  }
+  body.travel-mobile-list .user-view .status-panel > .section:nth-child(2){
+    min-height:auto !important;
+    display:block !important;
+    overflow:visible !important;
+  }
+  body.travel-mobile-list .user-view .submission-scroll{
+    overflow:visible !important;
+  }
+  body.travel-mobile-list .user-view .submission-scroll .list-card{
+    cursor:pointer !important;
+  }
+  body.travel-mobile-list .user-view .submission-scroll .list-card:active{
+    transform:scale(.995);
+  }
+
+  body.travel-mobile-detail .user-view .status-panel{
+    display:none !important;
+  }
+  body.travel-mobile-detail .user-view .form-panel{
+    display:block !important;
+    min-width:0 !important;
+    width:100% !important;
+  }
+  body.travel-mobile-detail .travel-mobile-backbar{
+    display:flex !important;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin:0 0 12px;
+    padding:0;
+  }
+  .travel-mobile-backbtn{
+    width:auto !important;
+    min-width:0 !important;
+    height:40px !important;
+    padding:0 13px !important;
+    border-radius:12px !important;
+    background:#eef2ff !important;
+    color:#3730a3 !important;
+    font-size:14px !important;
+    font-weight:900 !important;
+  }
+  .travel-mobile-backtitle{
+    font-size:14px;
+    font-weight:900;
+    color:#334155;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+}
 </style>
 
 <style id="admin-final-adjustments">
@@ -6753,31 +6832,7 @@
     const popup = window.open('', '_blank', 'width=1200,height=920,resizable=yes,scrollbars=yes');
     if(!popup){ alert('팝업이 차단되었습니다. 브라우저 팝업을 허용해 주세요.'); return; }
     popup.document.open();
-    popup.document.write('<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>출력 준비 중</title>
-
-<style id="travel-mobile-list-detail-patch">
-  .travel-mobile-backbar{display:none;}
-  @media(max-width:760px){
-    body.travel-mobile-list .user-view .form-panel{display:none !important;}
-    body.travel-mobile-list .user-view .status-panel{display:block !important;}
-    body.travel-mobile-detail .user-view .status-panel{display:none !important;}
-    body.travel-mobile-detail .user-view .form-panel{display:block !important;}
-    body.travel-mobile-detail .user-view .expense-workspace{display:block !important;}
-    body.travel-mobile-list .user-view .expense-workspace{display:block !important;}
-    body.travel-mobile-list .user-view .status-panel,
-    body.travel-mobile-detail .user-view .form-panel{min-width:0 !important;width:100% !important;}
-    body.travel-mobile-list .user-view .status-panel{position:static !important;height:auto !important;overflow:visible !important;}
-    body.travel-mobile-list .user-view .status-panel > .section:nth-child(2){min-height:auto !important;display:block !important;overflow:visible !important;}
-    body.travel-mobile-list .user-view .submission-scroll{overflow:visible !important;}
-    body.travel-mobile-list .user-view .submission-scroll .list-card{cursor:pointer !important;}
-    body.travel-mobile-list .user-view .submission-scroll .list-card:active{transform:scale(.995);}
-    .travel-mobile-backbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:0;}
-    body.travel-mobile-list .travel-mobile-backbar{display:none !important;}
-    .travel-mobile-backbtn{width:auto !important;min-width:0 !important;height:40px !important;padding:0 13px !important;border-radius:12px !important;background:#eef2ff !important;color:#3730a3 !important;font-size:14px !important;font-weight:900 !important;}
-    .travel-mobile-backtitle{font-size:14px;font-weight:900;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  }
-</style>
-</head><body style="font-family:sans-serif;padding:40px"><h2>출력 데이터를 불러오는 중입니다...</h2></body></html>');
+    popup.document.write('<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>출력 준비 중</title></head><body style="font-family:sans-serif;padding:40px"><h2>출력 데이터를 불러오는 중입니다...</h2></body></html>');
     popup.document.close();
     try{
       const details = [];
@@ -7148,10 +7203,12 @@
   if(window.__travelMobileListDetailControllerInstalled) return;
   window.__travelMobileListDetailControllerInstalled = true;
 
-  var mq = window.matchMedia ? window.matchMedia('(max-width: 760px)') : null;
+  var mq = window.matchMedia ? window.matchMedia('(max-width: 1100px)') : null;
   var currentView = 'list';
 
-  function isMobile(){ return mq ? mq.matches : window.innerWidth <= 760; }
+  function isMobileWidth(){
+    return mq ? mq.matches : window.innerWidth <= 1100;
+  }
 
   function ensureBackButton(){
     var panel = document.querySelector('.user-view .form-panel');
@@ -7160,16 +7217,18 @@
     bar.className = 'travel-mobile-backbar';
     bar.innerHTML = '<button type="button" class="travel-mobile-backbtn">← 목록으로</button><div class="travel-mobile-backtitle">출장비 정산 상세</div>';
     var btn = bar.querySelector('.travel-mobile-backbtn');
-    btn.addEventListener('click', function(e){
-      e.preventDefault();
-      window.backTravelExpenseMobileList();
-    });
+    if(btn){
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        if(typeof window.backTravelExpenseMobileList === 'function') window.backTravelExpenseMobileList();
+      });
+    }
     panel.insertBefore(bar, panel.firstChild);
   }
 
   function applyView(view){
     ensureBackButton();
-    if(!isMobile()){
+    if(!isMobileWidth()){
       document.body.classList.remove('travel-mobile-list','travel-mobile-detail');
       return;
     }
@@ -7177,7 +7236,7 @@
     document.body.classList.toggle('travel-mobile-list', currentView === 'list');
     document.body.classList.toggle('travel-mobile-detail', currentView === 'detail');
     if(currentView === 'detail'){
-      setTimeout(function(){ window.scrollTo({top:0, behavior:'smooth'}); }, 30);
+      setTimeout(function(){ try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(e){ window.scrollTo(0,0); } }, 30);
     }
   }
 
@@ -7189,7 +7248,7 @@
     var original = window.newRequest;
     window.newRequest = function(){
       var result = original.apply(this, arguments);
-      if(isMobile()) setTimeout(function(){ applyView('detail'); }, 30);
+      if(isMobileWidth()) setTimeout(function(){ applyView('detail'); }, 50);
       return result;
     };
     window.newRequest.__mobileListDetailWrapped = true;
@@ -7198,22 +7257,28 @@
   document.addEventListener('click', function(event){
     patchNewRequest();
 
-    var editButton = event.target.closest ? event.target.closest('[data-edit-id]') : null;
-    if(editButton && isMobile()){
+    var newBtn = event.target && event.target.closest ? event.target.closest('button[onclick*="newRequest"]') : null;
+    if(newBtn && isMobileWidth()){
+      setTimeout(function(){ applyView('detail'); }, 80);
+      return;
+    }
+
+    var editButton = event.target && event.target.closest ? event.target.closest('[data-edit-id]') : null;
+    if(editButton && isMobileWidth()){
       setTimeout(function(){ applyView('detail'); }, 160);
       return;
     }
 
-    var card = event.target.closest ? event.target.closest('.user-view .submission-scroll .list-card') : null;
+    var card = event.target && event.target.closest ? event.target.closest('.user-view .submission-scroll .list-card') : null;
     if(!card) return;
     if(event.target.closest('.my-card-actions,[data-delete-id],[data-recall-id],button,a,input,select,textarea')) return;
-    if(isMobile()) setTimeout(function(){ applyView('detail'); }, 180);
+    if(isMobileWidth()) setTimeout(function(){ applyView('detail'); }, 180);
   }, true);
 
   function init(){
     ensureBackButton();
     patchNewRequest();
-    if(isMobile()) applyView(currentView || 'list');
+    if(isMobileWidth()) applyView(currentView || 'list');
     else applyView('desktop');
   }
 
