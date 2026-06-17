@@ -98,5 +98,10 @@
   "position.부소장.Global": "Director of Global R&D",
   "position.팀장": "Team Manager",
   "aic.delete": "Delete",
-  "aic.displayOriginalOnly": "Show Original Only"
+  "aic.displayOriginalOnly": "Show Original Only",
+  "aic.english": "English",
+  "aic.japanese": "Japanese",
+  "aic.chinese": "Chinese",
+  "aic.vietnamese": "Vietnamese",
+  "aic.thai": "Thai"
 }
