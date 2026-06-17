@@ -98,5 +98,10 @@
   "position.부소장.Global": "부소장",
   "position.팀장": "팀장",
   "aic.delete": "삭제",
-  "aic.displayOriginalOnly": "원문만 표시"
+  "aic.displayOriginalOnly": "원문만 표시",
+  "aic.english": "영어",
+  "aic.japanese": "일본어",
+  "aic.chinese": "중국어",
+  "aic.vietnamese": "베트남어",
+  "aic.thai": "태국어"
 }
