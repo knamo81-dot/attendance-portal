@@ -6874,11 +6874,20 @@
   }
 
   var timer=null;
+  async function refreshMonthly(){
+    if(typeof window.refreshMonthlyProcessSummary === 'function'){
+      try { await window.refreshMonthlyProcessSummary(); } catch(e){ console.warn('[TravelExpense] monthly refresh failed', e); }
+    }
+  }
   function refreshAll(delay){
     clearTimeout(timer);
     timer=setTimeout(function(){
-      Promise.resolve(refreshApplicant()).then(refreshAdmin).catch(function(e){ console.warn('[TravelExpense] screen refresh failed', e); });
-    }, delay == null ? 250 : delay);
+      Promise.resolve()
+        .then(refreshApplicant)
+        .then(refreshMonthly)
+        .then(refreshAdmin)
+        .catch(function(e){ console.warn('[TravelExpense] screen refresh failed', e); });
+    }, delay == null ? 120 : delay);
   }
 
   function wrap(name){
@@ -6909,12 +6918,16 @@
 
   document.addEventListener('click', function(e){
     var txt=String((e.target && e.target.textContent) || '').trim();
-    if(/제출하기|임시저장|수정요청|승인|저장|취소|회수|삭제/.test(txt)) refreshAll(900);
+    if(/제출하기|임시저장|수정요청|승인|저장|취소|회수|삭제/.test(txt)){
+      refreshAll(180);
+      setTimeout(function(){ refreshAll(0); }, 900);
+    }
   }, true);
 
   window.refreshTravelExpenseScreens=function(){ refreshAll(0); };
   window.refreshTravelExpenseApplicantScreen=refreshApplicant;
   window.refreshTravelExpenseAdminScreen=refreshAdmin;
+  window.refreshTravelExpenseProcessSummary=refreshMonthly;
 
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
   else install();
@@ -6976,11 +6989,15 @@
   }
 
   function refreshNow(){
+    var usedBridge = false;
     if(typeof window.refreshTravelExpenseScreens === 'function'){
-      try { window.refreshTravelExpenseScreens(); return; } catch(e){ console.warn('[TravelExpense] realtime refresh failed', e); }
+      try { window.refreshTravelExpenseScreens(); usedBridge = true; } catch(e){ console.warn('[TravelExpense] realtime refresh failed', e); }
     }
-    if(typeof window.loadMyRequests === 'function') safe(function(){ window.loadMyRequests(); }, null);
-    if(typeof window.travelExpenseAdminRefresh === 'function') safe(function(){ window.travelExpenseAdminRefresh(); }, null);
+    if(typeof window.refreshMonthlyProcessSummary === 'function'){
+      safe(function(){ window.refreshMonthlyProcessSummary(); }, null);
+    }
+    if(!usedBridge && typeof window.loadMyRequests === 'function') safe(function(){ window.loadMyRequests(); }, null);
+    if(!usedBridge && typeof window.travelExpenseAdminRefresh === 'function') safe(function(){ window.travelExpenseAdminRefresh(); }, null);
   }
 
   function scheduleRefresh(reason){
@@ -6988,7 +7005,7 @@
     refreshTimer = setTimeout(function(){
       console.info('[TravelExpense] realtime refresh', reason || 'change');
       refreshNow();
-    }, 350);
+    }, 100);
   }
 
   function install(){
@@ -7584,5 +7601,52 @@
   }
 </style>
 
+
+
+<script id="travel-expense-realtime-summary-bridge-final">
+(function(){
+  if(window.__travelExpenseRealtimeSummaryBridgeFinalInstalled) return;
+  window.__travelExpenseRealtimeSummaryBridgeFinalInstalled = true;
+
+  function safe(fn){ try { return fn(); } catch(e){ console.warn('[TravelExpense] summary bridge warning', e); } }
+  function callMonthly(){
+    if(typeof window.refreshMonthlyProcessSummary === 'function'){
+      return safe(function(){ return window.refreshMonthlyProcessSummary(); });
+    }
+  }
+  function callApplicant(){
+    if(typeof window.refreshTravelExpenseApplicantScreen === 'function'){
+      return safe(function(){ return window.refreshTravelExpenseApplicantScreen(); });
+    }
+    if(typeof window.loadMyRequests === 'function'){
+      return safe(function(){ return window.loadMyRequests(); });
+    }
+  }
+  function callAdmin(){
+    if(typeof window.refreshTravelExpenseAdminScreen === 'function'){
+      return safe(function(){ return window.refreshTravelExpenseAdminScreen(); });
+    }
+    if(typeof window.travelExpenseAdminRefresh === 'function'){
+      return safe(function(){ return window.travelExpenseAdminRefresh(); });
+    }
+  }
+
+  var prior = window.refreshTravelExpenseScreens;
+  var timer = null;
+  window.refreshTravelExpenseScreens = function(){
+    clearTimeout(timer);
+    timer = setTimeout(function(){
+      Promise.resolve()
+        .then(function(){ if(typeof prior === 'function') return safe(function(){ return prior(); }); })
+        .then(callApplicant)
+        .then(callMonthly)
+        .then(callAdmin)
+        .catch(function(e){ console.warn('[TravelExpense] bridge refresh failed', e); });
+    }, 0);
+  };
+
+  window.refreshTravelExpenseRealtimeNow = window.refreshTravelExpenseScreens;
+})();
+</script>
 </body>
 </html>
