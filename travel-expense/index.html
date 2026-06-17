@@ -1712,6 +1712,147 @@
       <div class="viewer-shell">${viewer}</div>
     </section>
   </main>
+
+
+<script id="travel-mobile-save-submit-list-return-final">
+(function(){
+  if(window.__travelMobileSaveSubmitListReturnFinalInstalled) return;
+  window.__travelMobileSaveSubmitListReturnFinalInstalled = true;
+
+  var mq = window.matchMedia ? window.matchMedia('(max-width: 1100px)') : null;
+
+  function isMobileWidth(){
+    return mq ? mq.matches : window.innerWidth <= 1100;
+  }
+
+  function ensureBackButton(){
+    var panel = document.querySelector('.user-view .form-panel');
+    if(!panel || panel.querySelector('.travel-mobile-backbar')) return;
+    var bar = document.createElement('div');
+    bar.className = 'travel-mobile-backbar';
+    bar.innerHTML = '<button type="button" class="travel-mobile-backbtn">← 목록으로</button><div class="travel-mobile-backtitle">출장비 정산 상세</div>';
+    var btn = bar.querySelector('.travel-mobile-backbtn');
+    if(btn){
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        forceMobileList();
+      });
+    }
+    panel.insertBefore(bar, panel.firstChild);
+  }
+
+  function forceMobileList(){
+    if(!isMobileWidth()) return;
+    ensureBackButton();
+    document.body.classList.remove('travel-mobile-detail');
+    document.body.classList.add('travel-mobile-list');
+    try{
+      window.scrollTo({top:0, behavior:'smooth'});
+    }catch(e){
+      window.scrollTo(0,0);
+    }
+  }
+
+  function isSuccessMessage(message){
+    var text = String(message || '');
+    return text.indexOf('임시저장되었습니다') !== -1 ||
+      text.indexOf('제출되었습니다') !== -1 ||
+      text.indexOf('저장되었습니다') !== -1;
+  }
+
+  function scheduleMobileListReturn(){
+    if(!isMobileWidth()) return;
+    setTimeout(forceMobileList, 0);
+    setTimeout(forceMobileList, 120);
+    setTimeout(forceMobileList, 450);
+    setTimeout(forceMobileList, 900);
+  }
+
+  function patchAlert(){
+    if(!window.alert || window.alert.__travelMobileListReturnFinalWrapped) return;
+    var originalAlert = window.alert;
+    var wrappedAlert = function(message){
+      var shouldReturn = isSuccessMessage(message);
+      var result = originalAlert.apply(window, arguments);
+      if(shouldReturn) scheduleMobileListReturn();
+      return result;
+    };
+    wrappedAlert.__travelMobileListReturnFinalWrapped = true;
+    window.alert = wrappedAlert;
+  }
+
+  function patchFunction(name){
+    var fn = window[name];
+    if(typeof fn !== 'function' || fn.__travelMobileListReturnFinalWrapped) return;
+
+    var original = fn;
+    var wrapped = function(){
+      var result;
+      try{
+        result = original.apply(this, arguments);
+      }catch(error){
+        throw error;
+      }
+
+      return Promise.resolve(result).then(function(value){
+        // saveRequest 계열은 성공 시 request id를 반환하고, 실패/검증 오류 시 null을 반환합니다.
+        if(value !== null && value !== undefined) scheduleMobileListReturn();
+        return value;
+      });
+    };
+
+    // 기존 wrapper의 표식도 같이 유지해서 중복 패치 충돌을 줄입니다.
+    Object.keys(original).forEach(function(key){
+      try{ wrapped[key] = original[key]; }catch(e){}
+    });
+    wrapped.__travelMobileListReturnFinalWrapped = true;
+    window[name] = wrapped;
+  }
+
+  function patchSaveSubmit(){
+    patchFunction('saveTravelExpenseDraft');
+    patchFunction('submitTravelExpense');
+  }
+
+  function bindActionButtons(){
+    document.addEventListener('click', function(event){
+      var btn = event.target && event.target.closest ? event.target.closest('button') : null;
+      if(!btn || !isMobileWidth()) return;
+      var text = String(btn.textContent || '').trim();
+      var onclick = String(btn.getAttribute('onclick') || '');
+      if(text.indexOf('임시저장') === -1 && text.indexOf('제출하기') === -1 && onclick.indexOf('saveTravelExpenseDraft') === -1 && onclick.indexOf('submitTravelExpense') === -1) return;
+
+      // 함수 wrapper/alert wrapper가 성공 신호를 놓치는 경우를 대비한 최후 보정입니다.
+      // 저장 실패 시에는 성공 alert가 없으므로 alert wrapper가 우선이며, 이 보정은 충분히 늦게 한 번만 실행합니다.
+      setTimeout(function(){
+        var active = document.activeElement;
+        if(active && active.blur) active.blur();
+      }, 50);
+    }, true);
+  }
+
+  function init(){
+    ensureBackButton();
+    patchAlert();
+    patchSaveSubmit();
+  }
+
+  bindActionButtons();
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+
+  setTimeout(init, 300);
+  setTimeout(init, 800);
+  setTimeout(init, 1500);
+  setTimeout(init, 3000);
+  setTimeout(init, 5000);
+
+  if(mq && mq.addEventListener) mq.addEventListener('change', init);
+  else window.addEventListener('resize', function(){ setTimeout(init, 80); });
+})();
+</script>
+
 </body>
 </html>`);
     w.document.close();
@@ -3569,6 +3710,147 @@
     </section>
     ${evidencePages(printTrips, mode)}
   </div>
+
+
+<script id="travel-mobile-save-submit-list-return-final">
+(function(){
+  if(window.__travelMobileSaveSubmitListReturnFinalInstalled) return;
+  window.__travelMobileSaveSubmitListReturnFinalInstalled = true;
+
+  var mq = window.matchMedia ? window.matchMedia('(max-width: 1100px)') : null;
+
+  function isMobileWidth(){
+    return mq ? mq.matches : window.innerWidth <= 1100;
+  }
+
+  function ensureBackButton(){
+    var panel = document.querySelector('.user-view .form-panel');
+    if(!panel || panel.querySelector('.travel-mobile-backbar')) return;
+    var bar = document.createElement('div');
+    bar.className = 'travel-mobile-backbar';
+    bar.innerHTML = '<button type="button" class="travel-mobile-backbtn">← 목록으로</button><div class="travel-mobile-backtitle">출장비 정산 상세</div>';
+    var btn = bar.querySelector('.travel-mobile-backbtn');
+    if(btn){
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        forceMobileList();
+      });
+    }
+    panel.insertBefore(bar, panel.firstChild);
+  }
+
+  function forceMobileList(){
+    if(!isMobileWidth()) return;
+    ensureBackButton();
+    document.body.classList.remove('travel-mobile-detail');
+    document.body.classList.add('travel-mobile-list');
+    try{
+      window.scrollTo({top:0, behavior:'smooth'});
+    }catch(e){
+      window.scrollTo(0,0);
+    }
+  }
+
+  function isSuccessMessage(message){
+    var text = String(message || '');
+    return text.indexOf('임시저장되었습니다') !== -1 ||
+      text.indexOf('제출되었습니다') !== -1 ||
+      text.indexOf('저장되었습니다') !== -1;
+  }
+
+  function scheduleMobileListReturn(){
+    if(!isMobileWidth()) return;
+    setTimeout(forceMobileList, 0);
+    setTimeout(forceMobileList, 120);
+    setTimeout(forceMobileList, 450);
+    setTimeout(forceMobileList, 900);
+  }
+
+  function patchAlert(){
+    if(!window.alert || window.alert.__travelMobileListReturnFinalWrapped) return;
+    var originalAlert = window.alert;
+    var wrappedAlert = function(message){
+      var shouldReturn = isSuccessMessage(message);
+      var result = originalAlert.apply(window, arguments);
+      if(shouldReturn) scheduleMobileListReturn();
+      return result;
+    };
+    wrappedAlert.__travelMobileListReturnFinalWrapped = true;
+    window.alert = wrappedAlert;
+  }
+
+  function patchFunction(name){
+    var fn = window[name];
+    if(typeof fn !== 'function' || fn.__travelMobileListReturnFinalWrapped) return;
+
+    var original = fn;
+    var wrapped = function(){
+      var result;
+      try{
+        result = original.apply(this, arguments);
+      }catch(error){
+        throw error;
+      }
+
+      return Promise.resolve(result).then(function(value){
+        // saveRequest 계열은 성공 시 request id를 반환하고, 실패/검증 오류 시 null을 반환합니다.
+        if(value !== null && value !== undefined) scheduleMobileListReturn();
+        return value;
+      });
+    };
+
+    // 기존 wrapper의 표식도 같이 유지해서 중복 패치 충돌을 줄입니다.
+    Object.keys(original).forEach(function(key){
+      try{ wrapped[key] = original[key]; }catch(e){}
+    });
+    wrapped.__travelMobileListReturnFinalWrapped = true;
+    window[name] = wrapped;
+  }
+
+  function patchSaveSubmit(){
+    patchFunction('saveTravelExpenseDraft');
+    patchFunction('submitTravelExpense');
+  }
+
+  function bindActionButtons(){
+    document.addEventListener('click', function(event){
+      var btn = event.target && event.target.closest ? event.target.closest('button') : null;
+      if(!btn || !isMobileWidth()) return;
+      var text = String(btn.textContent || '').trim();
+      var onclick = String(btn.getAttribute('onclick') || '');
+      if(text.indexOf('임시저장') === -1 && text.indexOf('제출하기') === -1 && onclick.indexOf('saveTravelExpenseDraft') === -1 && onclick.indexOf('submitTravelExpense') === -1) return;
+
+      // 함수 wrapper/alert wrapper가 성공 신호를 놓치는 경우를 대비한 최후 보정입니다.
+      // 저장 실패 시에는 성공 alert가 없으므로 alert wrapper가 우선이며, 이 보정은 충분히 늦게 한 번만 실행합니다.
+      setTimeout(function(){
+        var active = document.activeElement;
+        if(active && active.blur) active.blur();
+      }, 50);
+    }, true);
+  }
+
+  function init(){
+    ensureBackButton();
+    patchAlert();
+    patchSaveSubmit();
+  }
+
+  bindActionButtons();
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+
+  setTimeout(init, 300);
+  setTimeout(init, 800);
+  setTimeout(init, 1500);
+  setTimeout(init, 3000);
+  setTimeout(init, 5000);
+
+  if(mq && mq.addEventListener) mq.addEventListener('change', init);
+  else window.addEventListener('resize', function(){ setTimeout(init, 80); });
+})();
+</script>
+
 </body>
 </html>`;
   }
@@ -7359,5 +7641,146 @@
   else window.addEventListener('resize', function(){ setTimeout(init, 80); });
 })();
 </script>
+
+
+<script id="travel-mobile-save-submit-list-return-final">
+(function(){
+  if(window.__travelMobileSaveSubmitListReturnFinalInstalled) return;
+  window.__travelMobileSaveSubmitListReturnFinalInstalled = true;
+
+  var mq = window.matchMedia ? window.matchMedia('(max-width: 1100px)') : null;
+
+  function isMobileWidth(){
+    return mq ? mq.matches : window.innerWidth <= 1100;
+  }
+
+  function ensureBackButton(){
+    var panel = document.querySelector('.user-view .form-panel');
+    if(!panel || panel.querySelector('.travel-mobile-backbar')) return;
+    var bar = document.createElement('div');
+    bar.className = 'travel-mobile-backbar';
+    bar.innerHTML = '<button type="button" class="travel-mobile-backbtn">← 목록으로</button><div class="travel-mobile-backtitle">출장비 정산 상세</div>';
+    var btn = bar.querySelector('.travel-mobile-backbtn');
+    if(btn){
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        forceMobileList();
+      });
+    }
+    panel.insertBefore(bar, panel.firstChild);
+  }
+
+  function forceMobileList(){
+    if(!isMobileWidth()) return;
+    ensureBackButton();
+    document.body.classList.remove('travel-mobile-detail');
+    document.body.classList.add('travel-mobile-list');
+    try{
+      window.scrollTo({top:0, behavior:'smooth'});
+    }catch(e){
+      window.scrollTo(0,0);
+    }
+  }
+
+  function isSuccessMessage(message){
+    var text = String(message || '');
+    return text.indexOf('임시저장되었습니다') !== -1 ||
+      text.indexOf('제출되었습니다') !== -1 ||
+      text.indexOf('저장되었습니다') !== -1;
+  }
+
+  function scheduleMobileListReturn(){
+    if(!isMobileWidth()) return;
+    setTimeout(forceMobileList, 0);
+    setTimeout(forceMobileList, 120);
+    setTimeout(forceMobileList, 450);
+    setTimeout(forceMobileList, 900);
+  }
+
+  function patchAlert(){
+    if(!window.alert || window.alert.__travelMobileListReturnFinalWrapped) return;
+    var originalAlert = window.alert;
+    var wrappedAlert = function(message){
+      var shouldReturn = isSuccessMessage(message);
+      var result = originalAlert.apply(window, arguments);
+      if(shouldReturn) scheduleMobileListReturn();
+      return result;
+    };
+    wrappedAlert.__travelMobileListReturnFinalWrapped = true;
+    window.alert = wrappedAlert;
+  }
+
+  function patchFunction(name){
+    var fn = window[name];
+    if(typeof fn !== 'function' || fn.__travelMobileListReturnFinalWrapped) return;
+
+    var original = fn;
+    var wrapped = function(){
+      var result;
+      try{
+        result = original.apply(this, arguments);
+      }catch(error){
+        throw error;
+      }
+
+      return Promise.resolve(result).then(function(value){
+        // saveRequest 계열은 성공 시 request id를 반환하고, 실패/검증 오류 시 null을 반환합니다.
+        if(value !== null && value !== undefined) scheduleMobileListReturn();
+        return value;
+      });
+    };
+
+    // 기존 wrapper의 표식도 같이 유지해서 중복 패치 충돌을 줄입니다.
+    Object.keys(original).forEach(function(key){
+      try{ wrapped[key] = original[key]; }catch(e){}
+    });
+    wrapped.__travelMobileListReturnFinalWrapped = true;
+    window[name] = wrapped;
+  }
+
+  function patchSaveSubmit(){
+    patchFunction('saveTravelExpenseDraft');
+    patchFunction('submitTravelExpense');
+  }
+
+  function bindActionButtons(){
+    document.addEventListener('click', function(event){
+      var btn = event.target && event.target.closest ? event.target.closest('button') : null;
+      if(!btn || !isMobileWidth()) return;
+      var text = String(btn.textContent || '').trim();
+      var onclick = String(btn.getAttribute('onclick') || '');
+      if(text.indexOf('임시저장') === -1 && text.indexOf('제출하기') === -1 && onclick.indexOf('saveTravelExpenseDraft') === -1 && onclick.indexOf('submitTravelExpense') === -1) return;
+
+      // 함수 wrapper/alert wrapper가 성공 신호를 놓치는 경우를 대비한 최후 보정입니다.
+      // 저장 실패 시에는 성공 alert가 없으므로 alert wrapper가 우선이며, 이 보정은 충분히 늦게 한 번만 실행합니다.
+      setTimeout(function(){
+        var active = document.activeElement;
+        if(active && active.blur) active.blur();
+      }, 50);
+    }, true);
+  }
+
+  function init(){
+    ensureBackButton();
+    patchAlert();
+    patchSaveSubmit();
+  }
+
+  bindActionButtons();
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+
+  setTimeout(init, 300);
+  setTimeout(init, 800);
+  setTimeout(init, 1500);
+  setTimeout(init, 3000);
+  setTimeout(init, 5000);
+
+  if(mq && mq.addEventListener) mq.addEventListener('change', init);
+  else window.addEventListener('resize', function(){ setTimeout(init, 80); });
+})();
+</script>
+
 </body>
 </html>
