@@ -7120,11 +7120,11 @@
 
 
 <!-- =========================================================
-  Mobile list/detail split + right-edge swipe back
+  Mobile list/detail split + wide-area left swipe back
   - PC layout untouched (max-width:760px only)
   - Mobile list: status panel + new button + submissions
   - Mobile detail: form panel only
-  - Back: swipe from right edge to left
+  - Back: swipe from center/right area to left
 ========================================================= -->
 <style id="travel-mobile-right-edge-swipe-style">
   @media (max-width:760px){
@@ -7199,9 +7199,9 @@
   window.__travelMobileRightEdgeSwipeInstalled = true;
 
   var MOBILE_QUERY = '(max-width:760px)';
-  var RIGHT_EDGE_PX = 72;       // 오른쪽 끝 전용 시작 영역
-  var SWIPE_MIN_X = 70;         // 왼쪽으로 최소 이동거리
-  var SWIPE_MAX_Y = 85;         // 세로 스크롤과 구분
+  var LEFT_EDGE_GUARD_PX = 48;  // 포탈 메뉴 보호용: 화면 왼쪽 끝 영역은 제외
+  var SWIPE_MIN_X = 80;         // 왼쪽으로 최소 이동거리
+  var SWIPE_MAX_Y = 70;         // 세로 스크롤과 구분
   var SWIPE_MAX_TIME = 1000;
   var mobileMode = 'list';      // list | detail
   var touchStartX = null;
@@ -7289,15 +7289,14 @@
     setTimeout(goDetail, 120);
   }, true);
 
-  // 오른쪽 끝에서 왼쪽으로 스와이프하면 목록으로 복귀합니다.
-  // 포탈 메뉴는 왼쪽 끝 → 오른쪽 스와이프이므로 방향/영역이 분리됩니다.
+  // 중앙/오른쪽 영역에서 왼쪽으로 스와이프하면 목록으로 복귀합니다.
+  // 포탈 메뉴 보호를 위해 왼쪽 끝 영역에서 시작한 터치는 제외합니다.
   document.addEventListener('touchstart', function(event){
     if(!isActiveMobile() || mobileMode !== 'detail') return;
     if(!event.touches || event.touches.length !== 1) return;
     if(event.target && event.target.closest && event.target.closest('.modal-backdrop,.dropdown-menu')) return;
     var t = event.touches[0];
-    var width = window.innerWidth || document.documentElement.clientWidth || 0;
-    if(width && t.clientX < width - RIGHT_EDGE_PX) return;
+    if(t.clientX < LEFT_EDGE_GUARD_PX) return;
     touchStartX = t.clientX;
     touchStartY = t.clientY;
     touchStartAt = Date.now();
