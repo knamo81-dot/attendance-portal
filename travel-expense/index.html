@@ -1600,119 +1600,7 @@
     </section>
   </main>
 
-<!-- mobile form width patch: basic inputs + route rows -->
-<style id="travel-mobile-form-width-patch">
-  @media(max-width:760px){
-    body:not(.admin) .user-view .form-panel,
-    body:not(.admin) .user-view .form-panel .section,
-    body:not(.admin) .user-view .basic-info-grid,
-    body:not(.admin) .user-view .basic-info-grid > div{
-      max-width:100% !important;
-      min-width:0 !important;
-      width:100% !important;
-      overflow:visible !important;
-    }
 
-    body:not(.admin) .user-view .basic-info-grid{
-      display:grid !important;
-      grid-template-columns:1fr !important;
-      gap:14px !important;
-    }
-
-    body:not(.admin) .user-view .basic-info-grid input,
-    body:not(.admin) .user-view .basic-info-grid select,
-    body:not(.admin) .user-view .basic-info-grid textarea,
-    body:not(.admin) .user-view .settlement-date-pair,
-    body:not(.admin) .user-view .settlement-date-pair > div,
-    body:not(.admin) .user-view .settlement-date-pair input{
-      max-width:100% !important;
-      min-width:0 !important;
-      width:100% !important;
-      box-sizing:border-box !important;
-    }
-
-    body:not(.admin) .user-view input[type="date"]{
-      -webkit-appearance:none !important;
-      appearance:none !important;
-      max-width:100% !important;
-      min-width:0 !important;
-      width:100% !important;
-      text-align:left !important;
-    }
-
-    body:not(.admin) .user-view .route-panel{
-      max-width:100% !important;
-      min-width:0 !important;
-      width:100% !important;
-      overflow:hidden !important;
-      padding:14px !important;
-    }
-
-    body:not(.admin) .user-view .route-head{
-      align-items:flex-start !important;
-    }
-
-    body:not(.admin) .user-view .route-row{
-      display:grid !important;
-      grid-template-columns:1fr !important;
-      gap:12px !important;
-      align-items:stretch !important;
-      width:100% !important;
-      max-width:100% !important;
-      min-width:0 !important;
-      padding:0 !important;
-      margin:0 0 14px !important;
-      background:transparent !important;
-      border:0 !important;
-    }
-
-    body:not(.admin) .user-view .route-row .route-num,
-    body:not(.admin) .user-view .route-row .route-arrow{
-      display:none !important;
-    }
-
-    body:not(.admin) .user-view .route-row > div,
-    body:not(.admin) .user-view .route-row .distance-wrap{
-      grid-column:auto !important;
-      width:100% !important;
-      max-width:100% !important;
-      min-width:0 !important;
-    }
-
-    body:not(.admin) .user-view .route-row input,
-    body:not(.admin) .user-view .route-row select,
-    body:not(.admin) .user-view .route-row textarea{
-      width:100% !important;
-      max-width:100% !important;
-      min-width:0 !important;
-      box-sizing:border-box !important;
-    }
-
-    body:not(.admin) .user-view .route-row button,
-    body:not(.admin) .user-view .route-row button.btn-danger,
-    body:not(.admin) .user-view .route-row .btn-danger{
-      grid-column:auto !important;
-      width:100% !important;
-      max-width:100% !important;
-      min-width:0 !important;
-      height:46px !important;
-      padding:0 14px !important;
-      display:flex !important;
-      align-items:center !important;
-      justify-content:center !important;
-      writing-mode:horizontal-tb !important;
-    }
-
-    body:not(.admin) .user-view .route-summary{
-      width:100% !important;
-      max-width:100% !important;
-      min-width:0 !important;
-      box-sizing:border-box !important;
-      word-break:keep-all !important;
-      overflow-wrap:anywhere !important;
-    }
-  }
-</style>
 
 </body>
 </html>`);
@@ -7452,5 +7340,116 @@
   window.addEventListener('orientationchange', function(){ setTimeout(applyMode, 250); });
 })();
 </script>
+
+<!-- mobile form width patch: basic inputs + route rows -->
+<style id="travel-mobile-form-width-patch">
+  @media(max-width:760px){
+    body:not(.admin) .user-view .form-panel,
+    body:not(.admin) .user-view .form-panel .section,
+    body:not(.admin) .user-view .basic-info-grid,
+    body:not(.admin) .user-view .basic-info-grid > *,
+    body:not(.admin) .user-view .settlement-date-pair,
+    body:not(.admin) .user-view .settlement-date-pair > *,
+    body:not(.admin) .user-view .route-panel,
+    body:not(.admin) .user-view .route-row,
+    body:not(.admin) .user-view .route-row > *{
+      max-width:100% !important;
+      min-width:0 !important;
+      width:100% !important;
+      box-sizing:border-box !important;
+    }
+
+    body:not(.admin) .user-view .basic-info-grid,
+    body:not(.admin) .user-view .settlement-date-pair{
+      display:grid !important;
+      grid-template-columns:minmax(0,1fr) !important;
+      gap:14px !important;
+    }
+
+    body:not(.admin) .user-view .basic-info-grid input,
+    body:not(.admin) .user-view .basic-info-grid select,
+    body:not(.admin) .user-view .basic-info-grid textarea,
+    body:not(.admin) .user-view .settlement-date-pair input,
+    body:not(.admin) .user-view .settlement-date-pair select,
+    body:not(.admin) .user-view .settlement-date-pair textarea,
+    body:not(.admin) .user-view input[type="date"]{
+      display:block !important;
+      width:100% !important;
+      max-width:100% !important;
+      min-width:0 !important;
+      box-sizing:border-box !important;
+      -webkit-appearance:none !important;
+      appearance:none !important;
+      text-align:left !important;
+    }
+
+    body:not(.admin) .user-view .route-panel{
+      overflow:hidden !important;
+      padding:14px !important;
+    }
+
+    body:not(.admin) .user-view .route-head{
+      align-items:flex-start !important;
+      gap:8px !important;
+    }
+
+    body:not(.admin) .user-view .route-row{
+      display:grid !important;
+      grid-template-columns:minmax(0,1fr) !important;
+      gap:12px !important;
+      align-items:stretch !important;
+      padding:0 !important;
+      margin:0 0 14px !important;
+      background:transparent !important;
+      border:0 !important;
+    }
+
+    body:not(.admin) .user-view .route-row .route-num,
+    body:not(.admin) .user-view .route-row .route-arrow{
+      display:none !important;
+    }
+
+    body:not(.admin) .user-view .route-row > div,
+    body:not(.admin) .user-view .route-row .distance-wrap{
+      display:block !important;
+      grid-column:auto !important;
+    }
+
+    body:not(.admin) .user-view .route-row input,
+    body:not(.admin) .user-view .route-row select,
+    body:not(.admin) .user-view .route-row textarea{
+      display:block !important;
+      width:100% !important;
+      max-width:100% !important;
+      min-width:0 !important;
+      box-sizing:border-box !important;
+    }
+
+    body:not(.admin) .user-view .route-row button,
+    body:not(.admin) .user-view .route-row button.btn-danger,
+    body:not(.admin) .user-view .route-row .btn-danger{
+      grid-column:auto !important;
+      width:100% !important;
+      max-width:100% !important;
+      min-width:0 !important;
+      height:46px !important;
+      padding:0 14px !important;
+      display:flex !important;
+      align-items:center !important;
+      justify-content:center !important;
+      writing-mode:horizontal-tb !important;
+    }
+
+    body:not(.admin) .user-view .route-summary{
+      width:100% !important;
+      max-width:100% !important;
+      min-width:0 !important;
+      box-sizing:border-box !important;
+      word-break:keep-all !important;
+      overflow-wrap:anywhere !important;
+    }
+  }
+</style>
+
 </body>
 </html>
