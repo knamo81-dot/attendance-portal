@@ -6923,6 +6923,139 @@
 })();
 </script>
 
+
+
+<script id="travel-expense-realtime-sync-controller">
+(function(){
+  if(window.__travelExpenseRealtimeSyncControllerInstalled) return;
+  window.__travelExpenseRealtimeSyncControllerInstalled = true;
+
+  var channel = null;
+  var retryTimer = null;
+  var refreshTimer = null;
+  var fallbackTimer = null;
+  var installedAt = Date.now();
+
+  function safe(fn, fallback){ try { return fn(); } catch(e){ return fallback; } }
+  function hasClient(v){ return !!(v && typeof v.from === 'function' && typeof v.channel === 'function'); }
+
+  function findDb(scope){
+    if(!scope) return null;
+    var names = [
+      'supabaseClient','supabase_client','sb','db','database',
+      'portalSupabase','portalSupabaseClient','EXELO_SUPABASE','EXELO_DB',
+      '__supabaseClient','__SUPABASE_CLIENT__','client'
+    ];
+    for(var i=0;i<names.length;i++){
+      var v = safe(function(){ return scope[names[i]]; }, null);
+      if(hasClient(v)) return v;
+    }
+    var keys = safe(function(){ return Object.keys(scope); }, []);
+    for(var j=0;j<keys.length;j++){
+      var key = keys[j];
+      if(key === 'supabase') continue;
+      var candidate = safe(function(){ return scope[key]; }, null);
+      if(hasClient(candidate)) return candidate;
+    }
+    return null;
+  }
+
+  function client(){
+    return findDb(window) || findDb(safe(function(){ return window.parent; }, null));
+  }
+
+  function getSessionCompanyId(){
+    var s = safe(function(){ return window.portalSession; }, null)
+         || safe(function(){ return window.parent && window.parent.portalSession; }, null)
+         || safe(function(){ return window.parent && window.parent.__PORTAL_SESSION__; }, null)
+         || safe(function(){ return JSON.parse(sessionStorage.getItem('portalSession') || 'null'); }, null)
+         || safe(function(){ return JSON.parse(localStorage.getItem('portalSession') || 'null'); }, null)
+         || {};
+    var company = s.company || s.activeCompany || {};
+    return s.activeCompanyId || s.companyId || s.company_id || company.id || company.company_id || company.companyId || null;
+  }
+
+  function refreshNow(){
+    if(typeof window.refreshTravelExpenseScreens === 'function'){
+      try { window.refreshTravelExpenseScreens(); return; } catch(e){ console.warn('[TravelExpense] realtime refresh failed', e); }
+    }
+    if(typeof window.loadMyRequests === 'function') safe(function(){ window.loadMyRequests(); }, null);
+    if(typeof window.travelExpenseAdminRefresh === 'function') safe(function(){ window.travelExpenseAdminRefresh(); }, null);
+  }
+
+  function scheduleRefresh(reason){
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(function(){
+      console.info('[TravelExpense] realtime refresh', reason || 'change');
+      refreshNow();
+    }, 350);
+  }
+
+  function install(){
+    var db = client();
+    if(!db){
+      if(Date.now() - installedAt < 15000){
+        clearTimeout(retryTimer);
+        retryTimer = setTimeout(install, 700);
+      }else{
+        console.warn('[TravelExpense] realtime client not found');
+      }
+      return;
+    }
+    if(channel) return;
+
+    var companyId = getSessionCompanyId();
+    var channelName = 'travel-expense-realtime-sync-' + (companyId || 'all');
+    channel = db.channel(channelName);
+
+    var tables = [
+      'travel_expense_requests',
+      'travel_expense_items',
+      'travel_expense_routes',
+      'travel_expense_attachments',
+      'travel_expense_review_logs'
+    ];
+
+    tables.forEach(function(table){
+      var filter = companyId ? { event:'*', schema:'public', table:table, filter:'company_id=eq.' + companyId }
+                             : { event:'*', schema:'public', table:table };
+      channel.on('postgres_changes', filter, function(payload){
+        scheduleRefresh(table + ':' + (payload && payload.eventType ? payload.eventType : 'change'));
+      });
+    });
+
+    channel.subscribe(function(status){
+      if(status === 'SUBSCRIBED'){
+        console.info('[TravelExpense] realtime subscribed', channelName);
+      }else if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
+        console.warn('[TravelExpense] realtime status', status);
+      }
+    });
+
+    // Realtime이 지연/차단되는 환경 대비. 화면이 보일 때만 조용히 재조회합니다.
+    clearInterval(fallbackTimer);
+    fallbackTimer = setInterval(function(){
+      if(document.visibilityState === 'visible') scheduleRefresh('fallback');
+    }, 30000);
+  }
+
+  window.addEventListener('beforeunload', function(){
+    var db = client();
+    if(db && channel && typeof db.removeChannel === 'function'){
+      safe(function(){ db.removeChannel(channel); }, null);
+    }
+    clearInterval(fallbackTimer);
+    clearTimeout(refreshTimer);
+    clearTimeout(retryTimer);
+  });
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
+  else install();
+  setTimeout(install, 1000);
+  setTimeout(install, 2500);
+})();
+</script>
+
 <script id="travel-expense-role-access-controller">
 (function(){
   if(window.__travelExpenseRoleAccessControllerInstalled) return;
