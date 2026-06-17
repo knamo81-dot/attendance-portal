@@ -158,6 +158,7 @@
       original: original,
       translated: message.translated || '',
       source_lang: message.source_lang || detectTextLanguage(original),
+      translations: normalizeTranslations(message.translations),
       created_at: message.created_at || ''
     };
   }
@@ -176,28 +177,68 @@
   }
 
   function getViewerLanguage() {
-    var lang = String(
+    var lang = normalizeAicLang(
       state.settings.defaultLang ||
       getCurrentLang() ||
       'ko'
-    ).toLowerCase();
+    );
 
-    if (lang.indexOf('en') === 0) return 'en';
-    return 'ko';
+    return lang || 'ko';
+  }
+
+  function normalizeAicLang(value) {
+    var lang = String(value || '').trim().toLowerCase();
+    if (!lang) return '';
+
+    if (lang === 'kr' || lang === 'korean' || lang.indexOf('ko') === 0) return 'ko';
+    if (lang === 'english' || lang.indexOf('en') === 0) return 'en';
+    if (lang === 'japanese' || lang.indexOf('ja') === 0 || lang.indexOf('jp') === 0) return 'ja';
+    if (lang === 'chinese' || lang.indexOf('zh') === 0 || lang.indexOf('cn') === 0) return 'zh';
+    if (lang === 'vietnamese' || lang.indexOf('vi') === 0) return 'vi';
+    if (lang === 'thai' || lang.indexOf('th') === 0) return 'th';
+    if (lang === 'spanish' || lang.indexOf('es') === 0) return 'es';
+    if (lang === 'french' || lang.indexOf('fr') === 0) return 'fr';
+    if (lang === 'german' || lang.indexOf('de') === 0) return 'de';
+
+    return lang.slice(0, 8);
+  }
+
+  function normalizeTranslations(value) {
+    if (!value) return {};
+    if (typeof value === 'object' && !Array.isArray(value)) return value;
+
+    try {
+      var parsed = JSON.parse(String(value));
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function getTranslationForLang(msg, lang) {
+    var targetLang = normalizeAicLang(lang || getViewerLanguage());
+    var translations = normalizeTranslations(msg && msg.translations);
+
+    if (targetLang && translations[targetLang]) {
+      return String(translations[targetLang] || '');
+    }
+
+    return '';
   }
 
   function getPreferredMessageText(msg) {
     var original = String(msg?.original || '');
     var translated = String(msg?.translated || '');
-    var sourceLang = msg?.source_lang || detectTextLanguage(original);
+    var sourceLang = normalizeAicLang(msg?.source_lang) || detectTextLanguage(original);
     var viewerLang = getViewerLanguage();
+    var viewerTranslation = getTranslationForLang(msg, viewerLang);
 
     // 내가 보낸 메시지는 모든 표시 모드에서 원문을 우선 보여줍니다.
-    if (msg && msg.type === 'me') return original || translated;
+    if (msg && msg.type === 'me') return original || viewerTranslation || translated;
 
-    // 상대방 메시지는 내 개인설정 언어 기준으로 번역문을 보여줍니다.
-    if (sourceLang === viewerLang) return original || translated;
-    return translated || original;
+    // 상대방 메시지는 내 개인설정 언어 기준 번역문을 우선 보여줍니다.
+    if (sourceLang === viewerLang) return original || viewerTranslation || translated;
+    return viewerTranslation || translated || original;
   }
 
   function buildMessageFooter(msg) {
@@ -239,10 +280,33 @@
         throw new Error(data.error || ('AI 번역 실패: HTTP ' + response.status));
       }
 
-      return data.translated || data.translation || '';
+      var targetLang = normalizeAicLang(data.targetLang || data.target_lang || '');
+      var source = normalizeAicLang(data.sourceLang || data.source_lang || detectedSourceLang);
+      var translated = data.translated || data.translation || '';
+      var translations = normalizeTranslations(data.translations);
+
+      if (targetLang && translated && !translations[targetLang]) {
+        translations[targetLang] = translated;
+      }
+
+      return {
+        translated: translated,
+        source_lang: source || detectedSourceLang,
+        target_lang: targetLang,
+        translations: translations
+      };
     } catch (error) {
       console.warn('[AIC AI]', error);
-      return fakeTranslate(text, sourceLang || state.settings.defaultLang);
+      var fallback = fakeTranslate(text, sourceLang || state.settings.defaultLang);
+      var fallbackTargetLang = detectedSourceLang === 'ko' ? 'en' : 'ko';
+      var fallbackTranslations = {};
+      fallbackTranslations[fallbackTargetLang] = fallback;
+      return {
+        translated: fallback,
+        source_lang: detectedSourceLang,
+        target_lang: fallbackTargetLang,
+        translations: fallbackTranslations
+      };
     }
   }
 
@@ -255,7 +319,7 @@
     next.tone = 'business';
     next.autoTranslate = true;
 
-    if (next.defaultLang !== 'en') next.defaultLang = 'ko';
+    next.defaultLang = normalizeAicLang(next.defaultLang) || 'ko';
     if (['original', 'translated', 'both'].indexOf(next.display) < 0) next.display = 'both';
 
     return next;
@@ -1088,6 +1152,7 @@
           original: original,
           translated: message.translated || '',
           source_lang: message.source_lang || detectTextLanguage(original),
+          translations: normalizeTranslations(message.translations),
           created_at: message.created_at || ''
         };
       })
@@ -1317,14 +1382,18 @@
       sender_name: message.sender || getCurrentUserName(),
       sender_email: getCurrentUserEmail(),
       original: message.original || '',
-      translated: message.translated || ''
-    }).select('id, created_at, sender_name, sender_email, original, translated, room_id').maybeSingle();
+      translated: message.translated || '',
+      source_lang: message.source_lang || detectTextLanguage(message.original || ''),
+      translations: normalizeTranslations(message.translations)
+    }).select('id, created_at, sender_name, sender_email, original, translated, source_lang, translations, room_id').maybeSingle();
 
     if (messageResult.error) throw messageResult.error;
 
     if (messageResult.data) {
       message.id = messageResult.data.id || message.id;
       message.created_at = messageResult.data.created_at || message.created_at;
+      message.source_lang = messageResult.data.source_lang || message.source_lang;
+      message.translations = normalizeTranslations(messageResult.data.translations || message.translations);
     }
 
     try {
@@ -2100,7 +2169,7 @@
     var displayMode = state.settings.display || 'both';
     var sender = getMessageSenderName(room, msg);
     var original = String(msg?.original || '');
-    var translated = String(msg?.translated || '');
+    var translated = getTranslationForLang(msg, getViewerLanguage()) || String(msg?.translated || '');
     var isMine = msg && msg.type === 'me';
     var preferredText = getPreferredMessageText(msg);
 
@@ -2134,9 +2203,9 @@
       ].join('');
     }
 
-    var sourceLang = msg?.source_lang || detectTextLanguage(original);
+    var sourceLang = normalizeAicLang(msg?.source_lang) || detectTextLanguage(original);
     var viewerLang = getViewerLanguage();
-    var showTranslated = translated && sourceLang !== viewerLang;
+    var showTranslated = translated && translated !== original && sourceLang !== viewerLang;
 
     return [
       '<div class="aic-message other">',
@@ -2302,6 +2371,7 @@
       original: text,
       translated: tr('aic.searching', '검색 중입니다...'),
       source_lang: detectTextLanguage(text),
+      translations: {},
       created_at: new Date().toISOString()
     };
 
@@ -2310,7 +2380,10 @@
     render(false);
 
     try {
-      message.translated = await translateWithAi(text, lang ? lang.value : state.settings.defaultLang, room);
+      var translationResult = await translateWithAi(text, lang ? lang.value : state.settings.defaultLang, room);
+      message.translated = translationResult.translated || '';
+      message.source_lang = translationResult.source_lang || message.source_lang || detectTextLanguage(text);
+      message.translations = normalizeTranslations(translationResult.translations);
       render(false);
 
       await insertMessageToServer(room, message);
