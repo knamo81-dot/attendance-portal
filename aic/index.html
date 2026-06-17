@@ -337,32 +337,13 @@
   <div id="aicSettingsModal" class="aic-modal-overlay" hidden>
     <div class="aic-modal">
       <h2 data-i18n="aic.myTranslationSettings">내 번역 기본 설정</h2>
-      <p data-i18n="aic.myTranslationSettingsDesc">AIC 회의방에서 기본 적용되는 개인 번역 설정입니다.</p>
+      <p data-i18n="aic.myTranslationSettingsDesc">AIC 회의방에서 사용할 내 언어와 메시지 표시 방식입니다.</p>
 
       <label class="aic-field">
-        <span data-i18n="aic.defaultInputLang">기본 입력 언어</span>
+        <span data-i18n="aic.myLanguage">내 언어</span>
         <select id="aicSetDefaultLang" class="module-select">
-          <option value="ko" data-i18n="aic.koreanInput">한국어 입력</option>
-          <option value="en" data-i18n="aic.englishInput">English Input</option>
-        </select>
-      </label>
-
-      <label class="aic-field">
-        <span data-i18n="aic.translationDirection">번역 방향</span>
-        <select id="aicSetDirection" class="module-select">
-          <option value="auto" data-i18n="aic.autoDetect">자동 감지</option>
-          <option value="ko-en" data-i18n="aic.koToEn">한국어 → 영어</option>
-          <option value="en-ko" data-i18n="aic.enToKo">영어 → 한국어</option>
-        </select>
-      </label>
-
-      <label class="aic-field">
-        <span data-i18n="aic.translationTone">번역 톤</span>
-        <select id="aicSetTone" class="module-select">
-          <option value="business" data-i18n="aic.businessTone">비즈니스 영어</option>
-          <option value="meeting" data-i18n="aic.meetingTone">간단 회의 영어</option>
-          <option value="polite" data-i18n="aic.politeTone">정중한 이메일식 영어</option>
-          <option value="casual" data-i18n="aic.casualTone">캐주얼 대화식 영어</option>
+          <option value="ko" data-i18n="aic.korean">한국어</option>
+          <option value="en" data-i18n="aic.english">English</option>
         </select>
       </label>
 
@@ -370,24 +351,10 @@
         <span data-i18n="aic.displayMode">번역 표시 방식</span>
         <select id="aicSetDisplay" class="module-select">
           <option value="original" data-i18n="aic.displayOriginalOnly">원문만 표시</option>
-          <option value="both" data-i18n="aic.displayBoth">원문 + 번역 같이 표시</option>
           <option value="translated" data-i18n="aic.displayTranslatedOnly">번역문만 표시</option>
+          <option value="both" data-i18n="aic.displayBoth">원문 + 번역 같이 표시</option>
         </select>
       </label>
-
-      <div class="aic-toggle-row">
-        <div>
-          <strong data-i18n="aic.autoTranslate">자동번역 사용</strong>
-          <span data-i18n="aic.autoTranslateDesc">메시지 전송 시 자동으로 번역문을 생성합니다.</span>
-        </div>
-        <button
-          id="aicAutoTranslateSwitch"
-          class="aic-switch on"
-          type="button"
-          aria-label="자동번역 사용"
-          data-i18n-aria-label="aic.autoTranslate"
-        ></button>
-      </div>
 
       <div class="aic-modal-actions">
         <button id="aicSettingsCancelBtn" class="module-btn" type="button" data-i18n="aic.cancel">취소</button>
