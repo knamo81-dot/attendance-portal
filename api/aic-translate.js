@@ -1,4 +1,35 @@
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
+function json(res, status, body) {
+  res.status(status).setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.end(JSON.stringify(body));
+}
+
+function safeText(value, fallback = '') {
+  if (value === null || value === undefined) return fallback;
+  return String(value).trim();
+}
+
+function normalizeLang(value) {
+  const lang = safeText(value, '').toLowerCase().replace('_', '-');
+  if (!lang) return '';
+
+  const aliases = {
+    kr: 'ko',
+    korean: 'ko',
+    kor: 'ko',
+
+    english: 'en',
+    eng: 'en',
+
+    japanese: 'ja',
+    jp: 'ja',
+    jpn: 'ja',
+
+    chinese: 'zh',
+    cn: 'zh',
+    chn: 'zh',
     'zh-cn': 'zh',
     'zh-tw': 'zh',
 
@@ -226,3 +257,4 @@ module.exports = async function handler(req, res) {
     });
   }
 };
+
