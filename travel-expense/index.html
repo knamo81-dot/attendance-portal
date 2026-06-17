@@ -1599,9 +1599,6 @@
       <div class="viewer-shell">${viewer}</div>
     </section>
   </main>
-
-
-
 </body>
 </html>`);
     w.document.close();
@@ -7121,72 +7118,66 @@
 </script>
 
 
-<!-- mobile list/detail swipe controller: PC layout safe -->
-<style id="travel-mobile-swipe-list-detail-style">
+
+<!-- =========================================================
+  Mobile list/detail split + right-edge swipe back
+  - PC layout untouched (max-width:760px only)
+  - Mobile list: status panel + new button + submissions
+  - Mobile detail: form panel only
+  - Back: swipe from right edge to left
+========================================================= -->
+<style id="travel-mobile-right-edge-swipe-style">
   @media (max-width:760px){
     body.travel-mobile-list:not(.admin) .user-view .expense-workspace,
-    body.travel-mobile-detail:not(.admin) .user-view .expense-workspace,
-    html.portal-embedded body.travel-mobile-list:not(.admin) .user-view .expense-workspace,
-    html.portal-embedded body.travel-mobile-detail:not(.admin) .user-view .expense-workspace{
+    body.travel-mobile-detail:not(.admin) .user-view .expense-workspace{
       display:block !important;
       grid-template-columns:1fr !important;
     }
 
-    body.travel-mobile-list:not(.admin) .user-view .form-panel,
-    html.portal-embedded body.travel-mobile-list:not(.admin) .user-view .form-panel{
+    body.travel-mobile-list:not(.admin) .user-view .form-panel{
       display:none !important;
     }
-
-    body.travel-mobile-list:not(.admin) .user-view .status-panel,
-    html.portal-embedded body.travel-mobile-list:not(.admin) .user-view .status-panel{
+    body.travel-mobile-list:not(.admin) .user-view .status-panel{
       display:block !important;
       position:static !important;
       top:auto !important;
       height:auto !important;
       max-height:none !important;
+      min-height:0 !important;
       min-width:0 !important;
       width:100% !important;
       overflow:visible !important;
     }
-
-    body.travel-mobile-list:not(.admin) .user-view .status-panel > .section,
-    html.portal-embedded body.travel-mobile-list:not(.admin) .user-view .status-panel > .section{
+    body.travel-mobile-list:not(.admin) .user-view .status-panel > .section{
       margin-bottom:14px !important;
     }
-
-    body.travel-mobile-list:not(.admin) .user-view .status-panel > .section:nth-child(2),
-    html.portal-embedded body.travel-mobile-list:not(.admin) .user-view .status-panel > .section:nth-child(2){
+    body.travel-mobile-list:not(.admin) .user-view .status-panel > .section:nth-child(2){
       min-height:auto !important;
       display:block !important;
       overflow:visible !important;
     }
-
-    body.travel-mobile-list:not(.admin) .user-view .submission-scroll,
-    html.portal-embedded body.travel-mobile-list:not(.admin) .user-view .submission-scroll{
+    body.travel-mobile-list:not(.admin) .user-view .submission-scroll{
       overflow:visible !important;
       max-height:none !important;
+      min-height:0 !important;
     }
-
     body.travel-mobile-list:not(.admin) .user-view .submission-scroll .list-card{
       cursor:pointer !important;
     }
-
     body.travel-mobile-list:not(.admin) .user-view .submission-scroll .list-card:active{
       transform:scale(.995);
     }
 
-    body.travel-mobile-detail:not(.admin) .user-view .status-panel,
-    html.portal-embedded body.travel-mobile-detail:not(.admin) .user-view .status-panel{
+    body.travel-mobile-detail:not(.admin) .user-view .status-panel{
       display:none !important;
     }
-
-    body.travel-mobile-detail:not(.admin) .user-view .form-panel,
-    html.portal-embedded body.travel-mobile-detail:not(.admin) .user-view .form-panel{
+    body.travel-mobile-detail:not(.admin) .user-view .form-panel{
       display:block !important;
       min-width:0 !important;
       width:100% !important;
     }
 
+    /* 입력칸 터치 시 iOS/Safari 줌인 방지 */
     input,
     select,
     textarea{
@@ -7195,7 +7186,6 @@
       -webkit-text-size-adjust:100% !important;
       text-size-adjust:100% !important;
     }
-
     input[type="checkbox"],
     input[type="radio"]{
       width:auto !important;
@@ -7203,163 +7193,150 @@
     }
   }
 </style>
-<script id="travel-mobile-swipe-list-detail-controller">
+<script id="travel-mobile-right-edge-swipe-controller">
 (function(){
-  if(window.__travelMobileSwipeListDetailInstalled) return;
-  window.__travelMobileSwipeListDetailInstalled = true;
+  if(window.__travelMobileRightEdgeSwipeInstalled) return;
+  window.__travelMobileRightEdgeSwipeInstalled = true;
 
   var MOBILE_QUERY = '(max-width:760px)';
-  var EDGE_GUARD_PX = 60;
-  var SWIPE_MIN_X = 90;
-  var SWIPE_MAX_Y = 70;
-  var mobileMode = 'list';
+  var RIGHT_EDGE_PX = 72;       // 오른쪽 끝 전용 시작 영역
+  var SWIPE_MIN_X = 70;         // 왼쪽으로 최소 이동거리
+  var SWIPE_MAX_Y = 85;         // 세로 스크롤과 구분
+  var SWIPE_MAX_TIME = 1000;
+  var mobileMode = 'list';      // list | detail
   var touchStartX = null;
   var touchStartY = null;
-  var touchStartedAt = 0;
+  var touchStartAt = 0;
 
   function isMobile(){
     try{ return window.matchMedia(MOBILE_QUERY).matches; }
     catch(e){ return window.innerWidth <= 760; }
   }
+  function isAdminMode(){ return document.body.classList.contains('admin'); }
+  function hasApplicantWorkspace(){ return !!document.querySelector('.user-view .expense-workspace'); }
+  function isActiveMobile(){ return isMobile() && !isAdminMode() && hasApplicantWorkspace(); }
 
-  function isAdminMode(){
-    return document.body.classList.contains('admin');
-  }
-
-  function hasApplicantWorkspace(){
-    return !!document.querySelector('.user-view .expense-workspace');
-  }
-
-  function applyMobileMode(){
-    var active = isMobile() && !isAdminMode() && hasApplicantWorkspace();
+  function applyMode(){
+    var active = isActiveMobile();
     document.body.classList.toggle('travel-mobile-list', active && mobileMode === 'list');
     document.body.classList.toggle('travel-mobile-detail', active && mobileMode === 'detail');
     if(!active){
-      document.body.classList.remove('travel-mobile-list');
-      document.body.classList.remove('travel-mobile-detail');
+      document.body.classList.remove('travel-mobile-list','travel-mobile-detail');
     }
   }
 
   function goList(){
-    if(!isMobile() || isAdminMode()) return;
+    if(!isActiveMobile()) return;
     mobileMode = 'list';
-    applyMobileMode();
-    try{ window.scrollTo({top:0, behavior:'smooth'}); }
-    catch(e){ window.scrollTo(0,0); }
+    applyMode();
+    try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(e){ window.scrollTo(0,0); }
   }
-
   function goDetail(){
-    if(!isMobile() || isAdminMode()) return;
+    if(!isActiveMobile()) return;
     mobileMode = 'detail';
-    applyMobileMode();
-    try{ window.scrollTo({top:0, behavior:'smooth'}); }
-    catch(e){ window.scrollTo(0,0); }
+    applyMode();
+    try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(e){ window.scrollTo(0,0); }
   }
 
-  function wrapNewRequest(){
-    if(typeof window.newRequest !== 'function' || window.newRequest.__travelMobileWrapped) return;
-    var original = window.newRequest;
-    window.newRequest = function(){
+  function wrapFunction(name, after){
+    var original = window[name];
+    if(typeof original !== 'function' || original.__travelMobileRightEdgeWrapped) return;
+    window[name] = function(){
       var result = original.apply(this, arguments);
-      if(isMobile() && !isAdminMode()) setTimeout(goDetail, 0);
+      try{
+        if(result && typeof result.then === 'function'){
+          result.then(function(){ setTimeout(after, 0); }).catch(function(){});
+        }else{
+          setTimeout(after, 0);
+        }
+      }catch(e){ setTimeout(after, 0); }
       return result;
     };
-    window.newRequest.__travelMobileWrapped = true;
+    window[name].__travelMobileRightEdgeWrapped = true;
   }
 
   function wrapSetMode(){
-    if(typeof window.setMode !== 'function' || window.setMode.__travelMobileWrapped) return;
     var original = window.setMode;
-    window.setMode = function(mode, btn){
+    if(typeof original !== 'function' || original.__travelMobileRightEdgeWrapped) return;
+    window.setMode = function(mode){
       var result = original.apply(this, arguments);
-      if(String(mode) === 'admin'){
-        document.body.classList.remove('travel-mobile-list');
-        document.body.classList.remove('travel-mobile-detail');
+      if(mode === 'admin'){
+        document.body.classList.remove('travel-mobile-list','travel-mobile-detail');
       }else{
         if(isMobile()) mobileMode = 'list';
-        setTimeout(applyMobileMode, 0);
+        setTimeout(applyMode, 0);
       }
       return result;
     };
-    window.setMode.__travelMobileWrapped = true;
+    window.setMode.__travelMobileRightEdgeWrapped = true;
   }
 
-  function install(){
-    wrapNewRequest();
+  function installWrappers(){
+    wrapFunction('newRequest', goDetail);
+    wrapFunction('loadTravelExpenseRequest', goDetail);
+    wrapFunction('startTravelExpenseEdit', goDetail);
     wrapSetMode();
-    applyMobileMode();
+    applyMode();
   }
 
+  // 내 제출내역 카드 클릭 시 기존 상세 로딩은 기존 코드가 처리하고,
+  // 모바일에서만 화면을 상세 모드로 전환합니다.
   document.addEventListener('click', function(event){
-    if(!isMobile() || isAdminMode()) return;
-    var target = event.target;
-    if(!target || !target.closest) return;
-
-    var card = target.closest('.submission-scroll .list-card');
+    if(!isActiveMobile()) return;
+    var card = event.target && event.target.closest ? event.target.closest('.submission-scroll .list-card') : null;
     if(!card) return;
-
-    if(target.closest('button,.card-menu,.dropdown-menu,a,input,select,textarea,label')) return;
-    setTimeout(goDetail, 80);
+    if(event.target.closest('button,.card-menu,.dropdown-menu,a,input,select,textarea,label')) return;
+    setTimeout(goDetail, 120);
   }, true);
 
+  // 오른쪽 끝에서 왼쪽으로 스와이프하면 목록으로 복귀합니다.
+  // 포탈 메뉴는 왼쪽 끝 → 오른쪽 스와이프이므로 방향/영역이 분리됩니다.
   document.addEventListener('touchstart', function(event){
-    if(!isMobile() || isAdminMode() || mobileMode !== 'detail') return;
+    if(!isActiveMobile() || mobileMode !== 'detail') return;
     if(!event.touches || event.touches.length !== 1) return;
-
-    var target = event.target;
-    if(target && target.closest && target.closest('input,textarea,select,button,a,label,.dropdown-menu,.modal-backdrop')) return;
-
+    if(event.target && event.target.closest && event.target.closest('.modal-backdrop,.dropdown-menu')) return;
     var t = event.touches[0];
+    var width = window.innerWidth || document.documentElement.clientWidth || 0;
+    if(width && t.clientX < width - RIGHT_EDGE_PX) return;
     touchStartX = t.clientX;
     touchStartY = t.clientY;
-    touchStartedAt = Date.now();
+    touchStartAt = Date.now();
   }, {passive:true});
 
   document.addEventListener('touchend', function(event){
-    if(touchStartX === null || touchStartY === null) return;
-
-    if(!isMobile() || isAdminMode() || mobileMode !== 'detail'){
-      touchStartX = null;
-      touchStartY = null;
-      return;
-    }
-
-    var changed = event.changedTouches && event.changedTouches[0];
-    if(!changed){
-      touchStartX = null;
-      touchStartY = null;
-      return;
-    }
-
-    var dx = changed.clientX - touchStartX;
-    var dy = changed.clientY - touchStartY;
-    var elapsed = Date.now() - touchStartedAt;
-    var protectedPortalEdge = touchStartX < EDGE_GUARD_PX;
-
+    if(touchStartX == null || touchStartY == null) return;
+    var startX = touchStartX;
+    var startY = touchStartY;
+    var started = touchStartAt;
     touchStartX = null;
     touchStartY = null;
+    touchStartAt = 0;
 
-    if(protectedPortalEdge) return;
-    if(dx >= SWIPE_MIN_X && Math.abs(dy) <= SWIPE_MAX_Y && elapsed <= 900){
+    if(!isActiveMobile() || mobileMode !== 'detail') return;
+    var changed = event.changedTouches && event.changedTouches[0];
+    if(!changed) return;
+    var dx = changed.clientX - startX;
+    var dy = changed.clientY - startY;
+    var elapsed = Date.now() - started;
+
+    if(dx <= -SWIPE_MIN_X && Math.abs(dy) <= SWIPE_MAX_Y && elapsed <= SWIPE_MAX_TIME){
       goList();
     }
   }, {passive:true});
 
   window.travelExpenseMobileGoList = goList;
   window.travelExpenseMobileGoDetail = goDetail;
-  window.travelExpenseMobileApplyMode = applyMobileMode;
+  window.travelExpenseMobileApplyMode = applyMode;
 
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
-  else install();
-
-  setTimeout(install, 300);
-  setTimeout(install, 1000);
-  setTimeout(install, 2000);
-
-  window.addEventListener('resize', applyMobileMode);
-  window.addEventListener('orientationchange', function(){ setTimeout(applyMobileMode, 250); });
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installWrappers);
+  else installWrappers();
+  setTimeout(installWrappers, 250);
+  setTimeout(installWrappers, 800);
+  setTimeout(installWrappers, 1600);
+  setTimeout(installWrappers, 2500);
+  window.addEventListener('resize', applyMode);
+  window.addEventListener('orientationchange', function(){ setTimeout(applyMode, 250); });
 })();
 </script>
-
 </body>
 </html>
