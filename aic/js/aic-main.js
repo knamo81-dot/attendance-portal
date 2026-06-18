@@ -273,24 +273,60 @@
     return (bytes / 1024 / 1024 / 1024).toFixed(1) + ' GB';
   }
 
-  function sanitizeStorageFileName(name) {
-    var value = String(name || 'file').trim() || 'file';
-    value = value.replace(/[\\/:*?"<>|#%{}^~`\[\]]/g, '_').replace(/\s+/g, '_');
-    if (value.length > 120) {
-      var dot = value.lastIndexOf('.');
-      var ext = dot > -1 ? value.slice(dot).slice(0, 20) : '';
-      var base = dot > -1 ? value.slice(0, dot) : value;
-      value = base.slice(0, 100) + ext;
+  function getSafeFileExtension(name, mimeType) {
+    var rawName = String(name || '').trim();
+    var match = rawName.match(/\.([A-Za-z0-9]{1,12})$/);
+    var ext = match ? String(match[1] || '').toLowerCase() : '';
+
+    if (!ext) {
+      var mime = String(mimeType || '').toLowerCase();
+      var mimeMap = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/gif': 'gif',
+        'image/webp': 'webp',
+        'application/pdf': 'pdf',
+        'text/plain': 'txt',
+        'text/csv': 'csv',
+        'application/zip': 'zip',
+        'application/vnd.ms-excel': 'xls',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+        'application/msword': 'doc',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+        'application/vnd.ms-powerpoint': 'ppt',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx'
+      };
+      ext = mimeMap[mime] || '';
     }
-    return value || 'file';
+
+    ext = ext.replace(/[^a-z0-9]/g, '').slice(0, 12);
+    return ext;
+  }
+
+  function sanitizeStoragePathPart(value, fallback) {
+    var safe = String(value || fallback || '').trim()
+      .replace(/[^A-Za-z0-9_-]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '');
+
+    return safe || String(fallback || 'item');
+  }
+
+  function sanitizeStorageFileName(name, mimeType) {
+    // Storage key에는 한글/공백/특수문자를 넣지 않습니다.
+    // 원본 파일명은 aic_attachments.file_name 및 메시지 attachment metadata에 따로 보관합니다.
+    var ext = getSafeFileExtension(name, mimeType);
+    var unique = Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+    return unique + (ext ? '.' + ext : '');
   }
 
   function buildAttachmentStoragePath(room, file) {
-    var companyId = getCompanyId() || 'company';
-    var roomId = String(room?.id || 'room').replace(/[^a-zA-Z0-9_-]/g, '_');
+    var companyId = sanitizeStoragePathPart(getCompanyId(), 'company');
+    var roomId = sanitizeStoragePathPart(room?.id, 'room');
     var date = new Date().toISOString().slice(0, 10);
-    var unique = Date.now() + '_' + Math.random().toString(16).slice(2);
-    return [companyId, roomId, date, unique + '_' + sanitizeStorageFileName(file?.name)].join('/');
+    var safeFileName = sanitizeStorageFileName(file?.name, file?.type);
+
+    return [companyId, roomId, date, safeFileName].join('/');
   }
 
   function buildAttachmentMessage(room, msg) {
