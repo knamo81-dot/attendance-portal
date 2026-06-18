@@ -159,6 +159,7 @@
       translated: message.translated || '',
       source_lang: message.source_lang || detectTextLanguage(original),
       translations: normalizeTranslations(message.translations),
+      attachment: getAttachmentFromMessage({ translations: message.translations }),
       created_at: message.created_at || ''
     };
   }
@@ -245,6 +246,145 @@
     var timeText = formatMessageTime(msg?.created_at);
     if (!timeText) return '';
     return '<div class="aic-message-time">' + esc(timeText) + '</div>';
+  }
+
+  function getAicStorageBucket() {
+    return String(window.AIC_API?.storageBucket || 'aic-files').trim() || 'aic-files';
+  }
+
+  function getAttachmentFromMessage(msg) {
+    if (!msg) return null;
+    if (msg.attachment && typeof msg.attachment === 'object') return msg.attachment;
+
+    var translations = normalizeTranslations(msg.translations);
+    if (translations.__attachment && typeof translations.__attachment === 'object') {
+      return translations.__attachment;
+    }
+
+    return null;
+  }
+
+  function formatFileSize(size) {
+    var bytes = Number(size) || 0;
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0) + ' MB';
+    return (bytes / 1024 / 1024 / 1024).toFixed(1) + ' GB';
+  }
+
+  function sanitizeStorageFileName(name) {
+    var value = String(name || 'file').trim() || 'file';
+    value = value.replace(/[\\/:*?"<>|#%{}^~`\[\]]/g, '_').replace(/\s+/g, '_');
+    if (value.length > 120) {
+      var dot = value.lastIndexOf('.');
+      var ext = dot > -1 ? value.slice(dot).slice(0, 20) : '';
+      var base = dot > -1 ? value.slice(0, dot) : value;
+      value = base.slice(0, 100) + ext;
+    }
+    return value || 'file';
+  }
+
+  function buildAttachmentStoragePath(room, file) {
+    var companyId = getCompanyId() || 'company';
+    var roomId = String(room?.id || 'room').replace(/[^a-zA-Z0-9_-]/g, '_');
+    var date = new Date().toISOString().slice(0, 10);
+    var unique = Date.now() + '_' + Math.random().toString(16).slice(2);
+    return [companyId, roomId, date, unique + '_' + sanitizeStorageFileName(file?.name)].join('/');
+  }
+
+  function buildAttachmentMessage(room, msg) {
+    var attachment = getAttachmentFromMessage(msg) || {};
+    var sender = getMessageSenderName(room, msg);
+    var isMine = msg && msg.type === 'me';
+    var fileName = attachment.file_name || attachment.name || msg.original || '첨부파일';
+    var fileSize = formatFileSize(attachment.file_size || attachment.size);
+    var filePath = attachment.file_path || attachment.path || '';
+    var disabled = filePath ? '' : ' disabled';
+
+    return [
+      '<div class="aic-message ', isMine ? 'me' : 'other', '">',
+      '  <div class="aic-message-name">', esc(sender), '</div>',
+      '  <button type="button" class="aic-attachment-card" data-attachment-path="', esc(filePath), '" data-attachment-name="', esc(fileName), '"', disabled, ' style="display:flex;align-items:center;gap:10px;width:100%;max-width:260px;padding:10px 12px;border:1px solid rgba(148,163,184,.45);border-radius:12px;background:rgba(255,255,255,.92);color:#0f172a;text-align:left;cursor:pointer;">',
+      '    <span style="font-size:20px;line-height:1;">📎</span>',
+      '    <span style="min-width:0;display:flex;flex-direction:column;gap:2px;">',
+      '      <span style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">', esc(fileName), '</span>',
+      fileSize ? '      <span style="font-size:11px;color:#64748b;">' + esc(fileSize) + '</span>' : '',
+      '    </span>',
+      '  </button>',
+      buildMessageFooter(msg),
+      '</div>'
+    ].join('');
+  }
+
+  async function openAicAttachment(filePath, fileName) {
+    var sb = getSupabaseClient();
+    if (!sb || !filePath) {
+      alert('첨부파일을 열 수 없습니다. Supabase Storage 연결을 확인해 주세요.');
+      return;
+    }
+
+    try {
+      var result = await sb.storage
+        .from(getAicStorageBucket())
+        .createSignedUrl(filePath, 60 * 10, {
+          download: fileName || undefined
+        });
+
+      if (result.error) throw result.error;
+      var url = result.data?.signedUrl;
+      if (!url) throw new Error('서명 URL 생성 실패');
+
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      alert('첨부파일 열기 실패: ' + (error?.message || 'Storage 정책/권한을 확인해 주세요.'));
+    }
+  }
+
+  async function insertAttachmentToServer(room, message, attachment) {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+    if (!sb || !companyId || !room || !message || !attachment) return;
+
+    var payload = {
+      company_id: companyId,
+      room_id: room.id,
+      message_id: String(message.id || '').indexOf('temp_') === 0 ? null : message.id,
+      sender_name: message.sender || getCurrentUserName(),
+      sender_email: getCurrentUserEmail(),
+      file_name: attachment.file_name || attachment.name || '첨부파일',
+      file_path: attachment.file_path || attachment.path || '',
+      file_url: attachment.file_url || '',
+      file_size: attachment.file_size || attachment.size || 0,
+      mime_type: attachment.mime_type || attachment.type || ''
+    };
+
+    var result = await sb.from('aic_attachments').insert(payload);
+    if (result.error) throw result.error;
+  }
+
+  async function uploadAicAttachmentFile(room, file) {
+    var sb = getSupabaseClient();
+    if (!sb) throw new Error('Supabase 클라이언트를 찾을 수 없습니다.');
+    if (!room || !file) throw new Error('업로드할 파일 정보가 없습니다.');
+
+    var filePath = buildAttachmentStoragePath(room, file);
+    var uploadResult = await sb.storage
+      .from(getAicStorageBucket())
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || 'application/octet-stream'
+      });
+
+    if (uploadResult.error) throw uploadResult.error;
+
+    return {
+      file_name: file.name || '첨부파일',
+      file_path: filePath,
+      file_size: file.size || 0,
+      mime_type: file.type || 'application/octet-stream'
+    };
   }
 
   async function translateWithAi(text, sourceLang, room) {
@@ -473,7 +613,8 @@
     if (!last) return '아직 메시지가 없습니다.';
 
     var sender = getMessageSenderName(room, last);
-    var text = getPreferredMessageText(last) || last.original || last.translated || '';
+    var attachment = getAttachmentFromMessage(last);
+    var text = attachment ? ('📎 ' + (attachment.file_name || attachment.name || '첨부파일')) : (getPreferredMessageText(last) || last.original || last.translated || '');
     text = String(text || '').replace(/\s+/g, ' ').trim();
 
     if (text.length > 42) text = text.slice(0, 42) + '…';
@@ -1153,6 +1294,7 @@
           translated: message.translated || '',
           source_lang: message.source_lang || detectTextLanguage(original),
           translations: normalizeTranslations(message.translations),
+          attachment: getAttachmentFromMessage({ translations: message.translations }),
           created_at: message.created_at || ''
         };
       })
@@ -1376,6 +1518,12 @@
     var companyId = getCompanyId();
     if (!sb || !companyId || !room || !message) return;
 
+    var messageTranslations = normalizeTranslations(message.translations);
+    var messageAttachment = getAttachmentFromMessage(message);
+    if (messageAttachment) {
+      messageTranslations.__attachment = messageAttachment;
+    }
+
     var messageResult = await sb.from('aic_messages').insert({
       company_id: companyId,
       room_id: room.id,
@@ -1384,7 +1532,7 @@
       original: message.original || '',
       translated: message.translated || '',
       source_lang: message.source_lang || detectTextLanguage(message.original || ''),
-      translations: normalizeTranslations(message.translations)
+      translations: messageTranslations
     }).select('id, created_at, sender_name, sender_email, original, translated, source_lang, translations, room_id').maybeSingle();
 
     if (messageResult.error) throw messageResult.error;
@@ -1394,6 +1542,7 @@
       message.created_at = messageResult.data.created_at || message.created_at;
       message.source_lang = messageResult.data.source_lang || message.source_lang;
       message.translations = normalizeTranslations(messageResult.data.translations || message.translations);
+      message.attachment = getAttachmentFromMessage(message);
     }
 
     try {
@@ -1403,6 +1552,8 @@
         .eq('company_id', companyId)
         .eq('id', room.id);
     } catch (_) {}
+
+    return messageResult.data || null;
   }
 
   async function insertParticipantToServer(room, member) {
@@ -2173,6 +2324,10 @@
     var isMine = msg && msg.type === 'me';
     var preferredText = getPreferredMessageText(msg);
 
+    if (getAttachmentFromMessage(msg)) {
+      return buildAttachmentMessage(room, msg);
+    }
+
     if (displayMode === 'original') {
       return [
         '<div class="aic-message ', isMine ? 'me' : 'other', '">',
@@ -2336,17 +2491,18 @@
       input.addEventListener('change', function (event) {
         var slotIndex = Number(input.getAttribute('data-attach-input-slot')) || 0;
         var file = event.target && event.target.files && event.target.files[0] ? event.target.files[0] : null;
-        if (!file) return;
-
-        console.log('[AIC ATTACHMENT SELECTED]', {
-          slotIndex: slotIndex,
-          name: file.name,
-          size: file.size,
-          type: file.type
-        });
-
-        // 서버 업로드는 다음 단계에서 Supabase Storage와 aic_attachments 저장 로직으로 연결합니다.
         input.value = '';
+        if (!file) return;
+        sendAttachmentMessage(slotIndex, file);
+      });
+    });
+
+    Array.from(els.slots.querySelectorAll('[data-attachment-path]')).forEach(function (btn) {
+      btn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        var filePath = btn.getAttribute('data-attachment-path') || '';
+        var fileName = btn.getAttribute('data-attachment-name') || '첨부파일';
+        openAicAttachment(filePath, fileName);
       });
     });
 
@@ -2390,6 +2546,57 @@
     });
 
     markVisibleRoomsRead();
+  }
+
+  async function sendAttachmentMessage(slotIndex, file) {
+    var slot = state.openSlots[slotIndex];
+    if (!slot) return;
+
+    var room = getRoom(slot.roomId);
+    if (!room) return;
+    if (!file) return;
+
+    var tempId = 'temp_file_' + Date.now() + '_' + Math.random().toString(16).slice(2);
+    var message = {
+      id: tempId,
+      type: 'me',
+      sender: getCurrentUserName(),
+      sender_email: getCurrentUserEmail(),
+      original: file.name || '첨부파일',
+      translated: '',
+      source_lang: 'file',
+      translations: {},
+      attachment: {
+        file_name: file.name || '첨부파일',
+        file_path: '',
+        file_size: file.size || 0,
+        mime_type: file.type || 'application/octet-stream'
+      },
+      created_at: new Date().toISOString()
+    };
+
+    room.messages.push(message);
+    markRoomRead(room.id);
+    render(false);
+
+    try {
+      var attachment = await uploadAicAttachmentFile(room, file);
+      message.attachment = attachment;
+      message.original = attachment.file_name || message.original;
+      message.translations = normalizeTranslations(message.translations);
+      message.translations.__attachment = attachment;
+      render(false);
+
+      await insertMessageToServer(room, message);
+      await insertAttachmentToServer(room, message, attachment);
+      render(false);
+    } catch (error) {
+      room.messages = (room.messages || []).filter(function (item) {
+        return item.id !== tempId;
+      });
+      render(false);
+      alert('첨부파일 업로드 실패: ' + (error?.message || 'Storage 버킷/RLS 정책을 확인해 주세요.'));
+    }
   }
 
   async function sendMessage(slotIndex) {
