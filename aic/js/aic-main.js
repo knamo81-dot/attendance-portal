@@ -466,16 +466,13 @@
     };
 
     var viewerPath = getAicFileViewerPath();
-    var key = 'aic_file_viewer_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
 
-    try {
-      localStorage.setItem(key, JSON.stringify(payload));
-      return viewerPath + '?key=' + encodeURIComponent(key);
-    } catch (_) {
-      return viewerPath + '?url=' + encodeURIComponent(payload.url) +
-        '&name=' + encodeURIComponent(payload.name) +
-        '&kind=' + encodeURIComponent(payload.kind);
-    }
+    // 새 창/새 탭에서는 sessionStorage/localStorage key 전달이 환경에 따라 실패할 수 있습니다.
+    // 따라서 파일 미리보기용 signed URL을 viewer.html의 URL 파라미터로 직접 전달합니다.
+    return viewerPath +
+      '?url=' + encodeURIComponent(payload.url) +
+      '&name=' + encodeURIComponent(payload.name) +
+      '&kind=' + encodeURIComponent(payload.kind);
   }
 
   function openAttachmentViewerUrl(url) {
