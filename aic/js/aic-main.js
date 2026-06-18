@@ -2258,7 +2258,12 @@
         '    </div>',
         '  </div>',
         '  <div class="aic-messages" data-message-box="', i, '">', messages, '</div>',
-        '  <div class="aic-chat-input" style="display:flex; align-items:center; gap:8px;">',
+        '  <div class="aic-chat-input" style="position:relative; display:flex; align-items:center; gap:8px;">',
+        '    <button class="module-btn aic-attach-toggle" data-attach-toggle-slot="', i, '" type="button" title="첨부" aria-label="첨부" style="flex:0 0 42px; width:42px; min-width:42px; max-width:42px; height:38px; padding:0; font-size:20px; font-weight:900; line-height:1;">+</button>',
+        '    <div class="aic-attach-menu" data-attach-menu-slot="', i, '" hidden style="position:absolute; left:0; bottom:48px; z-index:50; min-width:132px; padding:8px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; box-shadow:0 12px 30px rgba(15,23,42,.16);">',
+        '      <button class="module-btn aic-attach-file-btn" data-attach-file-slot="', i, '" type="button" style="width:100%; justify-content:flex-start; white-space:nowrap;">첨부파일</button>',
+        '    </div>',
+        '    <input type="file" data-attach-input-slot="', i, '" hidden />',
         '    <input class="module-input" data-input-slot="', i, '" placeholder="', tr('aic.inputPlaceholder', '메시지를 입력하세요'), '" style="flex:1 1 auto; min-width:0; width:auto;" />',
         '    <button class="module-btn accent aic-send-btn" data-send-slot="', i, '" type="button" style="flex:0 0 72px; width:72px; min-width:72px; max-width:72px; white-space:nowrap;">', tr('aic.send', '전송'), '</button>',
         '  </div>',
@@ -2298,6 +2303,50 @@
       btn.addEventListener('click', function (event) {
         event.stopPropagation();
         backToMobileRoomList();
+      });
+    });
+
+    Array.from(els.slots.querySelectorAll('[data-attach-toggle-slot]')).forEach(function (btn) {
+      btn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        var slotIndex = Number(btn.getAttribute('data-attach-toggle-slot')) || 0;
+        Array.from(els.slots.querySelectorAll('[data-attach-menu-slot]')).forEach(function (menu) {
+          var menuSlotIndex = Number(menu.getAttribute('data-attach-menu-slot')) || 0;
+          if (menuSlotIndex === slotIndex) {
+            menu.hidden = !menu.hidden;
+          } else {
+            menu.hidden = true;
+          }
+        });
+      });
+    });
+
+    Array.from(els.slots.querySelectorAll('[data-attach-file-slot]')).forEach(function (btn) {
+      btn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        var slotIndex = Number(btn.getAttribute('data-attach-file-slot')) || 0;
+        var fileInput = els.slots.querySelector('[data-attach-input-slot="' + slotIndex + '"]');
+        var menu = els.slots.querySelector('[data-attach-menu-slot="' + slotIndex + '"]');
+        if (menu) menu.hidden = true;
+        if (fileInput) fileInput.click();
+      });
+    });
+
+    Array.from(els.slots.querySelectorAll('[data-attach-input-slot]')).forEach(function (input) {
+      input.addEventListener('change', function (event) {
+        var slotIndex = Number(input.getAttribute('data-attach-input-slot')) || 0;
+        var file = event.target && event.target.files && event.target.files[0] ? event.target.files[0] : null;
+        if (!file) return;
+
+        console.log('[AIC ATTACHMENT SELECTED]', {
+          slotIndex: slotIndex,
+          name: file.name,
+          size: file.size,
+          type: file.type
+        });
+
+        // 서버 업로드는 다음 단계에서 Supabase Storage와 aic_attachments 저장 로직으로 연결합니다.
+        input.value = '';
       });
     });
 
@@ -2375,7 +2424,7 @@
     render(false);
 
     try {
-      var translationResult = await translateWithAi(text, lang ? lang.value : state.settings.defaultLang, room);
+      var translationResult = await translateWithAi(text, detectTextLanguage(text), room);
       message.translated = translationResult.translated || '';
       message.source_lang = translationResult.source_lang || message.source_lang || detectTextLanguage(text);
       message.translations = normalizeTranslations(translationResult.translations);
