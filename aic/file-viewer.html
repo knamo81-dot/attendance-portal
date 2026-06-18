@@ -76,8 +76,14 @@
         var key = getParam('key');
         if (key) {
           try {
-            var raw = sessionStorage.getItem(key);
-            if (raw) return JSON.parse(raw) || {};
+            // 새 창은 opener와 sessionStorage를 공유하지 않는 경우가 있어
+            // aic-main.js에서 저장한 localStorage payload를 우선 사용합니다.
+            var raw = localStorage.getItem(key) || sessionStorage.getItem(key);
+            if (raw) {
+              try { localStorage.removeItem(key); } catch (_) {}
+              try { sessionStorage.removeItem(key); } catch (_) {}
+              return JSON.parse(raw) || {};
+            }
           } catch (_) {}
         }
 
