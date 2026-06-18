@@ -346,7 +346,6 @@
   }
 
   function getAttachmentPrimaryActionLabel(kind) {
-    if (kind === 'image' || kind === 'pdf') return '미리보기';
     return '열기';
   }
 
@@ -374,7 +373,7 @@
       '    </div>',
       '    <div style="display:flex;gap:6px;justify-content:flex-end;">',
       '      <button type="button" class="module-btn tiny" data-attachment-action="preview" data-attachment-kind="', esc(kind), '" data-attachment-path="', esc(filePath), '" data-attachment-name="', esc(fileName), '"', disabledAttr, ' style="height:26px;padding:0 9px;border-radius:9px;font-size:11px;font-weight:800;">', esc(primaryLabel), '</button>',
-      '      <button type="button" class="module-btn tiny" data-attachment-action="download" data-attachment-kind="', esc(kind), '" data-attachment-path="', esc(filePath), '" data-attachment-name="', esc(fileName), '"', disabledAttr, ' style="height:26px;padding:0 9px;border-radius:9px;font-size:11px;font-weight:800;">다운로드</button>',
+      '      <button type="button" class="module-btn tiny" data-attachment-action="download" data-attachment-kind="', esc(kind), '" data-attachment-path="', esc(filePath), '" data-attachment-name="', esc(fileName), '"', disabledAttr, ' style="height:26px;padding:0 9px;border-radius:9px;font-size:11px;font-weight:800;">저장</button>',
       '    </div>',
       '  </div>',
       buildMessageFooter(msg),
@@ -425,7 +424,7 @@
       '<div style="width:min(980px,96vw);max-height:96vh;background:#fff;border-radius:18px;box-shadow:0 24px 80px rgba(15,23,42,.35);overflow:hidden;display:flex;flex-direction:column;">',
       '  <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #e2e8f0;">',
       '    <div title="', esc(fileName), '" style="font-weight:900;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;">', esc(fileName), '</div>',
-      '    <button type="button" data-aic-preview-download="1" style="height:32px;padding:0 12px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;font-weight:800;cursor:pointer;">다운로드</button>',
+      '    <button type="button" data-aic-preview-download="1" style="height:32px;padding:0 12px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;font-weight:800;cursor:pointer;">저장</button>',
       '    <button type="button" data-aic-preview-close="1" style="height:32px;width:32px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;font-size:18px;font-weight:900;cursor:pointer;">×</button>',
       '  </div>',
       '  <div style="padding:12px;background:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:220px;">', bodyHtml, '</div>',
@@ -446,6 +445,25 @@
 
   function buildOfficeViewerUrl(url) {
     return 'https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(url);
+  }
+
+  function buildAicFileViewerUrl(fileUrl, fileName, kind) {
+    var payload = {
+      url: fileUrl || '',
+      name: fileName || '첨부파일',
+      kind: kind || 'file'
+    };
+
+    var key = 'aic_file_viewer_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+
+    try {
+      sessionStorage.setItem(key, JSON.stringify(payload));
+      return 'aic-file-viewer.html?key=' + encodeURIComponent(key);
+    } catch (_) {
+      return 'aic-file-viewer.html?url=' + encodeURIComponent(payload.url) +
+        '&name=' + encodeURIComponent(payload.name) +
+        '&kind=' + encodeURIComponent(payload.kind);
+    }
   }
 
   function openAttachmentViewerUrl(url) {
@@ -511,17 +529,8 @@
       }
 
       var previewUrl = await createAicAttachmentSignedUrl(filePath);
-
-      // 미리보기/열기는 모두 새 창 Viewer 기준으로 처리합니다.
-      // - 이미지/PDF: 브라우저 기본 뷰어 새 창
-      // - Office: Microsoft Office Online Viewer 새 창
-      // - 기타 파일: Signed URL 새 창
-      if (kind === 'office') {
-        openAttachmentViewerUrl(buildOfficeViewerUrl(previewUrl));
-        return;
-      }
-
-      openAttachmentViewerUrl(previewUrl);
+      var viewerUrl = buildAicFileViewerUrl(previewUrl, fileName, kind);
+      openAttachmentViewerUrl(viewerUrl);
     } catch (error) {
       alert('첨부파일 열기 실패: ' + (error?.message || 'Storage 정책/권한을 확인해 주세요.'));
     }
