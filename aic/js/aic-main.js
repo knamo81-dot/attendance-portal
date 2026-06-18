@@ -444,6 +444,25 @@
     document.body.appendChild(modal);
   }
 
+  function buildOfficeViewerUrl(url) {
+    return 'https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(url);
+  }
+
+  function openAttachmentViewerUrl(url) {
+    var opened = null;
+
+    try {
+      opened = window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (_) {
+      opened = null;
+    }
+
+    // 모바일/인앱 브라우저에서 새 창이 막히는 경우 현재 탭으로 이동합니다.
+    if (!opened) {
+      window.location.href = url;
+    }
+  }
+
   async function downloadAicAttachment(url, fileName) {
     var name = fileName || '첨부파일';
 
@@ -480,27 +499,29 @@
 
     action = action || 'preview';
     kind = kind || getAttachmentKind({}, fileName);
+    fileName = fileName || '첨부파일';
 
     try {
       if (action === 'download') {
-        var downloadUrl = await createAicAttachmentSignedUrl(filePath);
-        await downloadAicAttachment(downloadUrl, fileName || '첨부파일');
+        var downloadUrl = await createAicAttachmentSignedUrl(filePath, {
+          download: fileName
+        });
+        await downloadAicAttachment(downloadUrl, fileName);
         return;
       }
 
       var previewUrl = await createAicAttachmentSignedUrl(filePath);
 
-      if (kind === 'image' || kind === 'pdf') {
-        showAicAttachmentPreviewModal(previewUrl, fileName || '첨부파일', kind);
+      // 미리보기/열기는 모두 새 창 Viewer 기준으로 처리합니다.
+      // - 이미지/PDF: 브라우저 기본 뷰어 새 창
+      // - Office: Microsoft Office Online Viewer 새 창
+      // - 기타 파일: Signed URL 새 창
+      if (kind === 'office') {
+        openAttachmentViewerUrl(buildOfficeViewerUrl(previewUrl));
         return;
       }
 
-      // Office/ZIP 등은 브라우저 인앱 미리보기가 불안정하므로 열기 동작으로 처리합니다.
-      if (isMobileAttachmentView()) {
-        window.location.href = previewUrl;
-      } else {
-        window.open(previewUrl, '_blank', 'noopener,noreferrer');
-      }
+      openAttachmentViewerUrl(previewUrl);
     } catch (error) {
       alert('첨부파일 열기 실패: ' + (error?.message || 'Storage 정책/권한을 확인해 주세요.'));
     }
