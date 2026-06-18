@@ -447,6 +447,17 @@
     return 'https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(url);
   }
 
+  function getAicFileViewerPath() {
+    // 실제 배포 위치:
+    // attendance-portal/aic/file-viewer.html
+    // 따라서 루트 기준 절대경로로 열어 Vercel 404를 방지합니다.
+    if (window.AIC_API && window.AIC_API.fileViewerPath) {
+      return String(window.AIC_API.fileViewerPath || '/aic/file-viewer.html').trim() || '/aic/file-viewer.html';
+    }
+
+    return '/aic/file-viewer.html';
+  }
+
   function buildAicFileViewerUrl(fileUrl, fileName, kind) {
     var payload = {
       url: fileUrl || '',
@@ -454,13 +465,14 @@
       kind: kind || 'file'
     };
 
+    var viewerPath = getAicFileViewerPath();
     var key = 'aic_file_viewer_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
 
     try {
       sessionStorage.setItem(key, JSON.stringify(payload));
-      return 'aic-file-viewer.html?key=' + encodeURIComponent(key);
+      return viewerPath + '?key=' + encodeURIComponent(key);
     } catch (_) {
-      return 'aic-file-viewer.html?url=' + encodeURIComponent(payload.url) +
+      return viewerPath + '?url=' + encodeURIComponent(payload.url) +
         '&name=' + encodeURIComponent(payload.name) +
         '&kind=' + encodeURIComponent(payload.kind);
     }
