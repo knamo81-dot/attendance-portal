@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIC File Viewer</title>
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #f8fafc;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .viewer-root {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #f8fafc;
+    }
+
+    .viewer-frame,
+    .viewer-image-wrap {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+      background: #fff;
+    }
+
+    .viewer-image-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: auto;
+      background: #0f172a;
+    }
+
+    .viewer-image-wrap img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .viewer-empty {
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+      color: #475569;
+      font-size: 14px;
+      font-weight: 800;
+      text-align: center;
+      background: #f8fafc;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewerRoot" class="viewer-root"></div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      function getParam(name) {
+        var params = new URLSearchParams(window.location.search || '');
+        return params.get(name) || '';
+      }
+
+      function getPayload() {
+        var key = getParam('key');
+        if (key) {
+          try {
+            var raw = sessionStorage.getItem(key);
+            if (raw) return JSON.parse(raw) || {};
+          } catch (_) {}
+        }
+
+        return {
+          url: getParam('url'),
+          name: getParam('name') || '첨부파일',
+          kind: getParam('kind') || 'file'
+        };
+      }
+
+      function getExt(name) {
+        var match = String(name || '').toLowerCase().match(/\.([a-z0-9]{1,12})(?:$|[?#])/);
+        return match ? match[1] : '';
+      }
+
+      function normalizeKind(kind, name) {
+        var value = String(kind || '').toLowerCase();
+        var ext = getExt(name);
+        if (value === 'image' || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].indexOf(ext) >= 0) return 'image';
+        if (value === 'pdf' || ext === 'pdf') return 'pdf';
+        if (value === 'office' || ['xls', 'xlsx', 'csv', 'doc', 'docx', 'ppt', 'pptx'].indexOf(ext) >= 0) return 'office';
+        return 'file';
+      }
+
+      function buildOfficeViewerUrl(url) {
+        return 'https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(url);
+      }
+
+      function render() {
+        var root = document.getElementById('viewerRoot');
+        var payload = getPayload();
+        var url = payload.url || '';
+        var name = payload.name || '첨부파일';
+        var kind = normalizeKind(payload.kind, name);
+
+        document.title = name;
+
+        if (!url) {
+          root.innerHTML = '<div class="viewer-empty">파일 미리보기 주소가 없습니다.</div>';
+          return;
+        }
+
+        if (kind === 'image') {
+          var wrap = document.createElement('div');
+          wrap.className = 'viewer-image-wrap';
+          var img = document.createElement('img');
+          img.src = url;
+          img.alt = name;
+          wrap.appendChild(img);
+          root.appendChild(wrap);
+          return;
+        }
+
+        var iframe = document.createElement('iframe');
+        iframe.className = 'viewer-frame';
+        iframe.title = name;
+        iframe.allow = 'fullscreen; clipboard-read; clipboard-write';
+        iframe.referrerPolicy = 'no-referrer-when-downgrade';
+        iframe.src = kind === 'office' ? buildOfficeViewerUrl(url) : url;
+        root.appendChild(iframe);
+      }
+
+      render();
+    })();
+  </script>
+</body>
+</html>
