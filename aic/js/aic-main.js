@@ -2258,10 +2258,9 @@
         '    </div>',
         '  </div>',
         '  <div class="aic-messages" data-message-box="', i, '">', messages, '</div>',
-        '  <div class="aic-chat-input">',
-        '    ',
-        '    <input class="module-input" data-input-slot="', i, '" placeholder="', tr('aic.inputPlaceholder', '메시지를 입력하세요'), '" />',
-        '    <button class="module-btn accent aic-send-btn" data-send-slot="', i, '" type="button">', tr('aic.send', '전송'), '</button>',
+        '  <div class="aic-chat-input" style="display:flex; align-items:center; gap:8px;">',
+        '    <input class="module-input" data-input-slot="', i, '" placeholder="', tr('aic.inputPlaceholder', '메시지를 입력하세요'), '" style="flex:1 1 auto; min-width:0; width:auto;" />',
+        '    <button class="module-btn accent aic-send-btn" data-send-slot="', i, '" type="button" style="flex:0 0 72px; width:72px; min-width:72px; max-width:72px; white-space:nowrap;">', tr('aic.send', '전송'), '</button>',
         '  </div>',
         '</section>'
       ].join('');
