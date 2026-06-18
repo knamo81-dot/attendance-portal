@@ -329,6 +329,27 @@
     return [companyId, roomId, date, safeFileName].join('/');
   }
 
+  function getAttachmentFileExtension(fileName) {
+    var name = String(fileName || '').trim().toLowerCase();
+    var match = name.match(/\.([a-z0-9]{1,12})(?:$|[?#])/i);
+    return match ? match[1] : '';
+  }
+
+  function getAttachmentKind(attachment, fileName) {
+    var mime = String(attachment?.mime_type || attachment?.type || '').toLowerCase();
+    var ext = getAttachmentFileExtension(fileName || attachment?.file_name || attachment?.name);
+
+    if (mime.indexOf('image/') === 0 || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].indexOf(ext) >= 0) return 'image';
+    if (mime === 'application/pdf' || ext === 'pdf') return 'pdf';
+    if (['xls', 'xlsx', 'csv', 'doc', 'docx', 'ppt', 'pptx'].indexOf(ext) >= 0) return 'office';
+    return 'file';
+  }
+
+  function getAttachmentPrimaryActionLabel(kind) {
+    if (kind === 'image' || kind === 'pdf') return '미리보기';
+    return '열기';
+  }
+
   function buildAttachmentMessage(room, msg) {
     var attachment = getAttachmentFromMessage(msg) || {};
     var sender = getMessageSenderName(room, msg);
@@ -336,42 +357,150 @@
     var fileName = attachment.file_name || attachment.name || msg.original || '첨부파일';
     var fileSize = formatFileSize(attachment.file_size || attachment.size);
     var filePath = attachment.file_path || attachment.path || '';
-    var disabled = filePath ? '' : ' disabled';
+    var kind = getAttachmentKind(attachment, fileName);
+    var primaryLabel = getAttachmentPrimaryActionLabel(kind);
+    var disabledAttr = filePath ? '' : ' disabled';
 
     return [
       '<div class="aic-message ', isMine ? 'me' : 'other', '">',
       '  <div class="aic-message-name">', esc(sender), '</div>',
-      '  <button type="button" class="aic-attachment-card" data-attachment-path="', esc(filePath), '" data-attachment-name="', esc(fileName), '"', disabled, ' style="display:flex;align-items:center;gap:10px;width:100%;max-width:260px;padding:10px 12px;border:1px solid rgba(148,163,184,.45);border-radius:12px;background:rgba(255,255,255,.92);color:#0f172a;text-align:left;cursor:pointer;">',
-      '    <span style="font-size:20px;line-height:1;">📎</span>',
-      '    <span style="min-width:0;display:flex;flex-direction:column;gap:2px;">',
-      '      <span style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">', esc(fileName), '</span>',
-      fileSize ? '      <span style="font-size:11px;color:#64748b;">' + esc(fileSize) + '</span>' : '',
-      '    </span>',
-      '  </button>',
+      '  <div class="aic-attachment-card" style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:300px;padding:10px 12px;border:1px solid rgba(148,163,184,.45);border-radius:14px;background:rgba(255,255,255,.94);color:#0f172a;text-align:left;">',
+      '    <div style="display:flex;align-items:center;gap:10px;min-width:0;">',
+      '      <span style="font-size:20px;line-height:1;flex:0 0 auto;">📎</span>',
+      '      <span style="min-width:0;display:flex;flex-direction:column;gap:2px;flex:1 1 auto;">',
+      '        <span title="', esc(fileName), '" style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">', esc(fileName), '</span>',
+      fileSize ? '        <span style="font-size:11px;color:#64748b;">' + esc(fileSize) + '</span>' : '',
+      '      </span>',
+      '    </div>',
+      '    <div style="display:flex;gap:6px;justify-content:flex-end;">',
+      '      <button type="button" class="module-btn tiny" data-attachment-action="preview" data-attachment-kind="', esc(kind), '" data-attachment-path="', esc(filePath), '" data-attachment-name="', esc(fileName), '"', disabledAttr, ' style="height:26px;padding:0 9px;border-radius:9px;font-size:11px;font-weight:800;">', esc(primaryLabel), '</button>',
+      '      <button type="button" class="module-btn tiny" data-attachment-action="download" data-attachment-kind="', esc(kind), '" data-attachment-path="', esc(filePath), '" data-attachment-name="', esc(fileName), '"', disabledAttr, ' style="height:26px;padding:0 9px;border-radius:9px;font-size:11px;font-weight:800;">다운로드</button>',
+      '    </div>',
+      '  </div>',
       buildMessageFooter(msg),
       '</div>'
     ].join('');
   }
 
-  async function openAicAttachment(filePath, fileName) {
+  function isMobileAttachmentView() {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '') || window.innerWidth <= 760;
+  }
+
+  async function createAicAttachmentSignedUrl(filePath, options) {
     var sb = getSupabaseClient();
-    if (!sb || !filePath) {
-      alert('첨부파일을 열 수 없습니다. Supabase Storage 연결을 확인해 주세요.');
+    if (!sb || !filePath) throw new Error('Supabase Storage 연결을 확인해 주세요.');
+
+    var result = await sb.storage
+      .from(getAicStorageBucket())
+      .createSignedUrl(filePath, 60 * 10, options || {});
+
+    if (result.error) throw result.error;
+    var url = result.data?.signedUrl;
+    if (!url) throw new Error('서명 URL 생성 실패');
+    return url;
+  }
+
+  function closeAicAttachmentPreview() {
+    var existing = document.querySelector('[data-aic-attachment-preview-modal="1"]');
+    if (existing) existing.remove();
+  }
+
+  function showAicAttachmentPreviewModal(url, fileName, kind) {
+    closeAicAttachmentPreview();
+
+    var modal = document.createElement('div');
+    modal.setAttribute('data-aic-attachment-preview-modal', '1');
+    modal.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.58);display:flex;align-items:center;justify-content:center;padding:18px;';
+
+    var bodyHtml = '';
+    if (kind === 'image') {
+      bodyHtml = '<img src="' + esc(url) + '" alt="' + esc(fileName) + '" style="max-width:100%;max-height:calc(100vh - 150px);object-fit:contain;border-radius:12px;background:#fff;" />';
+    } else if (kind === 'pdf') {
+      bodyHtml = '<iframe src="' + esc(url) + '" title="' + esc(fileName) + '" style="width:100%;height:calc(100vh - 145px);border:0;border-radius:12px;background:#fff;"></iframe>';
+    } else {
+      bodyHtml = '<div style="padding:32px;text-align:center;color:#475569;font-weight:800;">이 파일은 인앱 미리보기를 지원하지 않습니다.<br>열기 또는 다운로드를 이용해 주세요.</div>';
+    }
+
+    modal.innerHTML = [
+      '<div style="width:min(980px,96vw);max-height:96vh;background:#fff;border-radius:18px;box-shadow:0 24px 80px rgba(15,23,42,.35);overflow:hidden;display:flex;flex-direction:column;">',
+      '  <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #e2e8f0;">',
+      '    <div title="', esc(fileName), '" style="font-weight:900;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;">', esc(fileName), '</div>',
+      '    <button type="button" data-aic-preview-download="1" style="height:32px;padding:0 12px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;font-weight:800;cursor:pointer;">다운로드</button>',
+      '    <button type="button" data-aic-preview-close="1" style="height:32px;width:32px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;font-size:18px;font-weight:900;cursor:pointer;">×</button>',
+      '  </div>',
+      '  <div style="padding:12px;background:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:220px;">', bodyHtml, '</div>',
+      '</div>'
+    ].join('');
+
+    modal.addEventListener('click', function (event) {
+      if (event.target === modal || event.target.closest('[data-aic-preview-close]')) {
+        closeAicAttachmentPreview();
+      }
+      if (event.target.closest('[data-aic-preview-download]')) {
+        downloadAicAttachment(url, fileName);
+      }
+    });
+
+    document.body.appendChild(modal);
+  }
+
+  async function downloadAicAttachment(url, fileName) {
+    var name = fileName || '첨부파일';
+
+    try {
+      var response = await fetch(url);
+      if (!response.ok) throw new Error('다운로드 요청 실패');
+      var blob = await response.blob();
+      var objectUrl = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = name;
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 2000);
+    } catch (_) {
+      var fallback = document.createElement('a');
+      fallback.href = url;
+      fallback.download = name;
+      fallback.target = '_blank';
+      fallback.rel = 'noopener noreferrer';
+      document.body.appendChild(fallback);
+      fallback.click();
+      fallback.remove();
+    }
+  }
+
+  async function openAicAttachment(filePath, fileName, action, kind) {
+    if (!filePath) {
+      alert('첨부파일 경로가 없습니다.');
       return;
     }
 
+    action = action || 'preview';
+    kind = kind || getAttachmentKind({}, fileName);
+
     try {
-      var result = await sb.storage
-        .from(getAicStorageBucket())
-        .createSignedUrl(filePath, 60 * 10, {
-          download: fileName || undefined
-        });
+      if (action === 'download') {
+        var downloadUrl = await createAicAttachmentSignedUrl(filePath);
+        await downloadAicAttachment(downloadUrl, fileName || '첨부파일');
+        return;
+      }
 
-      if (result.error) throw result.error;
-      var url = result.data?.signedUrl;
-      if (!url) throw new Error('서명 URL 생성 실패');
+      var previewUrl = await createAicAttachmentSignedUrl(filePath);
 
-      window.open(url, '_blank', 'noopener,noreferrer');
+      if (kind === 'image' || kind === 'pdf') {
+        showAicAttachmentPreviewModal(previewUrl, fileName || '첨부파일', kind);
+        return;
+      }
+
+      // Office/ZIP 등은 브라우저 인앱 미리보기가 불안정하므로 열기 동작으로 처리합니다.
+      if (isMobileAttachmentView()) {
+        window.location.href = previewUrl;
+      } else {
+        window.open(previewUrl, '_blank', 'noopener,noreferrer');
+      }
     } catch (error) {
       alert('첨부파일 열기 실패: ' + (error?.message || 'Storage 정책/권한을 확인해 주세요.'));
     }
@@ -2533,12 +2662,14 @@
       });
     });
 
-    Array.from(els.slots.querySelectorAll('[data-attachment-path]')).forEach(function (btn) {
+    Array.from(els.slots.querySelectorAll('[data-attachment-action]')).forEach(function (btn) {
       btn.addEventListener('click', function (event) {
         event.stopPropagation();
         var filePath = btn.getAttribute('data-attachment-path') || '';
         var fileName = btn.getAttribute('data-attachment-name') || '첨부파일';
-        openAicAttachment(filePath, fileName);
+        var action = btn.getAttribute('data-attachment-action') || 'preview';
+        var kind = btn.getAttribute('data-attachment-kind') || '';
+        openAicAttachment(filePath, fileName, action, kind);
       });
     });
 
