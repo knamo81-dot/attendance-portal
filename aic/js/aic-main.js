@@ -469,7 +469,7 @@
     var key = 'aic_file_viewer_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
 
     try {
-      sessionStorage.setItem(key, JSON.stringify(payload));
+      localStorage.setItem(key, JSON.stringify(payload));
       return viewerPath + '?key=' + encodeURIComponent(key);
     } catch (_) {
       return viewerPath + '?url=' + encodeURIComponent(payload.url) +
