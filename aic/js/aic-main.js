@@ -476,17 +476,16 @@
   }
 
   function openAttachmentViewerUrl(url) {
-    var opened = null;
-
+    // 첨부파일 미리보기는 항상 별도 창/탭에서만 엽니다.
+    // 현재 AIC 채팅 화면이 file-viewer.html로 이동하지 않도록 window.location fallback은 사용하지 않습니다.
     try {
-      opened = window.open(url, '_blank', 'noopener,noreferrer');
+      window.open(url, '_blank', 'noopener,noreferrer');
     } catch (_) {
-      opened = null;
-    }
-
-    // 모바일/인앱 브라우저에서 새 창이 막히는 경우 현재 탭으로 이동합니다.
-    if (!opened) {
-      window.location.href = url;
+      try {
+        window.open(url, '_blank');
+      } catch (error) {
+        alert('첨부파일 미리보기 창을 열 수 없습니다. 팝업 차단 설정을 확인해 주세요.');
+      }
     }
   }
 
