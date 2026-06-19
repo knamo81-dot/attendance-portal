@@ -248,6 +248,144 @@
     return '<div class="aic-message-time">' + esc(timeText) + '</div>';
   }
 
+  function extractUrlsFromText(text) {
+    var value = String(text || '');
+    if (!value) return [];
+
+    var urlRegex = /((?:https?:\/\/|www\.)[^\s<>"']+|(?:[A-Za-z0-9-]+\.)+(?:com|net|org|co\.kr|kr|io|app|dev|me|ai|xyz|co|info|biz|gov|go\.kr|or\.kr|ac\.kr)(?:\/[^\s<>"']*)?)/gi;
+    var matches = [];
+    var seen = {};
+
+    value.replace(urlRegex, function (raw) {
+      var cleaned = String(raw || '')
+        .replace(/[)\].,!?;:]+$/g, '')
+        .trim();
+
+      if (!cleaned) return raw;
+
+      var normalized = normalizeLinkUrl(cleaned);
+      if (!normalized || seen[normalized]) return raw;
+
+      seen[normalized] = true;
+      matches.push({
+        raw: cleaned,
+        url: normalized,
+        meta: getLinkMeta(normalized)
+      });
+
+      return raw;
+    });
+
+    return matches;
+  }
+
+  function normalizeLinkUrl(value) {
+    var url = String(value || '').trim();
+    if (!url) return '';
+
+    url = url.replace(/[)\].,!?;:]+$/g, '');
+
+    if (/^www\./i.test(url)) {
+      url = 'https://' + url;
+    } else if (!/^https?:\/\//i.test(url)) {
+      url = 'https://' + url;
+    }
+
+    if (!/^https?:\/\//i.test(url)) return '';
+
+    return url;
+  }
+
+  function getLinkHost(url) {
+    try {
+      return new URL(url).hostname.replace(/^www\./i, '').toLowerCase();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function getLinkMeta(url) {
+    var host = getLinkHost(url);
+    var lowerUrl = String(url || '').toLowerCase();
+    var label = '사이트 링크';
+    var icon = '🌐';
+
+    if (host.indexOf('map.naver.com') >= 0 || host === 'naver.me' || host.endsWith('.naver.me')) {
+      label = '네이버 지도';
+      icon = '📍';
+    } else if (host.indexOf('maps.google.') >= 0 || lowerUrl.indexOf('google.com/maps') >= 0 || lowerUrl.indexOf('goo.gl/maps') >= 0) {
+      label = 'Google 지도';
+      icon = '📍';
+    } else if (host === 'github.com' || host.endsWith('.github.com')) {
+      label = 'GitHub';
+      icon = '🐙';
+    } else if (host === 'supabase.com' || host.endsWith('.supabase.com')) {
+      label = 'Supabase';
+      icon = '🗄️';
+    } else if (host === 'vercel.app' || host.endsWith('.vercel.app') || host === 'vercel.com' || host.endsWith('.vercel.com')) {
+      label = 'Vercel';
+      icon = '▲';
+    } else if (host === 'naver.com' || host.endsWith('.naver.com')) {
+      label = 'NAVER';
+      icon = '🌐';
+    }
+
+    return {
+      label: label,
+      icon: icon,
+      host: host || url
+    };
+  }
+
+  function renderTextWithLinks(text) {
+    var value = String(text || '');
+    if (!value) return '';
+
+    var urlRegex = /((?:https?:\/\/|www\.)[^\s<>"']+|(?:[A-Za-z0-9-]+\.)+(?:com|net|org|co\.kr|kr|io|app|dev|me|ai|xyz|co|info|biz|gov|go\.kr|or\.kr|ac\.kr)(?:\/[^\s<>"']*)?)/gi;
+    var html = '';
+    var lastIndex = 0;
+
+    value.replace(urlRegex, function (raw, _match, offset) {
+      var full = String(raw || '');
+      var cleaned = full.replace(/[)\].,!?;:]+$/g, '');
+      var trailing = full.slice(cleaned.length);
+      var url = normalizeLinkUrl(cleaned);
+
+      html += esc(value.slice(lastIndex, offset));
+
+      if (url) {
+        html += '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" data-aic-link-url="' + esc(url) + '" style="color:inherit;text-decoration:underline;font-weight:900;overflow-wrap:anywhere;">' + esc(cleaned) + '</a>';
+        html += esc(trailing);
+      } else {
+        html += esc(full);
+      }
+
+      lastIndex = offset + full.length;
+      return full;
+    });
+
+    html += esc(value.slice(lastIndex));
+    return html.replace(/\n/g, '<br>');
+  }
+
+  function buildLinkCards(text) {
+    var links = extractUrlsFromText(text);
+    if (!links.length) return '';
+
+    return links.map(function (link) {
+      var meta = link.meta || getLinkMeta(link.url);
+      return [
+        '<div class="aic-link-card" data-aic-link-url="', esc(link.url), '" title="', esc(link.url), '" style="margin-top:8px;display:flex;align-items:center;gap:10px;width:100%;max-width:320px;padding:10px 12px;border:1px solid rgba(148,163,184,.45);border-radius:14px;background:rgba(255,255,255,.94);color:#0f172a;text-align:left;cursor:pointer;">',
+        '  <span style="font-size:20px;line-height:1;flex:0 0 auto;">', esc(meta.icon), '</span>',
+        '  <span style="min-width:0;display:flex;flex-direction:column;gap:2px;flex:1 1 auto;">',
+        '    <span style="font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">', esc(meta.label), '</span>',
+        '    <span style="font-size:11px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">', esc(meta.host), '</span>',
+        '  </span>',
+        '</div>'
+      ].join('');
+    }).join('');
+  }
+
   function getAicStorageBucket() {
     return String(window.AIC_API?.storageBucket || 'aic-files').trim() || 'aic-files';
   }
@@ -2548,17 +2686,20 @@
       return [
         '<div class="aic-message ', isMine ? 'me' : 'other', '">',
         '  <div class="aic-message-name">', esc(sender), '</div>',
-        '  <div class="aic-message-original">', esc(original), '</div>',
+        '  <div class="aic-message-original">', renderTextWithLinks(original), '</div>',
+        buildLinkCards(original),
         buildMessageFooter(msg),
         '</div>'
       ].join('');
     }
 
     if (displayMode === 'translated') {
+      var displayText = isMine ? original : preferredText;
       return [
         '<div class="aic-message ', isMine ? 'me' : 'other', '">',
         '  <div class="aic-message-name">', esc(sender), '</div>',
-        '  <div class="aic-message-original">', esc(isMine ? original : preferredText), '</div>',
+        '  <div class="aic-message-original">', renderTextWithLinks(displayText), '</div>',
+        buildLinkCards(displayText),
         buildMessageFooter(msg),
         '</div>'
       ].join('');
@@ -2568,7 +2709,8 @@
       return [
         '<div class="aic-message me">',
         '  <div class="aic-message-name">', esc(sender), '</div>',
-        '  <div class="aic-message-original">', esc(original), '</div>',
+        '  <div class="aic-message-original">', renderTextWithLinks(original), '</div>',
+        buildLinkCards(original),
         buildMessageFooter(msg),
         '</div>'
       ].join('');
@@ -2581,8 +2723,10 @@
     return [
       '<div class="aic-message other">',
       '  <div class="aic-message-name">', esc(sender), '</div>',
-      '  <div class="aic-message-original">', esc(original), '</div>',
-      showTranslated ? '  <div class="aic-message-translated">' + esc(translated) + '</div>' : '',
+      '  <div class="aic-message-original">', renderTextWithLinks(original), '</div>',
+      buildLinkCards(original),
+      showTranslated ? '  <div class="aic-message-translated">' + renderTextWithLinks(translated) + '</div>' : '',
+      showTranslated ? buildLinkCards(translated) : '',
       buildMessageFooter(msg),
       '</div>'
     ].join('');
@@ -2721,6 +2865,29 @@
         var action = btn.getAttribute('data-attachment-action') || 'preview';
         var kind = btn.getAttribute('data-attachment-kind') || '';
         openAicAttachment(filePath, fileName, action, kind);
+      });
+    });
+
+    Array.from(els.slots.querySelectorAll('[data-aic-link-url]')).forEach(function (el) {
+      el.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        var url = el.getAttribute('data-aic-link-url') || el.getAttribute('href') || '';
+        url = normalizeLinkUrl(url);
+        if (!url) return;
+
+        try {
+          window.open(url, '_blank', 'noopener,noreferrer');
+        } catch (_) {
+          var a = document.createElement('a');
+          a.href = url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }
       });
     });
 
