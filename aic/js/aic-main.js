@@ -354,7 +354,7 @@
       html += esc(value.slice(lastIndex, offset));
 
       if (url) {
-        html += '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" data-aic-link-url="' + esc(url) + '" style="color:inherit;text-decoration:underline;font-weight:900;overflow-wrap:anywhere;">' + esc(cleaned) + '</a>';
+        html += '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;font-weight:900;overflow-wrap:anywhere;">' + esc(cleaned) + '</a>';
         html += esc(trailing);
       } else {
         html += esc(full);
@@ -375,7 +375,7 @@
     return links.map(function (link) {
       var meta = link.meta || getLinkMeta(link.url);
       return [
-        '<div class="aic-link-card" data-aic-link-url="', esc(link.url), '" title="', esc(link.url), '" style="margin-top:8px;display:flex;align-items:center;gap:10px;width:100%;max-width:320px;padding:10px 12px;border:1px solid rgba(148,163,184,.45);border-radius:14px;background:rgba(255,255,255,.94);color:#0f172a;text-align:left;cursor:pointer;">',
+        '<div class="aic-link-card" data-aic-link-card-url="', esc(link.url), '" title="', esc(link.url), '" style="margin-top:8px;display:flex;align-items:center;gap:10px;width:100%;max-width:320px;padding:10px 12px;border:1px solid rgba(148,163,184,.45);border-radius:14px;background:rgba(255,255,255,.94);color:#0f172a;text-align:left;cursor:pointer;">',
         '  <span style="font-size:20px;line-height:1;flex:0 0 auto;">', esc(meta.icon), '</span>',
         '  <span style="min-width:0;display:flex;flex-direction:column;gap:2px;flex:1 1 auto;">',
         '    <span style="font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">', esc(meta.label), '</span>',
@@ -2682,12 +2682,20 @@
       return buildAttachmentMessage(room, msg);
     }
 
+    // 링크 카드는 원문/번역문 표시 방식과 관계없이 메시지당 1회만 생성합니다.
+    // iPad/태블릿에서 original + translated 영역이 함께 표시될 때 같은 링크 카드가 2개 보이는 문제를 방지합니다.
+    var linkCardSource = [original, translated, preferredText].filter(function (value, index, array) {
+      value = String(value || '').trim();
+      return value && array.indexOf(value) === index;
+    }).join('\n');
+    var linkCardHtml = buildLinkCards(linkCardSource);
+
     if (displayMode === 'original') {
       return [
         '<div class="aic-message ', isMine ? 'me' : 'other', '">',
         '  <div class="aic-message-name">', esc(sender), '</div>',
         '  <div class="aic-message-original">', renderTextWithLinks(original), '</div>',
-        buildLinkCards(original),
+        linkCardHtml,
         buildMessageFooter(msg),
         '</div>'
       ].join('');
@@ -2699,7 +2707,7 @@
         '<div class="aic-message ', isMine ? 'me' : 'other', '">',
         '  <div class="aic-message-name">', esc(sender), '</div>',
         '  <div class="aic-message-original">', renderTextWithLinks(displayText), '</div>',
-        buildLinkCards(displayText),
+        linkCardHtml,
         buildMessageFooter(msg),
         '</div>'
       ].join('');
@@ -2710,7 +2718,7 @@
         '<div class="aic-message me">',
         '  <div class="aic-message-name">', esc(sender), '</div>',
         '  <div class="aic-message-original">', renderTextWithLinks(original), '</div>',
-        buildLinkCards(original),
+        linkCardHtml,
         buildMessageFooter(msg),
         '</div>'
       ].join('');
@@ -2724,9 +2732,8 @@
       '<div class="aic-message other">',
       '  <div class="aic-message-name">', esc(sender), '</div>',
       '  <div class="aic-message-original">', renderTextWithLinks(original), '</div>',
-      buildLinkCards(original),
       showTranslated ? '  <div class="aic-message-translated">' + renderTextWithLinks(translated) + '</div>' : '',
-      showTranslated ? buildLinkCards(translated) : '',
+      linkCardHtml,
       buildMessageFooter(msg),
       '</div>'
     ].join('');
@@ -2868,12 +2875,12 @@
       });
     });
 
-    Array.from(els.slots.querySelectorAll('[data-aic-link-url]')).forEach(function (el) {
+    Array.from(els.slots.querySelectorAll('[data-aic-link-card-url]')).forEach(function (el) {
       el.addEventListener('click', function (event) {
         event.preventDefault();
         event.stopPropagation();
 
-        var url = el.getAttribute('data-aic-link-url') || el.getAttribute('href') || '';
+        var url = el.getAttribute('data-aic-link-card-url') || '';
         url = normalizeLinkUrl(url);
         if (!url) return;
 
