@@ -2682,12 +2682,11 @@
       return buildAttachmentMessage(room, msg);
     }
 
-    // 링크 카드는 원문/번역문 표시 방식과 관계없이 메시지당 1회만 생성합니다.
-    // iPad/태블릿에서 original + translated 영역이 함께 표시될 때 같은 링크 카드가 2개 보이는 문제를 방지합니다.
-    var linkCardSource = [original, translated, preferredText].filter(function (value, index, array) {
-      value = String(value || '').trim();
-      return value && array.indexOf(value) === index;
-    }).join('\n');
+    // URL이 포함된 메시지는 원문/번역본 같이 보기(both)에서도 URL 텍스트가 2번 보이지 않도록 처리합니다.
+    // 링크 카드는 메시지당 1회만 생성하고, 카드 소스는 원문을 우선 사용합니다.
+    var hasOriginalLinks = extractUrlsFromText(original).length > 0;
+    var hasPreferredLinks = !hasOriginalLinks && extractUrlsFromText(preferredText).length > 0;
+    var linkCardSource = hasOriginalLinks ? original : (hasPreferredLinks ? preferredText : translated);
     var linkCardHtml = buildLinkCards(linkCardSource);
 
     if (displayMode === 'original') {
@@ -2727,6 +2726,12 @@
     var sourceLang = normalizeAicLang(msg?.source_lang) || detectTextLanguage(original);
     var viewerLang = getViewerLanguage();
     var showTranslated = translated && translated !== original && sourceLang !== viewerLang;
+
+    // 링크 메시지는 both 모드에서도 번역/보조문 영역을 숨깁니다.
+    // 일반 메시지는 기존처럼 원문 + 번역본을 함께 표시합니다.
+    if (hasOriginalLinks) {
+      showTranslated = false;
+    }
 
     return [
       '<div class="aic-message other">',
