@@ -337,6 +337,18 @@
     };
   }
 
+  
+  function stripUrlsFromText(text) {
+    var value = String(text || '');
+    var urlRegex = /((?:https?:\/\/|www\.)[^\s<>"']+|(?:[A-Za-z0-9-]+\.)+(?:com|net|org|co\.kr|kr|io|app|dev|me|ai|xyz|co|info|biz|gov|go\.kr|or\.kr|ac\.kr)(?:\/[^\s<>"']*)?)/gi;
+    return value.replace(urlRegex, '').replace(/\s+/g, ' ').trim();
+  }
+
+  function renderTextCardOnly(text) {
+    return esc(stripUrlsFromText(text)).replace(/\n/g, '<br>');
+  }
+
+
   function renderTextWithLinks(text) {
     var value = String(text || '');
     if (!value) return '';
@@ -2693,7 +2705,7 @@
       return [
         '<div class="aic-message ', isMine ? 'me' : 'other', '">',
         '  <div class="aic-message-name">', esc(sender), '</div>',
-        '  <div class="aic-message-original">', renderTextWithLinks(original), '</div>',
+        '  <div class="aic-message-original">', renderTextCardOnly(original), '</div>',
         linkCardHtml,
         buildMessageFooter(msg),
         '</div>'
@@ -2705,7 +2717,7 @@
       return [
         '<div class="aic-message ', isMine ? 'me' : 'other', '">',
         '  <div class="aic-message-name">', esc(sender), '</div>',
-        '  <div class="aic-message-original">', renderTextWithLinks(displayText), '</div>',
+        '  <div class="aic-message-original">', renderTextCardOnly(displayText), '</div>',
         linkCardHtml,
         buildMessageFooter(msg),
         '</div>'
@@ -2716,7 +2728,7 @@
       return [
         '<div class="aic-message me">',
         '  <div class="aic-message-name">', esc(sender), '</div>',
-        '  <div class="aic-message-original">', renderTextWithLinks(original), '</div>',
+        '  <div class="aic-message-original">', renderTextCardOnly(original), '</div>',
         linkCardHtml,
         buildMessageFooter(msg),
         '</div>'
@@ -2736,8 +2748,8 @@
     return [
       '<div class="aic-message other">',
       '  <div class="aic-message-name">', esc(sender), '</div>',
-      '  <div class="aic-message-original">', renderTextWithLinks(original), '</div>',
-      showTranslated ? '  <div class="aic-message-translated">' + renderTextWithLinks(translated) + '</div>' : '',
+      '  <div class="aic-message-original">', renderTextCardOnly(original), '</div>',
+      showTranslated ? '  <div class="aic-message-translated">' + renderTextCardOnly(translated) + '</div>' : '',
       linkCardHtml,
       buildMessageFooter(msg),
       '</div>'
