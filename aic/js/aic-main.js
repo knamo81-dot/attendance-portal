@@ -16,7 +16,8 @@
       direction: 'auto',
       tone: 'business',
       display: 'both',
-      autoTranslate: true
+      autoTranslate: true,
+      theme: 'blue'
     },
     slotPolicy: {
       defaultVisibleSlots: 2,
@@ -1402,6 +1403,10 @@
     next.defaultLang = normalizeAicLang(next.defaultLang) || 'ko';
     if (['original', 'translated', 'both'].indexOf(next.display) < 0) next.display = 'both';
 
+    var allowedThemes = ['blue', 'mint', 'forest', 'lavender', 'sand', 'pink', 'dark'];
+    next.theme = String(next.theme || 'blue').trim().toLowerCase();
+    if (allowedThemes.indexOf(next.theme) < 0) next.theme = 'blue';
+
     return next;
   }
 
@@ -1411,6 +1416,83 @@
       if (raw) return normalizeSettings(JSON.parse(raw));
     } catch (_) {}
     return normalizeSettings(CONFIG.defaultSettings);
+  }
+
+  function getAicThemeOptions() {
+    return [
+      { value: 'blue', label: '기본 블루' },
+      { value: 'mint', label: '민트' },
+      { value: 'forest', label: '포레스트' },
+      { value: 'lavender', label: '라벤더' },
+      { value: 'sand', label: '샌드' },
+      { value: 'pink', label: '베이비핑크' },
+      { value: 'dark', label: '다크' }
+    ];
+  }
+
+  function applyAicTheme(theme) {
+    var normalized = String(theme || state.settings?.theme || 'blue').trim().toLowerCase();
+    var allowedThemes = getAicThemeOptions().map(function (item) { return item.value; });
+    if (allowedThemes.indexOf(normalized) < 0) normalized = 'blue';
+
+    try {
+      document.documentElement.setAttribute('data-aic-theme', normalized);
+    } catch (_) {}
+
+    try {
+      if (els.root) els.root.setAttribute('data-aic-theme', normalized);
+    } catch (_) {}
+
+    return normalized;
+  }
+
+  function ensureAicThemeSettingField() {
+    if (!els.settingsModal) return null;
+
+    var existing = $('aicSetTheme');
+    if (existing) {
+      els.setTheme = existing;
+      return existing;
+    }
+
+    var field = document.createElement('label');
+    field.className = 'aic-field';
+    field.setAttribute('data-aic-theme-setting-field', '1');
+
+    var title = document.createElement('span');
+    title.textContent = '채팅 테마';
+
+    var select = document.createElement('select');
+    select.id = 'aicSetTheme';
+    select.className = 'module-select';
+
+    getAicThemeOptions().forEach(function (item) {
+      var option = document.createElement('option');
+      option.value = item.value;
+      option.textContent = item.label;
+      select.appendChild(option);
+    });
+
+    select.addEventListener('change', function () {
+      state.settings.theme = select.value || 'blue';
+      state.settings = normalizeSettings(state.settings);
+      applyAicTheme(state.settings.theme);
+    });
+
+    field.appendChild(title);
+    field.appendChild(select);
+
+    var modalBody = els.settingsModal.querySelector('.aic-modal') || els.settingsModal;
+    var actions = modalBody.querySelector('.aic-modal-actions');
+
+    if (actions && actions.parentNode) {
+      actions.parentNode.insertBefore(field, actions);
+    } else {
+      modalBody.appendChild(field);
+    }
+
+    els.setTheme = select;
+    return select;
   }
 
   function saveSettingsToLocal() {
@@ -4254,11 +4336,16 @@
     if (!els.settingsModal) return;
 
     state.settings = normalizeSettings(state.settings);
+    ensureAicThemeSettingField();
+
     if (els.setDefaultLang) els.setDefaultLang.value = state.settings.defaultLang;
     if (els.setDirection) els.setDirection.value = state.settings.direction;
     if (els.setTone) els.setTone.value = state.settings.tone;
     if (els.setDisplay) els.setDisplay.value = state.settings.display;
+    if (els.setTheme) els.setTheme.value = state.settings.theme || 'blue';
     if (els.autoSwitch) els.autoSwitch.classList.toggle('on', !!state.settings.autoTranslate);
+
+    applyAicTheme(state.settings.theme);
     els.settingsModal.hidden = false;
   }
 
@@ -4267,13 +4354,17 @@
   }
 
   function saveSettings() {
+    ensureAicThemeSettingField();
+
     state.settings.defaultLang = els.setDefaultLang ? els.setDefaultLang.value : state.settings.defaultLang;
     state.settings.display = els.setDisplay ? els.setDisplay.value : state.settings.display;
+    state.settings.theme = els.setTheme ? els.setTheme.value : state.settings.theme;
     state.settings.direction = 'auto';
     state.settings.tone = 'business';
     state.settings.autoTranslate = true;
     state.settings = normalizeSettings(state.settings);
 
+    applyAicTheme(state.settings.theme);
     saveSettingsToLocal();
     closeSettingsModal();
     render(false);
@@ -4395,6 +4486,7 @@
     els.setDirection = $('aicSetDirection');
     els.setTone = $('aicSetTone');
     els.setDisplay = $('aicSetDisplay');
+    els.setTheme = $('aicSetTheme');
     els.autoSwitch = $('aicAutoTranslateSwitch');
     els.settingsCancelBtn = $('aicSettingsCancelBtn');
     els.settingsSaveBtn = $('aicSettingsSaveBtn');
@@ -4436,6 +4528,7 @@
 
   function render(fill) {
     persistVisibleAicDrafts();
+    applyAicTheme(state.settings?.theme || 'blue');
     ensureSlots(fill !== false);
     renderSlotButtons();
     renderRoomList();
@@ -4475,6 +4568,8 @@
 
   function bootstrap() {
     cacheEls();
+    state.settings = normalizeSettings(state.settings);
+    applyAicTheme(state.settings.theme);
     bind();
 
     if (window.I18N && typeof window.I18N.changeLanguage === 'function' && !window.I18N.__aicPatched) {
