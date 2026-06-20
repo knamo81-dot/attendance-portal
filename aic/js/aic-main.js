@@ -651,10 +651,14 @@
       'color:#0f172a'
     ].join(';') + ';';
 
+    var isTouchMenu = !!(event && event.aicTouch === true);
+
     menu.innerHTML = [
       '<button type="button" data-aic-context-action="copy" style="display:block;width:100%;height:32px;padding:0 10px;border:0;border-radius:9px;background:#fff;text-align:left;font:inherit;cursor:pointer;">복사</button>',
       '<button type="button" data-aic-context-action="edit"', canEdit ? '' : ' disabled', ' style="display:block;width:100%;height:32px;padding:0 10px;border:0;border-radius:9px;background:#fff;text-align:left;font:inherit;cursor:', canEdit ? 'pointer' : 'not-allowed', ';opacity:', canEdit ? '1' : '.45', ';">수정</button>',
-      '<button type="button" data-aic-context-action="delete" style="display:block;width:100%;height:32px;padding:0 10px;border:0;border-radius:9px;background:#fff;text-align:left;font:inherit;cursor:pointer;color:#dc2626;">삭제</button>'
+      '<button type="button" data-aic-context-action="delete" style="display:block;width:100%;height:32px;padding:0 10px;border:0;border-radius:9px;background:#fff;text-align:left;font:inherit;cursor:pointer;color:#dc2626;">삭제</button>',
+      isTouchMenu ? '<div style="height:1px;margin:6px 2px;background:#e2e8f0;"></div>' : '',
+      isTouchMenu ? '<button type="button" data-aic-context-action="cancel" style="display:block;width:100%;height:32px;padding:0 10px;border:0;border-radius:9px;background:#fff;text-align:left;font:inherit;cursor:pointer;color:#64748b;">취소</button>' : ''
     ].join('');
 
     menu.addEventListener('mouseover', function (e) {
@@ -672,7 +676,12 @@
       if (!btn || btn.disabled) return;
       e.preventDefault();
       e.stopPropagation();
-      handleAicContextAction(btn.getAttribute('data-aic-context-action'), roomId, messageId);
+      var action = btn.getAttribute('data-aic-context-action');
+      if (action === 'cancel') {
+        closeAicContextMenu();
+        return;
+      }
+      handleAicContextAction(action, roomId, messageId);
     });
 
     document.body.appendChild(menu);
@@ -693,11 +702,92 @@
       if (messageEl.dataset.aicContextBound === '1') return;
       messageEl.dataset.aicContextBound = '1';
 
+      var longPressTimer = null;
+      var touchStartX = 0;
+      var touchStartY = 0;
+      var longPressTriggered = false;
+
+      function clearLongPressTimer() {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      }
+
       messageEl.addEventListener('contextmenu', function (event) {
         event.preventDefault();
         event.stopPropagation();
         showAicContextMenu(event, messageEl);
       });
+
+      messageEl.addEventListener('click', function (event) {
+        if (messageEl.dataset.aicLongPressSuppressClick === '1') {
+          event.preventDefault();
+          event.stopPropagation();
+          if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+          messageEl.dataset.aicLongPressSuppressClick = '0';
+        }
+      }, true);
+
+      messageEl.addEventListener('touchstart', function (event) {
+        if (!event.touches || event.touches.length !== 1) return;
+
+        var touch = event.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        longPressTriggered = false;
+        clearLongPressTimer();
+
+        longPressTimer = setTimeout(function () {
+          longPressTriggered = true;
+          messageEl.dataset.aicLongPressSuppressClick = '1';
+
+          try {
+            if (navigator.vibrate) navigator.vibrate(25);
+          } catch (_) {}
+
+          showAicContextMenu({
+            clientX: touchStartX,
+            clientY: touchStartY,
+            aicTouch: true
+          }, messageEl);
+        }, 600);
+      }, { passive: true });
+
+      messageEl.addEventListener('touchmove', function (event) {
+        if (!event.touches || event.touches.length !== 1) {
+          clearLongPressTimer();
+          return;
+        }
+
+        var touch = event.touches[0];
+        var dx = Math.abs(touch.clientX - touchStartX);
+        var dy = Math.abs(touch.clientY - touchStartY);
+
+        if (dx > 12 || dy > 12) {
+          clearLongPressTimer();
+        }
+      }, { passive: true });
+
+      messageEl.addEventListener('touchend', function (event) {
+        clearLongPressTimer();
+
+        if (longPressTriggered) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+          longPressTriggered = false;
+
+          setTimeout(function () {
+            messageEl.dataset.aicLongPressSuppressClick = '0';
+          }, 450);
+        }
+      });
+
+      messageEl.addEventListener('touchcancel', function () {
+        clearLongPressTimer();
+        longPressTriggered = false;
+      }, { passive: true });
     });
   }
 
@@ -3626,9 +3716,6 @@
       render(false);
 
       await insertMessageToServer(room, message);
-      // 서버 저장 후 temp_ 아이디가 실제 DB 아이디로 교체되므로,
-      // DOM의 data-aic-message-id도 즉시 갱신해 5분 이내 수정 메뉴가 바로 활성화되게 합니다.
-      render(false);
     } catch (error) {
       alert('메시지 저장 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
     }
