@@ -3519,7 +3519,7 @@
 
       var editing = state.editingMessage && state.editingMessage.roomId === room.id && Number(state.editingMessage.slotIndex) === i ? state.editingMessage : null;
       var editingValue = editing ? String(editing.original || '') : '';
-      var sendLabel = editing ? '저장' : tr('aic.send', '전송');
+      var sendLabel = editing ? '✓' : '➤';
 
       var messages = room.messages.map(function (message) {
         return buildMessage(room, message);
@@ -3549,9 +3549,9 @@
         '      <button class="module-btn aic-attach-file-btn" data-attach-file-slot="', i, '" type="button" style="width:100%; justify-content:flex-start; white-space:nowrap;">첨부파일</button>',
         '    </div>',
         '    <input type="file" data-attach-input-slot="', i, '" hidden />',
-        '    <input class="module-input" data-input-slot="', i, '" placeholder="', editing ? '수정할 메시지를 입력하세요' : tr('aic.inputPlaceholder', '메시지를 입력하세요'), '" value="', esc(editingValue), '" style="flex:1 1 auto; min-width:0; width:auto;" />',
-        editing ? '    <button class="module-btn" data-edit-cancel-slot="' + i + '" type="button" style="flex:0 0 58px; width:58px; min-width:58px; max-width:58px; white-space:nowrap;">취소</button>' : '',
-        '    <button class="module-btn accent aic-send-btn" data-send-slot="', i, '" type="button" style="flex:0 0 72px; width:72px; min-width:72px; max-width:72px; white-space:nowrap;">', sendLabel, '</button>',
+        '    <input class="module-input aic-message-input" data-input-slot="', i, '" placeholder="', editing ? '메시지 수정 중...' : tr('aic.inputPlaceholder', '메시지를 입력하세요'), '" value="', esc(editingValue), '" style="flex:1 1 auto; min-width:0; width:auto;" />',
+        editing ? '    <button class="module-btn aic-edit-cancel-btn" data-edit-cancel-slot="' + i + '" type="button" title="수정 취소" aria-label="수정 취소" style="flex:0 0 42px; width:42px; min-width:42px; max-width:42px; height:38px; padding:0; white-space:nowrap; font-size:18px; line-height:1;">✕</button>' : '',
+        '    <button class="module-btn accent aic-send-btn" data-send-slot="', i, '" type="button" title="', editing ? '수정 저장' : '전송', '" aria-label="', editing ? '수정 저장' : '전송', '" style="flex:0 0 42px; width:42px; min-width:42px; max-width:42px; height:38px; padding:0; white-space:nowrap; font-size:18px; line-height:1;">', sendLabel, '</button>',
         '  </div>',
         '</section>'
       ].join('');
