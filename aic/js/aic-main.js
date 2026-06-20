@@ -637,6 +637,11 @@
 
     var menu = document.createElement('div');
     menu.setAttribute('data-aic-message-context-menu', '1');
+    // 모바일 롱프레스 후 손을 떼는 이벤트가 메뉴 버튼을 즉시 누르지 않도록 잠시 잠금 처리합니다.
+    menu.dataset.aicMenuReady = '0';
+    setTimeout(function () {
+      if (menu && menu.parentNode) menu.dataset.aicMenuReady = '1';
+    }, 350);
     menu.style.cssText = [
       'position:fixed',
       'z-index:999999',
@@ -676,6 +681,13 @@
       if (!btn || btn.disabled) return;
       e.preventDefault();
       e.stopPropagation();
+
+      // 롱프레스 직후 손을 떼면서 발생하는 첫 클릭은 무시합니다.
+      if (menu.dataset.aicMenuReady !== '1') {
+        if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+        return;
+      }
+
       var action = btn.getAttribute('data-aic-context-action');
       if (action === 'cancel') {
         closeAicContextMenu();
@@ -688,8 +700,17 @@
 
     var width = menu.offsetWidth || 128;
     var height = menu.offsetHeight || 104;
-    var left = Math.min(event.clientX, window.innerWidth - width - 8);
-    var top = Math.min(event.clientY, window.innerHeight - height - 8);
+    var rawLeft = Number(event.clientX) || 8;
+    var rawTop = Number(event.clientY) || 8;
+
+    // 모바일 롱프레스 메뉴는 손가락 바로 아래가 아니라 약간 위에 띄워서
+    // touchend가 메뉴 버튼으로 들어가는 상황을 줄입니다.
+    if (isTouchMenu) {
+      rawTop = rawTop - height - 10;
+    }
+
+    var left = Math.min(rawLeft, window.innerWidth - width - 8);
+    var top = Math.min(rawTop, window.innerHeight - height - 8);
 
     menu.style.left = Math.max(8, left) + 'px';
     menu.style.top = Math.max(8, top) + 'px';
