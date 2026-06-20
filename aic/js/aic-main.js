@@ -67,6 +67,7 @@
     readSaveTimer: null,
     readSyncReady: false,
     readSavingRooms: {},
+    editingMessage: null,
     dbReady: false,
     dbLoading: false
   };
@@ -423,6 +424,168 @@
     render(false);
   }
 
+  function canEditAicMessage(message) {
+    if (!message) return false;
+
+    var attachment = getAttachmentFromMessage(message);
+    if (attachment) return false;
+
+    var messageId = String(message.id || '').trim();
+    if (!messageId || messageId.indexOf('temp_') === 0) return false;
+
+    var currentEmail = String(getCurrentUserEmail() || '').trim().toLowerCase();
+    var senderEmail = String(message.sender_email || '').trim().toLowerCase();
+    if (!currentEmail || !senderEmail || currentEmail !== senderEmail) return false;
+
+    var createdAt = Date.parse(message.created_at || '');
+    if (!Number.isFinite(createdAt)) return false;
+
+    return Date.now() - createdAt <= 5 * 60 * 1000;
+  }
+
+  function findOpenSlotIndexByRoomId(roomId) {
+    roomId = String(roomId || '').trim();
+    for (var i = 0; i < (state.openSlots || []).length; i++) {
+      var slot = state.openSlots[i];
+      if (slot && String(slot.roomId || '').trim() === roomId) return i;
+    }
+    return -1;
+  }
+
+  function clearAicMessageEdit() {
+    state.editingMessage = null;
+  }
+
+  function startAicMessageEdit(room, message) {
+    if (!room || !message) return;
+
+    if (!canEditAicMessage(message)) {
+      alert('메시지 수정은 본인이 보낸 일반 메시지만 작성 후 5분 이내에 가능합니다.');
+      return;
+    }
+
+    var slotIndex = findOpenSlotIndexByRoomId(room.id);
+    if (slotIndex < 0) {
+      alert('열려 있는 채팅창을 찾을 수 없습니다.');
+      return;
+    }
+
+    state.activeSlotIndex = slotIndex;
+    state.editingMessage = {
+      roomId: room.id,
+      messageId: message.id,
+      slotIndex: slotIndex,
+      original: String(message.original || '')
+    };
+
+    render(false);
+
+    setTimeout(function () {
+      var input = els.slots ? els.slots.querySelector('[data-input-slot="' + slotIndex + '"]') : null;
+      if (input) {
+        input.focus();
+        try {
+          input.setSelectionRange(input.value.length, input.value.length);
+        } catch (_) {}
+      }
+    }, 0);
+  }
+
+  function updateAicMessageLocal(roomId, messageId, patch) {
+    var found = findContextMessage(roomId, messageId);
+    var message = found.message;
+    if (!message) return;
+
+    Object.assign(message, patch || {});
+  }
+
+  async function updateAicMessageOnServer(room, message, nextText) {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+    var messageId = String(message?.id || '').trim();
+    var text = String(nextText || '').trim();
+
+    if (!room || !message || !messageId) throw new Error('수정할 메시지 정보가 없습니다.');
+    if (!text) throw new Error('수정할 내용을 입력해 주세요.');
+    if (!canEditAicMessage(message)) throw new Error('메시지 수정은 작성 후 5분 이내에만 가능합니다.');
+    if (!sb || !companyId) throw new Error('Supabase 연결 정보를 확인해 주세요.');
+
+    var translationResult = await translateWithAi(text, detectTextLanguage(text), room);
+    var translations = normalizeTranslations(translationResult.translations);
+    var sourceLang = translationResult.source_lang || detectTextLanguage(text);
+    var translated = translationResult.translated || '';
+
+    var updatePayload = {
+      original: text,
+      translated: translated,
+      source_lang: sourceLang,
+      translations: translations
+    };
+
+    var messageResult = await sb
+      .from('aic_messages')
+      .update(updatePayload)
+      .eq('company_id', companyId)
+      .eq('room_id', room.id)
+      .eq('id', messageId);
+
+    if (messageResult.error) throw messageResult.error;
+
+    updateAicMessageLocal(room.id, messageId, updatePayload);
+
+    try {
+      await sb
+        .from('aic_rooms')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('company_id', companyId)
+        .eq('id', room.id);
+    } catch (_) {}
+  }
+
+  async function saveAicMessageEdit(slotIndex) {
+    var editing = state.editingMessage;
+    if (!editing) return false;
+    if (Number(editing.slotIndex) !== Number(slotIndex)) return false;
+
+    var found = findContextMessage(editing.roomId, editing.messageId);
+    var room = found.room;
+    var message = found.message;
+
+    if (!room || !message) {
+      clearAicMessageEdit();
+      render(false);
+      alert('수정할 메시지를 찾을 수 없습니다.');
+      return true;
+    }
+
+    var input = els.slots ? els.slots.querySelector('[data-input-slot="' + slotIndex + '"]') : null;
+    var text = input ? input.value.trim() : '';
+
+    if (!text) {
+      alert('수정할 내용을 입력해 주세요.');
+      return true;
+    }
+
+    if (text === String(message.original || '').trim()) {
+      clearAicMessageEdit();
+      render(false);
+      return true;
+    }
+
+    if (input) input.disabled = true;
+
+    try {
+      await updateAicMessageOnServer(room, message, text);
+      clearAicMessageEdit();
+      render(false);
+    } catch (error) {
+      if (input) input.disabled = false;
+      alert('메시지 수정 실패: ' + (error?.message || 'Supabase 권한/RLS 정책을 확인해 주세요.'));
+    }
+
+    return true;
+  }
+
   async function handleAicContextAction(action, roomId, messageId) {
     closeAicContextMenu();
 
@@ -441,7 +604,7 @@
     }
 
     if (action === 'edit') {
-      alert('수정 기능은 다음 단계에서 서버 저장과 함께 연결합니다.');
+      startAicMessageEdit(room, message);
       return;
     }
 
@@ -468,6 +631,8 @@
     var messageId = messageEl.getAttribute('data-aic-message-id') || '';
     var kind = messageEl.getAttribute('data-aic-message-kind') || 'text';
     var isAttachment = kind === 'attachment';
+    var foundMessage = findContextMessage(roomId, messageId).message;
+    var canEdit = !isAttachment && canEditAicMessage(foundMessage);
 
     var menu = document.createElement('div');
     menu.setAttribute('data-aic-message-context-menu', '1');
@@ -487,7 +652,7 @@
 
     menu.innerHTML = [
       '<button type="button" data-aic-context-action="copy" style="display:block;width:100%;height:32px;padding:0 10px;border:0;border-radius:9px;background:#fff;text-align:left;font:inherit;cursor:pointer;">복사</button>',
-      '<button type="button" data-aic-context-action="edit"', isAttachment ? ' disabled' : '', ' style="display:block;width:100%;height:32px;padding:0 10px;border:0;border-radius:9px;background:#fff;text-align:left;font:inherit;cursor:', isAttachment ? 'not-allowed' : 'pointer', ';opacity:', isAttachment ? '.45' : '1', ';">수정</button>',
+      '<button type="button" data-aic-context-action="edit"', canEdit ? '' : ' disabled', ' style="display:block;width:100%;height:32px;padding:0 10px;border:0;border-radius:9px;background:#fff;text-align:left;font:inherit;cursor:', canEdit ? 'pointer' : 'not-allowed', ';opacity:', canEdit ? '1' : '.45', ';">수정</button>',
       '<button type="button" data-aic-context-action="delete" style="display:block;width:100%;height:32px;padding:0 10px;border:0;border-radius:9px;background:#fff;text-align:left;font:inherit;cursor:pointer;color:#dc2626;">삭제</button>'
     ].join('');
 
@@ -3074,6 +3239,10 @@
         continue;
       }
 
+      var editing = state.editingMessage && state.editingMessage.roomId === room.id && Number(state.editingMessage.slotIndex) === i ? state.editingMessage : null;
+      var editingValue = editing ? String(editing.original || '') : '';
+      var sendLabel = editing ? '저장' : tr('aic.send', '전송');
+
       var messages = room.messages.map(function (message) {
         return buildMessage(room, message);
       }).join('');
@@ -3102,8 +3271,9 @@
         '      <button class="module-btn aic-attach-file-btn" data-attach-file-slot="', i, '" type="button" style="width:100%; justify-content:flex-start; white-space:nowrap;">첨부파일</button>',
         '    </div>',
         '    <input type="file" data-attach-input-slot="', i, '" hidden />',
-        '    <input class="module-input" data-input-slot="', i, '" placeholder="', tr('aic.inputPlaceholder', '메시지를 입력하세요'), '" style="flex:1 1 auto; min-width:0; width:auto;" />',
-        '    <button class="module-btn accent aic-send-btn" data-send-slot="', i, '" type="button" style="flex:0 0 72px; width:72px; min-width:72px; max-width:72px; white-space:nowrap;">', tr('aic.send', '전송'), '</button>',
+        '    <input class="module-input" data-input-slot="', i, '" placeholder="', editing ? '수정할 메시지를 입력하세요' : tr('aic.inputPlaceholder', '메시지를 입력하세요'), '" value="', esc(editingValue), '" style="flex:1 1 auto; min-width:0; width:auto;" />',
+        editing ? '    <button class="module-btn" data-edit-cancel-slot="' + i + '" type="button" style="flex:0 0 58px; width:58px; min-width:58px; max-width:58px; white-space:nowrap;">취소</button>' : '',
+        '    <button class="module-btn accent aic-send-btn" data-send-slot="', i, '" type="button" style="flex:0 0 72px; width:72px; min-width:72px; max-width:72px; white-space:nowrap;">', sendLabel, '</button>',
         '  </div>',
         '</section>'
       ].join('');
@@ -3221,9 +3391,17 @@
       });
     });
 
+    Array.from(els.slots.querySelectorAll('[data-edit-cancel-slot]')).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        clearAicMessageEdit();
+        render(false);
+      });
+    });
+
     Array.from(els.slots.querySelectorAll('[data-input-slot]')).forEach(function (input) {
       input.addEventListener('keydown', function (event) {
         if (event.key === 'Enter') {
+          event.preventDefault();
           sendMessage(Number(input.getAttribute('data-input-slot')) || 0);
         }
       });
@@ -3309,6 +3487,11 @@
   }
 
   async function sendMessage(slotIndex) {
+    if (state.editingMessage && Number(state.editingMessage.slotIndex) === Number(slotIndex)) {
+      var handledEdit = await saveAicMessageEdit(slotIndex);
+      if (handledEdit) return;
+    }
+
     var slot = state.openSlots[slotIndex];
     if (!slot) return;
 
