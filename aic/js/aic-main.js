@@ -732,8 +732,8 @@
       messageEl.addEventListener('touchstart', function (event) {
         if (!event.touches || event.touches.length !== 1) return;
 
-        // iOS Safari 기본 텍스트 선택/복사 메뉴를 막고 AIC 롱프레스 메뉴만 표시합니다.
-        if (event.cancelable) event.preventDefault();
+        // 짧은 터치는 링크/첨부파일 클릭이 가능해야 하므로 preventDefault를 하지 않습니다.
+        // 실제 롱프레스가 성공한 경우에만 touchend에서 클릭을 차단합니다.
         event.stopPropagation();
 
         var touch = event.touches[0];
