@@ -3519,7 +3519,7 @@
       }
 
       var editing = state.editingMessage && state.editingMessage.roomId === room.id && Number(state.editingMessage.slotIndex) === i ? state.editingMessage : null;
-      var editingValue = editing ? String(editing.original || '') : '';
+      var editingValue = editing ? String(editing.original || '') : String((state.drafts || {})[String(room.id || '')] || '');
       var sendLabel = editing ? '✓' : '➤';
 
       var messages = room.messages.map(function (message) {
@@ -3681,7 +3681,19 @@
       input.addEventListener('input', function () {
         var slotIndex = Number(input.getAttribute('data-input-slot')) || 0;
         var slot = state.openSlots[slotIndex];
-        if (!slot) return;
+        if (!slot || !slot.roomId) return;
+
+        if (state.editingMessage && Number(state.editingMessage.slotIndex) === slotIndex) {
+          return;
+        }
+
+        state.drafts[String(slot.roomId || '')] = input.value || '';
+      });
+
+      input.addEventListener('change', function () {
+        var slotIndex = Number(input.getAttribute('data-input-slot')) || 0;
+        var slot = state.openSlots[slotIndex];
+        if (!slot || !slot.roomId) return;
 
         if (state.editingMessage && Number(state.editingMessage.slotIndex) === slotIndex) {
           return;
@@ -3796,7 +3808,7 @@
     if (!text) return;
 
     if (input) input.value = '';
-    state.drafts[String(room.id||'')] = '';
+    if (state.drafts) delete state.drafts[String(room.id || '')];
 
     var tempId = 'temp_' + Date.now() + '_' + Math.random().toString(16).slice(2);
     var message = {
@@ -4405,7 +4417,25 @@
     els.participantsCloseBtn = $('aicParticipantsCloseBtn');
   }
 
+
+  function persistVisibleAicDrafts() {
+    if (!els.slots) return;
+
+    Array.from(els.slots.querySelectorAll('[data-input-slot]')).forEach(function (input) {
+      var slotIndex = Number(input.getAttribute('data-input-slot')) || 0;
+      var slot = state.openSlots[slotIndex];
+      if (!slot || !slot.roomId) return;
+
+      if (state.editingMessage && Number(state.editingMessage.slotIndex) === slotIndex) {
+        return;
+      }
+
+      state.drafts[String(slot.roomId || '')] = input.value || '';
+    });
+  }
+
   function render(fill) {
+    persistVisibleAicDrafts();
     ensureSlots(fill !== false);
     renderSlotButtons();
     renderRoomList();
@@ -4474,4 +4504,3 @@
     bootstrap();
   }
 })();
-
