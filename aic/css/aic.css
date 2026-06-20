@@ -1371,3 +1371,89 @@ input[type="radio"],
     touch-action: manipulation;
   }
 }
+
+
+/* =========================================================
+   AIC 6-5 Mobile edit input action buttons
+   - 수정모드에서 [취소][저장] 버튼을 아이콘 크기로 고정
+   - 모바일 iOS 입력 줌 및 전송버튼 밀림 방지
+========================================================= */
+.aic-chat-input {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.aic-message-input {
+  flex: 1 1 auto;
+  min-width: 0 !important;
+  width: auto !important;
+}
+
+.aic-attach-toggle,
+.aic-edit-cancel-btn,
+.aic-send-btn {
+  flex: 0 0 42px !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  max-width: 42px !important;
+  height: 38px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  line-height: 1 !important;
+}
+
+.aic-edit-cancel-btn,
+.aic-send-btn {
+  font-size: 18px !important;
+}
+
+@media (max-width: 760px) {
+  .aic-chat-input {
+    grid-template-columns: none !important;
+    display: flex !important;
+    gap: 6px !important;
+    align-items: center !important;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .aic-chat-input .module-input,
+  .aic-message-input {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    width: auto !important;
+    font-size: 16px !important;
+  }
+
+  .aic-attach-toggle,
+  .aic-edit-cancel-btn,
+  .aic-send-btn {
+    flex-basis: 42px !important;
+    width: 42px !important;
+    min-width: 42px !important;
+    max-width: 42px !important;
+    height: 42px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .aic-chat-input {
+    gap: 5px !important;
+  }
+
+  .aic-attach-toggle,
+  .aic-edit-cancel-btn,
+  .aic-send-btn {
+    flex-basis: 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+  }
+}
