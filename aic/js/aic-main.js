@@ -315,10 +315,119 @@
     }
   }
 
-  function handleAicContextAction(action, roomId, messageId) {
+  function canDeleteAicMessage(message) {
+    if (!message) return false;
+    if (isAicSystemAdmin()) return true;
+
+    var currentEmail = String(getCurrentUserEmail() || '').trim().toLowerCase();
+    var senderEmail = String(message.sender_email || '').trim().toLowerCase();
+
+    return !!currentEmail && !!senderEmail && currentEmail === senderEmail;
+  }
+
+  function removeAicMessageFromLocal(roomId, messageId) {
+    var room = getRoom(roomId);
+    if (!room) return;
+
+    room.messages = (room.messages || []).filter(function (item) {
+      return String(item.id || '').trim() !== String(messageId || '').trim();
+    });
+  }
+
+  async function deleteAicMessageFromServer(room, message) {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+    var messageId = String(message?.id || '').trim();
+
+    if (!room || !messageId) throw new Error('삭제할 메시지 정보가 없습니다.');
+
+    // 아직 서버에 저장되기 전의 임시 메시지는 화면에서만 제거합니다.
+    if (messageId.indexOf('temp_') === 0) {
+      removeAicMessageFromLocal(room.id, messageId);
+      render(false);
+      return;
+    }
+
+    if (!sb || !companyId) {
+      throw new Error('Supabase 연결 정보를 확인해 주세요.');
+    }
+
+    var attachment = getAttachmentFromMessage(message);
+    var filePath = String(attachment?.file_path || attachment?.path || '').trim();
+
+    // 첨부파일 메시지는 Storage 파일을 먼저 삭제합니다.
+    // Storage 삭제가 실패해도 DB 메시지 삭제는 계속 진행해서 화면에 남지 않도록 합니다.
+    if (filePath) {
+      try {
+        var storageResult = await sb.storage
+          .from(getAicStorageBucket())
+          .remove([filePath]);
+
+        if (storageResult.error) {
+          console.warn('[AIC DELETE] storage cleanup skipped:', storageResult.error);
+        }
+      } catch (error) {
+        console.warn('[AIC DELETE] storage cleanup skipped:', error);
+      }
+
+      try {
+        var attachmentByPathResult = await sb
+          .from('aic_attachments')
+          .delete()
+          .eq('company_id', companyId)
+          .eq('room_id', room.id)
+          .eq('file_path', filePath);
+
+        if (attachmentByPathResult.error) {
+          console.warn('[AIC DELETE] attachment path cleanup skipped:', attachmentByPathResult.error);
+        }
+      } catch (error) {
+        console.warn('[AIC DELETE] attachment path cleanup skipped:', error);
+      }
+    }
+
+    try {
+      var attachmentByMessageResult = await sb
+        .from('aic_attachments')
+        .delete()
+        .eq('company_id', companyId)
+        .eq('room_id', room.id)
+        .eq('message_id', messageId);
+
+      if (attachmentByMessageResult.error) {
+        console.warn('[AIC DELETE] attachment message cleanup skipped:', attachmentByMessageResult.error);
+      }
+    } catch (error) {
+      console.warn('[AIC DELETE] attachment message cleanup skipped:', error);
+    }
+
+    var messageResult = await sb
+      .from('aic_messages')
+      .delete()
+      .eq('company_id', companyId)
+      .eq('room_id', room.id)
+      .eq('id', messageId);
+
+    if (messageResult.error) throw messageResult.error;
+
+    removeAicMessageFromLocal(room.id, messageId);
+
+    try {
+      await sb
+        .from('aic_rooms')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('company_id', companyId)
+        .eq('id', room.id);
+    } catch (_) {}
+
+    render(false);
+  }
+
+  async function handleAicContextAction(action, roomId, messageId) {
     closeAicContextMenu();
 
     var found = findContextMessage(roomId, messageId);
+    var room = found.room;
     var message = found.message;
 
     if (!message) {
@@ -337,8 +446,17 @@
     }
 
     if (action === 'delete') {
-      if (confirm('이 메시지를 삭제하시겠습니까?')) {
-        alert('삭제 기능은 다음 단계에서 서버 삭제와 함께 연결합니다.');
+      if (!canDeleteAicMessage(message)) {
+        alert('본인이 보낸 메시지만 삭제할 수 있습니다.');
+        return;
+      }
+
+      if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
+
+      try {
+        await deleteAicMessageFromServer(room, message);
+      } catch (error) {
+        alert('메시지 삭제 실패: ' + (error?.message || 'Supabase 권한/RLS 정책을 확인해 주세요.'));
       }
     }
   }
@@ -2489,6 +2607,18 @@
           },
           function (payload) {
             handleRealtimeMessage(payload.new || {});
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'aic_messages',
+            filter: 'company_id=eq.' + companyId
+          },
+          function () {
+            loadRoomsFromServer({ skipRealtime: true });
           }
         )
         .on(
