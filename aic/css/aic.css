@@ -456,8 +456,9 @@ body {
   margin-top: 7px;
   padding-top: 7px;
   border-top: 1px solid rgba(148, 163, 184, .36);
-  font-size: var(--aic-base-size);
-  opacity: .92;
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 1;
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
@@ -741,9 +742,13 @@ body {
     margin-bottom: 3px;
   }
 
-  .aic-message-original,
-  .aic-message-translated {
+  .aic-message-original {
     font-size: 11px;
+  }
+
+  .aic-message-translated {
+    font-size: 12px;
+    font-weight: 500;
   }
 
   .aic-message-time {
@@ -1972,4 +1977,3 @@ input[type="radio"],
   border-color: #94a3b8 !important;
   color: #020617 !important;
 }
-
