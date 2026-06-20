@@ -3725,6 +3725,7 @@
       render(false);
 
       await insertMessageToServer(room, message);
+      render(false);
     } catch (error) {
       alert('메시지 저장 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
     }
