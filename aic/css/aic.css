@@ -1550,3 +1550,310 @@ input[type="radio"],
     padding: 0 12px !important;
   }
 }
+
+
+/* =========================================================
+   AIC 7-1 Chat UI Theme Variables
+   - AIC 내부 채팅 UI 전용 테마 변수
+   - JS 없이도 기본 Blue 테마 적용
+   - 추후 html 또는 .aic-root에 data-aic-theme 값만 주면 테마 변경 가능
+   - 지원 테마: blue, mint, forest, lavender, sand, pink, dark
+========================================================= */
+:root,
+:root[data-aic-theme="blue"],
+.aic-root[data-aic-theme="blue"] {
+  --aic-chat-bg: linear-gradient(180deg, #f8fafc 0%, #eef6ff 100%);
+  --aic-chat-surface: #ffffff;
+  --aic-chat-head-bg: #ffffff;
+  --aic-room-list-bg: #f8fafc;
+  --aic-room-card-bg: #ffffff;
+  --aic-room-card-active-bg: #eff6ff;
+  --aic-input-bg: rgba(255, 255, 255, 0.98);
+
+  --aic-my-bubble: #dbeafe;
+  --aic-my-border: #60a5fa;
+  --aic-my-text: #1e3a8a;
+  --aic-my-time: #2563eb;
+
+  --aic-other-bubble: #f8fafc;
+  --aic-other-border: #cbd5e1;
+  --aic-other-text: #334155;
+  --aic-other-time: #64748b;
+
+  --aic-bubble-shadow: 0 1px 5px rgba(15, 23, 42, 0.045);
+}
+
+:root[data-aic-theme="mint"],
+.aic-root[data-aic-theme="mint"] {
+  --aic-chat-bg: linear-gradient(180deg, #f0fdfa 0%, #ecfeff 100%);
+  --aic-chat-surface: #ffffff;
+  --aic-chat-head-bg: #ffffff;
+  --aic-room-list-bg: #f0fdfa;
+  --aic-room-card-bg: #ecfeff;
+  --aic-room-card-active-bg: #ccfbf1;
+  --aic-input-bg: rgba(255, 255, 255, 0.98);
+
+  --aic-my-bubble: #ccfbf1;
+  --aic-my-border: #5eead4;
+  --aic-my-text: #115e59;
+  --aic-my-time: #0f766e;
+
+  --aic-other-bubble: #ffffff;
+  --aic-other-border: #ccfbf1;
+  --aic-other-text: #334155;
+  --aic-other-time: #64748b;
+
+  --aic-bubble-shadow: 0 1px 5px rgba(20, 184, 166, 0.08);
+}
+
+:root[data-aic-theme="forest"],
+.aic-root[data-aic-theme="forest"] {
+  --aic-chat-bg: linear-gradient(180deg, #f6fef9 0%, #ecfdf5 100%);
+  --aic-chat-surface: #ffffff;
+  --aic-chat-head-bg: #ffffff;
+  --aic-room-list-bg: #f6fef9;
+  --aic-room-card-bg: #ffffff;
+  --aic-room-card-active-bg: #dcfce7;
+  --aic-input-bg: rgba(255, 255, 255, 0.98);
+
+  --aic-my-bubble: #dcfce7;
+  --aic-my-border: #86efac;
+  --aic-my-text: #166534;
+  --aic-my-time: #15803d;
+
+  --aic-other-bubble: #f8fafc;
+  --aic-other-border: #cbd5e1;
+  --aic-other-text: #334155;
+  --aic-other-time: #64748b;
+
+  --aic-bubble-shadow: 0 1px 5px rgba(34, 197, 94, 0.08);
+}
+
+:root[data-aic-theme="lavender"],
+.aic-root[data-aic-theme="lavender"] {
+  --aic-chat-bg: linear-gradient(180deg, #faf5ff 0%, #f5f3ff 100%);
+  --aic-chat-surface: #ffffff;
+  --aic-chat-head-bg: #ffffff;
+  --aic-room-list-bg: #faf5ff;
+  --aic-room-card-bg: #ffffff;
+  --aic-room-card-active-bg: #f3e8ff;
+  --aic-input-bg: rgba(255, 255, 255, 0.98);
+
+  --aic-my-bubble: #e9d5ff;
+  --aic-my-border: #c084fc;
+  --aic-my-text: #5b21b6;
+  --aic-my-time: #7e22ce;
+
+  --aic-other-bubble: #ffffff;
+  --aic-other-border: #e9d5ff;
+  --aic-other-text: #334155;
+  --aic-other-time: #64748b;
+
+  --aic-bubble-shadow: 0 1px 5px rgba(168, 85, 247, 0.08);
+}
+
+:root[data-aic-theme="sand"],
+.aic-root[data-aic-theme="sand"] {
+  --aic-chat-bg: linear-gradient(180deg, #fafaf9 0%, #fefce8 100%);
+  --aic-chat-surface: #ffffff;
+  --aic-chat-head-bg: #ffffff;
+  --aic-room-list-bg: #fafaf9;
+  --aic-room-card-bg: #ffffff;
+  --aic-room-card-active-bg: #fef3c7;
+  --aic-input-bg: rgba(255, 255, 255, 0.98);
+
+  --aic-my-bubble: #fef3c7;
+  --aic-my-border: #facc15;
+  --aic-my-text: #854d0e;
+  --aic-my-time: #a16207;
+
+  --aic-other-bubble: #f8fafc;
+  --aic-other-border: #e5e7eb;
+  --aic-other-text: #334155;
+  --aic-other-time: #64748b;
+
+  --aic-bubble-shadow: 0 1px 5px rgba(234, 179, 8, 0.08);
+}
+
+:root[data-aic-theme="pink"],
+.aic-root[data-aic-theme="pink"] {
+  --aic-chat-bg: linear-gradient(180deg, #fffafb 0%, #fff1f5 100%);
+  --aic-chat-surface: #ffffff;
+  --aic-chat-head-bg: #ffffff;
+  --aic-room-list-bg: #fffafb;
+  --aic-room-card-bg: #ffffff;
+  --aic-room-card-active-bg: #fdebf3;
+  --aic-input-bg: rgba(255, 255, 255, 0.98);
+
+  --aic-my-bubble: #fdebf3;
+  --aic-my-border: #f8c8dc;
+  --aic-my-text: #8b4b6b;
+  --aic-my-time: #9d5275;
+
+  --aic-other-bubble: #f8fafc;
+  --aic-other-border: #e2e8f0;
+  --aic-other-text: #334155;
+  --aic-other-time: #64748b;
+
+  --aic-bubble-shadow: 0 1px 5px rgba(244, 114, 182, 0.08);
+}
+
+:root[data-aic-theme="dark"],
+.aic-root[data-aic-theme="dark"] {
+  --aic-bg: #0f172a;
+  --aic-card: #1e293b;
+  --aic-line: #334155;
+  --aic-text: #e5e7eb;
+  --aic-muted: #94a3b8;
+  --aic-dark: #020617;
+  --aic-accent: #60a5fa;
+
+  --aic-chat-bg: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+  --aic-chat-surface: #1e293b;
+  --aic-chat-head-bg: #1e293b;
+  --aic-room-list-bg: #0f172a;
+  --aic-room-card-bg: #1e293b;
+  --aic-room-card-active-bg: #263449;
+  --aic-input-bg: rgba(15, 23, 42, 0.98);
+
+  --aic-my-bubble: #2563eb;
+  --aic-my-border: #3b82f6;
+  --aic-my-text: #ffffff;
+  --aic-my-time: rgba(255, 255, 255, 0.78);
+
+  --aic-other-bubble: #334155;
+  --aic-other-border: #475569;
+  --aic-other-text: #e5e7eb;
+  --aic-other-time: #cbd5e1;
+
+  --aic-bubble-shadow: 0 1px 6px rgba(0, 0, 0, 0.22);
+}
+
+/* =========================================================
+   AIC 7-1 Theme Apply Overrides
+   - 기존 CSS 하단에서 최종 오버라이드
+   - JS 설정 기능 추가 전에도 기본 Blue 테마가 적용됨
+========================================================= */
+.aic-sidebar {
+  background: var(--aic-room-list-bg) !important;
+}
+
+.aic-sidebar-head,
+.aic-toolbar,
+.aic-chat-head {
+  background: var(--aic-chat-head-bg) !important;
+  border-color: var(--aic-line) !important;
+}
+
+.aic-main,
+.aic-chat-window {
+  background: var(--aic-chat-surface) !important;
+  border-color: var(--aic-line) !important;
+}
+
+.aic-room-list {
+  background: var(--aic-room-list-bg) !important;
+}
+
+.aic-room-item {
+  background: var(--aic-room-card-bg) !important;
+  border-color: var(--aic-line) !important;
+}
+
+.aic-room-item.active {
+  background: var(--aic-room-card-active-bg) !important;
+  border-color: var(--aic-accent) !important;
+}
+
+.aic-messages {
+  background: var(--aic-chat-bg) !important;
+}
+
+.aic-message {
+  box-shadow: var(--aic-bubble-shadow) !important;
+}
+
+.aic-message.me {
+  background: var(--aic-my-bubble) !important;
+  color: var(--aic-my-text) !important;
+  border: 1px solid var(--aic-my-border) !important;
+}
+
+.aic-message.other {
+  background: var(--aic-other-bubble) !important;
+  color: var(--aic-other-text) !important;
+  border: 1px solid var(--aic-other-border) !important;
+}
+
+.aic-message.me .aic-message-time {
+  color: var(--aic-my-time) !important;
+}
+
+.aic-message.other .aic-message-time {
+  color: var(--aic-other-time) !important;
+}
+
+.aic-message.me .aic-message-translated {
+  border-top-color: color-mix(in srgb, var(--aic-my-border) 60%, transparent) !important;
+}
+
+.aic-message.other .aic-message-translated {
+  border-top-color: color-mix(in srgb, var(--aic-other-border) 60%, transparent) !important;
+}
+
+.aic-chat-input,
+.aic-root.aic-mobile-chat-view .aic-chat-input {
+  background: var(--aic-input-bg) !important;
+  border-color: var(--aic-line) !important;
+}
+
+.aic-chat-input .module-input,
+.aic-chat-input .module-select {
+  background: var(--aic-chat-surface) !important;
+  color: var(--aic-text) !important;
+  border-color: var(--aic-line) !important;
+}
+
+/* 다크 테마일 때 카드/버튼/입력 보정 */
+:root[data-aic-theme="dark"] .aic-icon-btn,
+:root[data-aic-theme="dark"] .aic-slot-btn,
+:root[data-aic-theme="dark"] .aic-chat-action,
+:root[data-aic-theme="dark"] .module-btn,
+:root[data-aic-theme="dark"] .aic-mobile-back-btn,
+.aic-root[data-aic-theme="dark"] .aic-icon-btn,
+.aic-root[data-aic-theme="dark"] .aic-slot-btn,
+.aic-root[data-aic-theme="dark"] .aic-chat-action,
+.aic-root[data-aic-theme="dark"] .module-btn,
+.aic-root[data-aic-theme="dark"] .aic-mobile-back-btn {
+  background: #1e293b !important;
+  border-color: #475569 !important;
+  color: #e5e7eb !important;
+}
+
+:root[data-aic-theme="dark"] .aic-slot-btn.active,
+:root[data-aic-theme="dark"] .aic-icon-btn.primary,
+:root[data-aic-theme="dark"] .aic-send-btn,
+.aic-root[data-aic-theme="dark"] .aic-slot-btn.active,
+.aic-root[data-aic-theme="dark"] .aic-icon-btn.primary,
+.aic-root[data-aic-theme="dark"] .aic-send-btn {
+  background: #2563eb !important;
+  border-color: #3b82f6 !important;
+  color: #ffffff !important;
+}
+
+:root[data-aic-theme="dark"] .aic-link-card,
+:root[data-aic-theme="dark"] .aic-attachment-card,
+.aic-root[data-aic-theme="dark"] .aic-link-card,
+.aic-root[data-aic-theme="dark"] .aic-attachment-card {
+  background: #1e293b !important;
+  border-color: #475569 !important;
+  color: #e5e7eb !important;
+}
+
+:root[data-aic-theme="dark"] .aic-link-card span,
+:root[data-aic-theme="dark"] .aic-attachment-card span,
+.aic-root[data-aic-theme="dark"] .aic-link-card span,
+.aic-root[data-aic-theme="dark"] .aic-attachment-card span {
+  color: inherit !important;
+}
+
