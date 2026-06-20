@@ -70,7 +70,8 @@
     editingMessage: null,
     resumeRefreshTimer: null,
     dbReady: false,
-    dbLoading: false
+    dbLoading: false,
+    drafts: {}
   };
 
   function $(id) {
@@ -3677,6 +3678,18 @@
     });
 
     Array.from(els.slots.querySelectorAll('[data-input-slot]')).forEach(function (input) {
+      input.addEventListener('input', function () {
+        var slotIndex = Number(input.getAttribute('data-input-slot')) || 0;
+        var slot = state.openSlots[slotIndex];
+        if (!slot) return;
+
+        if (state.editingMessage && Number(state.editingMessage.slotIndex) === slotIndex) {
+          return;
+        }
+
+        state.drafts[String(slot.roomId || '')] = input.value || '';
+      });
+
       input.addEventListener('keydown', function (event) {
         if (event.key === 'Enter') {
           event.preventDefault();
@@ -3783,6 +3796,7 @@
     if (!text) return;
 
     if (input) input.value = '';
+    state.drafts[String(room.id||'')] = '';
 
     var tempId = 'temp_' + Date.now() + '_' + Math.random().toString(16).slice(2);
     var message = {
@@ -4460,3 +4474,4 @@
     bootstrap();
   }
 })();
+
