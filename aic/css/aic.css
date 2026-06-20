@@ -1570,6 +1570,13 @@ input[type="radio"],
   --aic-room-card-active-bg: #eff6ff;
   --aic-input-bg: rgba(255, 255, 255, 0.98);
 
+  --aic-sidebar-title: #0f172a;
+  --aic-sidebar-subtitle: #64748b;
+  --aic-room-title: #0f172a;
+  --aic-room-meta-text: #64748b;
+  --aic-room-preview-text: #334155;
+  --aic-room-preview-active-text: #1d4ed8;
+
   --aic-my-bubble: #dbeafe;
   --aic-my-border: #60a5fa;
   --aic-my-text: #1e3a8a;
@@ -1592,6 +1599,13 @@ input[type="radio"],
   --aic-room-card-bg: #ecfeff;
   --aic-room-card-active-bg: #ccfbf1;
   --aic-input-bg: rgba(255, 255, 255, 0.98);
+
+  --aic-sidebar-title: #134e4a;
+  --aic-sidebar-subtitle: #0f766e;
+  --aic-room-title: #134e4a;
+  --aic-room-meta-text: #0f766e;
+  --aic-room-preview-text: #115e59;
+  --aic-room-preview-active-text: #0f766e;
 
   --aic-my-bubble: #ccfbf1;
   --aic-my-border: #5eead4;
@@ -1616,6 +1630,13 @@ input[type="radio"],
   --aic-room-card-active-bg: #dcfce7;
   --aic-input-bg: rgba(255, 255, 255, 0.98);
 
+  --aic-sidebar-title: #14532d;
+  --aic-sidebar-subtitle: #15803d;
+  --aic-room-title: #14532d;
+  --aic-room-meta-text: #166534;
+  --aic-room-preview-text: #166534;
+  --aic-room-preview-active-text: #15803d;
+
   --aic-my-bubble: #dcfce7;
   --aic-my-border: #86efac;
   --aic-my-text: #166534;
@@ -1638,6 +1659,13 @@ input[type="radio"],
   --aic-room-card-bg: #ffffff;
   --aic-room-card-active-bg: #f3e8ff;
   --aic-input-bg: rgba(255, 255, 255, 0.98);
+
+  --aic-sidebar-title: #581c87;
+  --aic-sidebar-subtitle: #7e22ce;
+  --aic-room-title: #581c87;
+  --aic-room-meta-text: #6b21a8;
+  --aic-room-preview-text: #5b21b6;
+  --aic-room-preview-active-text: #7e22ce;
 
   --aic-my-bubble: #e9d5ff;
   --aic-my-border: #c084fc;
@@ -1662,6 +1690,13 @@ input[type="radio"],
   --aic-room-card-active-bg: #fef3c7;
   --aic-input-bg: rgba(255, 255, 255, 0.98);
 
+  --aic-sidebar-title: #713f12;
+  --aic-sidebar-subtitle: #a16207;
+  --aic-room-title: #713f12;
+  --aic-room-meta-text: #854d0e;
+  --aic-room-preview-text: #854d0e;
+  --aic-room-preview-active-text: #a16207;
+
   --aic-my-bubble: #fef3c7;
   --aic-my-border: #facc15;
   --aic-my-text: #854d0e;
@@ -1684,6 +1719,13 @@ input[type="radio"],
   --aic-room-card-bg: #ffffff;
   --aic-room-card-active-bg: #fdebf3;
   --aic-input-bg: rgba(255, 255, 255, 0.98);
+
+  --aic-sidebar-title: #7a3f5f;
+  --aic-sidebar-subtitle: #9d5275;
+  --aic-room-title: #7a3f5f;
+  --aic-room-meta-text: #8b4b6b;
+  --aic-room-preview-text: #8b4b6b;
+  --aic-room-preview-active-text: #9d5275;
 
   --aic-my-bubble: #fdebf3;
   --aic-my-border: #f8c8dc;
@@ -1715,6 +1757,13 @@ input[type="radio"],
   --aic-room-card-bg: #1e293b;
   --aic-room-card-active-bg: #263449;
   --aic-input-bg: rgba(15, 23, 42, 0.98);
+
+  --aic-sidebar-title: #f8fafc;
+  --aic-sidebar-subtitle: #cbd5e1;
+  --aic-room-title: #f8fafc;
+  --aic-room-meta-text: #cbd5e1;
+  --aic-room-preview-text: #93c5fd;
+  --aic-room-preview-active-text: #60a5fa;
 
   --aic-my-bubble: #2563eb;
   --aic-my-border: #3b82f6;
@@ -1855,5 +1904,72 @@ input[type="radio"],
 .aic-root[data-aic-theme="dark"] .aic-link-card span,
 .aic-root[data-aic-theme="dark"] .aic-attachment-card span {
   color: inherit !important;
+}
+
+
+/* =========================================================
+   AIC 7-3 Room List Text Theme Patch
+   - 채팅 테마 변경 시 회의방 목록 카드 내부 글자색도 함께 변경
+   - 특히 다크모드에서 방제목/참여자/미리보기/시간 가독성 보정
+   - JS 변경 없음
+========================================================= */
+.aic-title {
+  color: var(--aic-sidebar-title) !important;
+}
+
+.aic-subtitle {
+  color: var(--aic-sidebar-subtitle) !important;
+}
+
+.aic-room-name {
+  color: var(--aic-room-title) !important;
+}
+
+.aic-room-meta {
+  color: var(--aic-room-meta-text) !important;
+}
+
+.aic-room-preview {
+  color: var(--aic-room-preview-text) !important;
+}
+
+.aic-room-item.active .aic-room-preview {
+  color: var(--aic-room-preview-active-text) !important;
+}
+
+.aic-room-preview-row,
+.aic-room-preview-row *:not(.aic-unread-badge) {
+  color: inherit;
+}
+
+/* 다크 테마에서 회의방 목록 버튼/슬롯 가독성 보정 */
+:root[data-aic-theme="dark"] .aic-room-slot,
+.aic-root[data-aic-theme="dark"] .aic-room-slot {
+  background: #334155 !important;
+  color: #e5e7eb !important;
+}
+
+:root[data-aic-theme="dark"] .aic-room-slot.open,
+.aic-root[data-aic-theme="dark"] .aic-room-slot.open {
+  background: #020617 !important;
+  color: #ffffff !important;
+}
+
+:root[data-aic-theme="dark"] .aic-room-leave,
+:root[data-aic-theme="dark"] .aic-room-delete,
+.aic-root[data-aic-theme="dark"] .aic-room-leave,
+.aic-root[data-aic-theme="dark"] .aic-room-delete {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+:root[data-aic-theme="dark"] .aic-room-leave:hover,
+:root[data-aic-theme="dark"] .aic-room-delete:hover,
+.aic-root[data-aic-theme="dark"] .aic-room-leave:hover,
+.aic-root[data-aic-theme="dark"] .aic-room-delete:hover {
+  background: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
+  color: #020617 !important;
 }
 
