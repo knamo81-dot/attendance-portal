@@ -2474,6 +2474,68 @@
     return messageResult.data || null;
   }
 
+
+
+  function replaceTempMessageWithSavedMessage(room, tempId, savedRow, fallbackMessage) {
+    if (!room || !tempId) return fallbackMessage || null;
+
+    var savedMessage = fallbackMessage || {};
+    if (savedRow) {
+      var normalized = normalizeDbMessage(savedRow);
+      savedMessage = Object.assign({}, savedMessage, normalized, {
+        type: 'me',
+        sender: savedMessage.sender || normalized.sender || getCurrentUserName(),
+        sender_email: savedMessage.sender_email || normalized.sender_email || getCurrentUserEmail(),
+        original: savedMessage.original || normalized.original || '',
+        translated: savedMessage.translated || normalized.translated || '',
+        source_lang: savedMessage.source_lang || normalized.source_lang || detectTextLanguage(savedMessage.original || normalized.original || ''),
+        translations: normalizeTranslations(savedMessage.translations || normalized.translations),
+        attachment: getAttachmentFromMessage(savedMessage) || getAttachmentFromMessage(normalized)
+      });
+    }
+
+    if (savedRow && savedRow.id) savedMessage.id = savedRow.id;
+    if (savedRow && savedRow.created_at) savedMessage.created_at = savedRow.created_at;
+
+    var replaced = false;
+    room.messages = (room.messages || []).map(function (item) {
+      if (String(item.id || '').trim() === String(tempId || '').trim()) {
+        replaced = true;
+        return savedMessage;
+      }
+      return item;
+    });
+
+    if (!replaced && savedMessage && !hasMessage(room, savedMessage)) {
+      room.messages.push(savedMessage);
+    }
+
+    return savedMessage;
+  }
+
+  async function updateStoredMessageTranslation(room, message) {
+    var sb = getSupabaseClient();
+    var companyId = getCompanyId();
+    var messageId = String(message?.id || '').trim();
+
+    if (!sb || !companyId || !room || !messageId || messageId.indexOf('temp_') === 0) return;
+
+    var updatePayload = {
+      translated: message.translated || '',
+      source_lang: message.source_lang || detectTextLanguage(message.original || ''),
+      translations: normalizeTranslations(message.translations)
+    };
+
+    var result = await sb
+      .from('aic_messages')
+      .update(updatePayload)
+      .eq('company_id', companyId)
+      .eq('room_id', room.id)
+      .eq('id', messageId);
+
+    if (result.error) throw result.error;
+  }
+
   async function insertParticipantToServer(room, member) {
     var sb = getSupabaseClient();
     var companyId = getCompanyId();
@@ -3669,7 +3731,8 @@
       message.translations.__attachment = attachment;
       render(false);
 
-      await insertMessageToServer(room, message);
+      var savedAttachmentRow = await insertMessageToServer(room, message);
+      message = replaceTempMessageWithSavedMessage(room, tempId, savedAttachmentRow, message) || message;
       await insertAttachmentToServer(room, message, attachment);
       render(false);
     } catch (error) {
@@ -3718,13 +3781,26 @@
     render(false);
 
     try {
+      // 먼저 DB에 저장해서 실제 message id를 즉시 확보합니다.
+      // 이렇게 해야 PC/모바일 모두 Realtime이나 재조회 대기 없이 5분 이내 수정 메뉴가 바로 활성화됩니다.
+      var savedRow = await insertMessageToServer(room, message);
+      message = replaceTempMessageWithSavedMessage(room, tempId, savedRow, message) || message;
+      render(false);
+
+      var originalTextForTranslation = text;
       var translationResult = await translateWithAi(text, detectTextLanguage(text), room);
+
+      // 저장 직후 사용자가 이미 수정한 경우, 늦게 도착한 최초 번역 결과가 수정 내용을 덮어쓰지 않도록 막습니다.
+      if (String(message.original || '').trim() !== String(originalTextForTranslation || '').trim()) {
+        return;
+      }
+
       message.translated = translationResult.translated || '';
       message.source_lang = translationResult.source_lang || message.source_lang || detectTextLanguage(text);
       message.translations = normalizeTranslations(translationResult.translations);
       render(false);
 
-      await insertMessageToServer(room, message);
+      await updateStoredMessageTranslation(room, message);
       render(false);
     } catch (error) {
       alert('메시지 저장 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
