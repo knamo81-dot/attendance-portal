@@ -248,6 +248,175 @@
     return '<div class="aic-message-time">' + esc(timeText) + '</div>';
   }
 
+
+  function buildMessageDataAttrs(room, msg, kind) {
+    return [
+      ' data-aic-room-id="', esc(room?.id || ''), '"',
+      ' data-aic-message-id="', esc(msg?.id || ''), '"',
+      ' data-aic-message-kind="', esc(kind || 'text'), '"',
+      ' data-aic-message-owner="', msg && msg.type === 'me' ? 'me' : 'other', '"'
+    ].join('');
+  }
+
+  function closeAicContextMenu() {
+    var existing = document.querySelector('[data-aic-message-context-menu="1"]');
+    if (existing) existing.remove();
+  }
+
+  function findContextMessage(roomId, messageId) {
+    roomId = String(roomId || '').trim();
+    messageId = String(messageId || '').trim();
+    if (!roomId || !messageId) return { room: null, message: null };
+
+    var room = getRoom(roomId);
+    if (!room) return { room: null, message: null };
+
+    var message = (room.messages || []).find(function (item) {
+      return String(item.id || '').trim() === messageId;
+    }) || null;
+
+    return { room: room, message: message };
+  }
+
+  function getContextMessageCopyText(message) {
+    if (!message) return '';
+
+    var attachment = getAttachmentFromMessage(message);
+    if (attachment) {
+      return String(attachment.file_name || attachment.name || message.original || '첨부파일');
+    }
+
+    return String(getPreferredMessageText(message) || message.original || message.translated || '').trim();
+  }
+
+  async function copyTextToClipboard(text) {
+    var value = String(text || '').trim();
+    if (!value) {
+      alert('복사할 내용이 없습니다.');
+      return;
+    }
+
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        var textarea = document.createElement('textarea');
+        textarea.value = value;
+        textarea.setAttribute('readonly', 'readonly');
+        textarea.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        textarea.remove();
+      }
+      alert('복사되었습니다.');
+    } catch (error) {
+      alert('복사 실패: 브라우저 권한을 확인해 주세요.');
+    }
+  }
+
+  function handleAicContextAction(action, roomId, messageId) {
+    closeAicContextMenu();
+
+    var found = findContextMessage(roomId, messageId);
+    var message = found.message;
+
+    if (!message) {
+      alert('메시지 정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    if (action === 'copy') {
+      copyTextToClipboard(getContextMessageCopyText(message));
+      return;
+    }
+
+    if (action === 'edit') {
+      alert('수정 기능은 다음 단계에서 서버 저장과 함께 연결합니다.');
+      return;
+    }
+
+    if (action === 'delete') {
+      if (confirm('이 메시지를 삭제하시겠습니까?')) {
+        alert('삭제 기능은 다음 단계에서 서버 삭제와 함께 연결합니다.');
+      }
+    }
+  }
+
+  function showAicContextMenu(event, messageEl) {
+    closeAicContextMenu();
+
+    var roomId = messageEl.getAttribute('data-aic-room-id') || '';
+    var messageId = messageEl.getAttribute('data-aic-message-id') || '';
+    var kind = messageEl.getAttribute('data-aic-message-kind') || 'text';
+    var isAttachment = kind === 'attachment';
+
+    var menu = document.createElement('div');
+    menu.setAttribute('data-aic-message-context-menu', '1');
+    menu.style.cssText = [
+      'position:fixed',
+      'z-index:999999',
+      'min-width:128px',
+      'padding:6px',
+      'border:1px solid rgba(148,163,184,.55)',
+      'border-radius:12px',
+      'background:#fff',
+      'box-shadow:0 18px 42px rgba(15,23,42,.22)',
+      'font-size:13px',
+      'font-weight:800',
+      'color:#0f172a'
+    ].join(';') + ';';
+
+    menu.innerHTML = [
+      '<button type="button" data-aic-context-action="copy" style="display:block;width:100%;height:32px;padding:0 10px;border:0;border-radius:9px;background:#fff;text-align:left;font:inherit;cursor:pointer;">복사</button>',
+      '<button type="button" data-aic-context-action="edit"', isAttachment ? ' disabled' : '', ' style="display:block;width:100%;height:32px;padding:0 10px;border:0;border-radius:9px;background:#fff;text-align:left;font:inherit;cursor:', isAttachment ? 'not-allowed' : 'pointer', ';opacity:', isAttachment ? '.45' : '1', ';">수정</button>',
+      '<button type="button" data-aic-context-action="delete" style="display:block;width:100%;height:32px;padding:0 10px;border:0;border-radius:9px;background:#fff;text-align:left;font:inherit;cursor:pointer;color:#dc2626;">삭제</button>'
+    ].join('');
+
+    menu.addEventListener('mouseover', function (e) {
+      var btn = e.target.closest('button[data-aic-context-action]');
+      if (btn && !btn.disabled) btn.style.background = '#f1f5f9';
+    });
+
+    menu.addEventListener('mouseout', function (e) {
+      var btn = e.target.closest('button[data-aic-context-action]');
+      if (btn) btn.style.background = '#fff';
+    });
+
+    menu.addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-aic-context-action]');
+      if (!btn || btn.disabled) return;
+      e.preventDefault();
+      e.stopPropagation();
+      handleAicContextAction(btn.getAttribute('data-aic-context-action'), roomId, messageId);
+    });
+
+    document.body.appendChild(menu);
+
+    var width = menu.offsetWidth || 128;
+    var height = menu.offsetHeight || 104;
+    var left = Math.min(event.clientX, window.innerWidth - width - 8);
+    var top = Math.min(event.clientY, window.innerHeight - height - 8);
+
+    menu.style.left = Math.max(8, left) + 'px';
+    menu.style.top = Math.max(8, top) + 'px';
+  }
+
+  function bindAicMessageContextMenu() {
+    if (!els.slots) return;
+
+    Array.from(els.slots.querySelectorAll('.aic-message[data-aic-message-id]')).forEach(function (messageEl) {
+      if (messageEl.dataset.aicContextBound === '1') return;
+      messageEl.dataset.aicContextBound = '1';
+
+      messageEl.addEventListener('contextmenu', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        showAicContextMenu(event, messageEl);
+      });
+    });
+  }
+
   function extractUrlsFromText(text) {
     var value = String(text || '');
     if (!value) return [];
@@ -511,7 +680,7 @@
     var disabledAttr = filePath ? '' : ' disabled';
 
     return [
-      '<div class="aic-message ', isMine ? 'me' : 'other', '">',
+      '<div class="aic-message ', isMine ? 'me' : 'other', '"', buildMessageDataAttrs(room, msg, 'attachment'), '>',
       '  <div class="aic-message-name">', esc(sender), '</div>',
       '  <div class="aic-attachment-card" style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:300px;padding:10px 12px;border:1px solid rgba(148,163,184,.45);border-radius:14px;background:rgba(255,255,255,.94);color:#0f172a;text-align:left;">',
       '    <div style="display:flex;align-items:center;gap:10px;min-width:0;">',
@@ -2703,7 +2872,7 @@
 
     if (displayMode === 'original') {
       return [
-        '<div class="aic-message ', isMine ? 'me' : 'other', '">',
+        '<div class="aic-message ', isMine ? 'me' : 'other', '"', buildMessageDataAttrs(room, msg, 'text'), '>',
         '  <div class="aic-message-name">', esc(sender), '</div>',
         '  <div class="aic-message-original">', renderTextCardOnly(original), '</div>',
         linkCardHtml,
@@ -2715,7 +2884,7 @@
     if (displayMode === 'translated') {
       var displayText = isMine ? original : preferredText;
       return [
-        '<div class="aic-message ', isMine ? 'me' : 'other', '">',
+        '<div class="aic-message ', isMine ? 'me' : 'other', '"', buildMessageDataAttrs(room, msg, 'text'), '>',
         '  <div class="aic-message-name">', esc(sender), '</div>',
         '  <div class="aic-message-original">', renderTextCardOnly(displayText), '</div>',
         linkCardHtml,
@@ -2726,7 +2895,7 @@
 
     if (isMine) {
       return [
-        '<div class="aic-message me">',
+        '<div class="aic-message me"', buildMessageDataAttrs(room, msg, 'text'), '>',
         '  <div class="aic-message-name">', esc(sender), '</div>',
         '  <div class="aic-message-original">', renderTextCardOnly(original), '</div>',
         linkCardHtml,
@@ -2746,7 +2915,7 @@
     }
 
     return [
-      '<div class="aic-message other">',
+      '<div class="aic-message other"', buildMessageDataAttrs(room, msg, 'text'), '>',
       '  <div class="aic-message-name">', esc(sender), '</div>',
       '  <div class="aic-message-original">', renderTextCardOnly(original), '</div>',
       showTranslated ? '  <div class="aic-message-translated">' + renderTextCardOnly(translated) + '</div>' : '',
@@ -2811,6 +2980,7 @@
     }
 
     els.slots.innerHTML = html;
+    bindAicMessageContextMenu();
 
     // 채팅창 전체 mousedown 재렌더링 제거
     // 입력창/버튼/select 클릭 시 DOM이 다시 그려져 타이핑과 버튼 클릭이 끊기는 문제를 방지합니다.
@@ -3514,6 +3684,10 @@
         els.autoSwitch.classList.toggle('on');
       });
     }
+
+    document.addEventListener('click', closeAicContextMenu);
+    document.addEventListener('scroll', closeAicContextMenu, true);
+    window.addEventListener('blur', closeAicContextMenu);
 
     window.addEventListener('resize', function () {
       clearTimeout(resizeTimer);
