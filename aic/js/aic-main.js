@@ -68,6 +68,7 @@
     readSyncReady: false,
     readSavingRooms: {},
     editingMessage: null,
+    resumeRefreshTimer: null,
     dbReady: false,
     dbLoading: false
   };
@@ -2777,13 +2778,25 @@
         .on(
           'postgres_changes',
           {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'aic_messages',
+            filter: 'company_id=eq.' + companyId
+          },
+          function (payload) {
+            handleRealtimeMessageUpdate(payload.new || {});
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
             event: 'DELETE',
             schema: 'public',
             table: 'aic_messages',
             filter: 'company_id=eq.' + companyId
           },
-          function () {
-            loadRoomsFromServer({ skipRealtime: true });
+          function (payload) {
+            handleRealtimeMessageDelete(payload.old || {});
           }
         )
         .on(
@@ -2906,6 +2919,89 @@
     }
 
     render(false);
+  }
+
+  function handleRealtimeMessageUpdate(row) {
+    if (!row || !row.id) return;
+
+    var roomId = String(row.room_id || '').trim();
+    var messageId = String(row.id || '').trim();
+    var room = roomId ? getRoom(roomId) : null;
+
+    if (!room) {
+      loadRoomsFromServer({ skipRealtime: true });
+      return;
+    }
+
+    room.messages = Array.isArray(room.messages) ? room.messages : [];
+
+    var index = room.messages.findIndex(function (item) {
+      return String(item.id || '').trim() === messageId;
+    });
+
+    if (index < 0) {
+      handleRealtimeMessage(row);
+      return;
+    }
+
+    var nextMessage = normalizeDbMessage(row);
+    room.messages[index] = nextMessage;
+
+    if (state.editingMessage && String(state.editingMessage.messageId || '') === messageId) {
+      clearAicMessageEdit();
+    }
+
+    render(false);
+  }
+
+  function handleRealtimeMessageDelete(row) {
+    var messageId = String(row && row.id || '').trim();
+    var roomId = String(row && row.room_id || '').trim();
+
+    if (!messageId) {
+      loadRoomsFromServer({ skipRealtime: true });
+      return;
+    }
+
+    var changed = false;
+
+    (state.rooms || []).forEach(function (room) {
+      if (roomId && String(room.id || '').trim() !== roomId) return;
+
+      var before = Array.isArray(room.messages) ? room.messages.length : 0;
+      room.messages = (room.messages || []).filter(function (item) {
+        return String(item.id || '').trim() !== messageId;
+      });
+
+      if (before !== room.messages.length) changed = true;
+    });
+
+    if (state.editingMessage && String(state.editingMessage.messageId || '') === messageId) {
+      clearAicMessageEdit();
+    }
+
+    if (changed) {
+      render(false);
+    } else {
+      loadRoomsFromServer({ skipRealtime: true });
+    }
+  }
+
+  function refreshAicAfterResume(reason) {
+    clearTimeout(state.resumeRefreshTimer);
+    state.resumeRefreshTimer = setTimeout(function () {
+      var sb = getSupabaseClient();
+      var companyId = getCompanyId();
+
+      if (!sb || !companyId) {
+        scheduleRender();
+        return;
+      }
+
+      subscribeRealtime({ force: true });
+      subscribeReadRealtime({ force: true });
+      loadRoomsFromServer({ skipRealtime: false });
+    }, 250);
   }
 
   function getToneLabel(value) {
@@ -4023,24 +4119,36 @@
         data.type === 'portal-frame-active' ||
         data.type === 'portal-layout-refresh'
       ) {
-        scheduleRender();
+        refreshAicAfterResume('portal-message');
       }
     });
 
-    window.addEventListener('load', scheduleRender);
-    window.addEventListener('pageshow', scheduleRender);
+    window.addEventListener('load', function () {
+      scheduleRender();
+      refreshAicAfterResume('load');
+    });
+
+    window.addEventListener('pageshow', function () {
+      refreshAicAfterResume('pageshow');
+    });
+
+    window.addEventListener('focus', function () {
+      refreshAicAfterResume('focus');
+    });
+
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden) {
-        scheduleRender();
-        subscribeRealtime();
+        refreshAicAfterResume('visibilitychange');
       } else {
         // 모바일 브라우저에서 백그라운드 전환 시 채널이 애매하게 남는 경우가 있어 정리합니다.
         unsubscribeRealtime();
+        unsubscribeReadRealtime();
       }
     });
 
     window.addEventListener('beforeunload', function () {
       unsubscribeRealtime();
+      unsubscribeReadRealtime();
     });
   }
 
