@@ -3626,6 +3626,9 @@
       render(false);
 
       await insertMessageToServer(room, message);
+      // 서버 저장 후 temp_ 아이디가 실제 DB 아이디로 교체되므로,
+      // DOM의 data-aic-message-id도 즉시 갱신해 5분 이내 수정 메뉴가 바로 활성화되게 합니다.
+      render(false);
     } catch (error) {
       alert('메시지 저장 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
     }
