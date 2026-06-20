@@ -732,6 +732,10 @@
       messageEl.addEventListener('touchstart', function (event) {
         if (!event.touches || event.touches.length !== 1) return;
 
+        // iOS Safari 기본 텍스트 선택/복사 메뉴를 막고 AIC 롱프레스 메뉴만 표시합니다.
+        if (event.cancelable) event.preventDefault();
+        event.stopPropagation();
+
         var touch = event.touches[0];
         touchStartX = touch.clientX;
         touchStartY = touch.clientY;
@@ -746,13 +750,18 @@
             if (navigator.vibrate) navigator.vibrate(25);
           } catch (_) {}
 
+          try {
+            var selection = window.getSelection && window.getSelection();
+            if (selection && typeof selection.removeAllRanges === 'function') selection.removeAllRanges();
+          } catch (_) {}
+
           showAicContextMenu({
             clientX: touchStartX,
             clientY: touchStartY,
             aicTouch: true
           }, messageEl);
         }, 600);
-      }, { passive: true });
+      }, { passive: false });
 
       messageEl.addEventListener('touchmove', function (event) {
         if (!event.touches || event.touches.length !== 1) {
