@@ -15,6 +15,8 @@
     height: window.innerHeight || 0
   };
   var lastScheduleRenderAt = 0;
+  var mobileRenderQueued = false;
+  var mobileRenderFlushing = false;
 
   var CONFIG = {
     defaultSettings: {
@@ -80,6 +82,70 @@
     if (widthDelta < 2 && heightDelta > 0 && heightDelta <= 140) return true;
 
     return false;
+  }
+
+  function captureAicMobileInputFocus() {
+    if (!isAicMobileViewport()) return null;
+
+    var active = document.activeElement;
+    if (!active || !active.matches || !active.matches('[data-input-slot]')) return null;
+
+    var slotIndex = active.getAttribute('data-input-slot') || '';
+    var selectionStart = 0;
+    var selectionEnd = 0;
+
+    try {
+      selectionStart = active.selectionStart || 0;
+      selectionEnd = active.selectionEnd || selectionStart;
+    } catch (_) {}
+
+    return {
+      slotIndex: slotIndex,
+      selectionStart: selectionStart,
+      selectionEnd: selectionEnd
+    };
+  }
+
+  function restoreAicMobileInputFocus(snapshot) {
+    if (!snapshot || !isAicMobileViewport() || !els.slots) return;
+
+    requestAnimationFrame(function () {
+      var input = els.slots.querySelector('[data-input-slot="' + snapshot.slotIndex + '"]');
+      if (!input) return;
+
+      try {
+        input.focus({ preventScroll: true });
+      } catch (_) {
+        try { input.focus(); } catch (__) {}
+      }
+
+      try {
+        var length = String(input.value || '').length;
+        var start = Math.min(snapshot.selectionStart || length, length);
+        var end = Math.min(snapshot.selectionEnd || start, length);
+        input.setSelectionRange(start, end);
+      } catch (_) {}
+    });
+  }
+
+  function requestAicMobileRender(fill) {
+    if (!isAicMobileViewport() || fill !== false || mobileRenderFlushing) return false;
+
+    if (mobileRenderQueued) return true;
+    mobileRenderQueued = true;
+
+    requestAnimationFrame(function () {
+      mobileRenderQueued = false;
+      mobileRenderFlushing = true;
+
+      try {
+        render(false);
+      } finally {
+        mobileRenderFlushing = false;
+      }
+    });
+
+    return true;
   }
 
   var state = {
@@ -5654,6 +5720,12 @@
   }
 
   function render(fill) {
+    if (requestAicMobileRender(fill)) {
+      return;
+    }
+
+    var mobileInputFocus = captureAicMobileInputFocus();
+
     persistVisibleAicDrafts();
     applyAicTheme(state.settings?.theme || 'blue');
     ensureSlots(fill !== false);
@@ -5661,6 +5733,8 @@
     renderRoomList();
     renderChatSlots();
     syncMobileAicView();
+
+    restoreAicMobileInputFocus(mobileInputFocus);
   }
 
   function scheduleRender() {
