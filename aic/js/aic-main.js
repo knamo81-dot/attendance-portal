@@ -9,6 +9,7 @@
 
   var els = {};
   var resizeTimer = null;
+  var mobileKeyboardTimer = null;
   var mobileViewportStableAt = Date.now() + 1500;
   var lastViewportSize = {
     width: window.innerWidth || 0,
@@ -80,6 +81,89 @@
     if (widthDelta < 2 && heightDelta > 0 && heightDelta <= 140) return true;
 
     return false;
+  }
+
+  function getAicMobileKeyboardOffset() {
+    if (!isAicMobileViewport() || !window.visualViewport) return 0;
+
+    var viewport = window.visualViewport;
+    var innerHeight = window.innerHeight || 0;
+    var visualHeight = viewport.height || innerHeight;
+    var offsetTop = viewport.offsetTop || 0;
+    var keyboardOffset = Math.max(0, Math.round(innerHeight - visualHeight - offsetTop));
+
+    return keyboardOffset > 80 ? keyboardOffset : 0;
+  }
+
+  function applyAicMobileKeyboardLayout() {
+    if (!isAicMobileViewport()) {
+      try {
+        document.documentElement.style.removeProperty('--aic-keyboard-offset');
+        if (els.root) {
+          els.root.removeAttribute('data-aic-keyboard-open');
+          els.root.style.removeProperty('height');
+          els.root.style.removeProperty('min-height');
+          els.root.style.removeProperty('max-height');
+        }
+      } catch (_) {}
+      return;
+    }
+
+    updateAicViewportUnit();
+
+    var height = getAicViewportHeight();
+    var keyboardOffset = getAicMobileKeyboardOffset();
+
+    try {
+      document.documentElement.style.setProperty('--aic-keyboard-offset', keyboardOffset + 'px');
+
+      if (els.root && height) {
+        // 모바일 키보드가 올라오면 visualViewport 높이를 기준으로 루트 높이를 맞춥니다.
+        // 전체 render를 다시 돌리지 않고 높이만 보정해서 채팅창이 키보드 위에 자연스럽게 붙도록 합니다.
+        els.root.style.height = height + 'px';
+        els.root.style.minHeight = height + 'px';
+        els.root.style.maxHeight = height + 'px';
+
+        if (keyboardOffset > 0) els.root.setAttribute('data-aic-keyboard-open', '1');
+        else els.root.removeAttribute('data-aic-keyboard-open');
+      }
+    } catch (_) {}
+
+    scheduleVisibleAicMessageBoxesBottomScroll();
+  }
+
+  function scheduleAicMobileKeyboardLayout(delay) {
+    clearTimeout(mobileKeyboardTimer);
+    mobileKeyboardTimer = setTimeout(function () {
+      requestAnimationFrame(function () {
+        applyAicMobileKeyboardLayout();
+      });
+    }, Number(delay) || 0);
+  }
+
+  function refocusAicInputAfterMobileSend(slotIndex) {
+    if (!isAicMobileViewport() || !els.slots) return;
+
+    slotIndex = Number(slotIndex) || 0;
+
+    requestAnimationFrame(function () {
+      var input = els.slots ? els.slots.querySelector('[data-input-slot="' + slotIndex + '"]') : null;
+      if (!input) return;
+
+      try {
+        input.focus({ preventScroll: true });
+      } catch (_) {
+        try { input.focus(); } catch (__) {}
+      }
+
+      try {
+        var length = String(input.value || '').length;
+        input.setSelectionRange(length, length);
+      } catch (_) {}
+
+      scheduleAicMobileKeyboardLayout(40);
+      scheduleVisibleAicMessageBoxesBottomScroll();
+    });
   }
 
   var state = {
@@ -4840,6 +4924,15 @@
     });
 
     Array.from(els.slots.querySelectorAll('[data-input-slot]')).forEach(function (input) {
+      input.addEventListener('focus', function () {
+        scheduleAicMobileKeyboardLayout(40);
+        scheduleVisibleAicMessageBoxesBottomScroll();
+      });
+
+      input.addEventListener('blur', function () {
+        scheduleAicMobileKeyboardLayout(180);
+      });
+
       input.addEventListener('input', function () {
         var slotIndex = Number(input.getAttribute('data-input-slot')) || 0;
         var slot = state.openSlots[slotIndex];
@@ -4933,6 +5026,7 @@
     rememberPendingAttachmentMessage(room.id, tempId, message);
     markRoomRead(room.id);
     render(false);
+    refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
     try {
@@ -4942,6 +5036,7 @@
       message.translations = normalizeTranslations(message.translations);
       message.translations.__attachment = attachment;
       render(false);
+    refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
       var savedAttachmentRow = await insertMessageToServer(room, message);
@@ -4954,6 +5049,7 @@
       await insertAttachmentToServer(room, message, attachment);
       scheduleForgetPendingAttachmentMessage(room.id, tempId, 15000);
       render(false);
+    refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
     } catch (error) {
       forgetPendingAttachmentMessage(room.id, tempId);
@@ -4961,6 +5057,7 @@
         return item.id !== tempId;
       });
       render(false);
+    refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
       var uploadFailMessage = String(error?.message || '');
       if (uploadFailMessage.toLowerCase().indexOf('failed to fetch') >= 0) {
@@ -5014,12 +5111,14 @@
     room.messages.push(message);
     markRoomRead(room.id);
     render(false);
+    refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
     try {
       var savedRow = await insertMessageToServer(room, message);
       replaceTempMessageWithSavedMessage(room, tempId, savedRow, message);
       render(false);
+    refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
     } catch (error) {
       alert('이모티콘 전송 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
@@ -5062,6 +5161,7 @@
     room.messages.push(message);
     markRoomRead(room.id);
     render(false);
+    refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
     try {
@@ -5070,6 +5170,7 @@
       var savedRow = await insertMessageToServer(room, message);
       message = replaceTempMessageWithSavedMessage(room, tempId, savedRow, message) || message;
       render(false);
+    refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
       var originalTextForTranslation = text;
@@ -5084,10 +5185,12 @@
       message.source_lang = translationResult.source_lang || message.source_lang || detectTextLanguage(text);
       message.translations = normalizeTranslations(translationResult.translations);
       render(false);
+    refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
       await updateStoredMessageTranslation(room, message);
       render(false);
+    refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
     } catch (error) {
       alert('메시지 저장 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
@@ -5585,7 +5688,8 @@
     window.addEventListener('resize', function () {
       updateAicViewportUnit();
 
-      if (isAicSoftMobileViewportResize()) {
+      if (isAicMobileViewport()) {
+        scheduleAicMobileKeyboardLayout(60);
         return;
       }
 
@@ -5593,14 +5697,15 @@
       resizeTimer = setTimeout(function () {
         updateAicViewportUnit();
         render(true);
-      }, isAicMobileViewport() ? 260 : 120);
+      }, 120);
     });
 
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', function () {
         updateAicViewportUnit();
 
-        if (isAicSoftMobileViewportResize()) {
+        if (isAicMobileViewport()) {
+          scheduleAicMobileKeyboardLayout(40);
           return;
         }
 
@@ -5608,7 +5713,13 @@
         resizeTimer = setTimeout(function () {
           updateAicViewportUnit();
           render(true);
-        }, isAicMobileViewport() ? 260 : 120);
+        }, 120);
+      });
+
+      window.visualViewport.addEventListener('scroll', function () {
+        if (isAicMobileViewport()) {
+          scheduleAicMobileKeyboardLayout(40);
+        }
       });
     }
 
@@ -5632,12 +5743,14 @@
 
     window.addEventListener('load', function () {
       updateAicViewportUnit();
+      scheduleAicMobileKeyboardLayout(0);
       scheduleRender();
       refreshAicAfterResume('load');
     });
 
     window.addEventListener('pageshow', function () {
       updateAicViewportUnit();
+      scheduleAicMobileKeyboardLayout(60);
       refreshAicAfterResume('pageshow');
     });
 
@@ -5729,6 +5842,7 @@
     renderRoomList();
     renderChatSlots();
     syncMobileAicView();
+    scheduleAicMobileKeyboardLayout(0);
   }
 
   function scheduleRender() {
