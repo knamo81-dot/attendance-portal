@@ -791,7 +791,7 @@
         </div>
 
         <div class="notice el-notice">
-          이미지는 Supabase Storage <strong>aic-assets</strong> 버킷의 <strong>emojis/[팩코드]/</strong> 경로에 저장됩니다.
+          이미지는 Supabase Storage <strong>aic-assets</strong> 버킷에 자동 저장됩니다. 관리자는 팩명과 이미지 파일만 관리하면 됩니다.
         </div>
 
         <div class="emoji-admin-grid">
@@ -804,24 +804,17 @@
               <button id="refreshEmojiPacksBtn" class="btn el-btn" type="button">새로고침</button>
             </div>
 
-            <div class="emoji-pack-create compact">
-              <div class="field emoji-pack-name-field">
-                <label for="emojiPackNameInput">팩명</label>
-                <input id="emojiPackNameInput" class="input el-input" placeholder="예: 여자연구원" autocomplete="off">
-              </div>
-              <div class="field emoji-sort-field">
-                <label for="emojiPackSortInput">순서</label>
-                <input id="emojiPackSortInput" class="input el-input" type="number" value="1">
-              </div>
-              <button id="createEmojiPackBtn" class="btn el-btn-primary primary" type="button">팩 생성</button>
+            <div class="emoji-pack-create folder-mode">
+              <input id="emojiPackNameInput" class="input el-input" placeholder="새 팩명 입력" autocomplete="off">
+              <button id="createEmojiPackBtn" class="btn el-btn-primary primary" type="button">추가</button>
             </div>
 
-            <div class="toolbar emoji-toolbar">
-              <div class="badge el-badge" id="emojiPackCountBadge">팩 0개</div>
+            <div id="emojiPackList" class="emoji-pack-list folder-list">
+              <div class="empty emoji-empty-small">이모티콘 팩을 불러오는 중입니다.</div>
             </div>
 
-            <div id="emojiPackList" class="emoji-pack-list">
-              <div class="empty">이모티콘 팩을 불러오는 중입니다.</div>
+            <div class="emoji-pack-footer">
+              <span id="emojiPackCountBadge">총 0개 팩</span>
             </div>
           </section>
 
@@ -847,7 +840,7 @@
             </div>
 
             <div id="emojiGrid" class="emoji-grid">
-              <div class="empty">선택된 팩이 없습니다.</div>
+              <div class="empty emoji-empty-large">왼쪽에서 이모티콘 팩을 선택해 주세요.</div>
             </div>
           </section>
         </div>
@@ -946,7 +939,7 @@
     emojisView: document.getElementById('emojisView'),
     emojiPackCodeInput: null,
     emojiPackNameInput: document.getElementById('emojiPackNameInput'),
-    emojiPackSortInput: document.getElementById('emojiPackSortInput'),
+    emojiPackSortInput: null,
     createEmojiPackBtn: document.getElementById('createEmojiPackBtn'),
     refreshEmojiPacksBtn: document.getElementById('refreshEmojiPacksBtn'),
     emojiPackCountBadge: document.getElementById('emojiPackCountBadge'),
@@ -1712,26 +1705,27 @@
   }
 
   function renderEmojiPacks() {
-    if (els.emojiPackCountBadge) els.emojiPackCountBadge.textContent = '팩 ' + emojiPacks.length + '개';
+    if (els.emojiPackCountBadge) els.emojiPackCountBadge.textContent = '총 ' + emojiPacks.length + '개 팩';
     if (!els.emojiPackList) return;
 
     if (!emojiPacks.length) {
-      els.emojiPackList.innerHTML = '<div class="empty">등록된 이모티콘 팩이 없습니다.</div>';
+      els.emojiPackList.innerHTML = '<div class="empty emoji-empty-small"><strong>📁 등록된 팩 없음</strong><span>첫 번째 이모티콘 팩을 추가하세요.</span></div>';
       return;
     }
 
     els.emojiPackList.innerHTML = emojiPacks.map(pack => {
       const active = pack.is_active !== false;
       const selected = String(pack.code || '') === String(selectedEmojiPackCode || '');
+      const emojiCount = Array.isArray(pack.emojis) ? pack.emojis.length : null;
       return `
-        <div class="emoji-pack-item ${selected ? 'selected' : ''}" data-select-emoji-pack="${escapeHtml(pack.code || '')}">
+        <div class="emoji-pack-item folder-item ${selected ? 'selected' : ''}" data-select-emoji-pack="${escapeHtml(pack.code || '')}">
+          <div class="emoji-pack-icon">📁</div>
           <div class="emoji-pack-main">
-            <span class="badge el-badge ${active ? 'active' : 'inactive'}">${active ? '사용중' : '미사용'}</span>
             <strong>${escapeHtml(pack.name || '이모티콘 팩')}</strong>
-            <span>순서 ${escapeHtml(pack.sort_order ?? 0)}</span>
+            <span>${active ? '사용중' : '미사용'} · 순서 ${escapeHtml(pack.sort_order ?? 0)}</span>
           </div>
           <div class="emoji-pack-actions">
-            <button type="button" class="btn el-btn ${active ? 'el-btn-danger danger' : 'el-btn-primary primary'}" data-toggle-emoji-pack="${escapeHtml(pack.code || '')}" data-next-active="${active ? 'false' : 'true'}">${active ? '미사용' : '사용'}</button>
+            <button type="button" class="btn el-btn ${active ? 'el-btn-danger danger' : 'el-btn-primary primary'}" data-toggle-emoji-pack="${escapeHtml(pack.code || '')}" data-next-active="${active ? 'false' : 'true'}">${active ? '끄기' : '켜기'}</button>
             <button type="button" class="btn el-btn-danger danger" data-delete-emoji-pack="${escapeHtml(pack.code || '')}">삭제</button>
           </div>
         </div>
@@ -1739,13 +1733,15 @@
     }).join('');
   }
 
-
   async function createEmojiPack() {
     assertServiceAdmin();
     await ensureServiceAdminAuthSession();
 
     const name = String(els.emojiPackNameInput?.value || '').trim();
-    const sortOrder = Number(els.emojiPackSortInput?.value || 0) || ((emojiPacks || []).length + 1);
+    const sortOrder = (emojiPacks || []).reduce((max, pack) => {
+      const value = Number(pack.sort_order || 0);
+      return Number.isFinite(value) && value > max ? value : max;
+    }, 0) + 1;
 
     if (!name) {
       setFeedback('팩명을 입력해 주세요.', 'error');
@@ -1755,10 +1751,9 @@
     let code = createAutoPackCode(name);
 
     els.createEmojiPackBtn.disabled = true;
-    setFeedback('이모티콘 팩을 생성하는 중입니다.', '');
+    setFeedback('이모티콘 팩을 추가하는 중입니다.', '');
 
     try {
-      // 매우 짧은 시간에 같은 이름으로 연속 등록하는 경우를 대비해 충돌 시 한 번 더 보정합니다.
       if (emojiPacks.some(pack => String(pack.code || '') === code)) {
         code = code + '-' + Math.random().toString(36).slice(2, 6);
       }
@@ -1775,14 +1770,13 @@
       if (error) throw error;
 
       if (els.emojiPackNameInput) els.emojiPackNameInput.value = '';
-      if (els.emojiPackSortInput) els.emojiPackSortInput.value = String(sortOrder + 1 || 1);
 
       selectedEmojiPackCode = code;
       await loadEmojiPacks();
-      setFeedback('이모티콘 팩을 생성했습니다.', 'ok');
+      setFeedback('이모티콘 팩을 추가했습니다.', 'ok');
     } catch (error) {
       console.error(error);
-      setFeedback(error.message || '이모티콘 팩 생성 중 오류가 발생했습니다.', 'error');
+      setFeedback(error.message || '이모티콘 팩 추가 중 오류가 발생했습니다.', 'error');
     } finally {
       els.createEmojiPackBtn.disabled = false;
     }
@@ -1808,7 +1802,9 @@
     await ensureServiceAdminAuthSession();
 
     if (!packCode) return;
-    const ok = confirm(`${packCode} 이모티콘 팩을 삭제하시겠습니까?\n\n팩에 등록된 이모티콘 DB도 함께 삭제됩니다. Storage 파일은 필요 시 Supabase에서 직접 정리해 주세요.`);
+    const pack = emojiPacks.find(item => String(item.code || '') === String(packCode || ''));
+    const packName = pack?.name || packCode;
+    const ok = confirm(`${packName} 이모티콘 팩을 삭제하시겠습니까?\n\n팩에 등록된 이모티콘 DB도 함께 삭제됩니다. Storage 파일은 필요 시 Supabase에서 직접 정리해 주세요.`);
     if (!ok) return;
 
     const deleteEmojis = await sb().from('aic_emojis').delete().eq('pack_code', packCode);
@@ -1868,12 +1864,12 @@
     if (!els.emojiGrid) return;
 
     if (!pack) {
-      els.emojiGrid.innerHTML = '<div class="empty">선택된 팩이 없습니다.</div>';
+      els.emojiGrid.innerHTML = '<div class="empty emoji-empty-large">왼쪽에서 이모티콘 팩을 선택해 주세요.</div>';
       return;
     }
 
     if (!emojis.length) {
-      els.emojiGrid.innerHTML = '<div class="empty">등록된 이모티콘이 없습니다.</div>';
+      els.emojiGrid.innerHTML = '<div class="empty emoji-empty-large"><strong>아직 등록된 이미지가 없습니다.</strong><span>위에서 PNG, WEBP, GIF 파일을 선택해 업로드하세요.</span></div>';
       return;
     }
 
@@ -2478,6 +2474,12 @@ employees 사원정보는 삭제되지 않습니다.`);
 
 
     els.createEmojiPackBtn?.addEventListener('click', () => createEmojiPack());
+    els.emojiPackNameInput?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        createEmojiPack();
+      }
+    });
     els.refreshEmojiPacksBtn?.addEventListener('click', () => {
       loadEmojiPacks().catch(error => {
         console.error(error);
