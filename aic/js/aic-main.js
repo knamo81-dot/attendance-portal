@@ -15,8 +15,6 @@
     height: window.innerHeight || 0
   };
   var lastScheduleRenderAt = 0;
-  var mobileRenderQueued = false;
-  var mobileRenderFlushing = false;
 
   var CONFIG = {
     defaultSettings: {
@@ -82,70 +80,6 @@
     if (widthDelta < 2 && heightDelta > 0 && heightDelta <= 140) return true;
 
     return false;
-  }
-
-  function captureAicMobileInputFocus() {
-    if (!isAicMobileViewport()) return null;
-
-    var active = document.activeElement;
-    if (!active || !active.matches || !active.matches('[data-input-slot]')) return null;
-
-    var slotIndex = active.getAttribute('data-input-slot') || '';
-    var selectionStart = 0;
-    var selectionEnd = 0;
-
-    try {
-      selectionStart = active.selectionStart || 0;
-      selectionEnd = active.selectionEnd || selectionStart;
-    } catch (_) {}
-
-    return {
-      slotIndex: slotIndex,
-      selectionStart: selectionStart,
-      selectionEnd: selectionEnd
-    };
-  }
-
-  function restoreAicMobileInputFocus(snapshot) {
-    if (!snapshot || !isAicMobileViewport() || !els.slots) return;
-
-    requestAnimationFrame(function () {
-      var input = els.slots.querySelector('[data-input-slot="' + snapshot.slotIndex + '"]');
-      if (!input) return;
-
-      try {
-        input.focus({ preventScroll: true });
-      } catch (_) {
-        try { input.focus(); } catch (__) {}
-      }
-
-      try {
-        var length = String(input.value || '').length;
-        var start = Math.min(snapshot.selectionStart || length, length);
-        var end = Math.min(snapshot.selectionEnd || start, length);
-        input.setSelectionRange(start, end);
-      } catch (_) {}
-    });
-  }
-
-  function requestAicMobileRender(fill) {
-    if (!isAicMobileViewport() || fill !== false || mobileRenderFlushing) return false;
-
-    if (mobileRenderQueued) return true;
-    mobileRenderQueued = true;
-
-    requestAnimationFrame(function () {
-      mobileRenderQueued = false;
-      mobileRenderFlushing = true;
-
-      try {
-        render(false);
-      } finally {
-        mobileRenderFlushing = false;
-      }
-    });
-
-    return true;
   }
 
   var state = {
@@ -4663,6 +4597,100 @@
     menu.style.top = Math.max(8, top) + 'px';
   }
 
+  function buildAicMessagesHtml(room) {
+    if (!room) return '';
+
+    var messages = (room.messages || []).map(function (message) {
+      return wrapMessageWithUnread(room, message, buildMessage(room, message));
+    }).join('');
+
+    if (!messages) {
+      messages = '<div class="aic-empty-message">' + tr('aic.noMessages', '아직 메시지가 없습니다.') + '<br>' + tr('aic.writeMessageGuide', '아래 입력창으로 메시지를 작성하세요.') + '</div>';
+    }
+
+    return messages;
+  }
+
+  function bindAicMessageBoxActions(box) {
+    if (!box) return;
+
+    bindAicMessageContextMenu();
+
+    Array.from(box.querySelectorAll('[data-attachment-action]')).forEach(function (btn) {
+      if (btn.dataset.aicAttachmentActionBound === '1') return;
+      btn.dataset.aicAttachmentActionBound = '1';
+
+      btn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        var filePath = btn.getAttribute('data-attachment-path') || '';
+        var fileName = btn.getAttribute('data-attachment-name') || '첨부파일';
+        var action = btn.getAttribute('data-attachment-action') || 'preview';
+        var kind = btn.getAttribute('data-attachment-kind') || '';
+        openAicAttachment(filePath, fileName, action, kind);
+      });
+    });
+
+    Array.from(box.querySelectorAll('[data-aic-link-card-url]')).forEach(function (el) {
+      if (el.dataset.aicLinkCardBound === '1') return;
+      el.dataset.aicLinkCardBound = '1';
+
+      el.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        var url = el.getAttribute('data-aic-link-card-url') || '';
+        url = normalizeLinkUrl(url);
+        if (!url) return;
+
+        try {
+          window.open(url, '_blank', 'noopener,noreferrer');
+        } catch (_) {
+          var a = document.createElement('a');
+          a.href = url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }
+      });
+    });
+  }
+
+  function renderAicMessageBoxOnly(slotIndex, options) {
+    options = options || {};
+    if (!els.slots) return false;
+
+    slotIndex = Number(slotIndex) || 0;
+    var slot = state.openSlots[slotIndex];
+    if (!slot) return false;
+
+    var room = getRoom(slot.roomId);
+    if (!room) return false;
+
+    var box = els.slots.querySelector('[data-message-box="' + slotIndex + '"]');
+    if (!box) return false;
+
+    box.innerHTML = buildAicMessagesHtml(room);
+    bindAicMessageBoxActions(box);
+
+    if (options.scroll !== false) {
+      box.scrollTop = box.scrollHeight;
+    }
+
+    return true;
+  }
+
+  function renderAfterAicMessageChange(slotIndex) {
+    // 모바일 전송/업로드 중에는 입력창 DOM을 다시 만들지 않고 메시지 영역만 갱신합니다.
+    // 전체 render(false)가 입력창과 sticky 영역을 재생성하면서 하단 깜빡임이 발생하던 문제를 줄입니다.
+    if (isAicMobileViewport() && renderAicMessageBoxOnly(slotIndex, { scroll: true })) {
+      return;
+    }
+
+    render(false);
+  }
+
   function renderChatSlots() {
     closeAicAttachPortalMenu();
     closeAicEmojiPanel();
@@ -4688,12 +4716,7 @@
       var editingValue = editing ? String(editing.original || '') : String((state.drafts || {})[String(room.id || '')] || '');
       var sendLabel = editing ? '✓' : '➤';
 
-      var messages = room.messages.map(function (message) {
-        return wrapMessageWithUnread(room, message, buildMessage(room, message));
-      }).join('');
-      if (!messages) {
-        messages = '<div class="aic-empty-message">' + tr('aic.noMessages', '아직 메시지가 없습니다.') + '<br>' + tr('aic.writeMessageGuide', '아래 입력창으로 메시지를 작성하세요.') + '</div>';
-      }
+      var messages = buildAicMessagesHtml(room);
 
       html += [
         '<section class="aic-chat-window', i === state.activeSlotIndex ? ' active' : '', '" data-slot-index="', i, '">',
@@ -4940,7 +4963,7 @@
     room.messages.push(message);
     rememberPendingAttachmentMessage(room.id, tempId, message);
     markRoomRead(room.id);
-    render(false);
+    renderAfterAicMessageChange(slotIndex);
 
     try {
       var attachment = await uploadAicAttachmentFile(room, file);
@@ -4948,7 +4971,7 @@
       message.original = attachment.file_name || message.original;
       message.translations = normalizeTranslations(message.translations);
       message.translations.__attachment = attachment;
-      render(false);
+      renderAfterAicMessageChange(slotIndex);
 
       var savedAttachmentRow = await insertMessageToServer(room, message);
       message = replaceTempMessageWithSavedMessage(room, tempId, savedAttachmentRow, message) || message;
@@ -4959,13 +4982,13 @@
 
       await insertAttachmentToServer(room, message, attachment);
       scheduleForgetPendingAttachmentMessage(room.id, tempId, 15000);
-      render(false);
+      renderAfterAicMessageChange(slotIndex);
     } catch (error) {
       forgetPendingAttachmentMessage(room.id, tempId);
       room.messages = (room.messages || []).filter(function (item) {
         return item.id !== tempId;
       });
-      render(false);
+      renderAfterAicMessageChange(slotIndex);
       var uploadFailMessage = String(error?.message || '');
       if (uploadFailMessage.toLowerCase().indexOf('failed to fetch') >= 0) {
         uploadFailMessage = '브라우저/보안프로그램 또는 네트워크가 파일 업로드 요청을 차단했을 수 있습니다. 잠시 후 다시 시도해 주세요. (' + uploadFailMessage + ')';
@@ -5017,12 +5040,12 @@
 
     room.messages.push(message);
     markRoomRead(room.id);
-    render(false);
+    renderAfterAicMessageChange(slotIndex);
 
     try {
       var savedRow = await insertMessageToServer(room, message);
       replaceTempMessageWithSavedMessage(room, tempId, savedRow, message);
-      render(false);
+      renderAfterAicMessageChange(slotIndex);
     } catch (error) {
       alert('이모티콘 전송 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
     }
@@ -5063,14 +5086,14 @@
 
     room.messages.push(message);
     markRoomRead(room.id);
-    render(false);
+    renderAfterAicMessageChange(slotIndex);
 
     try {
       // 먼저 DB에 저장해서 실제 message id를 즉시 확보합니다.
       // 이렇게 해야 PC/모바일 모두 Realtime이나 재조회 대기 없이 5분 이내 수정 메뉴가 바로 활성화됩니다.
       var savedRow = await insertMessageToServer(room, message);
       message = replaceTempMessageWithSavedMessage(room, tempId, savedRow, message) || message;
-      render(false);
+      renderAfterAicMessageChange(slotIndex);
 
       var originalTextForTranslation = text;
       var translationResult = await translateWithAi(text, detectTextLanguage(text), room);
@@ -5083,10 +5106,10 @@
       message.translated = translationResult.translated || '';
       message.source_lang = translationResult.source_lang || message.source_lang || detectTextLanguage(text);
       message.translations = normalizeTranslations(translationResult.translations);
-      render(false);
+      renderAfterAicMessageChange(slotIndex);
 
       await updateStoredMessageTranslation(room, message);
-      render(false);
+      renderAfterAicMessageChange(slotIndex);
     } catch (error) {
       alert('메시지 저장 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
     }
@@ -5720,12 +5743,6 @@
   }
 
   function render(fill) {
-    if (requestAicMobileRender(fill)) {
-      return;
-    }
-
-    var mobileInputFocus = captureAicMobileInputFocus();
-
     persistVisibleAicDrafts();
     applyAicTheme(state.settings?.theme || 'blue');
     ensureSlots(fill !== false);
@@ -5733,8 +5750,6 @@
     renderRoomList();
     renderChatSlots();
     syncMobileAicView();
-
-    restoreAicMobileInputFocus(mobileInputFocus);
   }
 
   function scheduleRender() {
