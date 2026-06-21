@@ -73,6 +73,10 @@
     messageUnreadReloadTimer: null,
     messageReadTargetBackfillRooms: {},
     pendingAttachmentMessages: {},
+    emojiPacks: [],
+    emojiMap: {},
+    activeEmojiPackCode: '',
+    emojiLoading: false,
     editingMessage: null,
     resumeRefreshTimer: null,
     dbReady: false,
@@ -169,6 +173,7 @@
       source_lang: message.source_lang || detectTextLanguage(original),
       translations: normalizeTranslations(message.translations),
       attachment: getAttachmentFromMessage({ translations: message.translations }),
+      emoji: getEmojiFromMessage({ translations: message.translations }),
       created_at: message.created_at || ''
     };
   }
@@ -289,6 +294,11 @@
 
   function getContextMessageCopyText(message) {
     if (!message) return '';
+
+    var emoji = getEmojiFromMessage(message);
+    if (emoji) {
+      return getAicEmojiName(emoji);
+    }
 
     var attachment = getAttachmentFromMessage(message);
     if (attachment) {
@@ -437,6 +447,9 @@
 
     var attachment = getAttachmentFromMessage(message);
     if (attachment) return false;
+
+    var emoji = getEmojiFromMessage(message);
+    if (emoji) return false;
 
     var messageId = String(message.id || '').trim();
     if (!messageId || messageId.indexOf('temp_') === 0) return false;
@@ -1002,6 +1015,35 @@
     }
 
     return null;
+  }
+
+
+  function getEmojiFromMessage(msg) {
+    if (!msg) return null;
+    if (msg.emoji && typeof msg.emoji === 'object') return msg.emoji;
+
+    var translations = normalizeTranslations(msg.translations);
+    if (translations.__emoji && typeof translations.__emoji === 'object') {
+      return translations.__emoji;
+    }
+
+    return null;
+  }
+
+  function getAicEmojiStorageBucket() {
+    return String(window.AIC_API?.emojiStorageBucket || 'aic-assets').trim() || 'aic-assets';
+  }
+
+  function getAicEmojiName(emoji) {
+    return String(emoji?.emoji_name || emoji?.name || emoji?.emoji_code || emoji?.code || '이모티콘').trim() || '이모티콘';
+  }
+
+  function getAicEmojiImageUrl(emoji) {
+    return String(emoji?.image_url || emoji?.url || '').trim();
+  }
+
+  function isAicEmojiMessage(msg) {
+    return !!getEmojiFromMessage(msg);
   }
 
   function formatFileSize(size) {
@@ -3136,7 +3178,8 @@
         translated: savedMessage.translated || normalized.translated || '',
         source_lang: savedMessage.source_lang || normalized.source_lang || detectTextLanguage(savedMessage.original || normalized.original || ''),
         translations: normalizeTranslations(savedMessage.translations || normalized.translations),
-        attachment: getAttachmentFromMessage(savedMessage) || getAttachmentFromMessage(normalized)
+        attachment: getAttachmentFromMessage(savedMessage) || getAttachmentFromMessage(normalized),
+        emoji: getEmojiFromMessage(savedMessage) || getEmojiFromMessage(normalized)
       });
     }
 
@@ -4073,6 +4116,25 @@
     });
   }
 
+
+  function buildEmojiMessage(room, msg) {
+    var emoji = getEmojiFromMessage(msg) || {};
+    var sender = getMessageSenderName(room, msg);
+    var isMine = msg && msg.type === 'me';
+    var imageUrl = getAicEmojiImageUrl(emoji);
+    var emojiName = getAicEmojiName(emoji);
+
+    return [
+      '<div class="aic-message aic-emoji-message ', isMine ? 'me' : 'other', '"', buildMessageDataAttrs(room, msg, 'emoji'), '>',
+      '  <div class="aic-message-name">', esc(sender), '</div>',
+      '  <div class="aic-emoji-bubble">',
+      imageUrl ? '    <img class="aic-emoji-message-img" src="' + esc(imageUrl) + '" alt="' + esc(emojiName) + '" loading="lazy">' : '    <span class="aic-emoji-missing">이모티콘</span>',
+      '  </div>',
+      buildMessageFooter(msg),
+      '</div>'
+    ].join('');
+  }
+
   function buildMessage(room, msg) {
     var displayMode = state.settings.display || 'both';
     var sender = getMessageSenderName(room, msg);
@@ -4080,6 +4142,10 @@
     var translated = getTranslationForLang(msg, getViewerLanguage()) || String(msg?.translated || '');
     var isMine = msg && msg.type === 'me';
     var preferredText = getPreferredMessageText(msg);
+
+    if (getEmojiFromMessage(msg)) {
+      return buildEmojiMessage(room, msg);
+    }
 
     if (getAttachmentFromMessage(msg)) {
       return buildAttachmentMessage(room, msg);
@@ -4148,6 +4214,11 @@
   }
 
 
+  function closeAicEmojiPanel() {
+    var existing = document.querySelector('[data-aic-emoji-panel="1"]');
+    if (existing) existing.remove();
+  }
+
   function closeAicAttachPortalMenu() {
     var existing = document.querySelector('[data-aic-attach-portal-menu="1"]');
     if (existing) existing.remove();
@@ -4157,6 +4228,228 @@
         menu.hidden = true;
       });
     }
+  }
+
+
+  async function loadAicEmojiData(force) {
+    var sb = getSupabaseClient();
+    if (!sb) return { packs: [], emojiMap: {} };
+
+    if (!force && state.emojiPacks.length) {
+      return {
+        packs: state.emojiPacks,
+        emojiMap: state.emojiMap
+      };
+    }
+
+    if (state.emojiLoading) {
+      return {
+        packs: state.emojiPacks,
+        emojiMap: state.emojiMap
+      };
+    }
+
+    state.emojiLoading = true;
+
+    try {
+      var packsResult = await sb
+        .from('aic_emoji_packs')
+        .select('id, code, name, sort_order, is_active')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true });
+
+      if (packsResult.error) throw packsResult.error;
+
+      var packs = packsResult.data || [];
+      var emojiMap = {};
+
+      if (packs.length) {
+        var codes = packs.map(function (pack) { return String(pack.code || '').trim(); }).filter(Boolean);
+
+        var emojisResult = await sb
+          .from('aic_emojis')
+          .select('id, pack_code, emoji_code, emoji_name, image_url, sort_order, is_active')
+          .in('pack_code', codes)
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true })
+          .order('emoji_name', { ascending: true });
+
+        if (emojisResult.error) throw emojisResult.error;
+
+        (emojisResult.data || []).forEach(function (emoji) {
+          var packCode = String(emoji.pack_code || '').trim();
+          if (!packCode) return;
+          if (!emojiMap[packCode]) emojiMap[packCode] = [];
+          emojiMap[packCode].push(emoji);
+        });
+      }
+
+      state.emojiPacks = packs;
+      state.emojiMap = emojiMap;
+
+      if (!state.activeEmojiPackCode || !packs.some(function (pack) {
+        return String(pack.code || '') === String(state.activeEmojiPackCode || '');
+      })) {
+        state.activeEmojiPackCode = packs[0]?.code || '';
+      }
+
+      return {
+        packs: state.emojiPacks,
+        emojiMap: state.emojiMap
+      };
+    } catch (error) {
+      console.error('[AIC Emoji] load failed:', error);
+      return {
+        packs: state.emojiPacks || [],
+        emojiMap: state.emojiMap || {}
+      };
+    } finally {
+      state.emojiLoading = false;
+    }
+  }
+
+  function renderAicEmojiPanel(slotIndex) {
+    var panel = document.querySelector('[data-aic-emoji-panel="1"]');
+    if (!panel) return;
+
+    var packs = state.emojiPacks || [];
+    var activeCode = String(state.activeEmojiPackCode || (packs[0]?.code || '') || '');
+    var emojis = activeCode ? (state.emojiMap[activeCode] || []) : [];
+
+    if (!packs.length) {
+      panel.innerHTML = [
+        '<div class="aic-emoji-panel-head">',
+        '  <strong>이모티콘</strong>',
+        '  <button type="button" class="aic-emoji-close" data-aic-emoji-close="1">×</button>',
+        '</div>',
+        '<div class="aic-emoji-empty">등록된 이모티콘 팩이 없습니다.</div>'
+      ].join('');
+      return;
+    }
+
+    panel.innerHTML = [
+      '<div class="aic-emoji-panel-head">',
+      '  <strong>이모티콘</strong>',
+      '  <button type="button" class="aic-emoji-close" data-aic-emoji-close="1">×</button>',
+      '</div>',
+      '<div class="aic-emoji-tabs">',
+      packs.map(function (pack) {
+        var code = String(pack.code || '');
+        return '<button type="button" class="aic-emoji-tab ' + (code === activeCode ? 'active' : '') + '" data-aic-emoji-pack="' + esc(code) + '">' + esc(pack.name || code || '팩') + '</button>';
+      }).join(''),
+      '</div>',
+      '<div class="aic-emoji-grid" data-aic-emoji-grid="1">',
+      emojis.length ? emojis.map(function (emoji) {
+        var imageUrl = getAicEmojiImageUrl(emoji);
+        var name = getAicEmojiName(emoji);
+        return [
+          '<button type="button" class="aic-emoji-item" data-aic-emoji-send="1"',
+          ' data-aic-emoji-id="', esc(emoji.id || ''), '"',
+          ' data-aic-emoji-pack-code="', esc(emoji.pack_code || activeCode), '"',
+          ' data-aic-emoji-code="', esc(emoji.emoji_code || ''), '"',
+          ' data-aic-emoji-name="', esc(name), '"',
+          ' data-aic-emoji-url="', esc(imageUrl), '"',
+          ' title="', esc(name), '">',
+          imageUrl ? '<img src="' + esc(imageUrl) + '" alt="' + esc(name) + '" loading="lazy">' : '<span>🙂</span>',
+          '</button>'
+        ].join('');
+      }).join('') : '<div class="aic-emoji-empty">이 팩에 사용중인 이모티콘이 없습니다.</div>',
+      '</div>'
+    ].join('');
+  }
+
+  async function showAicEmojiPanel(slotIndex, anchor) {
+    closeAicEmojiPanel();
+    closeAicAttachPortalMenu();
+
+    slotIndex = Number(slotIndex) || 0;
+    if (!anchor) return;
+
+    var panel = document.createElement('div');
+    panel.setAttribute('data-aic-emoji-panel', '1');
+    panel.setAttribute('data-aic-emoji-panel-slot', String(slotIndex));
+    panel.className = 'aic-emoji-panel';
+    panel.innerHTML = [
+      '<div class="aic-emoji-panel-head">',
+      '  <strong>이모티콘</strong>',
+      '  <button type="button" class="aic-emoji-close" data-aic-emoji-close="1">×</button>',
+      '</div>',
+      '<div class="aic-emoji-empty">이모티콘을 불러오는 중입니다.</div>'
+    ].join('');
+
+    panel.addEventListener('mousedown', function (event) {
+      event.stopPropagation();
+    });
+
+    panel.addEventListener('touchstart', function (event) {
+      event.stopPropagation();
+    }, { passive: true });
+
+    panel.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (event.target.closest('[data-aic-emoji-close]')) {
+        closeAicEmojiPanel();
+        return;
+      }
+
+      var packBtn = event.target.closest('[data-aic-emoji-pack]');
+      if (packBtn) {
+        state.activeEmojiPackCode = packBtn.getAttribute('data-aic-emoji-pack') || '';
+        renderAicEmojiPanel(slotIndex);
+        return;
+      }
+
+      var emojiBtn = event.target.closest('[data-aic-emoji-send]');
+      if (emojiBtn) {
+        var emoji = {
+          id: emojiBtn.getAttribute('data-aic-emoji-id') || '',
+          pack_code: emojiBtn.getAttribute('data-aic-emoji-pack-code') || state.activeEmojiPackCode || '',
+          emoji_code: emojiBtn.getAttribute('data-aic-emoji-code') || '',
+          emoji_name: emojiBtn.getAttribute('data-aic-emoji-name') || '이모티콘',
+          image_url: emojiBtn.getAttribute('data-aic-emoji-url') || ''
+        };
+
+        closeAicEmojiPanel();
+        sendEmojiMessage(slotIndex, emoji);
+      }
+    });
+
+    document.body.appendChild(panel);
+
+    var rect = anchor.getBoundingClientRect();
+    var width = Math.min(760, Math.max(320, Math.round(window.innerWidth * 0.52)));
+    if (window.innerWidth <= 760) width = Math.max(300, window.innerWidth - 24);
+    panel.style.width = width + 'px';
+
+    var height = panel.offsetHeight || 360;
+    var gap = 8;
+    var left = rect.left;
+    var top = rect.top - height - gap;
+
+    if (window.innerWidth <= 760) {
+      left = 12;
+    } else if (left + width > window.innerWidth - 8) {
+      left = window.innerWidth - width - 8;
+    }
+
+    if (top < 8) {
+      top = Math.max(8, rect.bottom + gap);
+    }
+
+    panel.style.left = Math.max(8, left) + 'px';
+    panel.style.top = Math.max(8, top) + 'px';
+
+    await loadAicEmojiData(false);
+    renderAicEmojiPanel(slotIndex);
+
+    // 데이터 로딩 후 실제 높이 기준으로 한 번 더 위치 보정
+    height = panel.offsetHeight || height;
+    top = rect.top - height - gap;
+    if (top < 8) top = Math.max(8, rect.bottom + gap);
+    panel.style.top = Math.max(8, top) + 'px';
   }
 
   function showAicAttachPortalMenu(slotIndex, anchor) {
@@ -4185,7 +4478,8 @@
     ].join(';') + ';';
 
     menu.innerHTML = [
-      '<button class="module-btn aic-attach-file-btn" data-aic-attach-portal-file-slot="', esc(slotIndex), '" type="button" style="width:100%; justify-content:flex-start; white-space:nowrap;">첨부파일</button>'
+      '<button class="module-btn aic-attach-emoji-btn" data-aic-attach-portal-emoji-slot="', esc(slotIndex), '" type="button" style="width:100%; justify-content:flex-start; white-space:nowrap;margin-bottom:6px;">😀 이모티콘</button>',
+      '<button class="module-btn aic-attach-file-btn" data-aic-attach-portal-file-slot="', esc(slotIndex), '" type="button" style="width:100%; justify-content:flex-start; white-space:nowrap;">📎 첨부파일</button>'
     ].join('');
 
     menu.addEventListener('mousedown', function (event) {
@@ -4199,6 +4493,14 @@
     menu.addEventListener('click', function (event) {
       event.preventDefault();
       event.stopPropagation();
+
+      var emojiBtn = event.target.closest('[data-aic-attach-portal-emoji-slot]');
+      if (emojiBtn) {
+        var emojiSlotIndex = Number(emojiBtn.getAttribute('data-aic-attach-portal-emoji-slot')) || 0;
+        closeAicAttachPortalMenu();
+        showAicEmojiPanel(emojiSlotIndex, anchor);
+        return;
+      }
 
       var btn = event.target.closest('[data-aic-attach-portal-file-slot]');
       if (!btn) return;
@@ -4234,6 +4536,7 @@
 
   function renderChatSlots() {
     closeAicAttachPortalMenu();
+    closeAicEmojiPanel();
     if (!els.slots) return;
 
     var html = '';
@@ -4539,6 +4842,60 @@
         uploadFailMessage = '브라우저/보안프로그램 또는 네트워크가 파일 업로드 요청을 차단했을 수 있습니다. 잠시 후 다시 시도해 주세요. (' + uploadFailMessage + ')';
       }
       alert('첨부파일 업로드 실패: ' + (uploadFailMessage || 'Storage 버킷/RLS 정책을 확인해 주세요.'));
+    }
+  }
+
+
+  async function sendEmojiMessage(slotIndex, emoji) {
+    var slot = state.openSlots[slotIndex];
+    if (!slot) return;
+
+    var room = getRoom(slot.roomId);
+    if (!room) return;
+
+    var safeEmoji = {
+      id: String(emoji?.id || '').trim(),
+      pack_code: String(emoji?.pack_code || '').trim(),
+      emoji_code: String(emoji?.emoji_code || '').trim(),
+      emoji_name: getAicEmojiName(emoji),
+      image_url: getAicEmojiImageUrl(emoji)
+    };
+
+    if (!safeEmoji.image_url) {
+      alert('이모티콘 이미지 정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    var input = els.slots ? els.slots.querySelector('[data-input-slot="' + slotIndex + '"]') : null;
+    if (input && !state.editingMessage) input.value = '';
+    if (state.drafts) delete state.drafts[String(room.id || '')];
+
+    var tempId = 'temp_emoji_' + Date.now() + '_' + Math.random().toString(16).slice(2);
+    var message = {
+      id: tempId,
+      type: 'me',
+      sender: getCurrentUserName(),
+      sender_email: getCurrentUserEmail(),
+      original: '[이모티콘] ' + safeEmoji.emoji_name,
+      translated: '',
+      source_lang: 'emoji',
+      translations: {
+        __emoji: safeEmoji
+      },
+      emoji: safeEmoji,
+      created_at: new Date().toISOString()
+    };
+
+    room.messages.push(message);
+    markRoomRead(room.id);
+    render(false);
+
+    try {
+      var savedRow = await insertMessageToServer(room, message);
+      replaceTempMessageWithSavedMessage(room, tempId, savedRow, message);
+      render(false);
+    } catch (error) {
+      alert('이모티콘 전송 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
     }
   }
 
@@ -5078,9 +5435,9 @@
       });
     }
 
-    document.addEventListener('click', closeAicContextMenu);
-    document.addEventListener('scroll', closeAicContextMenu, true);
-    window.addEventListener('blur', closeAicContextMenu);
+    document.addEventListener('click', function () { closeAicContextMenu(); closeAicAttachPortalMenu(); closeAicEmojiPanel(); });
+    document.addEventListener('scroll', function () { closeAicContextMenu(); closeAicAttachPortalMenu(); closeAicEmojiPanel(); }, true);
+    window.addEventListener('blur', function () { closeAicContextMenu(); closeAicAttachPortalMenu(); closeAicEmojiPanel(); });
 
     window.addEventListener('resize', function () {
       clearTimeout(resizeTimer);
