@@ -1936,6 +1936,10 @@
     }
   }
 
+
+  // 메시지 실시간 수신 안정화를 위해 메시지별 읽음 테이블 Realtime 구독은
+  // 메인 aic_messages 채널에 연결하지 않습니다.
+  // 읽음 숫자는 방 열람/메시지 송수신 시 재계산 방식으로 반영합니다.
   function handleMessageReadStateRealtime(row) {
     var roomId = String(row && row.room_id || '').trim();
     if (!roomId) {
@@ -3370,28 +3374,6 @@
           },
           function () {
             loadRoomsFromServer({ skipRealtime: true });
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'aic_message_read_targets'
-          },
-          function (payload) {
-            handleMessageReadStateRealtime(payload.new || payload.old || {});
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'aic_message_read_receipts'
-          },
-          function (payload) {
-            handleMessageReadStateRealtime(payload.new || payload.old || {});
           }
         );
 
