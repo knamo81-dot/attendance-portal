@@ -9,6 +9,7 @@
 
   var els = {};
   var resizeTimer = null;
+  var viewportUnitTimer = null;
   var mobileViewportStableAt = Date.now() + 1500;
   var lastViewportSize = {
     width: window.innerWidth || 0,
@@ -55,8 +56,20 @@
     if (!height) return;
 
     try {
-      document.documentElement.style.setProperty('--aic-vh', (height * 0.01) + 'px');
+      var nextValue = (height * 0.01) + 'px';
+      var currentValue = document.documentElement.style.getPropertyValue('--aic-vh');
+      if (currentValue === nextValue) return;
+      document.documentElement.style.setProperty('--aic-vh', nextValue);
     } catch (_) {}
+  }
+
+  function scheduleAicViewportUnitUpdate(delay) {
+    clearTimeout(viewportUnitTimer);
+    viewportUnitTimer = setTimeout(function () {
+      requestAnimationFrame(function () {
+        updateAicViewportUnit();
+      });
+    }, Number(delay) || 0);
   }
 
   function isAicSoftMobileViewportResize() {
@@ -3913,14 +3926,24 @@
       var companyId = getCompanyId();
 
       if (!sb || !companyId) {
-        scheduleRender();
+        if (!isAicMobileViewport()) scheduleRender();
         return;
       }
 
       subscribeRealtime({ force: true });
       subscribeReadRealtime({ force: true });
+
+      // 모바일 홈 복귀/포커스/페이지쇼 때 즉시 전체 재조회가 돌면 viewport 재계산과 겹쳐 화면 전체가 깜빡입니다.
+      // 모바일에서는 열린 데이터가 없을 때만 재조회하고, 일반 복귀는 Realtime 재연결만 수행합니다.
+      if (isAicMobileViewport()) {
+        if (!state.rooms || !state.rooms.length) {
+          loadRoomsFromServer({ skipRealtime: false });
+        }
+        return;
+      }
+
       loadRoomsFromServer({ skipRealtime: false });
-    }, 250);
+    }, isAicMobileViewport() ? 700 : 250);
   }
 
   function getToneLabel(value) {
@@ -4682,12 +4705,8 @@
   }
 
   function renderAfterAicMessageChange(slotIndex) {
-    // 모바일 전송/업로드 중에는 입력창 DOM을 다시 만들지 않고 메시지 영역만 갱신합니다.
-    // 전체 render(false)가 입력창과 sticky 영역을 재생성하면서 하단 깜빡임이 발생하던 문제를 줄입니다.
-    if (isAicMobileViewport() && renderAicMessageBoxOnly(slotIndex, { scroll: true })) {
-      return;
-    }
-
+    // 최신 테스트에서 메시지 영역 부분 갱신이 모바일 전체 깜빡임을 키워서 사용하지 않습니다.
+    // 안정성을 위해 기존 전체 렌더 흐름으로 되돌리고, viewport/복귀 이벤트 쪽 반복 렌더를 줄입니다.
     render(false);
   }
 
@@ -5604,32 +5623,34 @@
     window.addEventListener('blur', function () { closeAicContextMenu(); closeAicAttachPortalMenu(); closeAicEmojiPanel(); });
 
     window.addEventListener('resize', function () {
-      updateAicViewportUnit();
-
-      if (isAicSoftMobileViewportResize()) {
+      if (isAicMobileViewport()) {
+        scheduleAicViewportUnitUpdate(80);
         return;
       }
+
+      updateAicViewportUnit();
 
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(function () {
         updateAicViewportUnit();
         render(true);
-      }, isAicMobileViewport() ? 260 : 120);
+      }, 120);
     });
 
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', function () {
-        updateAicViewportUnit();
-
-        if (isAicSoftMobileViewportResize()) {
+        if (isAicMobileViewport()) {
+          scheduleAicViewportUnitUpdate(80);
           return;
         }
+
+        updateAicViewportUnit();
 
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(function () {
           updateAicViewportUnit();
           render(true);
-        }, isAicMobileViewport() ? 260 : 120);
+        }, 120);
       });
     }
 
@@ -5654,7 +5675,9 @@
     window.addEventListener('load', function () {
       updateAicViewportUnit();
       scheduleRender();
-      refreshAicAfterResume('load');
+      if (!isAicMobileViewport()) {
+        refreshAicAfterResume('load');
+      }
     });
 
     window.addEventListener('pageshow', function () {
@@ -5663,7 +5686,9 @@
     });
 
     window.addEventListener('focus', function () {
-      refreshAicAfterResume('focus');
+      if (!isAicMobileViewport()) {
+        refreshAicAfterResume('focus');
+      }
     });
 
     document.addEventListener('visibilitychange', function () {
@@ -5759,9 +5784,7 @@
     var isMobile = isAicMobileViewport();
     var now = Date.now();
 
-    // 모바일 초기 진입 시 같은 프레임 안에서 render가 여러 번 돌면
-    // 채팅방 하단이 깜빡일 수 있어 짧은 시간 중복 예약을 줄입니다.
-    if (isMobile && now - lastScheduleRenderAt < 180) {
+    if (isMobile && now - lastScheduleRenderAt < 350) {
       return;
     }
 
@@ -5772,17 +5795,19 @@
       render(true);
     });
 
+    if (isMobile) {
+      return;
+    }
+
     // iframe 전환 직후 포탈 레이아웃이 안정된 뒤 다시 계산
     resizeTimer = setTimeout(function () {
       updateAicViewportUnit();
       render(true);
-    }, isMobile ? 420 : 180);
+    }, 180);
 
-    if (!isMobile) {
-      setTimeout(function () {
-        render(true);
-      }, 520);
-    }
+    setTimeout(function () {
+      render(true);
+    }, 520);
   }
 
   window.aicRender = scheduleRender;
