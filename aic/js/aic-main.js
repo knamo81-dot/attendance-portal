@@ -3693,7 +3693,11 @@
 
   function openRoom(roomId) {
     var existing = getOpenSlotIndex(roomId);
+
+    // 회의방 목록에서 들어온 경우에도 메시지별 읽음 처리 강제 수행
     markRoomRead(roomId);
+    markRoomMessagesRead(roomId);
+    scheduleMessageUnreadReload([roomId]);
 
     if (existing >= 0) {
       state.activeSlotIndex = existing;
