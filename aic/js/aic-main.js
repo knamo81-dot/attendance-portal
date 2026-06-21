@@ -584,6 +584,16 @@
 
     try {
       await updateAicMessageOnServer(room, message, text);
+
+      if (input) {
+        input.value = '';
+        input.disabled = false;
+      }
+
+      if (state.drafts) {
+        delete state.drafts[String(room.id || '')];
+      }
+
       clearAicMessageEdit();
       render(false);
     } catch (error) {
