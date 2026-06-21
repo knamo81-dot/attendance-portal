@@ -5451,7 +5451,19 @@
     }
 
     document.addEventListener('click', function () { closeAicContextMenu(); closeAicAttachPortalMenu(); closeAicEmojiPanel(); });
-    document.addEventListener('scroll', function () { closeAicContextMenu(); closeAicAttachPortalMenu(); closeAicEmojiPanel(); }, true);
+    document.addEventListener('scroll', function (event) {
+      var target = event && event.target ? event.target : null;
+
+      // 이모티콘 패널 내부 목록 스크롤은 패널을 닫지 않습니다.
+      // capture 단계의 scroll 이벤트가 내부 그리드 스크롤에도 반응해서 패널이 닫히던 문제를 방지합니다.
+      if (target && target.closest && target.closest('[data-aic-emoji-panel="1"]')) {
+        return;
+      }
+
+      closeAicContextMenu();
+      closeAicAttachPortalMenu();
+      closeAicEmojiPanel();
+    }, true);
     window.addEventListener('blur', function () { closeAicContextMenu(); closeAicAttachPortalMenu(); closeAicEmojiPanel(); });
 
     window.addEventListener('resize', function () {
