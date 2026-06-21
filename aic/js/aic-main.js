@@ -4911,8 +4911,71 @@
     });
 
     Array.from(els.slots.querySelectorAll('[data-send-slot]')).forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        sendMessage(Number(btn.getAttribute('data-send-slot')) || 0);
+      function getSendSlotIndex() {
+        return Number(btn.getAttribute('data-send-slot')) || 0;
+      }
+
+      function keepInputFocusedBeforeSend(slotIndex) {
+        if (!isAicMobileViewport() || !els.slots) return;
+
+        var input = els.slots.querySelector('[data-input-slot="' + slotIndex + '"]');
+        if (!input) return;
+
+        try {
+          input.focus({ preventScroll: true });
+        } catch (_) {
+          try { input.focus(); } catch (__) {}
+        }
+      }
+
+      function runSend(event, fromPointer) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+
+        var slotIndex = getSendSlotIndex();
+
+        if (fromPointer) {
+          btn.dataset.aicSendPointerHandled = '1';
+          setTimeout(function () {
+            btn.dataset.aicSendPointerHandled = '0';
+          }, 500);
+        }
+
+        // 모바일에서는 전송 버튼 터치가 입력창 focus를 빼앗으면서 키보드가 내려갈 수 있습니다.
+        // pointer/touch 단계에서 기본 동작을 막고 입력창 focus를 유지한 상태로 전송합니다.
+        keepInputFocusedBeforeSend(slotIndex);
+        sendMessage(slotIndex);
+      }
+
+      if (window.PointerEvent) {
+        btn.addEventListener('pointerdown', function (event) {
+          if (!isAicMobileViewport()) return;
+          runSend(event, true);
+        });
+      } else {
+        btn.addEventListener('touchstart', function (event) {
+          if (!isAicMobileViewport()) return;
+          runSend(event, true);
+        }, { passive: false });
+      }
+
+      btn.addEventListener('mousedown', function (event) {
+        if (isAicMobileViewport()) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      });
+
+      btn.addEventListener('click', function (event) {
+        if (btn.dataset.aicSendPointerHandled === '1') {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+
+        runSend(event, false);
       });
     });
 
