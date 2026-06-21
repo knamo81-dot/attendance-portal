@@ -4147,7 +4147,93 @@
     ].join('');
   }
 
+
+  function closeAicAttachPortalMenu() {
+    var existing = document.querySelector('[data-aic-attach-portal-menu="1"]');
+    if (existing) existing.remove();
+
+    if (els.slots) {
+      Array.from(els.slots.querySelectorAll('[data-attach-menu-slot]')).forEach(function (menu) {
+        menu.hidden = true;
+      });
+    }
+  }
+
+  function showAicAttachPortalMenu(slotIndex, anchor) {
+    closeAicAttachPortalMenu();
+
+    slotIndex = Number(slotIndex) || 0;
+    if (!anchor) return;
+
+    var menu = document.createElement('div');
+    menu.setAttribute('data-aic-attach-portal-menu', '1');
+    menu.setAttribute('data-aic-attach-portal-slot', String(slotIndex));
+
+    menu.style.cssText = [
+      'position:fixed',
+      'z-index:2147483647',
+      'min-width:132px',
+      'padding:8px',
+      'border:1px solid #e2e8f0',
+      'border-radius:12px',
+      'background:#fff',
+      'box-shadow:0 18px 42px rgba(15,23,42,.26)',
+      'font-size:13px',
+      'font-weight:800',
+      'color:#0f172a',
+      'pointer-events:auto'
+    ].join(';') + ';';
+
+    menu.innerHTML = [
+      '<button class="module-btn aic-attach-file-btn" data-aic-attach-portal-file-slot="', esc(slotIndex), '" type="button" style="width:100%; justify-content:flex-start; white-space:nowrap;">첨부파일</button>'
+    ].join('');
+
+    menu.addEventListener('mousedown', function (event) {
+      event.stopPropagation();
+    });
+
+    menu.addEventListener('touchstart', function (event) {
+      event.stopPropagation();
+    }, { passive: true });
+
+    menu.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      var btn = event.target.closest('[data-aic-attach-portal-file-slot]');
+      if (!btn) return;
+
+      var targetSlotIndex = Number(btn.getAttribute('data-aic-attach-portal-file-slot')) || 0;
+      var fileInput = els.slots ? els.slots.querySelector('[data-attach-input-slot="' + targetSlotIndex + '"]') : null;
+
+      closeAicAttachPortalMenu();
+
+      if (fileInput) {
+        setTimeout(function () {
+          fileInput.click();
+        }, 0);
+      }
+    });
+
+    document.body.appendChild(menu);
+
+    var rect = anchor.getBoundingClientRect();
+    var width = menu.offsetWidth || 132;
+    var height = menu.offsetHeight || 52;
+    var gap = 8;
+
+    var left = rect.left;
+    var top = rect.top - height - gap;
+
+    if (top < 8) top = rect.bottom + gap;
+    if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;
+
+    menu.style.left = Math.max(8, left) + 'px';
+    menu.style.top = Math.max(8, top) + 'px';
+  }
+
   function renderChatSlots() {
+    closeAicAttachPortalMenu();
     if (!els.slots) return;
 
     var html = '';
@@ -4194,7 +4280,7 @@
         '  <div class="aic-messages" data-message-box="', i, '">', messages, '</div>',
         '  <div class="aic-chat-input" style="position:relative; display:flex; align-items:center; gap:8px;">',
         '    <button class="module-btn aic-attach-toggle" data-attach-toggle-slot="', i, '" type="button" title="첨부" aria-label="첨부" style="flex:0 0 42px; width:42px; min-width:42px; max-width:42px; height:38px; padding:0; font-size:20px; font-weight:900; line-height:1;">+</button>',
-        '    <div class="aic-attach-menu" data-attach-menu-slot="', i, '" hidden style="position:absolute; left:0; bottom:48px; z-index:50; min-width:132px; padding:8px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; box-shadow:0 12px 30px rgba(15,23,42,.16);">',
+        '    <div class="aic-attach-menu" data-attach-menu-slot="', i, '" hidden style="position:absolute; left:0; bottom:48px; z-index:2147483647; min-width:132px; padding:8px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; box-shadow:0 12px 30px rgba(15,23,42,.16);">',
         '      <button class="module-btn aic-attach-file-btn" data-attach-file-slot="', i, '" type="button" style="width:100%; justify-content:flex-start; white-space:nowrap;">첨부파일</button>',
         '    </div>',
         '    <input type="file" data-attach-input-slot="', i, '" hidden />',
@@ -4244,26 +4330,32 @@
 
     Array.from(els.slots.querySelectorAll('[data-attach-toggle-slot]')).forEach(function (btn) {
       btn.addEventListener('click', function (event) {
+        event.preventDefault();
         event.stopPropagation();
+
         var slotIndex = Number(btn.getAttribute('data-attach-toggle-slot')) || 0;
-        Array.from(els.slots.querySelectorAll('[data-attach-menu-slot]')).forEach(function (menu) {
-          var menuSlotIndex = Number(menu.getAttribute('data-attach-menu-slot')) || 0;
-          if (menuSlotIndex === slotIndex) {
-            menu.hidden = !menu.hidden;
-          } else {
-            menu.hidden = true;
-          }
-        });
+        var existing = document.querySelector('[data-aic-attach-portal-menu="1"]');
+        var existingSlot = existing ? Number(existing.getAttribute('data-aic-attach-portal-slot')) || 0 : -1;
+
+        if (existing && existingSlot === slotIndex) {
+          closeAicAttachPortalMenu();
+          return;
+        }
+
+        showAicAttachPortalMenu(slotIndex, btn);
       });
     });
 
     Array.from(els.slots.querySelectorAll('[data-attach-file-slot]')).forEach(function (btn) {
       btn.addEventListener('click', function (event) {
+        event.preventDefault();
         event.stopPropagation();
+
         var slotIndex = Number(btn.getAttribute('data-attach-file-slot')) || 0;
         var fileInput = els.slots.querySelector('[data-attach-input-slot="' + slotIndex + '"]');
-        var menu = els.slots.querySelector('[data-attach-menu-slot="' + slotIndex + '"]');
-        if (menu) menu.hidden = true;
+
+        closeAicAttachPortalMenu();
+
         if (fileInput) fileInput.click();
       });
     });
