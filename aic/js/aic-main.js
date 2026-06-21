@@ -68,6 +68,9 @@
     readSaveTimer: null,
     readSyncReady: false,
     readSavingRooms: {},
+    messageUnreadMap: {},
+    messageReadSavingRooms: {},
+    messageUnreadReloadTimer: null,
     editingMessage: null,
     resumeRefreshTimer: null,
     dbReady: false,
@@ -1669,6 +1672,217 @@
     }).length;
   }
 
+
+  function getMessageUnreadCount(message) {
+    var messageId = String(message?.id || '').trim();
+    if (!messageId || messageId.indexOf('temp_') === 0) return 0;
+
+    var count = Number((state.messageUnreadMap || {})[messageId] || 0);
+    if (!Number.isFinite(count) || count < 1) return 0;
+    return count;
+  }
+
+  function buildMessageUnreadBadge(msg) {
+    var count = getMessageUnreadCount(msg);
+    if (!count) return '';
+    return '<span class="aic-message-unread" aria-label="안읽음 ' + esc(count) + '">' + esc(count) + '</span>';
+  }
+
+  function wrapMessageWithUnread(room, msg, bubbleHtml) {
+    var isMine = msg && msg.type === 'me';
+    var badgeHtml = buildMessageUnreadBadge(msg);
+    if (!badgeHtml) return bubbleHtml;
+
+    return [
+      '<div class="aic-message-line ', isMine ? 'me' : 'other', '" data-aic-message-line-id="', esc(msg?.id || ''), '">',
+      isMine ? badgeHtml : '',
+      bubbleHtml,
+      isMine ? '' : badgeHtml,
+      '</div>'
+    ].join('');
+  }
+
+  function getRoomReadTargetEmails(room, message) {
+    var senderEmail = String(message?.sender_email || getCurrentUserEmail() || '').trim().toLowerCase();
+    var members = Array.isArray(room?.memberList) ? room.memberList : [];
+    var seen = {};
+    var emails = [];
+
+    members.forEach(function (member) {
+      var email = String(member?.email || member?.user_email || '').trim();
+      var key = email.toLowerCase();
+      if (!email || !key || key === senderEmail || seen[key]) return;
+      seen[key] = true;
+      emails.push(email);
+    });
+
+    return emails;
+  }
+
+  async function createMessageReadTargets(room, message) {
+    var sb = getSupabaseClient();
+    var messageId = String(message?.id || '').trim();
+    var roomId = String(room?.id || message?.room_id || '').trim();
+    if (!sb || !room || !messageId || messageId.indexOf('temp_') === 0 || !roomId) return;
+
+    var targetEmails = getRoomReadTargetEmails(room, message);
+    if (!targetEmails.length) return;
+
+    var rows = targetEmails.map(function (email) {
+      return {
+        message_id: messageId,
+        room_id: roomId,
+        user_email: email
+      };
+    });
+
+    try {
+      var result = await sb
+        .from('aic_message_read_targets')
+        .upsert(rows, { onConflict: 'message_id,user_email' });
+
+      if (result.error) throw result.error;
+    } catch (error) {
+      console.warn('[AIC MESSAGE READ] target save skipped:', error);
+    }
+  }
+
+  async function loadMessageUnreadCountsFromServer(roomIds) {
+    var sb = getSupabaseClient();
+    roomIds = Array.isArray(roomIds) ? roomIds.map(function (id) { return String(id || '').trim(); }).filter(Boolean) : [];
+
+    if (!sb || !roomIds.length) {
+      if (!roomIds.length) state.messageUnreadMap = {};
+      return;
+    }
+
+    try {
+      var targetsResult = await sb
+        .from('aic_message_read_targets')
+        .select('message_id, room_id, user_email')
+        .in('room_id', roomIds);
+
+      if (targetsResult.error) throw targetsResult.error;
+
+      var targetRows = targetsResult.data || [];
+      var messageIds = Array.from(new Set(targetRows.map(function (row) {
+        return String(row.message_id || '').trim();
+      }).filter(Boolean)));
+
+      var receiptRows = [];
+      if (messageIds.length) {
+        var receiptsResult = await sb
+          .from('aic_message_read_receipts')
+          .select('message_id, room_id, user_email')
+          .in('message_id', messageIds);
+
+        if (receiptsResult.error) throw receiptsResult.error;
+        receiptRows = receiptsResult.data || [];
+      }
+
+      var targetCount = {};
+      targetRows.forEach(function (row) {
+        var messageId = String(row.message_id || '').trim();
+        if (!messageId) return;
+        targetCount[messageId] = (targetCount[messageId] || 0) + 1;
+      });
+
+      var readKeys = {};
+      receiptRows.forEach(function (row) {
+        var messageId = String(row.message_id || '').trim();
+        var email = String(row.user_email || '').trim().toLowerCase();
+        if (!messageId || !email) return;
+        var key = messageId + '|' + email;
+        if (readKeys[key]) return;
+        readKeys[key] = true;
+      });
+
+      var readCount = {};
+      Object.keys(readKeys).forEach(function (key) {
+        var messageId = key.split('|')[0];
+        readCount[messageId] = (readCount[messageId] || 0) + 1;
+      });
+
+      var nextMap = Object.assign({}, state.messageUnreadMap || {});
+      messageIds.forEach(function (messageId) {
+        var unread = Math.max(0, (targetCount[messageId] || 0) - (readCount[messageId] || 0));
+        if (unread > 0) nextMap[messageId] = unread;
+        else delete nextMap[messageId];
+      });
+
+      // 현재 조회한 room의 메시지가 0명이면 이전 값이 남지 않도록 정리합니다.
+      targetRows.forEach(function (row) {
+        var messageId = String(row.message_id || '').trim();
+        if (messageId && !targetCount[messageId]) delete nextMap[messageId];
+      });
+
+      state.messageUnreadMap = nextMap;
+    } catch (error) {
+      console.warn('[AIC MESSAGE READ] unread count load skipped:', error);
+    }
+  }
+
+  function scheduleMessageUnreadReload(roomIds) {
+    roomIds = Array.isArray(roomIds) ? roomIds : [];
+    var ids = roomIds.map(function (id) { return String(id || '').trim(); }).filter(Boolean);
+    if (!ids.length) {
+      ids = (state.rooms || []).map(function (room) { return String(room.id || '').trim(); }).filter(Boolean);
+    }
+    if (!ids.length) return;
+
+    if (state.messageUnreadReloadTimer) clearTimeout(state.messageUnreadReloadTimer);
+    state.messageUnreadReloadTimer = setTimeout(async function () {
+      state.messageUnreadReloadTimer = null;
+      await loadMessageUnreadCountsFromServer(ids);
+      render(false);
+    }, 180);
+  }
+
+  async function markRoomMessagesRead(roomId) {
+    var sb = getSupabaseClient();
+    var email = String(getCurrentUserEmail() || '').trim();
+    roomId = String(roomId || '').trim();
+
+    if (!sb || !email || !roomId) return;
+    if (state.messageReadSavingRooms[roomId]) return;
+    state.messageReadSavingRooms[roomId] = true;
+
+    try {
+      var targetsResult = await sb
+        .from('aic_message_read_targets')
+        .select('message_id, room_id, user_email')
+        .eq('room_id', roomId)
+        .ilike('user_email', email);
+
+      if (targetsResult.error) throw targetsResult.error;
+
+      var targets = targetsResult.data || [];
+      if (!targets.length) return;
+
+      var rows = targets.map(function (row) {
+        return {
+          message_id: row.message_id,
+          room_id: roomId,
+          user_email: email,
+          read_at: new Date().toISOString()
+        };
+      });
+
+      var receiptResult = await sb
+        .from('aic_message_read_receipts')
+        .upsert(rows, { onConflict: 'message_id,user_email' });
+
+      if (receiptResult.error) throw receiptResult.error;
+
+      await loadMessageUnreadCountsFromServer([roomId]);
+      render(false);
+    } catch (error) {
+      console.warn('[AIC MESSAGE READ] receipt save skipped:', error);
+    } finally {
+      delete state.messageReadSavingRooms[roomId];
+    }
+  }
+
   function markRoomRead(roomId) {
     var room = getRoom(roomId);
     if (!room) return;
@@ -1688,7 +1902,9 @@
 
   function markVisibleRoomsRead() {
     (state.openSlots || []).forEach(function (slot) {
-      if (slot && slot.roomId) markRoomRead(slot.roomId);
+      if (!slot || !slot.roomId) return;
+      markRoomRead(slot.roomId);
+      markRoomMessagesRead(slot.roomId);
     });
   }
 
@@ -2441,6 +2657,7 @@
       if (messagesResult.error) throw messagesResult.error;
 
       await loadReadMapFromServer(roomIds);
+      await loadMessageUnreadCountsFromServer(roomIds);
 
       var peopleIndex = await loadPeopleIndex();
       var enrichedMembers = (membersResult.data || []).map(function (member) {
@@ -2574,6 +2791,9 @@
         .eq('company_id', companyId)
         .eq('id', room.id);
     } catch (_) {}
+
+    await createMessageReadTargets(room, message);
+    await loadMessageUnreadCountsFromServer([room.id]);
 
     return messageResult.data || null;
   }
@@ -3087,6 +3307,28 @@
           function () {
             loadRoomsFromServer({ skipRealtime: true });
           }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'aic_message_read_targets'
+          },
+          function (payload) {
+            handleMessageReadStateRealtime(payload.new || payload.old || {});
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'aic_message_read_receipts'
+          },
+          function (payload) {
+            handleMessageReadStateRealtime(payload.new || payload.old || {});
+          }
         );
 
       state.realtimeChannel = channel;
@@ -3137,6 +3379,16 @@
     state.realtimeSubscribing = false;
   }
 
+
+  function handleMessageReadStateRealtime(row) {
+    var roomId = String(row?.room_id || '').trim();
+    if (!roomId) return;
+
+    // 열려 있거나 목록에 존재하는 방만 재계산합니다.
+    if (!getRoom(roomId)) return;
+    scheduleMessageUnreadReload([roomId]);
+  }
+
   function handleRealtimeMessage(row) {
     if (!row || !row.room_id) return;
 
@@ -3181,8 +3433,10 @@
 
     if (getOpenSlotIndex(room.id) >= 0) {
       markRoomRead(room.id);
+      markRoomMessagesRead(room.id);
     }
 
+    scheduleMessageUnreadReload([room.id]);
     render(false);
   }
 
@@ -3514,9 +3768,10 @@
     var translated = getTranslationForLang(msg, getViewerLanguage()) || String(msg?.translated || '');
     var isMine = msg && msg.type === 'me';
     var preferredText = getPreferredMessageText(msg);
+    var bubbleHtml = '';
 
     if (getAttachmentFromMessage(msg)) {
-      return buildAttachmentMessage(room, msg);
+      return wrapMessageWithUnread(room, msg, buildAttachmentMessage(room, msg));
     }
 
     // URL이 포함된 메시지는 원문/번역본 같이 보기(both)에서도 URL 텍스트가 2번 보이지 않도록 처리합니다.
@@ -3527,7 +3782,7 @@
     var linkCardHtml = buildLinkCards(linkCardSource);
 
     if (displayMode === 'original') {
-      return [
+      bubbleHtml = [
         '<div class="aic-message ', isMine ? 'me' : 'other', '"', buildMessageDataAttrs(room, msg, 'text'), '>',
         '  <div class="aic-message-name">', esc(sender), '</div>',
         '  <div class="aic-message-original">', renderTextCardOnly(original), '</div>',
@@ -3535,11 +3790,13 @@
         buildMessageFooter(msg),
         '</div>'
       ].join('');
+
+      return wrapMessageWithUnread(room, msg, bubbleHtml);
     }
 
     if (displayMode === 'translated') {
       var displayText = isMine ? original : preferredText;
-      return [
+      bubbleHtml = [
         '<div class="aic-message ', isMine ? 'me' : 'other', '"', buildMessageDataAttrs(room, msg, 'text'), '>',
         '  <div class="aic-message-name">', esc(sender), '</div>',
         '  <div class="aic-message-original">', renderTextCardOnly(displayText), '</div>',
@@ -3547,10 +3804,12 @@
         buildMessageFooter(msg),
         '</div>'
       ].join('');
+
+      return wrapMessageWithUnread(room, msg, bubbleHtml);
     }
 
     if (isMine) {
-      return [
+      bubbleHtml = [
         '<div class="aic-message me"', buildMessageDataAttrs(room, msg, 'text'), '>',
         '  <div class="aic-message-name">', esc(sender), '</div>',
         '  <div class="aic-message-original">', renderTextCardOnly(original), '</div>',
@@ -3558,6 +3817,8 @@
         buildMessageFooter(msg),
         '</div>'
       ].join('');
+
+      return wrapMessageWithUnread(room, msg, bubbleHtml);
     }
 
     var sourceLang = normalizeAicLang(msg?.source_lang) || detectTextLanguage(original);
@@ -3570,7 +3831,7 @@
       showTranslated = false;
     }
 
-    return [
+    bubbleHtml = [
       '<div class="aic-message other"', buildMessageDataAttrs(room, msg, 'text'), '>',
       '  <div class="aic-message-name">', esc(sender), '</div>',
       '  <div class="aic-message-original">', renderTextCardOnly(original), '</div>',
@@ -3579,6 +3840,8 @@
       buildMessageFooter(msg),
       '</div>'
     ].join('');
+
+    return wrapMessageWithUnread(room, msg, bubbleHtml);
   }
 
   function renderChatSlots() {
