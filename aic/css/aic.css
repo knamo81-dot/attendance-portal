@@ -2037,3 +2037,184 @@ input[type="radio"],
     font-size: 10px;
   }
 }
+
+/* AIC Emoji picker */
+.aic-emoji-panel {
+  position: fixed;
+  z-index: 2147483647;
+  max-width: calc(100vw - 16px);
+  max-height: min(420px, calc(100vh - 24px));
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+  color: #0f172a;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.aic-emoji-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.aic-emoji-panel-head strong {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.aic-emoji-close {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.aic-emoji-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 8px;
+}
+
+.aic-emoji-tab {
+  flex: 0 0 auto;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.aic-emoji-tab.active {
+  border-color: var(--aic-dark, #0f172a);
+  background: var(--aic-dark, #0f172a);
+  color: #ffffff;
+}
+
+.aic-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  gap: 8px;
+  max-height: 310px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+.aic-emoji-item {
+  height: 70px;
+  border: 1px solid #e2e8f0;
+  border-radius: 13px;
+  background: #f8fafc;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+}
+
+.aic-emoji-item:hover {
+  border-color: var(--aic-accent, #0ea5e9);
+  background: #eff6ff;
+}
+
+.aic-emoji-item img {
+  max-width: 56px;
+  max-height: 56px;
+  object-fit: contain;
+}
+
+.aic-emoji-empty {
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.aic-message.aic-emoji-message {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 4px 6px;
+}
+
+.aic-message.aic-emoji-message.me {
+  color: var(--aic-text, #0f172a);
+}
+
+.aic-emoji-bubble {
+  display: flex;
+  justify-content: center;
+}
+
+.aic-emoji-message-img {
+  display: block;
+  max-width: 132px;
+  max-height: 132px;
+  object-fit: contain;
+  border-radius: 14px;
+}
+
+.aic-emoji-missing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  min-height: 96px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+@media (max-width: 760px) {
+  .aic-emoji-panel {
+    left: 8px !important;
+    right: 8px;
+    width: auto !important;
+    max-height: min(380px, calc(100dvh - 24px));
+  }
+
+  .aic-emoji-grid {
+    grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+    max-height: 270px;
+  }
+
+  .aic-emoji-item {
+    height: 64px;
+  }
+
+  .aic-emoji-item img {
+    max-width: 52px;
+    max-height: 52px;
+  }
+
+  .aic-emoji-message-img {
+    max-width: 112px;
+    max-height: 112px;
+  }
+}
