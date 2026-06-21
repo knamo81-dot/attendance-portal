@@ -691,6 +691,7 @@
     <nav class="admin-tabs" aria-label="서비스 관리자 메뉴">
       <button type="button" class="admin-tab-btn active" data-main-tab="companies">회사관리</button>
       <button type="button" class="admin-tab-btn" data-main-tab="serviceAdmins">관리자관리</button>
+      <button type="button" class="admin-tab-btn" data-main-tab="emojis">이모티콘관리</button>
     </nav>
 
     <section id="companiesView" class="view active">
@@ -777,6 +778,94 @@
               <tr><td colspan="8" class="muted-text">서비스관리자 목록을 불러오는 중입니다.</td></tr>
             </tbody>
           </table>
+        </div>
+      </article>
+    </section>
+
+
+    <section id="emojisView" class="view">
+      <article class="card el-card emoji-admin-layout">
+        <div>
+          <h2>이모티콘관리</h2>
+          <p>AIC 채팅에서 사용할 이모티콘 팩과 PNG 이미지를 관리합니다. 사용중 상태의 팩과 이모티콘이 채팅창에 표시됩니다.</p>
+        </div>
+
+        <div class="notice el-notice">
+          이미지는 Supabase Storage <strong>aic-assets</strong> 버킷의 <strong>emojis/[팩코드]/</strong> 경로에 저장됩니다.
+        </div>
+
+        <div class="emoji-admin-grid">
+          <section class="emoji-panel">
+            <div class="emoji-panel-head">
+              <div>
+                <strong>이모티콘 팩</strong>
+                <span>팩을 선택하면 하단 이모티콘 목록이 표시됩니다.</span>
+              </div>
+              <button id="refreshEmojiPacksBtn" class="btn el-btn" type="button">새로고침</button>
+            </div>
+
+            <div class="emoji-pack-create">
+              <div class="field">
+                <label for="emojiPackCodeInput">팩코드</label>
+                <input id="emojiPackCodeInput" class="input el-input" placeholder="researcher-female" autocomplete="off" spellcheck="false">
+              </div>
+              <div class="field">
+                <label for="emojiPackNameInput">팩명</label>
+                <input id="emojiPackNameInput" class="input el-input" placeholder="여자연구원" autocomplete="off">
+              </div>
+              <div class="field">
+                <label for="emojiPackSortInput">순서</label>
+                <input id="emojiPackSortInput" class="input el-input" type="number" value="1">
+              </div>
+              <button id="createEmojiPackBtn" class="btn el-btn-primary primary" type="button">팩 등록</button>
+            </div>
+
+            <div class="toolbar emoji-toolbar">
+              <div class="badge el-badge" id="emojiPackCountBadge">팩 0개</div>
+            </div>
+
+            <div id="emojiPackList" class="emoji-pack-list">
+              <div class="empty">이모티콘 팩을 불러오는 중입니다.</div>
+            </div>
+          </section>
+
+          <section class="emoji-panel">
+            <div class="emoji-panel-head">
+              <div>
+                <strong id="selectedEmojiPackTitle">이모티콘 목록</strong>
+                <span id="selectedEmojiPackDesc">왼쪽에서 팩을 선택해 주세요.</span>
+              </div>
+              <button id="refreshEmojisBtn" class="btn el-btn" type="button">새로고침</button>
+            </div>
+
+            <div class="emoji-create">
+              <div class="field">
+                <label for="emojiCodeInput">이모티콘코드</label>
+                <input id="emojiCodeInput" class="input el-input" placeholder="thanks" autocomplete="off" spellcheck="false">
+              </div>
+              <div class="field">
+                <label for="emojiNameInput">이모티콘명</label>
+                <input id="emojiNameInput" class="input el-input" placeholder="감사합니다" autocomplete="off">
+              </div>
+              <div class="field">
+                <label for="emojiSortInput">순서</label>
+                <input id="emojiSortInput" class="input el-input" type="number" value="1">
+              </div>
+              <div class="field">
+                <label for="emojiFileInput">이미지 파일</label>
+                <input id="emojiFileInput" class="input el-input" type="file" accept="image/png,image/webp,image/gif">
+              </div>
+              <button id="uploadEmojiBtn" class="btn el-btn-primary primary" type="button">업로드 등록</button>
+            </div>
+
+            <div class="toolbar emoji-toolbar">
+              <div class="badge el-badge" id="emojiCountBadge">이모티콘 0개</div>
+            </div>
+
+            <div id="emojiGrid" class="emoji-grid">
+              <div class="empty">선택된 팩이 없습니다.</div>
+            </div>
+          </section>
         </div>
       </article>
     </section>
@@ -870,6 +959,24 @@
     companiesView: document.getElementById('companiesView'),
     appsView: document.getElementById('appsView'),
     serviceAdminsView: document.getElementById('serviceAdminsView'),
+    emojisView: document.getElementById('emojisView'),
+    emojiPackCodeInput: document.getElementById('emojiPackCodeInput'),
+    emojiPackNameInput: document.getElementById('emojiPackNameInput'),
+    emojiPackSortInput: document.getElementById('emojiPackSortInput'),
+    createEmojiPackBtn: document.getElementById('createEmojiPackBtn'),
+    refreshEmojiPacksBtn: document.getElementById('refreshEmojiPacksBtn'),
+    emojiPackCountBadge: document.getElementById('emojiPackCountBadge'),
+    emojiPackList: document.getElementById('emojiPackList'),
+    selectedEmojiPackTitle: document.getElementById('selectedEmojiPackTitle'),
+    selectedEmojiPackDesc: document.getElementById('selectedEmojiPackDesc'),
+    emojiCodeInput: document.getElementById('emojiCodeInput'),
+    emojiNameInput: document.getElementById('emojiNameInput'),
+    emojiSortInput: document.getElementById('emojiSortInput'),
+    emojiFileInput: document.getElementById('emojiFileInput'),
+    uploadEmojiBtn: document.getElementById('uploadEmojiBtn'),
+    refreshEmojisBtn: document.getElementById('refreshEmojisBtn'),
+    emojiCountBadge: document.getElementById('emojiCountBadge'),
+    emojiGrid: document.getElementById('emojiGrid'),
     companyNameInput: document.getElementById('companyNameInput'),
     companySubdomainInput: document.getElementById('companySubdomainInput'),
     companyDomainPreview: document.getElementById('companyDomainPreview'),
@@ -912,6 +1019,9 @@
   let serviceAdminEmployeeMap = new Map();
   let selectedServiceAdminEmployeeEmail = '';
   let serviceAdminListKeyword = '';
+  let emojiPacks = [];
+  let emojis = [];
+  let selectedEmojiPackCode = '';
 
   function getParentSession() {
     try {
@@ -1006,6 +1116,7 @@
   function showView(viewName) {
     els.companiesView?.classList.toggle('active', viewName === 'companies');
     els.serviceAdminsView?.classList.toggle('active', viewName === 'serviceAdmins');
+    els.emojisView?.classList.toggle('active', viewName === 'emojis');
     els.appsView?.classList.toggle('active', viewName === 'apps');
     document.querySelectorAll('[data-main-tab]').forEach(btn => {
       const key = btn.getAttribute('data-main-tab');
@@ -1527,6 +1638,388 @@
   }
 
 
+
+  function normalizeEmojiCode(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  function getSelectedEmojiPack() {
+    return emojiPacks.find(pack => String(pack.code || '') === String(selectedEmojiPackCode || '')) || null;
+  }
+
+  function getEmojiStorageFileName(code, file) {
+    const safeCode = normalizeEmojiCode(code) || ('emoji-' + Date.now());
+    const rawName = String(file?.name || '').toLowerCase();
+    const match = rawName.match(/\.([a-z0-9]{1,8})$/);
+    const ext = match ? match[1] : 'png';
+    return `${safeCode}-${Date.now()}.${ext}`;
+  }
+
+  function getAicAssetPublicUrl(path) {
+    const { data } = sb().storage.from('aic-assets').getPublicUrl(path);
+    return data?.publicUrl || '';
+  }
+
+  function getStoragePathFromPublicUrl(url) {
+    const value = String(url || '');
+    const marker = '/storage/v1/object/public/aic-assets/';
+    const index = value.indexOf(marker);
+    if (index < 0) return '';
+    return decodeURIComponent(value.slice(index + marker.length).split('?')[0]);
+  }
+
+  async function loadEmojiPacks() {
+    assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
+    setFeedback('이모티콘 팩을 불러오는 중입니다.', '');
+
+    const { data, error } = await sb()
+      .from('aic_emoji_packs')
+      .select('id, code, name, sort_order, is_active, created_at')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    emojiPacks = data || [];
+
+    if (!selectedEmojiPackCode || !emojiPacks.some(pack => pack.code === selectedEmojiPackCode)) {
+      selectedEmojiPackCode = emojiPacks[0]?.code || '';
+    }
+
+    renderEmojiPacks();
+
+    if (selectedEmojiPackCode) {
+      await loadEmojis(selectedEmojiPackCode);
+    } else {
+      emojis = [];
+      renderEmojis();
+    }
+
+    setFeedback('이모티콘 팩을 불러왔습니다.', 'ok');
+  }
+
+  function renderEmojiPacks() {
+    if (els.emojiPackCountBadge) els.emojiPackCountBadge.textContent = '팩 ' + emojiPacks.length + '개';
+    if (!els.emojiPackList) return;
+
+    if (!emojiPacks.length) {
+      els.emojiPackList.innerHTML = '<div class="empty">등록된 이모티콘 팩이 없습니다.</div>';
+      return;
+    }
+
+    els.emojiPackList.innerHTML = emojiPacks.map(pack => {
+      const active = pack.is_active !== false;
+      const selected = String(pack.code || '') === String(selectedEmojiPackCode || '');
+      return `
+        <div class="emoji-pack-item ${selected ? 'selected' : ''}" data-select-emoji-pack="${escapeHtml(pack.code || '')}">
+          <div class="emoji-pack-main">
+            <span class="badge el-badge ${active ? 'active' : 'inactive'}">${active ? '사용중' : '미사용'}</span>
+            <strong>${escapeHtml(pack.name || pack.code || '-')}</strong>
+            <span>code: ${escapeHtml(pack.code || '-')} · 순서 ${escapeHtml(pack.sort_order ?? 0)}</span>
+          </div>
+          <div class="emoji-pack-actions">
+            <button type="button" class="btn el-btn ${active ? 'el-btn-danger danger' : 'el-btn-primary primary'}" data-toggle-emoji-pack="${escapeHtml(pack.code || '')}" data-next-active="${active ? 'false' : 'true'}">${active ? '미사용' : '사용'}</button>
+            <button type="button" class="btn el-btn-danger danger" data-delete-emoji-pack="${escapeHtml(pack.code || '')}">삭제</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function createEmojiPack() {
+    assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
+
+    const code = normalizeEmojiCode(els.emojiPackCodeInput?.value || '');
+    const name = String(els.emojiPackNameInput?.value || '').trim();
+    const sortOrder = Number(els.emojiPackSortInput?.value || 0) || 0;
+
+    if (!code) {
+      setFeedback('팩코드를 입력해 주세요. 예: researcher-female', 'error');
+      return;
+    }
+
+    if (!name) {
+      setFeedback('팩명을 입력해 주세요.', 'error');
+      return;
+    }
+
+    els.createEmojiPackBtn.disabled = true;
+    setFeedback('이모티콘 팩을 등록하는 중입니다.', '');
+
+    try {
+      const { error } = await sb()
+        .from('aic_emoji_packs')
+        .upsert({
+          code,
+          name,
+          sort_order: sortOrder,
+          is_active: true
+        }, { onConflict: 'code' });
+
+      if (error) throw error;
+
+      if (els.emojiPackCodeInput) els.emojiPackCodeInput.value = '';
+      if (els.emojiPackNameInput) els.emojiPackNameInput.value = '';
+      if (els.emojiPackSortInput) els.emojiPackSortInput.value = String(sortOrder + 1 || 1);
+
+      selectedEmojiPackCode = code;
+      await loadEmojiPacks();
+      setFeedback('이모티콘 팩을 등록했습니다.', 'ok');
+    } catch (error) {
+      console.error(error);
+      setFeedback(error.message || '이모티콘 팩 등록 중 오류가 발생했습니다.', 'error');
+    } finally {
+      els.createEmojiPackBtn.disabled = false;
+    }
+  }
+
+  async function toggleEmojiPack(packCode, nextActive) {
+    assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
+
+    const { error } = await sb()
+      .from('aic_emoji_packs')
+      .update({ is_active: nextActive })
+      .eq('code', packCode);
+
+    if (error) throw error;
+
+    await loadEmojiPacks();
+    setFeedback('이모티콘 팩 상태를 변경했습니다.', 'ok');
+  }
+
+  async function deleteEmojiPack(packCode) {
+    assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
+
+    if (!packCode) return;
+    const ok = confirm(`${packCode} 이모티콘 팩을 삭제하시겠습니까?\n\n팩에 등록된 이모티콘 DB도 함께 삭제됩니다. Storage 파일은 필요 시 Supabase에서 직접 정리해 주세요.`);
+    if (!ok) return;
+
+    const deleteEmojis = await sb().from('aic_emojis').delete().eq('pack_code', packCode);
+    if (deleteEmojis.error) throw deleteEmojis.error;
+
+    const deletePack = await sb().from('aic_emoji_packs').delete().eq('code', packCode);
+    if (deletePack.error) throw deletePack.error;
+
+    if (selectedEmojiPackCode === packCode) selectedEmojiPackCode = '';
+    await loadEmojiPacks();
+    setFeedback('이모티콘 팩을 삭제했습니다.', 'ok');
+  }
+
+  async function selectEmojiPack(packCode) {
+    selectedEmojiPackCode = String(packCode || '');
+    renderEmojiPacks();
+    await loadEmojis(selectedEmojiPackCode);
+  }
+
+  async function loadEmojis(packCode) {
+    assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
+
+    packCode = String(packCode || selectedEmojiPackCode || '').trim();
+
+    if (!packCode) {
+      emojis = [];
+      renderEmojis();
+      return;
+    }
+
+    const { data, error } = await sb()
+      .from('aic_emojis')
+      .select('id, pack_code, emoji_code, emoji_name, image_url, sort_order, is_active, created_at')
+      .eq('pack_code', packCode)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    emojis = data || [];
+    renderEmojis();
+  }
+
+  function renderEmojis() {
+    const pack = getSelectedEmojiPack();
+
+    if (els.selectedEmojiPackTitle) {
+      els.selectedEmojiPackTitle.textContent = pack ? `${pack.name || pack.code} 이모티콘` : '이모티콘 목록';
+    }
+
+    if (els.selectedEmojiPackDesc) {
+      els.selectedEmojiPackDesc.textContent = pack ? `Storage 경로: emojis/${pack.code}/` : '왼쪽에서 팩을 선택해 주세요.';
+    }
+
+    if (els.emojiCountBadge) els.emojiCountBadge.textContent = '이모티콘 ' + emojis.length + '개';
+    if (!els.emojiGrid) return;
+
+    if (!pack) {
+      els.emojiGrid.innerHTML = '<div class="empty">선택된 팩이 없습니다.</div>';
+      return;
+    }
+
+    if (!emojis.length) {
+      els.emojiGrid.innerHTML = '<div class="empty">등록된 이모티콘이 없습니다.</div>';
+      return;
+    }
+
+    els.emojiGrid.innerHTML = emojis.map(emoji => {
+      const active = emoji.is_active !== false;
+      return `
+        <div class="emoji-card">
+          <div class="emoji-preview">
+            <img src="${escapeHtml(emoji.image_url || '')}" alt="${escapeHtml(emoji.emoji_name || emoji.emoji_code || '이모티콘')}">
+          </div>
+          <div class="emoji-card-body">
+            <strong>${escapeHtml(emoji.emoji_name || '-')}</strong>
+            <span>${escapeHtml(emoji.emoji_code || '-')} · 순서 ${escapeHtml(emoji.sort_order ?? 0)}</span>
+          </div>
+          <div class="emoji-card-actions">
+            <span class="badge el-badge ${active ? 'active' : 'inactive'}">${active ? '사용중' : '미사용'}</span>
+            <button type="button" class="btn el-btn ${active ? 'el-btn-danger danger' : 'el-btn-primary primary'}" data-toggle-emoji="${escapeHtml(emoji.id)}" data-next-active="${active ? 'false' : 'true'}">${active ? '미사용' : '사용'}</button>
+            <button type="button" class="btn el-btn-danger danger" data-delete-emoji="${escapeHtml(emoji.id)}">삭제</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function uploadEmoji() {
+    assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
+
+    const pack = getSelectedEmojiPack();
+    if (!pack) {
+      setFeedback('먼저 이모티콘 팩을 선택해 주세요.', 'error');
+      return;
+    }
+
+    const emojiCode = normalizeEmojiCode(els.emojiCodeInput?.value || '');
+    const emojiName = String(els.emojiNameInput?.value || '').trim();
+    const sortOrder = Number(els.emojiSortInput?.value || 0) || 0;
+    const file = els.emojiFileInput?.files?.[0] || null;
+
+    if (!emojiCode) {
+      setFeedback('이모티콘코드를 입력해 주세요. 예: thanks', 'error');
+      return;
+    }
+
+    if (!emojiName) {
+      setFeedback('이모티콘명을 입력해 주세요.', 'error');
+      return;
+    }
+
+    if (!file) {
+      setFeedback('업로드할 이미지 파일을 선택해 주세요.', 'error');
+      return;
+    }
+
+    if (!/^image\//i.test(file.type || '')) {
+      setFeedback('이미지 파일만 업로드할 수 있습니다.', 'error');
+      return;
+    }
+
+    els.uploadEmojiBtn.disabled = true;
+    setFeedback('이모티콘 이미지를 업로드하는 중입니다.', '');
+
+    try {
+      const fileName = getEmojiStorageFileName(emojiCode, file);
+      const filePath = `emojis/${pack.code}/${fileName}`;
+
+      const uploadResult = await sb()
+        .storage
+        .from('aic-assets')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: file.type || 'image/png'
+        });
+
+      if (uploadResult.error) throw uploadResult.error;
+
+      const imageUrl = getAicAssetPublicUrl(filePath);
+      if (!imageUrl) throw new Error('이모티콘 공개 URL 생성에 실패했습니다.');
+
+      const { error } = await sb()
+        .from('aic_emojis')
+        .upsert({
+          pack_code: pack.code,
+          emoji_code: emojiCode,
+          emoji_name: emojiName,
+          image_url: imageUrl,
+          sort_order: sortOrder,
+          is_active: true
+        }, { onConflict: 'pack_code,emoji_code' });
+
+      if (error) throw error;
+
+      if (els.emojiCodeInput) els.emojiCodeInput.value = '';
+      if (els.emojiNameInput) els.emojiNameInput.value = '';
+      if (els.emojiFileInput) els.emojiFileInput.value = '';
+      if (els.emojiSortInput) els.emojiSortInput.value = String(sortOrder + 1 || 1);
+
+      await loadEmojis(pack.code);
+      setFeedback('이모티콘을 업로드하고 등록했습니다.', 'ok');
+    } catch (error) {
+      console.error(error);
+      setFeedback(error.message || '이모티콘 업로드 중 오류가 발생했습니다.', 'error');
+    } finally {
+      els.uploadEmojiBtn.disabled = false;
+    }
+  }
+
+  async function toggleEmoji(emojiId, nextActive) {
+    assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
+
+    const { error } = await sb()
+      .from('aic_emojis')
+      .update({ is_active: nextActive })
+      .eq('id', emojiId);
+
+    if (error) throw error;
+
+    await loadEmojis(selectedEmojiPackCode);
+    setFeedback('이모티콘 상태를 변경했습니다.', 'ok');
+  }
+
+  async function deleteEmoji(emojiId) {
+    assertServiceAdmin();
+    await ensureServiceAdminAuthSession();
+
+    const emoji = emojis.find(item => String(item.id || '') === String(emojiId || ''));
+    if (!emoji) return;
+
+    const ok = confirm(`${emoji.emoji_name || emoji.emoji_code} 이모티콘을 삭제하시겠습니까?`);
+    if (!ok) return;
+
+    const { error } = await sb()
+      .from('aic_emojis')
+      .delete()
+      .eq('id', emojiId);
+
+    if (error) throw error;
+
+    const filePath = getStoragePathFromPublicUrl(emoji.image_url);
+    if (filePath) {
+      try {
+        const removeResult = await sb().storage.from('aic-assets').remove([filePath]);
+        if (removeResult.error) console.warn('emoji storage cleanup skipped:', removeResult.error);
+      } catch (error) {
+        console.warn('emoji storage cleanup skipped:', error);
+      }
+    }
+
+    await loadEmojis(selectedEmojiPackCode);
+    setFeedback('이모티콘을 삭제했습니다.', 'ok');
+  }
+
   function normalizeEmail(value) {
     return String(value || '').trim().toLowerCase();
   }
@@ -1869,6 +2362,17 @@ employees 사원정보는 삭제되지 않습니다.`);
             if (els.serviceAdminTbody) els.serviceAdminTbody.innerHTML = '<tr><td colspan="8" class="muted-text">서비스관리자 정보를 불러오지 못했습니다.</td></tr>';
           }
         }
+
+        if (tab === 'emojis') {
+          try {
+            await loadEmojiPacks();
+          } catch (error) {
+            console.error(error);
+            setFeedback(error.message || '이모티콘 정보를 불러오지 못했습니다.', 'error');
+            if (els.emojiPackList) els.emojiPackList.innerHTML = '<div class="empty">이모티콘 팩을 불러오지 못했습니다.</div>';
+            if (els.emojiGrid) els.emojiGrid.innerHTML = '<div class="empty">이모티콘 목록을 불러오지 못했습니다.</div>';
+          }
+        }
       });
     });
 
@@ -1966,7 +2470,88 @@ employees 사원정보는 삭제되지 않습니다.`);
       }
     });
 
+
+    els.createEmojiPackBtn?.addEventListener('click', () => createEmojiPack());
+    els.refreshEmojiPacksBtn?.addEventListener('click', () => {
+      loadEmojiPacks().catch(error => {
+        console.error(error);
+        setFeedback(error.message || '이모티콘 팩 새로고침 중 오류가 발생했습니다.', 'error');
+      });
+    });
+    els.uploadEmojiBtn?.addEventListener('click', () => uploadEmoji());
+    els.refreshEmojisBtn?.addEventListener('click', () => {
+      loadEmojis(selectedEmojiPackCode).catch(error => {
+        console.error(error);
+        setFeedback(error.message || '이모티콘 새로고침 중 오류가 발생했습니다.', 'error');
+      });
+    });
+    els.emojiPackCodeInput?.addEventListener('input', () => {
+      els.emojiPackCodeInput.value = normalizeEmojiCode(els.emojiPackCodeInput.value);
+    });
+    els.emojiCodeInput?.addEventListener('input', () => {
+      els.emojiCodeInput.value = normalizeEmojiCode(els.emojiCodeInput.value);
+    });
+
     document.addEventListener('click', async (event) => {
+      const emojiPackSelectBtn = event.target.closest('[data-select-emoji-pack]');
+      if (emojiPackSelectBtn) {
+        const packCode = emojiPackSelectBtn.getAttribute('data-select-emoji-pack');
+        await selectEmojiPack(packCode);
+        return;
+      }
+
+      const emojiPackToggleBtn = event.target.closest('[data-toggle-emoji-pack]');
+      if (emojiPackToggleBtn) {
+        event.stopPropagation();
+        const packCode = emojiPackToggleBtn.getAttribute('data-toggle-emoji-pack');
+        const nextActive = emojiPackToggleBtn.getAttribute('data-next-active') === 'true';
+        try {
+          await toggleEmojiPack(packCode, nextActive);
+        } catch (error) {
+          console.error(error);
+          setFeedback(error.message || '이모티콘 팩 상태 변경 중 오류가 발생했습니다.', 'error');
+        }
+        return;
+      }
+
+      const emojiPackDeleteBtn = event.target.closest('[data-delete-emoji-pack]');
+      if (emojiPackDeleteBtn) {
+        event.stopPropagation();
+        const packCode = emojiPackDeleteBtn.getAttribute('data-delete-emoji-pack');
+        try {
+          await deleteEmojiPack(packCode);
+        } catch (error) {
+          console.error(error);
+          setFeedback(error.message || '이모티콘 팩 삭제 중 오류가 발생했습니다.', 'error');
+        }
+        return;
+      }
+
+      const emojiToggleBtn = event.target.closest('[data-toggle-emoji]');
+      if (emojiToggleBtn) {
+        const emojiId = emojiToggleBtn.getAttribute('data-toggle-emoji');
+        const nextActive = emojiToggleBtn.getAttribute('data-next-active') === 'true';
+        try {
+          await toggleEmoji(emojiId, nextActive);
+        } catch (error) {
+          console.error(error);
+          setFeedback(error.message || '이모티콘 상태 변경 중 오류가 발생했습니다.', 'error');
+        }
+        return;
+      }
+
+      const emojiDeleteBtn = event.target.closest('[data-delete-emoji]');
+      if (emojiDeleteBtn) {
+        const emojiId = emojiDeleteBtn.getAttribute('data-delete-emoji');
+        try {
+          await deleteEmoji(emojiId);
+        } catch (error) {
+          console.error(error);
+          setFeedback(error.message || '이모티콘 삭제 중 오류가 발생했습니다.', 'error');
+        }
+        return;
+      }
+
       const selectEmployeeBtn = event.target.closest('[data-select-service-admin-employee]');
       if (selectEmployeeBtn) {
         selectedServiceAdminEmployeeEmail = normalizeEmail(selectEmployeeBtn.getAttribute('data-select-service-admin-employee') || '');
