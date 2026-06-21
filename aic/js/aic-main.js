@@ -1309,28 +1309,74 @@
     if (result.error) throw result.error;
   }
 
+  function sleepAic(ms) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, ms);
+    });
+  }
+
+  function isRetryableAicUploadError(error) {
+    var message = String(error?.message || error || '').toLowerCase();
+
+    // Edge/WebView/보안모듈/네트워크 순간 차단 시 fetch가 상태코드 없이 실패하는 경우가 많습니다.
+    if (!message) return true;
+    if (message.indexOf('failed to fetch') >= 0) return true;
+    if (message.indexOf('network') >= 0) return true;
+    if (message.indexOf('load failed') >= 0) return true;
+    if (message.indexOf('timeout') >= 0) return true;
+    if (message.indexOf('fetch') >= 0) return true;
+
+    return false;
+  }
+
   async function uploadAicAttachmentFile(room, file) {
     var sb = getSupabaseClient();
     if (!sb) throw new Error('Supabase 클라이언트를 찾을 수 없습니다.');
     if (!room || !file) throw new Error('업로드할 파일 정보가 없습니다.');
 
-    var filePath = buildAttachmentStoragePath(room, file);
-    var uploadResult = await sb.storage
-      .from(getAicStorageBucket())
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-        contentType: file.type || 'application/octet-stream'
-      });
+    var maxAttempts = 3;
+    var lastError = null;
 
-    if (uploadResult.error) throw uploadResult.error;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      var filePath = buildAttachmentStoragePath(room, file);
 
-    return {
-      file_name: file.name || '첨부파일',
-      file_path: filePath,
-      file_size: file.size || 0,
-      mime_type: file.type || 'application/octet-stream'
-    };
+      try {
+        console.info('[AIC ATTACH] upload attempt', attempt + '/' + maxAttempts, {
+          name: file.name || '첨부파일',
+          size: file.size || 0,
+          path: filePath
+        });
+
+        var uploadResult = await sb.storage
+          .from(getAicStorageBucket())
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: file.type || 'application/octet-stream'
+          });
+
+        if (uploadResult.error) throw uploadResult.error;
+
+        return {
+          file_name: file.name || '첨부파일',
+          file_path: filePath,
+          file_size: file.size || 0,
+          mime_type: file.type || 'application/octet-stream'
+        };
+      } catch (error) {
+        lastError = error;
+        console.warn('[AIC ATTACH] upload failed', attempt + '/' + maxAttempts, error);
+
+        if (attempt >= maxAttempts || !isRetryableAicUploadError(error)) {
+          break;
+        }
+
+        // BSOne/Edge WebView가 파일 업로드 요청을 순간적으로 끊는 경우가 있어 잠시 대기 후 재시도합니다.
+        await sleepAic(attempt === 1 ? 1800 : 2800);
+      }
+    }
+
+    throw lastError || new Error('첨부파일 업로드 실패');
   }
 
   async function translateWithAi(text, sourceLang, room) {
@@ -4244,7 +4290,11 @@
         return item.id !== tempId;
       });
       render(false);
-      alert('첨부파일 업로드 실패: ' + (error?.message || 'Storage 버킷/RLS 정책을 확인해 주세요.'));
+      var uploadFailMessage = String(error?.message || '');
+      if (uploadFailMessage.toLowerCase().indexOf('failed to fetch') >= 0) {
+        uploadFailMessage = '브라우저/보안프로그램 또는 네트워크가 파일 업로드 요청을 차단했을 수 있습니다. 잠시 후 다시 시도해 주세요. (' + uploadFailMessage + ')';
+      }
+      alert('첨부파일 업로드 실패: ' + (uploadFailMessage || 'Storage 버킷/RLS 정책을 확인해 주세요.'));
     }
   }
 
