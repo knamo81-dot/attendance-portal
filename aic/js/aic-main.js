@@ -155,6 +155,22 @@
     }, Number(delay) || 0);
   }
 
+  function scrollAicInputIntoMobileView(input) {
+    if (!isAicMobileViewport() || !input) return;
+
+    // 전송 후에는 포커스만 유지하면 브라우저가 화면을 자동으로 올려주지 않는 경우가 있습니다.
+    // 입력창을 실제 viewport 안으로 다시 끌어올려 키보드 위에 채팅창이 붙도록 보정합니다.
+    try {
+      input.scrollIntoView({
+        block: 'end',
+        inline: 'nearest',
+        behavior: 'auto'
+      });
+    } catch (_) {
+      try { input.scrollIntoView(false); } catch (__) {}
+    }
+  }
+
   function refocusAicInputAfterMobileSend(slotIndex) {
     if (!isAicMobileViewport() || !els.slots) return;
 
@@ -169,10 +185,9 @@
       if (!input) return;
 
       try {
-        input.focus({ preventScroll: true });
-      } catch (_) {
-        try { input.focus(); } catch (__) {}
-      }
+        // preventScroll을 사용하면 키보드는 유지되지만 화면이 입력창 위치로 다시 올라오지 않는 문제가 있어 제거합니다.
+        input.focus();
+      } catch (_) {}
 
       try {
         var length = String(input.value || '').length;
@@ -180,6 +195,7 @@
       } catch (_) {}
 
       applyAicMobileKeyboardLayout();
+      scrollAicInputIntoMobileView(input);
       scheduleVisibleAicMessageBoxesBottomScroll();
     }
 
@@ -4949,10 +4965,9 @@
         if (!input) return;
 
         try {
-          input.focus({ preventScroll: true });
-        } catch (_) {
-          try { input.focus(); } catch (__) {}
-        }
+          input.focus();
+          scrollAicInputIntoMobileView(input);
+        } catch (_) {}
       }
 
       function runSend(event, fromPointer) {
