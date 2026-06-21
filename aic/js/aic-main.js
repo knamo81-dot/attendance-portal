@@ -10,6 +10,9 @@
   var els = {};
   var resizeTimer = null;
   var mobileKeyboardTimer = null;
+  var mobileKeyboardLockedUntil = 0;
+  var lastMobileKeyboardOffset = 0;
+  var lastMobileViewportHeight = 0;
   var mobileViewportStableAt = Date.now() + 1500;
   var lastViewportSize = {
     width: window.innerWidth || 0,
@@ -113,13 +116,24 @@
 
     var height = getAicViewportHeight();
     var keyboardOffset = getAicMobileKeyboardOffset();
+    var inputFocused = isAicMessageInputFocused();
+    var keyboardLocked = Date.now() < mobileKeyboardLockedUntil;
+
+    if (keyboardOffset > 0) {
+      lastMobileKeyboardOffset = keyboardOffset;
+      if (height) lastMobileViewportHeight = height;
+      mobileKeyboardLockedUntil = Date.now() + 1800;
+    } else if ((inputFocused || keyboardLocked) && lastMobileKeyboardOffset > 0) {
+      // 전송 직후 DOM 재생성/render 과정에서 visualViewport가 순간적으로 원래 높이처럼 잡히는 경우가 있습니다.
+      // 이때 높이를 즉시 풀면 키보드는 떠 있는데 채팅창만 아래로 내려가므로, 짧은 시간 마지막 키보드 높이를 유지합니다.
+      keyboardOffset = lastMobileKeyboardOffset;
+      height = lastMobileViewportHeight || height || Math.max(320, (window.innerHeight || 0) - keyboardOffset);
+    }
 
     try {
       document.documentElement.style.setProperty('--aic-keyboard-offset', keyboardOffset + 'px');
 
       if (els.root && height) {
-        // 모바일 키보드가 올라오면 visualViewport 높이를 기준으로 루트 높이를 맞춥니다.
-        // 전체 render를 다시 돌리지 않고 높이만 보정해서 채팅창이 키보드 위에 자연스럽게 붙도록 합니다.
         els.root.style.height = height + 'px';
         els.root.style.minHeight = height + 'px';
         els.root.style.maxHeight = height + 'px';
@@ -146,7 +160,11 @@
 
     slotIndex = Number(slotIndex) || 0;
 
-    requestAnimationFrame(function () {
+    // 전송 후 render(false)가 입력창 DOM을 다시 만들면서 채팅창 높이가 풀리는 것을 막기 위해
+    // 잠시 키보드 레이아웃을 고정하고 여러 프레임에 걸쳐 재보정합니다.
+    mobileKeyboardLockedUntil = Date.now() + 1800;
+
+    function focusAndFixLayout() {
       var input = els.slots ? els.slots.querySelector('[data-input-slot="' + slotIndex + '"]') : null;
       if (!input) return;
 
@@ -161,8 +179,17 @@
         input.setSelectionRange(length, length);
       } catch (_) {}
 
-      scheduleAicMobileKeyboardLayout(40);
+      applyAicMobileKeyboardLayout();
       scheduleVisibleAicMessageBoxesBottomScroll();
+    }
+
+    requestAnimationFrame(function () {
+      focusAndFixLayout();
+      requestAnimationFrame(focusAndFixLayout);
+    });
+
+    [40, 120, 260, 520, 900].forEach(function (delay) {
+      setTimeout(focusAndFixLayout, delay);
     });
   }
 
@@ -4943,8 +4970,13 @@
           }, 500);
         }
 
-        // 모바일에서는 전송 버튼 터치가 입력창 focus를 빼앗으면서 키보드가 내려갈 수 있습니다.
-        // pointer/touch 단계에서 기본 동작을 막고 입력창 focus를 유지한 상태로 전송합니다.
+        // 모바일에서는 전송 버튼 터치가 입력창 focus를 빼앗으면서 키보드가 내려가거나,
+        // render 직후 채팅창 높이가 풀릴 수 있으므로 전송 전부터 잠시 키보드 레이아웃을 고정합니다.
+        if (isAicMobileViewport()) {
+          mobileKeyboardLockedUntil = Date.now() + 1800;
+          applyAicMobileKeyboardLayout();
+        }
+
         keepInputFocusedBeforeSend(slotIndex);
         sendMessage(slotIndex);
       }
@@ -5905,7 +5937,13 @@
     renderRoomList();
     renderChatSlots();
     syncMobileAicView();
-    scheduleAicMobileKeyboardLayout(0);
+
+    if (isAicMobileViewport()) {
+      applyAicMobileKeyboardLayout();
+      scheduleAicMobileKeyboardLayout(80);
+    } else {
+      scheduleAicMobileKeyboardLayout(0);
+    }
   }
 
   function scheduleRender() {
