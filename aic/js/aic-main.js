@@ -72,6 +72,7 @@
     messageReadSavingRooms: {},
     messageUnreadReloadTimer: null,
     messageReadTargetBackfillRooms: {},
+    pendingAttachmentMessages: {},
     editingMessage: null,
     resumeRefreshTimer: null,
     dbReady: false,
@@ -2683,6 +2684,108 @@
     console.warn('[AIC DB]', message);
   }
 
+
+  function rememberPendingAttachmentMessage(roomId, tempId, message) {
+    roomId = String(roomId || '').trim();
+    tempId = String(tempId || '').trim();
+    if (!roomId || !tempId || !message) return;
+
+    if (!state.pendingAttachmentMessages) state.pendingAttachmentMessages = {};
+    if (!state.pendingAttachmentMessages[roomId]) state.pendingAttachmentMessages[roomId] = {};
+
+    state.pendingAttachmentMessages[roomId][tempId] = message;
+  }
+
+  function forgetPendingAttachmentMessage(roomId, tempId) {
+    roomId = String(roomId || '').trim();
+    tempId = String(tempId || '').trim();
+    if (!roomId || !tempId || !state.pendingAttachmentMessages || !state.pendingAttachmentMessages[roomId]) return;
+
+    delete state.pendingAttachmentMessages[roomId][tempId];
+
+    if (!Object.keys(state.pendingAttachmentMessages[roomId]).length) {
+      delete state.pendingAttachmentMessages[roomId];
+    }
+  }
+
+  function forgetPendingAttachmentBySavedMessage(roomId, savedMessage) {
+    roomId = String(roomId || '').trim();
+    if (!roomId || !savedMessage || !state.pendingAttachmentMessages || !state.pendingAttachmentMessages[roomId]) return;
+
+    var savedId = String(savedMessage.id || '').trim();
+    var savedFile = String(savedMessage.attachment?.file_name || savedMessage.original || '').trim();
+    var savedEmail = String(savedMessage.sender_email || '').trim().toLowerCase();
+
+    Object.keys(state.pendingAttachmentMessages[roomId]).forEach(function (tempId) {
+      var pending = state.pendingAttachmentMessages[roomId][tempId];
+      if (!pending) return;
+
+      var pendingId = String(pending.id || '').trim();
+      var pendingFile = String(pending.attachment?.file_name || pending.original || '').trim();
+      var pendingEmail = String(pending.sender_email || '').trim().toLowerCase();
+
+      if (savedId && pendingId === savedId) {
+        forgetPendingAttachmentMessage(roomId, tempId);
+        return;
+      }
+
+      if (savedFile && pendingFile === savedFile && savedEmail && pendingEmail === savedEmail) {
+        forgetPendingAttachmentMessage(roomId, tempId);
+      }
+    });
+  }
+
+  function mergePendingAttachmentMessages(room) {
+    if (!room || !room.id || !state.pendingAttachmentMessages) return room;
+
+    var roomId = String(room.id || '').trim();
+    var pendingMap = state.pendingAttachmentMessages[roomId];
+    if (!pendingMap) return room;
+
+    room.messages = Array.isArray(room.messages) ? room.messages : [];
+
+    Object.keys(pendingMap).forEach(function (tempId) {
+      var pending = pendingMap[tempId];
+      if (!pending) return;
+
+      var pendingId = String(pending.id || '').trim();
+      var pendingFile = String(pending.attachment?.file_name || pending.original || '').trim();
+      var pendingEmail = String(pending.sender_email || '').trim().toLowerCase();
+
+      var savedExists = room.messages.some(function (item) {
+        var itemId = String(item.id || '').trim();
+        if (pendingId && itemId === pendingId) return true;
+
+        var itemFile = String(item.attachment?.file_name || item.original || '').trim();
+        var itemEmail = String(item.sender_email || '').trim().toLowerCase();
+        var isSaved = itemId && itemId.indexOf('temp_') !== 0;
+
+        return isSaved &&
+          pendingFile &&
+          itemFile === pendingFile &&
+          pendingEmail &&
+          itemEmail === pendingEmail;
+      });
+
+      if (savedExists) {
+        forgetPendingAttachmentMessage(roomId, tempId);
+        return;
+      }
+
+      var alreadyPending = room.messages.some(function (item) {
+        return String(item.id || '').trim() === pendingId;
+      });
+
+      if (!alreadyPending) room.messages.push(pending);
+    });
+
+    room.messages.sort(function (a, b) {
+      return getMessageTimeValue(a) - getMessageTimeValue(b);
+    });
+
+    return room;
+  }
+
   function normalizeDbRoom(row, membersByRoom, messagesByRoom) {
     var roomId = String(row.id || '');
     var members = membersByRoom[roomId] || [];
@@ -2867,7 +2970,7 @@
       });
 
       state.rooms = roomRows.map(function (row) {
-        return normalizeDbRoom(row, membersByRoom, messagesByRoom);
+        return mergePendingAttachmentMessages(normalizeDbRoom(row, membersByRoom, messagesByRoom));
       });
 
       state.openSlots = state.openSlots.filter(function (slot) {
@@ -3569,6 +3672,7 @@
     }
 
     var message = normalizeDbMessage(row);
+    forgetPendingAttachmentBySavedMessage(room.id, message);
 
     room.messages = Array.isArray(room.messages) ? room.messages : [];
 
@@ -4274,6 +4378,7 @@
     };
 
     room.messages.push(message);
+    rememberPendingAttachmentMessage(room.id, tempId, message);
     markRoomRead(room.id);
     render(false);
 
@@ -4287,9 +4392,12 @@
 
       var savedAttachmentRow = await insertMessageToServer(room, message);
       message = replaceTempMessageWithSavedMessage(room, tempId, savedAttachmentRow, message) || message;
+      forgetPendingAttachmentMessage(room.id, tempId);
+      forgetPendingAttachmentBySavedMessage(room.id, message);
       await insertAttachmentToServer(room, message, attachment);
       render(false);
     } catch (error) {
+      forgetPendingAttachmentMessage(room.id, tempId);
       room.messages = (room.messages || []).filter(function (item) {
         return item.id !== tempId;
       });
