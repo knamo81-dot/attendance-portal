@@ -2718,6 +2718,16 @@
     }
   }
 
+  function scheduleForgetPendingAttachmentMessage(roomId, tempId, delay) {
+    roomId = String(roomId || '').trim();
+    tempId = String(tempId || '').trim();
+    if (!roomId || !tempId) return;
+
+    setTimeout(function () {
+      forgetPendingAttachmentMessage(roomId, tempId);
+    }, Number(delay) || 12000);
+  }
+
   function forgetPendingAttachmentBySavedMessage(roomId, savedMessage) {
     roomId = String(roomId || '').trim();
     if (!roomId || !savedMessage || !state.pendingAttachmentMessages || !state.pendingAttachmentMessages[roomId]) return;
@@ -2762,31 +2772,37 @@
       var pendingFile = String(pending.attachment?.file_name || pending.original || '').trim();
       var pendingEmail = String(pending.sender_email || '').trim().toLowerCase();
 
-      var savedExists = room.messages.some(function (item) {
+      var hasSavedServerMessage = room.messages.some(function (item) {
         var itemId = String(item.id || '').trim();
-        if (pendingId && itemId === pendingId) return true;
-
         var itemFile = String(item.attachment?.file_name || item.original || '').trim();
         var itemEmail = String(item.sender_email || '').trim().toLowerCase();
         var isSaved = itemId && itemId.indexOf('temp_') !== 0;
 
-        return isSaved &&
-          pendingFile &&
+        if (!isSaved) return false;
+        if (pendingId && pendingId.indexOf('temp_') !== 0 && itemId === pendingId) return true;
+
+        return pendingFile &&
           itemFile === pendingFile &&
           pendingEmail &&
           itemEmail === pendingEmail;
       });
 
-      if (savedExists) {
+      if (hasSavedServerMessage) {
+        // 서버 조회 결과에 실제 저장 메시지가 확인된 경우에만 pending을 제거합니다.
         forgetPendingAttachmentMessage(roomId, tempId);
         return;
       }
 
-      var alreadyPending = room.messages.some(function (item) {
-        return String(item.id || '').trim() === pendingId;
+      var existingIndex = room.messages.findIndex(function (item) {
+        var itemId = String(item.id || '').trim();
+        return pendingId && itemId === pendingId;
       });
 
-      if (!alreadyPending) room.messages.push(pending);
+      if (existingIndex >= 0) {
+        room.messages[existingIndex] = Object.assign({}, room.messages[existingIndex], pending);
+      } else {
+        room.messages.push(pending);
+      }
     });
 
     room.messages.sort(function (a, b) {
@@ -2795,6 +2811,7 @@
 
     return room;
   }
+
 
   function normalizeDbRoom(row, membersByRoom, messagesByRoom) {
     var roomId = String(row.id || '');
@@ -3137,6 +3154,11 @@
 
     if (!replaced && savedMessage && !hasMessage(room, savedMessage)) {
       room.messages.push(savedMessage);
+    }
+
+    if (savedMessage && getAttachmentFromMessage(savedMessage)) {
+      rememberPendingAttachmentMessage(room.id, tempId, savedMessage);
+      scheduleForgetPendingAttachmentMessage(room.id, tempId, 15000);
     }
 
     return savedMessage;
@@ -3682,7 +3704,6 @@
     }
 
     var message = normalizeDbMessage(row);
-    forgetPendingAttachmentBySavedMessage(room.id, message);
 
     room.messages = Array.isArray(room.messages) ? room.messages : [];
 
@@ -3704,9 +3725,14 @@
     if (tempIndex >= 0) {
       room.messages[tempIndex] = message;
     } else {
-      if (hasMessage(room, message)) return;
+      if (hasMessage(room, message)) {
+        forgetPendingAttachmentBySavedMessage(room.id, message);
+        return;
+      }
       room.messages.push(message);
     }
+
+    forgetPendingAttachmentBySavedMessage(room.id, message);
 
     // 최신 메시지가 들어온 회의방을 목록 상단으로 이동합니다.
     state.rooms = [room].concat(state.rooms.filter(function (item) {
@@ -4402,9 +4428,13 @@
 
       var savedAttachmentRow = await insertMessageToServer(room, message);
       message = replaceTempMessageWithSavedMessage(room, tempId, savedAttachmentRow, message) || message;
-      forgetPendingAttachmentMessage(room.id, tempId);
-      forgetPendingAttachmentBySavedMessage(room.id, message);
+
+      // 저장 직후 loadRoomsFromServer/realtime/render가 엇갈리면 내 화면에서 첨부 말풍선이 잠깐 사라질 수 있어
+      // pending을 즉시 제거하지 않고 실제 서버 메시지가 확인되거나 짧은 지연 후 정리합니다.
+      rememberPendingAttachmentMessage(room.id, tempId, message);
+
       await insertAttachmentToServer(room, message, attachment);
+      scheduleForgetPendingAttachmentMessage(room.id, tempId, 15000);
       render(false);
     } catch (error) {
       forgetPendingAttachmentMessage(room.id, tempId);
