@@ -9,6 +9,12 @@
 
   var els = {};
   var resizeTimer = null;
+  var mobileViewportStableAt = Date.now() + 1500;
+  var lastViewportSize = {
+    width: window.innerWidth || 0,
+    height: window.innerHeight || 0
+  };
+  var lastScheduleRenderAt = 0;
 
   var CONFIG = {
     defaultSettings: {
@@ -32,6 +38,48 @@
   if (window.AIC_CONFIG) {
     CONFIG.defaultSettings = Object.assign({}, CONFIG.defaultSettings, window.AIC_CONFIG.defaultSettings || {});
     CONFIG.slotPolicy = Object.assign({}, CONFIG.slotPolicy, window.AIC_CONFIG.slotPolicy || {});
+  }
+
+  function isAicMobileViewport() {
+    return window.innerWidth <= 760 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  }
+
+  function getAicViewportHeight() {
+    var visualHeight = window.visualViewport && window.visualViewport.height ? window.visualViewport.height : 0;
+    var innerHeight = window.innerHeight || 0;
+    return Math.round(visualHeight || innerHeight || 0);
+  }
+
+  function updateAicViewportUnit() {
+    var height = getAicViewportHeight();
+    if (!height) return;
+
+    try {
+      document.documentElement.style.setProperty('--aic-vh', (height * 0.01) + 'px');
+    } catch (_) {}
+  }
+
+  function isAicSoftMobileViewportResize() {
+    if (!isAicMobileViewport()) return false;
+
+    var nextWidth = window.innerWidth || 0;
+    var nextHeight = getAicViewportHeight();
+    var prevWidth = lastViewportSize.width || nextWidth;
+    var prevHeight = lastViewportSize.height || nextHeight;
+    var widthDelta = Math.abs(nextWidth - prevWidth);
+    var heightDelta = Math.abs(nextHeight - prevHeight);
+
+    lastViewportSize = {
+      width: nextWidth,
+      height: nextHeight
+    };
+
+    // 모바일 브라우저 주소창/하단바 변화는 주로 height만 짧게 흔들립니다.
+    // 이 경우 전체 render를 하지 않고 CSS 변수만 갱신해서 하단 깜빡임을 줄입니다.
+    if (Date.now() < mobileViewportStableAt && widthDelta < 2) return true;
+    if (widthDelta < 2 && heightDelta > 0 && heightDelta <= 140) return true;
+
+    return false;
   }
 
   var state = {
@@ -5467,11 +5515,34 @@
     window.addEventListener('blur', function () { closeAicContextMenu(); closeAicAttachPortalMenu(); closeAicEmojiPanel(); });
 
     window.addEventListener('resize', function () {
+      updateAicViewportUnit();
+
+      if (isAicSoftMobileViewportResize()) {
+        return;
+      }
+
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(function () {
+        updateAicViewportUnit();
         render(true);
-      }, 120);
+      }, isAicMobileViewport() ? 260 : 120);
     });
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', function () {
+        updateAicViewportUnit();
+
+        if (isAicSoftMobileViewportResize()) {
+          return;
+        }
+
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function () {
+          updateAicViewportUnit();
+          render(true);
+        }, isAicMobileViewport() ? 260 : 120);
+      });
+    }
 
     window.addEventListener('message', function (event) {
       var data = event && event.data ? event.data : {};
@@ -5492,11 +5563,13 @@
     });
 
     window.addEventListener('load', function () {
+      updateAicViewportUnit();
       scheduleRender();
       refreshAicAfterResume('load');
     });
 
     window.addEventListener('pageshow', function () {
+      updateAicViewportUnit();
       refreshAicAfterResume('pageshow');
     });
 
@@ -5592,23 +5665,35 @@
 
   function scheduleRender() {
     clearTimeout(resizeTimer);
+    updateAicViewportUnit();
+
+    var isMobile = isAicMobileViewport();
+    var now = Date.now();
+
+    // 모바일 초기 진입 시 같은 프레임 안에서 render가 여러 번 돌면
+    // 채팅방 하단이 깜빡일 수 있어 짧은 시간 중복 예약을 줄입니다.
+    if (isMobile && now - lastScheduleRenderAt < 180) {
+      return;
+    }
+
+    lastScheduleRenderAt = now;
 
     requestAnimationFrame(function () {
+      updateAicViewportUnit();
       render(true);
-
-      requestAnimationFrame(function () {
-        render(true);
-      });
     });
 
     // iframe 전환 직후 포탈 레이아웃이 안정된 뒤 다시 계산
     resizeTimer = setTimeout(function () {
+      updateAicViewportUnit();
       render(true);
-    }, 180);
+    }, isMobile ? 420 : 180);
 
-    setTimeout(function () {
-      render(true);
-    }, 520);
+    if (!isMobile) {
+      setTimeout(function () {
+        render(true);
+      }, 520);
+    }
   }
 
   window.aicRender = scheduleRender;
@@ -5621,6 +5706,7 @@
   };
 
   function bootstrap() {
+    updateAicViewportUnit();
     cacheEls();
     state.settings = normalizeSettings(state.settings);
     applyAicTheme(state.settings.theme);
