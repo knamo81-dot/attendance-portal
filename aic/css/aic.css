@@ -2038,12 +2038,13 @@ input[type="radio"],
   }
 }
 
+
 /* AIC Emoji picker */
 .aic-emoji-panel {
   position: fixed;
   z-index: 2147483647;
   max-width: calc(100vw - 16px);
-  max-height: min(420px, calc(100vh - 24px));
+  max-height: min(390px, calc(100vh - 74px));
   padding: 10px;
   border: 1px solid #e2e8f0;
   border-radius: 16px;
@@ -2052,6 +2053,8 @@ input[type="radio"],
   color: #0f172a;
   pointer-events: auto;
   overflow: hidden;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
 .aic-emoji-panel-head {
@@ -2111,13 +2114,14 @@ input[type="radio"],
 }
 
 .aic-emoji-grid {
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
   gap: 8px;
-  max-height: 310px;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 2px;
+  padding-bottom: 4px;
 }
 
 .aic-emoji-item {
@@ -2129,6 +2133,7 @@ input[type="radio"],
   display: grid;
   place-items: center;
   padding: 6px;
+  position: relative;
 }
 
 .aic-emoji-item:hover {
@@ -2136,10 +2141,81 @@ input[type="radio"],
   background: #eff6ff;
 }
 
+.aic-emoji-item.selected {
+  border-color: var(--aic-dark, #0f172a);
+  background: #eef2ff;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.10);
+}
+
+.aic-emoji-item.selected::after {
+  content: "선택";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--aic-dark, #0f172a);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 16px;
+}
+
 .aic-emoji-item img {
   max-width: 56px;
   max-height: 56px;
   object-fit: contain;
+}
+
+.aic-emoji-panel-footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.aic-emoji-selected-preview {
+  min-width: 0;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.aic-emoji-selected-preview img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.aic-emoji-selected-preview strong {
+  min-width: 0;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aic-emoji-send-btn {
+  min-width: 64px;
+  height: 34px;
+}
+
+.aic-emoji-send-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
 }
 
 .aic-emoji-empty {
@@ -2196,12 +2272,12 @@ input[type="radio"],
     left: 8px !important;
     right: 8px;
     width: auto !important;
-    max-height: min(380px, calc(100dvh - 24px));
+    bottom: 64px !important;
+    max-height: min(360px, calc(100dvh - 86px));
   }
 
   .aic-emoji-grid {
     grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
-    max-height: 270px;
   }
 
   .aic-emoji-item {
@@ -2217,4 +2293,9 @@ input[type="radio"],
     max-width: 112px;
     max-height: 112px;
   }
+
+  .aic-emoji-panel-footer {
+    grid-template-columns: minmax(0, 1fr) 62px;
+  }
 }
+
