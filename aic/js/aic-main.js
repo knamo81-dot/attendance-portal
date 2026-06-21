@@ -1885,7 +1885,7 @@
       state.messageUnreadReloadTimer = null;
       await loadMessageUnreadCountsFromServer(ids);
       render(false);
-    }, 180);
+    }, 350);
   }
 
   async function markRoomMessagesRead(roomId) {
@@ -3210,6 +3210,19 @@
           },
           function (payload) {
             handleReadRealtimeChange(payload.new || payload.old || {});
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'aic_message_read_receipts'
+          },
+          function (payload) {
+            // 메시지별 읽음 숫자는 메인 메시지 Realtime과 분리된 read 전용 채널에서만 처리합니다.
+            // 이 채널이 지연/재연결되어도 상대방 메시지 수신에는 영향을 주지 않습니다.
+            handleMessageReadStateRealtime(payload.new || payload.old || {});
           }
         );
 
