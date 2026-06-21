@@ -1730,6 +1730,62 @@
     return '<span class="aic-message-unread" aria-label="안읽음 ' + esc(count) + '">' + esc(count) + '</span>';
   }
 
+  function isAicMessageInputFocused() {
+    var active = document.activeElement;
+    return !!(active && active.matches && active.matches('[data-input-slot]'));
+  }
+
+  function updateMessageUnreadBadgesInDom(roomIds) {
+    if (!els.slots) return;
+
+    roomIds = Array.isArray(roomIds) ? roomIds.map(function (id) {
+      return String(id || '').trim();
+    }).filter(Boolean) : [];
+
+    var roomIdFilter = {};
+    roomIds.forEach(function (roomId) {
+      roomIdFilter[roomId] = true;
+    });
+
+    Array.from(els.slots.querySelectorAll('.aic-message-line[data-aic-message-line-id]')).forEach(function (line) {
+      var messageId = String(line.getAttribute('data-aic-message-line-id') || '').trim();
+      if (!messageId) return;
+
+      var messageEl = line.querySelector('.aic-message[data-aic-room-id]');
+      var roomId = messageEl ? String(messageEl.getAttribute('data-aic-room-id') || '').trim() : '';
+      if (roomIds.length && !roomIdFilter[roomId]) return;
+
+      var count = Number((state.messageUnreadMap || {})[messageId] || 0);
+      if (!Number.isFinite(count) || count < 1) count = 0;
+
+      var existing = line.querySelector('.aic-message-unread');
+
+      if (!count) {
+        if (existing) existing.remove();
+        return;
+      }
+
+      if (existing) {
+        existing.textContent = String(count);
+        existing.setAttribute('aria-label', '안읽음 ' + String(count));
+        return;
+      }
+
+      if (!messageEl) return;
+
+      var badge = document.createElement('span');
+      badge.className = 'aic-message-unread';
+      badge.setAttribute('aria-label', '안읽음 ' + String(count));
+      badge.textContent = String(count);
+
+      if (line.classList.contains('me')) {
+        line.insertBefore(badge, messageEl);
+      } else {
+        line.appendChild(badge);
+      }
+    });
+  }
+
   function wrapMessageWithUnread(room, msg, bubbleHtml) {
     var isMine = msg && msg.type === 'me';
     var badgeHtml = buildMessageUnreadBadge(msg);
@@ -1926,15 +1982,15 @@
       state.messageUnreadReloadTimer = null;
       try {
         await loadMessageUnreadCountsFromServer(ids);
+        updateMessageUnreadBadgesInDom(ids);
 
-        // 입력창에 포커스가 있으면 커서가 사라지지 않도록 즉시 전체 render를 피합니다.
-        var active = document.activeElement;
-        var isTyping = active && active.matches && active.matches('[data-input-slot]');
-        if (!isTyping) render(false);
+        // 입력 중 전체 render를 돌리면 input DOM이 재생성되어 커서가 사라질 수 있습니다.
+        // 숫자만 DOM에서 직접 갱신하고, 입력 중이 아닐 때만 전체 화면을 갱신합니다.
+        if (!isAicMessageInputFocused()) render(false);
       } catch (error) {
         console.warn('[AIC MESSAGE READ] scheduled reload skipped:', error);
       }
-    }, 350);
+    }, 120);
   }
 
   async function markRoomMessagesRead(roomId) {
@@ -1970,6 +2026,23 @@
         };
       });
 
+      var changedLocalUnread = false;
+      rows.forEach(function (row) {
+        var messageId = String(row.message_id || '').trim();
+        if (!messageId || !state.messageUnreadMap || !state.messageUnreadMap[messageId]) return;
+
+        var nextUnread = Math.max(0, Number(state.messageUnreadMap[messageId] || 0) - 1);
+        if (nextUnread > 0) state.messageUnreadMap[messageId] = nextUnread;
+        else delete state.messageUnreadMap[messageId];
+
+        changedLocalUnread = true;
+      });
+
+      if (changedLocalUnread) {
+        updateMessageUnreadBadgesInDom([roomId]);
+        if (!isAicMessageInputFocused()) render(false);
+      }
+
       var receiptResult = await sb
         .from('aic_message_read_receipts')
         .upsert(rows, { onConflict: 'message_id,user_email' });
@@ -1977,7 +2050,8 @@
       if (receiptResult.error) throw receiptResult.error;
 
       await loadMessageUnreadCountsFromServer([roomId]);
-      render(false);
+      updateMessageUnreadBadgesInDom([roomId]);
+      if (!isAicMessageInputFocused()) render(false);
     } catch (error) {
       console.warn('[AIC MESSAGE READ] receipt save skipped:', error);
     } finally {
@@ -2911,6 +2985,7 @@
 
     await createMessageReadTargets(room, message);
     await loadMessageUnreadCountsFromServer([room.id]);
+    updateMessageUnreadBadgesInDom([room.id]);
 
     return messageResult.data || null;
   }
@@ -3277,7 +3352,7 @@
           state.readRealtimeSubscribing = false;
 
           if (state.readRealtimeChannelBaseName === baseChannelName) {
-            scheduleReadRealtimeReconnect(1500);
+            scheduleReadRealtimeReconnect(3000);
           }
         }
       });
@@ -3317,19 +3392,27 @@
 
     var currentEmail = String(getCurrentUserEmail() || '').trim().toLowerCase();
     var rowEmail = String(row.user_email || '').trim().toLowerCase();
-
-    if (!currentEmail || !rowEmail || currentEmail !== rowEmail) return;
-
     var roomId = String(row.room_id || '').trim();
     var nextValue = row.last_read_at || '';
-    var current = Date.parse(state.readMap[roomId] || '');
     var next = Date.parse(nextValue || '');
 
     if (!roomId || !Number.isFinite(next)) return;
-    if (Number.isFinite(current) && current >= next) return;
 
-    state.readMap[roomId] = nextValue;
-    renderRoomList();
+    // 내가 읽은 상태는 회의방 목록 배지에 반영합니다.
+    if (currentEmail && rowEmail && currentEmail === rowEmail) {
+      var current = Date.parse(state.readMap[roomId] || '');
+      if (!Number.isFinite(current) || current < next) {
+        state.readMap[roomId] = nextValue;
+        renderRoomList();
+      }
+    }
+
+    // 상대방이 방을 읽은 경우에도 aic_message_reads Realtime은 들어옵니다.
+    // 이 이벤트를 메시지별 안읽음 숫자 재계산 트리거로 사용하면
+    // receipts Realtime/polling 없이 일반/링크/첨부 메시지 숫자를 같이 빠르게 갱신할 수 있습니다.
+    if (getOpenSlotIndex(roomId) >= 0) {
+      scheduleMessageUnreadReload([roomId]);
+    }
   }
 
   function subscribeRealtime(options) {
