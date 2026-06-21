@@ -130,16 +130,17 @@
   left: 19px;
 }
 
+
 /* Service Admin Emoji Management */
 .emoji-admin-layout {
-  width: min(1180px, 100%);
+  width: min(1280px, 100%);
   display: grid;
   gap: 12px;
 }
 
 .emoji-admin-grid {
   display: grid;
-  grid-template-columns: minmax(300px, 390px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 26%) minmax(0, 1fr);
   gap: 12px;
   align-items: start;
 }
@@ -182,12 +183,16 @@
   align-items: end;
 }
 
-.emoji-pack-create {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 72px auto;
+.emoji-pack-create.compact {
+  grid-template-columns: minmax(0, 1fr) 70px auto;
 }
 
-.emoji-create {
-  grid-template-columns: minmax(110px, 1fr) minmax(110px, 1fr) 72px minmax(150px, 1.2fr) auto;
+.emoji-create.compact {
+  grid-template-columns: minmax(220px, 1fr) auto;
+}
+
+.emoji-file-field .input[type="file"] {
+  padding-top: 4px;
 }
 
 .emoji-toolbar {
@@ -247,7 +252,7 @@
 
 .emoji-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 8px;
 }
 
@@ -265,7 +270,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 86px;
+  height: clamp(78px, 8vw, 96px);
   border-radius: 11px;
   background: #f8fafc;
   border: 1px dashed #cbd5e1;
@@ -273,8 +278,8 @@
 }
 
 .emoji-preview img {
-  max-width: 76px;
-  max-height: 76px;
+  max-width: min(82px, 82%);
+  max-height: min(82px, 82%);
   object-fit: contain;
 }
 
@@ -307,8 +312,31 @@
     grid-template-columns: 1fr;
   }
 
-  .emoji-pack-create,
-  .emoji-create {
+  .emoji-pack-create.compact,
+  .emoji-create.compact {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .emoji-admin-layout {
+    width: 100%;
+  }
+
+  .emoji-panel-head,
+  .emoji-pack-item {
+    grid-template-columns: 1fr;
+  }
+
+  .emoji-panel-head {
+    display: grid;
+  }
+
+  .emoji-pack-actions {
+    flex-wrap: wrap;
+  }
+
+  .emoji-grid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   }
 }
