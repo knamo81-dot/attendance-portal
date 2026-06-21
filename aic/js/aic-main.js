@@ -76,6 +76,7 @@
     emojiPacks: [],
     emojiMap: {},
     activeEmojiPackCode: '',
+    selectedEmoji: null,
     emojiLoading: false,
     editingMessage: null,
     resumeRefreshTimer: null,
@@ -4217,6 +4218,7 @@
   function closeAicEmojiPanel() {
     var existing = document.querySelector('[data-aic-emoji-panel="1"]');
     if (existing) existing.remove();
+    state.selectedEmoji = null;
   }
 
   function closeAicAttachPortalMenu() {
@@ -4316,6 +4318,9 @@
     var packs = state.emojiPacks || [];
     var activeCode = String(state.activeEmojiPackCode || (packs[0]?.code || '') || '');
     var emojis = activeCode ? (state.emojiMap[activeCode] || []) : [];
+    var selected = state.selectedEmoji || null;
+    var selectedUrl = getAicEmojiImageUrl(selected);
+    var selectedName = selected ? getAicEmojiName(selected) : '';
 
     if (!packs.length) {
       panel.innerHTML = [
@@ -4343,8 +4348,9 @@
       emojis.length ? emojis.map(function (emoji) {
         var imageUrl = getAicEmojiImageUrl(emoji);
         var name = getAicEmojiName(emoji);
+        var selectedClass = selected && String(selected.id || '') === String(emoji.id || '') ? ' selected' : '';
         return [
-          '<button type="button" class="aic-emoji-item" data-aic-emoji-send="1"',
+          '<button type="button" class="aic-emoji-item', selectedClass, '" data-aic-emoji-pick="1"',
           ' data-aic-emoji-id="', esc(emoji.id || ''), '"',
           ' data-aic-emoji-pack-code="', esc(emoji.pack_code || activeCode), '"',
           ' data-aic-emoji-code="', esc(emoji.emoji_code || ''), '"',
@@ -4355,6 +4361,13 @@
           '</button>'
         ].join('');
       }).join('') : '<div class="aic-emoji-empty">이 팩에 사용중인 이모티콘이 없습니다.</div>',
+      '</div>',
+      '<div class="aic-emoji-panel-footer">',
+      '  <div class="aic-emoji-selected-preview">',
+      selectedUrl ? '<img src="' + esc(selectedUrl) + '" alt="' + esc(selectedName) + '">' : '<span>이모티콘을 선택해 주세요.</span>',
+      selectedName ? '<strong>' + esc(selectedName) + '</strong>' : '',
+      '  </div>',
+      '  <button type="button" class="module-btn accent aic-emoji-send-btn" data-aic-emoji-send-selected="1"', selectedUrl ? '' : ' disabled', '>전송</button>',
       '</div>'
     ].join('');
   }
@@ -4365,6 +4378,8 @@
 
     slotIndex = Number(slotIndex) || 0;
     if (!anchor) return;
+
+    state.selectedEmoji = null;
 
     var panel = document.createElement('div');
     panel.setAttribute('data-aic-emoji-panel', '1');
@@ -4398,58 +4413,58 @@
       var packBtn = event.target.closest('[data-aic-emoji-pack]');
       if (packBtn) {
         state.activeEmojiPackCode = packBtn.getAttribute('data-aic-emoji-pack') || '';
+        state.selectedEmoji = null;
         renderAicEmojiPanel(slotIndex);
         return;
       }
 
-      var emojiBtn = event.target.closest('[data-aic-emoji-send]');
+      var emojiBtn = event.target.closest('[data-aic-emoji-pick]');
       if (emojiBtn) {
-        var emoji = {
+        state.selectedEmoji = {
           id: emojiBtn.getAttribute('data-aic-emoji-id') || '',
           pack_code: emojiBtn.getAttribute('data-aic-emoji-pack-code') || state.activeEmojiPackCode || '',
           emoji_code: emojiBtn.getAttribute('data-aic-emoji-code') || '',
           emoji_name: emojiBtn.getAttribute('data-aic-emoji-name') || '이모티콘',
           image_url: emojiBtn.getAttribute('data-aic-emoji-url') || ''
         };
+        renderAicEmojiPanel(slotIndex);
+        return;
+      }
 
+      var sendBtn = event.target.closest('[data-aic-emoji-send-selected]');
+      if (sendBtn) {
+        if (sendBtn.disabled || !state.selectedEmoji) return;
+        var selectedEmoji = state.selectedEmoji;
+        state.selectedEmoji = null;
         closeAicEmojiPanel();
-        sendEmojiMessage(slotIndex, emoji);
+        sendEmojiMessage(slotIndex, selectedEmoji);
       }
     });
 
     document.body.appendChild(panel);
 
     var rect = anchor.getBoundingClientRect();
-    var width = Math.min(760, Math.max(320, Math.round(window.innerWidth * 0.52)));
+    var width = Math.min(760, Math.max(340, Math.round(window.innerWidth * 0.56)));
     if (window.innerWidth <= 760) width = Math.max(300, window.innerWidth - 24);
     panel.style.width = width + 'px';
 
-    var height = panel.offsetHeight || 360;
-    var gap = 8;
+    var bottomGap = 58;
     var left = rect.left;
-    var top = rect.top - height - gap;
 
     if (window.innerWidth <= 760) {
       left = 12;
+      bottomGap = 64;
     } else if (left + width > window.innerWidth - 8) {
       left = window.innerWidth - width - 8;
     }
 
-    if (top < 8) {
-      top = Math.max(8, rect.bottom + gap);
-    }
-
     panel.style.left = Math.max(8, left) + 'px';
-    panel.style.top = Math.max(8, top) + 'px';
+    panel.style.top = 'auto';
+    panel.style.bottom = bottomGap + 'px';
+    panel.style.maxHeight = 'min(390px, calc(100vh - ' + (bottomGap + 16) + 'px))';
 
     await loadAicEmojiData(false);
     renderAicEmojiPanel(slotIndex);
-
-    // 데이터 로딩 후 실제 높이 기준으로 한 번 더 위치 보정
-    height = panel.offsetHeight || height;
-    top = rect.top - height - gap;
-    if (top < 8) top = Math.max(8, rect.bottom + gap);
-    panel.style.top = Math.max(8, top) + 'px';
   }
 
   function showAicAttachPortalMenu(slotIndex, anchor) {
