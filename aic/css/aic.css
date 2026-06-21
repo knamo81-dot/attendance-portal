@@ -1977,3 +1977,64 @@ input[type="radio"],
   border-color: #94a3b8 !important;
   color: #020617 !important;
 }
+
+
+/* =========================================================
+   AIC 8-1 Message Read Count Patch
+   - 메시지별 안읽음 숫자 표시
+   - 숫자만 표시, 0은 JS에서 숨김
+   - 상대방 메시지: 말풍선 오른쪽 하단 바깥
+   - 내 메시지: 말풍선 왼쪽 하단 바깥
+   - 시간 표기 높이와 비슷하게 말풍선 하단선보다 살짝 위에 배치
+========================================================= */
+.aic-message-line {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.aic-message-line.other {
+  justify-content: flex-start;
+}
+
+.aic-message-line.me {
+  justify-content: flex-end;
+}
+
+.aic-message-line .aic-message {
+  align-self: auto;
+}
+
+.aic-message-unread {
+  flex: 0 0 auto;
+  min-width: 10px;
+  margin-bottom: 7px;
+  color: #ff8a00;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  user-select: none;
+}
+
+.aic-message-line.me .aic-message-unread {
+  margin-right: 1px;
+}
+
+.aic-message-line.other .aic-message-unread {
+  margin-left: 1px;
+}
+
+@media (max-width: 760px) {
+  .aic-message-line {
+    gap: 3px;
+  }
+
+  .aic-message-unread {
+    margin-bottom: 6px;
+    font-size: 10px;
+  }
+}
+
