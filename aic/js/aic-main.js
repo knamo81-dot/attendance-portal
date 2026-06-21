@@ -64,6 +64,8 @@
     readRealtimeReady: false,
     readRealtimeSubscribing: false,
     readRealtimeResubscribeTimer: null,
+    messageUnreadPollTimer: null,
+    messageUnreadPollRunning: false,
     readMap: {},
     readSaveTimer: null,
     readSyncReady: false,
@@ -1930,9 +1932,44 @@
     if (state.messageUnreadReloadTimer) clearTimeout(state.messageUnreadReloadTimer);
     state.messageUnreadReloadTimer = setTimeout(async function () {
       state.messageUnreadReloadTimer = null;
+      try {
+        await loadMessageUnreadCountsFromServer(ids);
+        render(false);
+      } catch (error) {
+        console.warn('[AIC MESSAGE READ] scheduled reload skipped:', error);
+      }
+    }, 120);
+  }
+
+  async function pollVisibleMessageUnreadCounts() {
+    if (state.messageUnreadPollRunning) return;
+
+    var ids = (state.openSlots || [])
+      .map(function (slot) { return String(slot && slot.roomId || '').trim(); })
+      .filter(Boolean);
+
+    ids = Array.from(new Set(ids));
+    if (!ids.length) return;
+
+    state.messageUnreadPollRunning = true;
+    try {
       await loadMessageUnreadCountsFromServer(ids);
       render(false);
-    }, 350);
+    } catch (error) {
+      console.warn('[AIC MESSAGE READ] poll skipped:', error);
+    } finally {
+      state.messageUnreadPollRunning = false;
+    }
+  }
+
+  function startMessageUnreadPolling() {
+    if (state.messageUnreadPollTimer) return;
+
+    // read Realtime이 인앱/보안모듈 환경에서 CLOSED 되는 경우가 있어
+    // 열린 채팅방의 메시지별 안읽음 숫자만 가볍게 주기 재조회합니다.
+    state.messageUnreadPollTimer = setInterval(function () {
+      pollVisibleMessageUnreadCounts();
+    }, 1500);
   }
 
   async function markRoomMessagesRead(roomId) {
@@ -1967,6 +2004,20 @@
           read_at: new Date().toISOString()
         };
       });
+
+      // 현재 사용자가 방을 보고 있는 경우, 내 읽음 대상 메시지는 화면에서 즉시 1명 감소 처리합니다.
+      // DB/Recheck는 아래 upsert 후 다시 수행합니다.
+      var changedLocalUnread = false;
+      rows.forEach(function (row) {
+        var messageId = String(row.message_id || '').trim();
+        if (!messageId || !state.messageUnreadMap || !state.messageUnreadMap[messageId]) return;
+
+        var next = Math.max(0, Number(state.messageUnreadMap[messageId] || 0) - 1);
+        if (next > 0) state.messageUnreadMap[messageId] = next;
+        else delete state.messageUnreadMap[messageId];
+        changedLocalUnread = true;
+      });
+      if (changedLocalUnread) render(false);
 
       var receiptResult = await sb
         .from('aic_message_read_receipts')
@@ -2871,6 +2922,7 @@
         subscribeRealtime();
         subscribeReadRealtime();
       }
+      startMessageUnreadPolling();
       render(true);
     } catch (error) {
       state.dbReady = false;
@@ -3323,19 +3375,6 @@
           function (payload) {
             handleReadRealtimeChange(payload.new || payload.old || {});
           }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'aic_message_read_receipts'
-          },
-          function (payload) {
-            // 메시지별 읽음 숫자는 메인 메시지 Realtime과 분리된 read 전용 채널에서만 처리합니다.
-            // 이 채널이 지연/재연결되어도 상대방 메시지 수신에는 영향을 주지 않습니다.
-            handleMessageReadStateRealtime(payload.new || payload.old || {});
-          }
         );
 
       state.readRealtimeChannel = channel;
@@ -3344,6 +3383,8 @@
         if (status === 'SUBSCRIBED') {
           state.readRealtimeReady = true;
           state.readRealtimeSubscribing = false;
+          startMessageUnreadPolling();
+          scheduleMessageUnreadReload();
           return;
         }
 
@@ -3353,7 +3394,9 @@
           state.readRealtimeSubscribing = false;
 
           if (state.readRealtimeChannelBaseName === baseChannelName) {
-            scheduleReadRealtimeReconnect(1500);
+            startMessageUnreadPolling();
+            scheduleMessageUnreadReload();
+            scheduleReadRealtimeReconnect(3000);
           }
         }
       });
