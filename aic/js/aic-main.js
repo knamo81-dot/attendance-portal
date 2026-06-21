@@ -64,8 +64,6 @@
     readRealtimeReady: false,
     readRealtimeSubscribing: false,
     readRealtimeResubscribeTimer: null,
-    messageUnreadPollTimer: null,
-    messageUnreadPollRunning: false,
     readMap: {},
     readSaveTimer: null,
     readSyncReady: false,
@@ -74,7 +72,6 @@
     messageReadSavingRooms: {},
     messageUnreadReloadTimer: null,
     messageReadTargetBackfillRooms: {},
-    pendingAttachmentMessages: {},
     editingMessage: null,
     resumeRefreshTimer: null,
     dbReady: false,
@@ -1320,7 +1317,6 @@
   function isRetryableAicUploadError(error) {
     var message = String(error?.message || error || '').toLowerCase();
 
-    // Edge/WebView/보안모듈/네트워크 순간 차단 시 fetch가 상태코드 없이 실패하는 경우가 많습니다.
     if (!message) return true;
     if (message.indexOf('failed to fetch') >= 0) return true;
     if (message.indexOf('network') >= 0) return true;
@@ -1369,12 +1365,8 @@
         lastError = error;
         console.warn('[AIC ATTACH] upload failed', attempt + '/' + maxAttempts, error);
 
-        if (attempt >= maxAttempts || !isRetryableAicUploadError(error)) {
-          break;
-        }
-
-        // BSOne/Edge WebView가 파일 업로드 요청을 순간적으로 끊는 경우가 있어 잠시 대기 후 재시도합니다.
-        await sleepAic(attempt === 1 ? 1800 : 2800);
+        if (attempt >= maxAttempts || !isRetryableAicUploadError(error)) break;
+        await sleepAic(attempt === 1 ? 1200 : 2200);
       }
     }
 
@@ -1934,42 +1926,15 @@
       state.messageUnreadReloadTimer = null;
       try {
         await loadMessageUnreadCountsFromServer(ids);
-        render(false);
+
+        // 입력창에 포커스가 있으면 커서가 사라지지 않도록 즉시 전체 render를 피합니다.
+        var active = document.activeElement;
+        var isTyping = active && active.matches && active.matches('[data-input-slot]');
+        if (!isTyping) render(false);
       } catch (error) {
         console.warn('[AIC MESSAGE READ] scheduled reload skipped:', error);
       }
-    }, 120);
-  }
-
-  async function pollVisibleMessageUnreadCounts() {
-    if (state.messageUnreadPollRunning) return;
-
-    var ids = (state.openSlots || [])
-      .map(function (slot) { return String(slot && slot.roomId || '').trim(); })
-      .filter(Boolean);
-
-    ids = Array.from(new Set(ids));
-    if (!ids.length) return;
-
-    state.messageUnreadPollRunning = true;
-    try {
-      await loadMessageUnreadCountsFromServer(ids);
-      render(false);
-    } catch (error) {
-      console.warn('[AIC MESSAGE READ] poll skipped:', error);
-    } finally {
-      state.messageUnreadPollRunning = false;
-    }
-  }
-
-  function startMessageUnreadPolling() {
-    if (state.messageUnreadPollTimer) return;
-
-    // read Realtime이 인앱/보안모듈 환경에서 CLOSED 되는 경우가 있어
-    // 열린 채팅방의 메시지별 안읽음 숫자만 가볍게 주기 재조회합니다.
-    state.messageUnreadPollTimer = setInterval(function () {
-      pollVisibleMessageUnreadCounts();
-    }, 1500);
+    }, 350);
   }
 
   async function markRoomMessagesRead(roomId) {
@@ -2004,20 +1969,6 @@
           read_at: new Date().toISOString()
         };
       });
-
-      // 현재 사용자가 방을 보고 있는 경우, 내 읽음 대상 메시지는 화면에서 즉시 1명 감소 처리합니다.
-      // DB/Recheck는 아래 upsert 후 다시 수행합니다.
-      var changedLocalUnread = false;
-      rows.forEach(function (row) {
-        var messageId = String(row.message_id || '').trim();
-        if (!messageId || !state.messageUnreadMap || !state.messageUnreadMap[messageId]) return;
-
-        var next = Math.max(0, Number(state.messageUnreadMap[messageId] || 0) - 1);
-        if (next > 0) state.messageUnreadMap[messageId] = next;
-        else delete state.messageUnreadMap[messageId];
-        changedLocalUnread = true;
-      });
-      if (changedLocalUnread) render(false);
 
       var receiptResult = await sb
         .from('aic_message_read_receipts')
@@ -2658,71 +2609,6 @@
     console.warn('[AIC DB]', message);
   }
 
-
-  function rememberPendingAttachmentMessage(roomId, tempId, message) {
-    roomId = String(roomId || '').trim();
-    tempId = String(tempId || '').trim();
-    if (!roomId || !tempId || !message) return;
-
-    if (!state.pendingAttachmentMessages) state.pendingAttachmentMessages = {};
-    if (!state.pendingAttachmentMessages[roomId]) state.pendingAttachmentMessages[roomId] = {};
-
-    state.pendingAttachmentMessages[roomId][tempId] = message;
-  }
-
-  function forgetPendingAttachmentMessage(roomId, tempId) {
-    roomId = String(roomId || '').trim();
-    tempId = String(tempId || '').trim();
-    if (!roomId || !tempId || !state.pendingAttachmentMessages || !state.pendingAttachmentMessages[roomId]) return;
-
-    delete state.pendingAttachmentMessages[roomId][tempId];
-
-    if (!Object.keys(state.pendingAttachmentMessages[roomId]).length) {
-      delete state.pendingAttachmentMessages[roomId];
-    }
-  }
-
-  function mergePendingAttachmentMessages(room) {
-    if (!room || !room.id || !state.pendingAttachmentMessages) return room;
-
-    var pendingMap = state.pendingAttachmentMessages[String(room.id || '')];
-    if (!pendingMap) return room;
-
-    room.messages = Array.isArray(room.messages) ? room.messages : [];
-
-    Object.keys(pendingMap).forEach(function (tempId) {
-      var pending = pendingMap[tempId];
-      if (!pending) return;
-
-      var pendingId = String(pending.id || '').trim();
-      var pendingFile = String(pending.attachment?.file_name || pending.original || '').trim();
-      var pendingEmail = String(pending.sender_email || '').trim().toLowerCase();
-
-      var exists = room.messages.some(function (item) {
-        var itemId = String(item.id || '').trim();
-        if (pendingId && itemId === pendingId) return true;
-
-        var itemFile = String(item.attachment?.file_name || item.original || '').trim();
-        var itemEmail = String(item.sender_email || '').trim().toLowerCase();
-        var itemIsSaved = itemId && itemId.indexOf('temp_') !== 0;
-
-        return itemIsSaved &&
-          pendingFile &&
-          itemFile === pendingFile &&
-          pendingEmail &&
-          itemEmail === pendingEmail;
-      });
-
-      if (!exists) room.messages.push(pending);
-    });
-
-    room.messages.sort(function (a, b) {
-      return getMessageTimeValue(a) - getMessageTimeValue(b);
-    });
-
-    return room;
-  }
-
   function normalizeDbRoom(row, membersByRoom, messagesByRoom) {
     var roomId = String(row.id || '');
     var members = membersByRoom[roomId] || [];
@@ -2907,7 +2793,7 @@
       });
 
       state.rooms = roomRows.map(function (row) {
-        return mergePendingAttachmentMessages(normalizeDbRoom(row, membersByRoom, messagesByRoom));
+        return normalizeDbRoom(row, membersByRoom, messagesByRoom);
       });
 
       state.openSlots = state.openSlots.filter(function (slot) {
@@ -2922,7 +2808,6 @@
         subscribeRealtime();
         subscribeReadRealtime();
       }
-      startMessageUnreadPolling();
       render(true);
     } catch (error) {
       state.dbReady = false;
@@ -3383,8 +3268,6 @@
         if (status === 'SUBSCRIBED') {
           state.readRealtimeReady = true;
           state.readRealtimeSubscribing = false;
-          startMessageUnreadPolling();
-          scheduleMessageUnreadReload();
           return;
         }
 
@@ -3394,9 +3277,7 @@
           state.readRealtimeSubscribing = false;
 
           if (state.readRealtimeChannelBaseName === baseChannelName) {
-            startMessageUnreadPolling();
-            scheduleMessageUnreadReload();
-            scheduleReadRealtimeReconnect(3000);
+            scheduleReadRealtimeReconnect(1500);
           }
         }
       });
@@ -3849,7 +3730,7 @@
   function openRoom(roomId) {
     var existing = getOpenSlotIndex(roomId);
 
-    // 회의방 목록에서 들어온 경우에도 메시지별 읽음 처리 강제 수행
+    // 회의방 목록에서 들어온 경우에도 메시지별 읽음 처리 수행
     markRoomRead(roomId);
     markRoomMessagesRead(roomId);
     scheduleMessageUnreadReload([roomId]);
@@ -4310,7 +4191,6 @@
     };
 
     room.messages.push(message);
-    rememberPendingAttachmentMessage(room.id, tempId, message);
     markRoomRead(room.id);
     render(false);
 
@@ -4324,11 +4204,9 @@
 
       var savedAttachmentRow = await insertMessageToServer(room, message);
       message = replaceTempMessageWithSavedMessage(room, tempId, savedAttachmentRow, message) || message;
-      forgetPendingAttachmentMessage(room.id, tempId);
       await insertAttachmentToServer(room, message, attachment);
       render(false);
     } catch (error) {
-      forgetPendingAttachmentMessage(room.id, tempId);
       room.messages = (room.messages || []).filter(function (item) {
         return item.id !== tempId;
       });
