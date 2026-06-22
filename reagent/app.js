@@ -42,6 +42,7 @@ window.ReagentApp.els = {
   collectQty: document.getElementById("collectQty"),
   collectMix: document.getElementById("collectMix"),
   confirmSelectedCollect: document.getElementById("confirmSelectedCollect"),
+  downloadCollectQuoteExcel: document.getElementById("downloadCollectQuoteExcel"),
   excludeSelectedCollect: document.getElementById("excludeSelectedCollect"),
   sendToPrepare: document.getElementById("sendToPrepare"),
   refreshPrepare: document.getElementById("refreshPrepare"),
@@ -749,6 +750,7 @@ window.ReagentApp.bindEvents = function () {
   });
 
   els.confirmSelectedCollect?.addEventListener("click", () => collect.confirmSelectedCollect?.());
+  els.downloadCollectQuoteExcel?.addEventListener("click", () => collect.downloadCollectQuoteExcel?.());
   els.excludeSelectedCollect?.addEventListener("click", () => collect.excludeSelectedCollect?.());
 
   els.sendToPrepare?.addEventListener("click", () => collect.moveToPrepare?.());
