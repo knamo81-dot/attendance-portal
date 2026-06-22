@@ -111,18 +111,19 @@
 
     updateAicViewportUnit();
 
-    var height = getAicViewportHeight();
     var keyboardOffset = getAicMobileKeyboardOffset();
 
     try {
       document.documentElement.style.setProperty('--aic-keyboard-offset', keyboardOffset + 'px');
 
-      if (els.root && height) {
-        // 모바일에서는 visualViewport의 현재 높이만 사용합니다.
-        // 이전 키보드 높이를 강제로 재사용하지 않아 내려감/올라감 반복 보정을 막습니다.
-        els.root.style.height = height + 'px';
-        els.root.style.minHeight = height + 'px';
-        els.root.style.maxHeight = height + 'px';
+      if (els.root) {
+        // 2차 모바일 안정화 테스트:
+        // 모바일에서는 AIC 루트 높이를 JS로 강제 변경하지 않습니다.
+        // 키보드가 열릴 때 채팅룸이 위아래로 흔들리는 원인을 분리하기 위해
+        // height/min-height/max-height 조정은 브라우저 기본 레이아웃에 맡깁니다.
+        els.root.style.removeProperty('height');
+        els.root.style.removeProperty('min-height');
+        els.root.style.removeProperty('max-height');
 
         if (keyboardOffset > 0) els.root.setAttribute('data-aic-keyboard-open', '1');
         else els.root.removeAttribute('data-aic-keyboard-open');
@@ -142,10 +143,8 @@
   }
 
   function refocusAicInputAfterMobileSend(slotIndex) {
-    // 1차 모바일 안정화 테스트:
+    // 1차 모바일 안정화 테스트 유지:
     // 전송 후 입력창/채팅룸 위치를 강제로 보정하지 않습니다.
-    // 키보드 유지 및 화면 위치는 브라우저 기본 동작에 맡기고,
-    // 메시지 영역 하단 스크롤만 기존 흐름에서 처리합니다.
     return;
   }
 
