@@ -118,8 +118,8 @@
       document.documentElement.style.setProperty('--aic-keyboard-offset', keyboardOffset + 'px');
 
       if (els.root && height) {
-        // 모바일 키보드 위치는 브라우저 기본 동작에 맡기고,
-        // AIC 루트 높이만 현재 visualViewport 기준으로 맞춥니다.
+        // 모바일에서는 visualViewport의 현재 높이만 사용합니다.
+        // 이전 키보드 높이를 강제로 재사용하지 않아 내려감/올라감 반복 보정을 막습니다.
         els.root.style.height = height + 'px';
         els.root.style.minHeight = height + 'px';
         els.root.style.maxHeight = height + 'px';
@@ -142,29 +142,11 @@
   }
 
   function refocusAicInputAfterMobileSend(slotIndex) {
-    if (!isAicMobileViewport() || !els.slots) return;
-
-    slotIndex = Number(slotIndex) || 0;
-
-    // 전송 후 키보드를 강제로 올리거나 내리지 않고,
-    // 입력창 포커스만 유지합니다.
-    requestAnimationFrame(function () {
-      var input = els.slots ? els.slots.querySelector('[data-input-slot="' + slotIndex + '"]') : null;
-      if (!input) return;
-
-      try {
-        input.focus({ preventScroll: true });
-      } catch (_) {
-        try { input.focus(); } catch (__) {}
-      }
-
-      try {
-        var length = String(input.value || '').length;
-        input.setSelectionRange(length, length);
-      } catch (_) {}
-
-      scheduleVisibleAicMessageBoxesBottomScroll();
-    });
+    // 1차 모바일 안정화 테스트:
+    // 전송 후 입력창/채팅룸 위치를 강제로 보정하지 않습니다.
+    // 키보드 유지 및 화면 위치는 브라우저 기본 동작에 맡기고,
+    // 메시지 영역 하단 스크롤만 기존 흐름에서 처리합니다.
+    return;
   }
 
   var state = {
@@ -4945,6 +4927,7 @@
         }
 
         // 모바일에서는 전송 버튼 터치가 입력창 focus를 빼앗지 않도록 전송 직전에만 포커스를 유지합니다.
+        // 전송 후 화면 위치 보정은 반복하지 않고 visualViewport 높이 보정만 사용합니다.
         keepInputFocusedBeforeSend(slotIndex);
         sendMessage(slotIndex);
       }
@@ -4993,7 +4976,7 @@
       });
 
       input.addEventListener('blur', function () {
-        // 모바일 키보드 닫힘은 브라우저 resize 이벤트에 맡깁니다.
+        scheduleAicMobileKeyboardLayout(180);
       });
 
       input.addEventListener('input', function () {
@@ -5901,9 +5884,10 @@
     renderChatSlots();
     syncMobileAicView();
 
-    // 모바일 전송 중 render가 입력창/viewport와 싸우지 않도록 즉시 키보드 보정은 하지 않습니다.
-    // 키보드에 의한 실제 resize 이벤트가 들어올 때만 visualViewport 높이를 반영합니다.
-    if (!isAicMobileViewport()) {
+    if (isAicMobileViewport()) {
+      applyAicMobileKeyboardLayout();
+      scheduleAicMobileKeyboardLayout(80);
+    } else {
       scheduleAicMobileKeyboardLayout(0);
     }
   }
