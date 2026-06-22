@@ -1543,6 +1543,190 @@ window.ReagentApp.collect = {
     return wb;
   },
 
+
+  getCollectQuoteExcelGroups() {
+    this.loadCollectMeta();
+
+    const request = window.ReagentApp.request;
+    const els = window.ReagentApp.els || {};
+    if (!request) return [];
+
+    let groups = request.groupItems(request.getRowsForCurrentOrderMonth ? request.getRowsForCurrentOrderMonth() : request.requestRows)
+      .filter((g) => Number(request.collectedMeta?.[g.key] || 0) > 0);
+
+    const keyword = (els.collectKeyword?.value || "").trim().toLowerCase();
+    const category = els.collectCategory?.value || "";
+
+    if (keyword) {
+      groups = groups.filter((g) =>
+        [g.name, g.maker, g.code].join(" ").toLowerCase().includes(keyword)
+      );
+    }
+
+    if (category) {
+      groups = groups.filter((g) => g.category === category);
+    }
+
+    const categoryOrder = {
+      "시약": 1,
+      "초자": 2,
+      "초자/소모품": 2,
+      "안전용품": 3
+    };
+
+    const getCollectSortInfo = (group) => {
+      const meta = this.applyDefaultVendorToMeta(group, this.getMeta(group.key));
+      const defaultInfo = this.getDefaultVendorInfoForGroup(group);
+      const reason = String(meta.prepareRemark || defaultInfo.reason || "").trim();
+      const vendor = String(meta.vendor1 || defaultInfo.vendor || "").trim();
+
+      return {
+        category: String(group.category || ""),
+        categoryOrder: categoryOrder[group.category] || 99,
+        confirmedOrder: meta.confirmed ? 1 : 0,
+        reason,
+        vendor,
+        isOnline: reason === "온라인 구매",
+        isGeneral: !vendor && reason !== "온라인 구매"
+      };
+    };
+
+    const firstVendorByBucket = {};
+    groups.forEach((group) => {
+      const info = getCollectSortInfo(group);
+      if (info.isOnline || info.isGeneral || !info.vendor) return;
+
+      const bucketKey = `${info.confirmedOrder}||${info.category}`;
+      if (!firstVendorByBucket[bucketKey]) {
+        firstVendorByBucket[bucketKey] = info.vendor;
+      }
+    });
+
+    const getCollectBlockOrder = (group) => {
+      const info = getCollectSortInfo(group);
+      if (info.isOnline) return 9;
+      if (info.isGeneral) return 2;
+
+      const bucketKey = `${info.confirmedOrder}||${info.category}`;
+      const firstVendor = firstVendorByBucket[bucketKey] || "";
+
+      if (info.vendor && info.vendor === firstVendor) return 1;
+      if (info.vendor) return 3;
+      return 2;
+    };
+
+    groups.sort((a, b) => {
+      const aInfo = getCollectSortInfo(a);
+      const bInfo = getCollectSortInfo(b);
+
+      if (aInfo.confirmedOrder !== bInfo.confirmedOrder) return aInfo.confirmedOrder - bInfo.confirmedOrder;
+      if (aInfo.categoryOrder !== bInfo.categoryOrder) return aInfo.categoryOrder - bInfo.categoryOrder;
+
+      const aBlockOrder = getCollectBlockOrder(a);
+      const bBlockOrder = getCollectBlockOrder(b);
+      if (aBlockOrder !== bBlockOrder) return aBlockOrder - bBlockOrder;
+
+      const vendorCompare = aInfo.vendor.localeCompare(bInfo.vendor, "ko");
+      if (vendorCompare !== 0) return vendorCompare;
+
+      const usageA = String((a.entries || [])[0]?.usage || "");
+      const usageB = String((b.entries || [])[0]?.usage || "");
+      const usageCompare = usageA.localeCompare(usageB, "ko");
+      if (usageCompare !== 0) return usageCompare;
+
+      return String(a.name || "").localeCompare(String(b.name || ""), "ko");
+    });
+
+    return groups;
+  },
+
+  downloadCollectQuoteExcel() {
+    if (!window.XLSX) {
+      return window.ReagentApp.toast?.("엑셀 다운로드 라이브러리를 불러오지 못했습니다.", "warn");
+    }
+
+    const request = window.ReagentApp.request;
+    const groups = this.getCollectQuoteExcelGroups();
+
+    if (!groups.length) {
+      return window.ReagentApp.toast?.("다운로드할 제품취합 자료가 없습니다.", "warn");
+    }
+
+    const header = ["품명", "제조사", "제품코드", "CAS", "등급", "규격", "총수량", "거래처명"];
+    const rows = groups.map((group) => {
+      const meta = this.applyDefaultVendorToMeta(group, this.getMeta(group.key));
+      const defaultInfo = this.getDefaultVendorInfoForGroup(group);
+      const vendorName = String(meta.vendor1 || defaultInfo.vendor || "").trim();
+      const totalQty = Number(group.collectedQty || group.totalQty || 0);
+
+      return [
+        group.name || "",
+        group.maker || "",
+        group.code || "",
+        group.cas || "",
+        group.grade || "",
+        group.capacity || "",
+        totalQty || "",
+        vendorName
+      ];
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws["!cols"] = [
+      { wch: 42 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 16 },
+      { wch: 12 },
+      { wch: 16 },
+      { wch: 10 },
+      { wch: 20 }
+    ];
+
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    for (let c = range.s.c; c <= range.e.c; c += 1) {
+      const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+      if (cell) {
+        cell.s = {
+          font: { bold: true },
+          fill: { fgColor: { rgb: "E2E8F0" } },
+          alignment: { horizontal: "center", vertical: "center" },
+          border: {
+            top: { style: "thin", color: { rgb: "CBD5E1" } },
+            bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+            left: { style: "thin", color: { rgb: "CBD5E1" } },
+            right: { style: "thin", color: { rgb: "CBD5E1" } }
+          }
+        };
+      }
+    }
+
+    for (let r = 1; r <= range.e.r; r += 1) {
+      for (let c = range.s.c; c <= range.e.c; c += 1) {
+        const cell = ws[XLSX.utils.encode_cell({ r, c })];
+        if (!cell) continue;
+        cell.s = {
+          alignment: { vertical: "center", horizontal: c === 6 ? "right" : "left" },
+          border: {
+            top: { style: "thin", color: { rgb: "E5E7EB" } },
+            bottom: { style: "thin", color: { rgb: "E5E7EB" } },
+            left: { style: "thin", color: { rgb: "E5E7EB" } },
+            right: { style: "thin", color: { rgb: "E5E7EB" } }
+          }
+        };
+      }
+    }
+
+    ws["!autofilter"] = { ref: ws["!ref"] };
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "제품취합");
+
+    const monthKey = request?.getCurrentOrderMonth ? request.getCurrentOrderMonth() : "";
+    const safeMonth = monthKey || new Date().toISOString().slice(0, 7);
+    XLSX.writeFile(wb, `제품취합_견적요청_${safeMonth}.xlsx`);
+  },
+
   downloadExcel() {
     if (!window.XLSX) {
       return window.ReagentApp.toast?.("엑셀 다운로드 라이브러리를 불러오지 못했습니다.", "warn");
@@ -1791,6 +1975,13 @@ if (els.count) els.count.textContent = String(rows.length);
     if (cancelFinalizePrepareBtn) {
       cancelFinalizePrepareBtn.onclick = () => {
         this.cancelFinalizePrepareMonth();
+      };
+    }
+
+    const collectQuoteExcelBtn = document.getElementById("downloadCollectQuoteExcel");
+    if (collectQuoteExcelBtn) {
+      collectQuoteExcelBtn.onclick = () => {
+        this.downloadCollectQuoteExcel();
       };
     }
 
