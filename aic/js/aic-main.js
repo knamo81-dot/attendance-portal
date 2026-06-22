@@ -5040,7 +5040,7 @@
     room.messages.push(message);
     rememberPendingAttachmentMessage(room.id, tempId, message);
     markRoomRead(room.id);
-    render(false);
+    renderActiveMessageArea(slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
@@ -5050,7 +5050,7 @@
       message.original = attachment.file_name || message.original;
       message.translations = normalizeTranslations(message.translations);
       message.translations.__attachment = attachment;
-      render(false);
+      renderActiveMessageArea(slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
@@ -5063,7 +5063,7 @@
 
       await insertAttachmentToServer(room, message, attachment);
       scheduleForgetPendingAttachmentMessage(room.id, tempId, 15000);
-      render(false);
+      renderActiveMessageArea(slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
     } catch (error) {
@@ -5071,7 +5071,7 @@
       room.messages = (room.messages || []).filter(function (item) {
         return item.id !== tempId;
       });
-      render(false);
+      renderActiveMessageArea(slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
       var uploadFailMessage = String(error?.message || '');
@@ -5125,14 +5125,14 @@
 
     room.messages.push(message);
     markRoomRead(room.id);
-    render(false);
+    renderActiveMessageArea(slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
     try {
       var savedRow = await insertMessageToServer(room, message);
       replaceTempMessageWithSavedMessage(room, tempId, savedRow, message);
-      render(false);
+      renderActiveMessageArea(slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
     } catch (error) {
@@ -5140,7 +5140,18 @@
     }
   }
 
-  async function sendMessage(slotIndex) {
+  
+  function renderActiveMessageArea(slotIndex) {
+    try {
+      // 모바일 키보드 유지용 경량 갱신
+      renderChatSlots();
+      scheduleVisibleAicMessageBoxesBottomScroll();
+    } catch (_) {
+      render(false);
+    }
+  }
+
+async function sendMessage(slotIndex) {
     if (state.editingMessage && Number(state.editingMessage.slotIndex) === Number(slotIndex)) {
       var handledEdit = await saveAicMessageEdit(slotIndex);
       if (handledEdit) return;
@@ -5175,7 +5186,7 @@
 
     room.messages.push(message);
     markRoomRead(room.id);
-    render(false);
+    renderActiveMessageArea(slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
@@ -5184,7 +5195,7 @@
       // 이렇게 해야 PC/모바일 모두 Realtime이나 재조회 대기 없이 5분 이내 수정 메뉴가 바로 활성화됩니다.
       var savedRow = await insertMessageToServer(room, message);
       message = replaceTempMessageWithSavedMessage(room, tempId, savedRow, message) || message;
-      render(false);
+      renderActiveMessageArea(slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
@@ -5199,12 +5210,12 @@
       message.translated = translationResult.translated || '';
       message.source_lang = translationResult.source_lang || message.source_lang || detectTextLanguage(text);
       message.translations = normalizeTranslations(translationResult.translations);
-      render(false);
+      renderActiveMessageArea(slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
       await updateStoredMessageTranslation(room, message);
-      render(false);
+      renderActiveMessageArea(slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
     } catch (error) {
