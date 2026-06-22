@@ -84,62 +84,33 @@
   }
 
   function getAicMobileKeyboardOffset() {
-    if (!isAicMobileViewport() || !window.visualViewport) return 0;
-
-    var viewport = window.visualViewport;
-    var innerHeight = window.innerHeight || 0;
-    var visualHeight = viewport.height || innerHeight;
-    var offsetTop = viewport.offsetTop || 0;
-    var keyboardOffset = Math.max(0, Math.round(innerHeight - visualHeight - offsetTop));
-
-    return keyboardOffset > 80 ? keyboardOffset : 0;
+    // 3차 모바일 안정화:
+    // 키보드 높이를 JS로 계산하지 않습니다.
+    // 모바일 키보드 위치/높이는 브라우저 기본 동작에 맡깁니다.
+    return 0;
   }
 
   function applyAicMobileKeyboardLayout() {
-    if (!isAicMobileViewport()) {
-      try {
-        document.documentElement.style.removeProperty('--aic-keyboard-offset');
-        if (els.root) {
-          els.root.removeAttribute('data-aic-keyboard-open');
-          els.root.style.removeProperty('height');
-          els.root.style.removeProperty('min-height');
-          els.root.style.removeProperty('max-height');
-        }
-      } catch (_) {}
-      return;
-    }
-
-    updateAicViewportUnit();
-
-    var keyboardOffset = getAicMobileKeyboardOffset();
-
+    // 3차 모바일 안정화:
+    // AIC 루트 높이, keyboard offset, data-aic-keyboard-open을 JS로 조정하지 않습니다.
+    // 이전 단계에서 채팅룸 버벅임이 줄었으므로, 남은 내려감/키보드 불안정 원인을 분리하기 위해
+    // 모바일 키보드 레이아웃 보정은 완전히 중단합니다.
     try {
-      document.documentElement.style.setProperty('--aic-keyboard-offset', keyboardOffset + 'px');
-
+      document.documentElement.style.removeProperty('--aic-keyboard-offset');
       if (els.root) {
-        // 2차 모바일 안정화 테스트:
-        // 모바일에서는 AIC 루트 높이를 JS로 강제 변경하지 않습니다.
-        // 키보드가 열릴 때 채팅룸이 위아래로 흔들리는 원인을 분리하기 위해
-        // height/min-height/max-height 조정은 브라우저 기본 레이아웃에 맡깁니다.
+        els.root.removeAttribute('data-aic-keyboard-open');
         els.root.style.removeProperty('height');
         els.root.style.removeProperty('min-height');
         els.root.style.removeProperty('max-height');
-
-        if (keyboardOffset > 0) els.root.setAttribute('data-aic-keyboard-open', '1');
-        else els.root.removeAttribute('data-aic-keyboard-open');
       }
     } catch (_) {}
-
-    scheduleVisibleAicMessageBoxesBottomScroll();
   }
 
   function scheduleAicMobileKeyboardLayout(delay) {
+    // 3차 모바일 안정화:
+    // 모바일 키보드 레이아웃 보정 예약을 하지 않습니다.
     clearTimeout(mobileKeyboardTimer);
-    mobileKeyboardTimer = setTimeout(function () {
-      requestAnimationFrame(function () {
-        applyAicMobileKeyboardLayout();
-      });
-    }, Number(delay) || 0);
+    return;
   }
 
   function refocusAicInputAfterMobileSend(slotIndex) {
@@ -4970,12 +4941,11 @@
 
     Array.from(els.slots.querySelectorAll('[data-input-slot]')).forEach(function (input) {
       input.addEventListener('focus', function () {
-        scheduleAicMobileKeyboardLayout(40);
         scheduleVisibleAicMessageBoxesBottomScroll();
       });
 
       input.addEventListener('blur', function () {
-        scheduleAicMobileKeyboardLayout(180);
+        // 모바일 키보드 닫힘/열림은 브라우저 기본 동작에 맡깁니다.
       });
 
       input.addEventListener('input', function () {
@@ -5734,7 +5704,8 @@
       updateAicViewportUnit();
 
       if (isAicMobileViewport()) {
-        scheduleAicMobileKeyboardLayout(60);
+        // 3차 모바일 안정화:
+        // 모바일 resize는 키보드/주소창 변화로 자주 발생하므로 전체 render나 키보드 보정을 하지 않습니다.
         return;
       }
 
@@ -5750,7 +5721,7 @@
         updateAicViewportUnit();
 
         if (isAicMobileViewport()) {
-          scheduleAicMobileKeyboardLayout(40);
+          // visualViewport 변화는 브라우저 기본 레이아웃에 맡깁니다.
           return;
         }
 
@@ -5760,7 +5731,6 @@
           render(true);
         }, 120);
       });
-
     }
 
     window.addEventListener('message', function (event) {
@@ -5883,10 +5853,7 @@
     renderChatSlots();
     syncMobileAicView();
 
-    if (isAicMobileViewport()) {
-      applyAicMobileKeyboardLayout();
-      scheduleAicMobileKeyboardLayout(80);
-    } else {
+    if (!isAicMobileViewport()) {
       scheduleAicMobileKeyboardLayout(0);
     }
   }
