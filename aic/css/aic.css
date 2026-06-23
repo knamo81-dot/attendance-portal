@@ -664,9 +664,9 @@ body {
   }
 
   .aic-root {
-    height: calc(var(--aic-vh, 1vh) * 100);
-    min-height: calc(var(--aic-vh, 1vh) * 100);
-    max-height: calc(var(--aic-vh, 1vh) * 100);
+    height: 100vh;
+    min-height: 100vh;
+    max-height: none;
     padding: 8px;
     grid-template-columns: 1fr;
     grid-template-rows: minmax(160px, calc(var(--aic-vh, 1vh) * 30)) minmax(0, 1fr);
@@ -757,8 +757,8 @@ body {
   }
 
   .aic-chat-input {
-    position: sticky;
-    bottom: 0;
+    position: relative;
+    bottom: auto;
     z-index: 3;
     min-height: 48px;
     padding: 7px;
@@ -2314,5 +2314,3 @@ input[type="radio"],
     contain: content;
   }
 }
-
-
