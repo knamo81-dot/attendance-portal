@@ -171,138 +171,20 @@
   };
 
   function getAicDebugActiveInfo() {
-    var active = null;
-    try { active = document.activeElement; } catch (_) {}
-
-    if (!active) return { tag: '', inputSlot: '', sendSlot: '', className: '' };
-
-    return {
-      tag: String(active.tagName || '').toLowerCase(),
-      inputSlot: active.getAttribute ? String(active.getAttribute('data-input-slot') || '') : '',
-      sendSlot: active.getAttribute ? String(active.getAttribute('data-send-slot') || '') : '',
-      className: String(active.className || '').slice(0, 80)
-    };
+    return { tag: '', inputSlot: '', sendSlot: '', className: '' };
   }
 
   function aicDebugLog(eventName, detail) {
-    try {
-      var item = {
-        time: new Date().toLocaleTimeString(),
-        event: String(eventName || ''),
-        detail: detail || {},
-        active: getAicDebugActiveInfo(),
-        viewport: {
-          w: window.innerWidth || 0,
-          h: window.innerHeight || 0,
-          vvH: window.visualViewport ? Math.round(window.visualViewport.height || 0) : 0,
-          vvTop: window.visualViewport ? Math.round(window.visualViewport.offsetTop || 0) : 0
-        }
-      };
-
-      window.__aicDebugLogs = window.__aicDebugLogs || [];
-      window.__aicDebugLogs.push(item);
-      if (window.__aicDebugLogs.length > 120) window.__aicDebugLogs.shift();
-
-      if (window.console && typeof console.log === 'function') {
-        console.log('[AIC-DEBUG]', item.event, item);
-      }
-
-      try {
-        localStorage.setItem('aic_debug_logs', JSON.stringify(window.__aicDebugLogs.slice(-80)));
-      } catch (_) {}
-
-      renderAicDebugPanel();
-    } catch (_) {}
+    // production noop
   }
 
-  function toggleAicDebugPanel(forceOpen) {
-    try {
-      var panel = document.querySelector('[data-aic-debug-panel="1"]');
-      if (!panel) {
-        renderAicDebugPanel(true);
-        panel = document.querySelector('[data-aic-debug-panel="1"]');
-      }
-      if (!panel) return;
-
-      var body = panel.querySelector('[data-aic-debug-body="1"]');
-      if (!body) return;
-
-      var nextOpen = typeof forceOpen === 'boolean' ? forceOpen : body.hidden;
-      body.hidden = !nextOpen;
-      panel.setAttribute('data-aic-debug-open', nextOpen ? '1' : '0');
-    } catch (_) {}
-  }
-
-  function clearAicDebugLogs() {
-    try {
-      window.__aicDebugLogs = [];
-      localStorage.removeItem('aic_debug_logs');
-      renderAicDebugPanel();
-    } catch (_) {}
-  }
-
-  function renderAicDebugPanel(forceCreate) {
-    try {
-      if (!isAicMobileViewport() && !forceCreate) return;
-
-      var panel = document.querySelector('[data-aic-debug-panel="1"]');
-      if (!panel) {
-        panel = document.createElement('div');
-        panel.setAttribute('data-aic-debug-panel', '1');
-        panel.style.cssText = [
-          'position:fixed',
-          'left:8px',
-          'right:8px',
-          'bottom:8px',
-          'z-index:2147483647',
-          'font-family:monospace',
-          'font-size:11px',
-          'color:#e5e7eb',
-          'pointer-events:auto'
-        ].join(';') + ';';
-
-        panel.innerHTML = [
-          '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">',
-          '  <button type="button" data-aic-debug-toggle="1" style="height:28px;padding:0 10px;border:0;border-radius:999px;background:#111827;color:#fff;font-weight:900;">AIC LOG</button>',
-          '  <button type="button" data-aic-debug-clear="1" style="height:28px;padding:0 10px;border:0;border-radius:999px;background:#374151;color:#fff;font-weight:900;">CLEAR</button>',
-          '</div>',
-          '<div data-aic-debug-body="1" hidden style="max-height:42vh;overflow:auto;border-radius:12px;background:rgba(17,24,39,.94);box-shadow:0 12px 36px rgba(0,0,0,.35);padding:8px;white-space:pre-wrap;line-height:1.35;"></div>'
-        ].join('');
-
-        document.body.appendChild(panel);
-
-        panel.querySelector('[data-aic-debug-toggle]').addEventListener('click', function (event) {
-          event.preventDefault();
-          event.stopPropagation();
-          toggleAicDebugPanel();
-        });
-
-        panel.querySelector('[data-aic-debug-clear]').addEventListener('click', function (event) {
-          event.preventDefault();
-          event.stopPropagation();
-          clearAicDebugLogs();
-        });
-      }
-
-      var body = panel.querySelector('[data-aic-debug-body="1"]');
-      if (!body || body.hidden) return;
-
-      var logs = window.__aicDebugLogs || [];
-      body.textContent = logs.slice(-35).map(function (item) {
-        return [
-          item.time,
-          item.event,
-          'active=' + (item.active && item.active.tag ? item.active.tag : '-') + (item.active && item.active.inputSlot ? '[input:' + item.active.inputSlot + ']' : ''),
-          'vvH=' + (item.viewport ? item.viewport.vvH : ''),
-          JSON.stringify(item.detail || {})
-        ].join(' | ');
-      }).join('\n');
-    } catch (_) {}
-  }
+  function toggleAicDebugPanel(forceOpen) {}
+  function clearAicDebugLogs() {}
+  function renderAicDebugPanel(forceCreate) {}
 
   window.aicDebugLog = aicDebugLog;
-  window.aicDebugLogs = function () { return window.__aicDebugLogs || []; };
-  window.aicDebugPanel = function () { toggleAicDebugPanel(true); };
+  window.aicDebugLogs = function () { return []; };
+  window.aicDebugPanel = function () {};
   window.aicDebugClear = clearAicDebugLogs;
 
   function $(id) {
@@ -584,7 +466,7 @@
     // 아직 서버에 저장되기 전의 임시 메시지는 화면에서만 제거합니다.
     if (messageId.indexOf('temp_') === 0) {
       removeAicMessageFromLocal(room.id, messageId);
-      render(false);
+      updateAicMessageAfterChange(room.id);
       return;
     }
 
@@ -660,7 +542,7 @@
         .eq('id', room.id);
     } catch (_) {}
 
-    render(false);
+    updateAicMessageAfterChange(room.id);
   }
 
   function canEditAicMessage(message) {
@@ -4010,7 +3892,7 @@
     }
 
     scheduleMessageUnreadReload([room.id]);
-    render(false);
+    updateAicMessageAfterChange(room.id);
   }
 
   function handleRealtimeMessageUpdate(row) {
@@ -4044,7 +3926,7 @@
       clearAicMessageEdit();
     }
 
-    render(false);
+    updateAicMessageAfterChange(room.id);
     scheduleVisibleAicMessageBoxesBottomScroll();
   }
 
@@ -4075,7 +3957,8 @@
     }
 
     if (changed) {
-      render(false);
+      if (roomId) updateAicMessageAfterChange(roomId);
+      else render(false);
     } else {
       loadRoomsFromServer({ skipRealtime: true });
     }
@@ -5153,25 +5036,130 @@
   }
 
   
+  function buildAicMessageListHtml(room) {
+    var messages = (room && Array.isArray(room.messages) ? room.messages : []).map(function (message) {
+      return wrapMessageWithUnread(room, message, buildMessage(room, message));
+    }).join('');
+
+    if (!messages) {
+      messages = '<div class="aic-empty-message">' + tr('aic.noMessages', '아직 메시지가 없습니다.') + '<br>' + tr('aic.writeMessageGuide', '아래 입력창으로 메시지를 작성하세요.') + '</div>';
+    }
+
+    return messages;
+  }
+
+  function bindAicDynamicMessageActions(scope) {
+    var root = scope || els.slots;
+    if (!root) return;
+
+    bindAicMessageContextMenu();
+
+    Array.from(root.querySelectorAll('[data-attachment-action]')).forEach(function (btn) {
+      if (btn.dataset.aicAttachmentActionBound === '1') return;
+      btn.dataset.aicAttachmentActionBound = '1';
+
+      btn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        var filePath = btn.getAttribute('data-attachment-path') || '';
+        var fileName = btn.getAttribute('data-attachment-name') || '첨부파일';
+        var action = btn.getAttribute('data-attachment-action') || 'preview';
+        var kind = btn.getAttribute('data-attachment-kind') || '';
+        openAicAttachment(filePath, fileName, action, kind);
+      });
+    });
+
+    Array.from(root.querySelectorAll('[data-aic-link-card-url]')).forEach(function (el) {
+      if (el.dataset.aicLinkCardBound === '1') return;
+      el.dataset.aicLinkCardBound = '1';
+
+      el.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        var url = el.getAttribute('data-aic-link-card-url') || '';
+        url = normalizeLinkUrl(url);
+        if (!url) return;
+
+        try {
+          window.open(url, '_blank', 'noopener,noreferrer');
+        } catch (_) {
+          var a = document.createElement('a');
+          a.href = url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }
+      });
+    });
+  }
+
   function updateAicMessagesOnly(slotIndex) {
-    aicDebugLog('updateAicMessagesOnly', { slotIndex: slotIndex });
     try {
-      var room = getRoom(state.openSlots?.[slotIndex]?.roomId);
+      slotIndex = Number(slotIndex) || 0;
+
+      var slot = state.openSlots && state.openSlots[slotIndex] ? state.openSlots[slotIndex] : null;
+      var room = slot ? getRoom(slot.roomId) : null;
       var box = els.slots ? els.slots.querySelector('[data-message-box="' + slotIndex + '"]') : null;
       if (!room || !box) return false;
 
-      var html = (room.messages || []).map(function(msg){
-        return buildMessage(room, msg);
-      }).join('');
-
-      box.innerHTML = html;
-      bindAicMessageContextMenu();
-      bindAttachmentButtons();
+      // 1단계 구조 개선:
+      // 메시지 변경 시 채팅 슬롯 전체가 아니라 메시지 박스만 갱신합니다.
+      // 입력창 DOM을 유지해서 모바일 키보드/focus가 끊기지 않도록 합니다.
+      box.innerHTML = buildAicMessageListHtml(room);
+      bindAicDynamicMessageActions(box);
       scheduleVisibleAicMessageBoxesBottomScroll();
       return true;
     } catch (_) {
       return false;
     }
+  }
+
+  function updateAicOpenMessageViewsForRoom(roomId) {
+    roomId = String(roomId || '').trim();
+    var hadOpenSlot = false;
+    var failed = false;
+
+    (state.openSlots || []).forEach(function (slot, index) {
+      if (!slot || String(slot.roomId || '').trim() !== roomId) return;
+      hadOpenSlot = true;
+      if (!updateAicMessagesOnly(index)) failed = true;
+    });
+
+    try {
+      renderRoomList();
+    } catch (_) {}
+
+    if (hadOpenSlot && failed) {
+      render(false);
+      return false;
+    }
+
+    return true;
+  }
+
+  function updateAicMessageAfterChange(roomId, slotIndex) {
+    roomId = String(roomId || '').trim();
+
+    if (roomId) {
+      return updateAicOpenMessageViewsForRoom(roomId);
+    }
+
+    if (Number.isFinite(Number(slotIndex))) {
+      if (!updateAicMessagesOnly(Number(slotIndex))) {
+        render(false);
+        return false;
+      }
+
+      try {
+        renderRoomList();
+      } catch (_) {}
+      return true;
+    }
+
+    render(false);
+    return false;
   }
 
 async function sendAttachmentMessage(slotIndex, file) {
@@ -5205,7 +5193,7 @@ async function sendAttachmentMessage(slotIndex, file) {
     room.messages.push(message);
     rememberPendingAttachmentMessage(room.id, tempId, message);
     markRoomRead(room.id);
-    if (!updateAicMessagesOnly(slotIndex)) render(false);
+    updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
@@ -5215,7 +5203,7 @@ async function sendAttachmentMessage(slotIndex, file) {
       message.original = attachment.file_name || message.original;
       message.translations = normalizeTranslations(message.translations);
       message.translations.__attachment = attachment;
-      if (!updateAicMessagesOnly(slotIndex)) render(false);
+      updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
@@ -5228,7 +5216,7 @@ async function sendAttachmentMessage(slotIndex, file) {
 
       await insertAttachmentToServer(room, message, attachment);
       scheduleForgetPendingAttachmentMessage(room.id, tempId, 15000);
-      if (!updateAicMessagesOnly(slotIndex)) render(false);
+      updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
     } catch (error) {
@@ -5236,7 +5224,7 @@ async function sendAttachmentMessage(slotIndex, file) {
       room.messages = (room.messages || []).filter(function (item) {
         return item.id !== tempId;
       });
-      if (!updateAicMessagesOnly(slotIndex)) render(false);
+      updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
       var uploadFailMessage = String(error?.message || '');
@@ -5291,14 +5279,14 @@ async function sendAttachmentMessage(slotIndex, file) {
 
     room.messages.push(message);
     markRoomRead(room.id);
-    if (!updateAicMessagesOnly(slotIndex)) render(false);
+    updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
     try {
       var savedRow = await insertMessageToServer(room, message);
       replaceTempMessageWithSavedMessage(room, tempId, savedRow, message);
-      if (!updateAicMessagesOnly(slotIndex)) render(false);
+      updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
     } catch (error) {
@@ -5342,7 +5330,7 @@ async function sendAttachmentMessage(slotIndex, file) {
 
     room.messages.push(message);
     markRoomRead(room.id);
-    if (!updateAicMessagesOnly(slotIndex)) render(false);
+    updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
@@ -5351,7 +5339,7 @@ async function sendAttachmentMessage(slotIndex, file) {
       // 이렇게 해야 PC/모바일 모두 Realtime이나 재조회 대기 없이 5분 이내 수정 메뉴가 바로 활성화됩니다.
       var savedRow = await insertMessageToServer(room, message);
       message = replaceTempMessageWithSavedMessage(room, tempId, savedRow, message) || message;
-      if (!updateAicMessagesOnly(slotIndex)) render(false);
+      updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
@@ -5366,12 +5354,12 @@ async function sendAttachmentMessage(slotIndex, file) {
       message.translated = translationResult.translated || '';
       message.source_lang = translationResult.source_lang || message.source_lang || detectTextLanguage(text);
       message.translations = normalizeTranslations(translationResult.translations);
-      if (!updateAicMessagesOnly(slotIndex)) render(false);
+      updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
 
       await updateStoredMessageTranslation(room, message);
-      if (!updateAicMessagesOnly(slotIndex)) render(false);
+      updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
     scheduleVisibleAicMessageBoxesBottomScroll();
     } catch (error) {
