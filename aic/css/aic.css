@@ -2365,3 +2365,106 @@ input[type="radio"],
     grid-template-rows: minmax(0, 1fr) !important;
   }
 }
+
+
+/* =========================================================
+   AIC Mobile Layout Stabilizer v2
+   - 모바일 키보드 등장 시 100vh/100dvh 재계산과 100% height 체인 충돌 완화
+   - JS viewport/keyboard 보정 제거 상태에 맞춰 CSS 레이아웃을 iframe 내부 높이에 고정
+   - 입력창/메시지 영역은 grid 내부에서만 계산되도록 제한
+========================================================= */
+@media (max-width: 760px) {
+  html,
+  body {
+    height: 100% !important;
+    min-height: 100% !important;
+    max-height: none !important;
+    overflow: hidden !important;
+  }
+
+  .aic-root {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    contain: layout size !important;
+  }
+
+  .aic-root.aic-mobile-list-view,
+  .aic-root.aic-mobile-chat-view {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-main {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-toolbar {
+    display: none !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-slots {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-chat-window {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    transform: none !important;
+    contain: layout paint !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-messages {
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+    transform: none !important;
+    contain: layout paint !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-chat-input {
+    position: relative !important;
+    bottom: auto !important;
+    flex: 0 0 auto !important;
+    transform: none !important;
+    contain: layout paint !important;
+    will-change: auto !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-sidebar,
+  .aic-root.aic-mobile-chat-view .aic-room-list {
+    display: none !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .aic-root,
+  .aic-root.aic-mobile-list-view,
+  .aic-root.aic-mobile-chat-view {
+    height: 100% !important;
+    min-height: 0 !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+}
