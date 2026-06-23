@@ -5091,6 +5091,100 @@
     return messages;
   }
 
+  function getAicMessageRenderKey(message, index) {
+    var id = String(message && message.id || '').trim();
+    if (id) return id;
+
+    return [
+      'idx',
+      Number(index) || 0,
+      String(message && message.sender_email || '').trim(),
+      String(message && message.created_at || '').trim(),
+      String(message && message.original || '').trim()
+    ].join('_');
+  }
+
+  function hashAicMessageHtml(value) {
+    var text = String(value || '');
+    var hash = 5381;
+
+    for (var i = 0; i < text.length; i++) {
+      hash = ((hash << 5) + hash) + text.charCodeAt(i);
+      hash = hash & 0xffffffff;
+    }
+
+    return String(hash >>> 0);
+  }
+
+  function buildAicMessageNodeHtml(room, message) {
+    return wrapMessageWithUnread(room, message, buildMessage(room, message));
+  }
+
+  function createAicMessageNodeFromHtml(html, key, signature) {
+    var template = document.createElement('template');
+    template.innerHTML = String(html || '').trim();
+
+    var node = template.content.firstElementChild;
+    if (!node) return null;
+
+    node.dataset.aicMessageNodeId = String(key || '');
+    node.dataset.aicMessageRenderSig = String(signature || '');
+    return node;
+  }
+
+  function getAicMessageNodeId(node) {
+    if (!node || !node.getAttribute) return '';
+
+    var key = node.getAttribute('data-aic-message-node-id');
+    if (key) return String(key || '').trim();
+
+    key = node.getAttribute('data-aic-message-line-id');
+    if (key) return String(key || '').trim();
+
+    var messageEl = node.matches && node.matches('.aic-message[data-aic-message-id]')
+      ? node
+      : (node.querySelector ? node.querySelector('.aic-message[data-aic-message-id]') : null);
+
+    if (messageEl) {
+      key = messageEl.getAttribute('data-aic-message-id');
+      if (key) return String(key || '').trim();
+    }
+
+    return '';
+  }
+
+  function getAicMessageNodeByKey(box, key) {
+    key = String(key || '').trim();
+    if (!box || !key) return null;
+
+    var children = Array.from(box.children || []);
+    for (var i = 0; i < children.length; i++) {
+      if (getAicMessageNodeId(children[i]) === key) return children[i];
+    }
+
+    return null;
+  }
+
+  function getAicMessageNodeSignature(node) {
+    return String(node && node.dataset ? node.dataset.aicMessageRenderSig || '' : '');
+  }
+
+  function isAicEmptyMessageNode(node) {
+    return !!(node && node.classList && node.classList.contains('aic-empty-message'));
+  }
+
+  function setAicEmptyMessage(box) {
+    if (!box) return;
+    box.innerHTML = '<div class="aic-empty-message">' + tr('aic.noMessages', '아직 메시지가 없습니다.') + '<br>' + tr('aic.writeMessageGuide', '아래 입력창으로 메시지를 작성하세요.') + '</div>';
+  }
+
+  function removeAicEmptyMessage(box) {
+    if (!box) return;
+    Array.from(box.children || []).forEach(function (node) {
+      if (isAicEmptyMessageNode(node)) node.remove();
+    });
+  }
+
   function bindAicDynamicMessageActions(scope) {
     var root = scope || els.slots;
     if (!root) return;
@@ -5147,14 +5241,83 @@
       var box = els.slots ? els.slots.querySelector('[data-message-box="' + slotIndex + '"]') : null;
       if (!room || !box) return false;
 
-      // 1단계 구조 개선:
-      // 메시지 변경 시 채팅 슬롯 전체가 아니라 메시지 박스만 갱신합니다.
-      // 입력창 DOM을 유지해서 모바일 키보드/focus가 끊기지 않도록 합니다.
-      box.innerHTML = buildAicMessageListHtml(room);
-      bindAicDynamicMessageActions(box);
+      var messages = Array.isArray(room.messages) ? room.messages : [];
+
+      if (!messages.length) {
+        setAicEmptyMessage(box);
+        scheduleVisibleAicMessageBoxesBottomScroll(slotIndex, { force: true });
+        return true;
+      }
+
+      removeAicEmptyMessage(box);
+
+      var desiredKeys = {};
+      var changedNodes = [];
+
+      messages.forEach(function (message, index) {
+        var key = getAicMessageRenderKey(message, index);
+        var html = buildAicMessageNodeHtml(room, message);
+        var signature = hashAicMessageHtml(html);
+        desiredKeys[key] = true;
+
+        var existing = getAicMessageNodeByKey(box, key);
+        var node = existing;
+
+        if (!existing) {
+          node = createAicMessageNodeFromHtml(html, key, signature);
+          if (!node) return;
+          changedNodes.push(node);
+        } else {
+          // 기존 DOM에 서명이 없는 경우는 최초 1회 호환 처리입니다.
+          // 이때 기존 이모티콘/img DOM을 유지해서 첫 전송 시 전체 깜빡임을 피합니다.
+          var previousSignature = getAicMessageNodeSignature(existing);
+          if (!previousSignature) {
+            existing.dataset.aicMessageNodeId = key;
+            existing.dataset.aicMessageRenderSig = signature;
+            node = existing;
+          } else if (previousSignature !== signature) {
+            node = createAicMessageNodeFromHtml(html, key, signature);
+            if (!node) return;
+            existing.replaceWith(node);
+            changedNodes.push(node);
+          }
+        }
+
+        var currentAtIndex = box.children[index] || null;
+        if (node && currentAtIndex !== node) {
+          box.insertBefore(node, currentAtIndex);
+        }
+      });
+
+      Array.from(box.children || []).forEach(function (node) {
+        if (isAicEmptyMessageNode(node)) return;
+
+        var key = getAicMessageNodeId(node);
+        if (key && !desiredKeys[key]) {
+          node.remove();
+        }
+      });
+
+      bindAicDynamicMessageActions(changedNodes.length ? box : box);
       scheduleVisibleAicMessageBoxesBottomScroll(slotIndex, { force: true });
       return true;
-    } catch (_) {
+    } catch (error) {
+      try {
+        console.warn('[AIC MESSAGE DIFF] fallback to full message render:', error);
+      } catch (_) {}
+
+      try {
+        var fallbackSlot = state.openSlots && state.openSlots[slotIndex] ? state.openSlots[slotIndex] : null;
+        var fallbackRoom = fallbackSlot ? getRoom(fallbackSlot.roomId) : null;
+        var fallbackBox = els.slots ? els.slots.querySelector('[data-message-box="' + slotIndex + '"]') : null;
+        if (fallbackRoom && fallbackBox) {
+          fallbackBox.innerHTML = buildAicMessageListHtml(fallbackRoom);
+          bindAicDynamicMessageActions(fallbackBox);
+          scheduleVisibleAicMessageBoxesBottomScroll(slotIndex, { force: true });
+          return true;
+        }
+      } catch (_) {}
+
       return false;
     }
   }
