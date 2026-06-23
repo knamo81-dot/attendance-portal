@@ -10,7 +10,7 @@
   var els = {};
   var resizeTimer = null;
   var mobileKeyboardTimer = null;
-  var mobileViewportStableAt = Date.now() + 1500;
+  var mobileViewportStableAt = Date.now() + 5000;
   var lastViewportSize = {
     width: window.innerWidth || 0,
     height: window.innerHeight || 0
@@ -6275,7 +6275,10 @@ async function sendAttachmentMessage(slotIndex, file) {
       window.I18N.__aicPatched = true;
     }
 
-    scheduleRender();
+    if (!isAicMobileViewport()) {
+      scheduleRender();
+    }
+
     loadOrgMaps().then(function () {
       loadRoomsFromServer();
     });
