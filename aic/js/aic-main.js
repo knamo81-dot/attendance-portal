@@ -54,6 +54,8 @@
   }
 
   function updateAicViewportUnit() {
+    if (isAicMobileViewport()) return;
+
     var height = getAicViewportHeight();
     if (!height) return;
 
