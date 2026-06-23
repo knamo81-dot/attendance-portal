@@ -16,6 +16,8 @@
     height: window.innerHeight || 0
   };
   var lastScheduleRenderAt = 0;
+  var aicMessageScrollTimers = {};
+  var aicLastMessageScrollAt = 0;
 
   var CONFIG = {
     defaultSettings: {
@@ -3927,7 +3929,6 @@
     }
 
     updateAicMessageAfterChange(room.id);
-    scheduleVisibleAicMessageBoxesBottomScroll();
   }
 
   function handleRealtimeMessageDelete(row) {
@@ -4178,7 +4179,15 @@
   }
 
   function renderRoomList() {
-    syncMobileAicView();
+    var activeEl = null;
+    try { activeEl = document.activeElement; } catch (_) {}
+    var isTypingInAicInput = !!(activeEl && activeEl.matches && activeEl.matches('.aic-message-input'));
+
+    // 모바일 입력 중에는 목록/채팅 모바일 뷰 상태를 다시 동기화하지 않습니다.
+    // 키보드가 열린 상태에서 채팅룸이 내려가거나 올라가려는 충돌을 줄입니다.
+    if (!isAicMobileViewport() || !isTypingInAicInput) {
+      syncMobileAicView();
+    }
     if (!els.roomList) return;
 
     if (!state.rooms.length) {
@@ -4659,6 +4668,17 @@
     return Number(box && box.getAttribute && box.getAttribute('data-message-box')) || 0;
   }
 
+  function isAicMessageBoxNearBottom(box) {
+    if (!box) return true;
+
+    try {
+      var gap = Number(box.scrollHeight || 0) - Number(box.scrollTop || 0) - Number(box.clientHeight || 0);
+      return gap < 160;
+    } catch (_) {
+      return true;
+    }
+  }
+
   function scrollAicMessageBoxToBottom(box) {
     if (!box) return;
 
@@ -4667,32 +4687,49 @@
     } catch (_) {}
   }
 
-  function scheduleAicMessageBoxBottomScroll(box) {
+  function scheduleAicMessageBoxBottomScroll(box, options) {
     if (!box) return;
 
-    // 메시지/이모티콘/파일 카드 렌더 직후에는 이미지 높이가 아직 확정되지 않을 수 있습니다.
-    // 여러 프레임에 걸쳐 하단을 보정해서 마지막 메시지가 잘리지 않게 합니다.
-    var timers = [];
+    options = options || {};
+
+    var slotIndex = getAicMessageBoxSlotIndex(box);
+    var key = 'slot_' + slotIndex;
+    var force = options.force !== false;
+
+    // 모바일 키보드가 열린 상태에서는 여러 타이머가 반복적으로 scrollTop을 바꾸면
+    // 채팅룸이 내려가려다 올라오는 버벅임이 생길 수 있습니다.
+    // 그래서 슬롯별 예약을 1개로 합치고, 기본은 active 슬롯만 하단 보정합니다.
+    if (isAicMobileViewport() && slotIndex !== Number(state.activeSlotIndex || 0)) {
+      return;
+    }
+
+    if (!force && !isAicMessageBoxNearBottom(box)) {
+      return;
+    }
+
+    if (aicMessageScrollTimers[key]) {
+      clearTimeout(aicMessageScrollTimers[key]);
+      aicMessageScrollTimers[key] = null;
+    }
+
     var run = function () {
+      aicMessageScrollTimers[key] = null;
       scrollAicMessageBoxToBottom(box);
+      aicLastMessageScrollAt = Date.now();
     };
 
-    requestAnimationFrame(function () {
-      run();
-      requestAnimationFrame(run);
-    });
+    requestAnimationFrame(run);
 
-    [80, 180, 360, 700].forEach(function (delay) {
-      timers.push(setTimeout(run, delay));
-    });
+    // 이미지/이모티콘 높이가 늦게 잡히는 경우만 짧게 1회 보정합니다.
+    // 기존 [80,180,360,700] 다중 보정을 제거해 키보드 viewport와 싸우지 않게 합니다.
+    aicMessageScrollTimers[key] = setTimeout(run, isAicMobileViewport() ? 90 : 140);
 
     Array.from(box.querySelectorAll('img')).forEach(function (img) {
       if (img.dataset.aicBottomScrollBound === '1') return;
       img.dataset.aicBottomScrollBound = '1';
 
       var onDone = function () {
-        run();
-        setTimeout(run, 80);
+        scheduleAicMessageBoxBottomScroll(box, { force: true });
       };
 
       if (!img.complete) {
@@ -4702,11 +4739,15 @@
     });
   }
 
-  function scheduleVisibleAicMessageBoxesBottomScroll() {
+  function scheduleVisibleAicMessageBoxesBottomScroll(slotIndex, options) {
     if (!els.slots) return;
 
-    Array.from(els.slots.querySelectorAll('[data-message-box]')).forEach(function (box) {
-      scheduleAicMessageBoxBottomScroll(box);
+    var selector = Number.isFinite(Number(slotIndex))
+      ? '[data-message-box="' + (Number(slotIndex) || 0) + '"]'
+      : '[data-message-box]';
+
+    Array.from(els.slots.querySelectorAll(selector)).forEach(function (box) {
+      scheduleAicMessageBoxBottomScroll(box, options || { force: true });
     });
   }
 
@@ -4965,7 +5006,7 @@
     Array.from(els.slots.querySelectorAll('[data-input-slot]')).forEach(function (input) {
       input.addEventListener('focus', function () {
         aicDebugLog('input:focus', { slotIndex: Number(input.getAttribute('data-input-slot')) || 0 });
-        scheduleVisibleAicMessageBoxesBottomScroll();
+        scheduleVisibleAicMessageBoxesBottomScroll(Number(input.getAttribute('data-input-slot')) || 0, { force: false });
       });
 
       input.addEventListener('blur', function () {
@@ -5026,7 +5067,7 @@
       });
     });
 
-    scheduleVisibleAicMessageBoxesBottomScroll();
+    scheduleVisibleAicMessageBoxesBottomScroll(state.activeSlotIndex, { force: true });
 
     // 모바일에서 읽음처리 저장 직후 전체 render가 다시 돌면 하단이 깜빡일 수 있어,
     // 스크롤 보정이 먼저 끝난 뒤 읽음처리를 수행합니다.
@@ -5109,7 +5150,7 @@
       // 입력창 DOM을 유지해서 모바일 키보드/focus가 끊기지 않도록 합니다.
       box.innerHTML = buildAicMessageListHtml(room);
       bindAicDynamicMessageActions(box);
-      scheduleVisibleAicMessageBoxesBottomScroll();
+      scheduleVisibleAicMessageBoxesBottomScroll(slotIndex, { force: true });
       return true;
     } catch (_) {
       return false;
@@ -5195,7 +5236,6 @@ async function sendAttachmentMessage(slotIndex, file) {
     markRoomRead(room.id);
     updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
-    scheduleVisibleAicMessageBoxesBottomScroll();
 
     try {
       var attachment = await uploadAicAttachmentFile(room, file);
@@ -5205,7 +5245,6 @@ async function sendAttachmentMessage(slotIndex, file) {
       message.translations.__attachment = attachment;
       updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
-    scheduleVisibleAicMessageBoxesBottomScroll();
 
       var savedAttachmentRow = await insertMessageToServer(room, message);
       message = replaceTempMessageWithSavedMessage(room, tempId, savedAttachmentRow, message) || message;
@@ -5218,7 +5257,6 @@ async function sendAttachmentMessage(slotIndex, file) {
       scheduleForgetPendingAttachmentMessage(room.id, tempId, 15000);
       updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
-    scheduleVisibleAicMessageBoxesBottomScroll();
     } catch (error) {
       forgetPendingAttachmentMessage(room.id, tempId);
       room.messages = (room.messages || []).filter(function (item) {
@@ -5226,7 +5264,6 @@ async function sendAttachmentMessage(slotIndex, file) {
       });
       updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
-    scheduleVisibleAicMessageBoxesBottomScroll();
       var uploadFailMessage = String(error?.message || '');
       if (uploadFailMessage.toLowerCase().indexOf('failed to fetch') >= 0) {
         uploadFailMessage = '브라우저/보안프로그램 또는 네트워크가 파일 업로드 요청을 차단했을 수 있습니다. 잠시 후 다시 시도해 주세요. (' + uploadFailMessage + ')';
@@ -5281,14 +5318,12 @@ async function sendAttachmentMessage(slotIndex, file) {
     markRoomRead(room.id);
     updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
-    scheduleVisibleAicMessageBoxesBottomScroll();
 
     try {
       var savedRow = await insertMessageToServer(room, message);
       replaceTempMessageWithSavedMessage(room, tempId, savedRow, message);
       updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
-    scheduleVisibleAicMessageBoxesBottomScroll();
     } catch (error) {
       alert('이모티콘 전송 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
     }
@@ -5332,7 +5367,6 @@ async function sendAttachmentMessage(slotIndex, file) {
     markRoomRead(room.id);
     updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
-    scheduleVisibleAicMessageBoxesBottomScroll();
 
     try {
       // 먼저 DB에 저장해서 실제 message id를 즉시 확보합니다.
@@ -5341,7 +5375,6 @@ async function sendAttachmentMessage(slotIndex, file) {
       message = replaceTempMessageWithSavedMessage(room, tempId, savedRow, message) || message;
       updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
-    scheduleVisibleAicMessageBoxesBottomScroll();
 
       var originalTextForTranslation = text;
       var translationResult = await translateWithAi(text, detectTextLanguage(text), room);
@@ -5356,12 +5389,10 @@ async function sendAttachmentMessage(slotIndex, file) {
       message.translations = normalizeTranslations(translationResult.translations);
       updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
-    scheduleVisibleAicMessageBoxesBottomScroll();
 
       await updateStoredMessageTranslation(room, message);
       updateAicMessageAfterChange(room.id, slotIndex);
     refocusAicInputAfterMobileSend(slotIndex);
-    scheduleVisibleAicMessageBoxesBottomScroll();
     } catch (error) {
       alert('메시지 저장 실패: ' + (error?.message || 'Supabase 연결/테이블을 확인해 주세요.'));
     }
@@ -6037,13 +6068,14 @@ async function sendAttachmentMessage(slotIndex, file) {
       render(true);
     });
 
-    // iframe 전환 직후 포탈 레이아웃이 안정된 뒤 다시 계산
-    resizeTimer = setTimeout(function () {
-      updateAicViewportUnit();
-      render(true);
-    }, isMobile ? 420 : 180);
-
+    // 모바일에서는 지연 render가 입력창/키보드 상태와 충돌할 수 있어 2차 render를 생략합니다.
+    // PC에서는 기존처럼 레이아웃 안정화용 보정을 유지합니다.
     if (!isMobile) {
+      resizeTimer = setTimeout(function () {
+        updateAicViewportUnit();
+        render(true);
+      }, 180);
+
       setTimeout(function () {
         render(true);
       }, 520);
