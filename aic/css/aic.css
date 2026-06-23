@@ -669,7 +669,7 @@ body {
     max-height: none;
     padding: 8px;
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(160px, calc(var(--aic-vh, 1vh) * 30)) minmax(0, 1fr);
+    grid-template-rows: 220px minmax(0, 1fr);
     overflow: hidden;
   }
 
@@ -787,7 +787,7 @@ body {
 @media (max-width: 420px) {
   .aic-root {
     padding: 6px;
-    grid-template-rows: minmax(140px, calc(var(--aic-vh, 1vh) * 28)) minmax(0, 1fr);
+    grid-template-rows: 200px minmax(0, 1fr);
   }
 
   .aic-sidebar-head {
@@ -2312,5 +2312,56 @@ input[type="radio"],
 
   .aic-messages {
     contain: content;
+  }
+}
+
+
+/* =========================================================
+   AIC Mobile Stable Grid Patch v1
+   - 모바일에서 --aic-vh/calc 기반 grid 높이 계산을 사용하지 않음
+   - 키보드/주소창 변화 시 grid row가 재계산되며 채팅룸이 흔들리는 증상 완화
+   - 모바일 list/chat 전환 구조는 유지
+========================================================= */
+@media (max-width: 760px) {
+  .aic-root {
+    height: 100vh !important;
+    min-height: 100vh !important;
+    max-height: none !important;
+    grid-template-rows: 220px minmax(0, 1fr) !important;
+  }
+
+  .aic-root.aic-mobile-list-view,
+  .aic-root.aic-mobile-chat-view {
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-main,
+  .aic-root.aic-mobile-chat-view .aic-slots,
+  .aic-root.aic-mobile-chat-view .aic-chat-window {
+    min-height: 0 !important;
+    height: 100% !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-chat-window {
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+  }
+
+  .aic-root.aic-mobile-chat-view .aic-chat-input {
+    position: relative !important;
+    bottom: auto !important;
+    transform: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .aic-root {
+    grid-template-rows: 200px minmax(0, 1fr) !important;
+  }
+
+  .aic-root.aic-mobile-list-view,
+  .aic-root.aic-mobile-chat-view {
+    grid-template-rows: minmax(0, 1fr) !important;
   }
 }
