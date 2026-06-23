@@ -5074,7 +5074,12 @@
     Array.from(els.slots.querySelectorAll('[data-input-slot]')).forEach(function (input) {
       input.addEventListener('focus', function () {
         aicDebugLog('input:focus', { slotIndex: Number(input.getAttribute('data-input-slot')) || 0 });
-        scheduleVisibleAicMessageBoxesBottomScroll(Number(input.getAttribute('data-input-slot')) || 0, { force: false });
+
+        // 모바일에서는 키보드 오픈 과정과 스크롤 보정이 충돌하여
+        // 채팅창이 버벅이거나 올라오지 않는 현상을 줄이기 위해 비활성화
+        if (!isAicMobileViewport()) {
+          scheduleVisibleAicMessageBoxesBottomScroll(Number(input.getAttribute('data-input-slot')) || 0, { force: false });
+        }
       });
 
       input.addEventListener('blur', function () {
