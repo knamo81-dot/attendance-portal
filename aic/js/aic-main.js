@@ -123,6 +123,53 @@
     return;
   }
 
+  function getAicFocusedMessageInput() {
+    try {
+      var active = document.activeElement;
+      if (!active || !active.matches) return null;
+      if (active.matches('.aic-message-input, [data-input-slot]')) return active;
+    } catch (_) {}
+
+    return null;
+  }
+
+  function isAicMessageInputFocused() {
+    return !!getAicFocusedMessageInput();
+  }
+
+  function getAicFocusedInputSlotIndex() {
+    var input = getAicFocusedMessageInput();
+    if (!input) return -1;
+    return Number(input.getAttribute('data-input-slot')) || 0;
+  }
+
+  function renderAicAfterServerDataLoad(fill) {
+    // 모바일에서 입력창 focus/키보드가 열린 상태일 때 서버 reload 완료가 전체 render를 실행하면
+    // 입력창 DOM이 재생성되며 키보드가 내려갈 수 있습니다.
+    // 이 경우 방목록과 메시지 영역만 부분 갱신해서 focus를 유지합니다.
+    if (isAicMobileViewport() && isAicMessageInputFocused() && els.slots) {
+      try {
+        renderRoomList();
+      } catch (_) {}
+
+      var updated = false;
+      try {
+        (state.openSlots || []).forEach(function (slot, index) {
+          if (!slot || !slot.roomId) return;
+          if (updateAicMessagesOnly(index)) updated = true;
+        });
+      } catch (_) {}
+
+      try {
+        syncMobileAicView();
+      } catch (_) {}
+
+      if (updated) return;
+    }
+
+    render(fill);
+  }
+
   var state = {
     activeSlotIndex: 0,
     activeParticipantsRoomId: '',
@@ -3017,7 +3064,7 @@
     if (!sb || !companyId) {
       state.dbReady = false;
       state.rooms = [];
-      render(false);
+      renderAicAfterServerDataLoad(false);
       return;
     }
 
@@ -3050,7 +3097,7 @@
             subscribeRealtime();
             subscribeReadRealtime();
           }
-          render(false);
+          renderAicAfterServerDataLoad(false);
           return;
         }
 
@@ -3161,13 +3208,13 @@
         subscribeRealtime();
         subscribeReadRealtime();
       }
-      render(true);
+      renderAicAfterServerDataLoad(true);
     } catch (error) {
       state.dbReady = false;
       showDbWarn(error?.message || error);
       state.rooms = [];
       state.openSlots = [];
-      render(false);
+      renderAicAfterServerDataLoad(false);
       alert('AIC 서버 데이터 조회 실패: Supabase 테이블 생성 SQL을 먼저 실행했는지 확인해 주세요.\n\n' + (error?.message || ''));
     } finally {
       state.dbLoading = false;
@@ -3968,8 +4015,27 @@
   }
 
   function refreshAicAfterResume(reason) {
+    reason = String(reason || '');
+
+    // 모바일에서 input focus 시 window focus/pageshow/portal refresh가 같이 들어오면
+    // loadRoomsFromServer → render(true)가 실행되어 키보드가 바로 내려갈 수 있습니다.
+    // 입력 중에는 재조회/전체 렌더를 하지 않고, Realtime 수신과 전송 흐름에 맡깁니다.
+    if (isAicMobileViewport() && isAicMessageInputFocused()) {
+      return;
+    }
+
+    // 모바일 focus 이벤트는 키보드/iframe focus 과정에서 너무 자주 발생하므로
+    // 서버 재조회 트리거로 사용하지 않습니다.
+    if (isAicMobileViewport() && reason === 'focus') {
+      return;
+    }
+
     clearTimeout(state.resumeRefreshTimer);
     state.resumeRefreshTimer = setTimeout(function () {
+      if (isAicMobileViewport() && isAicMessageInputFocused()) {
+        return;
+      }
+
       var sb = getSupabaseClient();
       var companyId = getCompanyId();
 
@@ -3981,7 +4047,7 @@
       subscribeRealtime({ force: true });
       subscribeReadRealtime({ force: true });
       loadRoomsFromServer({ skipRealtime: false });
-    }, 250);
+    }, isAicMobileViewport() ? 650 : 250);
   }
 
   function getToneLabel(value) {
@@ -6090,8 +6156,10 @@ async function sendAttachmentMessage(slotIndex, file) {
       var data = event && event.data ? event.data : {};
       if (data.type === 'portal-auth') {
         unsubscribeRealtime();
-            loadRoomsFromServer();
-        scheduleRender();
+        loadRoomsFromServer();
+        if (!isAicMobileViewport() || !isAicMessageInputFocused()) {
+          scheduleRender();
+        }
         return;
       }
 
@@ -6106,18 +6174,25 @@ async function sendAttachmentMessage(slotIndex, file) {
 
     window.addEventListener('load', function () {
       updateAicViewportUnit();
-      scheduleAicMobileKeyboardLayout(0);
-      scheduleRender();
-      refreshAicAfterResume('load');
+
+      if (!isAicMobileViewport()) {
+        scheduleAicMobileKeyboardLayout(0);
+        scheduleRender();
+        refreshAicAfterResume('load');
+      }
     });
 
     window.addEventListener('pageshow', function () {
       updateAicViewportUnit();
-      scheduleAicMobileKeyboardLayout(60);
-      refreshAicAfterResume('pageshow');
+
+      if (!isAicMobileViewport()) {
+        scheduleAicMobileKeyboardLayout(60);
+        refreshAicAfterResume('pageshow');
+      }
     });
 
     window.addEventListener('focus', function () {
+      if (isAicMobileViewport()) return;
       refreshAicAfterResume('focus');
     });
 
@@ -6220,6 +6295,12 @@ async function sendAttachmentMessage(slotIndex, file) {
     var isMobile = isAicMobileViewport();
     var now = Date.now();
 
+    // 모바일 입력창 focus 중에는 전체 render를 예약하지 않습니다.
+    // 키보드가 올라오는 순간의 focus/resize 이벤트와 render(true)가 충돌하는 것을 방지합니다.
+    if (isMobile && isAicMessageInputFocused()) {
+      return;
+    }
+
     // 모바일 초기 진입 시 같은 프레임 안에서 render가 여러 번 돌면
     // 채팅방 하단이 깜빡일 수 있어 짧은 시간 중복 예약을 줄입니다.
     if (isMobile && now - lastScheduleRenderAt < 180) {
@@ -6230,6 +6311,9 @@ async function sendAttachmentMessage(slotIndex, file) {
 
     requestAnimationFrame(function () {
       updateAicViewportUnit();
+      if (isAicMobileViewport() && isAicMessageInputFocused()) {
+        return;
+      }
       render(true);
     });
 
