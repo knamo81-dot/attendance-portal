@@ -1833,62 +1833,6 @@ input[type="radio"]{
 }
 
 
-/* =========================================================
-   Portal AIC iframe Mobile Stabilizer v1
-   - AIC가 iframe 안에서 실행될 때 모바일 키보드 등장/종료로
-     부모 포털의 100dvh 높이가 재계산되며 iframe이 흔들리는 현상 완화
-   - AIC 화면에만 적용. 근태/시약/출장/설정 등 다른 iframe 화면 영향 없음
-========================================================= */
-@media (max-width: 768px) {
-  body.portal-aic-active {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 100svh !important;
-    min-height: 100svh !important;
-    max-height: 100svh !important;
-    overflow: hidden !important;
-    position: relative !important;
-    overscroll-behavior: none !important;
-    touch-action: pan-y !important;
-  }
-
-  body.portal-aic-active .app,
-  body.portal-aic-active .layout,
-  body.portal-aic-active .portal-main {
-    height: 100svh !important;
-    min-height: 100svh !important;
-    max-height: 100svh !important;
-    overflow: hidden !important;
-    transform: none !important;
-    overscroll-behavior: none !important;
-  }
-
-  body.portal-aic-active .portal-main {
-    display: grid !important;
-    grid-template-rows: auto auto minmax(0, 1fr) !important;
-    min-height: 0 !important;
-  }
-
-  body.portal-aic-active #portalFrame {
-    width: 100% !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow: hidden !important;
-    display: block !important;
-    transform: translateZ(0) !important;
-    backface-visibility: hidden !important;
-    -webkit-backface-visibility: hidden !important;
-    contain: layout paint size !important;
-    overscroll-behavior: none !important;
-  }
-
-  body.portal-aic-active .mobile-edge-swipe-zone,
-  body.portal-aic-active .mobile-right-edge-swipe-zone {
-    pointer-events: none !important;
-  }
-}
-
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2389,6 +2333,42 @@ body.auth-loading .top-user-bar {
   }
 }
 </style>
+
+
+
+/* =========================================================
+   Portal AIC iframe Mobile Stabilizer v2 - weak
+   - AIC 화면에서만 부모 포털 높이 흔들림을 줄이는 약한 보정
+   - 사이드 메뉴 스와이프, iframe 내부 렌더링, pointer-events, contain은 건드리지 않음
+========================================================= */
+@media (max-width: 768px) {
+  body.portal-aic-active {
+    height: 100svh !important;
+    min-height: 100svh !important;
+    overflow: hidden !important;
+  }
+
+  body.portal-aic-active .app,
+  body.portal-aic-active .layout {
+    height: 100svh !important;
+    min-height: 100svh !important;
+    max-height: 100svh !important;
+  }
+
+  body.portal-aic-active .portal-main {
+    height: 100svh !important;
+    min-height: 0 !important;
+    max-height: 100svh !important;
+    grid-template-rows: auto auto minmax(0, 1fr) !important;
+  }
+
+  body.portal-aic-active #portalFrame {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    display: block !important;
+  }
+}
 
 </head>
 <body class="portal-restoring">
