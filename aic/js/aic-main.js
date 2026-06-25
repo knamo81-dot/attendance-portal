@@ -4580,15 +4580,18 @@
 
     panel.addEventListener('mousedown', function (event) {
       event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
     });
 
     panel.addEventListener('touchstart', function (event) {
       event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
     }, { passive: true });
 
     panel.addEventListener('click', function (event) {
       event.preventDefault();
       event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
 
       if (event.target.closest('[data-aic-emoji-close]')) {
         closeAicEmojiPanel();
@@ -4684,15 +4687,18 @@
 
     menu.addEventListener('mousedown', function (event) {
       event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
     });
 
     menu.addEventListener('touchstart', function (event) {
       event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
     }, { passive: true });
 
     menu.addEventListener('click', function (event) {
       event.preventDefault();
       event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
 
       var emojiBtn = event.target.closest('[data-aic-attach-portal-emoji-slot]');
       if (emojiBtn) {
@@ -4738,15 +4744,38 @@
     return Number(box && box.getAttribute && box.getAttribute('data-message-box')) || 0;
   }
 
+  function getAicMessageBoxBottomGap(box) {
+    if (!box) return 0;
+
+    try {
+      return Number(box.scrollHeight || 0) - Number(box.scrollTop || 0) - Number(box.clientHeight || 0);
+    } catch (_) {
+      return 0;
+    }
+  }
+
   function isAicMessageBoxNearBottom(box) {
     if (!box) return true;
 
     try {
-      var gap = Number(box.scrollHeight || 0) - Number(box.scrollTop || 0) - Number(box.clientHeight || 0);
-      return gap < 160;
+      return getAicMessageBoxBottomGap(box) < 160;
     } catch (_) {
       return true;
     }
+  }
+
+  function updateAicMessageBoxUserScrollLock(box) {
+    if (!box || !box.dataset) return;
+
+    try {
+      // 사용자가 과거 메시지를 보기 위해 하단에서 충분히 벗어난 경우 자동 하단 스크롤을 잠급니다.
+      // 다시 하단 근처로 내려오면 잠금을 해제합니다.
+      box.dataset.aicUserScrollLock = getAicMessageBoxBottomGap(box) > 180 ? '1' : '0';
+    } catch (_) {}
+  }
+
+  function isAicMessageBoxUserScrollLocked(box) {
+    return !!(box && box.dataset && box.dataset.aicUserScrollLock === '1');
   }
 
   function scrollAicMessageBoxToBottom(box) {
@@ -4754,6 +4783,7 @@
 
     try {
       box.scrollTop = box.scrollHeight;
+      if (box.dataset) box.dataset.aicUserScrollLock = '0';
     } catch (_) {}
   }
 
@@ -4764,12 +4794,19 @@
 
     var slotIndex = getAicMessageBoxSlotIndex(box);
     var key = 'slot_' + slotIndex;
-    var force = options.force !== false;
+    var force = options.force === true;
+    var preserveUserScroll = options.preserveUserScroll !== false;
 
     // 모바일 키보드가 열린 상태에서는 여러 타이머가 반복적으로 scrollTop을 바꾸면
     // 채팅룸이 내려가려다 올라오는 버벅임이 생길 수 있습니다.
     // 그래서 슬롯별 예약을 1개로 합치고, 기본은 active 슬롯만 하단 보정합니다.
     if (isAicMobileViewport() && slotIndex !== Number(state.activeSlotIndex || 0)) {
+      return;
+    }
+
+    // PC에서 과거 대화를 읽으려고 스크롤을 올린 상태면 자동으로 하단으로 되돌리지 않습니다.
+    // 단, 명시적으로 overrideUserScroll이 들어온 경우만 예외로 둡니다.
+    if (preserveUserScroll && isAicMessageBoxUserScrollLocked(box) && options.overrideUserScroll !== true) {
       return;
     }
 
@@ -4784,6 +4821,11 @@
 
     var run = function () {
       aicMessageScrollTimers[key] = null;
+
+      if (preserveUserScroll && isAicMessageBoxUserScrollLocked(box) && options.overrideUserScroll !== true) {
+        return;
+      }
+
       scrollAicMessageBoxToBottom(box);
       aicLastMessageScrollAt = Date.now();
     };
@@ -4921,10 +4963,20 @@
       });
     });
 
+    Array.from(els.slots.querySelectorAll('[data-message-box]')).forEach(function (box) {
+      if (box.dataset.aicScrollLockBound === '1') return;
+      box.dataset.aicScrollLockBound = '1';
+
+      box.addEventListener('scroll', function () {
+        updateAicMessageBoxUserScrollLock(box);
+      }, { passive: true });
+    });
+
     Array.from(els.slots.querySelectorAll('[data-attach-toggle-slot]')).forEach(function (btn) {
       btn.addEventListener('click', function (event) {
         event.preventDefault();
         event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
 
         var slotIndex = Number(btn.getAttribute('data-attach-toggle-slot')) || 0;
         var existing = document.querySelector('[data-aic-attach-portal-menu="1"]');
@@ -6109,7 +6161,23 @@ async function sendAttachmentMessage(slotIndex, file) {
       });
     }
 
-    document.addEventListener('click', function () { closeAicContextMenu(); closeAicAttachPortalMenu(); closeAicEmojiPanel(); });
+    document.addEventListener('click', function (event) {
+      var target = event && event.target ? event.target : null;
+
+      if (target && target.closest && (
+        target.closest('[data-attach-toggle-slot]') ||
+        target.closest('[data-aic-attach-portal-menu="1"]') ||
+        target.closest('[data-attach-menu-slot]') ||
+        target.closest('[data-aic-emoji-panel="1"]') ||
+        target.closest('.aic-chat-input')
+      )) {
+        return;
+      }
+
+      closeAicContextMenu();
+      closeAicAttachPortalMenu();
+      closeAicEmojiPanel();
+    });
     document.addEventListener('scroll', function (event) {
       var target = event && event.target ? event.target : null;
 
