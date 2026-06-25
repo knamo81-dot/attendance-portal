@@ -3055,6 +3055,7 @@
   }
 
   async function loadRoomsFromServer(options) {
+    aicTrace('loadRoomsFromServer');
     options = options || {};
     var sb = getSupabaseClient();
     var companyId = getCompanyId();
@@ -4015,6 +4016,7 @@
   }
 
   function refreshAicAfterResume(reason) {
+    aicTrace('refreshAicAfterResume', reason);
     reason = String(reason || '');
 
     // 모바일에서 input focus 시 window focus/pageshow/portal refresh가 같이 들어오면
@@ -5074,6 +5076,7 @@
     Array.from(els.slots.querySelectorAll('[data-input-slot]')).forEach(function (input) {
       input.addEventListener('focus', function () {
         aicDebugLog('input:focus', { slotIndex: Number(input.getAttribute('data-input-slot')) || 0 });
+        aicTrace('input.focus', Number(input.getAttribute('data-input-slot')) || 0);
 
         // 모바일에서는 키보드 오픈 과정과 스크롤 보정이 충돌하여
         // 채팅창이 버벅이거나 올라오지 않는 현상을 줄이기 위해 비활성화
@@ -6124,6 +6127,7 @@ async function sendAttachmentMessage(slotIndex, file) {
 
     window.addEventListener('resize', function () {
       aicDebugLog('window:resize', {});
+      aicTrace('window.resize');
       updateAicViewportUnit();
 
       if (isAicMobileViewport()) {
@@ -6142,6 +6146,7 @@ async function sendAttachmentMessage(slotIndex, file) {
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', function () {
         aicDebugLog('visualViewport:resize', {});
+        aicTrace('visualViewport.resize');
         updateAicViewportUnit();
 
         if (isAicMobileViewport()) {
@@ -6277,8 +6282,17 @@ async function sendAttachmentMessage(slotIndex, file) {
     });
   }
 
+
+  function aicTrace(name, extra) {
+    try {
+      console.log('[AIC TRACE]', (performance.now()/1000).toFixed(3), name, extra || '');
+      console.trace();
+    } catch (_) {}
+  }
+
   function render(fill) {
     aicDebugLog('render', { fill: fill });
+    aicTrace('render',{fill:fill});
     persistVisibleAicDrafts();
     applyAicTheme(state.settings?.theme || 'blue');
     ensureSlots(fill !== false);
@@ -6294,6 +6308,7 @@ async function sendAttachmentMessage(slotIndex, file) {
 
   function scheduleRender() {
     aicDebugLog('scheduleRender', {});
+    aicTrace('scheduleRender');
     clearTimeout(resizeTimer);
     updateAicViewportUnit();
 
