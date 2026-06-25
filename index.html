@@ -1831,6 +1831,64 @@ input[type="radio"]{
   .service-company-modal-overlay { padding: 14px; }
   .service-company-modal { width: calc(100vw - 28px); max-height: calc(100dvh - 28px); }
 }
+
+
+/* =========================================================
+   Portal AIC iframe Mobile Stabilizer v1
+   - AIC가 iframe 안에서 실행될 때 모바일 키보드 등장/종료로
+     부모 포털의 100dvh 높이가 재계산되며 iframe이 흔들리는 현상 완화
+   - AIC 화면에만 적용. 근태/시약/출장/설정 등 다른 iframe 화면 영향 없음
+========================================================= */
+@media (max-width: 768px) {
+  body.portal-aic-active {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100svh !important;
+    min-height: 100svh !important;
+    max-height: 100svh !important;
+    overflow: hidden !important;
+    position: relative !important;
+    overscroll-behavior: none !important;
+    touch-action: pan-y !important;
+  }
+
+  body.portal-aic-active .app,
+  body.portal-aic-active .layout,
+  body.portal-aic-active .portal-main {
+    height: 100svh !important;
+    min-height: 100svh !important;
+    max-height: 100svh !important;
+    overflow: hidden !important;
+    transform: none !important;
+    overscroll-behavior: none !important;
+  }
+
+  body.portal-aic-active .portal-main {
+    display: grid !important;
+    grid-template-rows: auto auto minmax(0, 1fr) !important;
+    min-height: 0 !important;
+  }
+
+  body.portal-aic-active #portalFrame {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    display: block !important;
+    transform: translateZ(0) !important;
+    backface-visibility: hidden !important;
+    -webkit-backface-visibility: hidden !important;
+    contain: layout paint size !important;
+    overscroll-behavior: none !important;
+  }
+
+  body.portal-aic-active .mobile-edge-swipe-zone,
+  body.portal-aic-active .mobile-right-edge-swipe-zone {
+    pointer-events: none !important;
+  }
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2563,12 +2621,37 @@ body.auth-loading .top-user-bar {
   }
 
   const frame = document.getElementById('portalFrame');
+
+  function isAicPortalSrc(src) {
+    return normalizePortalSrc(src) === 'aic/index.html';
+  }
+
+  function setPortalAicActive(src) {
+    const active = isAicPortalSrc(src);
+
+    try {
+      document.body.classList.toggle('portal-aic-active', active);
+      document.documentElement.classList.toggle('portal-aic-active', active);
+    } catch (_) {}
+
+    try {
+      if (frame) {
+        if (active) {
+          frame.setAttribute('data-portal-app', 'aic');
+        } else {
+          frame.removeAttribute('data-portal-app');
+        }
+      }
+    } catch (_) {}
+  }
+
   const navButtons = Array.from(document.querySelectorAll('.nav-btn[data-portal-src]'));
   const logoutBtn = document.getElementById('logoutNavBtn');
   const homeBtn = document.getElementById('homeNavBtn');
   if (frame) {
     frame.addEventListener('load', function () {
-      const currentFrameSrc = normalizePortalSrc(frame?.getAttribute('src') || '');
+      const currentFrameSrc = normalizePortalSrc(frame?.dataset?.currentSrc || frame?.getAttribute('src') || '');
+      setPortalAicActive(currentFrameSrc);
       if (!currentFrameSrc || currentFrameSrc === 'about:blank') return;
       setTimeout(syncCurrentPortalTabToFrame, 80);
       setTimeout(syncCurrentPortalTabToFrame, 350);
@@ -4956,6 +5039,7 @@ body.auth-loading .top-user-bar {
 
   function clearPortalFrame() {
     if (!frame) return;
+    setPortalAicActive('');
     document.body.classList.add('portal-restoring');
     frame.onload = null;
     try {
@@ -4972,6 +5056,7 @@ body.auth-loading .top-user-bar {
 
   function replacePortalFrame(src) {
     if (!frame || !src) return;
+    setPortalAicActive(src);
     // 실제 iframe 이동은 location.replace를 사용하더라도, 현재 주소 추적용으로 별도 보관합니다.
     // 회사 전환 후 다시 같은 앱을 재로드할 때 이전 src 속성값을 참조하는 문제를 막습니다.
     try { frame.dataset.currentSrc = src; } catch (_) {}
