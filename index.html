@@ -1831,8 +1831,6 @@ input[type="radio"]{
   .service-company-modal-overlay { padding: 14px; }
   .service-company-modal { width: calc(100vw - 28px); max-height: calc(100dvh - 28px); }
 }
-
-
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2334,79 +2332,6 @@ body.auth-loading .top-user-bar {
 }
 </style>
 
-
-
-/* =========================================================
-   Portal AIC iframe Mobile Stabilizer v2 - weak
-   - AIC 화면에서만 부모 포털 높이 흔들림을 줄이는 약한 보정
-   - 사이드 메뉴 스와이프, iframe 내부 렌더링, pointer-events, contain은 건드리지 않음
-========================================================= */
-@media (max-width: 768px) {
-  body.portal-aic-active {
-    height: 100svh !important;
-    min-height: 100svh !important;
-    overflow: hidden !important;
-  }
-
-  body.portal-aic-active .app,
-  body.portal-aic-active .layout {
-    height: 100svh !important;
-    min-height: 100svh !important;
-    max-height: 100svh !important;
-  }
-
-  body.portal-aic-active .portal-main {
-    height: 100svh !important;
-    min-height: 0 !important;
-    max-height: 100svh !important;
-    grid-template-rows: auto auto minmax(0, 1fr) !important;
-  }
-
-  body.portal-aic-active #portalFrame {
-    height: 100% !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    display: block !important;
-  }
-}
-
-
-<style id="portal-aic-iframe-mobile-stabilizer-v2">
-/* =========================================================
-   Portal AIC iframe Mobile Stabilizer v2 - weak
-   - AIC 화면에서만 부모 포털 높이 흔들림을 줄이는 약한 보정
-   - 사이드 메뉴 스와이프, iframe 내부 렌더링, pointer-events, contain은 건드리지 않음
-========================================================= */
-@media (max-width: 768px) {
-  body.portal-aic-active {
-    height: 100svh !important;
-    min-height: 100svh !important;
-    overflow: hidden !important;
-  }
-
-  body.portal-aic-active .app,
-  body.portal-aic-active .layout {
-    height: 100svh !important;
-    min-height: 100svh !important;
-    max-height: 100svh !important;
-  }
-
-  body.portal-aic-active .portal-main {
-    height: 100svh !important;
-    min-height: 0 !important;
-    max-height: 100svh !important;
-    grid-template-rows: auto auto minmax(0, 1fr) !important;
-  }
-
-  body.portal-aic-active #portalFrame {
-    height: 100% !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    display: block !important;
-  }
-}
-</style>
-
 </head>
 <body class="portal-restoring">
   <div id="portalBootOverlay" class="portal-boot-overlay" aria-live="polite" aria-label="포탈 불러오는 중">
@@ -2638,37 +2563,12 @@ body.auth-loading .top-user-bar {
   }
 
   const frame = document.getElementById('portalFrame');
-
-  function isAicPortalSrc(src) {
-    return normalizePortalSrc(src) === 'aic/index.html';
-  }
-
-  function setPortalAicActive(src) {
-    const active = isAicPortalSrc(src);
-
-    try {
-      document.body.classList.toggle('portal-aic-active', active);
-      document.documentElement.classList.toggle('portal-aic-active', active);
-    } catch (_) {}
-
-    try {
-      if (frame) {
-        if (active) {
-          frame.setAttribute('data-portal-app', 'aic');
-        } else {
-          frame.removeAttribute('data-portal-app');
-        }
-      }
-    } catch (_) {}
-  }
-
   const navButtons = Array.from(document.querySelectorAll('.nav-btn[data-portal-src]'));
   const logoutBtn = document.getElementById('logoutNavBtn');
   const homeBtn = document.getElementById('homeNavBtn');
   if (frame) {
     frame.addEventListener('load', function () {
-      const currentFrameSrc = normalizePortalSrc(frame?.dataset?.currentSrc || frame?.getAttribute('src') || '');
-      setPortalAicActive(currentFrameSrc);
+      const currentFrameSrc = normalizePortalSrc(frame?.getAttribute('src') || '');
       if (!currentFrameSrc || currentFrameSrc === 'about:blank') return;
       setTimeout(syncCurrentPortalTabToFrame, 80);
       setTimeout(syncCurrentPortalTabToFrame, 350);
@@ -5056,7 +4956,6 @@ body.auth-loading .top-user-bar {
 
   function clearPortalFrame() {
     if (!frame) return;
-    setPortalAicActive('');
     document.body.classList.add('portal-restoring');
     frame.onload = null;
     try {
@@ -5073,7 +4972,6 @@ body.auth-loading .top-user-bar {
 
   function replacePortalFrame(src) {
     if (!frame || !src) return;
-    setPortalAicActive(src);
     // 실제 iframe 이동은 location.replace를 사용하더라도, 현재 주소 추적용으로 별도 보관합니다.
     // 회사 전환 후 다시 같은 앱을 재로드할 때 이전 src 속성값을 참조하는 문제를 막습니다.
     try { frame.dataset.currentSrc = src; } catch (_) {}
