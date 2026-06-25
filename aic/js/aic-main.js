@@ -216,8 +216,9 @@
     emojiLoading: false,
     editingMessage: null,
     resumeRefreshTimer: null,
-    attachMenuGuardUntil: 0,
-    emojiPanelGuardUntil: 0,
+    messageScrollLocks: {},
+    attachMenuOpenUntil: 0,
+    emojiPanelOpenUntil: 0,
     dbReady: false,
     dbLoading: false,
     drafts: {}
@@ -4403,7 +4404,7 @@
 
 
   function closeAicEmojiPanel(force) {
-    if (!force && state && Number(state.emojiPanelGuardUntil || 0) > Date.now()) {
+    if (!force && state && Number(state.emojiPanelOpenUntil || 0) > Date.now()) {
       return;
     }
 
@@ -4413,7 +4414,7 @@
   }
 
   function closeAicAttachPortalMenu(force) {
-    if (!force && state && Number(state.attachMenuGuardUntil || 0) > Date.now()) {
+    if (!force && state && Number(state.attachMenuOpenUntil || 0) > Date.now()) {
       return;
     }
 
@@ -4590,18 +4591,15 @@
 
     panel.addEventListener('mousedown', function (event) {
       event.stopPropagation();
-      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
     });
 
     panel.addEventListener('touchstart', function (event) {
       event.stopPropagation();
-      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
     }, { passive: true });
 
     panel.addEventListener('click', function (event) {
       event.preventDefault();
       event.stopPropagation();
-      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
 
       if (event.target.closest('[data-aic-emoji-close]')) {
         closeAicEmojiPanel();
@@ -4640,7 +4638,7 @@
     });
 
     document.body.appendChild(panel);
-    state.emojiPanelGuardUntil = Date.now() + 900;
+    state.emojiPanelOpenUntil = Date.now() + 700;
 
     var rect = anchor.getBoundingClientRect();
     var width = Math.min(760, Math.max(340, Math.round(window.innerWidth * 0.56)));
@@ -4698,18 +4696,15 @@
 
     menu.addEventListener('mousedown', function (event) {
       event.stopPropagation();
-      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
     });
 
     menu.addEventListener('touchstart', function (event) {
       event.stopPropagation();
-      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
     }, { passive: true });
 
     menu.addEventListener('click', function (event) {
       event.preventDefault();
       event.stopPropagation();
-      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
 
       var emojiBtn = event.target.closest('[data-aic-attach-portal-emoji-slot]');
       if (emojiBtn) {
@@ -4735,7 +4730,7 @@
     });
 
     document.body.appendChild(menu);
-    state.attachMenuGuardUntil = Date.now() + 900;
+    state.attachMenuOpenUntil = Date.now() + 700;
 
     var rect = anchor.getBoundingClientRect();
     var width = menu.offsetWidth || 132;
@@ -4776,18 +4771,27 @@
     }
   }
 
-  function updateAicMessageBoxUserScrollLock(box) {
-    if (!box || !box.dataset) return;
-
-    try {
-      // 사용자가 과거 메시지를 보기 위해 하단에서 충분히 벗어난 경우 자동 하단 스크롤을 잠급니다.
-      // 다시 하단 근처로 내려오면 잠금을 해제합니다.
-      box.dataset.aicUserScrollLock = getAicMessageBoxBottomGap(box) > 180 ? '1' : '0';
-    } catch (_) {}
+  function setAicMessageScrollLock(slotIndex, locked) {
+    slotIndex = Number(slotIndex) || 0;
+    if (!state.messageScrollLocks) state.messageScrollLocks = {};
+    state.messageScrollLocks['slot_' + slotIndex] = !!locked;
   }
 
-  function isAicMessageBoxUserScrollLocked(box) {
-    return !!(box && box.dataset && box.dataset.aicUserScrollLock === '1');
+  function isAicMessageScrollLocked(slotIndex) {
+    slotIndex = Number(slotIndex) || 0;
+    return !!(state.messageScrollLocks && state.messageScrollLocks['slot_' + slotIndex]);
+  }
+
+  function updateAicMessageBoxUserScrollLock(box) {
+    if (!box) return;
+
+    var slotIndex = getAicMessageBoxSlotIndex(box);
+    var locked = getAicMessageBoxBottomGap(box) > 180;
+    setAicMessageScrollLock(slotIndex, locked);
+
+    try {
+      if (box.dataset) box.dataset.aicUserScrollLock = locked ? '1' : '0';
+    } catch (_) {}
   }
 
   function scrollAicMessageBoxToBottom(box) {
@@ -4795,6 +4799,7 @@
 
     try {
       box.scrollTop = box.scrollHeight;
+      setAicMessageScrollLock(getAicMessageBoxSlotIndex(box), false);
       if (box.dataset) box.dataset.aicUserScrollLock = '0';
     } catch (_) {}
   }
@@ -4807,7 +4812,7 @@
     var slotIndex = getAicMessageBoxSlotIndex(box);
     var key = 'slot_' + slotIndex;
     var force = options.force === true;
-    var preserveUserScroll = options.preserveUserScroll !== false;
+    var overrideUserScroll = options.overrideUserScroll === true;
 
     // 모바일 키보드가 열린 상태에서는 여러 타이머가 반복적으로 scrollTop을 바꾸면
     // 채팅룸이 내려가려다 올라오는 버벅임이 생길 수 있습니다.
@@ -4816,9 +4821,9 @@
       return;
     }
 
-    // PC에서 과거 대화를 읽으려고 스크롤을 올린 상태면 자동으로 하단으로 되돌리지 않습니다.
-    // 단, 명시적으로 overrideUserScroll이 들어온 경우만 예외로 둡니다.
-    if (preserveUserScroll && isAicMessageBoxUserScrollLocked(box) && options.overrideUserScroll !== true) {
+    // 사용자가 이전 대화를 보기 위해 스크롤을 올린 상태에서는
+    // 신규 렌더/읽음처리/이미지 로딩이 와도 하단으로 되돌리지 않습니다.
+    if (!overrideUserScroll && isAicMessageScrollLocked(slotIndex)) {
       return;
     }
 
@@ -4834,7 +4839,7 @@
     var run = function () {
       aicMessageScrollTimers[key] = null;
 
-      if (preserveUserScroll && isAicMessageBoxUserScrollLocked(box) && options.overrideUserScroll !== true) {
+      if (!overrideUserScroll && isAicMessageScrollLocked(slotIndex)) {
         return;
       }
 
@@ -4853,7 +4858,7 @@
       img.dataset.aicBottomScrollBound = '1';
 
       var onDone = function () {
-        scheduleAicMessageBoxBottomScroll(box, { force: true });
+        scheduleAicMessageBoxBottomScroll(box, { force: false });
       };
 
       if (!img.complete) {
@@ -4877,9 +4882,6 @@
 
   function renderChatSlots() {
     aicDebugLog('renderChatSlots:start', { activeSlotIndex: state.activeSlotIndex, visibleSlotCount: state.visibleSlotCount });
-
-    // + 메뉴/이모티콘 패널을 연 직후 portal-auth/render가 겹치면 메뉴가 바로 닫히는 문제가 있어
-    // guard 시간 안에서는 닫지 않습니다.
     closeAicAttachPortalMenu(false);
     closeAicEmojiPanel(false);
     if (!els.slots) return;
@@ -4982,32 +4984,27 @@
       if (box.dataset.aicScrollLockBound === '1') return;
       box.dataset.aicScrollLockBound = '1';
 
+      box.addEventListener('wheel', function (event) {
+        var slotIndex = getAicMessageBoxSlotIndex(box);
+        state.activeSlotIndex = slotIndex;
+
+        if (event && Number(event.deltaY || 0) < 0) {
+          setAicMessageScrollLock(slotIndex, true);
+          if (box.dataset) box.dataset.aicUserScrollLock = '1';
+        }
+      }, { passive: true });
+
       box.addEventListener('scroll', function () {
         updateAicMessageBoxUserScrollLock(box);
       }, { passive: true });
 
-      box.addEventListener('wheel', function (event) {
-        if (event && Number(event.deltaY || 0) < 0 && box.dataset) {
-          box.dataset.aicUserScrollLock = '1';
-        }
-      }, { passive: true });
-
       box.addEventListener('touchstart', function () {
-        if (box.dataset) box.dataset.aicUserScrollLock = '1';
+        setAicMessageScrollLock(getAicMessageBoxSlotIndex(box), true);
       }, { passive: true });
 
       box.addEventListener('pointerdown', function () {
-        if (box.dataset && !isAicMessageBoxNearBottom(box)) {
-          box.dataset.aicUserScrollLock = '1';
-        }
+        state.activeSlotIndex = getAicMessageBoxSlotIndex(box);
       }, { passive: true });
-
-      box.addEventListener('keydown', function (event) {
-        var key = event && event.key ? event.key : '';
-        if ((key === 'PageUp' || key === 'ArrowUp' || key === 'Home') && box.dataset) {
-          box.dataset.aicUserScrollLock = '1';
-        }
-      });
     });
 
     Array.from(els.slots.querySelectorAll('[data-attach-toggle-slot]')).forEach(function (btn) {
@@ -5017,6 +5014,12 @@
         if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
 
         var slotIndex = Number(btn.getAttribute('data-attach-toggle-slot')) || 0;
+        state.activeSlotIndex = slotIndex;
+
+        Array.from(els.slots.querySelectorAll('[data-slot-index]')).forEach(function (item) {
+          item.classList.toggle('active', Number(item.getAttribute('data-slot-index')) === state.activeSlotIndex);
+        });
+
         var existing = document.querySelector('[data-aic-attach-portal-menu="1"]');
         var existingSlot = existing ? Number(existing.getAttribute('data-aic-attach-portal-slot')) || 0 : -1;
 
@@ -5025,7 +5028,12 @@
           return;
         }
 
-        showAicAttachPortalMenu(slotIndex, btn);
+        // 입력창을 먼저 클릭했을 때만 정상화되던 문제를 우회하기 위해,
+        // 현재 클릭 이벤트/포털 메시지/렌더가 끝난 다음 메뉴를 띄웁니다.
+        state.attachMenuOpenUntil = Date.now() + 700;
+        setTimeout(function () {
+          showAicAttachPortalMenu(slotIndex, btn);
+        }, 0);
       });
     });
 
@@ -5409,7 +5417,7 @@
 
       if (!messages.length) {
         setAicEmptyMessage(box);
-        scheduleVisibleAicMessageBoxesBottomScroll(slotIndex, { force: true });
+        scheduleVisibleAicMessageBoxesBottomScroll(slotIndex, { force: false });
         return true;
       }
 
@@ -5463,7 +5471,7 @@
       });
 
       bindAicDynamicMessageActions(changedNodes.length ? box : box);
-      scheduleVisibleAicMessageBoxesBottomScroll(slotIndex, { force: true });
+      scheduleVisibleAicMessageBoxesBottomScroll(slotIndex, { force: false });
       return true;
     } catch (error) {
       try {
@@ -5477,7 +5485,7 @@
         if (fallbackRoom && fallbackBox) {
           fallbackBox.innerHTML = buildAicMessageListHtml(fallbackRoom);
           bindAicDynamicMessageActions(fallbackBox);
-          scheduleVisibleAicMessageBoxesBottomScroll(slotIndex, { force: true });
+          scheduleVisibleAicMessageBoxesBottomScroll(slotIndex, { force: false });
           return true;
         }
       } catch (_) {}
@@ -6205,7 +6213,6 @@ async function sendAttachmentMessage(slotIndex, file) {
       if (target && target.closest && (
         target.closest('[data-attach-toggle-slot]') ||
         target.closest('[data-aic-attach-portal-menu="1"]') ||
-        target.closest('[data-attach-menu-slot]') ||
         target.closest('[data-aic-emoji-panel="1"]') ||
         target.closest('.aic-chat-input')
       )) {
@@ -6213,8 +6220,8 @@ async function sendAttachmentMessage(slotIndex, file) {
       }
 
       closeAicContextMenu();
-      closeAicAttachPortalMenu();
-      closeAicEmojiPanel();
+      closeAicAttachPortalMenu(false);
+      closeAicEmojiPanel(false);
     });
     document.addEventListener('scroll', function (event) {
       var target = event && event.target ? event.target : null;
@@ -6225,9 +6232,17 @@ async function sendAttachmentMessage(slotIndex, file) {
         return;
       }
 
+      if (target && target.closest && (
+        target.closest('[data-message-box]') ||
+        target.closest('[data-aic-attach-portal-menu="1"]') ||
+        target.closest('[data-aic-emoji-panel="1"]')
+      )) {
+        return;
+      }
+
       closeAicContextMenu();
-      closeAicAttachPortalMenu();
-      closeAicEmojiPanel();
+      closeAicAttachPortalMenu(false);
+      closeAicEmojiPanel(false);
     }, true);
     window.addEventListener('blur', function () { closeAicContextMenu(); closeAicAttachPortalMenu(); closeAicEmojiPanel(); });
 
