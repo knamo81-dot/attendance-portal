@@ -3055,7 +3055,7 @@
   }
 
   async function loadRoomsFromServer(options) {
-  aicPanelLog('loadRoomsFromServer');
+    aicTrace('loadRoomsFromServer');
     options = options || {};
     var sb = getSupabaseClient();
     var companyId = getCompanyId();
@@ -4016,7 +4016,7 @@
   }
 
   function refreshAicAfterResume(reason) {
-  aicPanelLog('refreshAicAfterResume',reason);
+    aicTrace('refreshAicAfterResume', reason);
     reason = String(reason || '');
 
     // 모바일에서 input focus 시 window focus/pageshow/portal refresh가 같이 들어오면
@@ -4130,7 +4130,6 @@
   }
 
   function syncMobileAicView() {
-  aicPanelLog('syncMobileAicView');
     if (!els.root) return;
 
     var hasOpenRoom = state.openSlots && state.openSlots.length > 0;
@@ -5076,8 +5075,8 @@
 
     Array.from(els.slots.querySelectorAll('[data-input-slot]')).forEach(function (input) {
       input.addEventListener('focus', function () {
-        aicPanelLog('input.focus');
         aicDebugLog('input:focus', { slotIndex: Number(input.getAttribute('data-input-slot')) || 0 });
+        aicTrace('input.focus', Number(input.getAttribute('data-input-slot')) || 0);
 
         // 모바일에서는 키보드 오픈 과정과 스크롤 보정이 충돌하여
         // 채팅창이 버벅이거나 올라오지 않는 현상을 줄이기 위해 비활성화
@@ -5087,7 +5086,6 @@
       });
 
       input.addEventListener('blur', function () {
-        aicPanelLog('input.blur');
         aicDebugLog('input:blur', { slotIndex: Number(input.getAttribute('data-input-slot')) || 0 });
         // 모바일 키보드 닫힘/열림은 브라우저 기본 동작에 맡깁니다.
       });
@@ -6128,8 +6126,8 @@ async function sendAttachmentMessage(slotIndex, file) {
     window.addEventListener('blur', function () { closeAicContextMenu(); closeAicAttachPortalMenu(); closeAicEmojiPanel(); });
 
     window.addEventListener('resize', function () {
-      aicPanelLog('window.resize');
       aicDebugLog('window:resize', {});
+      aicTrace('window.resize');
       updateAicViewportUnit();
 
       if (isAicMobileViewport()) {
@@ -6147,8 +6145,8 @@ async function sendAttachmentMessage(slotIndex, file) {
 
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', function () {
-        aicPanelLog('visualViewport.resize');
         aicDebugLog('visualViewport:resize', {});
+        aicTrace('visualViewport.resize');
         updateAicViewportUnit();
 
         if (isAicMobileViewport()) {
@@ -6284,9 +6282,17 @@ async function sendAttachmentMessage(slotIndex, file) {
     });
   }
 
+
+  function aicTrace(name, extra) {
+    try {
+      console.log('[AIC TRACE]', (performance.now()/1000).toFixed(3), name, extra || '');
+      console.trace();
+    } catch (_) {}
+  }
+
   function render(fill) {
-    aicPanelLog('render');
     aicDebugLog('render', { fill: fill });
+    aicTrace('render',{fill:fill});
     persistVisibleAicDrafts();
     applyAicTheme(state.settings?.theme || 'blue');
     ensureSlots(fill !== false);
@@ -6301,8 +6307,8 @@ async function sendAttachmentMessage(slotIndex, file) {
   }
 
   function scheduleRender() {
-    aicPanelLog('scheduleRender');
     aicDebugLog('scheduleRender', {});
+    aicTrace('scheduleRender');
     clearTimeout(resizeTimer);
     updateAicViewportUnit();
 
@@ -6354,43 +6360,10 @@ async function sendAttachmentMessage(slotIndex, file) {
     });
   };
 
-  
-var __AIC_LOGS__=[];
-function aicPanelLog(evt,data){
- try{
-  var t=new Date();
-  var ts=t.toLocaleTimeString()+'.'+String(t.getMilliseconds()).padStart(3,'0');
-  __AIC_LOGS__.push(ts+' '+evt+(data!==undefined?' '+JSON.stringify(data):''));
-  if(__AIC_LOGS__.length>100)__AIC_LOGS__.shift();
-  var p=document.getElementById('aicDebugLogText');
-  if(p)p.textContent=__AIC_LOGS__.join('\n');
- }catch(e){}
-}
-function ensureAicDebugPanel(){
- if(document.getElementById('aicDebugBtn')) return;
- var b=document.createElement('button');
- b.id='aicDebugBtn';
- b.textContent='AIC LOG';
- b.style.cssText='position:fixed;right:12px;bottom:12px;z-index:2147483647;padding:6px 10px;font-size:12px;';
- var d=document.createElement('div');
- d.id='aicDebugPanel';
- d.style.cssText='display:none;position:fixed;left:5%;top:5%;width:90%;height:70%;z-index:2147483647;background:#111;color:#0f0;border:1px solid #666;';
- var c=document.createElement('button');
- c.textContent='닫기';
- c.onclick=function(){d.style.display='none';};
- var pre=document.createElement('pre');
- pre.id='aicDebugLogText';
- pre.style.cssText='height:calc(100% - 36px);overflow:auto;margin:0;padding:8px;font-size:11px;white-space:pre-wrap;';
- d.appendChild(c);d.appendChild(pre);
- b.onclick=function(){pre.textContent=__AIC_LOGS__.join('\n');d.style.display='block';};
- document.body.appendChild(b);document.body.appendChild(d);
-}
-
-function bootstrap() {
+  function bootstrap() {
     aicDebugLog('bootstrap', {});
     updateAicViewportUnit();
     cacheEls();
-    ensureAicDebugPanel();
     state.settings = normalizeSettings(state.settings);
     applyAicTheme(state.settings.theme);
     bind();
