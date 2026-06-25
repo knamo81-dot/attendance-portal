@@ -216,6 +216,8 @@
     emojiLoading: false,
     editingMessage: null,
     resumeRefreshTimer: null,
+    attachMenuGuardUntil: 0,
+    emojiPanelGuardUntil: 0,
     dbReady: false,
     dbLoading: false,
     drafts: {}
@@ -4400,13 +4402,21 @@
   }
 
 
-  function closeAicEmojiPanel() {
+  function closeAicEmojiPanel(force) {
+    if (!force && state && Number(state.emojiPanelGuardUntil || 0) > Date.now()) {
+      return;
+    }
+
     var existing = document.querySelector('[data-aic-emoji-panel="1"]');
     if (existing) existing.remove();
     state.selectedEmoji = null;
   }
 
-  function closeAicAttachPortalMenu() {
+  function closeAicAttachPortalMenu(force) {
+    if (!force && state && Number(state.attachMenuGuardUntil || 0) > Date.now()) {
+      return;
+    }
+
     var existing = document.querySelector('[data-aic-attach-portal-menu="1"]');
     if (existing) existing.remove();
 
@@ -4624,12 +4634,13 @@
         if (sendBtn.disabled || !state.selectedEmoji) return;
         var selectedEmoji = state.selectedEmoji;
         state.selectedEmoji = null;
-        closeAicEmojiPanel();
+        closeAicEmojiPanel(true);
         sendEmojiMessage(slotIndex, selectedEmoji);
       }
     });
 
     document.body.appendChild(panel);
+    state.emojiPanelGuardUntil = Date.now() + 900;
 
     var rect = anchor.getBoundingClientRect();
     var width = Math.min(760, Math.max(340, Math.round(window.innerWidth * 0.56)));
@@ -4656,7 +4667,7 @@
   }
 
   function showAicAttachPortalMenu(slotIndex, anchor) {
-    closeAicAttachPortalMenu();
+    closeAicAttachPortalMenu(true);
 
     slotIndex = Number(slotIndex) || 0;
     if (!anchor) return;
@@ -4703,7 +4714,7 @@
       var emojiBtn = event.target.closest('[data-aic-attach-portal-emoji-slot]');
       if (emojiBtn) {
         var emojiSlotIndex = Number(emojiBtn.getAttribute('data-aic-attach-portal-emoji-slot')) || 0;
-        closeAicAttachPortalMenu();
+        closeAicAttachPortalMenu(true);
         showAicEmojiPanel(emojiSlotIndex, anchor);
         return;
       }
@@ -4714,7 +4725,7 @@
       var targetSlotIndex = Number(btn.getAttribute('data-aic-attach-portal-file-slot')) || 0;
       var fileInput = els.slots ? els.slots.querySelector('[data-attach-input-slot="' + targetSlotIndex + '"]') : null;
 
-      closeAicAttachPortalMenu();
+      closeAicAttachPortalMenu(true);
 
       if (fileInput) {
         setTimeout(function () {
@@ -4724,6 +4735,7 @@
     });
 
     document.body.appendChild(menu);
+    state.attachMenuGuardUntil = Date.now() + 900;
 
     var rect = anchor.getBoundingClientRect();
     var width = menu.offsetWidth || 132;
@@ -4859,14 +4871,17 @@
       : '[data-message-box]';
 
     Array.from(els.slots.querySelectorAll(selector)).forEach(function (box) {
-      scheduleAicMessageBoxBottomScroll(box, options || { force: true });
+      scheduleAicMessageBoxBottomScroll(box, options || { force: false });
     });
   }
 
   function renderChatSlots() {
     aicDebugLog('renderChatSlots:start', { activeSlotIndex: state.activeSlotIndex, visibleSlotCount: state.visibleSlotCount });
-    closeAicAttachPortalMenu();
-    closeAicEmojiPanel();
+
+    // + 메뉴/이모티콘 패널을 연 직후 portal-auth/render가 겹치면 메뉴가 바로 닫히는 문제가 있어
+    // guard 시간 안에서는 닫지 않습니다.
+    closeAicAttachPortalMenu(false);
+    closeAicEmojiPanel(false);
     if (!els.slots) return;
 
     var html = '';
@@ -4970,6 +4985,29 @@
       box.addEventListener('scroll', function () {
         updateAicMessageBoxUserScrollLock(box);
       }, { passive: true });
+
+      box.addEventListener('wheel', function (event) {
+        if (event && Number(event.deltaY || 0) < 0 && box.dataset) {
+          box.dataset.aicUserScrollLock = '1';
+        }
+      }, { passive: true });
+
+      box.addEventListener('touchstart', function () {
+        if (box.dataset) box.dataset.aicUserScrollLock = '1';
+      }, { passive: true });
+
+      box.addEventListener('pointerdown', function () {
+        if (box.dataset && !isAicMessageBoxNearBottom(box)) {
+          box.dataset.aicUserScrollLock = '1';
+        }
+      }, { passive: true });
+
+      box.addEventListener('keydown', function (event) {
+        var key = event && event.key ? event.key : '';
+        if ((key === 'PageUp' || key === 'ArrowUp' || key === 'Home') && box.dataset) {
+          box.dataset.aicUserScrollLock = '1';
+        }
+      });
     });
 
     Array.from(els.slots.querySelectorAll('[data-attach-toggle-slot]')).forEach(function (btn) {
@@ -4983,7 +5021,7 @@
         var existingSlot = existing ? Number(existing.getAttribute('data-aic-attach-portal-slot')) || 0 : -1;
 
         if (existing && existingSlot === slotIndex) {
-          closeAicAttachPortalMenu();
+          closeAicAttachPortalMenu(true);
           return;
         }
 
@@ -4999,7 +5037,7 @@
         var slotIndex = Number(btn.getAttribute('data-attach-file-slot')) || 0;
         var fileInput = els.slots.querySelector('[data-attach-input-slot="' + slotIndex + '"]');
 
-        closeAicAttachPortalMenu();
+        closeAicAttachPortalMenu(true);
 
         if (fileInput) fileInput.click();
       });
