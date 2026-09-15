@@ -2360,7 +2360,7 @@ body.auth-loading .top-user-bar {
             <button type="button" id="researchStaffNavBtn" class="nav-btn" data-portal-src="research-staff/index.html" title="인력운영현황">인력</button>
             <button type="button" id="suppliesNavBtn" class="nav-btn" data-portal-src="reagent/index.html" title="시약">시약</button>
             <button type="button" id="travelExpenseNavBtn" class="nav-btn" data-portal-src="travel-expense/index.html" title="출장비정산">출장</button>
-            <button type="button" id="qaNavBtn" class="nav-btn" data-portal-src="QA/index.html" title="QA">QA</button>
+            <button type="button" id="qaNavBtn" class="nav-btn" data-portal-src="QA/index.html" title="QA" hidden>QA</button>
             <button type="button" id="aicNavBtn" class="nav-btn" data-portal-src="aic/index.html" title="AIC">AIC</button>
             <button type="button" id="mealNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
             <button type="button" id="docsNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
@@ -2609,6 +2609,7 @@ body.auth-loading .top-user-bar {
     mobileEdgeSwipeZone: document.getElementById('mobileEdgeSwipeZone'),
     portalSideNav: document.getElementById('portalSideNav'),
     settingsNavBtn: document.getElementById('settingsNavBtn'),
+    qaNavBtn: document.getElementById('qaNavBtn'),
     researchStaffNavBtn: document.getElementById('researchStaffNavBtn'),
     serviceAdminBtn: document.getElementById('serviceAdminBtn'),
     portalSubtabsWrap: document.getElementById('portalSubtabsWrap'),
@@ -3663,6 +3664,16 @@ body.auth-loading .top-user-bar {
     els.settingsNavBtn.tabIndex = allowed ? 0 : -1;
   }
 
+  function updateQaButtonVisibility() {
+    if (!els.qaNavBtn) return;
+    // QA는 개발 중이므로 현재는 서비스관리자(root ops)에게만 표시합니다.
+    const allowed = Boolean(currentUser && isServiceAdminRole());
+    els.qaNavBtn.hidden = !allowed;
+    els.qaNavBtn.style.display = allowed ? '' : 'none';
+    els.qaNavBtn.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+    els.qaNavBtn.tabIndex = allowed ? 0 : -1;
+  }
+
   function getCurrentEmployeeDuty() {
     const employee = currentEmployee || {};
     const normalizedEmployee = normalizePortalEmployee(employee) || {};
@@ -4361,7 +4372,9 @@ body.auth-loading .top-user-bar {
     window.currentUserRole = null;
     updateServiceAdminButtonVisibility();
     updateSettingsButtonVisibility();
+    updateQaButtonVisibility();
     scheduleResearchStaffButtonVisibilityRefresh();
+    updateQaButtonVisibility();
   }
 
   window.getPortalSession = function () {
@@ -4422,6 +4435,7 @@ body.auth-loading .top-user-bar {
     if (els.passwordCard) els.passwordCard.hidden = true;
     if (els.topUserBar) els.topUserBar.hidden = false;
     scheduleResearchStaffButtonVisibilityRefresh();
+    updateQaButtonVisibility();
   }
 
   function applyRoleUI() {
