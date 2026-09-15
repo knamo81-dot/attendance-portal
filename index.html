@@ -3666,8 +3666,9 @@ body.auth-loading .top-user-bar {
 
   function updateQaButtonVisibility() {
     if (!els.qaNavBtn) return;
-    // QA는 개발 중이므로 현재는 서비스관리자(root ops)에게만 표시합니다.
-    const allowed = Boolean(currentUser && isServiceAdminRole());
+    // QA는 개발 중이므로 서비스관리자와 회사 관리자에게만 표시합니다.
+    // 기존 설정 메뉴와 동일한 관리자 판별 로직을 재사용합니다.
+    const allowed = Boolean(currentUser && canUseSettingsMenu());
     els.qaNavBtn.hidden = !allowed;
     els.qaNavBtn.style.display = allowed ? '' : 'none';
     els.qaNavBtn.setAttribute('aria-hidden', allowed ? 'false' : 'true');
