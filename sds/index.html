@@ -1,1 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SDS 관리</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="../common/mobile.css" />
+  <link rel="stylesheet" href="../common/theme.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="card sds-card">
+      <div class="card-head">
+        <div>
+          <h2>SDS 관리</h2>
+          <p>Safety Data Sheet</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="filters">
+          <div class="field search-field">
+            <label for="sdsSearch">검색</label>
+            <input id="sdsSearch" type="search" placeholder="품명 / 제조사 / 제품코드 / CAS 검색" autocomplete="off" />
+          </div>
+          <div class="field status-field">
+            <label for="sdsStatus">구분</label>
+            <select id="sdsStatus">
+              <option value="all">전체</option>
+              <option value="missing">미첨부</option>
+              <option value="attached">첨부</option>
+              <option value="none">SDS 없음</option>
+            </select>
+          </div>
+        </div>
 
+        <div id="sdsMessage" class="message" aria-live="polite"></div>
+
+        <div class="table-wrap">
+          <table class="sds-table">
+            <thead>
+              <tr>
+                <th>품명</th><th>제조사</th><th>제품코드</th><th>규격</th><th>CAS</th><th>등급</th>
+                <th>SDS</th><th>개정일</th><th>등록일</th><th>이력</th>
+              </tr>
+            </thead>
+            <tbody id="sdsProductList">
+              <tr><td colspan="10" class="empty">제품정보를 불러오는 중입니다.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+  <script src="app.js"></script>
+  <script src="../common/common.js"></script>
+</body>
+</html>
