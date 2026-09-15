@@ -10,26 +10,44 @@
 </head>
 <body>
   <main class="shell">
+    <div class="tabs" aria-label="QA 기능">
+      <button class="tab-btn active" type="button" data-tab="sds">SDS 관리</button>
+    </div>
+
     <section class="card sds-card">
-      <div class="card-head">
-        <div>
-          <h2>SDS 관리</h2>
-          <p>Safety Data Sheet</p>
-        </div>
+      <div class="card-head sds-main-head">
+        <div><h3>Safety Data Sheet 관리</h3></div>
+        <button class="btn primary" id="sdsDownloadExcel" type="button">엑셀 다운로드</button>
       </div>
+
       <div class="card-body">
+        <div class="summary" aria-label="SDS 현황">
+          <button class="tile" type="button" data-status-card="all">
+            <span class="k">전체제품</span><span class="v" id="sdsTotalCount">0건</span>
+          </button>
+          <button class="tile" type="button" data-status-card="attached">
+            <span class="k">SDS등록</span><span class="v" id="sdsAttachedCount">0건</span>
+          </button>
+          <button class="tile" type="button" data-status-card="missing">
+            <span class="k">SDS미등록</span><span class="v" id="sdsMissingCount">0건</span>
+          </button>
+          <button class="tile" type="button" data-status-card="none">
+            <span class="k">SDS없음</span><span class="v" id="sdsNoneCount">0건</span>
+          </button>
+        </div>
+
         <div class="filters">
           <div class="field search-field">
             <label for="sdsSearch">검색</label>
-            <input id="sdsSearch" type="search" placeholder="품명 / 제조사 / 제품코드 / CAS 검색" autocomplete="off" />
+            <input id="sdsSearch" type="search" placeholder="품명 / 제조사 / 제품코드 / CAS" autocomplete="off" />
           </div>
           <div class="field status-field">
             <label for="sdsStatus">구분</label>
             <select id="sdsStatus">
               <option value="all">전체</option>
-              <option value="missing">미첨부</option>
-              <option value="attached">첨부</option>
-              <option value="none">SDS 없음</option>
+              <option value="attached">SDS등록</option>
+              <option value="missing">SDS미등록</option>
+              <option value="none">SDS없음</option>
             </select>
           </div>
         </div>
@@ -53,9 +71,11 @@
     </section>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js"></script>
   <script src="app.js"></script>
   <script src="../common/common.js"></script>
 </body>
 </html>
+
