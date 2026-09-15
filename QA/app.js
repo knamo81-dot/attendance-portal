@@ -27,7 +27,7 @@
     setMessage('사용중 제품을 불러오는 중입니다.');
     const {data,error}=await window.SDSApp.db.from('product_master')
       .select('id, company_id, category, name, maker, code, capacity, cas, grade, is_active')
-      .eq('company_id',companyId).eq('is_active',true)
+      .eq('company_id',companyId).eq('is_active',true).eq('category','시약')
       .order('maker',{ascending:true}).order('name',{ascending:true}).order('capacity',{ascending:true}).order('code',{ascending:true});
     if(error){console.error('[SDS] product load error',error);setMessage('제품 목록을 불러오지 못했습니다: '+error.message,'error');return;}
     state.products=data||[]; setMessage(`사용중 제품 ${state.products.length.toLocaleString()}건`); render();
