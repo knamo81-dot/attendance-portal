@@ -22,7 +22,6 @@
     $('sdsAttachedCount').textContent=`${counts.attached.toLocaleString()}건`;
     $('sdsMissingCount').textContent=`${counts.missing.toLocaleString()}건`;
     $('sdsNoneCount').textContent=`${counts.none.toLocaleString()}건`;
-    document.querySelectorAll('[data-status-card]').forEach(el=>el.classList.toggle('active',el.dataset.statusCard===state.status));
   }
 
   function render(){
@@ -68,7 +67,6 @@
     $('sdsSearch').addEventListener('input',e=>{state.query=e.target.value;render();});
     $('sdsStatus').addEventListener('change',e=>{state.status=e.target.value;render();});
     $('sdsDownloadExcel').addEventListener('click',downloadExcel);
-    document.querySelectorAll('[data-status-card]').forEach(el=>el.addEventListener('click',()=>{state.status=el.dataset.statusCard;$('sdsStatus').value=state.status;render();}));
     loadProducts(); notifyPortal();
   });
   window.addEventListener('message',e=>{if(e.data?.type==='portal-tabs-request'||e.data?.type==='portal-filters-request') notifyPortal();});
