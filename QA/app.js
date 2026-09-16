@@ -498,6 +498,14 @@
     if (files.length) return openPdfViewer(files, 0);
   }
 
+  function isRegisteredToday(value) {
+    if (!value) return false;
+    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const registered = fmt.format(new Date(value));
+    const now = fmt.format(new Date());
+    return registered === now;
+  }
+
   async function openHistory(product) {
     state.selected = product;
     $('sdsHistoryProduct').innerHTML = productSummary(product);
@@ -538,12 +546,21 @@
       if (!files.length && row.file_path) files = [{ file_path: row.file_path, file_name: row.file_name || 'SDS PDF' }];
       const buttons = files.map((f, i) => `<button class="btn small history-file-btn" type="button" data-history-action="open" data-path="${esc(f.file_path)}" data-file-name="${esc(f.file_name || `PDF ${i + 1}`)}">${esc(f.file_name || `PDF ${i + 1}`)}</button>`).join('');
       const changes = changesByVersion.get(Number(row.id)) || [];
-      return `<tr><td>${row.is_current ? '<span class="status-badge registered">현재</span>' : '이전'}</td><td>${changeHtml(changes)}</td><td>${dateOnly(row.revision_date)}</td><td>${dateOnly(row.registered_at)}</td><td>${esc(row.registered_by || '-')}</td><td><div class="history-files">${buttons || '-'}</div></td><td><button class="btn small danger" type="button" data-history-action="delete" data-version-id="${row.id}" data-current="${row.is_current ? '1' : '0'}">삭제</button></td></tr>`;
+      const cancelButton = isRegisteredToday(row.registered_at)
+        ? `<button class="btn small danger" type="button" data-history-action="cancel" data-version-id="${row.id}" data-current="${row.is_current ? '1' : '0'}">등록취소</button>`
+        : '<span class="history-locked">-</span>';
+      return `<tr><td>${row.is_current ? '<span class="status-badge registered">현재</span>' : '이전'}</td><td>${changeHtml(changes)}</td><td>${dateOnly(row.revision_date)}</td><td>${dateOnly(row.registered_at)}</td><td>${esc(row.registered_by || '-')}</td><td><div class="history-files">${buttons || '-'}</div></td><td>${cancelButton}</td></tr>`;
     }).join('');
   }
 
-  async function deleteVersion(versionId, isCurrent) {
-    if (!confirm('이 SDS 이력을 삭제 처리하시겠습니까? 파일 이력은 복구를 위해 DB에 보존됩니다.')) return;
+  async function cancelVersion(versionId, isCurrent) {
+    const row = await window.SDSApp.db.from('qa_sds_versions').select('registered_at').eq('id', versionId).maybeSingle();
+    if (row.error) { setMessage(`등록일 확인에 실패했습니다: ${row.error.message}`, 'error'); return; }
+    if (!row.data?.registered_at || !isRegisteredToday(row.data.registered_at)) {
+      setMessage('등록취소는 등록 당일에만 가능합니다.', 'error');
+      return;
+    }
+    if (!confirm('이 SDS 등록을 취소하시겠습니까? 등록 당일에만 취소할 수 있으며, 이전 이력은 그대로 보존됩니다.')) return;
     const db = window.SDSApp.db;
     const { error } = await db.from('qa_sds_versions').update({ deleted_at: new Date().toISOString(), is_current: false }).eq('id', versionId);
     if (error) { setMessage(`SDS 이력 삭제에 실패했습니다: ${error.message}`, 'error'); return; }
@@ -553,7 +570,7 @@
       if (!previous.error && previous.data?.id) await db.from('qa_sds_versions').update({ is_current: true }).eq('id', previous.data.id);
       else await db.from('qa_sds_documents').update({ status: 'missing' }).eq('id', docId);
     }
-    setMessage('SDS 이력이 삭제 처리되었습니다.', 'success');
+    setMessage('SDS 등록이 취소되었습니다.', 'success');
     const productId = state.selected?.id;
     await loadProducts();
     const refreshed = state.products.find((p) => Number(p.id) === Number(productId));
@@ -668,7 +685,7 @@
       const historyButton = e.target.closest('[data-history-action]');
       if (historyButton) {
         if (historyButton.dataset.historyAction === 'open') await openFile(historyButton.dataset.path, historyButton.dataset.fileName || 'SDS PDF');
-        if (historyButton.dataset.historyAction === 'delete') await deleteVersion(Number(historyButton.dataset.versionId), historyButton.dataset.current === '1');
+        if (historyButton.dataset.historyAction === 'cancel') await cancelVersion(Number(historyButton.dataset.versionId), historyButton.dataset.current === '1');
       }
     });
 
@@ -678,3 +695,4 @@
 
   window.addEventListener('message', (e) => { if (e.data?.type === 'portal-tabs-request' || e.data?.type === 'portal-filters-request') notifyPortal(); });
 })();
+
