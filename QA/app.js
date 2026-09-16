@@ -39,7 +39,11 @@
   }
 
   function statusOf(product) {
-    return product?.sds_document?.status || 'missing';
+    const docStatus = product?.sds_document?.status || 'missing';
+    if (docStatus === 'registered') {
+      return product?.current_version?.file_path ? 'registered' : 'missing';
+    }
+    return docStatus;
   }
 
   function statusLabel(status) {
@@ -221,7 +225,7 @@
     const isUpdate = statusOf(product) === 'registered';
     $('sdsEditTitle').textContent = isUpdate ? 'SDS 갱신' : 'SDS 등록';
     $('sdsEditProduct').innerHTML = productSummary(product);
-    $('sdsRevisionDate').value = '';
+    $('sdsRevisionDate').value = isUpdate ? (product.current_version?.revision_date || '') : '';
     $('sdsLastCheckedDate').value = today();
     $('sdsFile').value = '';
     $('sdsFileHint').textContent = isUpdate
@@ -290,15 +294,25 @@
     saveButton.disabled = true;
     setMessage('SDS 파일을 저장하는 중입니다.');
 
+    let uploadedPath = null;
+    let createdDocId = null;
+
     try {
       const db = window.SDSApp.db;
       const companyId = window.SDSApp.getCompanyId();
-      const doc = await ensureDocument(product, {
-        status: 'registered',
-        last_checked_date: checkedDate,
-        no_sds_reason: null,
-        no_sds_note: null
-      });
+
+      // 문서 레코드는 먼저 확보하되, 실제 SDS 버전 등록이 끝나기 전에는
+      // registered 상태로 바꾸지 않습니다.
+      let doc = product.sds_document;
+      if (!doc?.id) {
+        doc = await ensureDocument(product, {
+          status: 'missing',
+          last_checked_date: null,
+          no_sds_reason: null,
+          no_sds_note: null
+        });
+        createdDocId = doc.id;
+      }
 
       const safeName = file.name.replace(/[^0-9A-Za-z가-힣._-]+/g, '_');
       const filePath = `${companyId}/${product.id}/${Date.now()}_${safeName}`;
@@ -307,34 +321,78 @@
         upsert: false
       });
       if (uploadRes.error) throw uploadRes.error;
+      uploadedPath = filePath;
 
+      // 새 버전을 먼저 일반 이력으로 저장합니다. 이 단계까지 실패하면
+      // 기존 현재본/등록상태는 그대로 유지됩니다.
+      const versionRes = await db.from('qa_sds_versions')
+        .insert({
+          sds_document_id: doc.id,
+          revision_date: revisionDate,
+          file_path: filePath,
+          file_name: file.name,
+          file_size: file.size,
+          registered_by: getUserName(),
+          is_current: false
+        })
+        .select('id')
+        .single();
+      if (versionRes.error) throw versionRes.error;
+
+      const newVersionId = versionRes.data.id;
+
+      // 기존 현재본 해제 후 새 버전을 현재본으로 지정합니다.
       const clearRes = await db.from('qa_sds_versions')
         .update({ is_current: false })
         .eq('sds_document_id', doc.id)
+        .neq('id', newVersionId)
         .eq('is_current', true)
         .is('deleted_at', null);
       if (clearRes.error) throw clearRes.error;
 
-      const versionRes = await db.from('qa_sds_versions').insert({
-        sds_document_id: doc.id,
-        revision_date: revisionDate,
-        file_path: filePath,
-        file_name: file.name,
-        file_size: file.size,
-        registered_by: getUserName(),
-        is_current: true
-      });
-      if (versionRes.error) {
-        await db.storage.from(BUCKET).remove([filePath]);
-        throw versionRes.error;
-      }
+      const currentRes = await db.from('qa_sds_versions')
+        .update({ is_current: true })
+        .eq('id', newVersionId);
+      if (currentRes.error) throw currentRes.error;
+
+      // 파일과 버전이 모두 정상 저장된 뒤 마지막에 등록 상태를 확정합니다.
+      const docRes = await db.from('qa_sds_documents')
+        .update({
+          status: 'registered',
+          last_checked_date: checkedDate,
+          no_sds_reason: null,
+          no_sds_note: null
+        })
+        .eq('id', doc.id);
+      if (docRes.error) throw docRes.error;
 
       closeModal('sdsEditModal');
       setMessage('SDS가 저장되었습니다.', 'success');
       await loadProducts();
     } catch (error) {
       console.error('[SDS] save error', error);
+
+      // 새 등록 도중 실패했다면 업로드된 파일과 빈 문서 레코드를 정리합니다.
+      if (uploadedPath) {
+        try {
+          await window.SDSApp.db.storage.from(BUCKET).remove([uploadedPath]);
+        } catch (_) {}
+      }
+      if (createdDocId) {
+        try {
+          const versions = await window.SDSApp.db.from('qa_sds_versions')
+            .select('id')
+            .eq('sds_document_id', createdDocId)
+            .is('deleted_at', null)
+            .limit(1);
+          if (!versions.error && !(versions.data || []).length) {
+            await window.SDSApp.db.from('qa_sds_documents').delete().eq('id', createdDocId);
+          }
+        } catch (_) {}
+      }
+
       setMessage(`SDS 저장에 실패했습니다: ${error.message}`, 'error');
+      await loadProducts();
     } finally {
       saveButton.disabled = false;
     }
@@ -559,3 +617,4 @@
     if (e.data?.type === 'portal-tabs-request' || e.data?.type === 'portal-filters-request') notifyPortal();
   });
 })();
+
