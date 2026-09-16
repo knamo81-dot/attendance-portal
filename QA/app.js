@@ -287,88 +287,98 @@
     } finally { button.disabled = false; }
   }
 
-  function resetPdfViewerPosition() {
-    const modal = document.querySelector('#sdsPdfModal .pdf-viewer-modal');
-    if (!modal) return;
-    modal.style.left = '';
-    modal.style.top = '';
+  function popupEsc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
   }
 
-  function initPdfViewerDrag() {
-    const modal = document.querySelector('#sdsPdfModal .pdf-viewer-modal');
-    const handle = document.querySelector('#sdsPdfModal .pdf-viewer-head');
-    if (!modal || !handle) return;
+  function openPdfPopupShell(files, startIndex = 0) {
+    const validFiles = (files || []).filter((f) => f?.file_path);
+    if (!validFiles.length) return null;
 
-    let dragging = false;
-    let offsetX = 0;
-    let offsetY = 0;
+    const index = Math.min(Math.max(Number(startIndex) || 0, 0), validFiles.length - 1);
+    const width = Math.min(1180, Math.max(760, Math.round((window.screen?.availWidth || 1280) * 0.82)));
+    const height = Math.min(900, Math.max(620, Math.round((window.screen?.availHeight || 800) * 0.88)));
+    const left = Math.max(0, Math.round(((window.screen?.availWidth || width) - width) / 2));
+    const top = Math.max(0, Math.round(((window.screen?.availHeight || height) - height) / 2));
+    const popup = window.open('', 'qaSdsPdfViewer', `popup=yes,width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no`);
 
-    handle.addEventListener('pointerdown', (e) => {
-      if (window.matchMedia('(max-width: 760px)').matches) return;
-      if (e.target.closest('button, a, input')) return;
-      const rect = modal.getBoundingClientRect();
-      dragging = true;
-      offsetX = e.clientX - rect.left;
-      offsetY = e.clientY - rect.top;
-      handle.setPointerCapture?.(e.pointerId);
-      modal.classList.add('dragging');
-      e.preventDefault();
-    });
-
-    handle.addEventListener('pointermove', (e) => {
-      if (!dragging) return;
-      const maxLeft = Math.max(0, window.innerWidth - modal.offsetWidth);
-      const maxTop = Math.max(0, window.innerHeight - modal.offsetHeight);
-      const left = Math.min(Math.max(0, e.clientX - offsetX), maxLeft);
-      const top = Math.min(Math.max(0, e.clientY - offsetY), maxTop);
-      modal.style.left = `${left}px`;
-      modal.style.top = `${top}px`;
-    });
-
-    const stopDrag = (e) => {
-      if (!dragging) return;
-      dragging = false;
-      modal.classList.remove('dragging');
-      try { handle.releasePointerCapture?.(e.pointerId); } catch (_) {}
-    };
-    handle.addEventListener('pointerup', stopDrag);
-    handle.addEventListener('pointercancel', stopDrag);
-  }
-
-  async function showPdfAt(index) {
-    const file = state.pdfFiles[index];
-    if (!file?.file_path) return;
-    state.pdfIndex = index;
-    $('sdsPdfLoading').hidden = false;
-    $('sdsPdfFrame').removeAttribute('src');
-    const { data, error } = await window.SDSApp.db.storage.from(BUCKET).createSignedUrl(file.file_path, 300);
-    if (error) {
-      $('sdsPdfLoading').textContent = `PDF를 불러오지 못했습니다: ${error.message}`;
-      setMessage(`SDS 파일을 열지 못했습니다: ${error.message}`, 'error');
-      return;
+    if (!popup) {
+      setMessage('PDF 창이 차단되었습니다. 브라우저의 팝업 허용 후 다시 시도해 주세요.', 'error');
+      return null;
     }
-    state.pdfUrl = data.signedUrl;
-    $('sdsPdfFileName').textContent = file.file_name || `PDF ${index + 1}`;
-    $('sdsPdfFrame').src = data.signedUrl;
-    Array.from($('sdsPdfTabs').querySelectorAll('[data-pdf-index]')).forEach((btn) => {
-      btn.classList.toggle('active', Number(btn.dataset.pdfIndex) === index);
-    });
+
+    const tabs = validFiles.length > 1
+      ? `<div class="tabs">${validFiles.map((f, i) => `<button type="button" class="tab${i === index ? ' active' : ''}" data-index="${i}" title="${popupEsc(f.file_name || `PDF ${i + 1}`)}">${popupEsc(f.file_name || `PDF ${i + 1}`)}</button>`).join('')}</div>`
+      : '';
+
+    popup.document.open();
+    popup.document.write(`<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SDS PDF</title>
+<style>
+  *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif;color:#1f2937;background:#e5e7eb}
+  .viewer{display:flex;flex-direction:column;width:100%;height:100%}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;padding:8px 12px;background:#fff;border-bottom:1px solid #d9e2ec}
+  .title{min-width:0}.title strong{display:block;font-size:15px}.filename{display:block;max-width:70vw;margin-top:2px;overflow:hidden;font-size:11px;color:#64748b;text-overflow:ellipsis;white-space:nowrap}
+  .tabs{display:flex;gap:2px;align-items:flex-end;padding:7px 10px 0;overflow-x:auto;background:#eef2f7;border-bottom:1px solid #cbd5e1}
+  .tab{max-width:260px;min-height:33px;padding:0 13px;overflow:hidden;font:700 11px inherit;color:#64748b;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;background:#e2e8f0;border:1px solid #cbd5e1;border-bottom:0;border-radius:8px 8px 0 0}
+  .tab.active{position:relative;z-index:1;color:#5b3db5;background:#fff;box-shadow:inset 0 2px 0 #6d4ccb}
+  .body{position:relative;flex:1;min-height:0;background:#e5e7eb}.body iframe{display:block;width:100%;height:100%;border:0;background:#fff}
+  .loading{position:absolute;top:50%;left:50%;z-index:2;padding:10px 14px;font-size:12px;color:#64748b;background:rgba(255,255,255,.95);border:1px solid #d9e2ec;border-radius:8px;transform:translate(-50%,-50%)}
+  .loading[hidden]{display:none}
+</style>
+</head>
+<body>
+<div class="viewer">
+  <div class="head"><div class="title"><strong>SDS PDF</strong><span id="fileName" class="filename"></span></div></div>
+  ${tabs}
+  <div class="body"><div id="loading" class="loading">PDF를 불러오는 중입니다.</div><iframe id="pdfFrame" title="SDS PDF 미리보기"></iframe></div>
+</div>
+</body>
+</html>`);
+    popup.document.close();
+    try { popup.focus(); } catch (_) {}
+    return { popup, validFiles, index };
+  }
+
+  async function createSignedUrls(files) {
+    return Promise.all(files.map(async (file) => {
+      const { data, error } = await window.SDSApp.db.storage.from(BUCKET).createSignedUrl(file.file_path, 300);
+      return { ...file, signedUrl: error ? '' : data.signedUrl, signedError: error?.message || '' };
+    }));
   }
 
   async function openPdfViewer(files, startIndex = 0) {
-    const validFiles = (files || []).filter((f) => f?.file_path);
-    if (!validFiles.length) return;
-    state.pdfFiles = validFiles;
-    state.pdfIndex = Math.min(Math.max(Number(startIndex) || 0, 0), validFiles.length - 1);
-    state.pdfUrl = '';
-    $('sdsPdfTabs').hidden = validFiles.length <= 1;
-    $('sdsPdfTabs').innerHTML = validFiles.map((f, i) =>
-      `<button class="btn small pdf-tab${i === state.pdfIndex ? ' active' : ''}" type="button" data-pdf-index="${i}">${esc(f.file_name || `PDF ${i + 1}`)}</button>`
-    ).join('');
-    $('sdsPdfLoading').textContent = 'PDF를 불러오는 중입니다.';
-    openModal('sdsPdfModal');
-    resetPdfViewerPosition();
-    await showPdfAt(state.pdfIndex);
+    const shell = openPdfPopupShell(files, startIndex);
+    if (!shell) return;
+
+    const { popup, validFiles } = shell;
+    const signedFiles = await createSignedUrls(validFiles);
+    if (popup.closed) return;
+
+    const frame = popup.document.getElementById('pdfFrame');
+    const loading = popup.document.getElementById('loading');
+    const fileName = popup.document.getElementById('fileName');
+
+    const show = (index) => {
+      const file = signedFiles[index];
+      if (!file) return;
+      fileName.textContent = file.file_name || `PDF ${index + 1}`;
+      popup.document.querySelectorAll('[data-index]').forEach((btn) => btn.classList.toggle('active', Number(btn.dataset.index) === index));
+      loading.hidden = false;
+      loading.textContent = file.signedUrl ? 'PDF를 불러오는 중입니다.' : `PDF를 불러오지 못했습니다: ${file.signedError || 'URL 생성 실패'}`;
+      frame.removeAttribute('src');
+      if (file.signedUrl) frame.src = file.signedUrl;
+    };
+
+    popup.document.querySelectorAll('[data-index]').forEach((btn) => {
+      btn.addEventListener('click', () => show(Number(btn.dataset.index)));
+    });
+    frame.addEventListener('load', () => { loading.hidden = true; });
+    show(shell.index);
   }
 
   async function openFile(filePath, fileName = 'SDS PDF') {
@@ -451,8 +461,6 @@
     $('sdsDownloadExcel').addEventListener('click', downloadExcel);
     $('sdsSave').addEventListener('click', saveSds);
     $('sdsAddFile').addEventListener('click', addFileRow);
-    $('sdsPdfFrame').addEventListener('load', () => { $('sdsPdfLoading').hidden = true; });
-    initPdfViewerDrag();
     document.querySelectorAll('input[name="sdsMode"]').forEach((r) => r.addEventListener('change', () => setMode(r.value)));
 
     document.addEventListener('click', async (e) => {
@@ -465,12 +473,7 @@
         else remove.closest('.file-row')?.querySelector('input') && (remove.closest('.file-row').querySelector('input').value = '');
         return;
       }
-      const pdfTab = e.target.closest('[data-pdf-index]');
-      if (pdfTab) { await showPdfAt(Number(pdfTab.dataset.pdfIndex)); return; }
-      if (e.target.closest('#sdsPdfNewWindow')) {
-        if (state.pdfUrl) window.open(state.pdfUrl, '_blank', 'noopener,noreferrer');
-        return;
-      }
+
       const currentFile = e.target.closest('[data-current-file]');
       if (currentFile) { await openFile(currentFile.dataset.currentFile, currentFile.dataset.currentFileName || 'SDS PDF'); return; }
       const actionButton = e.target.closest('[data-action]');
@@ -495,4 +498,3 @@
 
   window.addEventListener('message', (e) => { if (e.data?.type === 'portal-tabs-request' || e.data?.type === 'portal-filters-request') notifyPortal(); });
 })();
-
