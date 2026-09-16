@@ -37,7 +37,7 @@
 
   function statusLabel(status) {
     if (status === 'registered') return '등록';
-    if (status === 'none') return 'SDS없음';
+    if (status === 'none') return '해당사항<br>없음';
     return '미등록';
   }
 
@@ -79,12 +79,13 @@
       const doc = product.sds_document || {};
       const current = product.current_version || {};
       const mainAction = status === 'registered' ? '갱신' : '등록';
-      const fileButton = status === 'registered' && versionFiles(current).length
-        ? `<button class="btn small" type="button" data-action="open" data-id="${product.id}">보기</button>` : '';
+      const currentFileCount = versionFiles(current).length;
+      const fileButton = status === 'registered' && currentFileCount
+        ? `<button class="btn small two-line-action" type="button" data-action="open" data-id="${product.id}"><span>보기</span><span>${currentFileCount}건</span></button>` : '';
       return `<tr>
         <td>${esc(product.name || '-')}</td><td>${esc(product.maker || '-')}</td><td>${esc(product.code || '-')}</td>
         <td>${esc(product.capacity || '-')}</td><td>${esc(product.cas || '-')}</td><td>${esc(product.grade || '-')}</td>
-        <td><div class="sds-actions"><span class="status-badge ${status}">${statusLabel(status)}</span>${fileButton}<button class="btn small primary" type="button" data-action="edit" data-id="${product.id}">${mainAction}</button></div></td>
+        <td><div class="sds-actions"><span class="status-badge ${status}${status === 'none' ? ' two-line-status' : ''}">${statusLabel(status)}</span>${fileButton}<button class="btn small primary" type="button" data-action="edit" data-id="${product.id}">${mainAction}</button></div></td>
         <td><div class="date-stack"><span><b>개정</b>${dateOnly(current.revision_date)}</span><span><b>등록</b>${dateOnly(current.registered_at)}</span></div></td>
         <td><div class="date-stack"><span><b>확인</b>${dateOnly(doc.last_checked_date)}</span><span><b>발주</b>${dateOnly(product.last_order_date)}</span></div></td>
         <td><button class="btn small" type="button" data-action="history" data-id="${product.id}">이력</button></td>
@@ -277,7 +278,7 @@
       if (mode === 'none') await saveNoneIntegrated(product);
       else await saveFileVersion(product);
       closeModal('sdsEditModal');
-      setMessage(mode === 'none' ? 'SDS 없음 상태가 저장되었습니다.' : 'SDS가 저장되었습니다.', 'success');
+      setMessage(mode === 'none' ? '해당사항없음 상태가 저장되었습니다.' : 'SDS가 저장되었습니다.', 'success');
       await loadProducts();
     } catch (error) {
       console.error('[SDS] save error', error);
@@ -349,7 +350,7 @@
     const rows = filtered();
     if (!rows.length) { setMessage('엑셀로 다운로드할 제품이 없습니다.', 'error'); return; }
     if (!window.XLSX) { setMessage('엑셀 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.', 'error'); return; }
-    const data = rows.map((product) => ({ '품명': product.name || '', '제조사': product.maker || '', '제품코드': product.code || '', '규격': product.capacity || '', 'CAS': product.cas || '', '등급': product.grade || '', 'SDS': statusLabel(statusOf(product)), '개정일': dateOnly(product.current_version?.revision_date).replace('-', ''), '등록일': dateOnly(product.current_version?.registered_at).replace('-', ''), '최종확인일': dateOnly(product.sds_document?.last_checked_date).replace('-', ''), '최종발주일': dateOnly(product.last_order_date).replace('-', '') }));
+    const data = rows.map((product) => ({ '품명': product.name || '', '제조사': product.maker || '', '제품코드': product.code || '', '규격': product.capacity || '', 'CAS': product.cas || '', '등급': product.grade || '', 'SDS': statusOf(product) === 'none' ? '해당사항없음' : statusLabel(statusOf(product)), '개정일': dateOnly(product.current_version?.revision_date).replace('-', ''), '등록일': dateOnly(product.current_version?.registered_at).replace('-', ''), '최종확인일': dateOnly(product.sds_document?.last_checked_date).replace('-', ''), '최종발주일': dateOnly(product.last_order_date).replace('-', '') }));
     const ws = XLSX.utils.json_to_sheet(data);
     ws['!cols'] = [{ wch: 28 }, { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'SDS 관리'); XLSX.writeFile(wb, `SDS관리_${today().replaceAll('-', '')}.xlsx`);
