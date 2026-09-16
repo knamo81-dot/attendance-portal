@@ -560,3 +560,37 @@ body {
     align-items: stretch;
   }
 }
+
+/* SDS 상태 및 현재 파일 수: 좁은 SDS 컬럼용 2줄 표시 */
+.two-line-status,
+.two-line-action {
+  flex-direction: column;
+  gap: 1px;
+  min-width: 44px;
+  min-height: 38px;
+  line-height: 1.15;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.two-line-status {
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.two-line-action {
+  padding: 4px 8px;
+}
+
+.two-line-action span {
+  display: block;
+}
+
+.two-line-action span:last-child {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+
