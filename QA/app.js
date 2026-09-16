@@ -1,6 +1,6 @@
 (function () {
   const BUCKET = 'qa-sds-files';
-  const state = { products: [], query: '', status: 'all', selected: null, pdfFiles: [], pdfIndex: 0, pdfUrl: '' };
+  const state = { products: [], query: '', status: 'all', selected: null, pdfFiles: [], pdfIndex: 0, pdfUrl: '', currentFileActions: [] };
   const $ = (id) => document.getElementById(id);
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 
@@ -161,6 +161,26 @@
     $('sdsFileRows').appendChild(row);
   }
 
+  function renderCurrentFileActions() {
+    const wrap = $('sdsCurrentFiles');
+    if (!wrap) return;
+    wrap.innerHTML = state.currentFileActions.map((item, i) => {
+      const deleted = item.action === 'delete';
+      const replacing = item.action === 'replace';
+      return `<div class="current-file-manage${deleted ? ' is-deleted' : ''}">
+        <button class="current-file-name" type="button" data-current-file="${esc(item.file_path)}" data-current-file-name="${esc(item.file_name || `PDF ${i + 1}`)}" ${deleted ? 'disabled' : ''}>${esc(item.file_name || `PDF ${i + 1}`)}</button>
+        <div class="current-file-actions">
+          <button class="btn small current-replace-btn" type="button" data-current-replace="${i}" ${deleted ? 'disabled' : ''}>교체</button>
+          <button class="btn small danger" type="button" data-current-delete="${i}">${deleted ? '삭제취소' : '삭제'}</button>
+        </div>
+        <div class="current-replace-row" ${replacing && !deleted ? '' : 'hidden'}>
+          <input type="file" accept="application/pdf,.pdf" data-current-replace-input="${i}" />
+          <button class="btn small" type="button" data-current-replace-cancel="${i}">교체취소</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
   function openEdit(product) {
     state.selected = product;
     const status = statusOf(product);
@@ -175,9 +195,12 @@
     addFileRow();
 
     const currentFiles = versionFiles(product.current_version);
+    state.currentFileActions = currentFiles.map((f) => ({ ...f, action: 'keep', replacement: null }));
     $('sdsCurrentFilesWrap').hidden = !currentFiles.length;
-    $('sdsCurrentFiles').innerHTML = currentFiles.map((f, i) => `<button class="btn small" type="button" data-current-file="${esc(f.file_path)}" data-current-file-name="${esc(f.file_name || `PDF ${i + 1}`)}">${esc(f.file_name || `PDF ${i + 1}`)}</button>`).join('');
-    $('sdsFileHint').textContent = status === 'registered' ? '새 PDF를 등록하면 현재본은 이력으로 유지됩니다. 여러 파일을 함께 추가할 수 있습니다.' : 'PDF 파일을 선택해 주세요. 여러 파일을 한 개정 이력에 함께 등록할 수 있습니다.';
+    renderCurrentFileActions();
+    $('sdsFileHint').textContent = status === 'registered'
+      ? '기존 파일은 기본 유지됩니다. 교체할 파일만 [교체], 제외할 파일만 [삭제]를 선택하고, 새 파일은 아래에서 추가하세요.'
+      : 'PDF 파일을 선택해 주세요. 여러 파일을 한 개정 이력에 함께 등록할 수 있습니다.';
     setMode(status === 'none' ? 'none' : 'file');
     openModal('sdsEditModal');
   }
@@ -209,11 +232,22 @@
   async function saveFileVersion(product) {
     const revisionDate = $('sdsRevisionDate').value;
     const checkedDate = $('sdsLastCheckedDate').value;
-    const files = selectedFiles();
+    const addedFiles = selectedFiles();
+    const isUpdate = statusOf(product) === 'registered' && !!product.current_version;
+    const currentActions = isUpdate ? state.currentFileActions : [];
+
     if (!revisionDate) throw new Error('SDS 개정일을 입력해 주세요.');
     if (!checkedDate) throw new Error('최종확인일을 입력해 주세요.');
-    if (!files.length) throw new Error('등록할 SDS PDF 파일을 한 개 이상 선택해 주세요.');
-    validateFiles(files);
+
+    const replacementFiles = currentActions.filter((x) => x.action === 'replace').map((x) => x.replacement).filter(Boolean);
+    validateFiles([...addedFiles, ...replacementFiles]);
+
+    const keptOrReplacedCount = currentActions.filter((x) => x.action !== 'delete').length;
+    if (!isUpdate && !addedFiles.length) throw new Error('등록할 SDS PDF 파일을 한 개 이상 선택해 주세요.');
+    if (isUpdate && keptOrReplacedCount + addedFiles.length < 1) throw new Error('현재본에는 SDS PDF가 한 개 이상 있어야 합니다.');
+    if (isUpdate && currentActions.some((x) => x.action === 'replace' && !x.replacement)) {
+      throw new Error('교체할 PDF 파일을 선택해 주세요.');
+    }
 
     const db = window.SDSApp.db;
     const companyId = window.SDSApp.getCompanyId();
@@ -222,31 +256,59 @@
     const uploadedPaths = [];
     let newVersionId = null;
 
+    const uploadOne = async (file, tag) => {
+      const safeName = file.name.replace(/[^0-9A-Za-z가-힣._-]+/g, '_');
+      const path = `${companyId}/${product.id}/${Date.now()}_${tag}_${safeName}`;
+      const up = await db.storage.from(BUCKET).upload(path, file, { contentType: 'application/pdf', upsert: false });
+      if (up.error) throw up.error;
+      uploadedPaths.push(path);
+      return { file_path: path, file_name: file.name, file_size: file.size };
+    };
+
     try {
       if (!doc?.id) {
         doc = await ensureDocument(product, { status: 'missing', last_checked_date: null, no_sds_reason: null, no_sds_note: null });
         createdDocId = doc.id;
       }
 
-      for (let i = 0; i < files.length; i += 1) {
-        const file = files[i];
-        const safeName = file.name.replace(/[^0-9A-Za-z가-힣._-]+/g, '_');
-        const path = `${companyId}/${product.id}/${Date.now()}_${i + 1}_${safeName}`;
-        const up = await db.storage.from(BUCKET).upload(path, file, { contentType: 'application/pdf', upsert: false });
-        if (up.error) throw up.error;
-        uploadedPaths.push(path);
+      const finalFiles = [];
+      for (let i = 0; i < currentActions.length; i += 1) {
+        const item = currentActions[i];
+        if (item.action === 'delete') continue;
+        if (item.action === 'replace') {
+          const uploaded = await uploadOne(item.replacement, `replace_${i + 1}`);
+          finalFiles.push(uploaded);
+        } else {
+          finalFiles.push({ file_path: item.file_path, file_name: item.file_name || `PDF ${i + 1}`, file_size: item.file_size || null });
+        }
       }
 
-      const first = files[0];
+      for (let i = 0; i < addedFiles.length; i += 1) {
+        finalFiles.push(await uploadOne(addedFiles[i], `add_${i + 1}`));
+      }
+
+      if (!finalFiles.length) throw new Error('현재본에는 SDS PDF가 한 개 이상 있어야 합니다.');
+
+      const first = finalFiles[0];
       const vr = await db.from('qa_sds_versions').insert({
-        sds_document_id: doc.id, revision_date: revisionDate,
-        file_path: uploadedPaths[0], file_name: first.name, file_size: first.size,
-        registered_by: getUserName(), is_current: false
+        sds_document_id: doc.id,
+        revision_date: revisionDate,
+        file_path: first.file_path,
+        file_name: first.file_name,
+        file_size: first.file_size,
+        registered_by: getUserName(),
+        is_current: false
       }).select('id').single();
       if (vr.error) throw vr.error;
       newVersionId = vr.data.id;
 
-      const fileRows = files.map((file, i) => ({ sds_version_id: newVersionId, file_path: uploadedPaths[i], file_name: file.name, file_size: file.size, sort_order: i + 1 }));
+      const fileRows = finalFiles.map((file, i) => ({
+        sds_version_id: newVersionId,
+        file_path: file.file_path,
+        file_name: file.file_name,
+        file_size: file.file_size || null,
+        sort_order: i + 1
+      }));
       const fr = await db.from('qa_sds_files').insert(fileRows);
       if (fr.error) throw fr.error;
 
@@ -463,6 +525,25 @@
     $('sdsAddFile').addEventListener('click', addFileRow);
     document.querySelectorAll('input[name="sdsMode"]').forEach((r) => r.addEventListener('change', () => setMode(r.value)));
 
+    document.addEventListener('change', (e) => {
+      const input = e.target.closest('[data-current-replace-input]');
+      if (!input) return;
+      const i = Number(input.dataset.currentReplaceInput);
+      const file = input.files?.[0] || null;
+      if (!state.currentFileActions[i]) return;
+      if (file) {
+        try {
+          validateFiles([file]);
+          state.currentFileActions[i].action = 'replace';
+          state.currentFileActions[i].replacement = file;
+        } catch (error) {
+          input.value = '';
+          state.currentFileActions[i].replacement = null;
+          setMessage(error.message, 'error');
+        }
+      }
+    });
+
     document.addEventListener('click', async (e) => {
       const close = e.target.closest('[data-close]');
       if (close) { closeModal(close.dataset.close); return; }
@@ -471,6 +552,44 @@
         const rows = document.querySelectorAll('.file-row');
         if (rows.length > 1) remove.closest('.file-row')?.remove();
         else remove.closest('.file-row')?.querySelector('input') && (remove.closest('.file-row').querySelector('input').value = '');
+        return;
+      }
+
+      const replaceBtn = e.target.closest('[data-current-replace]');
+      if (replaceBtn) {
+        const i = Number(replaceBtn.dataset.currentReplace);
+        if (state.currentFileActions[i]) {
+          state.currentFileActions[i].action = 'replace';
+          state.currentFileActions[i].replacement = null;
+          renderCurrentFileActions();
+        }
+        return;
+      }
+
+      const replaceCancel = e.target.closest('[data-current-replace-cancel]');
+      if (replaceCancel) {
+        const i = Number(replaceCancel.dataset.currentReplaceCancel);
+        if (state.currentFileActions[i]) {
+          state.currentFileActions[i].action = 'keep';
+          state.currentFileActions[i].replacement = null;
+          renderCurrentFileActions();
+        }
+        return;
+      }
+
+      const deleteBtn = e.target.closest('[data-current-delete]');
+      if (deleteBtn) {
+        const i = Number(deleteBtn.dataset.currentDelete);
+        if (state.currentFileActions[i]) {
+          const item = state.currentFileActions[i];
+          if (item.action === 'delete') {
+            item.action = 'keep';
+          } else {
+            item.action = 'delete';
+            item.replacement = null;
+          }
+          renderCurrentFileActions();
+        }
         return;
       }
 
@@ -498,3 +617,4 @@
 
   window.addEventListener('message', (e) => { if (e.data?.type === 'portal-tabs-request' || e.data?.type === 'portal-filters-request') notifyPortal(); });
 })();
+
