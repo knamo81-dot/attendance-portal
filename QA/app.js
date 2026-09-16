@@ -287,6 +287,54 @@
     } finally { button.disabled = false; }
   }
 
+  function resetPdfViewerPosition() {
+    const modal = document.querySelector('#sdsPdfModal .pdf-viewer-modal');
+    if (!modal) return;
+    modal.style.left = '';
+    modal.style.top = '';
+  }
+
+  function initPdfViewerDrag() {
+    const modal = document.querySelector('#sdsPdfModal .pdf-viewer-modal');
+    const handle = document.querySelector('#sdsPdfModal .pdf-viewer-head');
+    if (!modal || !handle) return;
+
+    let dragging = false;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    handle.addEventListener('pointerdown', (e) => {
+      if (window.matchMedia('(max-width: 760px)').matches) return;
+      if (e.target.closest('button, a, input')) return;
+      const rect = modal.getBoundingClientRect();
+      dragging = true;
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+      handle.setPointerCapture?.(e.pointerId);
+      modal.classList.add('dragging');
+      e.preventDefault();
+    });
+
+    handle.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const maxLeft = Math.max(0, window.innerWidth - modal.offsetWidth);
+      const maxTop = Math.max(0, window.innerHeight - modal.offsetHeight);
+      const left = Math.min(Math.max(0, e.clientX - offsetX), maxLeft);
+      const top = Math.min(Math.max(0, e.clientY - offsetY), maxTop);
+      modal.style.left = `${left}px`;
+      modal.style.top = `${top}px`;
+    });
+
+    const stopDrag = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      modal.classList.remove('dragging');
+      try { handle.releasePointerCapture?.(e.pointerId); } catch (_) {}
+    };
+    handle.addEventListener('pointerup', stopDrag);
+    handle.addEventListener('pointercancel', stopDrag);
+  }
+
   async function showPdfAt(index) {
     const file = state.pdfFiles[index];
     if (!file?.file_path) return;
@@ -319,6 +367,7 @@
     ).join('');
     $('sdsPdfLoading').textContent = 'PDF를 불러오는 중입니다.';
     openModal('sdsPdfModal');
+    resetPdfViewerPosition();
     await showPdfAt(state.pdfIndex);
   }
 
@@ -403,6 +452,7 @@
     $('sdsSave').addEventListener('click', saveSds);
     $('sdsAddFile').addEventListener('click', addFileRow);
     $('sdsPdfFrame').addEventListener('load', () => { $('sdsPdfLoading').hidden = true; });
+    initPdfViewerDrag();
     document.querySelectorAll('input[name="sdsMode"]').forEach((r) => r.addEventListener('change', () => setMode(r.value)));
 
     document.addEventListener('click', async (e) => {
