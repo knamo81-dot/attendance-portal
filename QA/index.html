@@ -75,59 +75,61 @@
       </div>
       <div class="modal-body">
         <div class="product-summary" id="sdsEditProduct"></div>
-        <div class="form-grid">
-          <div class="field">
-            <label for="sdsRevisionDate">SDS 개정일</label>
-            <input id="sdsRevisionDate" type="date" />
+
+        <div class="sds-mode-switch" role="radiogroup" aria-label="SDS 등록 구분">
+          <label><input type="radio" name="sdsMode" value="file" checked /> SDS 파일 등록</label>
+          <label><input type="radio" name="sdsMode" value="none" /> SDS 없음</label>
+        </div>
+
+        <div id="sdsFileSection">
+          <div class="form-grid">
+            <div class="field">
+              <label for="sdsRevisionDate">SDS 개정일</label>
+              <input id="sdsRevisionDate" type="date" />
+            </div>
+            <div class="field">
+              <label for="sdsLastCheckedDate">최종확인일</label>
+              <input id="sdsLastCheckedDate" type="date" />
+            </div>
+            <div class="field full" id="sdsCurrentFilesWrap" hidden>
+              <label>현재 PDF 파일</label>
+              <div id="sdsCurrentFiles" class="current-files"></div>
+            </div>
+            <div class="field full">
+              <div class="field-label-row">
+                <label>새 SDS 파일 (PDF)</label>
+                <button class="btn small" id="sdsAddFile" type="button">+ 파일 추가</button>
+              </div>
+              <div id="sdsFileRows" class="file-rows"></div>
+              <small id="sdsFileHint">PDF 파일을 선택해 주세요. 여러 파일을 한 개정 이력에 함께 등록할 수 있습니다.</small>
+            </div>
           </div>
-          <div class="field">
-            <label for="sdsLastCheckedDate">최종확인일</label>
-            <input id="sdsLastCheckedDate" type="date" />
-          </div>
-          <div class="field full">
-            <label for="sdsFile">SDS 파일 (PDF)</label>
-            <input id="sdsFile" type="file" accept="application/pdf,.pdf" />
-            <small id="sdsFileHint">PDF 파일을 선택해 주세요.</small>
+        </div>
+
+        <div id="sdsNoneSection" hidden>
+          <div class="form-grid one">
+            <div class="field">
+              <label for="sdsNoneReason">SDS 없음 사유</label>
+              <select id="sdsNoneReason">
+                <option value="supplier_not_provided">제조사/공급자 미제공</option>
+                <option value="not_applicable">SDS 비대상으로 확인</option>
+                <option value="other">기타</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="sdsNoneCheckedDate">최종확인일</label>
+              <input id="sdsNoneCheckedDate" type="date" />
+            </div>
+            <div class="field">
+              <label for="sdsNoneNote">메모</label>
+              <textarea id="sdsNoneNote" rows="3" placeholder="필요한 경우 메모를 입력하세요."></textarea>
+            </div>
           </div>
         </div>
       </div>
       <div class="modal-foot">
         <button class="btn" type="button" data-close="sdsEditModal">취소</button>
         <button class="btn primary" id="sdsSave" type="button">저장</button>
-      </div>
-    </section>
-  </div>
-
-  <div class="modal-backdrop" id="sdsNoneModal" hidden>
-    <section class="modal small" role="dialog" aria-modal="true" aria-labelledby="sdsNoneTitle">
-      <div class="modal-head">
-        <h3 id="sdsNoneTitle">SDS 없음 등록</h3>
-        <button class="icon-btn" type="button" data-close="sdsNoneModal" aria-label="닫기">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="product-summary" id="sdsNoneProduct"></div>
-        <div class="form-grid one">
-          <div class="field">
-            <label for="sdsNoneReason">사유</label>
-            <select id="sdsNoneReason">
-              <option value="supplier_not_provided">제조사/공급자 미제공</option>
-              <option value="not_applicable">SDS 비대상으로 확인</option>
-              <option value="other">기타</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="sdsNoneCheckedDate">최종확인일</label>
-            <input id="sdsNoneCheckedDate" type="date" />
-          </div>
-          <div class="field">
-            <label for="sdsNoneNote">메모</label>
-            <textarea id="sdsNoneNote" rows="3" placeholder="필요한 경우 메모를 입력하세요."></textarea>
-          </div>
-        </div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn" type="button" data-close="sdsNoneModal">취소</button>
-        <button class="btn primary" id="sdsNoneSave" type="button">저장</button>
       </div>
     </section>
   </div>
