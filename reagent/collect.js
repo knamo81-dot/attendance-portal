@@ -207,16 +207,69 @@ window.ReagentApp.collect = {
     }, 500);
   },
 
+
+  getProductIdForCollectKey(key) {
+    const request = window.ReagentApp.request;
+    if (!request) return null;
+
+    const rows = request.getRowsForCurrentOrderMonth
+      ? request.getRowsForCurrentOrderMonth()
+      : (request.requestRows || []);
+    const group = request.groupItems?.(rows)?.find((item) => item.key === key);
+    if (!group) return null;
+
+    // 신청/그룹 데이터가 product_id를 이미 가지고 있으면 그것을 최우선으로 사용합니다.
+    const directId = Number(group.product_id || group.productId || 0);
+    if (directId > 0) return directId;
+
+    const entryWithProductId = (group.entries || []).find((item) =>
+      Number(item?.product_id || item?.productId || 0) > 0
+    );
+    const entryId = Number(entryWithProductId?.product_id || entryWithProductId?.productId || 0);
+    if (entryId > 0) return entryId;
+
+    // 기존 신청 데이터에는 product_id가 없을 수 있으므로 제품마스터와 제품정보로 보완 매칭합니다.
+    const masterRows = Array.isArray(request.productMasterRows) ? request.productMasterRows : [];
+    const same = (a, b) => String(a ?? "").trim() === String(b ?? "").trim();
+
+    const exact = masterRows.find((product) =>
+      same(product.category, group.category) &&
+      same(product.name, group.name) &&
+      same(product.maker, group.maker) &&
+      same(product.code, group.code) &&
+      same(product.capacity, group.capacity) &&
+      same(product.cas, group.cas) &&
+      same(product.grade, group.grade)
+    );
+    if (Number(exact?.id || 0) > 0) return Number(exact.id);
+
+    // 규격이 제품마스터에서 변경된 과거 건을 위해, 나머지 핵심 식별값이 모두 같은 단일 제품만 허용합니다.
+    const candidates = masterRows.filter((product) =>
+      same(product.category, group.category) &&
+      same(product.name, group.name) &&
+      same(product.maker, group.maker) &&
+      same(product.code, group.code) &&
+      same(product.cas, group.cas) &&
+      same(product.grade, group.grade)
+    );
+
+    return candidates.length === 1 && Number(candidates[0]?.id || 0) > 0
+      ? Number(candidates[0].id)
+      : null;
+  },
+
   async upsertCollectItem(key, collectedQty, extra = {}) {
     const sb = window.ReagentApp.sb;
     if (!sb) throw new Error("Supabase 연결 정보가 없습니다.");
 
+    const autoProductId = this.getProductIdForCollectKey(key);
     const row = window.ReagentApp.withCompanyPayload({
       item_key: key,
       order_month: this.getOrderMonthFromKey(key),
       collected_qty: Number(collectedQty || 0),
       updated_by: this.getCurrentUserName(),
       meta_json: this.buildCollectMetaSnapshot(key),
+      ...(autoProductId ? { product_id: autoProductId } : {}),
       ...extra
     });
 
@@ -2300,3 +2353,4 @@ if (els.count) els.count.textContent = String(rows.length);
     if (els.collectMix) els.collectMix.textContent = `${mixR} / ${mixG} / ${mixS}`;
   }
 };
+
