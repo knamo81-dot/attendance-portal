@@ -1,6 +1,6 @@
 (function () {
   const BUCKET = 'qa-sds-files';
-  const state = { products: [], query: '', status: 'all', selected: null };
+  const state = { products: [], query: '', status: 'all', selected: null, pdfFiles: [], pdfIndex: 0, pdfUrl: '' };
   const $ = (id) => document.getElementById(id);
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 
@@ -176,7 +176,7 @@
 
     const currentFiles = versionFiles(product.current_version);
     $('sdsCurrentFilesWrap').hidden = !currentFiles.length;
-    $('sdsCurrentFiles').innerHTML = currentFiles.map((f, i) => `<button class="btn small" type="button" data-current-file="${esc(f.file_path)}">${esc(f.file_name || `PDF ${i + 1}`)}</button>`).join('');
+    $('sdsCurrentFiles').innerHTML = currentFiles.map((f, i) => `<button class="btn small" type="button" data-current-file="${esc(f.file_path)}" data-current-file-name="${esc(f.file_name || `PDF ${i + 1}`)}">${esc(f.file_name || `PDF ${i + 1}`)}</button>`).join('');
     $('sdsFileHint').textContent = status === 'registered' ? '새 PDF를 등록하면 현재본은 이력으로 유지됩니다. 여러 파일을 함께 추가할 수 있습니다.' : 'PDF 파일을 선택해 주세요. 여러 파일을 한 개정 이력에 함께 등록할 수 있습니다.';
     setMode(status === 'none' ? 'none' : 'file');
     openModal('sdsEditModal');
@@ -287,17 +287,49 @@
     } finally { button.disabled = false; }
   }
 
-  async function openFile(filePath) {
+  async function showPdfAt(index) {
+    const file = state.pdfFiles[index];
+    if (!file?.file_path) return;
+    state.pdfIndex = index;
+    $('sdsPdfLoading').hidden = false;
+    $('sdsPdfFrame').removeAttribute('src');
+    const { data, error } = await window.SDSApp.db.storage.from(BUCKET).createSignedUrl(file.file_path, 300);
+    if (error) {
+      $('sdsPdfLoading').textContent = `PDF를 불러오지 못했습니다: ${error.message}`;
+      setMessage(`SDS 파일을 열지 못했습니다: ${error.message}`, 'error');
+      return;
+    }
+    state.pdfUrl = data.signedUrl;
+    $('sdsPdfFileName').textContent = file.file_name || `PDF ${index + 1}`;
+    $('sdsPdfFrame').src = data.signedUrl;
+    Array.from($('sdsPdfTabs').querySelectorAll('[data-pdf-index]')).forEach((btn) => {
+      btn.classList.toggle('active', Number(btn.dataset.pdfIndex) === index);
+    });
+  }
+
+  async function openPdfViewer(files, startIndex = 0) {
+    const validFiles = (files || []).filter((f) => f?.file_path);
+    if (!validFiles.length) return;
+    state.pdfFiles = validFiles;
+    state.pdfIndex = Math.min(Math.max(Number(startIndex) || 0, 0), validFiles.length - 1);
+    state.pdfUrl = '';
+    $('sdsPdfTabs').hidden = validFiles.length <= 1;
+    $('sdsPdfTabs').innerHTML = validFiles.map((f, i) =>
+      `<button class="btn small pdf-tab${i === state.pdfIndex ? ' active' : ''}" type="button" data-pdf-index="${i}">${esc(f.file_name || `PDF ${i + 1}`)}</button>`
+    ).join('');
+    $('sdsPdfLoading').textContent = 'PDF를 불러오는 중입니다.';
+    openModal('sdsPdfModal');
+    await showPdfAt(state.pdfIndex);
+  }
+
+  async function openFile(filePath, fileName = 'SDS PDF') {
     if (!filePath) return;
-    const { data, error } = await window.SDSApp.db.storage.from(BUCKET).createSignedUrl(filePath, 300);
-    if (error) { setMessage(`SDS 파일을 열지 못했습니다: ${error.message}`, 'error'); return; }
-    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    await openPdfViewer([{ file_path: filePath, file_name: fileName }], 0);
   }
 
   async function openCurrent(product) {
     const files = versionFiles(product.current_version);
-    if (files.length === 1) return openFile(files[0].file_path);
-    if (files.length > 1) return openHistory(product);
+    if (files.length) return openPdfViewer(files, 0);
   }
 
   async function openHistory(product) {
@@ -323,7 +355,7 @@
     body.innerHTML = versions.map((row) => {
       let files = byVersion.get(Number(row.id)) || [];
       if (!files.length && row.file_path) files = [{ file_path: row.file_path, file_name: row.file_name || 'SDS PDF' }];
-      const buttons = files.map((f, i) => `<button class="btn small history-file-btn" type="button" data-history-action="open" data-path="${esc(f.file_path)}">${esc(f.file_name || `PDF ${i + 1}`)}</button>`).join('');
+      const buttons = files.map((f, i) => `<button class="btn small history-file-btn" type="button" data-history-action="open" data-path="${esc(f.file_path)}" data-file-name="${esc(f.file_name || `PDF ${i + 1}`)}">${esc(f.file_name || `PDF ${i + 1}`)}</button>`).join('');
       return `<tr><td>${row.is_current ? '<span class="status-badge registered">현재</span>' : '이전'}</td><td>${dateOnly(row.revision_date)}</td><td>${dateOnly(row.registered_at)}</td><td>${esc(row.registered_by || '-')}</td><td><div class="history-files">${buttons || '-'}</div></td><td><button class="btn small danger" type="button" data-history-action="delete" data-version-id="${row.id}" data-current="${row.is_current ? '1' : '0'}">삭제</button></td></tr>`;
     }).join('');
   }
@@ -370,6 +402,7 @@
     $('sdsDownloadExcel').addEventListener('click', downloadExcel);
     $('sdsSave').addEventListener('click', saveSds);
     $('sdsAddFile').addEventListener('click', addFileRow);
+    $('sdsPdfFrame').addEventListener('load', () => { $('sdsPdfLoading').hidden = true; });
     document.querySelectorAll('input[name="sdsMode"]').forEach((r) => r.addEventListener('change', () => setMode(r.value)));
 
     document.addEventListener('click', async (e) => {
@@ -382,8 +415,14 @@
         else remove.closest('.file-row')?.querySelector('input') && (remove.closest('.file-row').querySelector('input').value = '');
         return;
       }
+      const pdfTab = e.target.closest('[data-pdf-index]');
+      if (pdfTab) { await showPdfAt(Number(pdfTab.dataset.pdfIndex)); return; }
+      if (e.target.closest('#sdsPdfNewWindow')) {
+        if (state.pdfUrl) window.open(state.pdfUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
       const currentFile = e.target.closest('[data-current-file]');
-      if (currentFile) { await openFile(currentFile.dataset.currentFile); return; }
+      if (currentFile) { await openFile(currentFile.dataset.currentFile, currentFile.dataset.currentFileName || 'SDS PDF'); return; }
       const actionButton = e.target.closest('[data-action]');
       if (actionButton) {
         const product = state.products.find((p) => Number(p.id) === Number(actionButton.dataset.id));
@@ -395,7 +434,7 @@
       }
       const historyButton = e.target.closest('[data-history-action]');
       if (historyButton) {
-        if (historyButton.dataset.historyAction === 'open') await openFile(historyButton.dataset.path);
+        if (historyButton.dataset.historyAction === 'open') await openFile(historyButton.dataset.path, historyButton.dataset.fileName || 'SDS PDF');
         if (historyButton.dataset.historyAction === 'delete') await deleteVersion(Number(historyButton.dataset.versionId), historyButton.dataset.current === '1');
       }
     });
