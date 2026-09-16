@@ -312,6 +312,51 @@
       const fr = await db.from('qa_sds_files').insert(fileRows);
       if (fr.error) throw fr.error;
 
+      const changeRows = [];
+      if (isUpdate) {
+        currentActions.forEach((item) => {
+          if (item.action === 'delete') {
+            changeRows.push({
+              sds_version_id: newVersionId, action: 'delete',
+              old_file_path: item.file_path, old_file_name: item.file_name || 'SDS PDF',
+              new_file_path: null, new_file_name: null
+            });
+          }
+        });
+
+        let finalIndex = 0;
+        currentActions.forEach((item) => {
+          if (item.action === 'delete') return;
+          const finalFile = finalFiles[finalIndex++];
+          if (item.action === 'replace') {
+            changeRows.push({
+              sds_version_id: newVersionId, action: 'update',
+              old_file_path: item.file_path, old_file_name: item.file_name || 'SDS PDF',
+              new_file_path: finalFile.file_path, new_file_name: finalFile.file_name
+            });
+          }
+        });
+        addedFiles.forEach((file, i) => {
+          const added = finalFiles[keptOrReplacedCount + i];
+          changeRows.push({
+            sds_version_id: newVersionId, action: 'add',
+            old_file_path: null, old_file_name: null,
+            new_file_path: added.file_path, new_file_name: added.file_name
+          });
+        });
+      } else {
+        finalFiles.forEach((file) => changeRows.push({
+          sds_version_id: newVersionId, action: 'add',
+          old_file_path: null, old_file_name: null,
+          new_file_path: file.file_path, new_file_name: file.file_name
+        }));
+      }
+
+      if (changeRows.length) {
+        const cr = await db.from('qa_sds_file_changes').insert(changeRows);
+        if (cr.error) throw cr.error;
+      }
+
       const clear = await db.from('qa_sds_versions').update({ is_current: false }).eq('sds_document_id', doc.id).neq('id', newVersionId).eq('is_current', true).is('deleted_at', null);
       if (clear.error) throw clear.error;
       const current = await db.from('qa_sds_versions').update({ is_current: true }).eq('id', newVersionId);
@@ -457,27 +502,43 @@
     state.selected = product;
     $('sdsHistoryProduct').innerHTML = productSummary(product);
     const body = $('sdsHistoryList');
-    body.innerHTML = '<tr><td colspan="6" class="empty">이력을 불러오는 중입니다.</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" class="empty">이력을 불러오는 중입니다.</td></tr>';
     openModal('sdsHistoryModal');
     const docId = product.sds_document?.id;
-    if (!docId) { body.innerHTML = '<tr><td colspan="6" class="empty">등록된 SDS 이력이 없습니다.</td></tr>'; return; }
+    if (!docId) { body.innerHTML = '<tr><td colspan="7" class="empty">등록된 SDS 이력이 없습니다.</td></tr>'; return; }
 
     const vr = await window.SDSApp.db.from('qa_sds_versions').select('id, sds_document_id, revision_date, file_path, file_name, registered_by, registered_at, is_current, deleted_at').eq('sds_document_id', docId).is('deleted_at', null).order('registered_at', { ascending: false });
-    if (vr.error) { body.innerHTML = `<tr><td colspan="6" class="empty">${esc(vr.error.message)}</td></tr>`; return; }
+    if (vr.error) { body.innerHTML = `<tr><td colspan="7" class="empty">${esc(vr.error.message)}</td></tr>`; return; }
     const versions = vr.data || [];
-    if (!versions.length) { body.innerHTML = '<tr><td colspan="6" class="empty">등록된 SDS 이력이 없습니다.</td></tr>'; return; }
+    if (!versions.length) { body.innerHTML = '<tr><td colspan="7" class="empty">등록된 SDS 이력이 없습니다.</td></tr>'; return; }
 
     const ids = versions.map((v) => v.id);
     const fr = await window.SDSApp.db.from('qa_sds_files').select('id, sds_version_id, file_path, file_name, sort_order').in('sds_version_id', ids).order('sort_order', { ascending: true });
-    if (fr.error) { body.innerHTML = `<tr><td colspan="6" class="empty">${esc(fr.error.message)}</td></tr>`; return; }
+    if (fr.error) { body.innerHTML = `<tr><td colspan="7" class="empty">${esc(fr.error.message)}</td></tr>`; return; }
     const byVersion = new Map();
     (fr.data || []).forEach((f) => { const a = byVersion.get(Number(f.sds_version_id)) || []; a.push(f); byVersion.set(Number(f.sds_version_id), a); });
+
+    const cr = await window.SDSApp.db.from('qa_sds_file_changes').select('id, sds_version_id, action, old_file_path, old_file_name, new_file_path, new_file_name, created_at').in('sds_version_id', ids).order('created_at', { ascending: true });
+    if (cr.error) { body.innerHTML = `<tr><td colspan="7" class="empty">${esc(cr.error.message)}</td></tr>`; return; }
+    const changesByVersion = new Map();
+    (cr.data || []).forEach((c) => { const a = changesByVersion.get(Number(c.sds_version_id)) || []; a.push(c); changesByVersion.set(Number(c.sds_version_id), a); });
+
+    const changeHtml = (changes) => {
+      if (!changes.length) return '<span class="history-change-empty">기록없음</span>';
+      return `<div class="history-changes">${changes.map((c) => {
+        if (c.action === 'add') return `<div><span class="change-badge add">추가</span><span>${esc(c.new_file_name || '-')}</span></div>`;
+        if (c.action === 'update') return `<div><span class="change-badge update">갱신</span><span>${esc(c.old_file_name || '-')} → ${esc(c.new_file_name || '-')}</span></div>`;
+        if (c.action === 'delete') return `<div><span class="change-badge delete">삭제</span><span>${esc(c.old_file_name || '-')}</span></div>`;
+        return '';
+      }).join('')}</div>`;
+    };
 
     body.innerHTML = versions.map((row) => {
       let files = byVersion.get(Number(row.id)) || [];
       if (!files.length && row.file_path) files = [{ file_path: row.file_path, file_name: row.file_name || 'SDS PDF' }];
       const buttons = files.map((f, i) => `<button class="btn small history-file-btn" type="button" data-history-action="open" data-path="${esc(f.file_path)}" data-file-name="${esc(f.file_name || `PDF ${i + 1}`)}">${esc(f.file_name || `PDF ${i + 1}`)}</button>`).join('');
-      return `<tr><td>${row.is_current ? '<span class="status-badge registered">현재</span>' : '이전'}</td><td>${dateOnly(row.revision_date)}</td><td>${dateOnly(row.registered_at)}</td><td>${esc(row.registered_by || '-')}</td><td><div class="history-files">${buttons || '-'}</div></td><td><button class="btn small danger" type="button" data-history-action="delete" data-version-id="${row.id}" data-current="${row.is_current ? '1' : '0'}">삭제</button></td></tr>`;
+      const changes = changesByVersion.get(Number(row.id)) || [];
+      return `<tr><td>${row.is_current ? '<span class="status-badge registered">현재</span>' : '이전'}</td><td>${changeHtml(changes)}</td><td>${dateOnly(row.revision_date)}</td><td>${dateOnly(row.registered_at)}</td><td>${esc(row.registered_by || '-')}</td><td><div class="history-files">${buttons || '-'}</div></td><td><button class="btn small danger" type="button" data-history-action="delete" data-version-id="${row.id}" data-current="${row.is_current ? '1' : '0'}">삭제</button></td></tr>`;
     }).join('');
   }
 
@@ -617,4 +678,3 @@
 
   window.addEventListener('message', (e) => { if (e.data?.type === 'portal-tabs-request' || e.data?.type === 'portal-filters-request') notifyPortal(); });
 })();
-
