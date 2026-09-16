@@ -685,3 +685,15 @@ body {
     align-items: stretch;
   }
 }
+
+
+/* SDS 이력 변경내역 */
+.history-modal { width: min(1080px, 100%); }
+.history-table { min-width: 940px; }
+.history-changes { display:flex; flex-direction:column; gap:5px; min-width:220px; white-space:normal; }
+.history-changes > div { display:flex; gap:6px; align-items:flex-start; line-height:1.35; }
+.change-badge { display:inline-flex; flex:0 0 auto; align-items:center; justify-content:center; min-width:36px; min-height:20px; padding:0 6px; font-size:10px; font-weight:800; border-radius:5px; }
+.change-badge.add { color:#166534; background:#dcfce7; }
+.change-badge.update { color:var(--main-hover); background:var(--main-light); }
+.change-badge.delete { color:var(--danger); background:#fee2e2; }
+.history-change-empty { font-size:11px; color:var(--muted); }
