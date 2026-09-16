@@ -595,3 +595,93 @@ body {
 
 
 
+
+
+/* SDS 갱신: 기존 파일 유지 / 교체 / 삭제 */
+.current-files {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.current-file-manage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px 10px;
+  align-items: center;
+  padding: 7px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.current-file-manage.is-deleted {
+  background: #f8fafc;
+  opacity: 0.7;
+}
+
+.current-file-name {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--main-hover);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.current-file-name:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.current-file-name:disabled {
+  color: var(--muted);
+  cursor: default;
+  text-decoration: line-through;
+}
+
+.current-file-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.current-replace-row {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  padding-top: 7px;
+  border-top: 1px dashed var(--line);
+}
+
+.current-replace-row[hidden] {
+  display: none;
+}
+
+.current-replace-row input[type="file"] {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+}
+
+@media (max-width: 760px) {
+  .current-file-manage {
+    grid-template-columns: 1fr;
+  }
+
+  .current-file-actions {
+    justify-content: flex-start;
+  }
+
+  .current-replace-row {
+    grid-column: 1;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
