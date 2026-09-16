@@ -21,7 +21,7 @@
           <div class="tile"><span class="k">전체제품</span><span class="v" id="sdsTotalCount">0건</span></div>
           <div class="tile"><span class="k">SDS등록</span><span class="v" id="sdsAttachedCount">0건</span></div>
           <div class="tile"><span class="k">SDS미등록</span><span class="v" id="sdsMissingCount">0건</span></div>
-          <div class="tile"><span class="k">SDS없음</span><span class="v" id="sdsNoneCount">0건</span></div>
+          <div class="tile"><span class="k">해당사항없음</span><span class="v" id="sdsNoneCount">0건</span></div>
         </div>
 
         <div class="filters">
@@ -35,7 +35,7 @@
               <option value="all">전체</option>
               <option value="registered">SDS등록</option>
               <option value="missing">SDS미등록</option>
-              <option value="none">SDS없음</option>
+              <option value="none">해당사항없음</option>
             </select>
           </div>
         </div>
@@ -78,7 +78,7 @@
 
         <div class="sds-mode-switch" role="radiogroup" aria-label="SDS 등록 구분">
           <label><input type="radio" name="sdsMode" value="file" checked /> SDS 파일 등록</label>
-          <label><input type="radio" name="sdsMode" value="none" /> SDS 없음</label>
+          <label><input type="radio" name="sdsMode" value="none" /> 해당사항없음</label>
         </div>
 
         <div id="sdsFileSection">
@@ -109,7 +109,7 @@
         <div id="sdsNoneSection" hidden>
           <div class="form-grid one">
             <div class="field">
-              <label for="sdsNoneReason">SDS 없음 사유</label>
+              <label for="sdsNoneReason">해당사항없음 사유</label>
               <select id="sdsNoneReason">
                 <option value="supplier_not_provided">제조사/공급자 미제공</option>
                 <option value="not_applicable">SDS 비대상으로 확인</option>
@@ -164,4 +164,5 @@
   <script src="../common/common.js"></script>
 </body>
 </html>
+
 
