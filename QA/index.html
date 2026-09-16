@@ -18,18 +18,10 @@
 
       <div class="card-body">
         <div class="summary" aria-label="SDS 현황">
-          <div class="tile">
-            <span class="k">전체제품</span><span class="v" id="sdsTotalCount">0건</span>
-          </div>
-          <div class="tile">
-            <span class="k">SDS등록</span><span class="v" id="sdsAttachedCount">0건</span>
-          </div>
-          <div class="tile">
-            <span class="k">SDS미등록</span><span class="v" id="sdsMissingCount">0건</span>
-          </div>
-          <div class="tile">
-            <span class="k">SDS없음</span><span class="v" id="sdsNoneCount">0건</span>
-          </div>
+          <div class="tile"><span class="k">전체제품</span><span class="v" id="sdsTotalCount">0건</span></div>
+          <div class="tile"><span class="k">SDS등록</span><span class="v" id="sdsAttachedCount">0건</span></div>
+          <div class="tile"><span class="k">SDS미등록</span><span class="v" id="sdsMissingCount">0건</span></div>
+          <div class="tile"><span class="k">SDS없음</span><span class="v" id="sdsNoneCount">0건</span></div>
         </div>
 
         <div class="filters">
@@ -41,7 +33,7 @@
             <label for="sdsStatus">구분</label>
             <select id="sdsStatus">
               <option value="all">전체</option>
-              <option value="attached">SDS등록</option>
+              <option value="registered">SDS등록</option>
               <option value="missing">SDS미등록</option>
               <option value="none">SDS없음</option>
             </select>
@@ -54,8 +46,16 @@
           <table class="sds-table">
             <thead>
               <tr>
-                <th>품명</th><th>제조사</th><th>제품코드</th><th>규격</th><th>CAS</th><th>등급</th>
-                <th>SDS</th><th>개정일</th><th>등록일</th><th>이력</th>
+                <th>품명</th>
+                <th>제조사</th>
+                <th>제품코드</th>
+                <th>규격</th>
+                <th>CAS</th>
+                <th>등급</th>
+                <th>SDS</th>
+                <th>개정일 / 등록일</th>
+                <th>최종확인일 / 최종발주일</th>
+                <th>이력</th>
               </tr>
             </thead>
             <tbody id="sdsProductList">
@@ -66,6 +66,94 @@
       </div>
     </section>
   </main>
+
+  <div class="modal-backdrop" id="sdsEditModal" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="sdsEditTitle">
+      <div class="modal-head">
+        <h3 id="sdsEditTitle">SDS 등록</h3>
+        <button class="icon-btn" type="button" data-close="sdsEditModal" aria-label="닫기">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="product-summary" id="sdsEditProduct"></div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="sdsRevisionDate">SDS 개정일</label>
+            <input id="sdsRevisionDate" type="date" />
+          </div>
+          <div class="field">
+            <label for="sdsLastCheckedDate">최종확인일</label>
+            <input id="sdsLastCheckedDate" type="date" />
+          </div>
+          <div class="field full">
+            <label for="sdsFile">SDS 파일 (PDF)</label>
+            <input id="sdsFile" type="file" accept="application/pdf,.pdf" />
+            <small id="sdsFileHint">PDF 파일을 선택해 주세요.</small>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" type="button" data-close="sdsEditModal">취소</button>
+        <button class="btn primary" id="sdsSave" type="button">저장</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="sdsNoneModal" hidden>
+    <section class="modal small" role="dialog" aria-modal="true" aria-labelledby="sdsNoneTitle">
+      <div class="modal-head">
+        <h3 id="sdsNoneTitle">SDS 없음 등록</h3>
+        <button class="icon-btn" type="button" data-close="sdsNoneModal" aria-label="닫기">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="product-summary" id="sdsNoneProduct"></div>
+        <div class="form-grid one">
+          <div class="field">
+            <label for="sdsNoneReason">사유</label>
+            <select id="sdsNoneReason">
+              <option value="supplier_not_provided">제조사/공급자 미제공</option>
+              <option value="not_applicable">SDS 비대상으로 확인</option>
+              <option value="other">기타</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="sdsNoneCheckedDate">최종확인일</label>
+            <input id="sdsNoneCheckedDate" type="date" />
+          </div>
+          <div class="field">
+            <label for="sdsNoneNote">메모</label>
+            <textarea id="sdsNoneNote" rows="3" placeholder="필요한 경우 메모를 입력하세요."></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" type="button" data-close="sdsNoneModal">취소</button>
+        <button class="btn primary" id="sdsNoneSave" type="button">저장</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="sdsHistoryModal" hidden>
+    <section class="modal history-modal" role="dialog" aria-modal="true" aria-labelledby="sdsHistoryTitle">
+      <div class="modal-head">
+        <h3 id="sdsHistoryTitle">SDS 이력</h3>
+        <button class="icon-btn" type="button" data-close="sdsHistoryModal" aria-label="닫기">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="product-summary" id="sdsHistoryProduct"></div>
+        <div class="history-table-wrap">
+          <table class="history-table">
+            <thead>
+              <tr><th>상태</th><th>SDS 개정일</th><th>SDS 등록일</th><th>등록자</th><th>파일</th><th>관리</th></tr>
+            </thead>
+            <tbody id="sdsHistoryList"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" type="button" data-close="sdsHistoryModal">닫기</button>
+      </div>
+    </section>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
