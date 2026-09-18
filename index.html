@@ -5077,7 +5077,12 @@ body.auth-loading .top-user-bar {
     // 헤더는 현재 메뉴인데 iframe만 이전 프로그램으로 되돌아가는 현상이 발생할 수 있습니다.
     try {
       if (frame.contentWindow && frame.contentWindow.location) {
-        frame.contentWindow.location.replace(src);
+        // src는 포털 index.html 기준 경로입니다.
+        // iframe 내부의 현재 경로(QA/index.html)를 기준으로 상대경로가 해석되면
+        // QA/special/index.html이 QA/QA/special/index.html로 잘못 이동할 수 있으므로
+        // 포털 문서 기준의 절대 URL로 변환한 뒤 이동합니다.
+        const targetUrl = new URL(src, window.location.href).href;
+        frame.contentWindow.location.replace(targetUrl);
       } else {
         frame.src = src;
       }
