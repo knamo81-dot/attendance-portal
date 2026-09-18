@@ -8,6 +8,7 @@
 
   const $ = (id) => document.getElementById(id);
   let rows = [];
+  let isSaving = false;
 
   function todayISO() {
     const d = new Date();
@@ -150,6 +151,10 @@
 
   async function save(e) {
     e.preventDefault();
+
+    // 저장 요청이 진행 중이면 Enter/더블클릭 등 추가 submit을 무시합니다.
+    if (isSaving) return;
+
     const id = $("editId").value;
     const payload = {
       name_ko: $("nameKo").value.trim(),
@@ -174,21 +179,42 @@
       return;
     }
 
-    const session = window.SDSApp?.getPortalSession?.() || {};
-    payload.created_by = id ? undefined : (session.email || session.user?.email || null);
-    if (id) delete payload.created_by;
+    const submitBtn = $("editForm").querySelector('button[type="submit"]');
+    const originalText = submitBtn?.textContent || "저장";
 
-    let result;
-    if (id) result = await db.from("qa_special_substances").update(payload).eq("id", id);
-    else result = await db.from("qa_special_substances").insert(payload);
-
-    if (result.error) {
-      console.error(result.error);
-      alert(`저장 실패: ${result.error.message}`);
-      return;
+    isSaving = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "저장 중...";
     }
-    closeModal();
-    await load();
+
+    try {
+      const session = window.SDSApp?.getPortalSession?.() || {};
+      payload.created_by = id ? undefined : (session.email || session.user?.email || null);
+      if (id) delete payload.created_by;
+
+      let result;
+      if (id) result = await db.from("qa_special_substances").update(payload).eq("id", id);
+      else result = await db.from("qa_special_substances").insert(payload);
+
+      if (result.error) {
+        console.error(result.error);
+        alert(`저장 실패: ${result.error.message}`);
+        return;
+      }
+
+      closeModal();
+      await load();
+    } catch (error) {
+      console.error(error);
+      alert(`저장 실패: ${error?.message || "알 수 없는 오류"}`);
+    } finally {
+      isSaving = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
+    }
   }
 
   async function deleteRow(row) {
