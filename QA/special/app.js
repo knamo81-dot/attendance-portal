@@ -28,18 +28,34 @@
     });
     return out;
   }
-  function orderInfoForProduct(productId){return orderMatches.get(String(productId))||null;}
+  function periodRange(){
+    const type=$("orderPeriod")?.value||"1y";
+    if(type==="all")return {start:null,end:null};
+    if(type==="custom")return {start:$("orderStartDate")?.value||null,end:$("orderEndDate")?.value||null};
+    const years=type==="5y"?5:type==="3y"?3:1;
+    const end=todayISO(), d=new Date(`${end}T00:00:00`);
+    d.setFullYear(d.getFullYear()-years);
+    const start=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    return {start,end};
+  }
+  function orderInfoForProduct(productId){
+    const dates=(orderMatches.get(String(productId))||[]).filter(Boolean);
+    const {start,end}=periodRange();
+    const filtered=dates.filter(d=>(!start||d>=start)&&(!end||d<=end)).sort();
+    return filtered.length?{ordered:true,latestOrderDate:filtered[filtered.length-1],orderCount:filtered.length}:null;
+  }
   function latestDateForProducts(products){
     const dates=products.map(p=>orderInfoForProduct(p.id)?.latestOrderDate).filter(Boolean).sort();
     return dates.length?dates[dates.length-1]:null;
   }
+  function productSort(a,b){
+    const ad=orderInfoForProduct(a.id)?.latestOrderDate||"", bd=orderInfoForProduct(b.id)?.latestOrderDate||"";
+    if(ad!==bd)return bd.localeCompare(ad);
+    return String(a.name||"").localeCompare(String(b.name||""),"ko");
+  }
   function productDisplay(p){
-    const parts=[p.name,p.maker,p.code,p.capacity].filter(Boolean);
-    const oi=orderInfoForProduct(p.id);
-    return `<div class="matched-product${oi?.ordered?" ordered":""}">
-      <span class="product-name">${esc(parts.join(" / ")||`제품 #${p.id}`)}</span>
-      ${oi?.ordered?`<span class="order-date">${esc(oi.latestOrderDate||"-")}</span>`:`<span class="no-order">발주이력 없음</span>`}
-    </div>`;
+    const parts=[p.name,p.maker,p.code,p.capacity].filter(Boolean), oi=orderInfoForProduct(p.id);
+    return `<div class="matched-product${oi?.ordered?" ordered":""}"><span class="product-name">${esc(parts.join(" / ")||`제품 #${p.id}`)}</span>${oi?.ordered?`<span class="order-date">${esc(oi.latestOrderDate||"-")}</span>`:`<span class="no-order">기간 내 발주 없음</span>`}</div>`;
   }
   async function loadProductAndOrders(){
     productMatches=new Map();orderMatches=new Map();
@@ -78,10 +94,9 @@
       (orders||[]).forEach(o=>{
         if(o.product_id==null)return;
         const key=String(o.product_id);
-        const prev=orderMatches.get(key);
-        if(!prev||String(o.order_date)>String(prev.latestOrderDate)){
-          orderMatches.set(key,{ordered:true,latestOrderDate:o.order_date});
-        }
+        const dates=orderMatches.get(key)||[];
+        if(o.order_date&&!dates.includes(o.order_date))dates.push(o.order_date);
+        orderMatches.set(key,dates);
       });
     }
   }
@@ -95,20 +110,14 @@
     const orderedCount=rows.filter(r=>productsFor(r).some(p=>orderInfoForProduct(p.id)?.ordered)).length;
     if($("matchedSubstanceCount"))$("matchedSubstanceCount").textContent=`${matchedCount}종`;
     if($("orderedSubstanceCount"))$("orderedSubstanceCount").textContent=`${orderedCount}종`;
-
+    const rawLimit=$("displayLimit")?.value||"10", limit=rawLimit==="all"?Infinity:Number(rawLimit);
     $("statusList").innerHTML=list.length?list.map(r=>{
-      const products=productsFor(r);
+      const products=productsFor(r).slice().sort(productSort);
       const orderedProducts=products.filter(p=>orderInfoForProduct(p.id)?.ordered);
-      const latest=latestDateForProducts(orderedProducts);
-      return `<tr>
-        <td class="strong">${esc(r.name_ko)}${r.name_en?`<span class="sub-name">${esc(r.name_en)}</span>`:""}</td>
-        <td>${casHtml(r)}</td>
-        <td>${thresholdText(r)}${conditionHtml(r)}</td>
-        <td>${products.length?`<div class="product-list">${products.map(productDisplay).join("")}</div>`:`<span class="muted">일치 제품 없음</span>`}</td>
-        <td>${orderedProducts.length?`<span class="badge ordered-badge">${orderedProducts.length}제품</span>`:`<span class="muted">-</span>`}</td>
-        <td>${esc(latest||"-")}</td>
-        <td>${badge(r)}</td>
-      </tr>`;
+      const notOrderedProducts=products.filter(p=>!orderInfoForProduct(p.id)?.ordered);
+      const displayProducts=[...orderedProducts,...notOrderedProducts].slice(0,limit);
+      const hiddenCount=Math.max(0,products.length-displayProducts.length), latest=latestDateForProducts(orderedProducts);
+      return `<tr><td class="strong">${esc(r.name_ko)}${r.name_en?`<span class="sub-name">${esc(r.name_en)}</span>`:""}</td><td>${casHtml(r)}</td><td>${thresholdText(r)}${conditionHtml(r)}</td><td>${products.length?`<div class="product-list">${displayProducts.map(productDisplay).join("")}${hiddenCount?`<div class="more-products">+ ${hiddenCount}제품 더 있음</div>`:""}</div>`:`<span class="muted">일치 제품 없음</span>`}</td><td>${orderedProducts.length?`<span class="badge ordered-badge">${orderedProducts.length}제품</span>`:`<span class="muted">-</span>`}</td><td>${esc(latest||"-")}</td><td>${badge(r)}</td></tr>`;
     }).join(""):`<tr><td colspan="7" class="empty">등록된 특별관리물질이 없습니다.</td></tr>`;
   }
   function renderMaster(){const list=filtered("masterSearch","masterStatus","masterType");$("masterList").innerHTML=list.length?list.map(r=>`<tr><td class="strong">${esc(r.name_ko)}</td><td>${esc(r.name_en||"-")}</td><td>${casHtml(r)}</td><td>${r.is_conditional?'조건부':'특별관리물질'}</td><td>${thresholdText(r)}${conditionHtml(r)}</td><td>${esc(r.effective_from||"-")}</td><td>${esc(r.effective_to||"-")}</td><td>${badge(r)}</td><td class="actions-cell"><button class="mini-btn" data-edit="${r.id}" type="button">수정</button><button class="mini-btn danger" data-delete="${r.id}" type="button">삭제</button></td></tr>`).join(""):`<tr><td colspan="9" class="empty">등록된 특별관리물질이 없습니다.</td></tr>`;}
@@ -133,7 +142,7 @@
     if(notice){
       notice.textContent=matchError
         ? `기준정보는 정상입니다. 제품/발주 연동 실패: ${matchError?.message||"알 수 없는 오류"}`
-        : "CAS가 일치하는 시약 제품을 자동 연결하고, 실제 발주기록이 있는 제품은 가장 최근 발주일을 표시합니다.";
+        : "CAS가 일치하는 시약 제품을 연결하고, 선택한 발주기간 내 제품별 가장 최근 발주일을 표시합니다.";
       notice.classList.toggle("error",!!matchError);
     }
   }
@@ -160,5 +169,8 @@
   async function deleteRow(row){if(!row)return;const ok=confirm(`"${row.name_ko}" 기준정보를 완전히 삭제할까요?\n\n잘못 입력한 자료를 삭제할 때만 사용하세요.\n법령상 제외된 물질은 삭제하지 말고 '제외일'을 입력해 주세요.`);if(!ok)return;const {error}=await db.from("qa_special_substances").delete().eq("id",row.id);if(error){console.error(error);alert(`삭제 실패: ${error.message}`);return;}await load();}
 
   $("statusViewBtn").addEventListener("click",()=>switchView("status"));$("masterViewBtn").addEventListener("click",()=>switchView("master"));$("newBtn").addEventListener("click",()=>openModal());$("addCasBtn").addEventListener("click",()=>addCasInput());$("conditionType").addEventListener("change",syncConditionalUI);$("thresholdType").addEventListener("change",syncThresholdUI);$("closeModal").addEventListener("click",closeModal);$("cancelBtn").addEventListener("click",closeModal);$("editModal").addEventListener("click",e=>{if(e.target===$("editModal"))closeModal();});$("editForm").addEventListener("submit",save);["statusSearch","statusFilter","statusType"].forEach(id=>$(id).addEventListener("input",renderStatus));["masterSearch","masterStatus","masterType"].forEach(id=>$(id).addEventListener("input",renderMaster));$("masterList").addEventListener("click",e=>{const editBtn=e.target.closest("[data-edit]");if(editBtn){const row=rows.find(r=>String(r.id)===editBtn.dataset.edit);if(row)openModal(row);return;}const deleteBtn=e.target.closest("[data-delete]");if(deleteBtn){const row=rows.find(r=>String(r.id)===deleteBtn.dataset.delete);if(row)deleteRow(row);}});
+  $("orderPeriod").addEventListener("change",()=>{$("customPeriod").hidden=$("orderPeriod").value!=="custom";renderStatus();});
+  ["orderStartDate","orderEndDate"].forEach(id=>$(id).addEventListener("change",()=>{if($("orderStartDate").value&&$("orderEndDate").value&&$("orderEndDate").value<$("orderStartDate").value)$("orderEndDate").value=$("orderStartDate").value;renderStatus();}));
+  $("displayLimit").addEventListener("change",renderStatus);
   switchView("status");load();
 })();
