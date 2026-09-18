@@ -110,12 +110,27 @@
         <div class="form-grid">
           <label>유해물질명 *<input id="nameKo" required /></label>
           <label>영문명<input id="nameEn" /></label>
-          <label>CAS No<input id="casNo" placeholder="예: 71-43-2" /></label>
+          <div class="full cas-field">
+            <div class="field-title-row">
+              <span>CAS No</span>
+              <button class="mini-btn add-cas-btn" id="addCasBtn" type="button">+ CAS 추가</button>
+            </div>
+            <div id="casInputs" class="cas-inputs"></div>
+          </div>
           <label>유형 *
             <select id="matchType" required>
               <option value="single">단일물질</option>
               <option value="group">그룹물질</option>
             </select>
+          </label>
+          <label>조건 구분 *
+            <select id="conditionType" required>
+              <option value="normal">일반</option>
+              <option value="conditional">조건부</option>
+            </select>
+          </label>
+          <label class="full conditional-field" id="conditionTextWrap" hidden>조건 내용
+            <textarea id="conditionText" rows="3" placeholder="예: 불용성화합물만 특별관리물질 / 벤젠을 0.1% 이상 함유한 경우만 특별관리물질"></textarea>
           </label>
           <label>혼합물 기준값<input id="thresholdValue" type="number" min="0" step="0.0001" placeholder="예: 0.1" /></label>
           <label>기준 단위<input id="thresholdUnit" value="%" /></label>
