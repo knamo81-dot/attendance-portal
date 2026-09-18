@@ -132,7 +132,15 @@
           <label class="full conditional-field" id="conditionTextWrap" hidden>조건 내용
             <textarea id="conditionText" rows="3" placeholder="예: 불용성화합물만 특별관리물질 / 벤젠을 0.1% 이상 함유한 경우만 특별관리물질"></textarea>
           </label>
-          <label>혼합물 기준값<input id="thresholdValue" type="number" min="0" step="0.0001" placeholder="예: 0.1" /></label>
+          <label>혼합물 기준 유형 *
+            <select id="thresholdType" required>
+              <option value="single">단일기준</option>
+              <option value="conditional">조건별기준</option>
+            </select>
+          </label>
+          <label id="singleThresholdWrap">혼합물 기준값<input id="thresholdValue" type="number" min="0" step="0.0001" placeholder="예: 0.3" /></label>
+          <label class="threshold-conditional" id="generalThresholdWrap" hidden>일반 기준값<input id="generalThresholdValue" type="number" min="0" step="0.0001" placeholder="예: 1" /></label>
+          <label class="threshold-conditional" id="specialThresholdWrap" hidden>특별관리 해당 기준값<input id="specialThresholdValue" type="number" min="0" step="0.0001" placeholder="예: 0.1" /></label>
           <label>기준 단위<input id="thresholdUnit" value="%" /></label>
           <label>기준 방식<input id="thresholdBasis" value="중량비율" /></label>
           <label>시행일<input id="effectiveFrom" type="date" /></label>
