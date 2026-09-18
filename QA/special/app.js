@@ -114,10 +114,9 @@
     $("statusList").innerHTML=list.length?list.map(r=>{
       const products=productsFor(r).slice().sort(productSort);
       const orderedProducts=products.filter(p=>orderInfoForProduct(p.id)?.ordered);
-      const notOrderedProducts=products.filter(p=>!orderInfoForProduct(p.id)?.ordered);
-      const displayProducts=[...orderedProducts,...notOrderedProducts].slice(0,limit);
-      const hiddenCount=Math.max(0,products.length-displayProducts.length), latest=latestDateForProducts(orderedProducts);
-      return `<tr><td class="strong">${esc(r.name_ko)}${r.name_en?`<span class="sub-name">${esc(r.name_en)}</span>`:""}</td><td>${casHtml(r)}</td><td>${thresholdText(r)}${conditionHtml(r)}</td><td>${products.length?`<div class="product-list">${displayProducts.map(productDisplay).join("")}${hiddenCount?`<div class="more-products">+ ${hiddenCount}제품 더 있음</div>`:""}</div>`:`<span class="muted">일치 제품 없음</span>`}</td><td>${orderedProducts.length?`<span class="badge ordered-badge">${orderedProducts.length}제품</span>`:`<span class="muted">-</span>`}</td><td>${esc(latest||"-")}</td><td>${badge(r)}</td></tr>`;
+      const displayProducts=orderedProducts.slice(0,limit);
+      const hiddenCount=Math.max(0,orderedProducts.length-displayProducts.length), latest=latestDateForProducts(orderedProducts);
+      return `<tr><td class="strong">${esc(r.name_ko)}${r.name_en?`<span class="sub-name">${esc(r.name_en)}</span>`:""}</td><td>${casHtml(r)}</td><td>${thresholdText(r)}${conditionHtml(r)}</td><td>${orderedProducts.length?`<div class="product-list">${displayProducts.map(productDisplay).join("")}${hiddenCount?`<div class="more-products">+ ${hiddenCount}제품 더 있음</div>`:""}</div>`:`<span class="muted">기간 내 발주제품 없음</span>`}</td><td>${orderedProducts.length?`<span class="badge ordered-badge">${orderedProducts.length}제품</span>`:`<span class="muted">-</span>`}</td><td>${esc(latest||"-")}</td><td>${badge(r)}</td></tr>`;
     }).join(""):`<tr><td colspan="7" class="empty">등록된 특별관리물질이 없습니다.</td></tr>`;
   }
   function renderMaster(){const list=filtered("masterSearch","masterStatus","masterType");$("masterList").innerHTML=list.length?list.map(r=>`<tr><td class="strong">${esc(r.name_ko)}</td><td>${esc(r.name_en||"-")}</td><td>${casHtml(r)}</td><td>${r.is_conditional?'조건부':'특별관리물질'}</td><td>${thresholdText(r)}${conditionHtml(r)}</td><td>${esc(r.effective_from||"-")}</td><td>${esc(r.effective_to||"-")}</td><td>${badge(r)}</td><td class="actions-cell"><button class="mini-btn" data-edit="${r.id}" type="button">수정</button><button class="mini-btn danger" data-delete="${r.id}" type="button">삭제</button></td></tr>`).join(""):`<tr><td colspan="9" class="empty">등록된 특별관리물질이 없습니다.</td></tr>`;}
@@ -142,7 +141,7 @@
     if(notice){
       notice.textContent=matchError
         ? `기준정보는 정상입니다. 제품/발주 연동 실패: ${matchError?.message||"알 수 없는 오류"}`
-        : "CAS가 일치하는 시약 제품을 연결하고, 선택한 발주기간 내 제품별 가장 최근 발주일을 표시합니다.";
+        : "CAS 매칭은 내부적으로 유지하며, 현황에는 선택한 발주기간 내 실제 발주가 확인된 제품만 제품별 최신 발주일로 표시합니다.";
       notice.classList.toggle("error",!!matchError);
     }
   }
