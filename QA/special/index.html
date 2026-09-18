@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>특별관리물질 현황</title>
+  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="../../common/mobile.css" />
+  <link rel="stylesheet" href="../../common/theme.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h3 id="pageTitle">특별관리물질 현황</h3>
+          <p id="pageDesc">특별관리물질 기준정보와 제품 연계 현황을 관리합니다.</p>
+        </div>
+        <div class="view-switch">
+          <button class="btn active" id="statusViewBtn" type="button">특별관리물질 현황</button>
+          <button class="btn" id="masterViewBtn" type="button">특별관리물질 기준관리</button>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="summary">
+          <div class="tile"><span class="k">전체 물질</span><span class="v" id="totalCount">0종</span></div>
+          <div class="tile"><span class="k">적용중</span><span class="v" id="activeCount">0종</span></div>
+          <div class="tile"><span class="k">적용예정</span><span class="v" id="scheduledCount">0종</span></div>
+          <div class="tile"><span class="k">제외/제외예정</span><span class="v" id="endedCount">0종</span></div>
+        </div>
+
+        <section id="statusView">
+          <div class="filters">
+            <div class="field grow">
+              <label for="statusSearch">검색</label>
+              <input id="statusSearch" type="search" placeholder="물질명 / 영문명 / CAS 검색" />
+            </div>
+            <div class="field">
+              <label for="statusFilter">상태</label>
+              <select id="statusFilter">
+                <option value="all">전체</option>
+                <option value="active">적용중</option>
+                <option value="scheduled">적용예정</option>
+                <option value="ending">제외예정</option>
+                <option value="ended">제외</option>
+              </select>
+            </div>
+          </div>
+          <div class="notice">제품 CAS 자동매칭과 최신 주문일 연동은 다음 단계에서 연결합니다.</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>특별관리물질</th><th>영문명</th><th>CAS No</th><th>혼합물 기준</th><th>시행일</th><th>상태</th>
+              </tr></thead>
+              <tbody id="statusList"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="masterView" hidden>
+          <div class="section-head">
+            <div>
+              <h4>특별관리물질 기준관리</h4>
+              <p>특별관리물질 기준정보를 신규 등록하거나 수정·제외 관리합니다.</p>
+            </div>
+            <button class="btn primary" id="newBtn" type="button">신규 입력</button>
+          </div>
+
+          <div class="filters">
+            <div class="field grow">
+              <label for="masterSearch">검색</label>
+              <input id="masterSearch" type="search" placeholder="유해물질명 / 영문명 / CAS 검색" />
+            </div>
+            <div class="field">
+              <label for="masterStatus">상태</label>
+              <select id="masterStatus">
+                <option value="all">전체</option>
+                <option value="active">적용중</option>
+                <option value="scheduled">적용예정</option>
+                <option value="ending">제외예정</option>
+                <option value="ended">제외</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="message" class="message" aria-live="polite"></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>유해물질명</th><th>영문명</th><th>CAS No</th><th>유형</th><th>혼합물 기준</th>
+                <th>시행일</th><th>제외일</th><th>상태</th><th>작업</th>
+              </tr></thead>
+              <tbody id="masterList"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="editModal" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head">
+        <h3 id="modalTitle">특별관리물질 신규 입력</h3>
+        <button class="icon-btn" id="closeModal" type="button" aria-label="닫기">×</button>
+      </div>
+      <form id="editForm">
+        <input type="hidden" id="editId" />
+        <div class="form-grid">
+          <label>유해물질명 *<input id="nameKo" required /></label>
+          <label>영문명<input id="nameEn" /></label>
+          <label>CAS No<input id="casNo" placeholder="예: 71-43-2" /></label>
+          <label>유형 *
+            <select id="matchType" required>
+              <option value="single">단일물질</option>
+              <option value="group">그룹물질</option>
+            </select>
+          </label>
+          <label>혼합물 기준값<input id="thresholdValue" type="number" min="0" step="0.0001" placeholder="예: 0.1" /></label>
+          <label>기준 단위<input id="thresholdUnit" value="%" /></label>
+          <label>기준 방식<input id="thresholdBasis" value="중량비율" /></label>
+          <label>시행일<input id="effectiveFrom" type="date" /></label>
+          <label>제외일<input id="effectiveTo" type="date" /></label>
+          <label class="full">비고<textarea id="note" rows="3"></textarea></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" id="cancelBtn" type="button">취소</button>
+          <button class="btn primary" type="submit">저장</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../supabase.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
