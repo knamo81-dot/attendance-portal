@@ -105,7 +105,12 @@
   function badge(r){const s=stateOf(r);return `<span class="badge ${s}">${stateLabel[s]}</span>`;}
   function renderSummary(){$("totalCount").textContent=`${rows.length}종`;$('activeCount').textContent=`${rows.filter(r=>stateOf(r)==='active').length}종`;$('scheduledCount').textContent=`${rows.filter(r=>stateOf(r)==='scheduled').length}종`;$('endedCount').textContent=`${rows.filter(r=>['ending','ended'].includes(stateOf(r))).length}종`;}
   function renderStatus(){
-    const list=filtered("statusSearch","statusFilter","statusType");
+    const list=filtered("statusSearch","statusFilter","statusType").slice().sort((a,b)=>{
+      const aLatest=latestDateForProducts(productsFor(a).filter(p=>orderInfoForProduct(p.id)?.ordered))||"";
+      const bLatest=latestDateForProducts(productsFor(b).filter(p=>orderInfoForProduct(p.id)?.ordered))||"";
+      if(aLatest!==bLatest)return bLatest.localeCompare(aLatest);
+      return String(a.name_ko||"").localeCompare(String(b.name_ko||""),"ko");
+    });
     const matchedCount=rows.filter(r=>productsFor(r).length>0).length;
     const orderedCount=rows.filter(r=>productsFor(r).some(p=>orderInfoForProduct(p.id)?.ordered)).length;
     if($("matchedSubstanceCount"))$("matchedSubstanceCount").textContent=`${matchedCount}종`;
