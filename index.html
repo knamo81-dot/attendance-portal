@@ -5585,6 +5585,15 @@ body.auth-loading .top-user-bar {
       }
 
       if (payload.type === 'portal-tabs-ready' || payload.type === 'portal-tabs-update') {
+        const currentSrc = normalizePortalSrc(frame?.dataset?.currentSrc || frame?.getAttribute('src') || frame?.src || HOME_SRC);
+
+        // QA는 SDS와 특별관리물질이 서로 독립 프로그램이므로,
+        // 각 하위 앱이 보내는 자체 탭 정보로 포털의 QA 공통 메뉴를 덮어쓰지 않습니다.
+        if (currentSrc === 'QA/index.html' || currentSrc === 'QA/special/index.html') {
+          updatePortalSubtabs(currentSrc);
+          return;
+        }
+
         const tabs = payload.tabs || payload.portalTabs || [];
         const activeId = payload.activeTabId || payload.activeTab || payload.tabId || '';
         renderPortalSubtabs(tabs, activeId);
