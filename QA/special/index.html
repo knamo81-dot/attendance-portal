@@ -54,11 +54,15 @@
               </select>
             </div>
           </div>
-          <div class="notice">제품 CAS 자동매칭과 최신 주문일 연동은 다음 단계에서 연결합니다.</div>
+          <div class="notice" id="matchNotice">제품 CAS와 실제 발주기록을 확인하고 있습니다.</div>
+          <div class="match-summary">
+            <span>제품매칭 <strong id="matchedSubstanceCount">0종</strong></span>
+            <span>주문확인 <strong id="orderedSubstanceCount">0종</strong></span>
+          </div>
           <div class="table-wrap">
-            <table>
+            <table class="status-table">
               <thead><tr>
-                <th>특별관리물질</th><th>영문명</th><th>CAS No</th><th>혼합물 기준</th><th>시행일</th><th>상태</th>
+                <th>특별관리물질</th><th>CAS No</th><th>혼합물 기준</th><th>연결제품</th><th>주문확인</th><th>최신 발주일</th><th>상태</th>
               </tr></thead>
               <tbody id="statusList"></tbody>
             </table>
