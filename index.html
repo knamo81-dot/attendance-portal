@@ -5641,6 +5641,26 @@ body.auth-loading .top-user-bar {
       }
 
       if (payload.type === 'portal-tab-active') {
+        const currentSrc = normalizePortalSrc(
+          frame?.dataset?.currentSrc ||
+          frame?.getAttribute('src') ||
+          frame?.src ||
+          HOME_SRC
+        );
+
+        // QA 상단 2개 버튼은 서로 다른 프로그램 경로를 나타냅니다.
+        // SDS 앱 내부에서 보내는 active tab id(예: sds)는 포털의 qa-sds와 다른 id이므로
+        // 그대로 적용하면 두 버튼 모두 비활성(흰색)이 됩니다.
+        // QA에서는 현재 iframe 경로를 기준으로 포털 버튼 active 상태를 고정합니다.
+        if (currentSrc === 'QA/index.html') {
+          setPortalSubtabActive('qa-sds', false);
+          return;
+        }
+        if (currentSrc === 'QA/special/index.html') {
+          setPortalSubtabActive('qa-special', false);
+          return;
+        }
+
         const activeId = payload.activeTabId || payload.activeTab || payload.tabId || payload.tab || '';
         if (activeId) setPortalSubtabActive(activeId);
         return;
