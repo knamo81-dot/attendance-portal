@@ -65,3 +65,14 @@ tr:last-child td{border-bottom:0}
 .actions-cell{display:flex;align-items:center;gap:6px}
 .mini-btn.danger{border-color:#f0b8b8;color:#b42318;background:#fff}
 .mini-btn.danger:hover{background:#fff1f1;border-color:#e68b8b}
+.field-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;font-weight:700;font-size:12px}
+.cas-field{display:block}
+.cas-inputs{display:flex;flex-direction:column;gap:7px}
+.cas-input-row{display:flex;align-items:center;gap:7px}
+.cas-input-row input{flex:1}
+.cas-remove-btn{flex:0 0 auto;border-color:#f0b8b8;color:#b42318;background:#fff}
+.cas-remove-btn:hover{background:#fff1f1;border-color:#e68b8b}
+.add-cas-btn{padding:6px 9px;color:var(--qa);border-color:#cfc2ef}
+.cas-list{display:flex;flex-direction:column;gap:2px;white-space:normal}
+.condition-note{display:block;margin-top:4px;color:#9a6500;font-size:11px;white-space:normal;max-width:340px}
+.conditional-field[hidden]{display:none}
