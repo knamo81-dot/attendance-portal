@@ -5076,15 +5076,19 @@ body.auth-loading .top-user-bar {
     // 모바일 Safari/WebView에서 iframe 자체 히스토리가 쌓이면 좌우 스와이프 시
     // 헤더는 현재 메뉴인데 iframe만 이전 프로그램으로 되돌아가는 현상이 발생할 수 있습니다.
     try {
-      if (frame.contentWindow && frame.contentWindow.location) {
-        // src는 포털 index.html 기준 경로입니다.
-        // iframe 내부의 현재 경로(QA/index.html)를 기준으로 상대경로가 해석되면
-        // QA/special/index.html이 QA/QA/special/index.html로 잘못 이동할 수 있으므로
-        // 포털 문서 기준의 절대 URL로 변환한 뒤 이동합니다.
-        const targetUrl = new URL(src, window.location.href).href;
+      const targetUrl = new URL(src, window.location.href).href;
+      const normalizedTarget = normalizePortalSrc(src);
+
+      // QA는 SDS와 특별관리물질을 서로 다른 HTML 프로그램으로 운영합니다.
+      // 기존 시약/근태 등은 같은 HTML 안에서 postMessage로 내부 탭을 바꾸지만,
+      // QA의 두 프로그램은 iframe 문서 자체를 교체해야 하므로 src를 직접 갱신합니다.
+      // 이렇게 해야 iframe의 src 속성도 실제 현재 프로그램과 일치합니다.
+      if (normalizedTarget === 'QA/index.html' || normalizedTarget === 'QA/special/index.html') {
+        frame.src = targetUrl;
+      } else if (frame.contentWindow && frame.contentWindow.location) {
         frame.contentWindow.location.replace(targetUrl);
       } else {
-        frame.src = src;
+        frame.src = targetUrl;
       }
     } catch (_) {
       frame.src = src;
