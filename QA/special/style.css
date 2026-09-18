@@ -1,0 +1,64 @@
+:root{
+  --qa:#6D4CCB; --qa-dark:#5B3DB5; --qa-light:#F1EDFA; --line:#D9E2EF;
+  --text:#152033; --muted:#66758a; --bg:#f3f6fa; --white:#fff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,"Noto Sans KR",sans-serif;font-size:13px}
+button,input,select,textarea{font:inherit}
+.shell{padding:12px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(20,40,70,.05)}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:15px 16px;border-bottom:1px solid var(--line)}
+.card-head h3,.section-head h4{margin:0 0 5px;font-size:16px}
+.card-head p,.section-head p{margin:0;color:var(--muted);font-size:12px}
+.card-body{padding:14px}
+.view-switch{display:flex;padding:4px;border:1px solid var(--line);border-radius:12px;background:#f8fafc;gap:4px}
+.btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 12px;font-weight:700;cursor:pointer}
+.btn:hover{border-color:#b8c5d8}
+.btn.active,.btn.primary{background:var(--qa);border-color:var(--qa);color:#fff}
+.btn.primary:hover,.btn.active:hover{background:var(--qa-dark)}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.tile{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff}
+.tile .k{display:block;color:var(--muted);font-size:12px;margin-bottom:8px}
+.tile .v{display:block;font-size:20px;font-weight:800}
+.filters{display:flex;gap:8px;align-items:end;margin:12px 0}
+.field{display:flex;flex-direction:column;gap:5px;min-width:160px}
+.field.grow{flex:1;max-width:440px}
+.field label{font-size:12px;font-weight:700;color:#53647b}
+input,select,textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fff;color:var(--text)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--qa-light);border-color:var(--qa)}
+.notice{padding:10px 12px;border-radius:9px;background:var(--qa-light);color:#59409c;margin-bottom:10px}
+.section-head{display:flex;justify-content:space-between;align-items:center;margin:4px 0 10px}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;min-width:900px}
+th,td{padding:10px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{background:#f8fafc;color:#53647b;font-size:12px}
+tr:last-child td{border-bottom:0}
+.strong{font-weight:700}
+.empty{text-align:center;color:var(--muted);padding:28px}
+.badge{display:inline-flex;padding:5px 8px;border-radius:999px;font-size:11px;font-weight:800}
+.badge.active{background:#e8f7ef;color:#137044}
+.badge.scheduled{background:#eef4ff;color:#2759a5}
+.badge.ending{background:#fff4df;color:#9a6500}
+.badge.ended{background:#f1f3f5;color:#68717d}
+.mini-btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 9px;font-weight:700;cursor:pointer}
+.message{min-height:18px;color:var(--muted);margin:4px 0 8px}
+.message.error{color:#b42318}
+.modal-backdrop{position:fixed;inset:0;background:rgba(17,24,39,.42);display:flex;align-items:center;justify-content:center;padding:20px;z-index:1000}
+.modal-backdrop[hidden]{display:none}
+.modal{width:min(760px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:14px;box-shadow:0 18px 55px rgba(0,0,0,.25)}
+.modal-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+.modal-head h3{margin:0}
+.icon-btn{border:0;background:transparent;font-size:24px;cursor:pointer}
+#editForm{padding:16px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid label{display:flex;flex-direction:column;gap:6px;font-weight:700;font-size:12px}
+.form-grid .full{grid-column:1/-1}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+@media(max-width:760px){
+  .card-head,.section-head{align-items:flex-start;flex-direction:column}
+  .view-switch{width:100%}.view-switch .btn{flex:1}
+  .summary{grid-template-columns:1fr 1fr}
+  .filters{flex-wrap:wrap}.field,.field.grow{min-width:100%;max-width:none}
+  .form-grid{grid-template-columns:1fr}
+  .form-grid .full{grid-column:auto}
+}
