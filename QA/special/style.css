@@ -77,3 +77,20 @@ tr:last-child td{border-bottom:0}
 .condition-note{display:block;margin-top:4px;color:#9a6500;font-size:11px;white-space:normal;max-width:340px}
 .conditional-field[hidden]{display:none}
 .threshold-conditional[hidden],#singleThresholdWrap[hidden]{display:none}
+
+
+/* 특별관리물질-제품/발주 연동 */
+.match-summary{display:flex;gap:10px;align-items:center;margin:-2px 0 10px;flex-wrap:wrap}
+.match-summary span{display:inline-flex;align-items:center;gap:5px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--muted)}
+.match-summary strong{color:var(--qa);font-size:14px}
+.status-table{min-width:1120px}
+.product-list{display:flex;flex-direction:column;gap:6px;min-width:290px;white-space:normal}
+.matched-product{display:grid;grid-template-columns:minmax(180px,1fr) auto;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.matched-product.ordered{background:#faf8ff;border-color:#d9cff2}
+.product-name{font-weight:700;line-height:1.35}
+.order-date{font-size:11px;color:#59409c;font-weight:800}
+.no-order,.muted{color:var(--muted);font-size:11px}
+.sub-name{display:block;margin-top:3px;color:var(--muted);font-size:11px;font-weight:400;white-space:normal}
+.ordered-badge{background:var(--qa-light);color:#59409c}
+.notice.error{background:#fff1f1;color:#b42318}
+
