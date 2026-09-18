@@ -62,3 +62,6 @@ tr:last-child td{border-bottom:0}
   .form-grid{grid-template-columns:1fr}
   .form-grid .full{grid-column:auto}
 }
+.actions-cell{display:flex;align-items:center;gap:6px}
+.mini-btn.danger{border-color:#f0b8b8;color:#b42318;background:#fff}
+.mini-btn.danger:hover{background:#fff1f1;border-color:#e68b8b}
