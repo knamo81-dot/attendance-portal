@@ -1,268 +1,48 @@
 (() => {
   "use strict";
   const db = window.SDSApp?.db;
-  if (!db) {
-    alert("Supabase 연결을 확인할 수 없습니다.");
-    return;
-  }
+  if (!db) { alert("Supabase 연결을 확인할 수 없습니다."); return; }
 
-  const $ = (id) => document.getElementById(id);
+  const $ = id => document.getElementById(id);
   let rows = [];
   let isSaving = false;
 
-  function todayISO() {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth()+1).padStart(2,"0");
-    const day = String(d.getDate()).padStart(2,"0");
-    return `${y}-${m}-${day}`;
+  function todayISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
+  function stateOf(row){const t=todayISO();if(row.effective_from&&t<row.effective_from)return"scheduled";if(row.effective_to){if(t>=row.effective_to)return"ended";return"ending";}return"active";}
+  const stateLabel={active:"적용중",scheduled:"적용예정",ending:"제외예정",ended:"제외"};
+  function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+  function thresholdText(r){if(r.threshold_value===null||r.threshold_value===undefined||r.threshold_value==="")return"-";return `${r.threshold_value}${esc(r.threshold_unit||"%") } ${esc(r.threshold_basis||"")} 이상`.trim();}
+  function casValues(r){const list=(r.qa_special_substance_cas||[]).slice().sort((a,b)=>(a.sort_order??0)-(b.sort_order??0)||(a.id??0)-(b.id??0)).map(x=>x.cas_no).filter(Boolean);return list.length?list:(r.cas_no?[r.cas_no]:[]);}
+  function casHtml(r){const list=casValues(r);return list.length?`<div class="cas-list">${list.map(x=>`<span>${esc(x)}</span>`).join("")}</div>`:"-";}
+  function conditionHtml(r){return r.is_conditional&&r.condition_text?`<span class="condition-note">조건부 · ${esc(r.condition_text)}</span>`:"";}
+  function filtered(searchId,statusId){const q=($(searchId)?.value||"").trim().toLowerCase();const status=$(statusId)?.value||"all";return rows.filter(r=>{const text=`${r.name_ko||""} ${r.name_en||""} ${r.cas_no||""} ${casValues(r).join(" ")} ${r.condition_text||""}`.toLowerCase();return(!q||text.includes(q))&&(status==="all"||stateOf(r)===status);});}
+  function badge(r){const s=stateOf(r);return `<span class="badge ${s}">${stateLabel[s]}</span>`;}
+  function renderSummary(){$("totalCount").textContent=`${rows.length}종`;$('activeCount').textContent=`${rows.filter(r=>stateOf(r)==='active').length}종`;$('scheduledCount').textContent=`${rows.filter(r=>stateOf(r)==='scheduled').length}종`;$('endedCount').textContent=`${rows.filter(r=>['ending','ended'].includes(stateOf(r))).length}종`;}
+  function renderStatus(){const list=filtered("statusSearch","statusFilter");$("statusList").innerHTML=list.length?list.map(r=>`<tr><td class="strong">${esc(r.name_ko)}</td><td>${esc(r.name_en||"-")}</td><td>${casHtml(r)}</td><td>${thresholdText(r)}${conditionHtml(r)}</td><td>${esc(r.effective_from||"-")}</td><td>${badge(r)}</td></tr>`).join(""):`<tr><td colspan="6" class="empty">등록된 특별관리물질이 없습니다.</td></tr>`;}
+  function renderMaster(){const list=filtered("masterSearch","masterStatus");$("masterList").innerHTML=list.length?list.map(r=>`<tr><td class="strong">${esc(r.name_ko)}</td><td>${esc(r.name_en||"-")}</td><td>${casHtml(r)}</td><td>${r.match_type==='group'?'그룹':'단일'}${r.is_conditional?'<span class="condition-note">조건부</span>':''}</td><td>${thresholdText(r)}${conditionHtml(r)}</td><td>${esc(r.effective_from||"-")}</td><td>${esc(r.effective_to||"-")}</td><td>${badge(r)}</td><td class="actions-cell"><button class="mini-btn" data-edit="${r.id}" type="button">수정</button><button class="mini-btn danger" data-delete="${r.id}" type="button">삭제</button></td></tr>`).join(""):`<tr><td colspan="9" class="empty">등록된 특별관리물질이 없습니다.</td></tr>`;}
+
+  async function load(){setMessage("기준정보를 불러오는 중입니다.");const {data,error}=await db.from("qa_special_substances").select("*, qa_special_substance_cas(id, cas_no, sort_order)").order("name_ko",{ascending:true});if(error){console.error(error);setMessage(`불러오기 실패: ${error.message}`,true);return;}rows=data||[];setMessage("");renderSummary();renderStatus();renderMaster();}
+  function setMessage(msg,error=false){const el=$("message");el.textContent=msg||"";el.classList.toggle("error",!!error);}
+  function switchView(view){const master=view==="master";$("statusView").hidden=master;$("masterView").hidden=!master;$("statusViewBtn").classList.toggle("active",!master);$("masterViewBtn").classList.toggle("active",master);$("pageTitle").textContent=master?"특별관리물질 기준관리":"특별관리물질 현황";$("pageDesc").textContent=master?"법령 기준 특별관리물질의 등록·수정 및 제외 정보를 관리합니다.":"특별관리물질 기준정보와 제품 연계 현황을 관리합니다.";}
+
+  function addCasInput(value=""){const row=document.createElement("div");row.className="cas-input-row";row.innerHTML=`<input class="cas-input" type="text" placeholder="예: 71-43-2" value="${esc(value)}"><button class="mini-btn cas-remove-btn" type="button">삭제</button>`;row.querySelector(".cas-remove-btn").addEventListener("click",()=>{const all=$("casInputs").querySelectorAll(".cas-input-row");if(all.length===1){row.querySelector("input").value="";}else row.remove();});$("casInputs").appendChild(row);}
+  function getCasInputs(){const vals=[...$("casInputs").querySelectorAll(".cas-input")].map(x=>x.value.trim()).filter(Boolean);return [...new Set(vals)];}
+  function syncConditionalUI(){const conditional=$("conditionType").value==="conditional";$("conditionTextWrap").hidden=!conditional;if(!conditional)$("conditionText").value="";}
+  function openModal(row=null){$("editForm").reset();$("casInputs").innerHTML="";$("thresholdUnit").value="%";$("thresholdBasis").value="중량비율";$("matchType").value="single";$("conditionType").value="normal";$("editId").value=row?.id||"";$("nameKo").value=row?.name_ko||"";$("nameEn").value=row?.name_en||"";const cases=row?casValues(row):[];(cases.length?cases:[""]).forEach(addCasInput);$("matchType").value=row?.match_type||"single";$("conditionType").value=row?.is_conditional?"conditional":"normal";$("conditionText").value=row?.condition_text||"";$("thresholdValue").value=row?.threshold_value??"";$("thresholdUnit").value=row?.threshold_unit||"%";$("thresholdBasis").value=row?.threshold_basis||"중량비율";$("effectiveFrom").value=row?.effective_from||"";$("effectiveTo").value=row?.effective_to||"";$("note").value=row?.note||"";syncConditionalUI();$("modalTitle").textContent=row?"특별관리물질 수정":"특별관리물질 신규 입력";$("editModal").hidden=false;}
+  function closeModal(){if(!isSaving)$("editModal").hidden=true;}
+
+  async function save(e){e.preventDefault();if(isSaving)return;const id=$("editId").value;const casList=getCasInputs();const isConditional=$("conditionType").value==="conditional";const payload={name_ko:$("nameKo").value.trim(),name_en:$("nameEn").value.trim()||null,cas_no:casList[0]||null,match_type:$("matchType").value,threshold_value:$("thresholdValue").value===""?null:Number($("thresholdValue").value),threshold_unit:$("thresholdUnit").value.trim()||"%",threshold_basis:$("thresholdBasis").value.trim()||"중량비율",is_conditional:isConditional,condition_text:isConditional?($("conditionText").value.trim()||null):null,effective_from:$("effectiveFrom").value||null,effective_to:$("effectiveTo").value||null,note:$("note").value.trim()||null};
+    if(!payload.name_ko)return;if(payload.match_type==="single"&&!casList.length){alert("단일물질은 CAS No를 1개 이상 입력해 주세요.");return;}if(isConditional&&!payload.condition_text){alert("조건부 물질은 조건 내용을 입력해 주세요.");return;}if(payload.effective_from&&payload.effective_to&&payload.effective_to<payload.effective_from){alert("제외일은 시행일보다 빠를 수 없습니다.");return;}
+    const submitBtn=$("editForm").querySelector('button[type="submit"]');const originalText=submitBtn?.textContent||"저장";isSaving=true;if(submitBtn){submitBtn.disabled=true;submitBtn.textContent="저장 중...";}
+    try{const session=window.SDSApp?.getPortalSession?.()||{};let substanceId=id?Number(id):null;let parentResult;if(id){parentResult=await db.from("qa_special_substances").update(payload).eq("id",substanceId).select("id").single();}else{payload.created_by=session.email||session.user?.email||null;parentResult=await db.from("qa_special_substances").insert(payload).select("id").single();}if(parentResult.error)throw parentResult.error;substanceId=parentResult.data.id;
+      const del=await db.from("qa_special_substance_cas").delete().eq("substance_id",substanceId);if(del.error)throw del.error;
+      if(casList.length){const casRows=casList.map((cas_no,i)=>({substance_id:substanceId,cas_no,sort_order:i}));const ins=await db.from("qa_special_substance_cas").insert(casRows);if(ins.error)throw ins.error;}
+      $("editModal").hidden=true;await load();
+    }catch(error){console.error(error);alert(`저장 실패: ${error?.message||"알 수 없는 오류"}`);}finally{isSaving=false;if(submitBtn){submitBtn.disabled=false;submitBtn.textContent=originalText;}}
   }
 
-  function stateOf(row) {
-    const today = todayISO();
-    if (row.effective_from && today < row.effective_from) return "scheduled";
-    if (row.effective_to) {
-      if (today >= row.effective_to) return "ended";
-      return "ending";
-    }
-    return "active";
-  }
+  async function deleteRow(row){if(!row)return;const ok=confirm(`"${row.name_ko}" 기준정보를 완전히 삭제할까요?\n\n잘못 입력한 자료를 삭제할 때만 사용하세요.\n법령상 제외된 물질은 삭제하지 말고 '제외일'을 입력해 주세요.`);if(!ok)return;const {error}=await db.from("qa_special_substances").delete().eq("id",row.id);if(error){console.error(error);alert(`삭제 실패: ${error.message}`);return;}await load();}
 
-  const stateLabel = { active:"적용중", scheduled:"적용예정", ending:"제외예정", ended:"제외" };
-
-  function esc(v) {
-    return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  }
-
-  function thresholdText(r) {
-    if (r.threshold_value === null || r.threshold_value === undefined || r.threshold_value === "") return "-";
-    return `${r.threshold_value}${esc(r.threshold_unit || "%")} ${esc(r.threshold_basis || "")} 이상`.trim();
-  }
-
-  function filtered(searchId, statusId) {
-    const q = ($(searchId)?.value || "").trim().toLowerCase();
-    const status = $(statusId)?.value || "all";
-    return rows.filter(r => {
-      const text = `${r.name_ko||""} ${r.name_en||""} ${r.cas_no||""}`.toLowerCase();
-      return (!q || text.includes(q)) && (status === "all" || stateOf(r) === status);
-    });
-  }
-
-  function badge(r) {
-    const s = stateOf(r);
-    return `<span class="badge ${s}">${stateLabel[s]}</span>`;
-  }
-
-  function renderSummary() {
-    $("totalCount").textContent = `${rows.length}종`;
-    $("activeCount").textContent = `${rows.filter(r=>stateOf(r)==="active").length}종`;
-    $("scheduledCount").textContent = `${rows.filter(r=>stateOf(r)==="scheduled").length}종`;
-    $("endedCount").textContent = `${rows.filter(r=>["ending","ended"].includes(stateOf(r))).length}종`;
-  }
-
-  function renderStatus() {
-    const list = filtered("statusSearch","statusFilter");
-    $("statusList").innerHTML = list.length ? list.map(r => `
-      <tr>
-        <td class="strong">${esc(r.name_ko)}</td>
-        <td>${esc(r.name_en || "-")}</td>
-        <td>${esc(r.cas_no || "-")}</td>
-        <td>${thresholdText(r)}</td>
-        <td>${esc(r.effective_from || "-")}</td>
-        <td>${badge(r)}</td>
-      </tr>`).join("") : `<tr><td colspan="6" class="empty">등록된 특별관리물질이 없습니다.</td></tr>`;
-  }
-
-  function renderMaster() {
-    const list = filtered("masterSearch","masterStatus");
-    $("masterList").innerHTML = list.length ? list.map(r => `
-      <tr>
-        <td class="strong">${esc(r.name_ko)}</td>
-        <td>${esc(r.name_en || "-")}</td>
-        <td>${esc(r.cas_no || "-")}</td>
-        <td>${r.match_type === "group" ? "그룹" : "단일"}</td>
-        <td>${thresholdText(r)}</td>
-        <td>${esc(r.effective_from || "-")}</td>
-        <td>${esc(r.effective_to || "-")}</td>
-        <td>${badge(r)}</td>
-        <td class="actions-cell">
-          <button class="mini-btn" data-edit="${r.id}" type="button">수정</button>
-          <button class="mini-btn danger" data-delete="${r.id}" type="button">삭제</button>
-        </td>
-      </tr>`).join("") : `<tr><td colspan="9" class="empty">등록된 특별관리물질이 없습니다.</td></tr>`;
-  }
-
-  async function load() {
-    setMessage("기준정보를 불러오는 중입니다.");
-    const { data, error } = await db.from("qa_special_substances")
-      .select("*")
-      .order("name_ko", { ascending:true });
-    if (error) {
-      console.error(error);
-      setMessage(`불러오기 실패: ${error.message}`, true);
-      return;
-    }
-    rows = data || [];
-    setMessage("");
-    renderSummary();
-    renderStatus();
-    renderMaster();
-  }
-
-  function setMessage(msg, error=false) {
-    const el = $("message");
-    el.textContent = msg || "";
-    el.classList.toggle("error", !!error);
-  }
-
-  function switchView(view) {
-    const master = view === "master";
-    $("statusView").hidden = master;
-    $("masterView").hidden = !master;
-    $("statusViewBtn").classList.toggle("active", !master);
-    $("masterViewBtn").classList.toggle("active", master);
-    $("pageTitle").textContent = master ? "특별관리물질 기준관리" : "특별관리물질 현황";
-    $("pageDesc").textContent = master
-      ? "법령 기준 특별관리물질의 등록·수정 및 제외 정보를 관리합니다."
-      : "특별관리물질 기준정보와 제품 연계 현황을 관리합니다.";
-  }
-
-  function openModal(row=null) {
-    $("editForm").reset();
-    $("thresholdUnit").value = "%";
-    $("thresholdBasis").value = "중량비율";
-    $("matchType").value = "single";
-    $("editId").value = row?.id || "";
-    $("nameKo").value = row?.name_ko || "";
-    $("nameEn").value = row?.name_en || "";
-    $("casNo").value = row?.cas_no || "";
-    $("matchType").value = row?.match_type || "single";
-    $("thresholdValue").value = row?.threshold_value ?? "";
-    $("thresholdUnit").value = row?.threshold_unit || "%";
-    $("thresholdBasis").value = row?.threshold_basis || "중량비율";
-    $("effectiveFrom").value = row?.effective_from || "";
-    $("effectiveTo").value = row?.effective_to || "";
-    $("note").value = row?.note || "";
-    $("modalTitle").textContent = row ? "특별관리물질 수정" : "특별관리물질 신규 입력";
-    $("editModal").hidden = false;
-  }
-
-  function closeModal() { $("editModal").hidden = true; }
-
-  async function save(e) {
-    e.preventDefault();
-
-    // 저장 요청이 진행 중이면 Enter/더블클릭 등 추가 submit을 무시합니다.
-    if (isSaving) return;
-
-    const id = $("editId").value;
-    const payload = {
-      name_ko: $("nameKo").value.trim(),
-      name_en: $("nameEn").value.trim() || null,
-      cas_no: $("casNo").value.trim() || null,
-      match_type: $("matchType").value,
-      threshold_value: $("thresholdValue").value === "" ? null : Number($("thresholdValue").value),
-      threshold_unit: $("thresholdUnit").value.trim() || "%",
-      threshold_basis: $("thresholdBasis").value.trim() || "중량비율",
-      effective_from: $("effectiveFrom").value || null,
-      effective_to: $("effectiveTo").value || null,
-      note: $("note").value.trim() || null
-    };
-
-    if (!payload.name_ko) return;
-    if (payload.match_type === "single" && !payload.cas_no) {
-      alert("단일물질은 CAS No를 입력해 주세요.");
-      return;
-    }
-    if (payload.effective_from && payload.effective_to && payload.effective_to < payload.effective_from) {
-      alert("제외일은 시행일보다 빠를 수 없습니다.");
-      return;
-    }
-
-    const submitBtn = $("editForm").querySelector('button[type="submit"]');
-    const originalText = submitBtn?.textContent || "저장";
-
-    isSaving = true;
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = "저장 중...";
-    }
-
-    try {
-      const session = window.SDSApp?.getPortalSession?.() || {};
-      payload.created_by = id ? undefined : (session.email || session.user?.email || null);
-      if (id) delete payload.created_by;
-
-      let result;
-      if (id) result = await db.from("qa_special_substances").update(payload).eq("id", id);
-      else result = await db.from("qa_special_substances").insert(payload);
-
-      if (result.error) {
-        console.error(result.error);
-        alert(`저장 실패: ${result.error.message}`);
-        return;
-      }
-
-      closeModal();
-      await load();
-    } catch (error) {
-      console.error(error);
-      alert(`저장 실패: ${error?.message || "알 수 없는 오류"}`);
-    } finally {
-      isSaving = false;
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalText;
-      }
-    }
-  }
-
-  async function deleteRow(row) {
-    if (!row) return;
-    const ok = confirm(
-      `"${row.name_ko}" 기준정보를 완전히 삭제할까요?\n\n` +
-      `잘못 입력한 자료를 삭제할 때만 사용하세요.\n` +
-      `법령상 제외된 물질은 삭제하지 말고 '제외일'을 입력해 주세요.`
-    );
-    if (!ok) return;
-
-    const { error } = await db.from("qa_special_substances")
-      .delete()
-      .eq("id", row.id);
-
-    if (error) {
-      console.error(error);
-      alert(`삭제 실패: ${error.message}`);
-      return;
-    }
-
-    await load();
-  }
-
-  $("statusViewBtn").addEventListener("click", ()=>switchView("status"));
-  $("masterViewBtn").addEventListener("click", ()=>switchView("master"));
-  $("newBtn").addEventListener("click", ()=>openModal());
-  $("closeModal").addEventListener("click", closeModal);
-  $("cancelBtn").addEventListener("click", closeModal);
-  $("editModal").addEventListener("click", e => { if (e.target === $("editModal")) closeModal(); });
-  $("editForm").addEventListener("submit", save);
-  ["statusSearch","statusFilter"].forEach(id => $(id).addEventListener("input", renderStatus));
-  ["masterSearch","masterStatus"].forEach(id => $(id).addEventListener("input", renderMaster));
-  $("masterList").addEventListener("click", e => {
-    const editBtn = e.target.closest("[data-edit]");
-    if (editBtn) {
-      const row = rows.find(r => String(r.id) === editBtn.dataset.edit);
-      if (row) openModal(row);
-      return;
-    }
-
-    const deleteBtn = e.target.closest("[data-delete]");
-    if (deleteBtn) {
-      const row = rows.find(r => String(r.id) === deleteBtn.dataset.delete);
-      if (row) deleteRow(row);
-    }
-  });
-
-  switchView("status");
-  load();
+  $("statusViewBtn").addEventListener("click",()=>switchView("status"));$("masterViewBtn").addEventListener("click",()=>switchView("master"));$("newBtn").addEventListener("click",()=>openModal());$("addCasBtn").addEventListener("click",()=>addCasInput());$("conditionType").addEventListener("change",syncConditionalUI);$("closeModal").addEventListener("click",closeModal);$("cancelBtn").addEventListener("click",closeModal);$("editModal").addEventListener("click",e=>{if(e.target===$("editModal"))closeModal();});$("editForm").addEventListener("submit",save);["statusSearch","statusFilter"].forEach(id=>$(id).addEventListener("input",renderStatus));["masterSearch","masterStatus"].forEach(id=>$(id).addEventListener("input",renderMaster));$("masterList").addEventListener("click",e=>{const editBtn=e.target.closest("[data-edit]");if(editBtn){const row=rows.find(r=>String(r.id)===editBtn.dataset.edit);if(row)openModal(row);return;}const deleteBtn=e.target.closest("[data-delete]");if(deleteBtn){const row=rows.find(r=>String(r.id)===deleteBtn.dataset.delete);if(row)deleteRow(row);}});
+  switchView("status");load();
 })();
