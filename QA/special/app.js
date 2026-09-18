@@ -84,7 +84,10 @@
         <td>${esc(r.effective_from || "-")}</td>
         <td>${esc(r.effective_to || "-")}</td>
         <td>${badge(r)}</td>
-        <td><button class="mini-btn" data-edit="${r.id}" type="button">수정</button></td>
+        <td class="actions-cell">
+          <button class="mini-btn" data-edit="${r.id}" type="button">수정</button>
+          <button class="mini-btn danger" data-delete="${r.id}" type="button">삭제</button>
+        </td>
       </tr>`).join("") : `<tr><td colspan="9" class="empty">등록된 특별관리물질이 없습니다.</td></tr>`;
   }
 
@@ -188,6 +191,28 @@
     await load();
   }
 
+  async function deleteRow(row) {
+    if (!row) return;
+    const ok = confirm(
+      `"${row.name_ko}" 기준정보를 완전히 삭제할까요?\n\n` +
+      `잘못 입력한 자료를 삭제할 때만 사용하세요.\n` +
+      `법령상 제외된 물질은 삭제하지 말고 '제외일'을 입력해 주세요.`
+    );
+    if (!ok) return;
+
+    const { error } = await db.from("qa_special_substances")
+      .delete()
+      .eq("id", row.id);
+
+    if (error) {
+      console.error(error);
+      alert(`삭제 실패: ${error.message}`);
+      return;
+    }
+
+    await load();
+  }
+
   $("statusViewBtn").addEventListener("click", ()=>switchView("status"));
   $("masterViewBtn").addEventListener("click", ()=>switchView("master"));
   $("newBtn").addEventListener("click", ()=>openModal());
@@ -198,10 +223,18 @@
   ["statusSearch","statusFilter"].forEach(id => $(id).addEventListener("input", renderStatus));
   ["masterSearch","masterStatus"].forEach(id => $(id).addEventListener("input", renderMaster));
   $("masterList").addEventListener("click", e => {
-    const btn = e.target.closest("[data-edit]");
-    if (!btn) return;
-    const row = rows.find(r => String(r.id) === btn.dataset.edit);
-    if (row) openModal(row);
+    const editBtn = e.target.closest("[data-edit]");
+    if (editBtn) {
+      const row = rows.find(r => String(r.id) === editBtn.dataset.edit);
+      if (row) openModal(row);
+      return;
+    }
+
+    const deleteBtn = e.target.closest("[data-delete]");
+    if (deleteBtn) {
+      const row = rows.find(r => String(r.id) === deleteBtn.dataset.delete);
+      if (row) deleteRow(row);
+    }
   });
 
   switchView("status");
