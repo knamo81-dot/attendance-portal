@@ -76,3 +76,4 @@ tr:last-child td{border-bottom:0}
 .cas-list{display:flex;flex-direction:column;gap:2px;white-space:normal}
 .condition-note{display:block;margin-top:4px;color:#9a6500;font-size:11px;white-space:normal;max-width:340px}
 .conditional-field[hidden]{display:none}
+.threshold-conditional[hidden],#singleThresholdWrap[hidden]{display:none}
