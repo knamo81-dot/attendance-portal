@@ -3027,6 +3027,12 @@ body.auth-loading .top-user-bar {
       desc: '제품별 안전보건자료와 등록 상태를 관리합니다.',
       gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
     },
+    'QA/special/index.html': {
+      top: 'Safety Management',
+      title: 'QA',
+      desc: '특별관리물질 기준정보와 제품 연계 현황을 관리합니다.',
+      gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
+    },
     'travel-expense/index.html': {
       top: 'Expense Management',
       title: '출장비 정산',
@@ -3085,7 +3091,14 @@ body.auth-loading .top-user-bar {
       { id: 'summary', label: '취합정리' },
       { id: 'products', label: '제품관리' }
     ],
-    'QA/index.html': [],
+    'QA/index.html': [
+      { id: 'qa-sds', label: 'SDS 관리' },
+      { id: 'qa-special', label: '특별관리물질 현황' }
+    ],
+    'QA/special/index.html': [
+      { id: 'qa-sds', label: 'SDS 관리' },
+      { id: 'qa-special', label: '특별관리물질 현황' }
+    ],
     'travel-expense/index.html': [],
     'aic/index.html': [],
     'settings.html': [
@@ -3330,6 +3343,20 @@ body.auth-loading .top-user-bar {
     if (!frame || !frame.contentWindow || !tabId) return;
 
     const currentSrc = normalizePortalSrc(frame.getAttribute('src') || frame.src || '');
+
+    // QA는 SDS와 특별관리물질을 독립 프로그램으로 운영하므로
+    // 포탈 상단 버튼에서 iframe 경로 자체를 전환합니다.
+    if (currentSrc === 'QA/index.html' || currentSrc === 'QA/special/index.html') {
+      if (tabId === 'qa-sds' && currentSrc !== 'QA/index.html') {
+        replacePortalFrame('QA/index.html');
+        return;
+      }
+      if (tabId === 'qa-special' && currentSrc !== 'QA/special/index.html') {
+        replacePortalFrame('QA/special/index.html');
+        return;
+      }
+      return;
+    }
     if (currentSrc === 'travel-expense/index.html' && isTravelExpenseAdminTab({ id: tabId, label: tabId })) {
       const travelRole = getPortalAppRoleForTabs('travel_expense');
       if (!isPortalOperatorRole(travelRole)) {
@@ -3360,7 +3387,10 @@ body.auth-loading .top-user-bar {
   function updatePortalSubtabs(src) {
     const key = normalizePortalSrc(src);
     const tabs = portalDefaultTabs[key] || [];
-    renderPortalSubtabs(tabs, tabs[0]?.id || '');
+    let activeId = tabs[0]?.id || '';
+    if (key === 'QA/index.html') activeId = 'qa-sds';
+    if (key === 'QA/special/index.html') activeId = 'qa-special';
+    renderPortalSubtabs(tabs, activeId);
     renderPortalFilters([]);
   }
 
