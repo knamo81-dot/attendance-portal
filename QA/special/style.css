@@ -94,3 +94,12 @@ tr:last-child td{border-bottom:0}
 .ordered-badge{background:var(--qa-light);color:#59409c}
 .notice.error{background:#fff1f1;color:#b42318}
 
+
+
+/* 발주기간 / 표시건수 */
+.order-controls{display:flex;align-items:flex-end;gap:8px;margin:0 0 10px;flex-wrap:wrap}
+.order-controls>.field{min-width:140px}.custom-period{display:flex;align-items:flex-end;gap:8px}.custom-period[hidden]{display:none}
+.custom-period .field{min-width:145px}.date-sep{padding:0 1px 10px;color:var(--muted);font-weight:700}
+.more-products{padding:6px 8px;border-radius:8px;background:#f8fafc;color:var(--muted);font-size:11px;font-weight:700;text-align:center}
+@media(max-width:760px){.order-controls,.custom-period{width:100%}.order-controls>.field,.custom-period .field{min-width:0;flex:1}.custom-period{flex-wrap:wrap}.date-sep{display:none}}
+
