@@ -3119,7 +3119,26 @@ body.auth-loading .top-user-bar {
 
 
   function normalizePortalSrc(src) {
-    return String(src || '').split('?')[0];
+    const raw = String(src || '').trim();
+    if (!raw) return '';
+
+    // iframe.src는 브라우저가 절대 URL로 바꿔 반환할 수 있습니다.
+    // 포털 내부 비교는 항상 루트 index.html 기준 상대경로로 통일합니다.
+    try {
+      const url = new URL(raw, window.location.href);
+      const baseDir = new URL('./', window.location.href).pathname;
+      let path = url.pathname;
+
+      if (baseDir !== '/' && path.startsWith(baseDir)) {
+        path = path.slice(baseDir.length);
+      } else {
+        path = path.replace(/^\/+/, '');
+      }
+
+      return decodeURIComponent(path);
+    } catch (_) {
+      return raw.split('?')[0].split('#')[0].replace(/^\.\//, '').replace(/^\/+/, '');
+    }
   }
 
   function normalizePortalTabs(tabs) {
