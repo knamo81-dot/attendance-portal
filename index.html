@@ -3361,7 +3361,15 @@ body.auth-loading .top-user-bar {
   function sendPortalTabChange(tabId) {
     if (!frame || !frame.contentWindow || !tabId) return;
 
-    const currentSrc = normalizePortalSrc(frame.getAttribute('src') || frame.src || '');
+    // QA 전환 후 다른 앱으로 이동할 때 iframe의 src 속성에는
+    // 이전 QA 경로가 남아 있을 수 있습니다. replacePortalFrame()이 관리하는
+    // dataset.currentSrc를 최우선으로 사용해야 현재 앱을 정확히 판별할 수 있습니다.
+    const currentSrc = normalizePortalSrc(
+      frame.dataset?.currentSrc ||
+      frame.getAttribute('src') ||
+      frame.src ||
+      ''
+    );
 
     // QA는 SDS와 특별관리물질을 독립 프로그램으로 운영하므로
     // 포탈 상단 버튼에서 iframe 경로 자체를 전환합니다.
@@ -3388,7 +3396,7 @@ body.auth-loading .top-user-bar {
     const tab = currentPortalTabs.find(function (item) { return item.id === tabId; }) || null;
 
     try {
-      if (normalizePortalSrc(frame.getAttribute('src') || frame.src || '') === 'settings.html' &&
+      if (normalizePortalSrc(frame.dataset?.currentSrc || frame.getAttribute('src') || frame.src || '') === 'settings.html' &&
           typeof frame.contentWindow.openPortalSettingsSection === 'function') {
         frame.contentWindow.openPortalSettingsSection(tabId);
       }
