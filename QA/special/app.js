@@ -6,6 +6,8 @@
   const $ = id => document.getElementById(id);
   let rows = [];
   let isSaving = false;
+  let productMatches = new Map();
+  let orderMatches = new Map();
 
   function todayISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
   function stateOf(row){const t=todayISO();if(row.effective_from&&t<row.effective_from)return"scheduled";if(row.effective_to){if(t>=row.effective_to)return"ended";return"ending";}return"active";}
@@ -15,13 +17,126 @@
   function casValues(r){const list=(r.qa_special_substance_cas||[]).slice().sort((a,b)=>(a.sort_order??0)-(b.sort_order??0)||(a.id??0)-(b.id??0)).map(x=>x.cas_no).filter(Boolean);return list.length?list:(r.cas_no?[r.cas_no]:[]);}
   function casHtml(r){const list=casValues(r);return list.length?`<div class="cas-list">${list.map(x=>`<span>${esc(x)}</span>`).join("")}</div>`:"-";}
   function conditionHtml(r){return r.is_conditional&&r.condition_text?`<span class="condition-note">조건부 · ${esc(r.condition_text)}</span>`:"";}
+  function normalizeCas(v){return String(v||"").trim().replace(/\s+/g,"");}
+  function productsFor(r){
+    const seen=new Set(), out=[];
+    casValues(r).forEach(cas=>{
+      (productMatches.get(normalizeCas(cas))||[]).forEach(p=>{
+        const key=String(p.id);
+        if(!seen.has(key)){seen.add(key);out.push(p);}
+      });
+    });
+    return out;
+  }
+  function orderInfoForProduct(productId){return orderMatches.get(String(productId))||null;}
+  function latestDateForProducts(products){
+    const dates=products.map(p=>orderInfoForProduct(p.id)?.latestOrderDate).filter(Boolean).sort();
+    return dates.length?dates[dates.length-1]:null;
+  }
+  function productDisplay(p){
+    const parts=[p.name,p.maker,p.code,p.capacity].filter(Boolean);
+    const oi=orderInfoForProduct(p.id);
+    return `<div class="matched-product${oi?.ordered?" ordered":""}">
+      <span class="product-name">${esc(parts.join(" / ")||`제품 #${p.id}`)}</span>
+      ${oi?.ordered?`<span class="order-date">${esc(oi.latestOrderDate||"-")}</span>`:`<span class="no-order">발주이력 없음</span>`}
+    </div>`;
+  }
+  async function loadProductAndOrders(){
+    productMatches=new Map();orderMatches=new Map();
+    const session=window.SDSApp?.getPortalSession?.()||{};
+    const companyId=session.activeCompanyId||session.company_id||session.companyId||null;
+
+    let pq=db.from("product_master")
+      .select("id, company_id, category, name, maker, code, capacity, cas, grade, is_active")
+      .eq("is_active",true)
+      .eq("category","시약");
+    if(companyId)pq=pq.eq("company_id",companyId);
+    const {data:products,error:pErr}=await pq;
+    if(pErr)throw pErr;
+
+    (products||[]).forEach(p=>{
+      const key=normalizeCas(p.cas);
+      if(!key)return;
+      if(!productMatches.has(key))productMatches.set(key,[]);
+      productMatches.get(key).push(p);
+    });
+
+    const productIds=(products||[]).map(p=>p.id);
+    if(!productIds.length)return;
+
+    // Supabase URL 길이를 피하기 위해 제품 ID를 나누어 조회합니다.
+    const chunkSize=150;
+    for(let i=0;i<productIds.length;i+=chunkSize){
+      const ids=productIds.slice(i,i+chunkSize);
+      let oq=db.from("reagent_collect_items")
+        .select("product_id, order_date")
+        .in("product_id",ids)
+        .not("order_date","is",null);
+      if(companyId)oq=oq.eq("company_id",companyId);
+      const {data:orders,error:oErr}=await oq;
+      if(oErr)throw oErr;
+      (orders||[]).forEach(o=>{
+        if(o.product_id==null)return;
+        const key=String(o.product_id);
+        const prev=orderMatches.get(key);
+        if(!prev||String(o.order_date)>String(prev.latestOrderDate)){
+          orderMatches.set(key,{ordered:true,latestOrderDate:o.order_date});
+        }
+      });
+    }
+  }
+
   function filtered(searchId,statusId,typeId){const q=($(searchId)?.value||"").trim().toLowerCase();const status=$(statusId)?.value||"all";const type=$(typeId)?.value||"all";return rows.filter(r=>{const text=`${r.name_ko||""} ${r.name_en||""} ${r.cas_no||""} ${casValues(r).join(" ")} ${r.condition_text||""}`.toLowerCase();const typeMatch=type==="all"||(type==="conditional"?!!r.is_conditional:!r.is_conditional);return(!q||text.includes(q))&&(status==="all"||stateOf(r)===status)&&typeMatch;});}
   function badge(r){const s=stateOf(r);return `<span class="badge ${s}">${stateLabel[s]}</span>`;}
   function renderSummary(){$("totalCount").textContent=`${rows.length}종`;$('activeCount').textContent=`${rows.filter(r=>stateOf(r)==='active').length}종`;$('scheduledCount').textContent=`${rows.filter(r=>stateOf(r)==='scheduled').length}종`;$('endedCount').textContent=`${rows.filter(r=>['ending','ended'].includes(stateOf(r))).length}종`;}
-  function renderStatus(){const list=filtered("statusSearch","statusFilter","statusType");$("statusList").innerHTML=list.length?list.map(r=>`<tr><td class="strong">${esc(r.name_ko)}</td><td>${esc(r.name_en||"-")}</td><td>${casHtml(r)}</td><td>${thresholdText(r)}${conditionHtml(r)}</td><td>${esc(r.effective_from||"-")}</td><td>${badge(r)}</td></tr>`).join(""):`<tr><td colspan="6" class="empty">등록된 특별관리물질이 없습니다.</td></tr>`;}
+  function renderStatus(){
+    const list=filtered("statusSearch","statusFilter","statusType");
+    const matchedCount=rows.filter(r=>productsFor(r).length>0).length;
+    const orderedCount=rows.filter(r=>productsFor(r).some(p=>orderInfoForProduct(p.id)?.ordered)).length;
+    if($("matchedSubstanceCount"))$("matchedSubstanceCount").textContent=`${matchedCount}종`;
+    if($("orderedSubstanceCount"))$("orderedSubstanceCount").textContent=`${orderedCount}종`;
+
+    $("statusList").innerHTML=list.length?list.map(r=>{
+      const products=productsFor(r);
+      const orderedProducts=products.filter(p=>orderInfoForProduct(p.id)?.ordered);
+      const latest=latestDateForProducts(orderedProducts);
+      return `<tr>
+        <td class="strong">${esc(r.name_ko)}${r.name_en?`<span class="sub-name">${esc(r.name_en)}</span>`:""}</td>
+        <td>${casHtml(r)}</td>
+        <td>${thresholdText(r)}${conditionHtml(r)}</td>
+        <td>${products.length?`<div class="product-list">${products.map(productDisplay).join("")}</div>`:`<span class="muted">일치 제품 없음</span>`}</td>
+        <td>${orderedProducts.length?`<span class="badge ordered-badge">${orderedProducts.length}제품</span>`:`<span class="muted">-</span>`}</td>
+        <td>${esc(latest||"-")}</td>
+        <td>${badge(r)}</td>
+      </tr>`;
+    }).join(""):`<tr><td colspan="7" class="empty">등록된 특별관리물질이 없습니다.</td></tr>`;
+  }
   function renderMaster(){const list=filtered("masterSearch","masterStatus","masterType");$("masterList").innerHTML=list.length?list.map(r=>`<tr><td class="strong">${esc(r.name_ko)}</td><td>${esc(r.name_en||"-")}</td><td>${casHtml(r)}</td><td>${r.is_conditional?'조건부':'특별관리물질'}</td><td>${thresholdText(r)}${conditionHtml(r)}</td><td>${esc(r.effective_from||"-")}</td><td>${esc(r.effective_to||"-")}</td><td>${badge(r)}</td><td class="actions-cell"><button class="mini-btn" data-edit="${r.id}" type="button">수정</button><button class="mini-btn danger" data-delete="${r.id}" type="button">삭제</button></td></tr>`).join(""):`<tr><td colspan="9" class="empty">등록된 특별관리물질이 없습니다.</td></tr>`;}
 
-  async function load(){setMessage("기준정보를 불러오는 중입니다.");const {data,error}=await db.from("qa_special_substances").select("*, qa_special_substance_cas(id, cas_no, sort_order)").order("name_ko",{ascending:true});if(error){console.error(error);setMessage(`불러오기 실패: ${error.message}`,true);return;}rows=data||[];setMessage("");renderSummary();renderStatus();renderMaster();}
+  async function load(){
+    setMessage("기준정보를 불러오는 중입니다.");
+    const {data,error}=await db.from("qa_special_substances")
+      .select("*, qa_special_substance_cas(id, cas_no, sort_order)")
+      .order("name_ko",{ascending:true});
+    if(error){console.error(error);setMessage(`불러오기 실패: ${error.message}`,true);return;}
+    rows=data||[];
+    let matchError=null;
+    try{
+      await loadProductAndOrders();
+    }catch(error){
+      console.error("제품/발주 연동 실패",error);
+      matchError=error;
+    }
+    setMessage("");
+    renderSummary();renderStatus();renderMaster();
+    const notice=$("matchNotice");
+    if(notice){
+      notice.textContent=matchError
+        ? `기준정보는 정상입니다. 제품/발주 연동 실패: ${matchError?.message||"알 수 없는 오류"}`
+        : "CAS가 일치하는 시약 제품을 자동 연결하고, 실제 발주기록이 있는 제품은 가장 최근 발주일을 표시합니다.";
+      notice.classList.toggle("error",!!matchError);
+    }
+  }
   function setMessage(msg,error=false){const el=$("message");el.textContent=msg||"";el.classList.toggle("error",!!error);}
   function switchView(view){const master=view==="master";$("statusView").hidden=master;$("masterView").hidden=!master;$("statusViewBtn").classList.toggle("active",!master);$("masterViewBtn").classList.toggle("active",master);$("pageTitle").textContent=master?"특별관리물질 기준관리":"특별관리물질 현황";$("pageDesc").textContent=master?"법령 기준 특별관리물질의 등록·수정 및 제외 정보를 관리합니다.":"특별관리물질 기준정보와 제품 연계 현황을 관리합니다.";}
 
@@ -47,4 +162,3 @@
   $("statusViewBtn").addEventListener("click",()=>switchView("status"));$("masterViewBtn").addEventListener("click",()=>switchView("master"));$("newBtn").addEventListener("click",()=>openModal());$("addCasBtn").addEventListener("click",()=>addCasInput());$("conditionType").addEventListener("change",syncConditionalUI);$("thresholdType").addEventListener("change",syncThresholdUI);$("closeModal").addEventListener("click",closeModal);$("cancelBtn").addEventListener("click",closeModal);$("editModal").addEventListener("click",e=>{if(e.target===$("editModal"))closeModal();});$("editForm").addEventListener("submit",save);["statusSearch","statusFilter","statusType"].forEach(id=>$(id).addEventListener("input",renderStatus));["masterSearch","masterStatus","masterType"].forEach(id=>$(id).addEventListener("input",renderMaster));$("masterList").addEventListener("click",e=>{const editBtn=e.target.closest("[data-edit]");if(editBtn){const row=rows.find(r=>String(r.id)===editBtn.dataset.edit);if(row)openModal(row);return;}const deleteBtn=e.target.closest("[data-delete]");if(deleteBtn){const row=rows.find(r=>String(r.id)===deleteBtn.dataset.delete);if(row)deleteRow(row);}});
   switchView("status");load();
 })();
-
