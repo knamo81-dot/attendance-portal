@@ -103,7 +103,3 @@ tr:last-child td{border-bottom:0}
 .more-products{padding:6px 8px;border-radius:8px;background:#f8fafc;color:var(--muted);font-size:11px;font-weight:700;text-align:center}
 @media(max-width:760px){.order-controls,.custom-period{width:100%}.order-controls>.field,.custom-period .field{min-width:0;flex:1}.custom-period{flex-wrap:wrap}.date-sep{display:none}}
 
-
-
-/* 현황/기준관리 공통 요약카드 숨김 - DOM은 유지하여 JS 렌더링 영향 없음 */
-.summary{display:none}
