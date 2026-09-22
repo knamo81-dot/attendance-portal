@@ -38,6 +38,18 @@
               <option value="none">해당사항없음</option>
             </select>
           </div>
+          <div class="field year-filter-field">
+            <label for="sdsOrderYear">최종발주일</label>
+            <select id="sdsOrderYear">
+              <option value="all">전체</option>
+            </select>
+          </div>
+          <div class="field year-filter-field checked-year-field">
+            <label for="sdsCheckedExcludeYear">최종확인일</label>
+            <select id="sdsCheckedExcludeYear">
+              <option value="all">전체</option>
+            </select>
+          </div>
         </div>
 
         <div id="sdsMessage" class="message" aria-live="polite"></div>
@@ -184,4 +196,3 @@
   <script src="../common/common.js"></script>
 </body>
 </html>
-
