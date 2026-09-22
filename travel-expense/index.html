@@ -5025,7 +5025,8 @@
 
     const rows = await fetchMonthlyRows();
     updateProcessTable(rows);
-    // 내 제출내역 카드 렌더링은 loadMyRequests/refreshCards 단일 렌더러에서만 처리합니다.
+    // 기준년월 변경 시 처리내역과 내 제출내역을 동일한 출장일 기준 월로 동기화합니다.
+    updateCards(rows);
     return rows;
   }
 
@@ -6848,7 +6849,14 @@
     var res=await q;
     if(res.error){ console.warn('[TravelExpense] applicant refresh failed', res.error); return; }
     var rows=Array.isArray(res.data) ? res.data : [];
-    if(!rows.length){ box.innerHTML='<div class="notice empty-state">제출 내역이 없습니다.</div>'; return; }
+    // 내 제출내역도 상단 기준년월과 동일하게 출장일 기준으로 필터링합니다.
+    var monthInput=document.getElementById('processMonthFilter');
+    var selectedMonth=(monthInput && monthInput.value) ? monthInput.value : new Date().toISOString().slice(0,7);
+    rows=rows.filter(function(row){
+      var base=row.trip_date || row.request_date || row.created_at || '';
+      return String(base).slice(0,7) === selectedMonth;
+    });
+    if(!rows.length){ box.innerHTML='<div class="notice empty-state">선택한 월의 제출 내역이 없습니다.</div>'; return; }
     box.innerHTML=rows.map(function(row){
       var status=row.status||'검토대기';
       var menu='';
