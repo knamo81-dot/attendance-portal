@@ -1580,6 +1580,12 @@
       .preview-frame{height:100vh;min-height:100vh}
     }
   </style>
+
+<style id="admin-month-filter-final">
+  .admin-view .admin-toolbar{grid-template-columns:150px 170px 170px minmax(240px,1fr) !important;}
+  @media(max-width:900px){.admin-view .admin-toolbar{grid-template-columns:1fr 1fr !important;}}
+  @media(max-width:760px){.admin-view .admin-toolbar{grid-template-columns:1fr !important;}}
+</style>
 </head>
 <body>
   <div class="topbar">
@@ -2432,6 +2438,12 @@
         
 
         <div class="admin-toolbar">
+          <div>
+            <label>기준년월</label>
+            <select id="adminMonthFilter" onchange="adminFilterChanged()">
+              <option value="all">전체</option>
+            </select>
+          </div>
           <div>
             <label>정렬 기준</label>
             <select id="adminSort" onchange="adminSortChanged()">
@@ -5661,7 +5673,10 @@
   function filteredRows(){
     const q = String($('adminSearch')?.value || '').toLowerCase().trim();
     const st = $('adminStatusFilter')?.value || 'all';
+    const month = $('adminMonthFilter')?.value || 'all';
     let list = rows.filter(row => !['임시저장','수정요청'].includes(String(row.status || '')));
+    // 관리팀 기준년월은 출장자 입력 화면과 동일하게 출장일(trip_date) 기준으로 적용합니다.
+    if(month !== 'all') list = list.filter(row => String(row.trip_date || '').slice(0,7) === month);
     if(st !== 'all') list = list.filter(row => String(row.status || '') === st);
     if(q){
       list = list.filter(row => (`${row.applicant_name||''} ${row.division_name||''} ${row.team_name||''} ${row.trip_type||''} ${row.trip_date||''} ${row.transport||''} ${row.status||''}`).toLowerCase().includes(q));
@@ -5727,6 +5742,21 @@
     if(res.error){ console.error('[TravelExpense] admin list load failed', res.error); return; }
     rows = Array.isArray(res.data) ? res.data : [];
     window.__travelExpenseAdminRows = rows;
+    // 기준년월 목록 구성: 기본값은 현재 년월, 필요 시 전체 조회 가능.
+    const monthSelect = $('adminMonthFilter');
+    if(monthSelect){
+      const previous = monthSelect.dataset.initialized === '1' ? monthSelect.value : '';
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      const months = [...new Set(rows.map(r => String(r.trip_date || '').slice(0,7)).filter(v => /^\d{4}-\d{2}$/.test(v)))].sort().reverse();
+      if(!months.includes(currentMonth)) months.unshift(currentMonth);
+      monthSelect.innerHTML = '<option value="all">전체</option>' + months.map(m => {
+        const [y,mo] = m.split('-');
+        return `<option value="${m}">${y}년 ${mo}월</option>`;
+      }).join('');
+      monthSelect.value = previous && (previous === 'all' || months.includes(previous)) ? previous : currentMonth;
+      monthSelect.dataset.initialized = '1';
+    }
     renderAdminList();
     if(selectedId && rows.some(r=>r.id===selectedId)) selectAdminRequest(selectedId, {silent:true});
   }
