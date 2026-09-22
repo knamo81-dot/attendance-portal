@@ -111,6 +111,7 @@ tr:last-child td{border-bottom:0}
 #statusView .order-period-field{min-width:140px}
 #statusView .display-limit-field{min-width:120px}
 #statusView .custom-period{display:flex;align-items:flex-end;gap:8px}
+#statusView .custom-period[hidden]{display:none !important}
 #masterView .filters{flex-wrap:nowrap;align-items:flex-end}
 #masterView .filters .field.grow{flex:0 1 440px;min-width:280px}
 #masterView .filter-action{margin-left:auto;display:flex;align-items:flex-end}
