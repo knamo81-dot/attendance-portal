@@ -162,6 +162,14 @@ body {
   width: 110px;
 }
 
+.year-filter-field {
+  width: 126px;
+}
+
+.checked-year-field {
+  width: 138px;
+}
+
 .message {
   min-height: 0;
   margin-bottom: 8px;
@@ -458,7 +466,9 @@ body {
   }
 
   .search-field,
-  .status-field {
+  .status-field,
+  .year-filter-field,
+  .checked-year-field {
     width: 100%;
   }
 
