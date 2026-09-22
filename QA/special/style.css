@@ -103,3 +103,21 @@ tr:last-child td{border-bottom:0}
 .more-products{padding:6px 8px;border-radius:8px;background:#f8fafc;color:var(--muted);font-size:11px;font-weight:700;text-align:center}
 @media(max-width:760px){.order-controls,.custom-period{width:100%}.order-controls>.field,.custom-period .field{min-width:0;flex:1}.custom-period{flex-wrap:wrap}.date-sep{display:none}}
 
+
+
+/* 2026-09-22 필터 행 레이아웃 개선 */
+#statusView .filters{flex-wrap:nowrap;align-items:flex-end}
+#statusView .filters .field.grow{flex:0 1 440px;min-width:280px}
+#statusView .order-period-field{min-width:140px}
+#statusView .display-limit-field{min-width:120px}
+#statusView .custom-period{display:flex;align-items:flex-end;gap:8px}
+#masterView .filters{flex-wrap:nowrap;align-items:flex-end}
+#masterView .filters .field.grow{flex:0 1 440px;min-width:280px}
+#masterView .filter-action{margin-left:auto;display:flex;align-items:flex-end}
+#masterView .filter-action .btn{white-space:nowrap}
+@media(max-width:760px){
+  #statusView .filters,#masterView .filters{flex-wrap:wrap}
+  #statusView .filters .field,#statusView .filters .field.grow,#masterView .filters .field,#masterView .filters .field.grow{min-width:100%;max-width:none;flex:1 1 100%}
+  #statusView .custom-period{width:100%;flex-wrap:wrap}
+  #masterView .filter-action{width:100%;margin-left:0;justify-content:flex-end}
+}
