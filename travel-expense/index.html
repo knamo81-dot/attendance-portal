@@ -1582,9 +1582,28 @@
   </style>
 
 <style id="admin-month-filter-final">
-  .admin-view .admin-toolbar{grid-template-columns:150px 170px 170px minmax(240px,1fr) !important;}
-  @media(max-width:900px){.admin-view .admin-toolbar{grid-template-columns:1fr 1fr !important;}}
-  @media(max-width:760px){.admin-view .admin-toolbar{grid-template-columns:1fr !important;}}
+  /* 관리팀 검토 상단 필터: PC에서는 4개 항목을 한 줄에 배치하고 검색 영역을 가장 넓게 사용 */
+  .admin-view .admin-console-head .admin-toolbar{
+    display:grid !important;
+    grid-template-columns:150px 150px 160px minmax(320px,1fr) !important;
+    gap:10px !important;
+    align-items:end !important;
+  }
+  .admin-view .admin-console-head .admin-toolbar > div{min-width:0 !important;}
+  .admin-view .admin-console-head .admin-toolbar .admin-search-wrap{grid-column:auto !important;width:auto !important;}
+  .admin-view .admin-console-head .admin-toolbar select,
+  .admin-view .admin-console-head .admin-toolbar input{width:100% !important;}
+  @media(max-width:1050px){
+    .admin-view .admin-console-head .admin-toolbar{grid-template-columns:150px 150px 160px minmax(220px,1fr) !important;}
+  }
+  @media(max-width:900px){
+    .admin-view .admin-console-head .admin-toolbar{grid-template-columns:1fr 1fr !important;}
+    .admin-view .admin-console-head .admin-toolbar .admin-search-wrap{grid-column:1 / -1 !important;}
+  }
+  @media(max-width:760px){
+    .admin-view .admin-console-head .admin-toolbar{grid-template-columns:1fr !important;}
+    .admin-view .admin-console-head .admin-toolbar .admin-search-wrap{grid-column:auto !important;}
+  }
 </style>
 </head>
 <body>
