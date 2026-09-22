@@ -1,6 +1,6 @@
 (function () {
   const BUCKET = 'qa-sds-files';
-  const state = { products: [], query: '', status: 'all', selected: null, pdfFiles: [], pdfIndex: 0, pdfUrl: '', currentFileActions: [] };
+  const state = { products: [], query: '', status: 'all', orderYear: 'all', checkedExcludeYear: 'all', selected: null, pdfFiles: [], pdfIndex: 0, pdfUrl: '', currentFileActions: [] };
   const $ = (id) => document.getElementById(id);
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 
@@ -45,13 +45,39 @@
     return `<strong>${esc(product.name || '-')}</strong> · ${esc(product.maker || '-')} · ${esc(product.code || '-')} · ${esc(product.capacity || '-')}`;
   }
 
+  function yearOf(value) {
+    const match = String(value || '').match(/^(\d{4})/);
+    return match ? match[1] : '';
+  }
+
   function filtered() {
     const q = state.query.trim().toLowerCase();
     return state.products.filter((product) => {
       if (state.status !== 'all' && statusOf(product) !== state.status) return false;
+      // 발주연도는 화면의 최종발주일이 아니라 실제 전체 발주이력 중 해당 연도 주문 존재 여부로 판단한다.
+      if (state.orderYear !== 'all' && !(product.order_years || []).includes(state.orderYear)) return false;
+      // 선택한 연도에 이미 최종확인한 품목은 제외한다. 확인일이 없거나 다른 연도이면 조회 대상에 포함한다.
+      if (state.checkedExcludeYear !== 'all' && yearOf(product.sds_document?.last_checked_date) === state.checkedExcludeYear) return false;
       if (!q) return true;
       return [product.name, product.maker, product.code, product.cas].some((v) => String(v || '').toLowerCase().includes(q));
     });
+  }
+
+  function populateYearFilters() {
+    const currentYear = new Date().getFullYear();
+    const years = new Set([String(currentYear)]);
+    state.products.forEach((product) => {
+      (product.order_years || []).forEach((year) => years.add(String(year)));
+      const checkedYear = yearOf(product.sds_document?.last_checked_date);
+      if (checkedYear) years.add(checkedYear);
+    });
+    const sorted = Array.from(years).filter((y) => /^\d{4}$/.test(y)).sort((a, b) => Number(b) - Number(a));
+    const orderSelect = $('sdsOrderYear');
+    const checkedSelect = $('sdsCheckedExcludeYear');
+    orderSelect.innerHTML = '<option value="all">전체</option>' + sorted.map((y) => `<option value="${y}">${y}년</option>`).join('');
+    checkedSelect.innerHTML = '<option value="all">전체</option>' + sorted.map((y) => `<option value="${y}">${y}년 제외</option>`).join('');
+    orderSelect.value = state.orderYear;
+    checkedSelect.value = state.checkedExcludeYear;
   }
 
   function updateSummary() {
@@ -133,14 +159,22 @@
     const docByProduct = new Map(docs.map((d) => [Number(d.product_id), d]));
     const versionByDoc = new Map(versions.map((v) => [Number(v.sds_document_id), v]));
     const lastOrderByProduct = new Map();
+    const orderYearsByProduct = new Map();
     (ordersRes.data || []).forEach((row) => {
       const id = Number(row.product_id), cur = lastOrderByProduct.get(id);
       if (!cur || String(row.order_date) > String(cur)) lastOrderByProduct.set(id, row.order_date);
+      const year = yearOf(row.order_date);
+      if (year) {
+        const years = orderYearsByProduct.get(id) || new Set();
+        years.add(year);
+        orderYearsByProduct.set(id, years);
+      }
     });
     state.products = (productsRes.data || []).map((product) => {
       const doc = docByProduct.get(Number(product.id)) || null;
-      return { ...product, sds_document: doc, current_version: doc ? (versionByDoc.get(Number(doc.id)) || null) : null, last_order_date: lastOrderByProduct.get(Number(product.id)) || null };
+      return { ...product, sds_document: doc, current_version: doc ? (versionByDoc.get(Number(doc.id)) || null) : null, last_order_date: lastOrderByProduct.get(Number(product.id)) || null, order_years: Array.from(orderYearsByProduct.get(Number(product.id)) || []) };
     });
+    populateYearFilters();
     setMessage(''); render();
   }
 
@@ -598,6 +632,8 @@
   document.addEventListener('DOMContentLoaded', () => {
     $('sdsSearch').addEventListener('input', (e) => { state.query = e.target.value; render(); });
     $('sdsStatus').addEventListener('change', (e) => { state.status = e.target.value; render(); });
+    $('sdsOrderYear').addEventListener('change', (e) => { state.orderYear = e.target.value; render(); });
+    $('sdsCheckedExcludeYear').addEventListener('change', (e) => { state.checkedExcludeYear = e.target.value; render(); });
     $('sdsDownloadExcel').addEventListener('click', downloadExcel);
     $('sdsSave').addEventListener('click', saveSds);
     $('sdsAddFile').addEventListener('click', addFileRow);
@@ -695,4 +731,3 @@
 
   window.addEventListener('message', (e) => { if (e.data?.type === 'portal-tabs-request' || e.data?.type === 'portal-filters-request') notifyPortal(); });
 })();
-
