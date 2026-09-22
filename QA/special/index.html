@@ -46,16 +46,14 @@
                 <option value="conditional">조건부</option>
               </select>
             </div>
-          </div>
-          <div class="order-controls">
-            <div class="field"><label for="orderPeriod">발주기간</label><select id="orderPeriod">
+            <div class="field order-period-field"><label for="orderPeriod">발주기간</label><select id="orderPeriod">
               <option value="all">전체</option><option value="1y" selected>최근 1년</option><option value="3y">최근 3년</option><option value="5y">최근 5년</option><option value="custom">직접설정</option>
             </select></div>
             <div class="custom-period" id="customPeriod" hidden>
               <div class="field"><label for="orderStartDate">시작일</label><input id="orderStartDate" type="date" /></div><span class="date-sep">~</span>
               <div class="field"><label for="orderEndDate">종료일</label><input id="orderEndDate" type="date" /></div>
             </div>
-            <div class="field"><label for="displayLimit">표시건수</label><select id="displayLimit">
+            <div class="field display-limit-field"><label for="displayLimit">표시건수</label><select id="displayLimit">
               <option value="10" selected>10개</option><option value="20">20개</option><option value="30">30개</option><option value="all">전체</option>
             </select></div>
           </div>
@@ -75,11 +73,6 @@
         </section>
 
         <section id="masterView" hidden>
-          <div class="section-head">
-            <div></div>
-            <button class="btn primary" id="newBtn" type="button">신규 입력</button>
-          </div>
-
         <div class="summary">
           <div class="tile"><span class="k">전체 물질</span><span class="v" id="totalCount">0종</span></div>
           <div class="tile"><span class="k">적용중</span><span class="v" id="activeCount">0종</span></div>
@@ -109,6 +102,7 @@
                 <option value="conditional">조건부</option>
               </select>
             </div>
+            <div class="filter-action"><button class="btn primary" id="newBtn" type="button">신규 입력</button></div>
           </div>
 
           <div id="message" class="message" aria-live="polite"></div>
