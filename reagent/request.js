@@ -269,6 +269,21 @@ window.ReagentApp.request = {
     return list.length ? list.join(", ") : (product.cas || "");
   },
 
+  renderCasLines(value = "") {
+    const items = String(value || "")
+      .split(/[,\n]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (!items.length) return "-";
+    return [...new Set(items)].map((item) => this.html(item)).join("<br>");
+  },
+
+  renderProductCasLines(product = {}) {
+    const list = this.productCasMap[String(product.id)] || product.cas_list || [];
+    if (list.length) return [...new Set(list)].map((casNo) => this.html(casNo)).join("<br>");
+    return this.renderCasLines(product.cas || "");
+  },
+
   filterProductMasterRows(rows = []) {
     const { els } = window.ReagentApp;
     const keyword = (els.searchInput?.value || "").trim().toLowerCase();
@@ -427,7 +442,7 @@ window.ReagentApp.request = {
           <span>${this.html(p.maker)}</span>
           <span>${this.html(p.code)}</span>
           <span>${this.html(p.capacity)}</span>
-          <span>${this.html(this.getProductCasDisplay(p))}</span>
+          <span>${this.renderProductCasLines(p)}</span>
           <span>${this.html(p.grade)}</span>
         </div>
       </div>
@@ -1990,7 +2005,7 @@ window.ReagentApp.request = {
             <div class="request-mobile-spec">
               <span>구분</span><b>${this.html(group.category || "-")}</b>
               <span>제품코드</span><b>${this.html(group.code || "-")}</b>
-              <span>CAS</span><b>${this.html(group.cas || "-")}</b>
+              <span>CAS</span><b>${this.renderCasLines(group.cas)}</b>
               <span>등급/규격</span><b>${this.html([group.grade, group.capacity].filter(Boolean).join(" / ") || "-")}</b>
               <span>용도</span><b>${this.html(group.entries.map((e) => e.usage).filter(Boolean).join(" / ") || "-")}</b>
             </div>
@@ -2105,7 +2120,7 @@ window.ReagentApp.request = {
           <td>${this.html(group.name)}</td>
           <td>${this.html(group.maker)}</td>
           <td>${this.html(group.code)}</td>
-          <td>${this.html(group.cas)}</td>
+          <td>${this.renderCasLines(group.cas)}</td>
           <td>${this.html(group.grade)}</td>
           <td>${this.html(group.capacity)}</td>
           <td>
