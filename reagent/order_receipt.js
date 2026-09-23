@@ -96,6 +96,7 @@
     dragMode: "add",
     showUnreceived: false,
     initialized: false,
+    productCasMap: {},
     remoteFailed: false,
     remoteEnabled: true,
     autoRefreshTimer: null,
@@ -143,6 +144,7 @@
 
       return {
         id: row.id || "",
+        product_id: Number(row.product_id || meta.product_id || meta.productId || 0) || null,
         recordKey: row.id ? `id:${row.id}` : `${orderMonth}__${row.item_key || ""}`,
         item_key: row.item_key || "",
         order_month: orderMonth,
@@ -165,6 +167,20 @@
       };
     },
 
+    async loadProductCasMap(rows = []) {
+      const sb = APP.sb;
+      const ids = [...new Set((rows || []).map((r) => Number(r.product_id || 0)).filter((id) => id > 0))];
+      this.productCasMap = {};
+      if (!sb || !ids.length) return;
+      const { data, error } = await sb.from("product_cas").select("id, product_id, cas_no, sort_order").in("product_id", ids).order("sort_order", { ascending: true }).order("id", { ascending: true });
+      if (error) { console.warn("발주/입고 제품 CAS 조회 실패:", error); return; }
+      (data || []).forEach((item) => {
+        const key = String(item.product_id);
+        this.productCasMap[key] = this.productCasMap[key] || [];
+        if (item.cas_no && !this.productCasMap[key].includes(item.cas_no)) this.productCasMap[key].push(item.cas_no);
+      });
+    },
+
     async loadRowsFromServer() {
       const sb = APP.sb;
       if (!sb || this.remoteFailed || !this.remoteEnabled) return [];
@@ -174,9 +190,15 @@
         query = APP.scopedCompanyQuery ? APP.scopedCompanyQuery(query) : query;
         const { data, error } = await query;
         if (error) throw error;
-        return (Array.isArray(data) ? data : [])
+        const rows = (Array.isArray(data) ? data : [])
           .map((row) => this.normalizeServerRow(row))
           .filter((row) => row.item_key || row.id);
+        await this.loadProductCasMap(rows);
+        rows.forEach((row) => {
+          const list = this.productCasMap[String(row.product_id)] || [];
+          if (list.length) row.cas = list.join(", ");
+        });
+        return rows;
       } catch (error) {
         console.warn("발주/입고 목록 서버 조회 실패:", error);
         // 자동 갱신 중 일시 오류가 발생해도 다음 주기에 다시 시도합니다.
