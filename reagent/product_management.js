@@ -631,6 +631,14 @@ window.ReagentApp.productManagement = {
     if (!ok) return;
 
     const user = this.getCurrentUser();
+    const category = this.getProductEditValue("pmEditProductCategory");
+    const casResult = category === "시약" ? this.collectProductCasRows() : { items: [] };
+    if (casResult.error) {
+      this.toast(casResult.error, "warn");
+      return;
+    }
+    const casItems = casResult.items || [];
+
     const row = {
       employee_no: employeeNo,
       name: employee.name || "",
@@ -823,7 +831,6 @@ window.ReagentApp.productManagement = {
             <div class="field"><label>제조사</label><input id="pmEditProductMaker" placeholder="제조사"/></div>
             <div class="field"><label>제품코드</label><input id="pmEditProductCode" placeholder="제품코드"/></div>
             <div class="field"><label>규격</label><input id="pmEditProductCapacity" placeholder="규격"/></div>
-            <div class="field"><label>CAS</label><input id="pmEditProductCas" placeholder="CAS"/></div>
             <div class="field"><label>등급</label><input id="pmEditProductGrade" placeholder="등급"/></div>
             <div class="field"><label>기본거래처</label><input id="pmEditProductDefaultVendor" placeholder="거래처"/></div>
             <div class="field">
@@ -845,6 +852,19 @@ window.ReagentApp.productManagement = {
               </select>
             </div>
           </div>
+          <div class="pm-cas-section" id="pmEditProductCasSection">
+            <div class="pm-cas-section-head">
+              <div>
+                <label>구성 화학물질 (CAS / 함유량)</label>
+                <div class="small">시약의 SDS 기준 CAS No.와 함유량(%)을 입력하세요. 함유량을 모르면 비워둘 수 있습니다.</div>
+              </div>
+              <button type="button" class="btn" id="pmAddProductCas">+ CAS 추가</button>
+            </div>
+            <div class="pm-cas-columns" aria-hidden="true">
+              <span>CAS No.</span><span>함유량(%)</span><span></span>
+            </div>
+            <div id="pmEditProductCasRows" class="pm-cas-rows"></div>
+          </div>
           <div class="field" style="margin-top:12px;">
             <label>비고</label>
             <input id="pmEditProductMemo" placeholder="비고"/>
@@ -864,8 +884,111 @@ window.ReagentApp.productManagement = {
     modal.querySelector("#pmCloseProductEditModal")?.addEventListener("click", close);
     modal.querySelector("#pmCancelProductEdit")?.addEventListener("click", close);
     modal.querySelector("#pmSaveProductEdit")?.addEventListener("click", () => this.saveProductEditFromModal());
+    modal.querySelector("#pmAddProductCas")?.addEventListener("click", () => this.addProductCasRow());
+    modal.querySelector("#pmEditProductCategory")?.addEventListener("change", () => this.updateProductCasSectionVisibility());
 
     return modal;
+  },
+
+
+  updateProductCasSectionVisibility() {
+    const section = document.getElementById("pmEditProductCasSection");
+    if (!section) return;
+    const category = this.getProductEditValue("pmEditProductCategory");
+    section.style.display = category === "시약" ? "block" : "none";
+  },
+
+  addProductCasRow(item = {}) {
+    const rows = document.getElementById("pmEditProductCasRows");
+    if (!rows) return;
+
+    const row = document.createElement("div");
+    row.className = "pm-cas-row";
+    row.innerHTML = `
+      <input class="pm-cas-no" placeholder="예: 64-17-5" value="${this.html(item.cas_no || "")}" />
+      <div class="pm-cas-content-range">
+        <input class="pm-cas-min" type="number" min="0" max="100" step="0.0001" placeholder="최소" value="${this.html(item.content_min ?? "")}" />
+        <span>~</span>
+        <input class="pm-cas-max" type="number" min="0" max="100" step="0.0001" placeholder="최대" value="${this.html(item.content_max ?? "")}" />
+        <span>%</span>
+      </div>
+      <button type="button" class="btn pm-cas-remove" aria-label="CAS 삭제">삭제</button>
+    `;
+    row.querySelector(".pm-cas-remove")?.addEventListener("click", () => row.remove());
+    rows.appendChild(row);
+  },
+
+  async loadProductCasRows(productId, fallbackCas = "") {
+    const rows = document.getElementById("pmEditProductCasRows");
+    if (!rows) return;
+    rows.innerHTML = "";
+
+    if (!this.sb || !productId) {
+      if (fallbackCas) this.addProductCasRow({ cas_no: fallbackCas });
+      else this.addProductCasRow();
+      return;
+    }
+
+    const { data, error } = await this.sb
+      .from("product_cas")
+      .select("id, product_id, cas_no, content_min, content_max, sort_order")
+      .eq("product_id", productId)
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: true });
+
+    if (error) {
+      console.error("제품 CAS 조회 실패:", error);
+      this.toast(`CAS 정보 조회 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      if (fallbackCas) this.addProductCasRow({ cas_no: fallbackCas });
+      else this.addProductCasRow();
+      return;
+    }
+
+    const items = Array.isArray(data) ? data : [];
+    if (items.length) items.forEach((item) => this.addProductCasRow(item));
+    else if (fallbackCas) this.addProductCasRow({ cas_no: fallbackCas });
+    else this.addProductCasRow();
+  },
+
+  collectProductCasRows() {
+    const rows = [...document.querySelectorAll("#pmEditProductCasRows .pm-cas-row")];
+    const items = [];
+
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index];
+      const casNo = String(row.querySelector(".pm-cas-no")?.value || "").trim();
+      const minRaw = String(row.querySelector(".pm-cas-min")?.value || "").trim();
+      const maxRaw = String(row.querySelector(".pm-cas-max")?.value || "").trim();
+
+      if (!casNo && !minRaw && !maxRaw) continue;
+      if (!casNo) return { error: `${index + 1}번째 CAS No.를 입력하세요.` };
+
+      const contentMin = minRaw === "" ? null : Number(minRaw);
+      const contentMax = maxRaw === "" ? null : Number(maxRaw);
+      if ((contentMin !== null && (!Number.isFinite(contentMin) || contentMin < 0 || contentMin > 100)) ||
+          (contentMax !== null && (!Number.isFinite(contentMax) || contentMax < 0 || contentMax > 100))) {
+        return { error: `${casNo}의 함유량은 0~100 사이로 입력하세요.` };
+      }
+      if (contentMin !== null && contentMax !== null && contentMin > contentMax) {
+        return { error: `${casNo}의 최소 함유량이 최대 함유량보다 클 수 없습니다.` };
+      }
+
+      items.push({ cas_no: casNo, content_min: contentMin, content_max: contentMax, sort_order: items.length + 1 });
+    }
+
+    const normalized = items.map((item) => item.cas_no.toLowerCase());
+    if (new Set(normalized).size !== normalized.length) return { error: "같은 CAS No.를 중복 등록할 수 없습니다." };
+    return { items };
+  },
+
+  async replaceProductCasRows(productId, items = []) {
+    const { error: deleteError } = await this.sb.from("product_cas").delete().eq("product_id", productId);
+    if (deleteError) throw deleteError;
+    if (!items.length) return;
+
+    const payload = items.map((item) => ({ product_id: productId, ...item }));
+    const { error: insertError } = await this.sb.from("product_cas").insert(payload);
+    if (insertError) throw insertError;
   },
 
   setProductEditValue(id, value) {
@@ -877,7 +1000,7 @@ window.ReagentApp.productManagement = {
     return String(document.getElementById(id)?.value || "").trim();
   },
 
-  openProductEditModal(id) {
+  async openProductEditModal(id) {
     const product = this.products.find((p) => Number(p.id) === Number(id));
     if (!product) {
       this.toast("수정할 제품을 찾지 못했습니다.", "warn");
@@ -892,12 +1015,13 @@ window.ReagentApp.productManagement = {
     this.setProductEditValue("pmEditProductMaker", product.maker || "");
     this.setProductEditValue("pmEditProductCode", product.code || "");
     this.setProductEditValue("pmEditProductCapacity", product.capacity || "");
-    this.setProductEditValue("pmEditProductCas", product.cas || "");
     this.setProductEditValue("pmEditProductGrade", product.grade || "");
     this.setProductEditValue("pmEditProductDefaultVendor", product.default_vendor || "");
     this.setProductEditValue("pmEditProductDefaultVendorReason", product.default_vendor_reason || "");
     this.setProductEditValue("pmEditProductMemo", product.memo || "");
     this.setProductEditValue("pmEditProductIsActive", product.is_active === false ? "false" : "true");
+    this.updateProductCasSectionVisibility();
+    await this.loadProductCasRows(product.id, product.cas || "");
 
     modal.classList.add("show");
     setTimeout(() => document.getElementById("pmEditProductName")?.focus(), 0);
@@ -916,13 +1040,22 @@ window.ReagentApp.productManagement = {
     }
 
     const user = this.getCurrentUser();
+    const category = this.getProductEditValue("pmEditProductCategory");
+    const casResult = category === "시약" ? this.collectProductCasRows() : { items: [] };
+    if (casResult.error) {
+      this.toast(casResult.error, "warn");
+      return;
+    }
+    const casItems = casResult.items || [];
+
     const row = {
       category: this.getProductEditValue("pmEditProductCategory"),
       name: this.getProductEditValue("pmEditProductName"),
       maker: this.getProductEditValue("pmEditProductMaker"),
       code: this.getProductEditValue("pmEditProductCode"),
       capacity: this.getProductEditValue("pmEditProductCapacity"),
-      cas: this.getProductEditValue("pmEditProductCas"),
+      // 기존 QA/SDS 등 product_master.cas를 사용하는 화면과의 호환을 위해 첫 번째 CAS를 동기화합니다.
+      cas: category === "시약" ? (casItems[0]?.cas_no || "") : (this.products.find((p) => Number(p.id) === id)?.cas || ""),
       grade: this.getProductEditValue("pmEditProductGrade"),
       default_vendor: this.getProductEditValue("pmEditProductDefaultVendor"),
       default_vendor_reason: this.getProductEditValue("pmEditProductDefaultVendorReason"),
@@ -963,8 +1096,18 @@ window.ReagentApp.productManagement = {
       return;
     }
 
+    if (row.category === "시약") {
+      try {
+        await this.replaceProductCasRows(id, casItems);
+      } catch (casError) {
+        console.error("제품 CAS 저장 실패:", casError);
+        this.toast(`제품 기본정보는 수정되었지만 CAS 저장에 실패했습니다: ${casError.message || "원인을 확인하세요."}`, "warn");
+        return;
+      }
+    }
+
     document.getElementById("pmProductEditModal")?.classList.remove("show");
-    this.toast("제품 정보가 수정되었습니다.", "success");
+    this.toast("제품 정보와 CAS 구성정보가 수정되었습니다.", "success");
     this.resetProductForm?.();
     await this.loadProducts();
     window.ReagentApp.request?.loadProductMaster?.(true);
@@ -1629,6 +1772,14 @@ window.ReagentApp.productManagement = {
     }
 
     const user = this.getCurrentUser();
+    const category = this.getProductEditValue("pmEditProductCategory");
+    const casResult = category === "시약" ? this.collectProductCasRows() : { items: [] };
+    if (casResult.error) {
+      this.toast(casResult.error, "warn");
+      return;
+    }
+    const casItems = casResult.items || [];
+
     const row = {
       category: this.getRequestEditValue("pmReqCategory"),
       name: this.getRequestEditValue("pmReqName"),
