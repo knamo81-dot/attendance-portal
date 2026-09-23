@@ -50,6 +50,28 @@ window.ReagentApp.productManagement = {
     return companyId ? query.eq("company_id", companyId) : query;
   },
 
+  async refreshLinkedProductViews() {
+    const request = window.ReagentApp.request;
+
+    if (request?.loadProductMaster) {
+      try {
+        await request.loadProductMaster(true);
+      } catch (error) {
+        console.warn("연결 화면 제품/CAS 새로고침 실패:", error);
+      }
+    }
+
+    request?.renderRequest?.();
+    window.ReagentApp.collect?.renderCollect?.();
+    window.ReagentApp.collect?.renderPrepare?.();
+
+    try {
+      await window.ReagentApp.orderReceipt?.refresh?.({ silent: true });
+    } catch (error) {
+      console.warn("발주/입고 CAS 새로고침 실패:", error);
+    }
+  },
+
   html(value) {
     return window.ReagentApp.escapeHtml
       ? window.ReagentApp.escapeHtml(value)
@@ -1163,7 +1185,7 @@ window.ReagentApp.productManagement = {
     this.toast("제품 정보와 CAS 구성정보가 수정되었습니다.", "success");
     this.resetProductForm?.();
     await this.loadProducts();
-    window.ReagentApp.request?.loadProductMaster?.(true);
+    await this.refreshLinkedProductViews();
   },
 
 
@@ -1268,7 +1290,7 @@ window.ReagentApp.productManagement = {
       this.toast(this.editingProductId ? "제품 정보가 수정되었습니다." : "제품이 등록되었습니다.", "success");
       this.resetProductForm();
       await this.loadProducts();
-      window.ReagentApp.request?.loadProductMaster?.(true);
+      await this.refreshLinkedProductViews();
     } catch (error) {
       console.error("제품 저장 실패:", error);
       this.toast(`제품 저장 실패: ${error.message || "원인을 확인하세요."}`, "warn");
@@ -1542,7 +1564,7 @@ window.ReagentApp.productManagement = {
 
       this.toast(`제품 마스터 ${insertRows.length}건을 등록했습니다.`, "success");
       await this.loadProducts();
-      window.ReagentApp.request?.loadProductMaster?.(true);
+      await this.refreshLinkedProductViews();
     } catch (error) {
       console.error("제품 마스터 엑셀 업로드 실패:", error);
       this.toast(`엑셀 업로드 실패: ${error.message || "파일 형식과 컬럼명을 확인하세요."}`, "warn");
@@ -1591,7 +1613,7 @@ window.ReagentApp.productManagement = {
     this.toast("제품이 사용중지 처리되었습니다.", "success");
     this.resetProductForm();
     await this.loadProducts();
-    window.ReagentApp.request?.loadProductMaster?.(true);
+    await this.refreshLinkedProductViews();
   },
 
   async loadRequests() {
@@ -1964,7 +1986,7 @@ window.ReagentApp.productManagement = {
       this.toast("제품 마스터 등록 및 요청 처리가 완료되었습니다.", "success");
       await Promise.all([this.loadProducts(), this.loadRequests()]);
       await this.refreshLinkedRequestStatus();
-      window.ReagentApp.request?.loadProductMaster?.(true);
+      await this.refreshLinkedProductViews();
     } catch (error) {
       console.error("요청 승인 실패:", error);
       this.toast(`요청 승인 실패: ${error.message || "원인을 확인하세요."}`, "warn");
