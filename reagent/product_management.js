@@ -2,6 +2,7 @@ window.ReagentApp = window.ReagentApp || {};
 
 window.ReagentApp.productManagement = {
   products: [],
+  productCasMap: {},
   requests: [],
   editingProductId: null,
   activeRequestStatus: "",
@@ -722,7 +723,58 @@ window.ReagentApp.productManagement = {
     }
 
     this.products = Array.isArray(data) ? data : [];
+    await this.loadProductCasMap();
     this.renderProducts();
+  },
+
+  async loadProductCasMap() {
+    this.productCasMap = {};
+    if (!this.sb) return;
+
+    const reagentIds = this.products
+      .filter((product) => product.category === "시약")
+      .map((product) => Number(product.id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+
+    if (!reagentIds.length) return;
+
+    const { data, error } = await this.sb
+      .from("product_cas")
+      .select("product_id, cas_no, sort_order, id")
+      .in("product_id", reagentIds)
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: true });
+
+    if (error) {
+      console.error("제품 CAS 목록 조회 실패:", error);
+      this.toast(`제품 CAS 목록 조회 실패: ${error.message || "원인을 확인하세요."}`, "warn");
+      return;
+    }
+
+    (Array.isArray(data) ? data : []).forEach((item) => {
+      const productId = Number(item.product_id);
+      const casNo = String(item.cas_no || "").trim();
+      if (!productId || !casNo) return;
+      if (!this.productCasMap[productId]) this.productCasMap[productId] = [];
+      this.productCasMap[productId].push(casNo);
+    });
+  },
+
+  getProductCasNumbers(product = {}) {
+    if (product.category !== "시약") {
+      return product.cas ? [String(product.cas).trim()] : [];
+    }
+
+    const rows = this.productCasMap?.[Number(product.id)] || [];
+    if (rows.length) return rows;
+
+    return product.cas ? [String(product.cas).trim()] : [];
+  },
+
+  renderProductCasCell(product = {}) {
+    const casNumbers = this.getProductCasNumbers(product);
+    if (!casNumbers.length) return "";
+    return casNumbers.map((casNo) => this.html(casNo)).join("<br>");
   },
 
   getFilteredProducts() {
@@ -732,7 +784,8 @@ window.ReagentApp.productManagement = {
     const active = els.productActive?.value || "";
 
     return this.products.filter((p) => {
-      const text = [p.category, p.name, p.maker, p.code, p.capacity, p.cas, p.grade, p.default_vendor, p.default_vendor_reason, p.memo]
+      const casSearchText = this.getProductCasNumbers(p).join(" ");
+      const text = [p.category, p.name, p.maker, p.code, p.capacity, casSearchText, p.grade, p.default_vendor, p.default_vendor_reason, p.memo]
         .join(" ")
         .toLowerCase();
 
@@ -783,7 +836,7 @@ window.ReagentApp.productManagement = {
         <td>${this.html(p.maker)}</td>
         <td>${this.html(p.code)}</td>
         <td>${this.html(p.capacity)}</td>
-        <td>${this.html(p.cas)}</td>
+        <td>${this.renderProductCasCell(p)}</td>
         <td>${this.html(p.grade)}</td>
         <td>${this.html(p.default_vendor)}</td>
         <td>${this.html(p.default_vendor_reason || "")}</td>
