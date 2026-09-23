@@ -258,6 +258,13 @@ window.ReagentApp.collect = {
       : null;
   },
 
+  getCasDisplayForGroup(group = {}) {
+    const request = window.ReagentApp.request;
+    const productId = Number(group.product_id || this.getProductIdForCollectKey(group.key) || 0);
+    const list = request?.productCasMap?.[String(productId)] || [];
+    return list.length ? list.join(", ") : (group.cas || "");
+  },
+
   async upsertCollectItem(key, collectedQty, extra = {}) {
     const sb = window.ReagentApp.sb;
     if (!sb) throw new Error("Supabase 연결 정보가 없습니다.");
@@ -1975,7 +1982,7 @@ if (els.count) els.count.textContent = String(rows.length);
         <td class="txt">${this.html(row.name)}</td>
         <td class="txt">${this.html(row.maker)}</td>
         <td class="txt">${this.html(row.code)}</td>
-        <td class="txt">${this.html(row.cas)}</td>
+        <td class="txt">${this.html(this.getCasDisplayForGroup(row))}</td>
         <td class="txt">${this.html(row.grade)}</td>
         <td class="txt">${this.html(row.capacity)}</td>
         <td class="num">${this.formatNumber(row.qty)}</td>
@@ -2248,7 +2255,7 @@ if (els.count) els.count.textContent = String(rows.length);
           <td class="collect-name-cell">${escapeHtml(group.name)} ${confirmedBadge}</td>
           <td>${escapeHtml(group.maker)}</td>
           <td>${escapeHtml(group.code)}</td>
-          <td>${escapeHtml(group.cas)}</td>
+          <td>${escapeHtml(this.getCasDisplayForGroup(group))}</td>
           <td>${escapeHtml(group.grade)}</td>
           <td>${escapeHtml(group.capacity)}</td>
           <td>
