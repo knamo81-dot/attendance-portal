@@ -284,6 +284,19 @@ window.ReagentApp.request = {
     return this.renderCasLines(product.cas || "");
   },
 
+  getGroupCasDisplay(group = {}) {
+    const entryProductId = Array.isArray(group.entries)
+      ? Number(group.entries.find((entry) => Number(entry?.product_id || 0) > 0)?.product_id || 0)
+      : 0;
+    const productId = Number(group.product_id || entryProductId || 0);
+    const list = this.productCasMap[String(productId)] || [];
+    return list.length ? list.join(", ") : (group.cas || "");
+  },
+
+  renderGroupCasLines(group = {}) {
+    return this.renderCasLines(this.getGroupCasDisplay(group));
+  },
+
   filterProductMasterRows(rows = []) {
     const { els } = window.ReagentApp;
     const keyword = (els.searchInput?.value || "").trim().toLowerCase();
@@ -380,6 +393,8 @@ window.ReagentApp.request = {
     document.documentElement.classList.add("search-modal-open");
     els.searchModal.classList.add("show");
 
+    // 제품관리에서 CAS가 변경된 경우 제품검색을 열 때 항상 최신 product_cas를 다시 읽습니다.
+    await this.loadProductMaster(true);
     await this.populateMakerOptions();
     this.renderSearchResults();
     setTimeout(() => {
@@ -2005,7 +2020,7 @@ window.ReagentApp.request = {
             <div class="request-mobile-spec">
               <span>구분</span><b>${this.html(group.category || "-")}</b>
               <span>제품코드</span><b>${this.html(group.code || "-")}</b>
-              <span>CAS</span><b>${this.renderCasLines(group.cas)}</b>
+              <span>CAS</span><b>${this.renderGroupCasLines(group)}</b>
               <span>등급/규격</span><b>${this.html([group.grade, group.capacity].filter(Boolean).join(" / ") || "-")}</b>
               <span>용도</span><b>${this.html(group.entries.map((e) => e.usage).filter(Boolean).join(" / ") || "-")}</b>
             </div>
@@ -2120,7 +2135,7 @@ window.ReagentApp.request = {
           <td>${this.html(group.name)}</td>
           <td>${this.html(group.maker)}</td>
           <td>${this.html(group.code)}</td>
-          <td>${this.renderCasLines(group.cas)}</td>
+          <td>${this.renderGroupCasLines(group)}</td>
           <td>${this.html(group.grade)}</td>
           <td>${this.html(group.capacity)}</td>
           <td>
