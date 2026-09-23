@@ -1929,11 +1929,21 @@ window.ReagentApp.productManagement = {
 
       if (!canApprove) return;
 
-      const { error: insertError } = await this.sb
+      const { data: insertedProduct, error: insertError } = await this.sb
         .from("product_master")
-        .insert(this.withCompanyPayload(productRow));
+        .insert(this.withCompanyPayload(productRow))
+        .select("id")
+        .single();
 
       if (insertError) throw insertError;
+
+      const initialCas = String(request.cas || "").trim();
+      if (initialCas && insertedProduct?.id) {
+        const { error: casInsertError } = await this.sb
+          .from("product_cas")
+          .insert({ product_id: insertedProduct.id, cas_no: initialCas, sort_order: 1 });
+        if (casInsertError) throw casInsertError;
+      }
 
       const approveUpdateQuery = this.scopedCompanyQuery(
         this.sb
