@@ -6,6 +6,7 @@ window.ReagentApp.request = {
   collectedMeta: {},
   productMasterRows: [],
   productMasterLoadedAt: 0,
+  productCasMap: {},
   myRegistrationRequests: [],
   activeRequestPanel: "list",
 
@@ -235,10 +236,37 @@ window.ReagentApp.request = {
       this.productMasterRows = this.mockProducts.map((row) => this.normalizeProductRow(row));
     } else {
       this.productMasterRows = (data || []).map((row) => this.normalizeProductRow(row));
+      await this.loadProductCasMap();
     }
 
     this.productMasterLoadedAt = now;
     return this.productMasterRows;
+  },
+
+  async loadProductCasMap() {
+    const sb = window.ReagentApp.sb;
+    const ids = (this.productMasterRows || []).filter((p) => p.category === "시약" && Number(p.id) > 0).map((p) => Number(p.id));
+    this.productCasMap = {};
+    if (!sb || !ids.length) return this.productCasMap;
+    let query = sb.from("product_cas").select("id, product_id, cas_no, sort_order").in("product_id", ids).order("sort_order", { ascending: true }).order("id", { ascending: true });
+    const { data, error } = await query;
+    if (error) { console.warn("제품 CAS 조회 실패:", error); return this.productCasMap; }
+    (data || []).forEach((row) => {
+      const key = String(row.product_id);
+      this.productCasMap[key] = this.productCasMap[key] || [];
+      if (row.cas_no && !this.productCasMap[key].includes(row.cas_no)) this.productCasMap[key].push(row.cas_no);
+    });
+    (this.productMasterRows || []).forEach((p) => {
+      const list = this.productCasMap[String(p.id)] || [];
+      p.cas_list = list;
+      p.cas_display = list.length ? list.join(", ") : (p.cas || "");
+    });
+    return this.productCasMap;
+  },
+
+  getProductCasDisplay(product = {}) {
+    const list = this.productCasMap[String(product.id)] || product.cas_list || [];
+    return list.length ? list.join(", ") : (product.cas || "");
   },
 
   filterProductMasterRows(rows = []) {
@@ -252,7 +280,7 @@ window.ReagentApp.request = {
 
     if (keyword) {
       results = results.filter((p) =>
-        [p.category, p.name, p.maker, p.code, p.capacity, p.cas, p.grade, p.default_vendor, p.default_vendor_reason, p.memo]
+        [p.category, p.name, p.maker, p.code, p.capacity, this.getProductCasDisplay(p), p.grade, p.default_vendor, p.default_vendor_reason, p.memo]
           .join(" ")
           .toLowerCase()
           .includes(keyword)
@@ -399,7 +427,7 @@ window.ReagentApp.request = {
           <span>${this.html(p.maker)}</span>
           <span>${this.html(p.code)}</span>
           <span>${this.html(p.capacity)}</span>
-          <span>${this.html(p.cas)}</span>
+          <span>${this.html(this.getProductCasDisplay(p))}</span>
           <span>${this.html(p.grade)}</span>
         </div>
       </div>
@@ -423,7 +451,7 @@ window.ReagentApp.request = {
     setValue(els.maker, product.maker || "");
     setValue(els.code, product.code || "");
     setValue(els.capacity, product.capacity || "");
-    setValue(els.cas, product.cas || "");
+    setValue(els.cas, this.getProductCasDisplay(product));
     setValue(els.grade, product.grade || "");
 
     // 제품마스터의 기본거래처/선정사유를 신청 저장 시 함께 넘기기 위해 보관합니다.
@@ -1246,7 +1274,6 @@ window.ReagentApp.request = {
       String(product.maker || "") === String(els.maker?.value || "") &&
       String(product.code || "") === String(els.code?.value || "") &&
       String(product.capacity || "") === String(els.capacity?.value || "") &&
-      String(product.cas || "") === String(els.cas?.value || "") &&
       String(product.grade || "") === String(els.grade?.value || "")
     ) || {};
     const defaultVendor = String(selectedProduct.default_vendor || matchedProduct.default_vendor || "").trim();
@@ -1255,6 +1282,7 @@ window.ReagentApp.request = {
     const currentUser = this.getCurrentUser();
 
     const row = {
+      product_id: Number(selectedProduct.id || matchedProduct.id || 0) || null,
       order_month: orderMonth,
       category: els.category?.value || "",
       name: productName,
@@ -1663,6 +1691,7 @@ window.ReagentApp.request = {
       if (!grouped[key]) {
         grouped[key] = {
           key,
+          product_id: Number(row.product_id || 0) || null,
           order_month: orderMonth,
           category: row.category || "",
           name: row.name || "",
