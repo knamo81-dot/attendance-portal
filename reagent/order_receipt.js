@@ -181,6 +181,15 @@
       });
     },
 
+    renderCasLines(value = "") {
+      const items = String(value || "")
+        .split(/[,\n]+/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (!items.length) return "-";
+      return [...new Set(items)].map((item) => escapeHtml(item)).join("<br>");
+    },
+
     async loadRowsFromServer() {
       const sb = APP.sb;
       if (!sb || this.remoteFailed || !this.remoteEnabled) return [];
@@ -628,7 +637,7 @@
               <div class="order-receipt-mobile-spec">
                 <span>구분</span><b>${escapeHtml(row.category || "-")}</b>
                 <span>제품코드</span><b>${escapeHtml(row.code || "-")}</b>
-                <span>CAS</span><b>${escapeHtml(row.cas || "-")}</b>
+                <span>CAS</span><b>${this.renderCasLines(row.cas)}</b>
                 <span>등급/규격</span><b>${escapeHtml(gradeCapacity || "-")}</b>
                 <span>용도</span><b>${escapeHtml(row.usage || "-")}</b>
                 ${renderDateCell("발주일자", "order_date", dateState.orderDateValue, dateState.orderDateText)}
@@ -683,7 +692,7 @@
             <td class="txt order-product-name">${escapeHtml(row.name)}</td>
             <td class="txt">${escapeHtml(row.maker)}</td>
             <td class="txt">${escapeHtml(row.code)}</td>
-            <td class="txt">${escapeHtml(row.cas)}</td>
+            <td class="txt">${this.renderCasLines(row.cas)}</td>
             <td class="txt">${escapeHtml(row.grade)}</td>
             <td class="txt">${escapeHtml(row.capacity)}</td>
             <td class="num">${formatNumber(row.qty)}</td>
