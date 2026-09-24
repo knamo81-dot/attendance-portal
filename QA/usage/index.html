@@ -13,14 +13,21 @@
     <section class="usage-app">
 
       <section id="usageInputView" class="screen">
-        <div class="screen-title-row">
-          <div class="title-side">
-            <div class="screen-index">1</div>
-            <h2>사용입력 화면 <span>(PC)</span></h2>
-          </div>
-          <div class="view-switch" role="tablist" aria-label="사용일지 내부 화면">
+        <div class="screen-toolbar">
+          <div class="view-switch toolbar-view-switch" role="tablist" aria-label="사용일지 내부 화면">
             <button id="usageInputTab" class="view-btn active" type="button">사용입력</button>
             <button id="usageLogTab" class="view-btn" type="button">사용일지</button>
+          </div>
+
+          <div class="period-controls input-period-controls">
+            <span class="period-label">조회기간</span>
+            <select id="inputYear" aria-label="사용입력 조회 연도"></select>
+            <select id="inputMonth" aria-label="사용입력 조회 월"></select>
+          </div>
+
+          <div class="metric-toggle toolbar-metric-toggle">
+            <button class="metric-btn active" data-monthly-metric="amount" type="button">사용량</button>
+            <button class="metric-btn" data-monthly-metric="time" type="button">사용시간</button>
           </div>
         </div>
 
@@ -103,10 +110,6 @@
                 <strong id="monthLabel">-</strong>
                 <button id="nextMonthBtn" type="button" aria-label="다음 달">›</button>
               </div>
-              <div class="metric-toggle">
-                <button class="metric-btn active" data-monthly-metric="amount" type="button">사용량</button>
-                <button class="metric-btn" data-monthly-metric="time" type="button">사용시간</button>
-              </div>
             </div>
 
             <div id="monthlyMessage" class="message compact" aria-live="polite"></div>
@@ -123,10 +126,10 @@
       </section>
 
       <section id="usageLogView" class="screen" hidden>
-        <div class="screen-title-row log-title-row">
-          <div class="title-side">
-            <div class="screen-index">2</div>
-            <h2>사용일지 화면 <span>(PC)</span></h2>
+        <div class="screen-toolbar log-toolbar">
+          <div class="view-switch toolbar-view-switch" role="tablist" aria-label="사용일지 내부 화면">
+            <button id="usageInputTab2" class="view-btn" type="button">사용입력</button>
+            <button id="usageLogTab2" class="view-btn active" type="button">사용일지</button>
           </div>
 
           <div class="period-controls">
@@ -141,15 +144,9 @@
             <select id="periodDetail"></select>
           </div>
 
-          <div class="right-controls">
-            <div class="metric-toggle log-metric-toggle">
-              <button class="metric-btn active" data-log-metric="amount" type="button">사용량</button>
-              <button class="metric-btn" data-log-metric="time" type="button">사용시간</button>
-            </div>
-            <div class="view-switch" role="tablist" aria-label="사용일지 내부 화면">
-              <button id="usageInputTab2" class="view-btn" type="button">사용입력</button>
-              <button id="usageLogTab2" class="view-btn active" type="button">사용일지</button>
-            </div>
+          <div class="metric-toggle toolbar-metric-toggle">
+            <button class="metric-btn active" data-log-metric="amount" type="button">사용량</button>
+            <button class="metric-btn" data-log-metric="time" type="button">사용시간</button>
           </div>
         </div>
 
@@ -174,3 +171,4 @@
   <script src="../../common/common.js"></script>
 </body>
 </html>
+
