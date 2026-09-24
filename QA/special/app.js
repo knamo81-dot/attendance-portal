@@ -74,12 +74,16 @@
     }
     if(hasMin)return `${min}% 이상`;
     if(hasMax)return `${max}% 이하`;
-    return "함유량 미입력";
+    return "";
   }
   function matchedCasText(p){
     const list=Array.isArray(p._matchedCas)?p._matchedCas:[];
-    if(!list.length)return "";
-    return list.map(info=>`CAS ${info.cas_no||"-"} · ${contentText(info)}`).join(" / ");
+    // 제품 자체의 CAS가 1개뿐이면 연결제품 아래에 CAS를 중복 표기하지 않습니다.
+    if(!list.length||Number(p._casCount||0)<=1)return "";
+    return list.map(info=>{
+      const content=contentText(info);
+      return `CAS ${info.cas_no||"-"}${content?` · ${content}`:""}`;
+    }).join(" / ");
   }
   function productDisplay(p){
     const parts=[p.name,p.maker,p.code,p.capacity].filter(Boolean), oi=orderInfoForProduct(p.id);
@@ -129,6 +133,7 @@
     (products||[]).forEach(p=>{
       const casList=productCasByProduct.get(String(p.id))||[];
       const effectiveCasList=casList.length?casList:(normalizeCas(p.cas)?[{cas_no:p.cas,content_min:null,content_max:null}]:[]);
+      p._casCount=effectiveCasList.length;
       effectiveCasList.forEach(casInfo=>{
         const key=normalizeCas(casInfo.cas_no);
         if(!key)return;
@@ -205,7 +210,7 @@
     if(notice){
       notice.textContent=matchError
         ? `기준정보는 정상입니다. 제품/발주 연동 실패: ${matchError?.message||"알 수 없는 오류"}`
-        : "제품 CAS는 product_cas 전체 CAS를 기준으로 매칭하며, 연결제품에는 매칭된 CAS의 SDS 함유량을 함께 표시합니다. 선택한 발주기간 내 실제 발주가 확인된 제품만 제품별 최신 발주일로 표시합니다.";
+        : "제품 CAS는 product_cas 전체 CAS를 기준으로 매칭합니다. 복수 CAS 제품은 매칭된 CAS를 표시하고, 함유량이 입력된 경우에만 함께 표시합니다. 선택한 발주기간 내 실제 발주가 확인된 제품만 제품별 최신 발주일로 표시합니다.";
       notice.classList.toggle("error",!!matchError);
     }
   }
