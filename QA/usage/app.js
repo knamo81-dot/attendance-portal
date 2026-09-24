@@ -659,9 +659,11 @@
   async function fetchEligibleLogEmployees(range) {
     const employeeResult = await db
       .from('employees')
-      .select('employee_no, name, email, sort_order, join_date, leave_date, is_reagent_user')
+      .select('employee_no, name, email, division_code, team_code, sort_order, join_date, leave_date, is_reagent_user')
       .eq('company_id', state.companyId)
       .eq('is_reagent_user', true)
+      .order('division_code', { ascending: true })
+      .order('team_code', { ascending: true })
       .order('sort_order', { ascending: true })
       .order('employee_no', { ascending: true });
 
@@ -688,10 +690,14 @@
         key: String(employee.employee_no || employee.email || employee.name || ''),
         name: employee.name || '-',
         no: employee.employee_no || '',
+        division_code: employee.division_code || '',
+        team_code: employee.team_code || '',
         sort_order: Number(employee.sort_order || 0)
       }))
       .filter((employee) => employee.key)
       .sort((a, b) =>
+        String(a.division_code).localeCompare(String(b.division_code), 'ko') ||
+        String(a.team_code).localeCompare(String(b.team_code), 'ko') ||
         a.sort_order - b.sort_order ||
         String(a.no || a.name).localeCompare(String(b.no || b.name), 'ko')
       );
@@ -915,8 +921,8 @@
     $('logHead').innerHTML = `<tr>
       <th class="material-col">물질명</th>
       <th class="cas-col">CAS No.</th>
-      ${employees.map((e) => `<th class="person-col"><span class="person-name">${esc(e.name)}</span><span class="person-no">${esc(e.no)}</span></th>`).join('')}
       <th class="total-col">합계</th>
+      ${employees.map((e) => `<th class="person-col"><span class="person-name">${esc(e.name)}</span><span class="person-no">${esc(e.no)}</span></th>`).join('')}
     </tr>`;
 
     if (!groups.length) {
@@ -939,12 +945,12 @@
           </div>
         </td>
         <td class="cas-col">${esc(g.cas)}</td>
+        <td class="total-col ${g.rows.length ? 'detail-cell' : ''}"${detailCellAttrs(g.rows, `${g.name} · 전체`)}>${metricCell(g.rows, state.logMetric)}</td>
         ${employees.map((e) => {
           const cellRows = rowsForEmployee(g.rows, e.key);
           const context = `${g.name} · ${e.name}${e.no ? ` (${e.no})` : ''}`;
-          return `<td class="${cellRows.length ? 'detail-cell' : ''}"${detailCellAttrs(cellRows, context)}>${metricCell(cellRows, state.logMetric)}</td>`;
+          return `<td class="person-col ${cellRows.length ? 'detail-cell' : ''}"${detailCellAttrs(cellRows, context)}>${metricCell(cellRows, state.logMetric)}</td>`;
         }).join('')}
-        <td class="total-col ${g.rows.length ? 'detail-cell' : ''}"${detailCellAttrs(g.rows, `${g.name} · 전체`)}>${metricCell(g.rows, state.logMetric)}</td>
       </tr>`);
 
       if (expanded) {
@@ -961,12 +967,12 @@
               </div>
             </td>
             <td class="cas-col">${esc(primaryCas(p) || '-')}</td>
+            <td class="total-col ${pitem.rows.length ? 'detail-cell' : ''}"${detailCellAttrs(pitem.rows, `${p?.name || g.name} · 전체`)}>${metricCell(pitem.rows, state.logMetric)}</td>
             ${employees.map((e) => {
               const cellRows = rowsForEmployee(pitem.rows, e.key);
               const context = `${p?.name || g.name} · ${e.name}${e.no ? ` (${e.no})` : ''}`;
-              return `<td class="${cellRows.length ? 'detail-cell' : ''}"${detailCellAttrs(cellRows, context)}>${metricCell(cellRows, state.logMetric)}</td>`;
+              return `<td class="person-col ${cellRows.length ? 'detail-cell' : ''}"${detailCellAttrs(cellRows, context)}>${metricCell(cellRows, state.logMetric)}</td>`;
             }).join('')}
-            <td class="total-col ${pitem.rows.length ? 'detail-cell' : ''}"${detailCellAttrs(pitem.rows, `${p?.name || g.name} · 전체`)}>${metricCell(pitem.rows, state.logMetric)}</td>
           </tr>`);
         });
       }
