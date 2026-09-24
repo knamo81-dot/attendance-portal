@@ -725,3 +725,17 @@ body {
   #sdsHistoryModal { padding: 6px; }
   #sdsHistoryModal .history-modal { width: calc(100vw - 12px); }
 }
+
+
+/* SDS 목록: product_cas 복수 CAS 세로 표시 */
+.cas-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.cas-stack span {
+  display: block;
+}
