@@ -43,6 +43,7 @@
     expandedLog: new Set(),
     detailRecordIds: [],
     detailContext: '',
+    detailReadonly: false,
     isSaving: false,
     isEditing: false
   };
@@ -785,19 +786,20 @@
             ${r.created_at ? `<span>등록 <b>${esc(formatCreatedAt(r.created_at))}</b></span>` : ''}
           </div>
         </div>
-        <div class="usage-detail-actions">
+        ${state.detailReadonly ? '' : `<div class="usage-detail-actions">
           <button class="btn-secondary" type="button" data-detail-edit="${Number(r.id)}">수정</button>
           <button class="btn-danger" type="button" data-detail-delete="${Number(r.id)}">삭제</button>
-        </div>
+        </div>`}
       </article>`;
     }).join('');
   }
 
-  function openUsageDetail(ids, context = '') {
+  function openUsageDetail(ids, context = '', readonly = false) {
     const parsed = String(ids || '').split(',').map(Number).filter(Number.isFinite);
     if (!parsed.length) return;
     state.detailRecordIds = parsed;
     state.detailContext = context || '사용내역 상세';
+    state.detailReadonly = !!readonly;
     $('usageEditSection').hidden = true;
     $('usageDetailModal').hidden = false;
     setMessage('usageDetailMessage');
@@ -809,11 +811,13 @@
     $('usageEditSection').hidden = true;
     state.detailRecordIds = [];
     state.detailContext = '';
+    state.detailReadonly = false;
     state.isEditing = false;
     setMessage('usageDetailMessage');
   }
 
   function openUsageEdit(id) {
+    if (state.detailReadonly) return;
     const r = findRecordById(id);
     if (!r) return;
     state.isEditing = true;
@@ -828,7 +832,7 @@
   }
 
   async function saveUsageEdit() {
-    if (state.isEditing === false) return;
+    if (state.detailReadonly || state.isEditing === false) return;
     const id = Number($('usageEditId').value);
     const productId = Number($('usageEditProduct').value);
     const usageDate = $('usageEditDate').value;
@@ -885,6 +889,7 @@
   }
 
   async function deleteUsageRecord(id) {
+    if (state.detailReadonly) return;
     const r = findRecordById(id);
     if (!r) return;
 
@@ -1068,7 +1073,7 @@
     $('monthlyBody').addEventListener('click', (e) => {
       const cell = e.target.closest('[data-detail-ids]');
       if (!cell) return;
-      openUsageDetail(cell.dataset.detailIds, cell.dataset.detailContext || '월간 사용내역');
+      openUsageDetail(cell.dataset.detailIds, cell.dataset.detailContext || '월간 사용내역', false);
     });
 
     document.querySelectorAll('[data-period-mode]').forEach((btn) => btn.addEventListener('click', () => {
@@ -1097,7 +1102,7 @@
     $('logBody').addEventListener('click', (e) => {
       const cell = e.target.closest('[data-detail-ids]');
       if (!cell) return;
-      openUsageDetail(cell.dataset.detailIds, cell.dataset.detailContext || '사용일지 상세');
+      openUsageDetail(cell.dataset.detailIds, cell.dataset.detailContext || '사용일지 상세', true);
     });
 
     $('usageDetailClose').addEventListener('click', closeUsageDetail);
