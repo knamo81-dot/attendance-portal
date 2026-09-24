@@ -1980,7 +1980,7 @@ html.embed-mode #settings-page .admin-section-panel > .real-card:first-child {
               </div>
 
               <div id="adminSectionIssue" class="admin-section-panel" hidden>
-                <div class="admin-header-desc" style="margin-bottom:12px;">재택근무, 단축근무, 파견, 휴직/휴가 등 근태 분석에 영향을 줄 수 있는 특이사항을 별도로 기록합니다.</div>
+                <div class="admin-header-desc" style="margin-bottom:12px;">재택근무, 단축근무, 파견, 휴직/휴가 등 근태 분석에 영향을 줄 수 있는 특이사항을 별도로 기록하고, 연구소 부재 / 근무조정 구분을 함께 관리합니다.</div>
                 <div class="real-admin-top-note">입력 순서는 본부, 팀, 담당자 선택 후 사번 자동표시 방식이며, 아래에서 적용 시작일과 종료일을 함께 저장하도록 구성했습니다.</div>
                 <div class="real-card">
                   <div class="real-box-title">특이사항 등록</div>
@@ -1991,6 +1991,7 @@ html.embed-mode #settings-page .admin-section-panel > .real-card:first-child {
                     <div class="real-field"><label>사번</label><input id="realIssueEmployeeNo" class="real-input" placeholder="담당자 선택 시 자동 표시" readonly></div>
                     <div class="real-field"><label>적용 시작일</label><input id="realIssueStartDate" class="real-input" type="date"></div>
                     <div class="real-field"><label>적용 종료일</label><input id="realIssueEndDate" class="real-input" type="date"></div>
+                    <div class="real-field"><label>구분</label><select id="realIssueGroup" class="real-select" title="시약 사용일지에서 연구소 부재 기간 판단에 사용됩니다."><option value="">선택</option><option value="absent">연구소 부재</option><option value="adjusted">근무조정</option></select></div>
                     <div class="real-field"><label>특이사항</label><select id="realIssueType" class="real-select"><option value="">선택</option><option value="재택근무">재택근무</option><option value="단축근무">단축근무</option><option value="파견">파견</option><option value="병가">병가</option><option value="육아휴직">육아휴직</option><option value="출산휴가">출산휴가</option><option value="일반휴직">일반휴직</option><option value="가족돌봄휴직">가족돌봄휴직</option></select></div>
                     <div class="real-field"><label>총 근무시간</label><input id="realIssueWorkHours" class="real-input" placeholder="단축근무 선택 시 입력"></div>
                     <div class="real-field full"><label>비고</label><input id="realIssueNote" class="real-input" placeholder="예: 임신초기 단축근무 / 본사 파견 / 육아휴직"></div>
@@ -2017,6 +2018,7 @@ html.embed-mode #settings-page .admin-section-panel > .real-card:first-child {
                           <th>팀</th>
                           <th>사번</th>
                           <th>담당자</th>
+                          <th>구분</th>
                           <th>특이사항</th>
                           <th>적용기간</th>
                           <th>총 근무시간</th>
@@ -2026,7 +2028,7 @@ html.embed-mode #settings-page .admin-section-panel > .real-card:first-child {
                         </tr>
                       </thead>
                       <tbody id="realIssueTbody">
-                        <tr><td colspan="10" class="real-empty-row">불러오는 중입니다.</td></tr>
+                        <tr><td colspan="11" class="real-empty-row">불러오는 중입니다.</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -4011,13 +4013,33 @@ create table if not exists user_app_roles (
     $('realIssueEmployeeNo').value = emp ? emp.employee_no : '';
   }
 
+  function defaultIssueGroupForType(issueType){
+    const type = String(issueType || '').trim();
+    if(!type) return '';
+    return type === '단축근무' ? 'adjusted' : 'absent';
+  }
+
+  function issueGroupLabel(group){
+    const value = String(group || '').trim();
+    if(value === 'absent') return '연구소 부재';
+    if(value === 'adjusted') return '근무조정';
+    return '-';
+  }
+
+  function syncIssueGroupFromType(){
+    const typeEl = $('realIssueType');
+    const groupEl = $('realIssueGroup');
+    if(!typeEl || !groupEl) return;
+    groupEl.value = defaultIssueGroupForType(typeEl.value);
+  }
+
   async function loadSpecialNotes(){
     const {data,error}=await safeSelect('employee_special_notes','*');
 
     if(error){
       dataState.specialNotes = [];
       $('realIssueCount').textContent = '총 0건';
-      $('realIssueTbody').innerHTML = '<tr><td colspan="10" class="real-empty-row">' + esc(error.message) + '</td></tr>';
+      $('realIssueTbody').innerHTML = '<tr><td colspan="11" class="real-empty-row">' + esc(error.message) + '</td></tr>';
       return;
     }
 
@@ -4027,7 +4049,7 @@ create table if not exists user_app_roles (
 
     $('realIssueCount').textContent = `총 ${dataState.specialNotes.length}건`;
     if(!dataState.specialNotes.length){
-      $('realIssueTbody').innerHTML='<tr><td colspan="10" class="real-empty-row">등록된 특이사항이 없습니다.</td></tr>';
+      $('realIssueTbody').innerHTML='<tr><td colspan="11" class="real-empty-row">등록된 특이사항이 없습니다.</td></tr>';
       return;
     }
 
@@ -4044,6 +4066,7 @@ create table if not exists user_app_roles (
         <td>${esc(rowTeamName)}</td>
         <td>${esc(r.employee_no || '-')}</td>
         <td>${esc(rowEmployeeLabel)}</td>
+        <td>${esc(issueGroupLabel(r.issue_group || defaultIssueGroupForType(r.issue_type)))}</td>
         <td>${esc(r.issue_type || '-')}</td>
         <td>${esc(r.start_date || '-')} ~ ${esc(r.end_date || '-')}</td>
         <td>${esc(r.total_work_hours || '-')}</td>
@@ -4058,7 +4081,7 @@ create table if not exists user_app_roles (
     dataState.editingIssueId = null;
     dataState.editingIssueSource = null;
     ['realIssueStartDate','realIssueEndDate','realIssueWorkHours','realIssueNote','realIssueEmployeeNo'].forEach(id=>$(id).value='');
-    $('realIssueType').value=''; $('realIssueEmployee').value='';
+    $('realIssueType').value=''; $('realIssueGroup').value=''; $('realIssueEmployee').value='';
   }
 
   function fillIssueEdit(id){
@@ -4075,6 +4098,7 @@ create table if not exists user_app_roles (
     $('realIssueStartDate').value = row.start_date || '';
     $('realIssueEndDate').value = row.end_date || '';
     $('realIssueType').value = row.issue_type || '';
+    $('realIssueGroup').value = row.issue_group || defaultIssueGroupForType(row.issue_type);
     $('realIssueWorkHours').value = row.total_work_hours || '';
     $('realIssueNote').value = row.note || '';
   }
@@ -4084,12 +4108,18 @@ create table if not exists user_app_roles (
     const emp = dataState.employees.find(e=>e.employee_no===employeeNo);
     if(!emp){ setFeedback('realIssueFeedback','담당자를 선택하세요.'); return; }
 
+    const issueType = $('realIssueType').value || '';
+    const issueGroup = $('realIssueGroup').value || '';
+    if(!issueType){ setFeedback('realIssueFeedback','특이사항을 선택하세요.'); $('realIssueType')?.focus(); return; }
+    if(!issueGroup){ setFeedback('realIssueFeedback','구분(연구소 부재 / 근무조정)을 선택하세요.'); $('realIssueGroup')?.focus(); return; }
+
     const payload = {
       division_code: emp.division_code || null,
       team_code: emp.team_code || null,
       employee_no: emp.employee_no,
       employee_name: emp.name || null,
-      issue_type: $('realIssueType').value || null,
+      issue_group: issueGroup,
+      issue_type: issueType,
       start_date: $('realIssueStartDate').value || null,
       end_date: $('realIssueEndDate').value || null,
       total_work_hours: $('realIssueWorkHours').value || null,
@@ -4373,6 +4403,7 @@ create table if not exists user_app_roles (
     $('realIssueDivision')?.addEventListener('change', ()=>{ fillTeamSelect('realIssueTeam', $('realIssueDivision').value); renderSpecialEmployeeOptions(); });
     $('realIssueTeam')?.addEventListener('change', renderSpecialEmployeeOptions);
     $('realIssueEmployee')?.addEventListener('change', ()=>{ const emp = dataState.employees.find(e=>e.employee_no === $('realIssueEmployee').value); $('realIssueEmployeeNo').value = emp ? emp.employee_no : ''; });
+    $('realIssueType')?.addEventListener('change', syncIssueGroupFromType);
     $('realIssueSaveBtn')?.addEventListener('click', saveIssue);
     $('realIssueResetBtn')?.addEventListener('click', resetIssueForm);
 
