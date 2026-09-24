@@ -423,6 +423,19 @@
     };
   }
 
+  function syncInputPeriodControls() {
+    if ($('inputYear')) $('inputYear').value = String(state.currentMonth.getFullYear());
+    if ($('inputMonth')) $('inputMonth').value = String(state.currentMonth.getMonth() + 1);
+  }
+
+  function applyInputPeriodSelection() {
+    const y = Number($('inputYear')?.value);
+    const m = Number($('inputMonth')?.value);
+    if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) return;
+    state.currentMonth = new Date(y, m - 1, 1);
+    loadMonthlyRows();
+  }
+
   function productGroupKey(product) {
     const cas = primaryCas(product);
     return cas ? `cas:${cas}` : `product:${product?.id || 'unknown'}`;
@@ -467,6 +480,7 @@
 
   function renderMonthly() {
     const { days } = monthRange(state.currentMonth);
+    syncInputPeriodControls();
     $('monthLabel').textContent = `${state.currentMonth.getFullYear()}년 ${state.currentMonth.getMonth() + 1}월`;
 
     $('monthlyHead').innerHTML = `<tr>
@@ -543,8 +557,19 @@
 
   function fillYearOptions() {
     const current = new Date().getFullYear();
-    $('logYear').innerHTML = Array.from({ length: 7 }, (_, i) => current - 4 + i)
+    const years = Array.from({ length: 7 }, (_, i) => current - 4 + i);
+    const options = years
       .map((y) => `<option value="${y}" ${y === current ? 'selected' : ''}>${y}년</option>`).join('');
+    $('logYear').innerHTML = options;
+    $('inputYear').innerHTML = options;
+
+    $('inputMonth').innerHTML = Array.from({ length: 12 }, (_, i) => {
+      const m = i + 1;
+      return `<option value="${m}">${m}월</option>`;
+    }).join('');
+
+    $('inputYear').value = String(state.currentMonth.getFullYear());
+    $('inputMonth').value = String(state.currentMonth.getMonth() + 1);
   }
 
   function syncPeriodDetail() {
@@ -702,12 +727,16 @@
 
     $('prevMonthBtn').addEventListener('click', () => {
       state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth() - 1, 1);
+      syncInputPeriodControls();
       loadMonthlyRows();
     });
     $('nextMonthBtn').addEventListener('click', () => {
       state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth() + 1, 1);
+      syncInputPeriodControls();
       loadMonthlyRows();
     });
+    $('inputYear').addEventListener('change', applyInputPeriodSelection);
+    $('inputMonth').addEventListener('change', applyInputPeriodSelection);
     document.querySelectorAll('[data-monthly-metric]').forEach((btn) => btn.addEventListener('click', () => {
       state.monthlyMetric = btn.dataset.monthlyMetric;
       document.querySelectorAll('[data-monthly-metric]').forEach((b) => b.classList.toggle('active', b === btn));
