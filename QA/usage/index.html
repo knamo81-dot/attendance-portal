@@ -3,151 +3,172 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>사용일지</title>
+  <title>QA 시약 사용일지</title>
   <link rel="stylesheet" href="./style.css" />
   <link rel="stylesheet" href="../../common/mobile.css" />
   <link rel="stylesheet" href="../../common/theme.css" />
 </head>
 <body>
-  <main class="shell">
-    <section class="card usage-card">
-      <div class="card-head usage-head">
-        <div>
-          <h3>시약 사용일지</h3>
-          <p>실제 사용한 시약 제품과 사용량을 기록하고 내 사용내역을 확인합니다.</p>
+  <main class="usage-shell">
+    <section class="usage-app">
+      <header class="usage-appbar">
+        <div class="brand-block">
+          <strong class="qa-mark">QA</strong>
+          <span class="app-title">시약 사용일지</span>
         </div>
-        <div class="view-switch" role="tablist" aria-label="사용일지 화면 전환">
-          <button class="btn active" id="usageInputViewBtn" type="button" data-view="input">사용 입력</button>
-          <button class="btn" id="usageLogViewBtn" type="button" data-view="log">사용 내역</button>
+
+        <nav class="usage-tabs" aria-label="사용일지 화면">
+          <button id="usageInputTab" class="usage-tab active" type="button">사용입력</button>
+          <button id="usageLogTab" class="usage-tab" type="button">사용일지</button>
+        </nav>
+
+        <div class="user-context">
+          <span id="companyName" class="company-name">회사</span>
+          <span class="context-dot">•</span>
+          <span id="employeeName">사용자</span>
+          <span id="employeeNo" class="employee-no"></span>
         </div>
-      </div>
+      </header>
 
-      <div class="card-body">
-        <section id="usageInputView">
-          <div class="identity-bar" id="identityBar">
-            <span class="identity-label">사용자</span>
-            <strong id="identityName">확인 중</strong>
-            <span class="identity-sub" id="identityMeta"></span>
-          </div>
+      <section id="usageInputView" class="screen">
+        <div class="screen-title-row">
+          <div class="screen-index">1</div>
+          <h2>사용입력 화면 <span>(PC)</span></h2>
+        </div>
 
-          <div class="usage-form-grid">
-            <div class="field product-search-field">
-              <label for="productSearch">제품 검색</label>
-              <input id="productSearch" type="search" autocomplete="off" placeholder="품명 / 제조사 / 제품코드 / CAS 검색" />
-              <div class="product-results" id="productResults" hidden></div>
-            </div>
+        <div class="input-layout">
+          <section class="panel input-panel">
+            <div class="panel-title">사용정보 입력</div>
 
-            <div class="selected-product" id="selectedProduct" hidden>
-              <div class="selected-product-head">
-                <div>
-                  <span class="eyebrow">선택 제품</span>
-                  <strong id="selectedProductName"></strong>
+            <div class="form-stack">
+              <label class="field">
+                <span>사용일</span>
+                <input id="usageDate" type="date" />
+              </label>
+
+              <div class="field product-search-wrap">
+                <span>사용제품</span>
+                <div class="search-input-row">
+                  <input id="productSearch" type="search" placeholder="제품명 / 제조사 / 코드 / CAS 검색" autocomplete="off" />
+                  <button id="productSearchBtn" class="search-btn" type="button" aria-label="제품 검색">⌕</button>
                 </div>
-                <button class="mini-btn" id="clearProductBtn" type="button">다시 선택</button>
+                <div id="productResults" class="product-results" hidden></div>
               </div>
-              <div class="selected-product-meta" id="selectedProductMeta"></div>
-              <div class="selected-product-cas" id="selectedProductCas"></div>
+
+              <div id="selectedProduct" class="selected-product" hidden>
+                <button id="clearProductBtn" class="selected-close" type="button" aria-label="선택 제품 해제">×</button>
+                <strong id="selectedProductName">-</strong>
+                <div id="selectedProductMeta" class="selected-meta">-</div>
+                <div class="selected-info-row">
+                  <span class="selected-label">CAS No.</span>
+                  <div id="selectedProductCas" class="selected-cas"></div>
+                </div>
+                <div class="selected-info-row">
+                  <span class="selected-label">물질명</span>
+                  <span id="selectedMaterialName">-</span>
+                </div>
+              </div>
+
+              <label class="field inline-field">
+                <span>사용시간</span>
+                <div class="suffix-input">
+                  <input id="usageHours" type="number" min="0.01" max="23.99" step="0.01" inputmode="decimal" placeholder="예: 0.5" />
+                  <b>시간</b>
+                </div>
+              </label>
+
+              <label class="field inline-field">
+                <span>사용량</span>
+                <input id="quantity" type="number" min="0" step="any" inputmode="decimal" placeholder="예: 100" />
+              </label>
+
+              <label class="field inline-field">
+                <span>단위</span>
+                <select id="unit">
+                  <optgroup label="부피">
+                    <option value="µL">µL</option>
+                    <option value="mL" selected>mL</option>
+                    <option value="L">L</option>
+                  </optgroup>
+                  <optgroup label="중량">
+                    <option value="µg">µg</option>
+                    <option value="mg">mg</option>
+                    <option value="g">g</option>
+                    <option value="kg">kg</option>
+                  </optgroup>
+                </select>
+              </label>
             </div>
 
-            <div class="field">
-              <label for="usageDate">사용일</label>
-              <input id="usageDate" type="date" />
-            </div>
-            <div class="field">
-              <label for="usageTime">사용시간</label>
-              <input id="usageTime" type="time" step="60" />
-            </div>
-            <div class="field">
-              <label for="quantityType">사용량 구분</label>
-              <select id="quantityType">
-                <option value="volume">부피</option>
-                <option value="weight">무게</option>
-              </select>
-            </div>
-            <div class="field quantity-field">
-              <label for="quantity">사용량</label>
-              <div class="quantity-row">
-                <input id="quantity" type="number" min="0" step="any" inputmode="decimal" placeholder="예: 500" />
-                <select id="unit" aria-label="단위"></select>
+            <div id="inputMessage" class="message" aria-live="polite"></div>
+            <button id="saveUsageBtn" class="save-btn" type="button">
+              <span class="lock-icon">▣</span>
+              사용내역 등록
+            </button>
+          </section>
+
+          <section class="panel monthly-panel">
+            <div class="panel-head">
+              <h3>나의 월간 사용현황</h3>
+              <div class="month-nav">
+                <button id="prevMonthBtn" type="button" aria-label="이전 달">‹</button>
+                <strong id="monthLabel">-</strong>
+                <button id="nextMonthBtn" type="button" aria-label="다음 달">›</button>
+              </div>
+              <div class="metric-toggle">
+                <button class="metric-btn active" data-monthly-metric="amount" type="button">사용량</button>
+                <button class="metric-btn" data-monthly-metric="time" type="button">사용시간</button>
               </div>
             </div>
-          </div>
 
-          <div id="inputMessage" class="message" aria-live="polite"></div>
-          <div class="form-actions">
-            <button class="btn primary" id="saveUsageBtn" type="button">사용기록 저장</button>
-          </div>
-
-          <div class="recent-block">
-            <div class="section-head">
-              <div>
-                <h4>최근 입력</h4>
-                <p>최근 등록한 사용기록 10건을 표시합니다.</p>
-              </div>
-              <button class="btn small" id="refreshRecentBtn" type="button">새로고침</button>
-            </div>
-            <div class="table-wrap">
-              <table class="usage-table recent-table">
-                <thead>
-                  <tr>
-                    <th>사용일시</th>
-                    <th>제품</th>
-                    <th>CAS No.</th>
-                    <th>사용량</th>
-                  </tr>
-                </thead>
-                <tbody id="recentUsageList">
-                  <tr><td colspan="4" class="empty">사용기록을 불러오는 중입니다.</td></tr>
+            <div id="monthlyMessage" class="message compact" aria-live="polite"></div>
+            <div class="matrix-wrap monthly-wrap">
+              <table id="monthlyTable" class="matrix-table monthly-table">
+                <thead id="monthlyHead"></thead>
+                <tbody id="monthlyBody">
+                  <tr><td class="empty">월간 사용현황을 불러오는 중입니다.</td></tr>
                 </tbody>
               </table>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
+      </section>
 
-        <section id="usageLogView" hidden>
-          <div class="filters log-filters">
-            <div class="field">
-              <label for="logStartDate">시작일</label>
-              <input id="logStartDate" type="date" />
-            </div>
-            <div class="field">
-              <label for="logEndDate">종료일</label>
-              <input id="logEndDate" type="date" />
-            </div>
-            <div class="field grow">
-              <label for="logSearch">검색</label>
-              <input id="logSearch" type="search" placeholder="품명 / 제조사 / 제품코드 / CAS" />
-            </div>
-            <div class="filter-action">
-              <button class="btn" id="logResetBtn" type="button">초기화</button>
-            </div>
-          </div>
+      <section id="usageLogView" class="screen" hidden>
+        <div class="screen-title-row log-title-row">
+          <div class="screen-index">2</div>
+          <h2>사용일지 화면 <span>(PC)</span></h2>
 
-          <div class="summary log-summary" aria-label="내 사용일지 요약">
-            <div class="tile"><span class="k">조회 건수</span><span class="v" id="logCount">0건</span></div>
-            <div class="tile"><span class="k">기간</span><span class="v small" id="logPeriod">-</span></div>
+          <div class="period-controls">
+            <span class="period-label">조회기간</span>
+            <select id="logYear"></select>
+            <div class="period-mode">
+              <button data-period-mode="month" type="button">월</button>
+              <button data-period-mode="quarter" type="button">분기</button>
+              <button data-period-mode="half" class="active" type="button">반기</button>
+              <button data-period-mode="year" type="button">년</button>
+            </div>
+            <select id="periodDetail"></select>
           </div>
 
-          <div id="logMessage" class="message" aria-live="polite"></div>
-          <div class="table-wrap">
-            <table class="usage-table log-table">
-              <thead>
-                <tr>
-                  <th>사용일시</th>
-                  <th>제품명</th>
-                  <th>제조사</th>
-                  <th>제품코드</th>
-                  <th>CAS No.</th>
-                  <th>사용량</th>
-                </tr>
-              </thead>
-              <tbody id="usageLogList">
-                <tr><td colspan="6" class="empty">사용내역을 불러오는 중입니다.</td></tr>
+          <div class="metric-toggle log-metric-toggle">
+            <button class="metric-btn active" data-log-metric="amount" type="button">사용량</button>
+            <button class="metric-btn" data-log-metric="time" type="button">사용시간</button>
+          </div>
+        </div>
+
+        <section class="panel log-panel">
+          <div id="logMessage" class="message compact" aria-live="polite"></div>
+          <div class="matrix-wrap log-wrap">
+            <table id="logTable" class="matrix-table log-table">
+              <thead id="logHead"></thead>
+              <tbody id="logBody">
+                <tr><td class="empty">사용일지를 불러오는 중입니다.</td></tr>
               </tbody>
             </table>
           </div>
         </section>
-      </div>
+      </section>
     </section>
   </main>
 
