@@ -38,7 +38,6 @@ button{cursor:pointer}
 }
 .view-btn:last-child{border-right:0}
 .view-btn.active{background:var(--qa);color:#fff}
-.right-controls{margin-left:auto;display:flex;align-items:center;gap:8px}
 .screen-index{
   width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;
   border-radius:999px;background:var(--qa);color:#fff;font-size:20px;font-weight:900
@@ -188,10 +187,125 @@ button{cursor:pointer}
 .usage-app{max-width:none}
 @media(max-width:980px){
   .log-title-row{align-items:flex-start}
-  .right-controls{width:100%;margin-left:0;justify-content:space-between}
 }
 @media(max-width:640px){
   .screen-title-row{align-items:flex-start;flex-wrap:wrap}
   .view-switch{margin-left:0}
-  .right-controls{flex-wrap:wrap}
+}
+
+
+/* v4: 사용일지의 사용량/사용시간 토글을 사용입력 화면과 동일하게
+   데이터 카드 내부 우측 상단으로 배치 */
+.log-view-switch{
+  margin-left:auto;
+}
+.log-panel-head{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  min-height:40px;
+  padding:0 0 8px;
+}
+.log-panel-head .log-metric-toggle{
+  margin-left:auto;
+}
+
+@media(max-width:860px){
+  .log-panel-head{
+    justify-content:flex-start;
+  }
+  .log-panel-head .log-metric-toggle{
+    margin-left:0;
+  }
+}
+
+
+/* v5: 화면명/번호 제거 + 내부 화면전환/조회기간/지표 토글 위치 통일 */
+.screen-title-row,
+.screen-index,
+.title-side,
+.log-panel-head {
+  display:none !important;
+}
+
+.screen-toolbar{
+  min-height:46px;
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:14px;
+  padding:0 12px 8px;
+}
+
+.toolbar-view-switch{
+  margin-left:0;
+  justify-self:start;
+}
+
+.screen-toolbar .period-controls{
+  margin-left:0;
+  justify-self:start;
+  min-width:0;
+}
+
+.toolbar-metric-toggle{
+  justify-self:end;
+  margin-left:auto;
+}
+
+.input-period-controls select{
+  min-width:86px;
+}
+
+#inputMonth{
+  min-width:72px;
+}
+
+.monthly-panel .panel-head{
+  grid-template-columns:auto 1fr;
+}
+
+.monthly-panel .month-nav{
+  justify-self:center;
+}
+
+.log-view-switch{
+  margin-left:0;
+}
+
+/* v4에서 추가했던 카드 내부 지표토글 영역은 더 이상 사용하지 않음 */
+.log-panel-head{
+  min-height:0 !important;
+  padding:0 !important;
+}
+
+@media(max-width:1000px){
+  .screen-toolbar{
+    grid-template-columns:auto 1fr auto;
+    gap:8px;
+  }
+  .screen-toolbar .period-controls{
+    overflow-x:auto;
+    max-width:100%;
+  }
+}
+
+@media(max-width:760px){
+  .screen-toolbar{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .toolbar-view-switch{
+    order:1;
+  }
+  .toolbar-metric-toggle{
+    order:2;
+    margin-left:auto;
+  }
+  .screen-toolbar .period-controls{
+    order:3;
+    width:100%;
+    overflow-x:auto;
+  }
 }
