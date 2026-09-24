@@ -50,6 +50,25 @@
     return match ? match[1] : '';
   }
 
+  function productCasNumbers(product) {
+    const rows = Array.isArray(product?.cas_numbers)
+      ? product.cas_numbers.map((value) => String(value || '').trim()).filter(Boolean)
+      : [];
+    if (rows.length) return rows;
+    const fallback = String(product?.cas || '').trim();
+    return fallback ? [fallback] : [];
+  }
+
+  function productCasText(product, separator = '\n') {
+    return productCasNumbers(product).join(separator);
+  }
+
+  function productCasHtml(product) {
+    const values = productCasNumbers(product);
+    if (!values.length) return '-';
+    return `<div class="cas-stack">${values.map((value) => `<span>${esc(value)}</span>`).join('')}</div>`;
+  }
+
   function filtered() {
     const q = state.query.trim().toLowerCase();
     return state.products.filter((product) => {
@@ -59,7 +78,9 @@
       // 선택한 연도에 이미 최종확인한 품목은 제외한다. 확인일이 없거나 다른 연도이면 조회 대상에 포함한다.
       if (state.checkedExcludeYear !== 'all' && yearOf(product.sds_document?.last_checked_date) === state.checkedExcludeYear) return false;
       if (!q) return true;
-      return [product.name, product.maker, product.code, product.cas].some((v) => String(v || '').toLowerCase().includes(q));
+      const baseMatch = [product.name, product.maker, product.code].some((v) => String(v || '').toLowerCase().includes(q));
+      const casMatch = productCasNumbers(product).some((casNo) => casNo.toLowerCase().includes(q));
+      return baseMatch || casMatch;
     });
   }
 
@@ -110,7 +131,7 @@
         ? `<button class="btn small two-line-action" type="button" data-action="open" data-id="${product.id}"><span>보기</span><span>${currentFileCount}건</span></button>` : '';
       return `<tr>
         <td>${esc(product.name || '-')}</td><td>${esc(product.maker || '-')}</td><td>${esc(product.code || '-')}</td>
-        <td>${esc(product.capacity || '-')}</td><td>${esc(product.cas || '-')}</td><td>${esc(product.grade || '-')}</td>
+        <td>${esc(product.capacity || '-')}</td><td>${productCasHtml(product)}</td><td>${esc(product.grade || '-')}</td>
         <td><div class="sds-actions"><span class="status-badge ${status}${status === 'none' ? ' two-line-status' : ''}">${statusLabel(status)}</span>${fileButton}<button class="btn small primary" type="button" data-action="edit" data-id="${product.id}">${mainAction}</button></div></td>
         <td><div class="date-stack"><span><b>개정</b>${dateOnly(current.revision_date)}</span><span><b>등록</b>${dateOnly(current.registered_at)}</span></div></td>
         <td><div class="date-stack"><span><b>확인</b>${dateOnly(doc.last_checked_date)}</span><span><b>발주</b>${dateOnly(product.last_order_date)}</span></div></td>
@@ -135,6 +156,31 @@
     ]);
     const firstError = productsRes.error || docsRes.error || ordersRes.error;
     if (firstError) { setMessage(`SDS 정보를 불러오지 못했습니다: ${firstError.message}`, 'error'); return; }
+
+    const products = productsRes.data || [];
+    const productIds = products.map((product) => Number(product.id)).filter(Number.isFinite);
+    let productCasRows = [];
+    if (productIds.length) {
+      const casRes = await db
+        .from('product_cas')
+        .select('id, product_id, cas_no, sort_order')
+        .in('product_id', productIds)
+        .order('product_id', { ascending: true })
+        .order('sort_order', { ascending: true })
+        .order('id', { ascending: true });
+      if (casRes.error) { setMessage(`제품 CAS 정보를 불러오지 못했습니다: ${casRes.error.message}`, 'error'); return; }
+      productCasRows = casRes.data || [];
+    }
+
+    const casByProduct = new Map();
+    productCasRows.forEach((row) => {
+      const productId = Number(row.product_id);
+      const casNo = String(row.cas_no || '').trim();
+      if (!productId || !casNo) return;
+      const list = casByProduct.get(productId) || [];
+      if (!list.includes(casNo)) list.push(casNo);
+      casByProduct.set(productId, list);
+    });
 
     const docs = docsRes.data || [];
     const docIds = docs.map((d) => d.id);
@@ -170,9 +216,17 @@
         orderYearsByProduct.set(id, years);
       }
     });
-    state.products = (productsRes.data || []).map((product) => {
-      const doc = docByProduct.get(Number(product.id)) || null;
-      return { ...product, sds_document: doc, current_version: doc ? (versionByDoc.get(Number(doc.id)) || null) : null, last_order_date: lastOrderByProduct.get(Number(product.id)) || null, order_years: Array.from(orderYearsByProduct.get(Number(product.id)) || []) };
+    state.products = products.map((product) => {
+      const productId = Number(product.id);
+      const doc = docByProduct.get(productId) || null;
+      return {
+        ...product,
+        cas_numbers: casByProduct.get(productId) || [],
+        sds_document: doc,
+        current_version: doc ? (versionByDoc.get(Number(doc.id)) || null) : null,
+        last_order_date: lastOrderByProduct.get(productId) || null,
+        order_years: Array.from(orderYearsByProduct.get(productId) || [])
+      };
     });
     populateYearFilters();
     setMessage(''); render();
@@ -615,7 +669,7 @@
     const rows = filtered();
     if (!rows.length) { setMessage('엑셀로 다운로드할 제품이 없습니다.', 'error'); return; }
     if (!window.XLSX) { setMessage('엑셀 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.', 'error'); return; }
-    const data = rows.map((product) => ({ '품명': product.name || '', '제조사': product.maker || '', '제품코드': product.code || '', '규격': product.capacity || '', 'CAS': product.cas || '', '등급': product.grade || '', 'SDS': statusOf(product) === 'none' ? '해당사항없음' : statusLabel(statusOf(product)), '개정일': dateOnly(product.current_version?.revision_date).replace('-', ''), '등록일': dateOnly(product.current_version?.registered_at).replace('-', ''), '최종확인일': dateOnly(product.sds_document?.last_checked_date).replace('-', ''), '최종발주일': dateOnly(product.last_order_date).replace('-', '') }));
+    const data = rows.map((product) => ({ '품명': product.name || '', '제조사': product.maker || '', '제품코드': product.code || '', '규격': product.capacity || '', 'CAS': productCasText(product, '\n'), '등급': product.grade || '', 'SDS': statusOf(product) === 'none' ? '해당사항없음' : statusLabel(statusOf(product)), '개정일': dateOnly(product.current_version?.revision_date).replace('-', ''), '등록일': dateOnly(product.current_version?.registered_at).replace('-', ''), '최종확인일': dateOnly(product.sds_document?.last_checked_date).replace('-', ''), '최종발주일': dateOnly(product.last_order_date).replace('-', '') }));
     const ws = XLSX.utils.json_to_sheet(data);
     ws['!cols'] = [{ wch: 28 }, { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'SDS 관리'); XLSX.writeFile(wb, `SDS관리_${today().replaceAll('-', '')}.xlsx`);
