@@ -45,7 +45,6 @@
                 <span>사용제품</span>
                 <div class="search-input-row">
                   <input id="productSearch" type="search" placeholder="제품명 / 제조사 / 코드 / CAS 검색" autocomplete="off" />
-                  <button id="productSearchBtn" class="search-btn" type="button" aria-label="제품 검색">⌕</button>
                 </div>
                 <div id="productResults" class="product-results" hidden></div>
               </div>
@@ -165,10 +164,82 @@
     </section>
   </main>
 
+  <div class="usage-modal-backdrop" id="usageDetailModal" hidden>
+    <section class="usage-modal" role="dialog" aria-modal="true" aria-labelledby="usageDetailTitle">
+      <div class="usage-modal-head">
+        <div>
+          <h3 id="usageDetailTitle">사용내역 상세</h3>
+          <p id="usageDetailContext"></p>
+        </div>
+        <button id="usageDetailClose" class="modal-close-btn" type="button" aria-label="닫기">×</button>
+      </div>
+
+      <div class="usage-modal-body">
+        <div id="usageDetailMessage" class="message compact" aria-live="polite"></div>
+        <div id="usageDetailList" class="usage-detail-list"></div>
+
+        <section id="usageEditSection" class="usage-edit-section" hidden>
+          <div class="edit-section-head">
+            <strong>사용내역 수정</strong>
+            <button id="usageEditCancel" class="btn-secondary small" type="button">수정 취소</button>
+          </div>
+
+          <input id="usageEditId" type="hidden" />
+
+          <div class="edit-grid">
+            <label>
+              <span>사용일</span>
+              <input id="usageEditDate" type="date" />
+            </label>
+
+            <label class="full">
+              <span>사용제품</span>
+              <select id="usageEditProduct"></select>
+            </label>
+
+            <label>
+              <span>사용시간</span>
+              <div class="suffix-input">
+                <input id="usageEditHours" type="number" min="0.01" max="23.99" step="0.01" inputmode="decimal" />
+                <b>시간</b>
+              </div>
+            </label>
+
+            <label>
+              <span>사용량</span>
+              <input id="usageEditQuantity" type="number" min="0" step="any" inputmode="decimal" />
+            </label>
+
+            <label>
+              <span>단위</span>
+              <select id="usageEditUnit">
+                <optgroup label="부피">
+                  <option value="µL">µL</option>
+                  <option value="mL">mL</option>
+                  <option value="L">L</option>
+                </optgroup>
+                <optgroup label="중량">
+                  <option value="µg">µg</option>
+                  <option value="mg">mg</option>
+                  <option value="g">g</option>
+                  <option value="kg">kg</option>
+                </optgroup>
+              </select>
+            </label>
+          </div>
+
+          <div class="edit-actions">
+            <button id="usageEditSave" class="btn-primary" type="button">수정 저장</button>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../supabase.js"></script>
   <script src="./app.js"></script>
   <script src="../../common/common.js"></script>
 </body>
 </html>
-
