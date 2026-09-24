@@ -38,6 +38,7 @@
     periodMode: 'half',
     monthlyRows: [],
     logRows: [],
+    logEmployees: [],
     expandedMonthly: new Set(),
     expandedLog: new Set(),
     detailRecordIds: [],
@@ -605,13 +606,99 @@
     return { start, end };
   }
 
-  function employeeColumns(rows) {
-    const map = new Map();
-    rows.forEach((r) => {
-      const key = String(r.employee_no || r.employee_email || r.employee_name || '');
-      if (!map.has(key)) map.set(key, { key, name: r.employee_name || '-', no: r.employee_no || '' });
-    });
-    return [...map.values()].sort((a, b) => (a.no || a.name).localeCompare(b.no || b.name, 'ko'));
+  function isoDayNumber(value) {
+    const m = String(value || '').match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+    if (!m) return null;
+    const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+    const t = Date.UTC(y, mo - 1, d);
+    const dt = new Date(t);
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null;
+    return Math.floor(t / 86400000);
+  }
+
+  function employeeActiveRange(employee, range) {
+    const rangeStart = isoDayNumber(range?.start);
+    const rangeEnd = isoDayNumber(range?.end);
+    if (rangeStart === null || rangeEnd === null) return null;
+
+    const joinDay = isoDayNumber(employee?.join_date);
+    const leaveDay = isoDayNumber(employee?.leave_date);
+    const start = Math.max(rangeStart, joinDay === null ? rangeStart : joinDay);
+    const end = Math.min(rangeEnd, leaveDay === null ? rangeEnd : leaveDay);
+    return start <= end ? { start, end } : null;
+  }
+
+  function isRangeFullyAbsent(employeeNo, activeRange, absentNotes) {
+    if (!activeRange) return true;
+
+    const intervals = (absentNotes || [])
+      .filter((note) => String(note.employee_no || '') === String(employeeNo || ''))
+      .map((note) => {
+        const start = isoDayNumber(note.start_date);
+        const end = isoDayNumber(note.end_date);
+        // 날짜가 완성되지 않은 특이사항은 자동 제외 판단에 사용하지 않습니다.
+        if (start === null || end === null || start > end) return null;
+        const clippedStart = Math.max(start, activeRange.start);
+        const clippedEnd = Math.min(end, activeRange.end);
+        return clippedStart <= clippedEnd ? { start: clippedStart, end: clippedEnd } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.start - b.start || a.end - b.end);
+
+    if (!intervals.length) return false;
+
+    let cursor = activeRange.start;
+    for (const interval of intervals) {
+      if (interval.start > cursor) return false; // 하루라도 부재가 아닌 날이 있으면 표시
+      if (interval.end >= cursor) cursor = Math.max(cursor, interval.end + 1);
+      if (cursor > activeRange.end) return true;
+    }
+    return cursor > activeRange.end;
+  }
+
+  async function fetchEligibleLogEmployees(range) {
+    const employeeResult = await db
+      .from('employees')
+      .select('employee_no, name, email, sort_order, join_date, leave_date, is_reagent_user')
+      .eq('company_id', state.companyId)
+      .eq('is_reagent_user', true)
+      .order('sort_order', { ascending: true })
+      .order('employee_no', { ascending: true });
+
+    if (employeeResult.error) throw employeeResult.error;
+
+    const noteResult = await db
+      .from('employee_special_notes')
+      .select('employee_no, issue_group, start_date, end_date')
+      .eq('company_id', state.companyId)
+      .eq('issue_group', 'absent');
+
+    if (noteResult.error) throw noteResult.error;
+
+    const absentNotes = Array.isArray(noteResult.data) ? noteResult.data : [];
+    const employees = Array.isArray(employeeResult.data) ? employeeResult.data : [];
+
+    return employees
+      .filter((employee) => {
+        const activeRange = employeeActiveRange(employee, range);
+        if (!activeRange) return false; // 조회기간과 입사~퇴사 기간이 겹치지 않음
+        return !isRangeFullyAbsent(employee.employee_no, activeRange, absentNotes);
+      })
+      .map((employee) => ({
+        key: String(employee.employee_no || employee.email || employee.name || ''),
+        name: employee.name || '-',
+        no: employee.employee_no || '',
+        sort_order: Number(employee.sort_order || 0)
+      }))
+      .filter((employee) => employee.key)
+      .sort((a, b) =>
+        a.sort_order - b.sort_order ||
+        String(a.no || a.name).localeCompare(String(b.no || b.name), 'ko')
+      );
+  }
+
+  function employeeColumns() {
+    return Array.isArray(state.logEmployees) ? state.logEmployees : [];
   }
 
   function rowsForEmployee(rows, employeeKey) {
@@ -822,7 +909,7 @@
   }
 
   function renderLog() {
-    const employees = employeeColumns(state.logRows);
+    const employees = employeeColumns();
     const groups = buildGroups(state.logRows);
 
     $('logHead').innerHTML = `<tr>
@@ -889,14 +976,20 @@
 
   async function loadLogRows() {
     const range = logRange();
-    setMessage('logMessage', '사용일지를 불러오는 중입니다.');
+    setMessage('logMessage', '사용일지와 시약취급자 목록을 불러오는 중입니다.');
     try {
-      state.logRows = await fetchUsage({ startDate: range.start, endDate: range.end });
+      const [rows, employees] = await Promise.all([
+        fetchUsage({ startDate: range.start, endDate: range.end }),
+        fetchEligibleLogEmployees(range)
+      ]);
+      state.logRows = rows;
+      state.logEmployees = employees;
       setMessage('logMessage');
       renderLog();
     } catch (e) {
       console.error(e);
       state.logRows = [];
+      state.logEmployees = [];
       setMessage('logMessage', `불러오기 실패: ${e?.message || '알 수 없는 오류'}`, 'error');
       renderLog();
     }
