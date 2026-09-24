@@ -150,12 +150,12 @@ button{cursor:pointer}
 .log-panel{padding:8px 12px 12px}
 .log-table .material-col{position:sticky;left:0;z-index:4;width:255px;min-width:255px;text-align:left}
 .log-table .cas-col{position:sticky;left:255px;z-index:4;width:130px;min-width:130px;background:#fff}
-.log-table thead .material-col,.log-table thead .cas-col{z-index:7;background:#fafbfe}
-.log-table .person-col{width:150px;min-width:150px}
-.log-table .total-col{width:160px;min-width:160px;font-weight:900}
-.log-table .group-row .material-col,.log-table .group-row .cas-col{background:#f4f2fb}
-.log-table .product-row .material-col,.log-table .product-row .cas-col{background:#fff}
-.person-name{display:block;font-size:11px;font-weight:900}.person-no{display:block;font-size:9px;color:#667085;margin-top:2px}
+.log-table .total-col{position:sticky;left:385px;z-index:4;width:100px;min-width:100px;font-weight:900;background:#fff}
+.log-table thead .material-col,.log-table thead .cas-col,.log-table thead .total-col{z-index:7;background:#fafbfe}
+.log-table .person-col{width:88px;min-width:88px;max-width:88px;padding-left:5px;padding-right:5px}
+.log-table .group-row .material-col,.log-table .group-row .cas-col,.log-table .group-row .total-col{background:#f4f2fb}
+.log-table .product-row .material-col,.log-table .product-row .cas-col,.log-table .product-row .total-col{background:#fff}
+.person-name{display:block;font-size:11px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.person-no{display:block;font-size:9px;color:#667085;margin-top:2px;white-space:nowrap}
 .amount-lines{display:flex;flex-direction:column;gap:2px;font-weight:800}
 .group-row .amount-lines{color:#3d2fb6;font-size:12px}
 .time-value{font-weight:900;color:#3d2fb6}
