@@ -19,14 +19,24 @@
   function conditionHtml(r){return r.is_conditional&&r.condition_text?`<span class="condition-note">조건부 · ${esc(r.condition_text)}</span>`:"";}
   function normalizeCas(v){return String(v||"").trim().replace(/\s+/g,"");}
   function productsFor(r){
-    const seen=new Set(), out=[];
+    const byProduct=new Map();
     casValues(r).forEach(cas=>{
-      (productMatches.get(normalizeCas(cas))||[]).forEach(p=>{
+      const normalized=normalizeCas(cas);
+      (productMatches.get(normalized)||[]).forEach(match=>{
+        const p=match.product||match;
         const key=String(p.id);
-        if(!seen.has(key)){seen.add(key);out.push(p);}
+        let item=byProduct.get(key);
+        if(!item){
+          item={...p,_matchedCas:[]};
+          byProduct.set(key,item);
+        }
+        const casInfo=match.casInfo||{cas_no:cas,content_min:null,content_max:null};
+        if(!item._matchedCas.some(x=>normalizeCas(x.cas_no)===normalizeCas(casInfo.cas_no))){
+          item._matchedCas.push(casInfo);
+        }
       });
     });
-    return out;
+    return Array.from(byProduct.values());
   }
   function periodRange(){
     const type=$("orderPeriod")?.value||"1y";
@@ -53,9 +63,28 @@
     if(ad!==bd)return bd.localeCompare(ad);
     return String(a.name||"").localeCompare(String(b.name||""),"ko");
   }
+  function contentText(casInfo){
+    const rawMin=casInfo?.content_min, rawMax=casInfo?.content_max;
+    const hasMin=rawMin!==null&&rawMin!==undefined&&rawMin!==""&&!Number.isNaN(Number(rawMin));
+    const hasMax=rawMax!==null&&rawMax!==undefined&&rawMax!==""&&!Number.isNaN(Number(rawMax));
+    const min=hasMin?Number(rawMin):null, max=hasMax?Number(rawMax):null;
+    if(hasMin&&hasMax){
+      if(min===max)return `${min}%`;
+      return `${min}~${max}%`;
+    }
+    if(hasMin)return `${min}% 이상`;
+    if(hasMax)return `${max}% 이하`;
+    return "함유량 미입력";
+  }
+  function matchedCasText(p){
+    const list=Array.isArray(p._matchedCas)?p._matchedCas:[];
+    if(!list.length)return "";
+    return list.map(info=>`CAS ${info.cas_no||"-"} · ${contentText(info)}`).join(" / ");
+  }
   function productDisplay(p){
     const parts=[p.name,p.maker,p.code,p.capacity].filter(Boolean), oi=orderInfoForProduct(p.id);
-    return `<div class="matched-product${oi?.ordered?" ordered":""}"><span class="product-name">${esc(parts.join(" / ")||`제품 #${p.id}`)}</span>${oi?.ordered?`<span class="order-date">${esc(oi.latestOrderDate||"-")}</span>`:`<span class="no-order">기간 내 발주 없음</span>`}</div>`;
+    const casLine=matchedCasText(p);
+    return `<div class="matched-product${oi?.ordered?" ordered":""}"><div class="product-name">${esc(parts.join(" / ")||`제품 #${p.id}`)}${casLine?`<span class="sub-name">${esc(casLine)}</span>`:""}</div>${oi?.ordered?`<span class="order-date">${esc(oi.latestOrderDate||"-")}</span>`:`<span class="no-order">기간 내 발주 없음</span>`}</div>`;
   }
   async function loadProductAndOrders(){
     productMatches=new Map();orderMatches=new Map();
@@ -80,7 +109,7 @@
     for(let i=0;i<productIds.length;i+=chunkSize){
       const ids=productIds.slice(i,i+chunkSize);
       const {data:casRows,error:casErr}=await db.from("product_cas")
-        .select("product_id, cas_no, sort_order, id")
+        .select("product_id, cas_no, content_min, content_max, sort_order, id")
         .in("product_id",ids)
         .order("sort_order",{ascending:true})
         .order("id",{ascending:true});
@@ -90,18 +119,24 @@
         const id=String(row.product_id);
         const list=productCasByProduct.get(id)||[];
         const cas=normalizeCas(row.cas_no);
-        if(cas&&!list.includes(cas))list.push(cas);
+        if(cas&&!list.some(item=>normalizeCas(item.cas_no)===cas)){
+          list.push({cas_no:row.cas_no,content_min:row.content_min,content_max:row.content_max});
+        }
         productCasByProduct.set(id,list);
       });
     }
 
     (products||[]).forEach(p=>{
       const casList=productCasByProduct.get(String(p.id))||[];
-      const effectiveCasList=casList.length?casList:[normalizeCas(p.cas)].filter(Boolean);
-      effectiveCasList.forEach(key=>{
+      const effectiveCasList=casList.length?casList:(normalizeCas(p.cas)?[{cas_no:p.cas,content_min:null,content_max:null}]:[]);
+      effectiveCasList.forEach(casInfo=>{
+        const key=normalizeCas(casInfo.cas_no);
+        if(!key)return;
         if(!productMatches.has(key))productMatches.set(key,[]);
         const matched=productMatches.get(key);
-        if(!matched.some(item=>String(item.id)===String(p.id)))matched.push(p);
+        if(!matched.some(item=>String(item.product?.id||item.id)===String(p.id))){
+          matched.push({product:p,casInfo});
+        }
       });
     });
 
@@ -170,7 +205,7 @@
     if(notice){
       notice.textContent=matchError
         ? `기준정보는 정상입니다. 제품/발주 연동 실패: ${matchError?.message||"알 수 없는 오류"}`
-        : "제품 CAS는 product_cas 전체 CAS를 기준으로 매칭하며, 현황에는 선택한 발주기간 내 실제 발주가 확인된 제품만 제품별 최신 발주일로 표시합니다.";
+        : "제품 CAS는 product_cas 전체 CAS를 기준으로 매칭하며, 연결제품에는 매칭된 CAS의 SDS 함유량을 함께 표시합니다. 선택한 발주기간 내 실제 발주가 확인된 제품만 제품별 최신 발주일로 표시합니다.";
       notice.classList.toggle("error",!!matchError);
     }
   }
