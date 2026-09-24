@@ -11,29 +11,17 @@
 <body>
   <main class="usage-shell">
     <section class="usage-app">
-      <header class="usage-appbar">
-        <div class="brand-block">
-          <strong class="qa-mark">QA</strong>
-          <span class="app-title">시약 사용일지</span>
-        </div>
-
-        <nav class="usage-tabs" aria-label="사용일지 화면">
-          <button id="usageInputTab" class="usage-tab active" type="button">사용입력</button>
-          <button id="usageLogTab" class="usage-tab" type="button">사용일지</button>
-        </nav>
-
-        <div class="user-context">
-          <span id="companyName" class="company-name">회사</span>
-          <span class="context-dot">•</span>
-          <span id="employeeName">사용자</span>
-          <span id="employeeNo" class="employee-no"></span>
-        </div>
-      </header>
 
       <section id="usageInputView" class="screen">
         <div class="screen-title-row">
-          <div class="screen-index">1</div>
-          <h2>사용입력 화면 <span>(PC)</span></h2>
+          <div class="title-side">
+            <div class="screen-index">1</div>
+            <h2>사용입력 화면 <span>(PC)</span></h2>
+          </div>
+          <div class="view-switch" role="tablist" aria-label="사용일지 내부 화면">
+            <button id="usageInputTab" class="view-btn active" type="button">사용입력</button>
+            <button id="usageLogTab" class="view-btn" type="button">사용일지</button>
+          </div>
         </div>
 
         <div class="input-layout">
@@ -136,8 +124,10 @@
 
       <section id="usageLogView" class="screen" hidden>
         <div class="screen-title-row log-title-row">
-          <div class="screen-index">2</div>
-          <h2>사용일지 화면 <span>(PC)</span></h2>
+          <div class="title-side">
+            <div class="screen-index">2</div>
+            <h2>사용일지 화면 <span>(PC)</span></h2>
+          </div>
 
           <div class="period-controls">
             <span class="period-label">조회기간</span>
@@ -151,9 +141,15 @@
             <select id="periodDetail"></select>
           </div>
 
-          <div class="metric-toggle log-metric-toggle">
-            <button class="metric-btn active" data-log-metric="amount" type="button">사용량</button>
-            <button class="metric-btn" data-log-metric="time" type="button">사용시간</button>
+          <div class="right-controls">
+            <div class="metric-toggle log-metric-toggle">
+              <button class="metric-btn active" data-log-metric="amount" type="button">사용량</button>
+              <button class="metric-btn" data-log-metric="time" type="button">사용시간</button>
+            </div>
+            <div class="view-switch" role="tablist" aria-label="사용일지 내부 화면">
+              <button id="usageInputTab2" class="view-btn" type="button">사용입력</button>
+              <button id="usageLogTab2" class="view-btn active" type="button">사용일지</button>
+            </div>
           </div>
         </div>
 
