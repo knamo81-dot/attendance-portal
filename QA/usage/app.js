@@ -40,7 +40,10 @@
     logRows: [],
     expandedMonthly: new Set(),
     expandedLog: new Set(),
-    isSaving: false
+    detailRecordIds: [],
+    detailContext: '',
+    isSaving: false,
+    isEditing: false
   };
 
   const $ = (id) => document.getElementById(id);
@@ -510,7 +513,8 @@
         </td>
         ${Array.from({ length: days }, (_, i) => {
           const rows = dayRows(g.rows, i + 1);
-          return `<td class="value-cell ${rows.length ? 'has-value' : ''}">${metricCell(rows, state.monthlyMetric)}</td>`;
+          const context = `${state.currentMonth.getFullYear()}년 ${state.currentMonth.getMonth() + 1}월 ${i + 1}일 · ${g.name}`;
+          return `<td class="value-cell ${rows.length ? 'has-value detail-cell' : ''}"${detailCellAttrs(rows, context)}>${metricCell(rows, state.monthlyMetric)}</td>`;
         }).join('')}
       </tr>`);
 
@@ -529,7 +533,8 @@
             </td>
             ${Array.from({ length: days }, (_, i) => {
               const rows = dayRows(pitem.rows, i + 1);
-              return `<td class="value-cell ${rows.length ? 'has-value' : ''}">${metricCell(rows, state.monthlyMetric)}</td>`;
+              const context = `${state.currentMonth.getFullYear()}년 ${state.currentMonth.getMonth() + 1}월 ${i + 1}일 · ${p?.name || g.name}`;
+              return `<td class="value-cell ${rows.length ? 'has-value detail-cell' : ''}"${detailCellAttrs(rows, context)}>${metricCell(rows, state.monthlyMetric)}</td>`;
             }).join('')}
           </tr>`);
         });
@@ -613,6 +618,209 @@
     return rows.filter((r) => String(r.employee_no || r.employee_email || r.employee_name || '') === employeeKey);
   }
 
+  function recordIdsAttr(rows) {
+    const ids = rows.map((r) => Number(r.id)).filter(Number.isFinite);
+    return ids.join(',');
+  }
+
+  function detailCellAttrs(rows, context = '') {
+    if (!rows.length) return '';
+    return ` data-detail-ids="${esc(recordIdsAttr(rows))}" data-detail-context="${esc(context)}"`;
+  }
+
+  function findRecordById(id) {
+    const n = Number(id);
+    return [...state.monthlyRows, ...state.logRows].find((r) => Number(r.id) === n) || null;
+  }
+
+  function recordsByIds(ids) {
+    const wanted = new Set((ids || []).map(Number).filter(Number.isFinite));
+    const merged = new Map();
+    [...state.monthlyRows, ...state.logRows].forEach((r) => {
+      const id = Number(r.id);
+      if (wanted.has(id)) merged.set(id, r);
+    });
+    return [...merged.values()].sort((a, b) => {
+      const da = String(a.usage_date || '') + String(a.created_at || '');
+      const dbv = String(b.usage_date || '') + String(b.created_at || '');
+      return da.localeCompare(dbv);
+    });
+  }
+
+  function formatCreatedAt(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    return new Intl.DateTimeFormat('ko-KR', {
+      year:'numeric', month:'2-digit', day:'2-digit',
+      hour:'2-digit', minute:'2-digit', hour12:false
+    }).format(d);
+  }
+
+  function renderEditProductOptions(selectedId) {
+    const select = $('usageEditProduct');
+    if (!select) return;
+    select.innerHTML = state.products.map((p) => {
+      const label = [p.name, p.maker, p.code, p.capacity].filter(Boolean).join(' · ');
+      return `<option value="${Number(p.id)}" ${Number(p.id) === Number(selectedId) ? 'selected' : ''}>${esc(label || `제품 #${p.id}`)}</option>`;
+    }).join('');
+  }
+
+  function renderUsageDetail() {
+    const records = recordsByIds(state.detailRecordIds);
+    $('usageDetailContext').textContent = state.detailContext || '';
+    const list = $('usageDetailList');
+
+    if (!records.length) {
+      list.innerHTML = '<div class="usage-detail-empty">표시할 사용내역이 없습니다.</div>';
+      return;
+    }
+
+    list.innerHTML = records.map((r) => {
+      const p = state.productsById.get(Number(r.product_id));
+      const cas = productCasRows(p).map((x) => x.cas_no).filter(Boolean).join(', ') || '-';
+      const hours = dbTimeToHours(r.usage_time);
+      return `<article class="usage-detail-item" data-detail-record="${Number(r.id)}">
+        <div class="usage-detail-main">
+          <div class="usage-detail-product">${esc(p?.name || `제품 #${r.product_id}`)}</div>
+          <div class="usage-detail-meta">${esc([p?.maker, p?.code, p?.capacity].filter(Boolean).join(' · ') || '-')}</div>
+          <div class="usage-detail-meta">CAS ${esc(cas)} · ${esc(r.employee_name || '')}${r.employee_no ? ` (${esc(r.employee_no)})` : ''}</div>
+          <div class="usage-detail-values">
+            <span>사용일 <b>${esc(r.usage_date || '-')}</b></span>
+            <span>사용시간 <b>${esc(numberText(hours, 2))}시간</b></span>
+            <span>사용량 <b>${esc(numberText(r.quantity, 4))} ${esc(r.unit || '')}</b></span>
+            ${r.created_at ? `<span>등록 <b>${esc(formatCreatedAt(r.created_at))}</b></span>` : ''}
+          </div>
+        </div>
+        <div class="usage-detail-actions">
+          <button class="btn-secondary" type="button" data-detail-edit="${Number(r.id)}">수정</button>
+          <button class="btn-danger" type="button" data-detail-delete="${Number(r.id)}">삭제</button>
+        </div>
+      </article>`;
+    }).join('');
+  }
+
+  function openUsageDetail(ids, context = '') {
+    const parsed = String(ids || '').split(',').map(Number).filter(Number.isFinite);
+    if (!parsed.length) return;
+    state.detailRecordIds = parsed;
+    state.detailContext = context || '사용내역 상세';
+    $('usageEditSection').hidden = true;
+    $('usageDetailModal').hidden = false;
+    setMessage('usageDetailMessage');
+    renderUsageDetail();
+  }
+
+  function closeUsageDetail() {
+    $('usageDetailModal').hidden = true;
+    $('usageEditSection').hidden = true;
+    state.detailRecordIds = [];
+    state.detailContext = '';
+    state.isEditing = false;
+    setMessage('usageDetailMessage');
+  }
+
+  function openUsageEdit(id) {
+    const r = findRecordById(id);
+    if (!r) return;
+    state.isEditing = true;
+    $('usageEditId').value = String(r.id);
+    $('usageEditDate').value = r.usage_date || '';
+    $('usageEditHours').value = numberText(dbTimeToHours(r.usage_time), 4).replaceAll(',', '');
+    $('usageEditQuantity').value = String(r.quantity ?? '');
+    $('usageEditUnit').value = r.unit || 'mL';
+    renderEditProductOptions(r.product_id);
+    $('usageEditSection').hidden = false;
+    $('usageEditSection').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  async function saveUsageEdit() {
+    if (state.isEditing === false) return;
+    const id = Number($('usageEditId').value);
+    const productId = Number($('usageEditProduct').value);
+    const usageDate = $('usageEditDate').value;
+    const quantity = Number($('usageEditQuantity').value);
+    const unit = $('usageEditUnit').value;
+    const hours = Number($('usageEditHours').value);
+
+    if (!Number.isFinite(id)) return;
+    if (!usageDate) { setMessage('usageDetailMessage', '사용일을 입력해 주세요.', 'error'); return; }
+    if (!Number.isFinite(productId)) { setMessage('usageDetailMessage', '사용제품을 선택해 주세요.', 'error'); return; }
+    if (!Number.isFinite(quantity) || quantity <= 0) { setMessage('usageDetailMessage', '사용량은 0보다 큰 숫자로 입력해 주세요.', 'error'); return; }
+
+    let usageTime;
+    try {
+      usageTime = hoursToDbTime(hours);
+    } catch (e) {
+      setMessage('usageDetailMessage', e.message || '사용시간을 확인해 주세요.', 'error');
+      return;
+    }
+
+    const btn = $('usageEditSave');
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '저장 중...';
+
+    try {
+      const { error } = await db.from(TABLE)
+        .update({
+          product_id: productId,
+          usage_date: usageDate,
+          usage_time: usageTime,
+          quantity_type: quantityTypeForUnit(unit),
+          quantity,
+          unit,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .eq('company_id', state.companyId);
+
+      if (error) throw error;
+
+      setMessage('usageDetailMessage', '사용내역이 수정되었습니다.', 'success');
+      $('usageEditSection').hidden = true;
+      state.isEditing = false;
+      await Promise.all([loadMonthlyRows(), loadLogRows()]);
+      renderUsageDetail();
+    } catch (e) {
+      console.error('[QA Usage] update failed', e);
+      setMessage('usageDetailMessage', `수정 실패: ${e?.message || '알 수 없는 오류'}`, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  }
+
+  async function deleteUsageRecord(id) {
+    const r = findRecordById(id);
+    if (!r) return;
+
+    const p = state.productsById.get(Number(r.product_id));
+    const ok = confirm(`이 사용내역을 삭제할까요?\n\n${r.usage_date || ''} · ${p?.name || `제품 #${r.product_id}`}\n${numberText(r.quantity, 4)} ${r.unit || ''}`);
+    if (!ok) return;
+
+    try {
+      const { error } = await db.from(TABLE)
+        .delete()
+        .eq('id', Number(id))
+        .eq('company_id', state.companyId);
+
+      if (error) throw error;
+
+      state.detailRecordIds = state.detailRecordIds.filter((x) => Number(x) !== Number(id));
+      setMessage('usageDetailMessage', '사용내역이 삭제되었습니다.', 'success');
+      await Promise.all([loadMonthlyRows(), loadLogRows()]);
+      if (!state.detailRecordIds.length) {
+        closeUsageDetail();
+      } else {
+        renderUsageDetail();
+      }
+    } catch (e) {
+      console.error('[QA Usage] delete failed', e);
+      setMessage('usageDetailMessage', `삭제 실패: ${e?.message || '알 수 없는 오류'}`, 'error');
+    }
+  }
+
   function renderLog() {
     const employees = employeeColumns(state.logRows);
     const groups = buildGroups(state.logRows);
@@ -644,8 +852,12 @@
           </div>
         </td>
         <td class="cas-col">${esc(g.cas)}</td>
-        ${employees.map((e) => `<td>${metricCell(rowsForEmployee(g.rows, e.key), state.logMetric)}</td>`).join('')}
-        <td class="total-col">${metricCell(g.rows, state.logMetric)}</td>
+        ${employees.map((e) => {
+          const cellRows = rowsForEmployee(g.rows, e.key);
+          const context = `${g.name} · ${e.name}${e.no ? ` (${e.no})` : ''}`;
+          return `<td class="${cellRows.length ? 'detail-cell' : ''}"${detailCellAttrs(cellRows, context)}>${metricCell(cellRows, state.logMetric)}</td>`;
+        }).join('')}
+        <td class="total-col ${g.rows.length ? 'detail-cell' : ''}"${detailCellAttrs(g.rows, `${g.name} · 전체`)}>${metricCell(g.rows, state.logMetric)}</td>
       </tr>`);
 
       if (expanded) {
@@ -662,8 +874,12 @@
               </div>
             </td>
             <td class="cas-col">${esc(primaryCas(p) || '-')}</td>
-            ${employees.map((e) => `<td>${metricCell(rowsForEmployee(pitem.rows, e.key), state.logMetric)}</td>`).join('')}
-            <td class="total-col">${metricCell(pitem.rows, state.logMetric)}</td>
+            ${employees.map((e) => {
+              const cellRows = rowsForEmployee(pitem.rows, e.key);
+              const context = `${p?.name || g.name} · ${e.name}${e.no ? ` (${e.no})` : ''}`;
+              return `<td class="${cellRows.length ? 'detail-cell' : ''}"${detailCellAttrs(cellRows, context)}>${metricCell(cellRows, state.logMetric)}</td>`;
+            }).join('')}
+            <td class="total-col ${pitem.rows.length ? 'detail-cell' : ''}"${detailCellAttrs(pitem.rows, `${p?.name || g.name} · 전체`)}>${metricCell(pitem.rows, state.logMetric)}</td>
           </tr>`);
         });
       }
@@ -713,7 +929,6 @@
 
     $('productSearch').addEventListener('input', renderProductResults);
     $('productSearch').addEventListener('focus', renderProductResults);
-    $('productSearchBtn').addEventListener('click', () => { $('productSearch').focus(); renderProductResults(); });
     $('productResults').addEventListener('click', (e) => {
       const item = e.target.closest('[data-product-id]');
       if (item) selectProduct(item.dataset.productId);
@@ -751,6 +966,12 @@
       renderMonthly();
     });
 
+    $('monthlyBody').addEventListener('click', (e) => {
+      const cell = e.target.closest('[data-detail-ids]');
+      if (!cell) return;
+      openUsageDetail(cell.dataset.detailIds, cell.dataset.detailContext || '월간 사용내역');
+    });
+
     document.querySelectorAll('[data-period-mode]').forEach((btn) => btn.addEventListener('click', () => {
       state.periodMode = btn.dataset.periodMode;
       document.querySelectorAll('[data-period-mode]').forEach((b) => b.classList.toggle('active', b === btn));
@@ -774,9 +995,42 @@
       renderLog();
     });
 
+    $('logBody').addEventListener('click', (e) => {
+      const cell = e.target.closest('[data-detail-ids]');
+      if (!cell) return;
+      openUsageDetail(cell.dataset.detailIds, cell.dataset.detailContext || '사용일지 상세');
+    });
+
+    $('usageDetailClose').addEventListener('click', closeUsageDetail);
+    $('usageDetailModal').addEventListener('click', (e) => {
+      if (e.target === $('usageDetailModal')) closeUsageDetail();
+    });
+    $('usageEditCancel').addEventListener('click', () => {
+      $('usageEditSection').hidden = true;
+      state.isEditing = false;
+      setMessage('usageDetailMessage');
+    });
+    $('usageEditSave').addEventListener('click', saveUsageEdit);
+
+    $('usageDetailList').addEventListener('click', (e) => {
+      const editBtn = e.target.closest('[data-detail-edit]');
+      if (editBtn) {
+        openUsageEdit(editBtn.dataset.detailEdit);
+        return;
+      }
+      const deleteBtn = e.target.closest('[data-detail-delete]');
+      if (deleteBtn) {
+        deleteUsageRecord(deleteBtn.dataset.detailDelete);
+      }
+    });
+
     window.addEventListener('message', (e) => {
       const p = e?.data || {};
       if (p.type === 'portal-tabs-request' || p.type === 'portal-filters-request') notifyPortal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !$('usageDetailModal').hidden) closeUsageDetail();
     });
   }
 
