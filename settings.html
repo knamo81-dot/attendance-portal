@@ -1873,6 +1873,7 @@ html.embed-mode #settings-page .admin-section-panel > .real-card:first-child {
                           <th>이메일</th>
                           <th>관리팀코드</th>
                           <th>근태대상</th>
+                          <th>시약취급자</th>
                           <th>상태</th>
                           <th>입사일</th>
                           <th>퇴사일</th>
@@ -1882,7 +1883,7 @@ html.embed-mode #settings-page .admin-section-panel > .real-card:first-child {
                         </tr>
                       </thead>
                       <tbody id="realEmployeeTbody">
-                        <tr><td colspan="16" class="real-empty-row">불러오는 중입니다.</td></tr>
+                        <tr><td colspan="17" class="real-empty-row">불러오는 중입니다.</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -1923,6 +1924,7 @@ html.embed-mode #settings-page .admin-section-panel > .real-card:first-child {
                     </div>
                     <div class="real-field"><label>관리팀코드</label><input id="realEmpManagedTeams" class="real-input" placeholder="예: AA01-01"></div>
                     <div class="real-field"><label>근태대상</label><select id="realEmpAttendance" class="real-select"><option value="true">Y</option><option value="false">N</option></select></div>
+                    <div class="real-field"><label>시약취급자</label><select id="realEmpReagentUser" class="real-select" title="QA 사용일지의 담당자 목록에 표시할 시약 취급자를 지정합니다."><option value="false">N</option><option value="true">Y</option></select></div>
                     <div class="real-field"><label>상태</label><select id="realEmpStatus" class="real-select"><option value="재직">재직</option><option value="퇴사">퇴사</option></select></div>
                     <div class="real-field"><label>입사일</label><input id="realEmpJoinDate" class="real-input" type="date"></div>
                     <div class="real-field"><label>퇴사일</label><input id="realEmpLeaveDate" class="real-input" type="date"></div>
@@ -3053,6 +3055,7 @@ create table if not exists user_app_roles (
       email: payload.email,
       managed_team_codes: managedCodes || null,
       attendance_target: !!payload.attendance_target,
+      is_reagent_user: !!payload.is_reagent_user,
       status: payload.status,
       join_date: payload.join_date,
       leave_date: payload.leave_date,
@@ -3458,7 +3461,7 @@ create table if not exists user_app_roles (
       safeSelect('managed_teams','*')
     ]);
     if(empRes.error){
-      $('realEmployeeTbody').innerHTML='<tr><td colspan="15" class="real-empty-row">'+esc(empRes.error.message)+'</td></tr>'; return;
+      $('realEmployeeTbody').innerHTML='<tr><td colspan="17" class="real-empty-row">'+esc(empRes.error.message)+'</td></tr>'; return;
     }
     const managedMap = new Map();
     (managedRes.data || []).forEach(row=>{
@@ -3570,7 +3573,7 @@ create table if not exists user_app_roles (
     $('realEmpActiveStat').textContent = `재직 ${dataState.employees.filter(e=>e.status!=='퇴사').length}명`;
     $('realEmpLeaveStat').textContent = `퇴사 ${dataState.employees.filter(e=>e.status==='퇴사').length}명`;
     if(!rows.length){
-      tbody.innerHTML='<tr><td colspan="15" class="real-empty-row">표시할 사원이 없습니다.</td></tr>'; return;
+      tbody.innerHTML='<tr><td colspan="17" class="real-empty-row">표시할 사원이 없습니다.</td></tr>'; return;
     }
     tbody.innerHTML = rows.map(e=>{
       const divName = dataState.divisions.find(d=>d.division_code===e.division_code)?.division_name || e.division_code || '-';
@@ -3586,6 +3589,7 @@ create table if not exists user_app_roles (
         <td>${esc(e.email || '-')}</td>
         <td>${esc(e.managed_team_codes || '-')}</td>
         <td>${e.attendance_target ? 'Y' : 'N'}</td>
+        <td>${e.is_reagent_user ? 'Y' : 'N'}</td>
         <td><span class="real-status-chip ${e.status==='퇴사'?'inactive':'active'}">${esc(e.status || '-')}</span></td>
         <td>${esc(e.join_date || '-')}</td>
         <td>${esc(e.leave_date || '-')}</td>
@@ -3635,7 +3639,7 @@ create table if not exists user_app_roles (
       setEmployeeModalSummary(null);
       $('realEmpNo').value=''; $('realEmpName').value=''; $('realEmpSort').value='1'; $('realEmpEmail').value='';
       $('realEmpDivisionSelect').value=''; fillTeamSelect('realEmpTeamSelect','');
-      $('realEmpGrade').value=''; $('realEmpAuthority').value=''; $('realEmpManagedTeams').value=''; $('realEmpAttendance').value='true';
+      $('realEmpGrade').value=''; $('realEmpAuthority').value=''; $('realEmpManagedTeams').value=''; $('realEmpAttendance').value='true'; $('realEmpReagentUser').value='false';
       $('realEmpStatus').value='재직'; $('realEmpJoinDate').value=''; $('realEmpLeaveDate').value=''; $('realEmpLeaveReason').value=''; $('realEmpMemo').value='';
       const newRoleEl = document.getElementById('realEmpRole');
       if (newRoleEl) newRoleEl.value = 'viewer';
@@ -3653,6 +3657,7 @@ create table if not exists user_app_roles (
     $('realEmpAuthority').value=row.authority||'';
     $('realEmpManagedTeams').value=row.managed_team_codes||'';
     $('realEmpAttendance').value=String(!!row.attendance_target);
+    $('realEmpReagentUser').value=String(!!row.is_reagent_user);
     $('realEmpStatus').value=row.status||'재직';
     $('realEmpJoinDate').value=row.join_date||'';
     $('realEmpLeaveDate').value=row.leave_date||'';
@@ -3741,6 +3746,7 @@ create table if not exists user_app_roles (
       email,
       email_raw: emailRaw || email,
       attendance_target: $('realEmpAttendance').value === 'true',
+      is_reagent_user: $('realEmpReagentUser').value === 'true',
       status: $('realEmpStatus').value,
       join_date: $('realEmpJoinDate').value || null,
       leave_date: $('realEmpLeaveDate').value || null,
@@ -3756,8 +3762,9 @@ create table if not exists user_app_roles (
     if(fbPre){ fbPre.classList.remove('ok'); }
     setFeedback('realEmployeeFeedback','사원정보와 로그인 계정을 저장하는 중입니다...', 'loading');
 
+    const { is_reagent_user: reagentUserFlag, ...accountPayload } = payload;
     const edgePayload = {
-      ...payload,
+      ...accountPayload,
       mode: formMode,
       company_id: (typeof getCompanyId === 'function' ? getCompanyId() : '') || undefined
     };
@@ -3767,6 +3774,20 @@ create table if not exists user_app_roles (
     const edgeMsg = await getEdgeFunctionMessage(error, data, '계정/사원 저장 Edge Function 호출에 실패했습니다.');
     if(!edgeOk){
       setFeedback('realEmployeeFeedback', edgeMsg, false);
+      return;
+    }
+
+    // 시약취급자 여부는 employees의 회사별 사원 속성으로 직접 저장합니다.
+    // 기존 create-employee-account Edge Function 스키마에는 영향을 주지 않습니다.
+    const reagentCompanyId = (typeof getCompanyId === 'function' ? String(getCompanyId() || '').trim() : '');
+    let reagentUserQuery = sb
+      .from('employees')
+      .update({ is_reagent_user: !!reagentUserFlag })
+      .eq('employee_no', employeeNo);
+    if(reagentCompanyId) reagentUserQuery = reagentUserQuery.eq('company_id', reagentCompanyId);
+    const reagentUserUpdate = await reagentUserQuery;
+    if(reagentUserUpdate.error){
+      setFeedback('realEmployeeFeedback', `사원정보는 저장되었지만 시약취급자 설정 반영에 실패했습니다: ${reagentUserUpdate.error.message}`, false);
       return;
     }
 
