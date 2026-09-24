@@ -3027,6 +3027,12 @@ body.auth-loading .top-user-bar {
       desc: '제품별 안전보건자료와 등록 상태를 관리합니다.',
       gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
     },
+    'QA/usage/index.html': {
+      top: 'Safety Management',
+      title: 'QA',
+      desc: '시약 사용입력과 사용일지를 관리합니다.',
+      gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
+    },
     'QA/special/index.html': {
       top: 'Safety Management',
       title: 'QA',
@@ -3092,10 +3098,17 @@ body.auth-loading .top-user-bar {
       { id: 'products', label: '제품관리' }
     ],
     'QA/index.html': [
+      { id: 'qa-usage', label: '사용일지' },
+      { id: 'qa-sds', label: 'SDS 관리' },
+      { id: 'qa-special', label: '특별관리물질 현황' }
+    ],
+    'QA/usage/index.html': [
+      { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: 'SDS 관리' },
       { id: 'qa-special', label: '특별관리물질 현황' }
     ],
     'QA/special/index.html': [
+      { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: 'SDS 관리' },
       { id: 'qa-special', label: '특별관리물질 현황' }
     ],
@@ -3371,9 +3384,13 @@ body.auth-loading .top-user-bar {
       ''
     );
 
-    // QA는 SDS와 특별관리물질을 독립 프로그램으로 운영하므로
+    // QA는 사용일지, SDS, 특별관리물질을 독립 프로그램으로 운영하므로
     // 포탈 상단 버튼에서 iframe 경로 자체를 전환합니다.
-    if (currentSrc === 'QA/index.html' || currentSrc === 'QA/special/index.html') {
+    if (currentSrc === 'QA/index.html' || currentSrc === 'QA/usage/index.html' || currentSrc === 'QA/special/index.html') {
+      if (tabId === 'qa-usage' && currentSrc !== 'QA/usage/index.html') {
+        replacePortalFrame('QA/usage/index.html');
+        return;
+      }
       if (tabId === 'qa-sds' && currentSrc !== 'QA/index.html') {
         replacePortalFrame('QA/index.html');
         return;
@@ -3415,6 +3432,7 @@ body.auth-loading .top-user-bar {
     const key = normalizePortalSrc(src);
     const tabs = portalDefaultTabs[key] || [];
     let activeId = tabs[0]?.id || '';
+    if (key === 'QA/usage/index.html') activeId = 'qa-usage';
     if (key === 'QA/index.html') activeId = 'qa-sds';
     if (key === 'QA/special/index.html') activeId = 'qa-special';
     renderPortalSubtabs(tabs, activeId);
@@ -5106,11 +5124,11 @@ body.auth-loading .top-user-bar {
       const targetUrl = new URL(src, window.location.href).href;
       const normalizedTarget = normalizePortalSrc(src);
 
-      // QA는 SDS와 특별관리물질을 서로 다른 HTML 프로그램으로 운영합니다.
+      // QA는 사용일지, SDS, 특별관리물질을 서로 다른 HTML 프로그램으로 운영합니다.
       // 기존 시약/근태 등은 같은 HTML 안에서 postMessage로 내부 탭을 바꾸지만,
-      // QA의 두 프로그램은 iframe 문서 자체를 교체해야 하므로 src를 직접 갱신합니다.
+      // QA의 세 프로그램은 iframe 문서 자체를 교체해야 하므로 src를 직접 갱신합니다.
       // 이렇게 해야 iframe의 src 속성도 실제 현재 프로그램과 일치합니다.
-      if (normalizedTarget === 'QA/index.html' || normalizedTarget === 'QA/special/index.html') {
+      if (normalizedTarget === 'QA/index.html' || normalizedTarget === 'QA/usage/index.html' || normalizedTarget === 'QA/special/index.html') {
         frame.src = targetUrl;
       } else if (frame.contentWindow && frame.contentWindow.location) {
         frame.contentWindow.location.replace(targetUrl);
@@ -5623,9 +5641,9 @@ body.auth-loading .top-user-bar {
       if (payload.type === 'portal-tabs-ready' || payload.type === 'portal-tabs-update') {
         const currentSrc = normalizePortalSrc(frame?.dataset?.currentSrc || frame?.getAttribute('src') || frame?.src || HOME_SRC);
 
-        // QA는 SDS와 특별관리물질이 서로 독립 프로그램이므로,
+        // QA는 사용일지, SDS, 특별관리물질이 서로 독립 프로그램이므로,
         // 각 하위 앱이 보내는 자체 탭 정보로 포털의 QA 공통 메뉴를 덮어쓰지 않습니다.
-        if (currentSrc === 'QA/index.html' || currentSrc === 'QA/special/index.html') {
+        if (currentSrc === 'QA/index.html' || currentSrc === 'QA/usage/index.html' || currentSrc === 'QA/special/index.html') {
           updatePortalSubtabs(currentSrc);
           return;
         }
@@ -5656,10 +5674,13 @@ body.auth-loading .top-user-bar {
           HOME_SRC
         );
 
-        // QA 상단 2개 버튼은 서로 다른 프로그램 경로를 나타냅니다.
-        // SDS 앱 내부에서 보내는 active tab id(예: sds)는 포털의 qa-sds와 다른 id이므로
-        // 그대로 적용하면 두 버튼 모두 비활성(흰색)이 됩니다.
+        // QA 상단 3개 버튼은 서로 다른 프로그램 경로를 나타냅니다.
+        // 각 하위 앱이 보내는 내부 active tab id와 포털의 qa-* id가 다를 수 있으므로
         // QA에서는 현재 iframe 경로를 기준으로 포털 버튼 active 상태를 고정합니다.
+        if (currentSrc === 'QA/usage/index.html') {
+          setPortalSubtabActive('qa-usage', false);
+          return;
+        }
         if (currentSrc === 'QA/index.html') {
           setPortalSubtabActive('qa-sds', false);
           return;
