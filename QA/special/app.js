@@ -70,18 +70,42 @@
     const {data:products,error:pErr}=await pq;
     if(pErr)throw pErr;
 
-    (products||[]).forEach(p=>{
-      const key=normalizeCas(p.cas);
-      if(!key)return;
-      if(!productMatches.has(key))productMatches.set(key,[]);
-      productMatches.get(key).push(p);
-    });
-
     const productIds=(products||[]).map(p=>p.id);
     if(!productIds.length)return;
 
-    // Supabase URL 길이를 피하기 위해 제품 ID를 나누어 조회합니다.
+    // CAS 기준정보는 product_master.cas가 아니라 product_cas 전체 CAS를 사용합니다.
+    // product_cas가 아직 없는 기존 제품만 product_master.cas를 fallback으로 사용합니다.
+    const productCasByProduct=new Map();
     const chunkSize=150;
+    for(let i=0;i<productIds.length;i+=chunkSize){
+      const ids=productIds.slice(i,i+chunkSize);
+      const {data:casRows,error:casErr}=await db.from("product_cas")
+        .select("product_id, cas_no, sort_order, id")
+        .in("product_id",ids)
+        .order("sort_order",{ascending:true})
+        .order("id",{ascending:true});
+      if(casErr)throw casErr;
+      (casRows||[]).forEach(row=>{
+        if(row.product_id==null)return;
+        const id=String(row.product_id);
+        const list=productCasByProduct.get(id)||[];
+        const cas=normalizeCas(row.cas_no);
+        if(cas&&!list.includes(cas))list.push(cas);
+        productCasByProduct.set(id,list);
+      });
+    }
+
+    (products||[]).forEach(p=>{
+      const casList=productCasByProduct.get(String(p.id))||[];
+      const effectiveCasList=casList.length?casList:[normalizeCas(p.cas)].filter(Boolean);
+      effectiveCasList.forEach(key=>{
+        if(!productMatches.has(key))productMatches.set(key,[]);
+        const matched=productMatches.get(key);
+        if(!matched.some(item=>String(item.id)===String(p.id)))matched.push(p);
+      });
+    });
+
+    // 발주이력은 product_id를 기준으로 기존 reagent_collect_items에서 조회합니다.
     for(let i=0;i<productIds.length;i+=chunkSize){
       const ids=productIds.slice(i,i+chunkSize);
       let oq=db.from("reagent_collect_items")
@@ -146,7 +170,7 @@
     if(notice){
       notice.textContent=matchError
         ? `기준정보는 정상입니다. 제품/발주 연동 실패: ${matchError?.message||"알 수 없는 오류"}`
-        : "CAS 매칭은 내부적으로 유지하며, 현황에는 선택한 발주기간 내 실제 발주가 확인된 제품만 제품별 최신 발주일로 표시합니다.";
+        : "제품 CAS는 product_cas 전체 CAS를 기준으로 매칭하며, 현황에는 선택한 발주기간 내 실제 발주가 확인된 제품만 제품별 최신 발주일로 표시합니다.";
       notice.classList.toggle("error",!!matchError);
     }
   }
