@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>특별관리물질 보관</title>
-  <link rel="stylesheet" href="./style.css?v=20260925-storage2" />
+  <link rel="stylesheet" href="./style.css?v=20260925-storage3" />
   <link rel="stylesheet" href="../../common/mobile.css" />
   <link rel="stylesheet" href="../../common/theme.css" />
 </head>
@@ -18,17 +18,15 @@
         </div>
         <div class="head-actions">
           <button id="saveQuantities" class="save-btn" type="button">수량 저장</button>
-          <span id="saveGuide" class="save-guide">보관함을 확인하며 수량을 입력한 뒤 한 번에 저장하세요.</span>
+          <span id="saveGuide" class="save-guide"></span>
         </div>
       </header>
 
       <div class="toolbar">
         <div class="period-controls">
           <span class="toolbar-label">조회기간</span>
-          <button id="prevMonthBtn" class="period-nav" type="button" aria-label="이전 달">&#8249;</button>
           <select id="yearSelect" aria-label="조회 연도"></select>
           <select id="monthSelect" aria-label="조회 월"></select>
-          <button id="nextMonthBtn" class="period-nav" type="button" aria-label="다음 달">&#8250;</button>
         </div>
 
         <label class="search-field">
@@ -76,7 +74,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../supabase.js"></script>
-  <script src="./app.js?v=20260925-storage2"></script>
+  <script src="./app.js?v=20260925-storage3"></script>
   <script src="../../common/common.js"></script>
 </body>
 </html>
