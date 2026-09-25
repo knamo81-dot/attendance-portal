@@ -30,6 +30,7 @@
     employee: null,
     products: [],
     productsById: new Map(),
+    chemicalByCas: new Map(),
     selectedProduct: null,
     currentView: 'input',
     currentMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -139,16 +140,52 @@
     return productCasRows(product)[0]?.cas_no || '';
   }
 
-  function baseMaterialName(product) {
-    const raw = String(product?.name || '').trim();
-    if (!raw) return '물질명 미등록';
-    return raw.split(',')[0].trim() || raw;
+  function casKey(value) {
+    return String(value || '').trim();
+  }
+
+  function chemicalForCas(casNo) {
+    return state.chemicalByCas.get(casKey(casNo)) || null;
+  }
+
+  function materialInfoForCas(casNo) {
+    const cas = casKey(casNo);
+    const chemical = chemicalForCas(cas) || {};
+    const ko = String(chemical.chem_name_ko || '').trim();
+    const en = String(chemical.chem_name_en || '').trim();
+    const name = ko || en || cas || '물질명 미등록';
+    const secondary = ko && en && normalize(ko) !== normalize(en) ? en : '';
+    return { cas_no: cas, chem_name_ko: ko, chem_name_en: en, name, secondary };
+  }
+
+  function productMaterialRows(product) {
+    return productCasRows(product).map((row) => ({
+      ...row,
+      ...materialInfoForCas(row.cas_no)
+    }));
+  }
+
+  function materialTextForProduct(product) {
+    const rows = productMaterialRows(product);
+    if (!rows.length) return String(product?.name || '').trim() || '물질명 미등록';
+    return rows.map((r) => r.name).filter(Boolean).join(' / ');
+  }
+
+  function renderMaterialStack(rows, fallback = '물질명 미등록') {
+    if (!rows?.length) return `<span class="material-entry"><b>${esc(fallback)}</b></span>`;
+    return rows.map((r) => `<span class="material-entry"><b>${esc(r.name)}</b>${r.secondary ? `<small>${esc(r.secondary)}</small>` : ''}</span>`).join('');
+  }
+
+  function renderCasStack(rows, withContent = false) {
+    if (!rows?.length) return '<span>-</span>';
+    return rows.map((r) => `<span class="cas-stack-line"><b>${esc(r.cas_no || '-')}</b>${withContent && formatContent(r) ? `<small>${esc(formatContent(r))}</small>` : ''}</span>`).join('');
   }
 
   function productSearchText(product) {
+    const materials = productMaterialRows(product);
     return normalize([
       product.name, product.maker, product.code, product.capacity, product.grade,
-      ...productCasRows(product).map((r) => r.cas_no)
+      ...materials.flatMap((r) => [r.cas_no, r.chem_name_ko, r.chem_name_en])
     ].join(' '));
   }
 
@@ -275,11 +312,13 @@
     }
     $('selectedProductName').textContent = p.name || '-';
     $('selectedProductMeta').textContent = [p.maker, p.code, p.capacity].filter(Boolean).join(' · ') || '-';
-    $('selectedMaterialName').textContent = baseMaterialName(p);
-    const casRows = productCasRows(p);
-    $('selectedProductCas').innerHTML = casRows.length
-      ? casRows.map((r) => `<span class="cas-line"><b>${esc(r.cas_no)}</b>${formatContent(r) ? `<span class="cas-content">${esc(formatContent(r))}</span>` : ''}</span>`).join('')
+    const materialRows = productMaterialRows(p);
+    $('selectedProductCas').innerHTML = materialRows.length
+      ? renderCasStack(materialRows, true)
       : '<span>CAS 미등록</span>';
+    $('selectedMaterialName').innerHTML = materialRows.length
+      ? renderMaterialStack(materialRows)
+      : '<span class="material-entry"><b>물질명 미등록</b></span>';
     wrap.hidden = false;
     $('productSearch').value = '';
     $('productSearch').disabled = true;
@@ -339,6 +378,29 @@
       product_cas: casMap.get(Number(p.id)) || []
     }));
     state.productsById = new Map(state.products.map((p) => [Number(p.id), p]));
+    await loadChemicalMaster();
+  }
+
+  async function loadChemicalMaster() {
+    const casNos = [...new Set(state.products.flatMap((p) => productCasRows(p).map((r) => casKey(r.cas_no))).filter(Boolean))];
+    const chemicalMap = new Map();
+
+    for (let i = 0; i < casNos.length; i += 200) {
+      const chunk = casNos.slice(i, i + 200);
+      if (!chunk.length) continue;
+      const chemicalResult = await db
+        .from('qa_chemical_master')
+        .select('cas_no, chem_name_ko, chem_name_en, source, sync_status')
+        .in('cas_no', chunk);
+
+      if (chemicalResult.error) throw chemicalResult.error;
+      (chemicalResult.data || []).forEach((row) => {
+        const key = casKey(row.cas_no);
+        if (key) chemicalMap.set(key, row);
+      });
+    }
+
+    state.chemicalByCas = chemicalMap;
   }
 
   function buildPayload() {
@@ -442,8 +504,16 @@
   }
 
   function productGroupKey(product) {
-    const cas = primaryCas(product);
-    return cas ? `cas:${cas}` : `product:${product?.id || 'unknown'}`;
+    const materials = productMaterialRows(product);
+    if (!materials.length) return `product:${product?.id || 'unknown'}`;
+    // 복수 CAS 제품은 구성 전체를 하나의 제품 조성으로 묶는다.
+    // 제품 사용량을 각 CAS 성분의 사용량으로 중복 계산하지 않는다.
+    const signature = materials.map((r) => [
+      casKey(r.cas_no),
+      r.content_min ?? '',
+      r.content_max ?? ''
+    ].join(':')).join('|');
+    return `composition:${signature}`;
   }
 
   function buildGroups(rows) {
@@ -452,10 +522,12 @@
       const product = state.productsById.get(Number(row.product_id));
       const key = productGroupKey(product);
       if (!groups.has(key)) {
+        const materials = productMaterialRows(product);
         groups.set(key, {
           key,
-          cas: primaryCas(product) || '-',
-          name: baseMaterialName(product),
+          materials,
+          fallbackName: String(product?.name || '').trim() || '물질명 미등록',
+          name: materialTextForProduct(product),
           rows: [],
           products: new Map()
         });
@@ -508,8 +580,8 @@
           <div class="material-main">
             <button class="expand-btn" type="button" data-month-group="${esc(g.key)}">${expandable ? (expanded ? '▼' : '▶') : '•'}</button>
             <div class="material-text">
-              <div class="material-name">${esc(g.name)}</div>
-              <div class="material-cas">${esc(g.cas)}</div>
+              <div class="material-stack">${renderMaterialStack(g.materials, g.fallbackName)}</div>
+              <div class="material-cas cas-stack">${renderCasStack(g.materials)}</div>
             </div>
           </div>
         </td>
@@ -551,7 +623,11 @@
     const range = monthRange(state.currentMonth);
     setMessage('monthlyMessage', '월간 사용현황을 불러오는 중입니다.');
     try {
-      state.monthlyRows = await fetchUsage({ startDate: range.start, endDate: range.end, employeeNo });
+      const [rows] = await Promise.all([
+        fetchUsage({ startDate: range.start, endDate: range.end, employeeNo }),
+        loadChemicalMaster()
+      ]);
+      state.monthlyRows = rows;
       setMessage('monthlyMessage');
       renderMonthly();
     } catch (e) {
@@ -772,13 +848,14 @@
 
     list.innerHTML = records.map((r) => {
       const p = state.productsById.get(Number(r.product_id));
-      const cas = productCasRows(p).map((x) => x.cas_no).filter(Boolean).join(', ') || '-';
+      const materials = productMaterialRows(p);
       const hours = dbTimeToHours(r.usage_time);
       return `<article class="usage-detail-item" data-detail-record="${Number(r.id)}">
         <div class="usage-detail-main">
           <div class="usage-detail-product">${esc(p?.name || `제품 #${r.product_id}`)}</div>
           <div class="usage-detail-meta">${esc([p?.maker, p?.code, p?.capacity].filter(Boolean).join(' · ') || '-')}</div>
-          <div class="usage-detail-meta">CAS ${esc(cas)} · ${esc(r.employee_name || '')}${r.employee_no ? ` (${esc(r.employee_no)})` : ''}</div>
+          <div class="usage-detail-materials">${materials.length ? materials.map((m) => `<span><b>${esc(m.cas_no)}</b><em>${esc(m.name)}</em>${m.secondary ? `<small>${esc(m.secondary)}</small>` : ''}${formatContent(m) ? `<i>${esc(formatContent(m))}</i>` : ''}</span>`).join('') : '<span><b>CAS 미등록</b><em>물질명 미등록</em></span>'}</div>
+          <div class="usage-detail-meta">${esc(r.employee_name || '')}${r.employee_no ? ` (${esc(r.employee_no)})` : ''}</div>
           <div class="usage-detail-values">
             <span>사용일 <b>${esc(r.usage_date || '-')}</b></span>
             <span>사용시간 <b>${esc(numberText(hours, 2))}시간</b></span>
@@ -944,12 +1021,11 @@
           <div class="material-main">
             <button class="expand-btn" type="button" data-log-group="${esc(g.key)}">${expandable ? (expanded ? '▼' : '▶') : '•'}</button>
             <div class="material-text">
-              <div class="material-name">${esc(g.name)}</div>
-              <div class="material-en">${esc(g.name)}</div>
+              <div class="material-stack">${renderMaterialStack(g.materials, g.fallbackName)}</div>
             </div>
           </div>
         </td>
-        <td class="cas-col">${esc(g.cas)}</td>
+        <td class="cas-col"><div class="cas-stack">${renderCasStack(g.materials)}</div></td>
         <td class="total-col ${g.rows.length ? 'detail-cell' : ''}"${detailCellAttrs(g.rows, `${g.name} · 전체`)}>${metricCell(g.rows, state.logMetric)}</td>
         ${employees.map((e) => {
           const cellRows = rowsForEmployee(g.rows, e.key);
@@ -971,7 +1047,7 @@
                 </div>
               </div>
             </td>
-            <td class="cas-col">${esc(primaryCas(p) || '-')}</td>
+            <td class="cas-col"><div class="cas-stack">${renderCasStack(productMaterialRows(p))}</div></td>
             <td class="total-col ${pitem.rows.length ? 'detail-cell' : ''}"${detailCellAttrs(pitem.rows, `${p?.name || g.name} · 전체`)}>${metricCell(pitem.rows, state.logMetric)}</td>
             ${employees.map((e) => {
               const cellRows = rowsForEmployee(pitem.rows, e.key);
@@ -991,7 +1067,8 @@
     try {
       const [rows, employees] = await Promise.all([
         fetchUsage({ startDate: range.start, endDate: range.end }),
-        fetchEligibleLogEmployees(range)
+        fetchEligibleLogEmployees(range),
+        loadChemicalMaster()
       ]);
       state.logRows = rows;
       state.logEmployees = employees;
