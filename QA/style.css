@@ -845,9 +845,32 @@ body {
 .cas-table {
   width: 100%;
   min-width: 1120px;
+  table-layout: fixed;
   font-size: 13px;
   border-collapse: collapse;
 }
+
+/* CAS List 열 너비 조정: CAS No.는 넓게, 영문명은 과도하게 넓어지지 않도록 제한 */
+.cas-table th:nth-child(1),
+.cas-table td:nth-child(1) { width: 92px; }
+
+.cas-table th:nth-child(2),
+.cas-table td:nth-child(2) {
+  width: 145px;
+  white-space: nowrap;
+}
+
+.cas-table th:nth-child(3),
+.cas-table td:nth-child(3) { width: 190px; }
+
+.cas-table th:nth-child(4),
+.cas-table td:nth-child(4) { width: 31%; }
+
+.cas-table th:nth-child(5),
+.cas-table td:nth-child(5) { width: 105px; }
+
+.cas-table th:nth-child(6),
+.cas-table td:nth-child(6) { width: auto; }
 
 .cas-table th,
 .cas-table td {
@@ -910,9 +933,10 @@ body {
 }
 
 .cas-material-name {
-  min-width: 150px;
+  min-width: 0;
   line-height: 1.35;
   white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .cas-source-badge {
