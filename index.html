@@ -3039,6 +3039,12 @@ body.auth-loading .top-user-bar {
       desc: '시약 사용입력과 사용일지를 관리합니다.',
       gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
     },
+    'QA/special-storage/index.html': {
+      top: 'Safety Management',
+      title: 'QA',
+      desc: '특별관리물질 포함 제품의 보관수량을 일자별로 관리합니다.',
+      gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
+    },
     'QA/special/index.html': {
       top: 'Safety Management',
       title: 'QA',
@@ -3105,21 +3111,31 @@ body.auth-loading .top-user-bar {
     ],
     'QA/index.html': [
       { id: 'qa-usage', label: '사용일지' },
+      { id: 'qa-storage', label: '특별관리물질 보관' },
       { id: 'qa-sds', label: 'SDS 관리' },
       { id: 'qa-special', label: '특별관리물질 현황' }
     ],
     'QA/usage/index.html': [
       { id: 'qa-usage', label: '사용일지' },
+      { id: 'qa-storage', label: '특별관리물질 보관' },
       { id: 'qa-sds', label: 'SDS 관리' },
       { id: 'qa-special', label: '특별관리물질 현황' }
     ],
     'QA/Mobile/usage/index.html': [
       { id: 'qa-usage', label: '사용일지' },
+      { id: 'qa-storage', label: '특별관리물질 보관' },
+      { id: 'qa-sds', label: 'SDS 관리' },
+      { id: 'qa-special', label: '특별관리물질 현황' }
+    ],
+    'QA/special-storage/index.html': [
+      { id: 'qa-usage', label: '사용일지' },
+      { id: 'qa-storage', label: '특별관리물질 보관' },
       { id: 'qa-sds', label: 'SDS 관리' },
       { id: 'qa-special', label: '특별관리물질 현황' }
     ],
     'QA/special/index.html': [
       { id: 'qa-usage', label: '사용일지' },
+      { id: 'qa-storage', label: '특별관리물질 보관' },
       { id: 'qa-sds', label: 'SDS 관리' },
       { id: 'qa-special', label: '특별관리물질 현황' }
     ],
@@ -3403,6 +3419,10 @@ body.auth-loading .top-user-bar {
         replacePortalFrame(qaUsageSrc);
         return;
       }
+      if (tabId === 'qa-storage' && currentSrc !== 'QA/special-storage/index.html') {
+        replacePortalFrame('QA/special-storage/index.html');
+        return;
+      }
       if (tabId === 'qa-sds' && currentSrc !== 'QA/index.html') {
         replacePortalFrame('QA/index.html');
         return;
@@ -3445,6 +3465,7 @@ body.auth-loading .top-user-bar {
     const tabs = portalDefaultTabs[key] || [];
     let activeId = tabs[0]?.id || '';
     if (isQaUsageSrc(key)) activeId = 'qa-usage';
+    if (key === 'QA/special-storage/index.html') activeId = 'qa-storage';
     if (key === 'QA/index.html') activeId = 'qa-sds';
     if (key === 'QA/special/index.html') activeId = 'qa-special';
     renderPortalSubtabs(tabs, activeId);
@@ -3599,7 +3620,7 @@ body.auth-loading .top-user-bar {
 
   function isQaProgramSrc(src) {
     const key = normalizePortalSrc(src);
-    return isQaUsageSrc(key) || key === 'QA/index.html' || key === 'QA/special/index.html';
+    return isQaUsageSrc(key) || key === 'QA/special-storage/index.html' || key === 'QA/index.html' || key === 'QA/special/index.html';
   }
 
   function resolveResponsivePortalSrc(src) {
@@ -5716,6 +5737,10 @@ body.auth-loading .top-user-bar {
         // QA에서는 현재 iframe 경로를 기준으로 포털 버튼 active 상태를 고정합니다.
         if (isQaUsageSrc(currentSrc)) {
           setPortalSubtabActive('qa-usage', false);
+          return;
+        }
+        if (currentSrc === 'QA/special-storage/index.html') {
+          setPortalSubtabActive('qa-storage', false);
           return;
         }
         if (currentSrc === 'QA/index.html') {
