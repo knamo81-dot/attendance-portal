@@ -534,3 +534,141 @@ button{cursor:pointer}
   .edit-grid{grid-template-columns:1fr}
   .edit-grid label.full{grid-column:auto}
 }
+
+/* v7: CAS List(qa_chemical_master) 물질명 연동 */
+.selected-materials,
+.material-stack,
+.cas-stack{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  min-width:0;
+}
+
+.selected-materials .material-entry,
+.material-stack .material-entry{
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+  min-width:0;
+  line-height:1.25;
+}
+
+.selected-materials .material-entry b,
+.material-stack .material-entry b{
+  font-size:12px;
+  font-weight:800;
+  overflow-wrap:anywhere;
+}
+
+.selected-materials .material-entry small,
+.material-stack .material-entry small{
+  color:#667085;
+  font-size:10px;
+  font-weight:500;
+  overflow-wrap:anywhere;
+}
+
+.selected-cas .cas-stack-line,
+.cas-stack .cas-stack-line{
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+  min-width:0;
+  line-height:1.25;
+}
+
+.selected-cas .cas-stack-line b,
+.cas-stack .cas-stack-line b{
+  font-size:11px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.selected-cas .cas-stack-line small,
+.cas-stack .cas-stack-line small{
+  color:#7b6b9f;
+  font-size:10px;
+  font-weight:500;
+  white-space:nowrap;
+}
+
+.monthly-table .material-col .material-stack,
+.log-table .material-col .material-stack{
+  gap:5px;
+}
+
+.monthly-table .material-col .material-entry + .material-entry,
+.log-table .material-col .material-entry + .material-entry{
+  padding-top:4px;
+  border-top:1px dashed #d9dde6;
+}
+
+.monthly-table .material-cas.cas-stack{
+  margin-top:5px;
+  gap:3px;
+}
+
+.log-table .cas-col .cas-stack{
+  align-items:flex-start;
+  text-align:left;
+  gap:5px;
+}
+
+.log-table .cas-col .cas-stack .cas-stack-line + .cas-stack-line{
+  padding-top:4px;
+  border-top:1px dashed #e1e5ec;
+}
+
+.usage-detail-materials{
+  display:grid;
+  gap:5px;
+  margin-top:8px;
+  padding:8px 10px;
+  border:1px solid #ebe7fb;
+  border-radius:8px;
+  background:#faf9ff;
+}
+
+.usage-detail-materials>span{
+  display:grid;
+  grid-template-columns:100px minmax(0,1fr) auto;
+  gap:4px 8px;
+  align-items:start;
+  font-size:11px;
+}
+
+.usage-detail-materials b{
+  color:#4b3ca7;
+  white-space:nowrap;
+}
+
+.usage-detail-materials em{
+  color:#344054;
+  font-style:normal;
+  font-weight:700;
+  overflow-wrap:anywhere;
+}
+
+.usage-detail-materials small{
+  grid-column:2 / -1;
+  color:#667085;
+  font-size:10px;
+  overflow-wrap:anywhere;
+}
+
+.usage-detail-materials i{
+  color:#7b6b9f;
+  font-size:10px;
+  font-style:normal;
+  white-space:nowrap;
+}
+
+@media(max-width:680px){
+  .usage-detail-materials>span{
+    grid-template-columns:1fr;
+  }
+  .usage-detail-materials small{
+    grid-column:auto;
+  }
+}
