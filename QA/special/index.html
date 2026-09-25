@@ -46,7 +46,7 @@
                 <option value="conditional">조건부</option>
               </select>
             </div>
-            <div class="field order-period-field"><label for="orderPeriod">발주기간</label><select id="orderPeriod">
+            <div class="field order-period-field"><label for="orderPeriod">입고기간</label><select id="orderPeriod">
               <option value="all">전체</option><option value="1y" selected>최근 1년</option><option value="3y">최근 3년</option><option value="5y">최근 5년</option><option value="custom">직접설정</option>
             </select></div>
             <div class="custom-period" id="customPeriod" hidden>
@@ -59,12 +59,12 @@
           </div>
           <div class="match-summary">
             <span>제품매칭 <strong id="matchedSubstanceCount">0종</strong></span>
-            <span>주문확인 <strong id="orderedSubstanceCount">0종</strong></span>
+            <span>입고확인 <strong id="orderedSubstanceCount">0종</strong></span>
           </div>
           <div class="table-wrap">
             <table class="status-table">
               <thead><tr>
-                <th>특별관리물질</th><th>CAS No</th><th>혼합물 기준</th><th>연결제품</th><th>주문확인</th><th>최신 발주일</th><th>상태</th>
+                <th>특별관리물질</th><th>CAS No</th><th>혼합물 기준</th><th>연결제품</th><th>입고확인</th><th>최근 입고일</th><th>상태</th>
               </tr></thead>
               <tbody id="statusList"></tbody>
             </table>
@@ -177,6 +177,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../supabase.js"></script>
-  <script src="./app.js"></script>
+  <script src="./app.js?v=20260925-receipt1"></script>
 </body>
 </html>
