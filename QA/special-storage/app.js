@@ -280,7 +280,7 @@
   function renderHeader(){
     const dim=daysInMonth(state.year,state.month);
     const weekdayNames=["일","월","화","수","목","금","토"];
-    let row1=`<tr><th class="product-col" rowspan="2">제품정보</th><th class="special-col" rowspan="2">특별관리물질 정보</th><th class="input-col" rowspan="2">보관수량 입력<br><small>수량(병)</small></th><th class="receipt-col" rowspan="2">최근입고일</th><th class="month-title" colspan="${dim}">${state.year}년 ${state.month}월</th></tr>`;
+    let row1=`<tr><th class="product-col" rowspan="2">제품정보</th><th class="special-col" rowspan="2">특별관리물질 정보</th><th class="input-col" rowspan="2">보관수량 입력<br><small>수량(병)</small></th><th class="receipt-col" rowspan="2">최근입고일</th><th class="month-title" colspan="${dim}"><div class="month-title-wrap"><button class="month-nav" type="button" data-shift-month="-1" aria-label="이전 달">&#8249;</button><span>${state.year}년 ${state.month}월</span><button class="month-nav" type="button" data-shift-month="1" aria-label="다음 달">&#8250;</button></div></th></tr>`;
     let row2="<tr>";
     for(let d=1;d<=dim;d++){
       const date=new Date(state.year,state.month-1,d);
@@ -339,9 +339,8 @@
     const editable=isTodayMonth()&&state.dailyTableReady&&!state.saving;
     const hasChanged=[...document.querySelectorAll("tr.changed-row .qty-input:not(:disabled)")].some(i=>i.value.trim()!=="");
     btn.disabled=!editable||!hasChanged;
-    $("saveGuide").textContent=!state.dailyTableReady
-      ? "DB 테이블 생성 후 수량 저장을 사용할 수 있습니다."
-      : "보관함을 확인하며 수량을 입력한 뒤 한 번에 저장하세요.";
+    const guide=$("saveGuide");
+    if(guide) guide.textContent="";
   }
 
   function render(){ renderHeader(); renderBody(); syncSaveButton(); }
@@ -417,8 +416,11 @@
   function bindEvents(){
     $("yearSelect").addEventListener("change",async()=>{state.year=Number($("yearSelect").value);await refresh();});
     $("monthSelect").addEventListener("change",async()=>{state.month=Number($("monthSelect").value);await refresh();});
-    $("prevMonthBtn").addEventListener("click",()=>{shiftMonth(-1);});
-    $("nextMonthBtn").addEventListener("click",()=>{shiftMonth(1);});
+    $("storageHead").addEventListener("click",(e)=>{
+      const btn=e.target.closest("[data-shift-month]");
+      if(!btn) return;
+      shiftMonth(Number(btn.dataset.shiftMonth)||0);
+    });
     $("searchInput").addEventListener("input",()=>{state.query=$("searchInput").value;renderBody();syncSaveButton();});
     $("stockFilter").addEventListener("change",()=>{state.stockFilter=$("stockFilter").value;renderBody();syncSaveButton();});
     $("saveQuantities").addEventListener("click",saveAll);
