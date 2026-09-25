@@ -739,3 +739,276 @@ body {
 .cas-stack span {
   display: block;
 }
+
+
+/* =========================================================
+   SDS 현황 / CAS List 2차 메뉴 및 CAS 관리
+   ========================================================= */
+.sds-view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.sds-view-btn {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  cursor: pointer;
+  background: #fff;
+  border: 0;
+  border-right: 1px solid var(--line);
+}
+
+.sds-view-btn:last-child { border-right: 0; }
+
+.sds-view-btn:hover {
+  color: var(--main-hover);
+  background: var(--main-light);
+}
+
+.sds-view-btn.active {
+  color: #fff;
+  background: var(--main);
+}
+
+.cas-unmatched-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  color: #fff;
+  background: #dc2626;
+  border-radius: 999px;
+}
+
+.sds-view-btn.active .cas-unmatched-badge {
+  color: #b91c1c;
+  background: #fff;
+}
+
+.sds-subview[hidden] { display: none; }
+
+.filter-actions {
+  display: flex;
+  align-items: flex-end;
+  margin-left: auto;
+}
+
+.filter-actions .btn {
+  min-height: 34px;
+}
+
+.cas-summary-tile {
+  appearance: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.cas-summary-tile:hover,
+.cas-summary-tile.active {
+  border-color: #b8a9e8;
+  box-shadow: 0 0 0 2px rgba(109, 76, 203, 0.08);
+}
+
+.cas-summary-tile.unmatched .v {
+  color: #b91c1c;
+  font-weight: 800;
+}
+
+.cas-search-field { width: 300px; }
+.cas-status-field { width: 118px; }
+.cas-source-field { width: 132px; }
+
+.cas-table {
+  width: 100%;
+  min-width: 1120px;
+  font-size: 13px;
+  border-collapse: collapse;
+}
+
+.cas-table th,
+.cas-table td {
+  padding: 9px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid #e8edf3;
+}
+
+.cas-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-weight: 800;
+  color: #334155;
+  white-space: nowrap;
+  background: var(--soft);
+}
+
+.cas-table tbody tr:hover td { background: #fbfdff; }
+
+.cas-table th:nth-child(1),
+.cas-table td:nth-child(1),
+.cas-table th:nth-child(5),
+.cas-table td:nth-child(5) {
+  text-align: center;
+}
+
+.cas-state-cell {
+  min-width: 92px;
+}
+
+.cas-state-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+}
+
+.cas-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 50px;
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 999px;
+}
+
+.cas-status-badge.matched {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.cas-status-badge.unmatched {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+.cas-material-name {
+  min-width: 150px;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.cas-source-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #475569;
+  background: #f1f5f9;
+  border-radius: 999px;
+}
+
+.cas-source-badge.keco {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.cas-source-badge.pubchem {
+  color: #6d28d9;
+  background: #ede9fe;
+}
+
+.cas-source-badge.sds {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.cas-source-badge.manual {
+  color: #9a3412;
+  background: #ffedd5;
+}
+
+.cas-products {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 260px;
+  white-space: normal;
+}
+
+.cas-product-item {
+  line-height: 1.35;
+}
+
+.cas-product-item strong {
+  font-weight: 700;
+}
+
+.cas-product-meta {
+  margin-left: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.cas-edit-summary {
+  display: grid;
+  gap: 5px;
+}
+
+.cas-edit-summary b {
+  display: inline-block;
+  min-width: 58px;
+  color: var(--muted);
+}
+
+.cas-edit-hint {
+  margin-top: 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+@media (max-width: 760px) {
+  .sds-main-head {
+    align-items: flex-start;
+  }
+
+  .sds-view-switch {
+    flex: 0 0 auto;
+  }
+
+  .sds-view-btn {
+    min-height: 34px;
+    padding: 0 10px;
+  }
+
+  .filter-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .filter-actions .btn {
+    width: 100%;
+    min-height: 42px;
+  }
+
+  .cas-search-field,
+  .cas-status-field,
+  .cas-source-field {
+    width: 100%;
+  }
+}
