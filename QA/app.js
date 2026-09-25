@@ -116,7 +116,13 @@
       const matched = isChemicalMatched(row);
       if (state.casStatus === 'unmatched' && matched) return false;
       if (state.casStatus === 'matched' && !matched) return false;
-      if (state.casSource !== 'all' && String(row.source || '') !== state.casSource) return false;
+      if (state.casSource !== 'all') {
+        if (!matched) return false;
+        const source = String(row.source || '');
+        if (state.casSource === 'SDS_MANUAL') {
+          if (!['SDS', 'MANUAL'].includes(source)) return false;
+        } else if (source !== state.casSource) return false;
+      }
       if (!q) return true;
       const productText = connectedProductsText(row.cas_no).toLowerCase();
       return [row.cas_no, row.chem_name_ko, row.chem_name_en, row.ke_no, row.source]
@@ -134,11 +140,13 @@
     const unmatched = rows.filter((row) => !isChemicalMatched(row)).length;
     const keco = rows.filter((row) => isChemicalMatched(row) && String(row.source || '') === 'K-ECO').length;
     const pubchem = rows.filter((row) => isChemicalMatched(row) && String(row.source || '') === 'PubChem').length;
+    const manual = rows.filter((row) => isChemicalMatched(row) && ['SDS', 'MANUAL'].includes(String(row.source || ''))).length;
 
     if ($('casTotalCount')) $('casTotalCount').textContent = rows.length.toLocaleString();
     if ($('casUnmatchedCount')) $('casUnmatchedCount').textContent = unmatched.toLocaleString();
     if ($('casKecoCount')) $('casKecoCount').textContent = keco.toLocaleString();
     if ($('casPubchemCount')) $('casPubchemCount').textContent = pubchem.toLocaleString();
+    if ($('casManualCount')) $('casManualCount').textContent = manual.toLocaleString();
 
     const badge = $('casUnmatchedBadge');
     if (badge) {
@@ -153,6 +161,7 @@
     if (state.casStatus === 'unmatched' && state.casSource === 'all') target = 'unmatched';
     else if (state.casStatus === 'matched' && state.casSource === 'K-ECO') target = 'keco';
     else if (state.casStatus === 'matched' && state.casSource === 'PubChem') target = 'pubchem';
+    else if (state.casStatus === 'matched' && state.casSource === 'SDS_MANUAL') target = 'manual';
     document.querySelector(`[data-cas-summary="${target}"]`)?.classList.add('active');
   }
 
@@ -174,7 +183,7 @@
         ? '<span class="cas-status-badge matched">완료</span>'
         : `<div class="cas-state-actions"><span class="cas-status-badge unmatched">미매칭</span><button class="btn small primary" type="button" data-cas-action="manual" data-cas-id="${row.id || ''}" data-cas-no="${esc(row.cas_no || '')}">수기입력</button></div>`;
       const source = String(row.source || '').trim();
-      const sourceHtml = source
+      const sourceHtml = matched && source
         ? `<span class="cas-source-badge ${chemicalSourceClass(source)}">${esc(source)}</span>`
         : '-';
       return `<tr>
@@ -976,6 +985,9 @@
         } else if (mode === 'pubchem') {
           state.casStatus = 'matched';
           state.casSource = 'PubChem';
+        } else if (mode === 'manual') {
+          state.casStatus = 'matched';
+          state.casSource = 'SDS_MANUAL';
         } else {
           state.casStatus = 'all';
           state.casSource = 'all';
