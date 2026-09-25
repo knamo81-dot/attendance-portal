@@ -689,33 +689,57 @@ button{cursor:pointer}
   overflow-wrap:anywhere;
 }
 
-/* v8-3: iPad / 태블릿 사용정보 입력 폭 보정
-   - Safari date input의 고유 최소폭으로 카드 밖으로 밀리는 현상 방지
-   - 입력요소/검색/단위 입력영역을 패널 가용폭에 맞춰 자동 축소 */
-@media (min-width:769px) and (max-width:1180px){
+/* v8-3b: iPad / 태블릿 사용정보 입력 폭 보정
+   - iPad 11/13인치 가로폭까지 적용되도록 범위를 1366px까지 확대
+   - Safari date input의 intrinsic/min-content 폭을 강제로 해제
+   - 사용일/사용제품/사용시간/사용량/단위의 우측 끝선을 동일하게 유지 */
+@media (min-width:769px) and (max-width:1366px){
   .input-panel,
   .form-stack,
-  .field,
-  .field > *,
-  .search-input-row,
-  .suffix-input{
-    min-width:0;
-  }
-
-  .input-panel .field input,
-  .input-panel .field select,
+  .input-panel .field,
   .input-panel .search-input-row,
-  .input-panel .search-input-row input,
   .input-panel .suffix-input{
     width:100%;
     min-width:0;
     max-width:100%;
+    box-sizing:border-box;
+  }
+
+  .input-panel .field{
+    grid-template-columns:95px minmax(0,1fr);
+  }
+
+  .input-panel .field > input,
+  .input-panel .field > select,
+  .input-panel .field > .search-input-row,
+  .input-panel .field > .suffix-input,
+  .input-panel .search-input-row input,
+  .input-panel .suffix-input input{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    box-sizing:border-box !important;
   }
 
   .input-panel input[type="date"]{
-    width:100%;
+    display:block;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    inline-size:100% !important;
+    min-inline-size:0 !important;
+    max-inline-size:100% !important;
+    box-sizing:border-box !important;
+    overflow:hidden;
+  }
+
+  .input-panel input[type="date"]::-webkit-date-and-time-value{
     min-width:0;
-    max-width:100%;
-    inline-size:100%;
+    text-align:left;
+  }
+
+  .input-panel input[type="date"]::-webkit-calendar-picker-indicator{
+    margin-left:auto;
+    flex:0 0 auto;
   }
 }
