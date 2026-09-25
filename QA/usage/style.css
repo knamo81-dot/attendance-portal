@@ -743,3 +743,53 @@ button{cursor:pointer}
     flex:0 0 auto;
   }
 }
+
+/* v8-3c: iPad / 설치형 웹앱 입력폭 최종 보정
+   - iPadOS WebKit date input의 intrinsic width를 grid track 안으로 강제
+   - 우측 끝선을 다른 입력요소와 동일하게 유지
+   - index.html의 CSS 버전 변경과 함께 캐시 갱신 */
+@media (min-width:769px) and (max-width:1366px){
+  .input-panel .field{
+    min-width:0;
+    max-width:100%;
+    overflow:visible;
+  }
+
+  .input-panel .field > input,
+  .input-panel .field > select,
+  .input-panel .field > .search-input-row,
+  .input-panel .field > .suffix-input{
+    min-width:0 !important;
+    max-width:100% !important;
+    justify-self:stretch;
+  }
+
+  .input-panel #usageDate{
+    display:block !important;
+    width:-webkit-fill-available !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    inline-size:auto !important;
+    min-inline-size:0 !important;
+    max-inline-size:100% !important;
+    justify-self:stretch !important;
+    box-sizing:border-box !important;
+  }
+
+  .input-panel #usageDate::-webkit-date-and-time-value{
+    width:100%;
+    min-width:0;
+    padding:0;
+    text-align:left;
+  }
+
+  .input-panel #usageDate::-webkit-datetime-edit{
+    min-width:0;
+    padding:0;
+  }
+
+  .input-panel #usageDate::-webkit-calendar-picker-indicator{
+    margin:0 0 0 auto;
+    padding-left:6px;
+  }
+}
