@@ -1,6 +1,6 @@
 (function () {
   const BUCKET = 'qa-sds-files';
-  const state = { products: [], query: '', status: 'all', orderYear: 'all', checkedExcludeYear: 'all', selected: null, pdfFiles: [], pdfIndex: 0, pdfUrl: '', currentFileActions: [] };
+  const state = { products: [], query: '', status: 'all', orderYear: 'all', checkedExcludeYear: 'all', selected: null, pdfFiles: [], pdfIndex: 0, pdfUrl: '', currentFileActions: [], view: 'sds', chemicals: [], casQuery: '', casStatus: 'all', casSource: 'all', selectedChemical: null };
   const $ = (id) => document.getElementById(id);
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 
@@ -67,6 +67,244 @@
     const values = productCasNumbers(product);
     if (!values.length) return '-';
     return `<div class="cas-stack">${values.map((value) => `<span>${esc(value)}</span>`).join('')}</div>`;
+  }
+
+  function setCasMessage(text, type = '') {
+    const el = $('casMessage');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = `message${type ? ` ${type}` : ''}`;
+  }
+
+  function isChemicalMatched(row) {
+    return String(row?.sync_status || '').toLowerCase() === 'synced';
+  }
+
+  function chemicalSourceClass(source) {
+    const value = String(source || '').toLowerCase();
+    if (value === 'k-eco') return 'keco';
+    if (value === 'pubchem') return 'pubchem';
+    if (value === 'sds') return 'sds';
+    if (value === 'manual') return 'manual';
+    return '';
+  }
+
+  function connectedProducts(casNo) {
+    const target = String(casNo || '').trim();
+    if (!target) return [];
+    return state.products.filter((product) => productCasNumbers(product).includes(target));
+  }
+
+  function connectedProductsText(casNo) {
+    const products = connectedProducts(casNo);
+    if (!products.length) return '-';
+    return products.map((product) => [product.name, product.maker, product.code].filter(Boolean).join(' · ')).join(' / ');
+  }
+
+  function connectedProductsHtml(casNo) {
+    const products = connectedProducts(casNo);
+    if (!products.length) return '-';
+    return `<div class="cas-products">${products.map((product) => {
+      const meta = [product.maker, product.code].filter(Boolean).map(esc).join(' · ');
+      return `<div class="cas-product-item"><strong>${esc(product.name || '-')}</strong>${meta ? `<span class="cas-product-meta">${meta}</span>` : ''}</div>`;
+    }).join('')}</div>`;
+  }
+
+  function filteredChemicals() {
+    const q = state.casQuery.trim().toLowerCase();
+    return state.chemicals.filter((row) => {
+      const matched = isChemicalMatched(row);
+      if (state.casStatus === 'unmatched' && matched) return false;
+      if (state.casStatus === 'matched' && !matched) return false;
+      if (state.casSource !== 'all' && String(row.source || '') !== state.casSource) return false;
+      if (!q) return true;
+      const productText = connectedProductsText(row.cas_no).toLowerCase();
+      return [row.cas_no, row.chem_name_ko, row.chem_name_en, row.ke_no, row.source]
+        .some((value) => String(value || '').toLowerCase().includes(q)) || productText.includes(q);
+    }).sort((a, b) => {
+      const am = isChemicalMatched(a) ? 1 : 0;
+      const bm = isChemicalMatched(b) ? 1 : 0;
+      if (am !== bm) return am - bm;
+      return String(a.cas_no || '').localeCompare(String(b.cas_no || ''), 'en', { numeric: true });
+    });
+  }
+
+  function updateCasSummary() {
+    const rows = state.chemicals;
+    const unmatched = rows.filter((row) => !isChemicalMatched(row)).length;
+    const keco = rows.filter((row) => isChemicalMatched(row) && String(row.source || '') === 'K-ECO').length;
+    const pubchem = rows.filter((row) => isChemicalMatched(row) && String(row.source || '') === 'PubChem').length;
+
+    if ($('casTotalCount')) $('casTotalCount').textContent = rows.length.toLocaleString();
+    if ($('casUnmatchedCount')) $('casUnmatchedCount').textContent = unmatched.toLocaleString();
+    if ($('casKecoCount')) $('casKecoCount').textContent = keco.toLocaleString();
+    if ($('casPubchemCount')) $('casPubchemCount').textContent = pubchem.toLocaleString();
+
+    const badge = $('casUnmatchedBadge');
+    if (badge) {
+      badge.hidden = unmatched < 1;
+      badge.textContent = unmatched ? String(unmatched) : '';
+    }
+  }
+
+  function updateCasSummaryActive() {
+    document.querySelectorAll('[data-cas-summary]').forEach((button) => button.classList.remove('active'));
+    let target = 'all';
+    if (state.casStatus === 'unmatched' && state.casSource === 'all') target = 'unmatched';
+    else if (state.casStatus === 'matched' && state.casSource === 'K-ECO') target = 'keco';
+    else if (state.casStatus === 'matched' && state.casSource === 'PubChem') target = 'pubchem';
+    document.querySelector(`[data-cas-summary="${target}"]`)?.classList.add('active');
+  }
+
+  function renderCasList() {
+    updateCasSummary();
+    updateCasSummaryActive();
+    const body = $('casList');
+    if (!body) return;
+
+    const rows = filteredChemicals();
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="6" class="empty">조회된 CAS 정보가 없습니다.</td></tr>';
+      return;
+    }
+
+    body.innerHTML = rows.map((row) => {
+      const matched = isChemicalMatched(row);
+      const stateHtml = matched
+        ? '<span class="cas-status-badge matched">완료</span>'
+        : `<div class="cas-state-actions"><span class="cas-status-badge unmatched">미매칭</span><button class="btn small primary" type="button" data-cas-action="manual" data-cas-id="${row.id || ''}" data-cas-no="${esc(row.cas_no || '')}">수기입력</button></div>`;
+      const source = String(row.source || '').trim();
+      const sourceHtml = source
+        ? `<span class="cas-source-badge ${chemicalSourceClass(source)}">${esc(source)}</span>`
+        : '-';
+      return `<tr>
+        <td class="cas-state-cell">${stateHtml}</td>
+        <td><strong>${esc(row.cas_no || '-')}</strong></td>
+        <td class="cas-material-name">${esc(row.chem_name_ko || '-')}</td>
+        <td class="cas-material-name">${esc(row.chem_name_en || '-')}</td>
+        <td>${sourceHtml}</td>
+        <td>${connectedProductsHtml(row.cas_no)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function loadChemicalMaster() {
+    const db = window.SDSApp.db;
+    const casNos = Array.from(new Set(state.products.flatMap((product) => productCasNumbers(product)))).filter(Boolean);
+
+    if (!casNos.length) {
+      state.chemicals = [];
+      renderCasList();
+      return;
+    }
+
+    setCasMessage('CAS 정보를 불러오는 중입니다.');
+    const { data, error } = await db
+      .from('qa_chemical_master')
+      .select('id, cas_no, chem_name_ko, chem_name_en, ke_no, molecular_formula, molecular_weight, source, source_updated_at, sync_status, sync_error, updated_at')
+      .in('cas_no', casNos);
+
+    if (error) {
+      state.chemicals = [];
+      renderCasList();
+      setCasMessage(`CAS 정보를 불러오지 못했습니다: ${error.message}`, 'error');
+      return;
+    }
+
+    const byCas = new Map((data || []).map((row) => [String(row.cas_no || '').trim(), row]));
+    state.chemicals = casNos.map((casNo) => byCas.get(casNo) || {
+      id: null,
+      cas_no: casNo,
+      chem_name_ko: null,
+      chem_name_en: null,
+      source: null,
+      sync_status: null,
+      sync_error: 'qa_chemical_master 미등록'
+    });
+
+    setCasMessage('');
+    renderCasList();
+  }
+
+  function setView(view) {
+    state.view = view === 'cas' ? 'cas' : 'sds';
+    const isCas = state.view === 'cas';
+    if ($('sdsView')) $('sdsView').hidden = isCas;
+    if ($('casView')) $('casView').hidden = !isCas;
+
+    const sdsButton = $('sdsViewButton');
+    const casButton = $('casViewButton');
+    if (sdsButton) {
+      sdsButton.classList.toggle('active', !isCas);
+      sdsButton.setAttribute('aria-selected', String(!isCas));
+    }
+    if (casButton) {
+      casButton.classList.toggle('active', isCas);
+      casButton.setAttribute('aria-selected', String(isCas));
+    }
+
+    if (isCas) renderCasList();
+  }
+
+  function openCasManual(row) {
+    if (!row) return;
+    state.selectedChemical = row;
+    $('casEditNo').textContent = row.cas_no || '-';
+    $('casEditProducts').textContent = connectedProductsText(row.cas_no);
+    $('casEditKo').value = row.chem_name_ko || '';
+    $('casEditEn').value = row.chem_name_en || '';
+    $('casEditSource').value = ['SDS', 'MANUAL'].includes(String(row.source || '')) ? row.source : 'SDS';
+    openModal('casEditModal');
+    setTimeout(() => ($('casEditKo').value ? $('casEditEn') : $('casEditKo'))?.focus(), 0);
+  }
+
+  async function saveCasManual() {
+    const row = state.selectedChemical;
+    if (!row) return;
+
+    const ko = $('casEditKo').value.trim();
+    const en = $('casEditEn').value.trim();
+    const source = $('casEditSource').value;
+
+    if (!ko && !en) {
+      setCasMessage('국문명 또는 영문명 중 하나 이상 입력해 주세요.', 'error');
+      return;
+    }
+
+    const button = $('casManualSave');
+    button.disabled = true;
+    const now = new Date().toISOString();
+
+    try {
+      const db = window.SDSApp.db;
+      const payload = {
+        chem_name_ko: ko || null,
+        chem_name_en: en || null,
+        source,
+        source_updated_at: now,
+        sync_status: 'synced',
+        sync_error: null,
+        updated_at: now
+      };
+
+      let result;
+      if (row.id) {
+        result = await db.from('qa_chemical_master').update(payload).eq('id', row.id);
+      } else {
+        result = await db.from('qa_chemical_master').upsert({ cas_no: row.cas_no, ...payload }, { onConflict: 'cas_no' });
+      }
+      if (result.error) throw result.error;
+
+      closeModal('casEditModal');
+      state.selectedChemical = null;
+      await loadChemicalMaster();
+      setCasMessage(`${row.cas_no} 물질명이 저장되었습니다.`, 'success');
+    } catch (error) {
+      console.error('[CAS] manual save error', error);
+      setCasMessage(`CAS 수기입력 저장에 실패했습니다: ${error.message}`, 'error');
+    } finally {
+      button.disabled = false;
+    }
   }
 
   function filtered() {
@@ -229,7 +467,9 @@
       };
     });
     populateYearFilters();
-    setMessage(''); render();
+    setMessage('');
+    render();
+    await loadChemicalMaster();
   }
 
   function openModal(id) { $(id).hidden = false; }
@@ -689,6 +929,14 @@
     $('sdsOrderYear').addEventListener('change', (e) => { state.orderYear = e.target.value; render(); });
     $('sdsCheckedExcludeYear').addEventListener('change', (e) => { state.checkedExcludeYear = e.target.value; render(); });
     $('sdsDownloadExcel').addEventListener('click', downloadExcel);
+
+    $('sdsViewButton').addEventListener('click', () => setView('sds'));
+    $('casViewButton').addEventListener('click', () => setView('cas'));
+    $('casSearch').addEventListener('input', (e) => { state.casQuery = e.target.value; renderCasList(); });
+    $('casStatus').addEventListener('change', (e) => { state.casStatus = e.target.value; renderCasList(); });
+    $('casSource').addEventListener('change', (e) => { state.casSource = e.target.value; renderCasList(); });
+    $('casManualSave').addEventListener('click', saveCasManual);
+
     $('sdsSave').addEventListener('click', saveSds);
     $('sdsAddFile').addEventListener('click', addFileRow);
     document.querySelectorAll('input[name="sdsMode"]').forEach((r) => r.addEventListener('change', () => setMode(r.value)));
@@ -715,6 +963,38 @@
     document.addEventListener('click', async (e) => {
       const close = e.target.closest('[data-close]');
       if (close) { closeModal(close.dataset.close); return; }
+
+      const casSummary = e.target.closest('[data-cas-summary]');
+      if (casSummary) {
+        const mode = casSummary.dataset.casSummary;
+        if (mode === 'unmatched') {
+          state.casStatus = 'unmatched';
+          state.casSource = 'all';
+        } else if (mode === 'keco') {
+          state.casStatus = 'matched';
+          state.casSource = 'K-ECO';
+        } else if (mode === 'pubchem') {
+          state.casStatus = 'matched';
+          state.casSource = 'PubChem';
+        } else {
+          state.casStatus = 'all';
+          state.casSource = 'all';
+        }
+        $('casStatus').value = state.casStatus;
+        $('casSource').value = state.casSource;
+        renderCasList();
+        return;
+      }
+
+      const casAction = e.target.closest('[data-cas-action]');
+      if (casAction) {
+        const id = Number(casAction.dataset.casId);
+        const casNo = String(casAction.dataset.casNo || '');
+        const row = state.chemicals.find((item) => (id && Number(item.id) === id) || String(item.cas_no || '') === casNo);
+        if (row && casAction.dataset.casAction === 'manual') openCasManual(row);
+        return;
+      }
+
       const remove = e.target.closest('.file-remove');
       if (remove) {
         const rows = document.querySelectorAll('.file-row');
