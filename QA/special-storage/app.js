@@ -341,9 +341,7 @@
     btn.disabled=!editable||!hasChanged;
     $("saveGuide").textContent=!state.dailyTableReady
       ? "DB 테이블 생성 후 수량 저장을 사용할 수 있습니다."
-      : !isTodayMonth()
-        ? "과거·미래 조회기간은 조회만 가능하며 오늘 날짜만 입력할 수 있습니다."
-        : "보관함을 확인하며 수량을 입력한 뒤 한 번에 저장하세요.";
+      : "보관함을 확인하며 수량을 입력한 뒤 한 번에 저장하세요.";
   }
 
   function render(){ renderHeader(); renderBody(); syncSaveButton(); }
@@ -387,6 +385,18 @@
     }
   }
 
+  function shiftMonth(delta){
+    let y=state.year;
+    let m=state.month + delta;
+    if(m < 1){ m = 12; y -= 1; }
+    else if(m > 12){ m = 1; y += 1; }
+    state.year = y;
+    state.month = m;
+    $("yearSelect").value = String(y);
+    $("monthSelect").value = String(m);
+    return refresh();
+  }
+
   async function refresh(showLoading=true){
     if(showLoading)setMessage("특별관리물질 보관 현황을 불러오는 중입니다.");
     try{
@@ -407,6 +417,8 @@
   function bindEvents(){
     $("yearSelect").addEventListener("change",async()=>{state.year=Number($("yearSelect").value);await refresh();});
     $("monthSelect").addEventListener("change",async()=>{state.month=Number($("monthSelect").value);await refresh();});
+    $("prevMonthBtn").addEventListener("click",()=>{shiftMonth(-1);});
+    $("nextMonthBtn").addEventListener("click",()=>{shiftMonth(1);});
     $("searchInput").addEventListener("input",()=>{state.query=$("searchInput").value;renderBody();syncSaveButton();});
     $("stockFilter").addEventListener("change",()=>{state.stockFilter=$("stockFilter").value;renderBody();syncSaveButton();});
     $("saveQuantities").addEventListener("click",saveAll);
