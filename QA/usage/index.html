@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QA 시약 사용일지</title>
-  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="./style.css?v=20260925-cas1" />
   <link rel="stylesheet" href="../../common/mobile.css" />
   <link rel="stylesheet" href="../../common/theme.css" />
 </head>
@@ -44,7 +44,7 @@
               <div class="field product-search-wrap">
                 <span>사용제품</span>
                 <div class="search-input-row">
-                  <input id="productSearch" type="search" placeholder="제품명 / 제조사 / 코드 / CAS 검색" autocomplete="off" />
+                  <input id="productSearch" type="search" placeholder="제품명 / 제조사 / 코드 / CAS / 물질명 검색" autocomplete="off" />
                 </div>
                 <div id="productResults" class="product-results" hidden></div>
               </div>
@@ -59,7 +59,7 @@
                 </div>
                 <div class="selected-info-row">
                   <span class="selected-label">물질명</span>
-                  <span id="selectedMaterialName">-</span>
+                  <div id="selectedMaterialName" class="selected-materials">-</div>
                 </div>
               </div>
 
@@ -239,7 +239,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../supabase.js"></script>
-  <script src="./app.js"></script>
+  <script src="./app.js?v=20260925-cas1"></script>
   <script src="../../common/common.js"></script>
 </body>
 </html>
+
