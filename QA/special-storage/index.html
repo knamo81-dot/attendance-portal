@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>특별관리물질 보관</title>
+  <link rel="stylesheet" href="./style.css?v=20260925-storage1" />
+  <link rel="stylesheet" href="../../common/mobile.css" />
+  <link rel="stylesheet" href="../../common/theme.css" />
+</head>
+<body>
+  <main class="storage-shell">
+    <section class="storage-card">
+      <header class="storage-head">
+        <div>
+          <h2>특별관리물질 보관</h2>
+          <p>특별관리물질이 포함된 제품의 보관 병수를 일자별로 확인하고 관리합니다.</p>
+        </div>
+        <div class="head-actions">
+          <button id="saveQuantities" class="save-btn" type="button">수량 저장</button>
+          <span id="saveGuide" class="save-guide">보관함을 확인하며 수량을 입력한 뒤 한 번에 저장하세요.</span>
+        </div>
+      </header>
+
+      <div class="toolbar">
+        <div class="period-controls">
+          <span class="toolbar-label">조회기간</span>
+          <select id="yearSelect" aria-label="조회 연도"></select>
+          <select id="monthSelect" aria-label="조회 월"></select>
+        </div>
+
+        <label class="search-field">
+          <span class="toolbar-label">검색</span>
+          <input id="searchInput" type="search" placeholder="제품명 / 제조사 / 코드 / CAS / 특별관리물질 검색" autocomplete="off" />
+        </label>
+
+        <label class="filter-field">
+          <span class="toolbar-label">표시</span>
+          <select id="stockFilter">
+            <option value="all">전체</option>
+            <option value="positive">보관수량 있음</option>
+            <option value="zero">0병</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="message" class="message" aria-live="polite"></div>
+
+      <div class="table-wrap">
+        <table class="storage-table">
+          <thead id="storageHead"></thead>
+          <tbody id="storageBody">
+            <tr><td class="empty">보관 현황을 불러오는 중입니다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <footer class="storage-footer">
+        <div class="notice-box">
+          <strong>안내사항</strong>
+          <span>보관수량은 내용물의 잔량과 관계없이 실제 보관 중인 용기 1개를 1병으로 입력합니다.</span>
+          <span>수량 입력·수정은 오늘 날짜만 가능하며, 과거 날짜는 조회만 가능합니다.</span>
+          <span>미입력일은 직전 유효수량과 입고수량을 기준으로 달력에 연속 표시됩니다.</span>
+        </div>
+        <div class="legend-box">
+          <strong>달력 안내</strong>
+          <span><i class="legend-swatch weekend"></i> 토·일</span>
+          <span><i class="legend-swatch today"></i> 오늘</span>
+          <span><b>-</b> 데이터 없음</span>
+        </div>
+      </footer>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../supabase.js"></script>
+  <script src="./app.js?v=20260925-storage1"></script>
+  <script src="../../common/common.js"></script>
+</body>
+</html>
