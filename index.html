@@ -3033,6 +3033,12 @@ body.auth-loading .top-user-bar {
       desc: '시약 사용입력과 사용일지를 관리합니다.',
       gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
     },
+    'QA/Mobile/usage/index.html': {
+      top: 'Safety Management',
+      title: 'QA',
+      desc: '시약 사용입력과 사용일지를 관리합니다.',
+      gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
+    },
     'QA/special/index.html': {
       top: 'Safety Management',
       title: 'QA',
@@ -3103,6 +3109,11 @@ body.auth-loading .top-user-bar {
       { id: 'qa-special', label: '특별관리물질 현황' }
     ],
     'QA/usage/index.html': [
+      { id: 'qa-usage', label: '사용일지' },
+      { id: 'qa-sds', label: 'SDS 관리' },
+      { id: 'qa-special', label: '특별관리물질 현황' }
+    ],
+    'QA/Mobile/usage/index.html': [
       { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: 'SDS 관리' },
       { id: 'qa-special', label: '특별관리물질 현황' }
@@ -3386,9 +3397,10 @@ body.auth-loading .top-user-bar {
 
     // QA는 사용일지, SDS, 특별관리물질을 독립 프로그램으로 운영하므로
     // 포탈 상단 버튼에서 iframe 경로 자체를 전환합니다.
-    if (currentSrc === 'QA/index.html' || currentSrc === 'QA/usage/index.html' || currentSrc === 'QA/special/index.html') {
-      if (tabId === 'qa-usage' && currentSrc !== 'QA/usage/index.html') {
-        replacePortalFrame('QA/usage/index.html');
+    if (isQaProgramSrc(currentSrc)) {
+      const qaUsageSrc = getQaUsageSrc();
+      if (tabId === 'qa-usage' && currentSrc !== qaUsageSrc) {
+        replacePortalFrame(qaUsageSrc);
         return;
       }
       if (tabId === 'qa-sds' && currentSrc !== 'QA/index.html') {
@@ -3432,7 +3444,7 @@ body.auth-loading .top-user-bar {
     const key = normalizePortalSrc(src);
     const tabs = portalDefaultTabs[key] || [];
     let activeId = tabs[0]?.id || '';
-    if (key === 'QA/usage/index.html') activeId = 'qa-usage';
+    if (isQaUsageSrc(key)) activeId = 'qa-usage';
     if (key === 'QA/index.html') activeId = 'qa-sds';
     if (key === 'QA/special/index.html') activeId = 'qa-special';
     renderPortalSubtabs(tabs, activeId);
@@ -3571,6 +3583,30 @@ body.auth-loading .top-user-bar {
 
   function isMobilePortalView() {
     return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  }
+
+  const QA_USAGE_DESKTOP_SRC = 'QA/usage/index.html';
+  const QA_USAGE_MOBILE_SRC = 'QA/Mobile/usage/index.html';
+
+  function getQaUsageSrc() {
+    return isMobilePortalView() ? QA_USAGE_MOBILE_SRC : QA_USAGE_DESKTOP_SRC;
+  }
+
+  function isQaUsageSrc(src) {
+    const key = normalizePortalSrc(src);
+    return key === QA_USAGE_DESKTOP_SRC || key === QA_USAGE_MOBILE_SRC;
+  }
+
+  function isQaProgramSrc(src) {
+    const key = normalizePortalSrc(src);
+    return isQaUsageSrc(key) || key === 'QA/index.html' || key === 'QA/special/index.html';
+  }
+
+  function resolveResponsivePortalSrc(src) {
+    const raw = String(src || '').trim();
+    if (!raw || !isQaUsageSrc(raw)) return src;
+    const suffixMatch = raw.match(/([?#].*)$/);
+    return getQaUsageSrc() + (suffixMatch ? suffixMatch[1] : '');
   }
 
   function setMobileDrawer(open) {
@@ -5073,6 +5109,7 @@ body.auth-loading .top-user-bar {
 
   function replacePortalFrame(src) {
     if (!frame || !src) return;
+    src = resolveResponsivePortalSrc(src);
     // 실제 iframe 이동은 location.replace를 사용하더라도, 현재 주소 추적용으로 별도 보관합니다.
     // 회사 전환 후 다시 같은 앱을 재로드할 때 이전 src 속성값을 참조하는 문제를 막습니다.
     try { frame.dataset.currentSrc = src; } catch (_) {}
@@ -5128,7 +5165,7 @@ body.auth-loading .top-user-bar {
       // 기존 시약/근태 등은 같은 HTML 안에서 postMessage로 내부 탭을 바꾸지만,
       // QA의 세 프로그램은 iframe 문서 자체를 교체해야 하므로 src를 직접 갱신합니다.
       // 이렇게 해야 iframe의 src 속성도 실제 현재 프로그램과 일치합니다.
-      if (normalizedTarget === 'QA/index.html' || normalizedTarget === 'QA/usage/index.html' || normalizedTarget === 'QA/special/index.html') {
+      if (isQaProgramSrc(normalizedTarget)) {
         frame.src = targetUrl;
       } else if (frame.contentWindow && frame.contentWindow.location) {
         frame.contentWindow.location.replace(targetUrl);
@@ -5643,7 +5680,7 @@ body.auth-loading .top-user-bar {
 
         // QA는 사용일지, SDS, 특별관리물질이 서로 독립 프로그램이므로,
         // 각 하위 앱이 보내는 자체 탭 정보로 포털의 QA 공통 메뉴를 덮어쓰지 않습니다.
-        if (currentSrc === 'QA/index.html' || currentSrc === 'QA/usage/index.html' || currentSrc === 'QA/special/index.html') {
+        if (isQaProgramSrc(currentSrc)) {
           updatePortalSubtabs(currentSrc);
           return;
         }
@@ -5677,7 +5714,7 @@ body.auth-loading .top-user-bar {
         // QA 상단 3개 버튼은 서로 다른 프로그램 경로를 나타냅니다.
         // 각 하위 앱이 보내는 내부 active tab id와 포털의 qa-* id가 다를 수 있으므로
         // QA에서는 현재 iframe 경로를 기준으로 포털 버튼 active 상태를 고정합니다.
-        if (currentSrc === 'QA/usage/index.html') {
+        if (isQaUsageSrc(currentSrc)) {
           setPortalSubtabActive('qa-usage', false);
           return;
         }
