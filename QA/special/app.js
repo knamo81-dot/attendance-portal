@@ -7,7 +7,7 @@
   let rows = [];
   let isSaving = false;
   let productMatches = new Map();
-  let orderMatches = new Map();
+  let receiptMatches = new Map();
 
   function todayISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
   function stateOf(row){const t=todayISO();if(row.effective_from&&t<row.effective_from)return"scheduled";if(row.effective_to){if(t>=row.effective_to)return"ended";return"ending";}return"active";}
@@ -48,18 +48,18 @@
     const start=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
     return {start,end};
   }
-  function orderInfoForProduct(productId){
-    const dates=(orderMatches.get(String(productId))||[]).filter(Boolean);
+  function receiptInfoForProduct(productId){
+    const dates=(receiptMatches.get(String(productId))||[]).filter(Boolean);
     const {start,end}=periodRange();
     const filtered=dates.filter(d=>(!start||d>=start)&&(!end||d<=end)).sort();
-    return filtered.length?{ordered:true,latestOrderDate:filtered[filtered.length-1],orderCount:filtered.length}:null;
+    return filtered.length?{ordered:true,latestReceiptDate:filtered[filtered.length-1],receiptCount:filtered.length}:null;
   }
   function latestDateForProducts(products){
-    const dates=products.map(p=>orderInfoForProduct(p.id)?.latestOrderDate).filter(Boolean).sort();
+    const dates=products.map(p=>receiptInfoForProduct(p.id)?.latestReceiptDate).filter(Boolean).sort();
     return dates.length?dates[dates.length-1]:null;
   }
-  function productSort(a,b){
-    const ad=orderInfoForProduct(a.id)?.latestOrderDate||"", bd=orderInfoForProduct(b.id)?.latestOrderDate||"";
+  function productSortByReceipt(a,b){
+    const ad=receiptInfoForProduct(a.id)?.latestReceiptDate||"", bd=receiptInfoForProduct(b.id)?.latestReceiptDate||"";
     if(ad!==bd)return bd.localeCompare(ad);
     return String(a.name||"").localeCompare(String(b.name||""),"ko");
   }
@@ -86,12 +86,12 @@
     }).join(" / ");
   }
   function productDisplay(p){
-    const parts=[p.name,p.maker,p.code,p.capacity].filter(Boolean), oi=orderInfoForProduct(p.id);
+    const parts=[p.name,p.maker,p.code,p.capacity].filter(Boolean), oi=receiptInfoForProduct(p.id);
     const casLine=matchedCasText(p);
-    return `<div class="matched-product${oi?.ordered?" ordered":""}"><div class="product-name">${esc(parts.join(" / ")||`제품 #${p.id}`)}${casLine?`<span class="sub-name">${esc(casLine)}</span>`:""}</div>${oi?.ordered?`<span class="order-date">${esc(oi.latestOrderDate||"-")}</span>`:`<span class="no-order">기간 내 발주 없음</span>`}</div>`;
+    return `<div class="matched-product${oi?.ordered?" ordered":""}"><div class="product-name">${esc(parts.join(" / ")||`제품 #${p.id}`)}${casLine?`<span class="sub-name">${esc(casLine)}</span>`:""}</div>${oi?.ordered?`<span class="order-date">${esc(oi.latestReceiptDate||"-")}</span>`:`<span class="no-order">기간 내 입고 없음</span>`}</div>`;
   }
-  async function loadProductAndOrders(){
-    productMatches=new Map();orderMatches=new Map();
+  async function loadProductAndReceipts(){
+    productMatches=new Map();receiptMatches=new Map();
     const session=window.SDSApp?.getPortalSession?.()||{};
     const companyId=session.activeCompanyId||session.company_id||session.companyId||null;
 
@@ -145,22 +145,22 @@
       });
     });
 
-    // 발주이력은 product_id를 기준으로 기존 reagent_collect_items에서 조회합니다.
+    // 입고이력은 product_id를 기준으로 기존 reagent_collect_items의 receipt_date에서 조회합니다.
     for(let i=0;i<productIds.length;i+=chunkSize){
       const ids=productIds.slice(i,i+chunkSize);
       let oq=db.from("reagent_collect_items")
-        .select("product_id, order_date")
+        .select("product_id, receipt_date")
         .in("product_id",ids)
-        .not("order_date","is",null);
+        .not("receipt_date","is",null);
       if(companyId)oq=oq.eq("company_id",companyId);
       const {data:orders,error:oErr}=await oq;
       if(oErr)throw oErr;
       (orders||[]).forEach(o=>{
         if(o.product_id==null)return;
         const key=String(o.product_id);
-        const dates=orderMatches.get(key)||[];
-        if(o.order_date&&!dates.includes(o.order_date))dates.push(o.order_date);
-        orderMatches.set(key,dates);
+        const dates=receiptMatches.get(key)||[];
+        if(o.receipt_date&&!dates.includes(o.receipt_date))dates.push(o.receipt_date);
+        receiptMatches.set(key,dates);
       });
     }
   }
@@ -170,22 +170,22 @@
   function renderSummary(){$("totalCount").textContent=`${rows.length}종`;$('activeCount').textContent=`${rows.filter(r=>stateOf(r)==='active').length}종`;$('scheduledCount').textContent=`${rows.filter(r=>stateOf(r)==='scheduled').length}종`;$('endedCount').textContent=`${rows.filter(r=>['ending','ended'].includes(stateOf(r))).length}종`;}
   function renderStatus(){
     const list=filtered("statusSearch","statusFilter","statusType").slice().sort((a,b)=>{
-      const aLatest=latestDateForProducts(productsFor(a).filter(p=>orderInfoForProduct(p.id)?.ordered))||"";
-      const bLatest=latestDateForProducts(productsFor(b).filter(p=>orderInfoForProduct(p.id)?.ordered))||"";
+      const aLatest=latestDateForProducts(productsFor(a).filter(p=>receiptInfoForProduct(p.id)?.ordered))||"";
+      const bLatest=latestDateForProducts(productsFor(b).filter(p=>receiptInfoForProduct(p.id)?.ordered))||"";
       if(aLatest!==bLatest)return bLatest.localeCompare(aLatest);
       return String(a.name_ko||"").localeCompare(String(b.name_ko||""),"ko");
     });
     const matchedCount=rows.filter(r=>productsFor(r).length>0).length;
-    const orderedCount=rows.filter(r=>productsFor(r).some(p=>orderInfoForProduct(p.id)?.ordered)).length;
+    const receivedCount=rows.filter(r=>productsFor(r).some(p=>receiptInfoForProduct(p.id)?.ordered)).length;
     if($("matchedSubstanceCount"))$("matchedSubstanceCount").textContent=`${matchedCount}종`;
-    if($("orderedSubstanceCount"))$("orderedSubstanceCount").textContent=`${orderedCount}종`;
+    if($("orderedSubstanceCount"))$("orderedSubstanceCount").textContent=`${receivedCount}종`;
     const rawLimit=$("displayLimit")?.value||"10", limit=rawLimit==="all"?Infinity:Number(rawLimit);
     $("statusList").innerHTML=list.length?list.map(r=>{
-      const products=productsFor(r).slice().sort(productSort);
-      const orderedProducts=products.filter(p=>orderInfoForProduct(p.id)?.ordered);
-      const displayProducts=orderedProducts.slice(0,limit);
-      const hiddenCount=Math.max(0,orderedProducts.length-displayProducts.length), latest=latestDateForProducts(orderedProducts);
-      return `<tr><td class="strong">${esc(r.name_ko)}${r.name_en?`<span class="sub-name">${esc(r.name_en)}</span>`:""}</td><td>${casHtml(r)}</td><td>${thresholdText(r)}${conditionHtml(r)}</td><td>${orderedProducts.length?`<div class="product-list">${displayProducts.map(productDisplay).join("")}${hiddenCount?`<div class="more-products">+ ${hiddenCount}제품 더 있음</div>`:""}</div>`:`<span class="muted">기간 내 발주제품 없음</span>`}</td><td>${orderedProducts.length?`<span class="badge ordered-badge">${orderedProducts.length}제품</span>`:`<span class="muted">-</span>`}</td><td>${esc(latest||"-")}</td><td>${badge(r)}</td></tr>`;
+      const products=productsFor(r).slice().sort(productSortByReceipt);
+      const receivedProducts=products.filter(p=>receiptInfoForProduct(p.id)?.ordered);
+      const displayProducts=receivedProducts.slice(0,limit);
+      const hiddenCount=Math.max(0,receivedProducts.length-displayProducts.length), latest=latestDateForProducts(receivedProducts);
+      return `<tr><td class="strong">${esc(r.name_ko)}${r.name_en?`<span class="sub-name">${esc(r.name_en)}</span>`:""}</td><td>${casHtml(r)}</td><td>${thresholdText(r)}${conditionHtml(r)}</td><td>${receivedProducts.length?`<div class="product-list">${displayProducts.map(productDisplay).join("")}${hiddenCount?`<div class="more-products">+ ${hiddenCount}제품 더 있음</div>`:""}</div>`:`<span class="muted">기간 내 입고제품 없음</span>`}</td><td>${receivedProducts.length?`<span class="badge ordered-badge">${receivedProducts.length}제품</span>`:`<span class="muted">-</span>`}</td><td>${esc(latest||"-")}</td><td>${badge(r)}</td></tr>`;
     }).join(""):`<tr><td colspan="7" class="empty">등록된 특별관리물질이 없습니다.</td></tr>`;
   }
   function renderMaster(){const list=filtered("masterSearch","masterStatus","masterType");$("masterList").innerHTML=list.length?list.map(r=>`<tr><td class="strong">${esc(r.name_ko)}</td><td>${esc(r.name_en||"-")}</td><td>${casHtml(r)}</td><td>${r.is_conditional?'조건부':'특별관리물질'}</td><td>${thresholdText(r)}${conditionHtml(r)}</td><td>${esc(r.effective_from||"-")}</td><td>${esc(r.effective_to||"-")}</td><td>${badge(r)}</td><td class="actions-cell"><button class="mini-btn" data-edit="${r.id}" type="button">수정</button><button class="mini-btn danger" data-delete="${r.id}" type="button">삭제</button></td></tr>`).join(""):`<tr><td colspan="9" class="empty">등록된 특별관리물질이 없습니다.</td></tr>`;}
@@ -199,9 +199,9 @@
     rows=data||[];
     let matchError=null;
     try{
-      await loadProductAndOrders();
+      await loadProductAndReceipts();
     }catch(error){
-      console.error("제품/발주 연동 실패",error);
+      console.error("제품/입고 연동 실패",error);
       matchError=error;
     }
     setMessage("");
@@ -209,8 +209,8 @@
     const notice=$("matchNotice");
     if(notice){
       notice.textContent=matchError
-        ? `기준정보는 정상입니다. 제품/발주 연동 실패: ${matchError?.message||"알 수 없는 오류"}`
-        : "제품 CAS는 product_cas 전체 CAS를 기준으로 매칭합니다. 복수 CAS 제품은 매칭된 CAS를 표시하고, 함유량이 입력된 경우에만 함께 표시합니다. 선택한 발주기간 내 실제 발주가 확인된 제품만 제품별 최신 발주일로 표시합니다.";
+        ? `기준정보는 정상입니다. 제품/입고 연동 실패: ${matchError?.message||"알 수 없는 오류"}`
+        : "제품 CAS는 product_cas 전체 CAS를 기준으로 매칭합니다. 복수 CAS 제품은 매칭된 CAS를 표시하고, 함유량이 입력된 경우에만 함께 표시합니다. 선택한 입고기간 내 실제 입고가 확인된 제품만 제품별 최근 입고일로 표시합니다.";
       notice.classList.toggle("error",!!matchError);
     }
   }
