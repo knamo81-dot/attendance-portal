@@ -1,1 +1,90 @@
-.
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>SDS 관리</title>
+  <link rel="stylesheet" href="./style.css?v=20260925-mobile-sds1" />
+  <link rel="stylesheet" href="../../../common/mobile.css" />
+  <link rel="stylesheet" href="../../../common/theme.css" />
+</head>
+<body>
+  <main class="mobile-sds-shell">
+    <section class="mobile-sds-app">
+      <header class="page-head">
+        <h2>SDS 관리</h2>
+        <p>등록된 안전보건자료(SDS)를 모바일에서 조회합니다.</p>
+      </header>
+
+      <section class="summary-grid" aria-label="SDS 현황">
+        <article class="summary-card">
+          <span class="summary-label">전체제품</span>
+          <strong id="sdsTotalCount">0건</strong>
+        </article>
+        <article class="summary-card">
+          <span class="summary-label">SDS등록</span>
+          <strong id="sdsAttachedCount">0건</strong>
+        </article>
+        <article class="summary-card">
+          <span class="summary-label">SDS미등록</span>
+          <strong id="sdsMissingCount">0건</strong>
+        </article>
+        <article class="summary-card">
+          <span class="summary-label">해당사항없음</span>
+          <strong id="sdsNoneCount">0건</strong>
+        </article>
+      </section>
+
+      <section class="filters-card">
+        <label class="field">
+          <span>검색</span>
+          <input id="sdsSearch" type="search" placeholder="품명 / 제조사 / 제품코드 / CAS" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>구분</span>
+          <select id="sdsStatus">
+            <option value="all">전체</option>
+            <option value="registered">SDS등록</option>
+            <option value="missing">SDS미등록</option>
+            <option value="none">해당사항없음</option>
+          </select>
+        </label>
+      </section>
+
+      <div id="sdsMessage" class="message" aria-live="polite"></div>
+
+      <section class="product-section">
+        <div class="list-head" aria-hidden="true">
+          <span>제품정보</span>
+          <span>SDS</span>
+        </div>
+        <div id="sdsProductList" class="product-list">
+          <div class="empty-card">SDS 정보를 불러오는 중입니다.</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="pdfModal" class="pdf-modal" hidden>
+    <section class="pdf-panel" role="dialog" aria-modal="true" aria-labelledby="pdfTitle">
+      <header class="pdf-head">
+        <div class="pdf-title-wrap">
+          <strong id="pdfTitle">SDS PDF</strong>
+          <span id="pdfFileName"></span>
+        </div>
+        <button id="pdfClose" class="pdf-close" type="button" aria-label="닫기">×</button>
+      </header>
+      <div id="pdfTabs" class="pdf-tabs" hidden></div>
+      <div class="pdf-body">
+        <div id="pdfLoading" class="pdf-loading">PDF를 불러오는 중입니다.</div>
+        <iframe id="pdfFrame" title="SDS PDF 미리보기"></iframe>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../../supabase.js"></script>
+  <script src="./app.js?v=20260925-mobile-sds1"></script>
+  <script src="../../../common/common.js"></script>
+</body>
+</html>
