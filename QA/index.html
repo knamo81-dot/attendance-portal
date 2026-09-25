@@ -13,10 +13,16 @@
     <section class="card sds-card">
       <div class="card-head sds-main-head">
         <div><h3>Safety Data Sheet 관리</h3></div>
-        <button class="btn primary" id="sdsDownloadExcel" type="button">엑셀 다운로드</button>
+        <div class="sds-view-switch" role="tablist" aria-label="SDS 관리 화면 전환">
+          <button class="sds-view-btn active" id="sdsViewButton" type="button" data-view="sds" role="tab" aria-selected="true">SDS 현황</button>
+          <button class="sds-view-btn" id="casViewButton" type="button" data-view="cas" role="tab" aria-selected="false">
+            CAS List <span class="cas-unmatched-badge" id="casUnmatchedBadge" hidden></span>
+          </button>
+        </div>
       </div>
 
       <div class="card-body">
+        <section id="sdsView" class="sds-subview">
         <div class="summary" aria-label="SDS 현황">
           <div class="tile"><span class="k">전체제품</span><span class="v" id="sdsTotalCount">0건</span></div>
           <div class="tile"><span class="k">SDS등록</span><span class="v" id="sdsAttachedCount">0건</span></div>
@@ -50,6 +56,9 @@
               <option value="all">전체</option>
             </select>
           </div>
+          <div class="filter-actions">
+            <button class="btn primary" id="sdsDownloadExcel" type="button">엑셀 다운로드</button>
+          </div>
         </div>
 
         <div id="sdsMessage" class="message" aria-live="polite"></div>
@@ -75,6 +84,69 @@
             </tbody>
           </table>
         </div>
+        </section>
+
+        <section id="casView" class="sds-subview" hidden>
+          <div class="summary cas-summary" aria-label="CAS List 현황">
+            <button class="tile cas-summary-tile active" type="button" data-cas-summary="all">
+              <span class="k">전체</span><span class="v" id="casTotalCount">0</span>
+            </button>
+            <button class="tile cas-summary-tile unmatched" type="button" data-cas-summary="unmatched">
+              <span class="k">미매칭</span><span class="v" id="casUnmatchedCount">0</span>
+            </button>
+            <button class="tile cas-summary-tile" type="button" data-cas-summary="keco">
+              <span class="k">K-ECO</span><span class="v" id="casKecoCount">0</span>
+            </button>
+            <button class="tile cas-summary-tile" type="button" data-cas-summary="pubchem">
+              <span class="k">PubChem</span><span class="v" id="casPubchemCount">0</span>
+            </button>
+          </div>
+
+          <div class="filters cas-filters">
+            <div class="field cas-search-field">
+              <label for="casSearch">검색</label>
+              <input id="casSearch" type="search" placeholder="CAS / 물질명 / 제품명" autocomplete="off" />
+            </div>
+            <div class="field cas-status-field">
+              <label for="casStatus">상태</label>
+              <select id="casStatus">
+                <option value="all">전체</option>
+                <option value="unmatched">미매칭</option>
+                <option value="matched">완료</option>
+              </select>
+            </div>
+            <div class="field cas-source-field">
+              <label for="casSource">출처</label>
+              <select id="casSource">
+                <option value="all">전체</option>
+                <option value="K-ECO">K-ECO</option>
+                <option value="PubChem">PubChem</option>
+                <option value="SDS">SDS</option>
+                <option value="MANUAL">MANUAL</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="casMessage" class="message" aria-live="polite"></div>
+
+          <div class="table-wrap">
+            <table class="cas-table">
+              <thead>
+                <tr>
+                  <th>상태</th>
+                  <th>CAS No.</th>
+                  <th>국문명</th>
+                  <th>영문명</th>
+                  <th>출처</th>
+                  <th>연결제품</th>
+                </tr>
+              </thead>
+              <tbody id="casList">
+                <tr><td colspan="6" class="empty">CAS 정보를 불러오는 중입니다.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </section>
   </main>
@@ -185,6 +257,43 @@
       <div class="pdf-viewer-body">
         <div class="pdf-viewer-loading" id="sdsPdfLoading">PDF를 불러오는 중입니다.</div>
         <iframe id="sdsPdfFrame" title="SDS PDF 미리보기" loading="eager"></iframe>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="casEditModal" hidden>
+    <section class="modal small" role="dialog" aria-modal="true" aria-labelledby="casEditTitle">
+      <div class="modal-head">
+        <h3 id="casEditTitle">CAS 물질명 수기입력</h3>
+        <button class="icon-btn" type="button" data-close="casEditModal" aria-label="닫기">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="product-summary cas-edit-summary">
+          <div><b>CAS No.</b> <span id="casEditNo">-</span></div>
+          <div><b>연결제품</b> <span id="casEditProducts">-</span></div>
+        </div>
+        <div class="form-grid one">
+          <div class="field">
+            <label for="casEditKo">국문명</label>
+            <input id="casEditKo" type="text" placeholder="국문 물질명" />
+          </div>
+          <div class="field">
+            <label for="casEditEn">영문명</label>
+            <input id="casEditEn" type="text" placeholder="English chemical name" />
+          </div>
+          <div class="field">
+            <label for="casEditSource">출처</label>
+            <select id="casEditSource">
+              <option value="SDS">SDS</option>
+              <option value="MANUAL">MANUAL</option>
+            </select>
+          </div>
+        </div>
+        <div class="cas-edit-hint">국문명 또는 영문명 중 하나 이상 입력해 주세요. 저장 후 해당 CAS는 매칭 완료로 전환됩니다.</div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" type="button" data-close="casEditModal">취소</button>
+        <button class="btn primary" id="casManualSave" type="button">저장</button>
       </div>
     </section>
   </div>
