@@ -311,7 +311,7 @@
       return;
     }
     $('selectedProductName').textContent = p.name || '-';
-    $('selectedProductMeta').textContent = [p.maker, p.code, p.capacity].filter(Boolean).join(' · ') || '-';
+    $('selectedProductMeta').textContent = [p.maker, p.code, p.capacity, p.grade].filter(Boolean).join(' · ') || '-';
     const materialRows = productMaterialRows(p);
     $('selectedProductCas').innerHTML = materialRows.length
       ? renderCasStack(materialRows, true)
@@ -541,6 +541,41 @@
     return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
   }
 
+  // 8-2: 나의 월간 사용현황은 물질/CAS가 아니라 실제 사용제품(product_id) 기준으로 집계한다.
+  // 혼합물도 한 제품은 한 행으로 유지해 입력내역 확인/수정 시 제품 식별이 명확하도록 한다.
+  function buildMonthlyProductGroups(rows) {
+    const groups = new Map();
+    rows.forEach((row) => {
+      const pid = Number(row.product_id);
+      const product = state.productsById.get(pid) || null;
+      const key = Number.isFinite(pid) ? `product:${pid}` : `product:unknown:${row.id || ''}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          product,
+          name: String(product?.name || '').trim() || `제품 #${row.product_id || '-'}`,
+          rows: []
+        });
+      }
+      groups.get(key).rows.push(row);
+    });
+
+    return [...groups.values()].sort((a, b) => {
+      const an = String(a.product?.name || a.name || '');
+      const bn = String(b.product?.name || b.name || '');
+      return an.localeCompare(bn, 'ko') ||
+        String(a.product?.maker || '').localeCompare(String(b.product?.maker || ''), 'ko') ||
+        String(a.product?.code || '').localeCompare(String(b.product?.code || ''), 'ko');
+    });
+  }
+
+  function monthlyProductMeta(product) {
+    return [product?.maker, product?.code, product?.capacity, product?.grade]
+      .map((v) => String(v || '').trim())
+      .filter(Boolean)
+      .join(' · ') || '-';
+  }
+
   function metricCell(rows, metric) {
     if (!rows.length) return '<span>-</span>';
     if (metric === 'time') {
@@ -561,27 +596,25 @@
     $('monthLabel').textContent = `${state.currentMonth.getFullYear()}년 ${state.currentMonth.getMonth() + 1}월`;
 
     $('monthlyHead').innerHTML = `<tr>
-      <th class="material-col">물질명 (CAS No.)</th>
+      <th class="material-col">사용제품</th>
       ${Array.from({ length: days }, (_, i) => `<th class="day-col">${i + 1}</th>`).join('')}
     </tr>`;
 
-    const groups = buildGroups(state.monthlyRows);
+    const groups = buildMonthlyProductGroups(state.monthlyRows);
     if (!groups.length) {
       $('monthlyBody').innerHTML = `<tr><td colspan="${days + 1}" class="empty">해당 월에 등록된 사용내역이 없습니다.</td></tr>`;
       return;
     }
 
-    const html = [];
-    groups.forEach((g) => {
-      const expandable = g.products.size > 1;
-      const expanded = state.expandedMonthly.has(g.key);
-      html.push(`<tr class="group-row">
+    $('monthlyBody').innerHTML = groups.map((g) => {
+      const p = g.product;
+      return `<tr class="group-row monthly-product-row">
         <td class="material-col">
           <div class="material-main">
-            <button class="expand-btn" type="button" data-month-group="${esc(g.key)}">${expandable ? (expanded ? '▼' : '▶') : '•'}</button>
+            <span class="expand-btn">•</span>
             <div class="material-text">
-              <div class="material-stack">${renderMaterialStack(g.materials, g.fallbackName)}</div>
-              <div class="material-cas cas-stack">${renderCasStack(g.materials)}</div>
+              <div class="material-name">${esc(g.name)}</div>
+              <div class="product-meta">${esc(monthlyProductMeta(p))}</div>
             </div>
           </div>
         </td>
@@ -590,31 +623,8 @@
           const context = `${state.currentMonth.getFullYear()}년 ${state.currentMonth.getMonth() + 1}월 ${i + 1}일 · ${g.name}`;
           return `<td class="value-cell ${rows.length ? 'has-value detail-cell' : ''}"${detailCellAttrs(rows, context)}>${metricCell(rows, state.monthlyMetric)}</td>`;
         }).join('')}
-      </tr>`);
-
-      if (expanded) {
-        [...g.products.values()].forEach((pitem) => {
-          const p = pitem.product;
-          html.push(`<tr class="product-row">
-            <td class="material-col">
-              <div class="material-main">
-                <span class="expand-btn">›</span>
-                <div class="material-text">
-                  <div class="material-name">${esc(p?.name || `제품 #${pitem.rows[0]?.product_id || ''}`)}</div>
-                  <div class="product-meta">${esc([p?.maker, p?.code, p?.capacity].filter(Boolean).join(' · ') || '-')}</div>
-                </div>
-              </div>
-            </td>
-            ${Array.from({ length: days }, (_, i) => {
-              const rows = dayRows(pitem.rows, i + 1);
-              const context = `${state.currentMonth.getFullYear()}년 ${state.currentMonth.getMonth() + 1}월 ${i + 1}일 · ${p?.name || g.name}`;
-              return `<td class="value-cell ${rows.length ? 'has-value detail-cell' : ''}"${detailCellAttrs(rows, context)}>${metricCell(rows, state.monthlyMetric)}</td>`;
-            }).join('')}
-          </tr>`);
-        });
-      }
-    });
-    $('monthlyBody').innerHTML = html.join('');
+      </tr>`;
+    }).join('');
   }
 
   async function loadMonthlyRows() {
@@ -623,11 +633,7 @@
     const range = monthRange(state.currentMonth);
     setMessage('monthlyMessage', '월간 사용현황을 불러오는 중입니다.');
     try {
-      const [rows] = await Promise.all([
-        fetchUsage({ startDate: range.start, endDate: range.end, employeeNo }),
-        loadChemicalMaster()
-      ]);
-      state.monthlyRows = rows;
+      state.monthlyRows = await fetchUsage({ startDate: range.start, endDate: range.end, employeeNo });
       setMessage('monthlyMessage');
       renderMonthly();
     } catch (e) {
@@ -831,7 +837,7 @@
     const select = $('usageEditProduct');
     if (!select) return;
     select.innerHTML = state.products.map((p) => {
-      const label = [p.name, p.maker, p.code, p.capacity].filter(Boolean).join(' · ');
+      const label = [p.name, p.maker, p.code, p.capacity, p.grade].filter(Boolean).join(' · ');
       return `<option value="${Number(p.id)}" ${Number(p.id) === Number(selectedId) ? 'selected' : ''}>${esc(label || `제품 #${p.id}`)}</option>`;
     }).join('');
   }
@@ -853,7 +859,7 @@
       return `<article class="usage-detail-item" data-detail-record="${Number(r.id)}">
         <div class="usage-detail-main">
           <div class="usage-detail-product">${esc(p?.name || `제품 #${r.product_id}`)}</div>
-          <div class="usage-detail-meta">${esc([p?.maker, p?.code, p?.capacity].filter(Boolean).join(' · ') || '-')}</div>
+          <div class="usage-detail-meta">${esc([p?.maker, p?.code, p?.capacity, p?.grade].filter(Boolean).join(' · ') || '-')}</div>
           <div class="usage-detail-materials">${materials.length ? materials.map((m) => `<span><b>${esc(m.cas_no)}</b><em>${esc(m.name)}</em>${m.secondary ? `<small>${esc(m.secondary)}</small>` : ''}${formatContent(m) ? `<i>${esc(formatContent(m))}</i>` : ''}</span>`).join('') : '<span><b>CAS 미등록</b><em>물질명 미등록</em></span>'}</div>
           <div class="usage-detail-meta">${esc(r.employee_name || '')}${r.employee_no ? ` (${esc(r.employee_no)})` : ''}</div>
           <div class="usage-detail-values">
