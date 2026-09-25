@@ -3045,6 +3045,12 @@ body.auth-loading .top-user-bar {
       desc: '특별관리물질 포함 제품의 보관수량을 일자별로 관리합니다.',
       gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
     },
+    'QA/Mobile/special-storage/index.html': {
+      top: 'Safety Management',
+      title: 'QA',
+      desc: '특별관리물질 포함 제품의 보관수량을 모바일에서 확인하고 관리합니다.',
+      gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
+    },
     'QA/special/index.html': {
       top: 'Safety Management',
       title: 'QA',
@@ -3128,6 +3134,12 @@ body.auth-loading .top-user-bar {
       { id: 'qa-special', label: '특별관리물질 현황' }
     ],
     'QA/special-storage/index.html': [
+      { id: 'qa-usage', label: '사용일지' },
+      { id: 'qa-sds', label: 'SDS 관리' },
+      { id: 'qa-storage', label: '특별관리물질 보관' },
+      { id: 'qa-special', label: '특별관리물질 현황' }
+    ],
+    'QA/Mobile/special-storage/index.html': [
       { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: 'SDS 관리' },
       { id: 'qa-storage', label: '특별관리물질 보관' },
@@ -3419,8 +3431,9 @@ body.auth-loading .top-user-bar {
         replacePortalFrame(qaUsageSrc);
         return;
       }
-      if (tabId === 'qa-storage' && currentSrc !== 'QA/special-storage/index.html') {
-        replacePortalFrame('QA/special-storage/index.html');
+      const qaStorageSrc = getQaStorageSrc();
+      if (tabId === 'qa-storage' && currentSrc !== qaStorageSrc) {
+        replacePortalFrame(qaStorageSrc);
         return;
       }
       if (tabId === 'qa-sds' && currentSrc !== 'QA/index.html') {
@@ -3465,7 +3478,7 @@ body.auth-loading .top-user-bar {
     const tabs = portalDefaultTabs[key] || [];
     let activeId = tabs[0]?.id || '';
     if (isQaUsageSrc(key)) activeId = 'qa-usage';
-    if (key === 'QA/special-storage/index.html') activeId = 'qa-storage';
+    if (isQaStorageSrc(key)) activeId = 'qa-storage';
     if (key === 'QA/index.html') activeId = 'qa-sds';
     if (key === 'QA/special/index.html') activeId = 'qa-special';
     renderPortalSubtabs(tabs, activeId);
@@ -3608,9 +3621,15 @@ body.auth-loading .top-user-bar {
 
   const QA_USAGE_DESKTOP_SRC = 'QA/usage/index.html';
   const QA_USAGE_MOBILE_SRC = 'QA/Mobile/usage/index.html';
+  const QA_STORAGE_DESKTOP_SRC = 'QA/special-storage/index.html';
+  const QA_STORAGE_MOBILE_SRC = 'QA/Mobile/special-storage/index.html';
 
   function getQaUsageSrc() {
     return isMobilePortalView() ? QA_USAGE_MOBILE_SRC : QA_USAGE_DESKTOP_SRC;
+  }
+
+  function getQaStorageSrc() {
+    return isMobilePortalView() ? QA_STORAGE_MOBILE_SRC : QA_STORAGE_DESKTOP_SRC;
   }
 
   function isQaUsageSrc(src) {
@@ -3618,16 +3637,24 @@ body.auth-loading .top-user-bar {
     return key === QA_USAGE_DESKTOP_SRC || key === QA_USAGE_MOBILE_SRC;
   }
 
+  function isQaStorageSrc(src) {
+    const key = normalizePortalSrc(src);
+    return key === QA_STORAGE_DESKTOP_SRC || key === QA_STORAGE_MOBILE_SRC;
+  }
+
   function isQaProgramSrc(src) {
     const key = normalizePortalSrc(src);
-    return isQaUsageSrc(key) || key === 'QA/special-storage/index.html' || key === 'QA/index.html' || key === 'QA/special/index.html';
+    return isQaUsageSrc(key) || isQaStorageSrc(key) || key === 'QA/index.html' || key === 'QA/special/index.html';
   }
 
   function resolveResponsivePortalSrc(src) {
     const raw = String(src || '').trim();
-    if (!raw || !isQaUsageSrc(raw)) return src;
+    if (!raw) return src;
     const suffixMatch = raw.match(/([?#].*)$/);
-    return getQaUsageSrc() + (suffixMatch ? suffixMatch[1] : '');
+    const suffix = suffixMatch ? suffixMatch[1] : '';
+    if (isQaUsageSrc(raw)) return getQaUsageSrc() + suffix;
+    if (isQaStorageSrc(raw)) return getQaStorageSrc() + suffix;
+    return src;
   }
 
   function setMobileDrawer(open) {
@@ -5739,7 +5766,7 @@ body.auth-loading .top-user-bar {
           setPortalSubtabActive('qa-usage', false);
           return;
         }
-        if (currentSrc === 'QA/special-storage/index.html') {
+        if (isQaStorageSrc(currentSrc)) {
           setPortalSubtabActive('qa-storage', false);
           return;
         }
