@@ -25,19 +25,17 @@ button{cursor:pointer}
 .head-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
 .save-btn{height:40px;padding:0 24px;border:0;border-radius:8px;background:linear-gradient(90deg,#6847d1,#5b39c0);color:#fff;font-size:13px;font-weight:900;box-shadow:0 5px 12px rgba(91,57,192,.18)}
 .save-btn:disabled{opacity:.45;cursor:not-allowed}
-.save-guide{font-size:11px;color:var(--muted)}
+.save-guide{display:none!important}
 .toolbar{display:flex;align-items:flex-end;gap:12px;padding:14px 20px;border-bottom:1px solid #edf0f4;background:#fff}
 .period-controls{display:flex;align-items:center;gap:7px;flex:0 0 auto}
-.period-nav{width:34px;height:34px;border:1px solid #d4dae4;border-radius:7px;background:#fff;color:#344054;font-size:22px;line-height:1;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0}
-.period-nav:hover{background:#f8f7ff;border-color:#b9abed}
 .toolbar-label{font-size:12px;font-weight:900;white-space:nowrap;color:#344054}
 .period-controls select,.filter-field select,.search-field input{height:36px;border:1px solid #d4dae4;border-radius:7px;background:#fff;color:var(--text);outline:none;font-size:12px}
 .period-controls select{min-width:82px;padding:0 28px 0 10px}
-.search-field{display:flex;align-items:center;gap:7px;min-width:220px;flex:0 1 360px;max-width:460px}
+.search-field{display:flex;align-items:center;gap:7px;min-width:190px;flex:0 1 300px;max-width:360px}
 .search-field input{width:100%;padding:0 11px}
 .filter-field{display:flex;align-items:center;gap:7px;flex:0 0 auto}
 .filter-field select{min-width:130px;padding:0 30px 0 10px}
-.period-controls select:focus,.filter-field select:focus,.search-field input:focus,.qty-input:focus,.period-nav:focus{border-color:#8d76de;box-shadow:0 0 0 3px rgba(100,68,200,.10)}
+.period-controls select:focus,.filter-field select:focus,.search-field input:focus,.qty-input:focus,.month-nav:focus{border-color:#8d76de;box-shadow:0 0 0 3px rgba(100,68,200,.10)}
 .message{min-height:20px;padding:7px 20px 0;font-size:11px;color:var(--muted)}
 .message.error{color:#b42318}.message.success{color:#137a42}
 .table-wrap{margin:0 12px 12px;border:1px solid var(--line);border-radius:8px;overflow:auto;background:#fff;max-height:calc(100vh - 320px)}
@@ -48,11 +46,14 @@ button{cursor:pointer}
 .storage-table th:last-child,.storage-table td:last-child{border-right:0}
 .product-col{position:sticky!important;left:0;z-index:8!important;width:255px;min-width:255px;text-align:left!important;background:var(--sticky)!important}
 .special-col{position:sticky!important;left:255px;z-index:8!important;width:230px;min-width:230px;text-align:left!important;background:var(--sticky)!important}
-.input-col{position:sticky!important;left:485px;z-index:8!important;width:96px;min-width:96px;background:#f8f6ff!important}
-.receipt-col{position:sticky!important;left:581px;z-index:8!important;width:88px;min-width:88px;background:var(--sticky)!important}
+.input-col{position:sticky!important;left:485px;z-index:8!important;width:78px;min-width:78px;background:#f8f6ff!important}
+.receipt-col{position:sticky!important;left:563px;z-index:8!important;width:68px;min-width:68px;background:var(--sticky)!important}
 thead .product-col,thead .special-col,thead .input-col,thead .receipt-col{z-index:16!important;background:#f7f8fb!important}
 thead .input-col{background:#f0edff!important}
-.month-title{font-size:13px;font-weight:900;background:#f9fafc!important}
+.month-title{font-size:13px;font-weight:900;background:#f9fafc!important;padding:6px 10px!important}
+.month-title-wrap{display:flex;align-items:center;justify-content:center;gap:12px}
+.month-nav{width:28px;height:28px;border:1px solid #d4dae4;border-radius:7px;background:#fff;color:#344054;font-size:18px;line-height:1;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.month-nav:hover{background:#f8f7ff;border-color:#b9abed}
 .day-col{width:39px;min-width:39px;padding:4px!important}
 .day-col .day-num{display:block;font-weight:900;font-size:11px}
 .day-col .weekday{display:block;margin-top:3px;font-size:9px;color:#667085;font-weight:700}
@@ -66,8 +67,8 @@ thead .input-col{background:#f0edff!important}
 .special-item:last-child{padding-bottom:0;border-bottom:0}
 .special-name{font-size:11px;font-weight:900;line-height:1.25}
 .special-meta{margin-top:2px;color:#667085;font-size:10px;line-height:1.3}
-.qty-wrap{display:flex;align-items:center;justify-content:center;gap:5px}
-.qty-input{width:56px;height:34px;border:1px solid #cfd5df;border-radius:7px;background:#fff;padding:0 6px;text-align:right;outline:none;font-size:13px;font-weight:900}
+.qty-wrap{display:flex;align-items:center;justify-content:center;gap:3px}
+.qty-input{width:48px;height:34px;border:1px solid #cfd5df;border-radius:7px;background:#fff;padding:0 4px;text-align:right;outline:none;font-size:13px;font-weight:900}
 .qty-input:disabled{background:#f2f4f7;color:#98a2b3}
 .qty-unit{font-size:10px;color:#667085;font-weight:800}
 .day-value{font-size:11px;font-weight:800;color:#344054}
@@ -87,7 +88,7 @@ thead .input-col{background:#f0edff!important}
   .storage-shell{padding:6px}.storage-head{padding:14px}.toolbar{padding:10px 14px}.message{padding-left:14px;padding-right:14px}
   .period-controls{width:100%}.period-controls select{flex:1;min-width:0}
   .filter-field{width:100%}.filter-field select{flex:1}.search-field{min-width:0}
-  .save-btn{width:100%}.save-guide{width:100%}
-  .product-col{width:210px;min-width:210px}.special-col{left:210px;width:205px;min-width:205px}.input-col{left:415px;width:92px;min-width:92px}.receipt-col{left:507px;width:84px;min-width:84px}
+  .save-btn{width:100%}.save-guide{display:none!important}
+  .product-col{width:210px;min-width:210px}.special-col{left:210px;width:205px;min-width:205px}.input-col{left:415px;width:74px;min-width:74px}.receipt-col{left:489px;width:62px;min-width:62px}
   .storage-footer{grid-template-columns:1fr}.notice-box,.legend-box{align-items:flex-start;flex-direction:column;gap:6px}
 }
