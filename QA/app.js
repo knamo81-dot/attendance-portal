@@ -1077,4 +1077,3 @@
 
   window.addEventListener('message', (e) => { if (e.data?.type === 'portal-tabs-request' || e.data?.type === 'portal-filters-request') notifyPortal(); });
 })();
-
