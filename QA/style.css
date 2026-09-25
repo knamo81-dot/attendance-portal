@@ -1,1014 +1,311 @@
-:root {
-  --bg: #f4f7fb;
-  --card: #fff;
-  --line: #d9e2ec;
-  --text: #1f2937;
-  --muted: #64748b;
-  --main: #6d4ccb;
-  --primary: #6d4ccb;
-  --main-hover: #5b3db5;
-  --main-light: #f1edfa;
-  --danger: #b91c1c;
-  --soft: #f8fafc;
-  --radius: 14px;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-html,
-body {
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
-  color: var(--text);
-  background: var(--bg);
-}
-
-.shell {
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  padding: 0;
-}
-
-.card {
-  overflow: hidden;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 0;
-}
-
-.sds-card {
-  border-top: 0;
-  border-right: 0;
-  border-left: 0;
-}
-
-.card-head {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 20px;
-}
-
-.card-head h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.card-body {
-  padding: 0 20px 24px;
-}
-
-.summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
-  margin: 0 0 18px;
-}
-
-.tile {
-  min-height: 76px;
-  padding: 14px 12px;
-  color: var(--text);
-  text-align: left;
-  background: #fff;
-  border: 1px solid #d6dce4;
-  border-radius: 14px;
-}
-
-.tile .k {
-  display: block;
-  margin-bottom: 10px;
-  font-size: 13px;
-}
-
-.tile .v {
-  display: block;
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.filters {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  margin: 0 0 10px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.field label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-}
-
-.field input,
-.field select,
-.field textarea {
-  width: 100%;
-  font: inherit;
-  font-size: 12px;
-  color: var(--text);
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  outline: none;
-}
-
-.field input,
-.field select {
-  height: 34px;
-  padding: 0 10px;
-}
-
-.field textarea {
-  padding: 9px 10px;
-  resize: vertical;
-}
-
-.field input:focus,
-.field select:focus,
-.field textarea:focus {
-  border-color: var(--main);
-  box-shadow: 0 0 0 3px rgba(109, 76, 203, 0.1);
-}
-
-.field small {
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.search-field {
-  width: 232px;
-}
-
-.status-field {
-  width: 110px;
-}
-
-.year-filter-field {
-  width: 126px;
-}
-
-.checked-year-field {
-  width: 138px;
-}
-
-.message {
-  min-height: 0;
-  margin-bottom: 8px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.message.error {
-  color: var(--danger);
-}
-
-.message.success {
-  color: #15803d;
-}
-
-.table-wrap {
-  width: 100%;
-  overflow: auto;
-  background: #fff;
-  border: 1px solid var(--line);
-}
-
-.sds-table {
-  width: 100%;
-  min-width: 1260px;
-  font-size: 13px;
-  border-collapse: collapse;
-}
-
-.sds-table th,
-.sds-table td {
-  padding: 9px;
-  text-align: left;
-  vertical-align: middle;
-  white-space: nowrap;
-  border-bottom: 1px solid #e8edf3;
-}
-
-.sds-table th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  font-weight: 800;
-  color: #334155;
-  background: var(--soft);
-}
-
-.sds-table tbody tr:hover td {
-  background: #fbfdff;
-}
-
-.sds-table th:nth-child(7),
-.sds-table td:nth-child(7),
-.sds-table th:nth-child(10),
-.sds-table td:nth-child(10) {
-  text-align: center;
-}
-
-.date-stack {
-  display: grid;
-  gap: 3px;
-  min-width: 120px;
-}
-
-.date-stack span {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.date-stack b {
-  min-width: 32px;
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--muted);
-}
-
-.sds-actions {
-  display: flex;
-  gap: 5px;
-  justify-content: center;
-}
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 0 8px;
-  font-size: 11px;
-  font-weight: 800;
-  border-radius: 999px;
-}
-
-.status-badge.registered {
-  color: var(--main-hover);
-  background: var(--main-light);
-}
-
-.status-badge.missing {
-  color: #9a3412;
-  background: #fff7ed;
-}
-
-.status-badge.none {
-  color: #475569;
-  background: #f1f5f9;
-}
-
-.empty {
-  padding: 28px !important;
-  color: var(--muted);
-  text-align: center !important;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 30px;
-  padding: 0 12px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #334155;
-  cursor: pointer;
-  background: #fff;
-  border: 1px solid #cbd5e1;
-  border-radius: 5px;
-}
-
-.btn.primary {
-  color: #fff;
-  background: var(--main);
-  border-color: var(--main);
-}
-
-.btn.primary:not(:disabled):hover {
-  background: var(--main-hover);
-  border-color: var(--main-hover);
-}
-
-.btn.danger {
-  color: var(--danger);
-  border-color: #fecaca;
-}
-
-.btn.small {
-  min-height: 26px;
-  padding: 0 8px;
-  font-size: 11px;
-}
-
-.btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: rgba(15, 23, 42, 0.46);
-}
-
-.modal-backdrop[hidden] {
-  display: none;
-}
-
-.modal {
-  width: min(620px, 100%);
-  max-height: calc(100vh - 40px);
-  overflow: auto;
-  background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.24);
-}
-
-.modal.small {
-  width: min(500px, 100%);
-}
-
-.modal.history-modal {
-  width: min(900px, 100%);
-}
-
-.modal-head,
-.modal-foot {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 14px 16px;
-}
-
-.modal-head {
-  justify-content: space-between;
-  border-bottom: 1px solid #e8edf3;
-}
-
-.modal-head h3 {
-  margin: 0;
-  font-size: 16px;
-}
-
-.modal-foot {
-  justify-content: flex-end;
-  border-top: 1px solid #e8edf3;
-}
-
-.modal-body {
-  padding: 16px;
-}
-
-.icon-btn {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  font-size: 24px;
-  line-height: 1;
-  color: #64748b;
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-}
-
-.product-summary {
-  padding: 10px 12px;
-  margin-bottom: 14px;
-  font-size: 12px;
-  line-height: 1.6;
-  background: var(--soft);
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.form-grid.one {
-  grid-template-columns: 1fr;
-}
-
-.form-grid .full {
-  grid-column: 1 / -1;
-}
-
-.history-table-wrap {
-  overflow: auto;
-  border: 1px solid var(--line);
-}
-
-.history-table {
-  width: 100%;
-  min-width: 700px;
-  font-size: 12px;
-  border-collapse: collapse;
-}
-
-.history-table th,
-.history-table td {
-  padding: 9px;
-  text-align: left;
-  white-space: nowrap;
-  border-bottom: 1px solid #e8edf3;
-}
-
-.history-table th {
-  background: var(--soft);
-}
-
-@media (max-width: 760px) {
-  .card-head {
-    padding: 10px 12px;
-  }
-
-  .card-body {
-    padding: 0 12px 18px;
-  }
-
-  .summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .filters {
-    flex-direction: column;
-    gap: 8px;
-    align-items: stretch;
-  }
-
-  .search-field,
-  .status-field,
-  .year-filter-field,
-  .checked-year-field {
-    width: 100%;
-  }
-
-  .field input,
-  .field select {
-    height: 42px;
-  }
-
-  .modal-backdrop {
-    padding: 10px;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* SDS 등록/갱신 통합 및 다중 파일 */
-.sds-mode-switch {
-  display: flex;
-  gap: 8px;
-  padding: 6px;
-  margin-bottom: 14px;
-  background: var(--soft);
-  border: 1px solid var(--line);
-  border-radius: 9px;
-}
-
-.sds-mode-switch label {
-  display: flex;
-  flex: 1;
-  gap: 7px;
-  align-items: center;
-  justify-content: center;
-  min-height: 34px;
-  padding: 0 10px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  background: #fff;
-  border: 1px solid #dbe3ec;
-  border-radius: 7px;
-}
-
-.sds-mode-switch input {
-  width: auto;
-  margin: 0;
-}
-
-.field-label-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 7px;
-}
-
-.field-label-row label {
-  margin: 0;
-}
-
-.file-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.file-row {
-  display: flex;
-  gap: 7px;
-  align-items: center;
-}
-
-.file-row input[type="file"] {
-  flex: 1;
-  min-width: 0;
-}
-
-.current-files,
-.history-files {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-#sdsCurrentFilesWrap {
-  padding: 10px;
-  background: #fafafa;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-
-@media (max-width: 760px) {
-  .sds-mode-switch {
-    flex-direction: column;
-  }
-
-  .file-row {
-    align-items: stretch;
-  }
-}
-
-/* SDS 상태 및 현재 파일 수: 좁은 SDS 컬럼용 2줄 표시 */
-.two-line-status,
-.two-line-action {
-  flex-direction: column;
-  gap: 1px;
-  min-width: 44px;
-  min-height: 38px;
-  line-height: 1.15;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.two-line-status {
-  justify-content: center;
-  padding: 4px 8px;
-  border-radius: 8px;
-}
-
-.two-line-action {
-  padding: 4px 8px;
-}
-
-.two-line-action span {
-  display: block;
-}
-
-.two-line-action span:last-child {
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--muted);
-}
-
-
-
-
-
-/* SDS 갱신: 기존 파일 유지 / 교체 / 삭제 */
-.current-files {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.current-file-manage {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 7px 10px;
-  align-items: center;
-  padding: 7px;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-
-.current-file-manage.is-deleted {
-  background: #f8fafc;
-  opacity: 0.7;
-}
-
-.current-file-name {
-  min-width: 0;
-  padding: 0;
-  overflow: hidden;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--main-hover);
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-}
-
-.current-file-name:hover:not(:disabled) {
-  text-decoration: underline;
-}
-
-.current-file-name:disabled {
-  color: var(--muted);
-  cursor: default;
-  text-decoration: line-through;
-}
-
-.current-file-actions {
-  display: flex;
-  gap: 5px;
-}
-
-.current-replace-row {
-  grid-column: 1 / -1;
-  display: flex;
-  gap: 7px;
-  align-items: center;
-  padding-top: 7px;
-  border-top: 1px dashed var(--line);
-}
-
-.current-replace-row[hidden] {
-  display: none;
-}
-
-.current-replace-row input[type="file"] {
-  flex: 1;
-  min-width: 0;
-  font-size: 11px;
-}
-
-@media (max-width: 760px) {
-  .current-file-manage {
-    grid-template-columns: 1fr;
-  }
-
-  .current-file-actions {
-    justify-content: flex-start;
-  }
-
-  .current-replace-row {
-    grid-column: 1;
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-
-
-/* SDS 이력 변경내역 */
-.history-modal { width: min(1080px, 100%); }
-.history-table { min-width: 940px; }
-.history-changes { display:flex; flex-direction:column; gap:5px; min-width:220px; white-space:normal; }
-.history-changes > div { display:flex; gap:6px; align-items:flex-start; line-height:1.35; }
-.change-badge { display:inline-flex; flex:0 0 auto; align-items:center; justify-content:center; min-width:36px; min-height:20px; padding:0 6px; font-size:10px; font-weight:800; border-radius:5px; }
-.change-badge.add { color:#166534; background:#dcfce7; }
-.change-badge.update { color:var(--main-hover); background:var(--main-light); }
-.change-badge.delete { color:var(--danger); background:#fee2e2; }
-.history-change-empty { font-size:11px; color:var(--muted); }
-
-
-/* SDS 이력 모달 가독성 및 당일 등록취소 */
-#sdsHistoryModal { padding: 12px; }
-#sdsHistoryModal .history-modal { width: min(1240px, calc(100vw - 24px)); max-width: none; }
-#sdsHistoryModal .history-table { min-width: 1040px; table-layout: auto; }
-#sdsHistoryModal .history-table th:nth-child(2),
-#sdsHistoryModal .history-table td:nth-child(2) { min-width: 280px; white-space: normal; }
-#sdsHistoryModal .history-table th:nth-child(6),
-#sdsHistoryModal .history-table td:nth-child(6) { min-width: 230px; white-space: normal; }
-#sdsHistoryModal .history-files { flex-wrap: wrap; }
-#sdsHistoryModal .history-changes { min-width: 0; }
-.history-locked { font-size: 11px; color: var(--muted); }
-
-@media (max-width: 760px) {
-  #sdsHistoryModal { padding: 6px; }
-  #sdsHistoryModal .history-modal { width: calc(100vw - 12px); }
-}
-
-
-/* SDS 목록: product_cas 복수 CAS 세로 표시 */
-.cas-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  line-height: 1.25;
-  white-space: nowrap;
-}
-
-.cas-stack span {
-  display: block;
-}
-
-
-/* =========================================================
-   SDS 현황 / CAS List 2차 메뉴 및 CAS 관리
-   ========================================================= */
-.sds-view-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
-  overflow: hidden;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
-
-.sds-view-btn {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  justify-content: center;
-  min-height: 32px;
-  padding: 0 14px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  color: #475569;
-  cursor: pointer;
-  background: #fff;
-  border: 0;
-  border-right: 1px solid var(--line);
-}
-
-.sds-view-btn:last-child { border-right: 0; }
-
-.sds-view-btn:hover {
-  color: var(--main-hover);
-  background: var(--main-light);
-}
-
-.sds-view-btn.active {
-  color: #fff;
-  background: var(--main);
-}
-
-.cas-unmatched-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  font-size: 10px;
-  font-weight: 900;
-  line-height: 1;
-  color: #fff;
-  background: #dc2626;
-  border-radius: 999px;
-}
-
-.sds-view-btn.active .cas-unmatched-badge {
-  color: #b91c1c;
-  background: #fff;
-}
-
-.sds-subview[hidden] { display: none; }
-
-.filter-actions {
-  display: flex;
-  align-items: flex-end;
-  margin-left: auto;
-}
-
-.filter-actions .btn {
-  min-height: 34px;
-}
-
-.cas-summary-tile {
-  appearance: none;
-  font: inherit;
-  cursor: pointer;
-}
-
-.cas-summary-tile:hover,
-.cas-summary-tile.active {
-  border-color: #b8a9e8;
-  box-shadow: 0 0 0 2px rgba(109, 76, 203, 0.08);
-}
-
-.cas-summary-tile.unmatched .v {
-  color: #b91c1c;
-  font-weight: 800;
-}
-
-.cas-search-field { width: 300px; }
-.cas-status-field { width: 118px; }
-.cas-source-field { width: 132px; }
-
-.cas-table {
-  width: 100%;
-  min-width: 1120px;
-  font-size: 13px;
-  border-collapse: collapse;
-}
-
-.cas-table th,
-.cas-table td {
-  padding: 9px;
-  text-align: left;
-  vertical-align: middle;
-  border-bottom: 1px solid #e8edf3;
-}
-
-.cas-table th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  font-weight: 800;
-  color: #334155;
-  white-space: nowrap;
-  background: var(--soft);
-}
-
-.cas-table tbody tr:hover td { background: #fbfdff; }
-
-.cas-table th:nth-child(1),
-.cas-table td:nth-child(1),
-.cas-table th:nth-child(5),
-.cas-table td:nth-child(5) {
-  text-align: center;
-}
-
-.cas-state-cell {
-  min-width: 92px;
-}
-
-.cas-state-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  align-items: center;
-}
-
-.cas-status-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 50px;
-  min-height: 24px;
-  padding: 0 8px;
-  font-size: 11px;
-  font-weight: 800;
-  border-radius: 999px;
-}
-
-.cas-status-badge.matched {
-  color: #166534;
-  background: #dcfce7;
-}
-
-.cas-status-badge.unmatched {
-  color: #b91c1c;
-  background: #fee2e2;
-}
-
-.cas-material-name {
-  min-width: 150px;
-  line-height: 1.35;
-  white-space: normal;
-}
-
-.cas-source-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 24px;
-  padding: 0 8px;
-  font-size: 11px;
-  font-weight: 800;
-  color: #475569;
-  background: #f1f5f9;
-  border-radius: 999px;
-}
-
-.cas-source-badge.keco {
-  color: #1d4ed8;
-  background: #dbeafe;
-}
-
-.cas-source-badge.pubchem {
-  color: #6d28d9;
-  background: #ede9fe;
-}
-
-.cas-source-badge.sds {
-  color: #166534;
-  background: #dcfce7;
-}
-
-.cas-source-badge.manual {
-  color: #9a3412;
-  background: #ffedd5;
-}
-
-.cas-products {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 260px;
-  white-space: normal;
-}
-
-.cas-product-item {
-  line-height: 1.35;
-}
-
-.cas-product-item strong {
-  font-weight: 700;
-}
-
-.cas-product-meta {
-  margin-left: 4px;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.cas-edit-summary {
-  display: grid;
-  gap: 5px;
-}
-
-.cas-edit-summary b {
-  display: inline-block;
-  min-width: 58px;
-  color: var(--muted);
-}
-
-.cas-edit-hint {
-  margin-top: 10px;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-
-@media (max-width: 760px) {
-  .sds-main-head {
-    align-items: flex-start;
-  }
-
-  .sds-view-switch {
-    flex: 0 0 auto;
-  }
-
-  .sds-view-btn {
-    min-height: 34px;
-    padding: 0 10px;
-  }
-
-  .filter-actions {
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .filter-actions .btn {
-    width: 100%;
-    min-height: 42px;
-  }
-
-  .cas-search-field,
-  .cas-status-field,
-  .cas-source-field {
-    width: 100%;
-  }
-}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SDS 관리</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="../common/mobile.css" />
+  <link rel="stylesheet" href="../common/theme.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="card sds-card">
+      <div class="card-head sds-main-head">
+        <div><h3>Safety Data Sheet 관리</h3></div>
+        <div class="sds-view-switch" role="tablist" aria-label="SDS 관리 화면 전환">
+          <button class="sds-view-btn active" id="sdsViewButton" type="button" data-view="sds" role="tab" aria-selected="true">SDS 현황</button>
+          <button class="sds-view-btn" id="casViewButton" type="button" data-view="cas" role="tab" aria-selected="false">
+            CAS List <span class="cas-unmatched-badge" id="casUnmatchedBadge" hidden></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <section id="sdsView" class="sds-subview">
+        <div class="summary" aria-label="SDS 현황">
+          <div class="tile"><span class="k">전체제품</span><span class="v" id="sdsTotalCount">0건</span></div>
+          <div class="tile"><span class="k">SDS등록</span><span class="v" id="sdsAttachedCount">0건</span></div>
+          <div class="tile"><span class="k">SDS미등록</span><span class="v" id="sdsMissingCount">0건</span></div>
+          <div class="tile"><span class="k">해당사항없음</span><span class="v" id="sdsNoneCount">0건</span></div>
+        </div>
+
+        <div class="filters">
+          <div class="field search-field">
+            <label for="sdsSearch">검색</label>
+            <input id="sdsSearch" type="search" placeholder="품명 / 제조사 / 제품코드 / CAS" autocomplete="off" />
+          </div>
+          <div class="field status-field">
+            <label for="sdsStatus">구분</label>
+            <select id="sdsStatus">
+              <option value="all">전체</option>
+              <option value="registered">SDS등록</option>
+              <option value="missing">SDS미등록</option>
+              <option value="none">해당사항없음</option>
+            </select>
+          </div>
+          <div class="field year-filter-field">
+            <label for="sdsOrderYear">최종발주일</label>
+            <select id="sdsOrderYear">
+              <option value="all">전체</option>
+            </select>
+          </div>
+          <div class="field year-filter-field checked-year-field">
+            <label for="sdsCheckedExcludeYear">최종확인일</label>
+            <select id="sdsCheckedExcludeYear">
+              <option value="all">전체</option>
+            </select>
+          </div>
+          <div class="filter-actions">
+            <button class="btn primary" id="sdsDownloadExcel" type="button">엑셀 다운로드</button>
+          </div>
+        </div>
+
+        <div id="sdsMessage" class="message" aria-live="polite"></div>
+
+        <div class="table-wrap">
+          <table class="sds-table">
+            <thead>
+              <tr>
+                <th>품명</th>
+                <th>제조사</th>
+                <th>제품코드</th>
+                <th>규격</th>
+                <th>CAS</th>
+                <th>등급</th>
+                <th>SDS</th>
+                <th>개정일 / 등록일</th>
+                <th>최종확인일 / 최종발주일</th>
+                <th>이력</th>
+              </tr>
+            </thead>
+            <tbody id="sdsProductList">
+              <tr><td colspan="10" class="empty">제품정보를 불러오는 중입니다.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        </section>
+
+        <section id="casView" class="sds-subview" hidden>
+          <div class="summary cas-summary" aria-label="CAS List 현황">
+            <button class="tile cas-summary-tile active" type="button" data-cas-summary="all">
+              <span class="k">전체</span><span class="v" id="casTotalCount">0</span>
+            </button>
+            <button class="tile cas-summary-tile unmatched" type="button" data-cas-summary="unmatched">
+              <span class="k">미매칭</span><span class="v" id="casUnmatchedCount">0</span>
+            </button>
+            <button class="tile cas-summary-tile" type="button" data-cas-summary="keco">
+              <span class="k">K-ECO</span><span class="v" id="casKecoCount">0</span>
+            </button>
+            <button class="tile cas-summary-tile" type="button" data-cas-summary="pubchem">
+              <span class="k">PubChem</span><span class="v" id="casPubchemCount">0</span>
+            </button>
+            <button class="tile cas-summary-tile" type="button" data-cas-summary="manual">
+              <span class="k">SDS/수기</span><span class="v" id="casManualCount">0</span>
+            </button>
+          </div>
+
+          <div class="filters cas-filters">
+            <div class="field cas-search-field">
+              <label for="casSearch">검색</label>
+              <input id="casSearch" type="search" placeholder="CAS / 물질명 / 제품명" autocomplete="off" />
+            </div>
+            <div class="field cas-status-field">
+              <label for="casStatus">상태</label>
+              <select id="casStatus">
+                <option value="all">전체</option>
+                <option value="unmatched">미매칭</option>
+                <option value="matched">완료</option>
+              </select>
+            </div>
+            <div class="field cas-source-field">
+              <label for="casSource">출처</label>
+              <select id="casSource">
+                <option value="all">전체</option>
+                <option value="K-ECO">K-ECO</option>
+                <option value="PubChem">PubChem</option>
+                <option value="SDS_MANUAL">SDS/수기</option>
+                <option value="SDS">SDS</option>
+                <option value="MANUAL">MANUAL</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="casMessage" class="message" aria-live="polite"></div>
+
+          <div class="table-wrap">
+            <table class="cas-table">
+              <thead>
+                <tr>
+                  <th>상태</th>
+                  <th>CAS No.</th>
+                  <th>국문명</th>
+                  <th>영문명</th>
+                  <th>출처</th>
+                  <th>연결제품</th>
+                </tr>
+              </thead>
+              <tbody id="casList">
+                <tr><td colspan="6" class="empty">CAS 정보를 불러오는 중입니다.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="sdsEditModal" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="sdsEditTitle">
+      <div class="modal-head">
+        <h3 id="sdsEditTitle">SDS 등록</h3>
+        <button class="icon-btn" type="button" data-close="sdsEditModal" aria-label="닫기">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="product-summary" id="sdsEditProduct"></div>
+
+        <div class="sds-mode-switch" role="radiogroup" aria-label="SDS 등록 구분">
+          <label><input type="radio" name="sdsMode" value="file" checked /> SDS 파일 등록</label>
+          <label><input type="radio" name="sdsMode" value="none" /> 해당사항없음</label>
+        </div>
+
+        <div id="sdsFileSection">
+          <div class="form-grid">
+            <div class="field">
+              <label for="sdsRevisionDate">SDS 개정일</label>
+              <input id="sdsRevisionDate" type="date" />
+            </div>
+            <div class="field">
+              <label for="sdsLastCheckedDate">최종확인일</label>
+              <input id="sdsLastCheckedDate" type="date" />
+            </div>
+            <div class="field full" id="sdsCurrentFilesWrap" hidden>
+              <label>현재 PDF 파일</label>
+              <div id="sdsCurrentFiles" class="current-files"></div>
+            </div>
+            <div class="field full">
+              <div class="field-label-row">
+                <label>새 SDS 파일 (PDF)</label>
+                <button class="btn small" id="sdsAddFile" type="button">+ 파일 추가</button>
+              </div>
+              <div id="sdsFileRows" class="file-rows"></div>
+              <small id="sdsFileHint">PDF 파일을 선택해 주세요. 여러 파일을 한 개정 이력에 함께 등록할 수 있습니다.</small>
+            </div>
+          </div>
+        </div>
+
+        <div id="sdsNoneSection" hidden>
+          <div class="form-grid one">
+            <div class="field">
+              <label for="sdsNoneReason">해당사항없음 사유</label>
+              <select id="sdsNoneReason">
+                <option value="supplier_not_provided">제조사/공급자 미제공</option>
+                <option value="not_applicable">SDS 비대상으로 확인</option>
+                <option value="other">기타</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="sdsNoneCheckedDate">최종확인일</label>
+              <input id="sdsNoneCheckedDate" type="date" />
+            </div>
+            <div class="field">
+              <label for="sdsNoneNote">메모</label>
+              <textarea id="sdsNoneNote" rows="3" placeholder="필요한 경우 메모를 입력하세요."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" type="button" data-close="sdsEditModal">취소</button>
+        <button class="btn primary" id="sdsSave" type="button">저장</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="sdsHistoryModal" hidden>
+    <section class="modal history-modal" role="dialog" aria-modal="true" aria-labelledby="sdsHistoryTitle">
+      <div class="modal-head">
+        <h3 id="sdsHistoryTitle">SDS 이력</h3>
+        <button class="icon-btn" type="button" data-close="sdsHistoryModal" aria-label="닫기">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="product-summary" id="sdsHistoryProduct"></div>
+        <div class="history-table-wrap">
+          <table class="history-table">
+            <thead>
+              <tr><th>상태</th><th>변경내역</th><th>SDS 개정일</th><th>SDS 등록일</th><th>등록자</th><th>파일</th><th>관리</th></tr>
+            </thead>
+            <tbody id="sdsHistoryList"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" type="button" data-close="sdsHistoryModal">닫기</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop pdf-viewer-backdrop" id="sdsPdfModal" hidden>
+    <section class="modal pdf-viewer-modal" role="dialog" aria-modal="true" aria-labelledby="sdsPdfTitle">
+      <div class="modal-head pdf-viewer-head">
+        <div class="pdf-viewer-title-wrap">
+          <h3 id="sdsPdfTitle">SDS PDF</h3>
+          <span id="sdsPdfFileName" class="pdf-viewer-file-name"></span>
+        </div>
+        <div class="pdf-viewer-head-actions">
+          <button class="btn small" id="sdsPdfNewWindow" type="button">새창</button>
+          <button class="icon-btn" type="button" data-close="sdsPdfModal" aria-label="닫기">×</button>
+        </div>
+      </div>
+      <div class="pdf-viewer-tabs" id="sdsPdfTabs" hidden></div>
+      <div class="pdf-viewer-body">
+        <div class="pdf-viewer-loading" id="sdsPdfLoading">PDF를 불러오는 중입니다.</div>
+        <iframe id="sdsPdfFrame" title="SDS PDF 미리보기" loading="eager"></iframe>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="casEditModal" hidden>
+    <section class="modal small" role="dialog" aria-modal="true" aria-labelledby="casEditTitle">
+      <div class="modal-head">
+        <h3 id="casEditTitle">CAS 물질명 수기입력</h3>
+        <button class="icon-btn" type="button" data-close="casEditModal" aria-label="닫기">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="product-summary cas-edit-summary">
+          <div><b>CAS No.</b> <span id="casEditNo">-</span></div>
+          <div><b>연결제품</b> <span id="casEditProducts">-</span></div>
+        </div>
+        <div class="form-grid one">
+          <div class="field">
+            <label for="casEditKo">국문명</label>
+            <input id="casEditKo" type="text" placeholder="국문 물질명" />
+          </div>
+          <div class="field">
+            <label for="casEditEn">영문명</label>
+            <input id="casEditEn" type="text" placeholder="English chemical name" />
+          </div>
+          <div class="field">
+            <label for="casEditSource">출처</label>
+            <select id="casEditSource">
+              <option value="SDS">SDS</option>
+              <option value="MANUAL">MANUAL</option>
+            </select>
+          </div>
+        </div>
+        <div class="cas-edit-hint">국문명 또는 영문명 중 하나 이상 입력해 주세요. 저장 후 해당 CAS는 매칭 완료로 전환됩니다.</div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" type="button" data-close="casEditModal">취소</button>
+        <button class="btn primary" id="casManualSave" type="button">저장</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+  <script src="app.js"></script>
+  <script src="../common/common.js"></script>
+</body>
+</html>
