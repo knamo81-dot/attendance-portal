@@ -689,140 +689,87 @@ button{cursor:pointer}
   overflow-wrap:anywhere;
 }
 
-/* v8-3b: iPad / 태블릿 사용정보 입력 폭 보정
-   - iPad 11/13인치 가로폭까지 적용되도록 범위를 1366px까지 확대
-   - Safari date input의 intrinsic/min-content 폭을 강제로 해제
-   - 사용일/사용제품/사용시간/사용량/단위의 우측 끝선을 동일하게 유지 */
+/* v8-3e: iPad / 설치형 웹앱 date 입력 최종 보정
+   - native date input의 자체 테두리를 제거하고 wrapper가 외곽선을 담당
+   - flex item의 기준 폭을 0으로 두어 iPadOS의 intrinsic width가 grid를 밀지 않도록 처리
+   - wrapper 바깥으로 넘치지 않으면서 오른쪽 테두리가 잘려 보이지 않도록 구성 */
+.usage-date-wrap{
+  display:flex;
+  align-items:center;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  height:38px;
+  overflow:hidden;
+  border:1px solid #cfd5df;
+  border-radius:7px;
+  background:#fff;
+  box-sizing:border-box;
+}
+
+.usage-date-wrap:focus-within{
+  border-color:#8d76de;
+  box-shadow:0 0 0 3px rgba(100,68,200,.11);
+}
+
+.usage-date-wrap > #usageDate{
+  flex:1 1 0 !important;
+  width:0 !important;
+  min-width:0 !important;
+  max-width:100% !important;
+  inline-size:0 !important;
+  min-inline-size:0 !important;
+  height:100% !important;
+  margin:0 !important;
+  padding:0 11px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  outline:none !important;
+  box-sizing:border-box !important;
+}
+
+.usage-date-wrap > #usageDate:focus{
+  border:0 !important;
+  box-shadow:none !important;
+  outline:none !important;
+}
+
+.usage-date-wrap > #usageDate::-webkit-date-and-time-value{
+  width:100%;
+  min-width:0;
+  padding:0;
+  text-align:center;
+}
+
+.usage-date-wrap > #usageDate::-webkit-datetime-edit{
+  min-width:0;
+  max-width:100%;
+  padding:0;
+  overflow:hidden;
+}
+
+.usage-date-wrap > #usageDate::-webkit-calendar-picker-indicator{
+  flex:0 0 auto;
+  margin-left:auto;
+  padding-left:6px;
+}
+
 @media (min-width:769px) and (max-width:1366px){
   .input-panel,
   .form-stack,
   .input-panel .field,
   .input-panel .search-input-row,
   .input-panel .suffix-input{
-    width:100%;
     min-width:0;
     max-width:100%;
     box-sizing:border-box;
   }
 
-  .input-panel .field{
-    grid-template-columns:95px minmax(0,1fr);
-  }
-
-  .input-panel .field > input,
-  .input-panel .field > select,
-  .input-panel .field > .search-input-row,
-  .input-panel .field > .suffix-input,
-  .input-panel .search-input-row input,
-  .input-panel .suffix-input input{
-    width:100% !important;
-    min-width:0 !important;
-    max-width:100% !important;
-    box-sizing:border-box !important;
-  }
-
-  .input-panel input[type="date"]{
-    display:block;
-    width:100% !important;
-    min-width:0 !important;
-    max-width:100% !important;
-    inline-size:100% !important;
-    min-inline-size:0 !important;
-    max-inline-size:100% !important;
-    box-sizing:border-box !important;
-    overflow:hidden;
-  }
-
-  .input-panel input[type="date"]::-webkit-date-and-time-value{
-    min-width:0;
-    text-align:left;
-  }
-
-  .input-panel input[type="date"]::-webkit-calendar-picker-indicator{
-    margin-left:auto;
-    flex:0 0 auto;
-  }
-}
-
-/* v8-3c: iPad / 설치형 웹앱 입력폭 최종 보정
-   - iPadOS WebKit date input의 intrinsic width를 grid track 안으로 강제
-   - 우측 끝선을 다른 입력요소와 동일하게 유지
-   - index.html의 CSS 버전 변경과 함께 캐시 갱신 */
-@media (min-width:769px) and (max-width:1366px){
-  .input-panel .field{
-    min-width:0;
-    max-width:100%;
-    overflow:visible;
-  }
-
-  .input-panel .field > input,
-  .input-panel .field > select,
-  .input-panel .field > .search-input-row,
-  .input-panel .field > .suffix-input{
-    min-width:0 !important;
-    max-width:100% !important;
-    justify-self:stretch;
-  }
-
-  .input-panel #usageDate{
-    display:block !important;
-    width:-webkit-fill-available !important;
-    min-width:0 !important;
-    max-width:100% !important;
-    inline-size:auto !important;
-    min-inline-size:0 !important;
-    max-inline-size:100% !important;
-    justify-self:stretch !important;
-    box-sizing:border-box !important;
-  }
-
-  .input-panel #usageDate::-webkit-date-and-time-value{
-    width:100%;
-    min-width:0;
-    padding:0;
-    text-align:left;
-  }
-
-  .input-panel #usageDate::-webkit-datetime-edit{
-    min-width:0;
-    padding:0;
-  }
-
-  .input-panel #usageDate::-webkit-calendar-picker-indicator{
-    margin:0 0 0 auto;
-    padding-left:6px;
-  }
-}
-
-/* v8-3d: iPad date input wrapper fix
-   - iPadOS 설치형 웹앱에서 native date control의 intrinsic width가
-     grid track을 밀어내는 현상을 wrapper에서 차단
-   - 사용일 우측 끝선을 사용제품/사용시간/사용량/단위와 동일하게 유지 */
-.usage-date-wrap{
-  display:grid;
-  grid-template-columns:minmax(0,1fr);
-  width:100%;
-  min-width:0;
-  max-width:100%;
-  overflow:hidden;
-  border-radius:7px;
-}
-
-.usage-date-wrap > #usageDate{
-  display:block;
-  width:100% !important;
-  min-width:0 !important;
-  max-width:100% !important;
-  inline-size:100% !important;
-  min-inline-size:0 !important;
-  max-inline-size:100% !important;
-  box-sizing:border-box !important;
-  justify-self:stretch;
-}
-
-@media (min-width:769px) and (max-width:1366px){
   .input-panel .date-field{
     grid-template-columns:95px minmax(0,1fr);
+    width:100%;
     min-width:0;
     max-width:100%;
   }
@@ -832,22 +779,16 @@ button{cursor:pointer}
     min-width:0 !important;
     max-width:100% !important;
     justify-self:stretch;
-    overflow:hidden;
   }
 
-  .input-panel .date-field .usage-date-wrap > #usageDate{
-    width:100% !important;
+  .input-panel .field > input,
+  .input-panel .field > select,
+  .input-panel .field > .search-input-row,
+  .input-panel .field > .suffix-input,
+  .input-panel .search-input-row input,
+  .input-panel .suffix-input input{
     min-width:0 !important;
     max-width:100% !important;
-    inline-size:100% !important;
-    min-inline-size:0 !important;
-    max-inline-size:100% !important;
-    margin:0 !important;
-  }
-
-  .input-panel .date-field .usage-date-wrap > #usageDate::-webkit-date-and-time-value,
-  .input-panel .date-field .usage-date-wrap > #usageDate::-webkit-datetime-edit{
-    min-width:0 !important;
-    max-width:100% !important;
+    box-sizing:border-box !important;
   }
 }
