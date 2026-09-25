@@ -688,3 +688,34 @@ button{cursor:pointer}
   line-height:1.35;
   overflow-wrap:anywhere;
 }
+
+/* v8-3: iPad / 태블릿 사용정보 입력 폭 보정
+   - Safari date input의 고유 최소폭으로 카드 밖으로 밀리는 현상 방지
+   - 입력요소/검색/단위 입력영역을 패널 가용폭에 맞춰 자동 축소 */
+@media (min-width:769px) and (max-width:1180px){
+  .input-panel,
+  .form-stack,
+  .field,
+  .field > *,
+  .search-input-row,
+  .suffix-input{
+    min-width:0;
+  }
+
+  .input-panel .field input,
+  .input-panel .field select,
+  .input-panel .search-input-row,
+  .input-panel .search-input-row input,
+  .input-panel .suffix-input{
+    width:100%;
+    min-width:0;
+    max-width:100%;
+  }
+
+  .input-panel input[type="date"]{
+    width:100%;
+    min-width:0;
+    max-width:100%;
+    inline-size:100%;
+  }
+}
