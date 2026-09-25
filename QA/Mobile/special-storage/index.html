@@ -1,1 +1,96 @@
-d
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>특별관리물질 보관</title>
+  <link rel="stylesheet" href="./style.css?v=20260925-mobile-storage1" />
+  <link rel="stylesheet" href="../../../common/mobile.css" />
+  <link rel="stylesheet" href="../../../common/theme.css" />
+</head>
+<body>
+  <main class="mobile-storage-shell">
+    <section class="mobile-storage-app">
+      <div class="view-switch" role="tablist" aria-label="특별관리물질 보관 화면">
+        <button id="todayTab" class="view-btn active" type="button">오늘 수량입력</button>
+        <button id="monthlyTab" class="view-btn" type="button">월간 보관현황</button>
+      </div>
+
+      <section id="todayView" class="screen">
+        <div class="screen-head">
+          <div>
+            <h2>오늘 수량입력</h2>
+            <p id="todayLabel">-</p>
+          </div>
+        </div>
+
+        <div class="toolbar compact-toolbar">
+          <label class="search-field">
+            <span>검색</span>
+            <input id="todaySearch" type="search" placeholder="제품명 / 제조사 / 코드 / CAS / 특별관리물질" autocomplete="off" />
+          </label>
+        </div>
+
+        <div id="todayMessage" class="message" aria-live="polite"></div>
+        <div id="todayList" class="product-list">
+          <div class="empty-card">보관 현황을 불러오는 중입니다.</div>
+        </div>
+
+        <div class="save-dock-space" aria-hidden="true"></div>
+        <div class="save-dock">
+          <button id="saveQuantities" class="save-btn" type="button" disabled>수량 저장</button>
+        </div>
+      </section>
+
+      <section id="monthlyView" class="screen" hidden>
+        <div class="screen-head">
+          <div>
+            <h2>월간 보관현황</h2>
+            <p>날짜를 선택하면 해당 일자의 제품별 보관수량을 확인할 수 있습니다.</p>
+          </div>
+        </div>
+
+        <div class="toolbar monthly-toolbar">
+          <div class="period-controls">
+            <span>조회기간</span>
+            <select id="yearSelect" aria-label="조회 연도"></select>
+            <select id="monthSelect" aria-label="조회 월"></select>
+          </div>
+          <label class="search-field monthly-search">
+            <span>검색</span>
+            <input id="monthlySearch" type="search" placeholder="제품명 / CAS / 특별관리물질" autocomplete="off" />
+          </label>
+        </div>
+
+        <div id="monthlyMessage" class="message" aria-live="polite"></div>
+
+        <section class="calendar-card">
+          <div class="calendar-head">
+            <button id="prevMonthBtn" class="month-nav" type="button" aria-label="이전 달">‹</button>
+            <strong id="monthLabel">-</strong>
+            <button id="nextMonthBtn" class="month-nav" type="button" aria-label="다음 달">›</button>
+          </div>
+          <div class="weekday-row" aria-hidden="true">
+            <span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span>
+          </div>
+          <div id="calendarGrid" class="calendar-grid"></div>
+        </section>
+
+        <section class="selected-day-section">
+          <div class="selected-day-head">
+            <h3 id="selectedDateTitle">-</h3>
+          </div>
+          <div id="monthlyList" class="product-list">
+            <div class="empty-card">날짜를 선택해 주세요.</div>
+          </div>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../../supabase.js"></script>
+  <script src="./app.js?v=20260925-mobile-storage1"></script>
+  <script src="../../../common/common.js"></script>
+</body>
+</html>
