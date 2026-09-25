@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>특별관리물질 보관</title>
-  <link rel="stylesheet" href="./style.css?v=20260925-storage1" />
+  <link rel="stylesheet" href="./style.css?v=20260925-storage2" />
   <link rel="stylesheet" href="../../common/mobile.css" />
   <link rel="stylesheet" href="../../common/theme.css" />
 </head>
@@ -25,8 +25,10 @@
       <div class="toolbar">
         <div class="period-controls">
           <span class="toolbar-label">조회기간</span>
+          <button id="prevMonthBtn" class="period-nav" type="button" aria-label="이전 달">&#8249;</button>
           <select id="yearSelect" aria-label="조회 연도"></select>
           <select id="monthSelect" aria-label="조회 월"></select>
+          <button id="nextMonthBtn" class="period-nav" type="button" aria-label="다음 달">&#8250;</button>
         </div>
 
         <label class="search-field">
@@ -74,7 +76,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../supabase.js"></script>
-  <script src="./app.js?v=20260925-storage1"></script>
+  <script src="./app.js?v=20260925-storage2"></script>
   <script src="../../common/common.js"></script>
 </body>
 </html>
