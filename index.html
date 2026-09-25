@@ -3027,6 +3027,12 @@ body.auth-loading .top-user-bar {
       desc: '제품별 안전보건자료와 등록 상태를 관리합니다.',
       gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
     },
+    'QA/Mobile/sds/index.html': {
+      top: 'Safety Management',
+      title: 'QA',
+      desc: '등록된 안전보건자료를 모바일에서 조회합니다.',
+      gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
+    },
     'QA/usage/index.html': {
       top: 'Safety Management',
       title: 'QA',
@@ -3116,6 +3122,12 @@ body.auth-loading .top-user-bar {
       { id: 'products', label: '제품관리' }
     ],
     'QA/index.html': [
+      { id: 'qa-usage', label: '사용일지' },
+      { id: 'qa-sds', label: 'SDS 관리' },
+      { id: 'qa-storage', label: '특별관리물질 보관' },
+      { id: 'qa-special', label: '특별관리물질 현황' }
+    ],
+    'QA/Mobile/sds/index.html': [
       { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: 'SDS 관리' },
       { id: 'qa-storage', label: '특별관리물질 보관' },
@@ -3436,8 +3448,9 @@ body.auth-loading .top-user-bar {
         replacePortalFrame(qaStorageSrc);
         return;
       }
-      if (tabId === 'qa-sds' && currentSrc !== 'QA/index.html') {
-        replacePortalFrame('QA/index.html');
+      const qaSdsSrc = getQaSdsSrc();
+      if (tabId === 'qa-sds' && currentSrc !== qaSdsSrc) {
+        replacePortalFrame(qaSdsSrc);
         return;
       }
       if (tabId === 'qa-special' && currentSrc !== 'QA/special/index.html') {
@@ -3479,7 +3492,7 @@ body.auth-loading .top-user-bar {
     let activeId = tabs[0]?.id || '';
     if (isQaUsageSrc(key)) activeId = 'qa-usage';
     if (isQaStorageSrc(key)) activeId = 'qa-storage';
-    if (key === 'QA/index.html') activeId = 'qa-sds';
+    if (isQaSdsSrc(key)) activeId = 'qa-sds';
     if (key === 'QA/special/index.html') activeId = 'qa-special';
     renderPortalSubtabs(tabs, activeId);
     renderPortalFilters([]);
@@ -3621,11 +3634,17 @@ body.auth-loading .top-user-bar {
 
   const QA_USAGE_DESKTOP_SRC = 'QA/usage/index.html';
   const QA_USAGE_MOBILE_SRC = 'QA/Mobile/usage/index.html';
+  const QA_SDS_DESKTOP_SRC = 'QA/index.html';
+  const QA_SDS_MOBILE_SRC = 'QA/Mobile/sds/index.html';
   const QA_STORAGE_DESKTOP_SRC = 'QA/special-storage/index.html';
   const QA_STORAGE_MOBILE_SRC = 'QA/Mobile/special-storage/index.html';
 
   function getQaUsageSrc() {
     return isMobilePortalView() ? QA_USAGE_MOBILE_SRC : QA_USAGE_DESKTOP_SRC;
+  }
+
+  function getQaSdsSrc() {
+    return isMobilePortalView() ? QA_SDS_MOBILE_SRC : QA_SDS_DESKTOP_SRC;
   }
 
   function getQaStorageSrc() {
@@ -3637,6 +3656,11 @@ body.auth-loading .top-user-bar {
     return key === QA_USAGE_DESKTOP_SRC || key === QA_USAGE_MOBILE_SRC;
   }
 
+  function isQaSdsSrc(src) {
+    const key = normalizePortalSrc(src);
+    return key === QA_SDS_DESKTOP_SRC || key === QA_SDS_MOBILE_SRC;
+  }
+
   function isQaStorageSrc(src) {
     const key = normalizePortalSrc(src);
     return key === QA_STORAGE_DESKTOP_SRC || key === QA_STORAGE_MOBILE_SRC;
@@ -3644,7 +3668,7 @@ body.auth-loading .top-user-bar {
 
   function isQaProgramSrc(src) {
     const key = normalizePortalSrc(src);
-    return isQaUsageSrc(key) || isQaStorageSrc(key) || key === 'QA/index.html' || key === 'QA/special/index.html';
+    return isQaUsageSrc(key) || isQaSdsSrc(key) || isQaStorageSrc(key) || key === 'QA/special/index.html';
   }
 
   function resolveResponsivePortalSrc(src) {
@@ -3653,6 +3677,7 @@ body.auth-loading .top-user-bar {
     const suffixMatch = raw.match(/([?#].*)$/);
     const suffix = suffixMatch ? suffixMatch[1] : '';
     if (isQaUsageSrc(raw)) return getQaUsageSrc() + suffix;
+    if (isQaSdsSrc(raw)) return getQaSdsSrc() + suffix;
     if (isQaStorageSrc(raw)) return getQaStorageSrc() + suffix;
     return src;
   }
@@ -5770,7 +5795,7 @@ body.auth-loading .top-user-bar {
           setPortalSubtabActive('qa-storage', false);
           return;
         }
-        if (currentSrc === 'QA/index.html') {
+        if (isQaSdsSrc(currentSrc)) {
           setPortalSubtabActive('qa-sds', false);
           return;
         }
