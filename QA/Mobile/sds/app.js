@@ -221,6 +221,14 @@
     state.pdfIndex = 0;
   }
 
+  function pdfFitUrl(url) {
+    if (!url) return "";
+    const clean = String(url).split("#")[0];
+    // 모바일 PDF 뷰어의 최초 표시를 페이지 가로폭 맞춤으로 요청합니다.
+    // 이후 확대/축소는 브라우저의 기본 핀치 줌을 그대로 사용합니다.
+    return `${clean}#view=FitH&zoom=page-width`;
+  }
+
   function showPdf(index) {
     const file = state.pdfSignedUrls[index];
     if (!file) return;
@@ -230,9 +238,9 @@
     const loading = $("pdfLoading");
     const frame = $("pdfFrame");
     loading.hidden = false;
-    loading.textContent = file.signedUrl ? "PDF를 불러오는 중입니다." : `PDF를 불러오지 못했습니다: ${file.signedError || "URL 생성 실패"}`;
+    loading.textContent = file.signedUrl ? "PDF를 화면 폭에 맞춰 불러오는 중입니다." : `PDF를 불러오지 못했습니다: ${file.signedError || "URL 생성 실패"}`;
     frame.removeAttribute("src");
-    if (file.signedUrl) frame.src = file.signedUrl;
+    if (file.signedUrl) frame.src = pdfFitUrl(file.signedUrl);
   }
 
   async function openCurrent(product) {
