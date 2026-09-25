@@ -2,6 +2,8 @@
   "use strict";
 
   const BUCKET = "qa-sds-files";
+  const PDFJS_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs";
+  const PDFJS_WORKER_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.mjs";
   const db = window.SDSApp?.db;
   const $ = (id) => document.getElementById(id);
 
@@ -11,7 +13,13 @@
     status: "all",
     pdfFiles: [],
     pdfIndex: 0,
-    pdfSignedUrls: []
+    pdfSignedUrls: [],
+    pdfRenderToken: 0,
+    pdfDoc: null,
+    pdfJsPromise: null,
+    pdfZoom: 1,
+    pinchStartDistance: 0,
+    pinchStartZoom: 1
   };
 
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (m) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
@@ -212,35 +220,198 @@
     }));
   }
 
-  function closePdf() {
+  async function loadPdfJs() {
+    if (!state.pdfJsPromise) {
+      state.pdfJsPromise = import(PDFJS_URL).then((pdfjsLib) => {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+        return pdfjsLib;
+      });
+    }
+    return state.pdfJsPromise;
+  }
+
+  function ensurePdfViewer() {
+    let viewer = $("pdfFrame");
+    if (!viewer) return null;
+    if (viewer.tagName === "IFRAME") {
+      const replacement = document.createElement("div");
+      replacement.id = "pdfFrame";
+      replacement.className = "pdf-viewer";
+      replacement.setAttribute("role", "document");
+      replacement.setAttribute("aria-label", "SDS PDF 미리보기");
+      viewer.replaceWith(replacement);
+      viewer = replacement;
+      bindPdfGestures(viewer);
+    }
+    return viewer;
+  }
+
+  function distance(t1, t2) {
+    return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+  }
+
+  function clampZoom(value) {
+    return Math.min(3.5, Math.max(1, value));
+  }
+
+  function applyPdfZoom(zoom) {
+    const viewer = $("pdfFrame");
+    if (!viewer || viewer.tagName === "IFRAME") return;
+    state.pdfZoom = clampZoom(zoom);
+    viewer.querySelectorAll("canvas[data-base-width]").forEach((canvas) => {
+      const w = Number(canvas.dataset.baseWidth || 0);
+      const h = Number(canvas.dataset.baseHeight || 0);
+      if (w > 0) canvas.style.width = `${w * state.pdfZoom}px`;
+      if (h > 0) canvas.style.height = `${h * state.pdfZoom}px`;
+    });
+    viewer.classList.toggle("is-zoomed", state.pdfZoom > 1.01);
+  }
+
+  function bindPdfGestures(viewer) {
+    if (!viewer || viewer.dataset.gestureBound === "1") return;
+    viewer.dataset.gestureBound = "1";
+
+    viewer.addEventListener("touchstart", (event) => {
+      if (event.touches.length !== 2) return;
+      state.pinchStartDistance = distance(event.touches[0], event.touches[1]);
+      state.pinchStartZoom = state.pdfZoom;
+    }, {passive:true});
+
+    viewer.addEventListener("touchmove", (event) => {
+      if (event.touches.length !== 2 || !state.pinchStartDistance) return;
+      const nextDistance = distance(event.touches[0], event.touches[1]);
+      const ratio = nextDistance / state.pinchStartDistance;
+      applyPdfZoom(state.pinchStartZoom * ratio);
+      event.preventDefault();
+    }, {passive:false});
+
+    viewer.addEventListener("touchend", (event) => {
+      if (event.touches.length < 2) state.pinchStartDistance = 0;
+    }, {passive:true});
+
+    let lastTap = 0;
+    viewer.addEventListener("touchend", (event) => {
+      if (event.changedTouches.length !== 1) return;
+      const now = Date.now();
+      if (now - lastTap < 320) applyPdfZoom(state.pdfZoom > 1.05 ? 1 : 1.7);
+      lastTap = now;
+    }, {passive:true});
+  }
+
+  function clearPdfViewer() {
+    const viewer = ensurePdfViewer();
+    if (viewer) viewer.innerHTML = "";
+  }
+
+  async function closePdf() {
+    state.pdfRenderToken += 1;
+    if (state.pdfDoc) {
+      try { await state.pdfDoc.destroy(); } catch (_) {}
+      state.pdfDoc = null;
+    }
     $("pdfModal").hidden = true;
-    $("pdfFrame").removeAttribute("src");
+    clearPdfViewer();
     $("pdfTabs").innerHTML = "";
     state.pdfFiles = [];
     state.pdfSignedUrls = [];
     state.pdfIndex = 0;
+    state.pdfZoom = 1;
   }
 
-  function pdfFitUrl(url) {
-    if (!url) return "";
-    const clean = String(url).split("#")[0];
-    // 모바일 PDF 뷰어의 최초 표시를 페이지 가로폭 맞춤으로 요청합니다.
-    // 이후 확대/축소는 브라우저의 기본 핀치 줌을 그대로 사용합니다.
-    return `${clean}#view=FitH&zoom=page-width`;
+  async function renderPdfDocument(file) {
+    const viewer = ensurePdfViewer();
+    const loading = $("pdfLoading");
+    if (!viewer) throw new Error("PDF 표시 영역을 찾을 수 없습니다.");
+
+    clearPdfViewer();
+    state.pdfZoom = 1;
+    const token = ++state.pdfRenderToken;
+    loading.hidden = false;
+    loading.textContent = "SDS 전체 페이지를 불러오는 중입니다.";
+
+    if (!file?.signedUrl) throw new Error(file?.signedError || "PDF URL 생성 실패");
+
+    const pdfjsLib = await loadPdfJs();
+    if (token !== state.pdfRenderToken) return;
+
+    if (state.pdfDoc) {
+      try { await state.pdfDoc.destroy(); } catch (_) {}
+      state.pdfDoc = null;
+    }
+
+    const loadingTask = pdfjsLib.getDocument({ url:file.signedUrl });
+    const pdf = await loadingTask.promise;
+    if (token !== state.pdfRenderToken) {
+      try { await pdf.destroy(); } catch (_) {}
+      return;
+    }
+    state.pdfDoc = pdf;
+
+    const pages = document.createElement("div");
+    pages.className = "pdf-pages";
+    viewer.appendChild(pages);
+
+    const availableWidth = Math.max(240, (viewer.clientWidth || window.innerWidth) - 16);
+    const outputScale = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
+      if (token !== state.pdfRenderToken) return;
+      loading.textContent = `SDS ${pageNum} / ${pdf.numPages} 페이지를 불러오는 중입니다.`;
+
+      const page = await pdf.getPage(pageNum);
+      const baseViewport = page.getViewport({ scale:1 });
+      const fitScale = availableWidth / baseViewport.width;
+      const viewport = page.getViewport({ scale:fitScale });
+
+      const shell = document.createElement("div");
+      shell.className = "pdf-page-shell";
+      shell.dataset.page = String(pageNum);
+
+      const canvas = document.createElement("canvas");
+      canvas.className = "pdf-page-canvas";
+      canvas.dataset.baseWidth = String(viewport.width);
+      canvas.dataset.baseHeight = String(viewport.height);
+      canvas.width = Math.max(1, Math.floor(viewport.width * outputScale));
+      canvas.height = Math.max(1, Math.floor(viewport.height * outputScale));
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
+      shell.appendChild(canvas);
+      pages.appendChild(shell);
+
+      const context = canvas.getContext("2d", {alpha:false});
+      await page.render({
+        canvasContext:context,
+        viewport,
+        transform:outputScale !== 1 ? [outputScale,0,0,outputScale,0,0] : null,
+        background:"rgb(255,255,255)"
+      }).promise;
+    }
+
+    if (token !== state.pdfRenderToken) return;
+    loading.hidden = true;
+    viewer.scrollTop = 0;
+    viewer.scrollLeft = 0;
+    applyPdfZoom(1);
   }
 
-  function showPdf(index) {
+  async function showPdf(index) {
     const file = state.pdfSignedUrls[index];
     if (!file) return;
     state.pdfIndex = index;
     $("pdfFileName").textContent = file.file_name || `PDF ${index+1}`;
     $("pdfTabs").querySelectorAll("[data-pdf-index]").forEach((btn) => btn.classList.toggle("active", Number(btn.dataset.pdfIndex) === index));
-    const loading = $("pdfLoading");
-    const frame = $("pdfFrame");
-    loading.hidden = false;
-    loading.textContent = file.signedUrl ? "PDF를 화면 폭에 맞춰 불러오는 중입니다." : `PDF를 불러오지 못했습니다: ${file.signedError || "URL 생성 실패"}`;
-    frame.removeAttribute("src");
-    if (file.signedUrl) frame.src = pdfFitUrl(file.signedUrl);
+    try {
+      await renderPdfDocument(file);
+    } catch (error) {
+      console.error("[Mobile SDS] PDF render error", error);
+      const viewer = ensurePdfViewer();
+      if (viewer) {
+        viewer.innerHTML = file.signedUrl
+          ? `<div class="pdf-error-card">PDF 미리보기를 불러오지 못했습니다.<br><a href="${esc(file.signedUrl)}" target="_blank" rel="noopener">원본 PDF 열기</a></div>`
+          : `<div class="pdf-error-card">PDF를 불러오지 못했습니다.</div>`;
+      }
+      $("pdfLoading").hidden = true;
+    }
   }
 
   async function openCurrent(product) {
@@ -252,6 +423,8 @@
     $("pdfLoading").hidden = false;
     $("pdfLoading").textContent = "PDF를 불러오는 중입니다.";
 
+    ensurePdfViewer();
+
     const tabs = $("pdfTabs");
     tabs.hidden = files.length <= 1;
     tabs.innerHTML = files.length > 1
@@ -259,7 +432,7 @@
       : "";
 
     state.pdfSignedUrls = await makeSignedUrls(files);
-    showPdf(0);
+    await showPdf(0);
   }
 
   function bindEvents() {
@@ -277,7 +450,6 @@
       const btn = event.target.closest("[data-pdf-index]");
       if (btn) showPdf(Number(btn.dataset.pdfIndex));
     });
-    $("pdfFrame").addEventListener("load", () => { $("pdfLoading").hidden = true; });
     window.addEventListener("message", (event) => {
       const p = event?.data || {};
       if (p.type === "portal-tabs-request" || p.type === "portal-filters-request") notifyPortal();
@@ -285,6 +457,7 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    ensurePdfViewer();
     bindEvents();
     notifyPortal();
     loadProducts();
