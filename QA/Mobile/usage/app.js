@@ -31,6 +31,8 @@
     products: [],
     productsById: new Map(),
     chemicalByCas: new Map(),
+    specialSubstancesByCas: new Map(),
+    selectedSpecialMaterials: [],
     selectedProduct: null,
     currentView: 'input',
     currentMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -308,6 +310,7 @@
     if (!p) {
       wrap.hidden = true;
       $('productSearch').disabled = false;
+      syncSpecialUsagePanel();
       return;
     }
     $('selectedProductName').textContent = p.name || '-';
@@ -323,6 +326,7 @@
     $('productSearch').value = '';
     $('productSearch').disabled = true;
     $('productResults').hidden = true;
+    syncSpecialUsagePanel();
   }
 
   function selectProduct(id) {
@@ -379,6 +383,7 @@
     }));
     state.productsById = new Map(state.products.map((p) => [Number(p.id), p]));
     await loadChemicalMaster();
+    await loadSpecialSubstanceMaster();
   }
 
   async function loadChemicalMaster() {
@@ -401,6 +406,202 @@
     }
 
     state.chemicalByCas = chemicalMap;
+  }
+
+  function specialCasValues(row) {
+    const nested = Array.isArray(row?.qa_special_substance_cas) ? row.qa_special_substance_cas : [];
+    const values = nested
+      .slice()
+      .sort((a, b) => Number(a.sort_order ?? 9999) - Number(b.sort_order ?? 9999))
+      .map((x) => casKey(x.cas_no))
+      .filter(Boolean);
+    if (values.length) return [...new Set(values)];
+    return casKey(row?.cas_no) ? [casKey(row.cas_no)] : [];
+  }
+
+  function specialSubstanceActiveOn(row, dateStr) {
+    const d = String(dateStr || localDateString());
+    if (row?.effective_from && d < String(row.effective_from)) return false;
+    if (row?.effective_to && d >= String(row.effective_to)) return false;
+    return true;
+  }
+
+  async function loadSpecialSubstanceMaster() {
+    const { data, error } = await db
+      .from('qa_special_substances')
+      .select('id, name_ko, name_en, cas_no, effective_from, effective_to, qa_special_substance_cas(cas_no, sort_order)')
+      .order('name_ko', { ascending: true });
+
+    if (error) throw error;
+
+    const map = new Map();
+    (data || []).forEach((row) => {
+      specialCasValues(row).forEach((casNo) => {
+        if (!map.has(casNo)) map.set(casNo, []);
+        map.get(casNo).push(row);
+      });
+    });
+    state.specialSubstancesByCas = map;
+  }
+
+  function specialMaterialsForProduct(product) {
+    if (!product) return [];
+    const usageDate = $('usageDate')?.value || localDateString();
+    const result = [];
+    const seen = new Set();
+
+    productCasRows(product).forEach((casRow) => {
+      const casNo = casKey(casRow.cas_no);
+      if (!casNo) return;
+      const standards = state.specialSubstancesByCas.get(casNo) || [];
+      standards.forEach((standard) => {
+        if (!specialSubstanceActiveOn(standard, usageDate)) return;
+        const key = casNo;
+        if (seen.has(key)) return;
+        seen.add(key);
+
+        const chemical = chemicalForCas(casNo) || {};
+        const substanceName = String(
+          chemical.chem_name_ko || chemical.chem_name_en || standard.name_ko || standard.name_en || casNo
+        ).trim();
+
+        result.push({
+          substance_id: Number(standard.id),
+          cas_no: casNo,
+          substance_name: substanceName,
+          percent_snapshot: formatContent(casRow) || null
+        });
+      });
+    });
+
+    return result;
+  }
+
+  function resetSpecialUsageForm() {
+    if ($('specialWorkType')) $('specialWorkType').value = '';
+    if ($('specialWorkDetail')) $('specialWorkDetail').value = '';
+    document.querySelectorAll('#specialPpeGroup input[type="checkbox"]').forEach((el) => { el.checked = false; });
+    if ($('specialPpeOther')) {
+      $('specialPpeOther').value = '';
+      $('specialPpeOther').hidden = true;
+    }
+    document.querySelectorAll('input[name="specialAccident"]').forEach((el) => { el.checked = false; });
+    if ($('specialDamageDetail')) $('specialDamageDetail').value = '';
+    if ($('specialActionDetail')) $('specialActionDetail').value = '';
+    if ($('specialAccidentFields')) $('specialAccidentFields').hidden = true;
+  }
+
+  function syncSpecialAccidentFields() {
+    const yes = $('specialAccidentYes')?.checked === true;
+    if ($('specialAccidentFields')) $('specialAccidentFields').hidden = !yes;
+    if (!yes) {
+      if ($('specialDamageDetail')) $('specialDamageDetail').value = '';
+      if ($('specialActionDetail')) $('specialActionDetail').value = '';
+    }
+  }
+
+  function syncSpecialPpeOther() {
+    const checked = $('specialPpeOtherCheck')?.checked === true;
+    if ($('specialPpeOther')) {
+      $('specialPpeOther').hidden = !checked;
+      if (!checked) $('specialPpeOther').value = '';
+    }
+  }
+
+  function syncSpecialUsagePanel() {
+    const panel = $('specialUsagePanel');
+    if (!panel) return;
+
+    const materials = specialMaterialsForProduct(state.selectedProduct);
+    state.selectedSpecialMaterials = materials;
+    const visible = !!state.selectedProduct && materials.length > 0;
+    panel.hidden = !visible;
+
+    if ($('specialUsageBadge')) {
+      $('specialUsageBadge').textContent = visible ? `특별관리물질 ${materials.length}종` : '특별관리물질';
+    }
+
+    if ($('specialMaterialNames')) {
+      $('specialMaterialNames').innerHTML = visible
+        ? materials.map((item) => `<span class="special-material-chip">${esc(item.substance_name || '물질명 미등록')}</span>`).join('')
+        : '';
+    }
+
+    if (!visible) resetSpecialUsageForm();
+  }
+
+  function buildSpecialUsageInput() {
+    const materials = state.selectedSpecialMaterials || [];
+    if (!materials.length) return null;
+
+    const workType = String($('specialWorkType')?.value || '').trim();
+    const workDetail = String($('specialWorkDetail')?.value || '').trim();
+    if (!workType) throw new Error('특별관리물질 작업내용을 선택해 주세요.');
+    if (workType === '기타' && !workDetail) throw new Error('기타 작업내용을 입력해 주세요.');
+
+    const ppe = [...document.querySelectorAll('#specialPpeGroup input[type="checkbox"]:checked')]
+      .map((el) => String(el.value || '').trim())
+      .filter(Boolean);
+    if (!ppe.length) throw new Error('착용 보호구를 1개 이상 선택해 주세요.');
+
+    const ppeOther = String($('specialPpeOther')?.value || '').trim();
+    if (ppe.includes('other') && !ppeOther) throw new Error('기타 보호구를 입력해 주세요.');
+
+    const accidentEl = document.querySelector('input[name="specialAccident"]:checked');
+    if (!accidentEl) throw new Error('사고 발생 여부를 선택해 주세요.');
+    const accidentOccurred = accidentEl.value === 'true';
+    const damageDetail = String($('specialDamageDetail')?.value || '').trim();
+    const actionDetail = String($('specialActionDetail')?.value || '').trim();
+    if (accidentOccurred && (!damageDetail || !actionDetail)) {
+      throw new Error('사고 발생 시 피해 내용과 조치 사항을 모두 입력해 주세요.');
+    }
+
+    return {
+      work_content: workDetail ? `${workType} - ${workDetail}` : workType,
+      ppe,
+      ppe_other: ppe.includes('other') ? ppeOther : null,
+      accident_occurred: accidentOccurred,
+      damage_detail: accidentOccurred ? damageDetail : null,
+      action_detail: accidentOccurred ? actionDetail : null,
+      materials
+    };
+  }
+
+  async function saveSpecialUsage(usageRecordId, specialInput) {
+    if (!specialInput?.materials?.length) return;
+    const employee = state.employee || {};
+
+    const parentResult = await db
+      .from('qa_special_substance_usage_records')
+      .insert({
+        usage_record_id: Number(usageRecordId),
+        company_id: state.companyId,
+        work_content: specialInput.work_content,
+        ppe: specialInput.ppe,
+        ppe_other: specialInput.ppe_other,
+        accident_occurred: specialInput.accident_occurred,
+        damage_detail: specialInput.damage_detail,
+        action_detail: specialInput.action_detail,
+        created_by: employee.email || null
+      })
+      .select('id')
+      .single();
+
+    if (parentResult.error) throw parentResult.error;
+
+    const specialUsageId = Number(parentResult.data?.id);
+    if (!Number.isFinite(specialUsageId)) throw new Error('특별관리물질 사용기록 ID를 확인할 수 없습니다.');
+
+    const itemRows = specialInput.materials.map((item) => ({
+      special_usage_id: specialUsageId,
+      substance_id: Number.isFinite(Number(item.substance_id)) ? Number(item.substance_id) : null,
+      substance_name_snapshot: item.substance_name,
+      cas_no_snapshot: item.cas_no,
+      percent_snapshot: item.percent_snapshot
+    }));
+
+    const itemResult = await db.from('qa_special_substance_usage_items').insert(itemRows);
+    if (itemResult.error) throw itemResult.error;
   }
 
   function buildPayload() {
@@ -436,8 +637,11 @@
     if (state.isSaving) return;
     setMessage('inputMessage');
     let payload;
+    let specialInput;
     try {
       payload = buildPayload();
+      syncSpecialUsagePanel();
+      specialInput = buildSpecialUsageInput();
     } catch (e) {
       setMessage('inputMessage', e.message || '입력값을 확인해 주세요.', 'error');
       return;
@@ -449,15 +653,28 @@
     btn.disabled = true;
     btn.textContent = '저장 중...';
 
+    let insertedUsageId = null;
     try {
-      const { error } = await db.from(TABLE).insert(payload);
-      if (error) throw error;
-      setMessage('inputMessage', '사용내역이 등록되었습니다.', 'success');
+      const usageResult = await db.from(TABLE).insert(payload).select('id').single();
+      if (usageResult.error) throw usageResult.error;
+      insertedUsageId = Number(usageResult.data?.id);
+      if (!Number.isFinite(insertedUsageId)) throw new Error('사용내역 ID를 확인할 수 없습니다.');
+
+      if (specialInput) await saveSpecialUsage(insertedUsageId, specialInput);
+
+      setMessage('inputMessage', specialInput ? '사용내역과 특별관리물질 기록이 등록되었습니다.' : '사용내역이 등록되었습니다.', 'success');
       $('usageHours').value = '';
       $('quantity').value = '';
       clearSelectedProduct();
       await Promise.all([loadMonthlyRows(), loadLogRows()]);
     } catch (e) {
+      if (Number.isFinite(insertedUsageId)) {
+        try {
+          await db.from(TABLE).delete().eq('id', insertedUsageId).eq('company_id', state.companyId);
+        } catch (rollbackError) {
+          console.error('[QA Usage] rollback failed', rollbackError);
+        }
+      }
       console.error('[QA Usage] save failed', e);
       setMessage('inputMessage', `저장 실패: ${e?.message || '알 수 없는 오류'}`, 'error');
     } finally {
@@ -1145,6 +1362,10 @@
     });
 
     $('saveUsageBtn').addEventListener('click', saveUsage);
+    $('usageDate').addEventListener('change', syncSpecialUsagePanel);
+    $('specialPpeOtherCheck').addEventListener('change', syncSpecialPpeOther);
+    $('specialAccidentNo').addEventListener('change', syncSpecialAccidentFields);
+    $('specialAccidentYes').addEventListener('change', syncSpecialAccidentFields);
 
     $('prevMonthBtn').addEventListener('click', () => {
       state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth() - 1, 1);
@@ -1238,6 +1459,7 @@
     fillYearOptions();
     syncPeriodDetail();
     bindEvents();
+    resetSpecialUsageForm();
     notifyPortal();
 
     // UI 전환 버튼은 DB 상태와 무관하게 항상 동작해야 합니다.
