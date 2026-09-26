@@ -3066,7 +3066,7 @@ body.auth-loading .top-user-bar {
     'QA/health/index.html': {
       top: 'Safety Management',
       title: 'QA',
-      desc: '특수건강진단 대상 유해인자와 검진 현황·결과를 관리합니다.',
+      desc: '특수건강진단 대상 유해인자 기준, 검진 대상·일정 및 검진결과를 통합 관리합니다.',
       gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
     },
     'travel-expense/index.html': {
@@ -3130,57 +3130,57 @@ body.auth-loading .top-user-bar {
     'QA/index.html': [
       { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: '화학물질 관리' },
-      { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-storage', label: '특별관리물질 현황' },
+      { id: 'qa-special', label: '특별관리물질 관리' },
       { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/Mobile/sds/index.html': [
       { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: '화학물질 관리' },
-      { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-storage', label: '특별관리물질 현황' },
+      { id: 'qa-special', label: '특별관리물질 관리' },
       { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/usage/index.html': [
       { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: '화학물질 관리' },
-      { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-storage', label: '특별관리물질 현황' },
+      { id: 'qa-special', label: '특별관리물질 관리' },
       { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/Mobile/usage/index.html': [
       { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: '화학물질 관리' },
-      { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-storage', label: '특별관리물질 현황' },
+      { id: 'qa-special', label: '특별관리물질 관리' },
       { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/special-storage/index.html': [
       { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: '화학물질 관리' },
-      { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-storage', label: '특별관리물질 현황' },
+      { id: 'qa-special', label: '특별관리물질 관리' },
       { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/Mobile/special-storage/index.html': [
       { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: '화학물질 관리' },
-      { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-storage', label: '특별관리물질 현황' },
+      { id: 'qa-special', label: '특별관리물질 관리' },
       { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/special/index.html': [
       { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: '화학물질 관리' },
-      { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-storage', label: '특별관리물질 현황' },
+      { id: 'qa-special', label: '특별관리물질 관리' },
       { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/health/index.html': [
       { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: '화학물질 관리' },
-      { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-storage', label: '특별관리물질 현황' },
+      { id: 'qa-special', label: '특별관리물질 관리' },
       { id: 'qa-health', label: '특수건강진단' }
     ],
     'travel-expense/index.html': [],
@@ -3455,7 +3455,7 @@ body.auth-loading .top-user-bar {
       ''
     );
 
-    // QA는 사용일지, SDS, 특별관리물질을 독립 프로그램으로 운영하므로
+    // QA는 사용일지, 화학물질, 특별관리물질, 특수건강진단을 독립 프로그램으로 운영하므로
     // 포탈 상단 버튼에서 iframe 경로 자체를 전환합니다.
     if (isQaProgramSrc(currentSrc)) {
       const qaUsageSrc = getQaUsageSrc();
@@ -5809,7 +5809,7 @@ body.auth-loading .top-user-bar {
           HOME_SRC
         );
 
-        // QA 상단 3개 버튼은 서로 다른 프로그램 경로를 나타냅니다.
+        // QA 상단 버튼은 서로 다른 프로그램 경로를 나타냅니다.
         // 각 하위 앱이 보내는 내부 active tab id와 포털의 qa-* id가 다를 수 있으므로
         // QA에서는 현재 iframe 경로를 기준으로 포털 버튼 active 상태를 고정합니다.
         if (isQaUsageSrc(currentSrc)) {
