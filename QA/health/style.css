@@ -600,3 +600,72 @@ tbody tr:last-child td {
     min-width: 1260px;
   }
 }
+
+
+/* 2026-09-26: 화학물질 관리와 동일한 밀도의 컴팩트 기준관리 */
+.stats {
+  gap:12px;
+  margin-bottom:10px;
+}
+.stat-card {
+  min-height:70px;
+  height:70px;
+  padding:11px 14px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.stat-card span {
+  font-size:11px;
+  margin-bottom:7px;
+}
+.stat-card strong {
+  font-size:17px;
+  line-height:1.1;
+  margin-bottom:0;
+}
+.stat-card small {
+  display:none;
+}
+.list-head {
+  margin:2px 0 9px;
+}
+.toolbar {
+  display:grid;
+  grid-template-columns:minmax(260px,520px) 155px 155px 155px;
+  justify-content:start;
+  gap:10px;
+  margin-bottom:10px;
+}
+.toolbar input,.toolbar select {
+  height:34px;
+  font-size:11px;
+}
+
+/* 최근사용일 추가에 따른 10열 구성 */
+.standards-table {
+  min-width:1380px;
+}
+.standards-table th:nth-child(7),
+.standards-table td:nth-child(7) {
+  width:auto;
+  min-width:300px;
+}
+.standards-table th:nth-child(8),
+.standards-table td:nth-child(8),
+.standards-table th:nth-child(9),
+.standards-table td:nth-child(9) {
+  width:115px;
+  white-space:nowrap;
+}
+.standards-table th:nth-child(10),
+.standards-table td:nth-child(10) {
+  width:90px;
+  white-space:nowrap;
+}
+@media(max-width:900px) {
+  .toolbar {grid-template-columns:1fr 1fr}
+  .search {grid-column:1/-1}
+  .stat-card {height:68px;min-height:68px}
+  .standards-table {min-width:1380px}
+}
