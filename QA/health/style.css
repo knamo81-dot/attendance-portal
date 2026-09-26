@@ -868,3 +868,39 @@ tbody tr:last-child td {
 
 /* 기준연도 정책: 현재연도가 아니면 구분=전체 고정 */
 #statusCategory:disabled{background:#f3f4f6;color:#6b7280;cursor:not-allowed;opacity:1}
+
+/* 2026-09-26 다음 검진기한: 최초/주기 구분 + 유해인자 산정내역 모달 */
+.next-deadline-cell{padding:5px 4px!important}
+.next-date-card{width:100%;border:0;background:transparent;padding:3px 2px;display:grid;gap:3px;justify-items:center;cursor:pointer;border-radius:8px;color:#0f172a}
+.next-date-card:hover{background:#f5f3ff;box-shadow:inset 0 0 0 1px #ddd6fe}
+.next-date-card strong{font-size:10.5px;font-weight:900;white-space:nowrap}
+.next-date-card small{max-width:100%;font-size:8.5px;font-weight:800;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.next-date-card small span{color:#6d28d9;font-weight:900}
+.next-date-card.overdue strong{color:#dc2626}
+.next-date-card.overdue small span{color:#dc2626}
+
+#deadlineModal{z-index:140}
+.deadline-modal-card{width:min(980px,96vw);max-width:none}
+.deadline-summary{margin:14px 18px 0;padding:11px 13px;border:1px solid #ddd6fe;border-radius:11px;background:#f7f5ff;display:flex;align-items:center;gap:12px;min-height:44px}
+.deadline-summary strong{font-size:15px;color:#4c1d95;white-space:nowrap}
+.deadline-summary span{font-size:10.5px;font-weight:900;color:#6d28d9}
+.deadline-table-wrap{margin:12px 18px 0;border:1px solid #e2e8f0;border-radius:11px;overflow:auto;max-height:min(500px,58vh)}
+.deadline-table{width:100%;min-width:820px;border-collapse:collapse;table-layout:fixed}
+.deadline-table th,.deadline-table td{padding:10px 9px;border-bottom:1px solid #edf1f6;text-align:center;font-size:10.5px;vertical-align:middle}
+.deadline-table th{position:sticky;top:0;z-index:1;background:#f8fafc;color:#334155;font-weight:900}
+.deadline-table th:nth-child(1){width:120px}
+.deadline-table th:nth-child(2){width:220px}
+.deadline-table th:nth-child(3){width:95px}
+.deadline-table th:nth-child(4){width:150px}
+.deadline-table th:nth-child(5){width:120px}
+.deadline-table th:nth-child(6){width:130px}
+.deadline-hazard-name{text-align:left!important}
+.deadline-hazard-name b{display:block;font-size:10.5px}
+.deadline-hazard-name small,.deadline-table td:nth-child(4) small{display:block;margin-top:3px;color:#64748b;font-size:9px}
+.deadline-kind{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:4px 7px;font-size:9px;font-weight:900;white-space:nowrap}
+.deadline-kind.first{background:#eef2ff;color:#4338ca}
+.deadline-kind.cycle{background:#ecfdf5;color:#047857}
+.deadline-due{white-space:nowrap;font-size:10.5px}
+.deadline-due.overdue{color:#dc2626}
+.deadline-help{padding:10px 18px 2px;font-size:9.5px;line-height:1.5;color:#64748b}
+@media(max-width:700px){.deadline-modal-card{width:98vw}.deadline-summary{align-items:flex-start;flex-direction:column;gap:4px}}
