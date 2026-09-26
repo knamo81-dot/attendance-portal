@@ -809,3 +809,18 @@ tbody tr:last-child td {
 /* 월 셀 전체 클릭영역 유지: 내부 표시요소가 클릭을 가로채지 않도록 함 */
 .month-cell{cursor:pointer;position:relative}
 .month-cell .month-event,.month-cell .month-chip{pointer-events:none}
+
+
+/* 2026-09-26 특수건강진단 다중선택/일괄입력 */
+.health-note.bulk-hint{color:#6d28d9;font-weight:800;margin-top:9px}
+.month-cell{user-select:none;-webkit-user-select:none}
+.month-cell.bulk-selected{background:#f3efff!important;box-shadow:inset 0 0 0 2px #7c3aed;position:relative;z-index:1}
+.month-cell.bulk-selected .month-event,.month-cell.bulk-selected .month-chip{filter:saturate(1.05)}
+.bulk-guide{display:grid;gap:4px;padding:11px 12px;border:1px solid #ddd6fe;border-radius:10px;background:#f5f3ff;color:#5b21b6;font-size:10.5px;line-height:1.45}
+.bulk-guide strong{font-size:11px}.bulk-guide span{color:#6b7280;font-weight:700}
+.bulk-field-note{margin-top:7px;font-size:9.5px;color:#64748b}
+#healthDrawer .drawer-actions{align-items:center}
+#healthDrawer .drawer-actions .delete{margin-right:auto;border:1px solid #fecaca;background:#fff;color:#dc2626;cursor:pointer!important}
+#healthDrawer .drawer-actions .delete:hover{background:#fef2f2}
+#healthDrawer .drawer-actions .delete:disabled{opacity:.45;cursor:not-allowed!important}
+#healthDrawer #drawerSave{cursor:pointer!important}
