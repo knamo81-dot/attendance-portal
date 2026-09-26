@@ -865,3 +865,6 @@ tbody tr:last-child td {
 .exam-context-banner.preplacement{background:#f8fafc;border-color:#cbd5e1}
 .exam-context-banner.return{background:#f1f5f9;border-color:#cbd5e1}
 .exam-context-banner.special{background:#f8fafc}
+
+/* 기준연도 정책: 현재연도가 아니면 구분=전체 고정 */
+#statusCategory:disabled{background:#f3f4f6;color:#6b7280;cursor:not-allowed;opacity:1}
