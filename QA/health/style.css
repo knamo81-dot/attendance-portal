@@ -793,3 +793,15 @@ tbody tr:last-child td {
 #healthDrawer #drawerSave:disabled{cursor:wait!important;opacity:.7}
 #healthDrawer input,#healthDrawer select,#healthDrawer textarea,#healthDrawer button{pointer-events:auto}
 .toast{z-index:220!important;pointer-events:none}
+
+/* 월별 검진정보 2줄 표시: [예약/완료] MM.DD / 병원 · 결과 */
+.health-calendar th,.health-calendar td{height:56px}
+.month-event{width:100%;min-width:0;display:grid;gap:3px;padding:4px 3px;line-height:1.15}
+.month-event-top{display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap}
+.month-event-top b{font-size:9.5px;color:#334155}
+.month-state{display:inline-flex;align-items:center;justify-content:center;border-radius:5px;padding:3px 5px;font-size:8.5px;font-weight:900}
+.month-event.reserved .month-state{background:#eef2ff;color:#4338ca}
+.month-event.done .month-state{background:#eaf8ef;color:#15803d}
+.month-event-top em{font-style:normal;font-size:8px;font-weight:900;color:#64748b}
+.month-event-sub{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;font-size:8.5px;font-weight:800;color:#64748b}
+.month-event-sub.abnormal{color:#dc2626;font-weight:900}
