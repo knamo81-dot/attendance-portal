@@ -217,6 +217,11 @@
     });
   }
 
+  let drawerCtx=null;
+  const selectedHazardIds=()=>new Set($$('#drawerSelectedHazards [data-chemical-id]').map(x=>String(x.dataset.chemicalId)));
+  function selectedHazardHtml(h,source='manual'){return`<div class="selected-hazard" data-chemical-id="${esc(h.chemical_id)}" data-source="${esc(source)}"><b>${esc(h.cas_no||'-')}</b><div class="hazard-name"><strong>${esc(h.name_ko||h.name_en||'-')}</strong><small>${esc(h.name_en||'')} · 주기 ${esc(h.exam_cycle_months||'-')}개월</small></div><div><span class="source-pill ${source==='manual'?'manual':''}">${source==='manual'?'수동추가':'자동'}</span>${source==='manual'?'<button class="remove-hazard" type="button" title="삭제">×</button>':''}</div></div>`}
+  function bindHazardRemove(){$$('#drawerSelectedHazards .remove-hazard').forEach(b=>b.onclick=()=>b.closest('.selected-hazard')?.remove())}
+
   function openDrawer(no,m){const emp=state.status.employees.find(e=>String(e.employee_no)===String(no)),year=state.status.year;if(!emp)return;const hz=empHazards(emp),due=hz.filter(h=>yearOf(h.due)===year&&monthOf(h.due)===m),exam=monthExam(no,year,m);drawerCtx={emp,year,month:m,examId:exam?.id||null};$('#drawerName').textContent=`${emp.name||'-'} · ${year}년 ${m}월`;$('#drawerMeta').textContent=`${emp.employee_no} · ${divisionName(emp.division_code)} / ${teamName(emp.team_code)} · 입사일 ${emp.join_date||'-'}`;
     const linked=exam?state.status.examHazards.filter(x=>String(x.exam_id)===String(exam.id)).map(x=>{const h=state.status.hazards.find(z=>String(z.chemical_id)===String(x.chemical_id));return h?{...h,source_type:x.source_type||'auto'}:null}).filter(Boolean):[];
     const initial=linked.length?linked:due.map(h=>({...h,source_type:'auto'}));
