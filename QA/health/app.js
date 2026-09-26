@@ -223,7 +223,43 @@
     return{type:'active',label:'',reason:'',exam_type:'special',noteId:null};
   }
   function latestExam(empNo,chemId){const ids=new Set(state.status.exams.filter(e=>String(e.employee_no)===String(empNo)).map(e=>String(e.id)));return state.status.examHazards.filter(h=>ids.has(String(h.exam_id))&&String(h.chemical_id)===String(chemId)).map(h=>({h,e:state.status.exams.find(e=>String(e.id)===String(h.exam_id))})).filter(x=>x.e?.exam_date).sort((a,b)=>String(b.e.exam_date).localeCompare(String(a.e.exam_date)))[0]||null}
-  function dueFor(emp,h){const last=latestExam(emp.employee_no,h.chemical_id);if(last)return{...h,due:addMonths(dateOnly(last.e.exam_date),last.h.exam_cycle_months||h.exam_cycle_months),kind:'cycle',last:dateOnly(last.e.exam_date)};const start=[labAssignDate(emp),h.first_usage].filter(Boolean).sort().at(-1);return{...h,due:addMonths(start,h.first_exam_months),kind:'first',last:null}}
+  function dueFor(emp,h){
+    const last=latestExam(emp.employee_no,h.chemical_id);
+    if(last){
+      const cycle=Number(last.h.exam_cycle_months||h.exam_cycle_months||0)||null;
+      const basis=dateOnly(last.e.exam_date);
+      return{...h,due:addMonths(basis,cycle),kind:'cycle',last:basis,basis_date:basis,basis_source:'최근 실제 검진일',applied_months:cycle};
+    }
+    const lab=labAssignDate(emp),usage=dateOnly(h.first_usage);
+    const start=[lab,usage].filter(Boolean).sort().at(-1)||null;
+    const first=Number(h.first_exam_months||0)||null;
+    const basisSource=start&&usage&&start===usage&&(!lab||usage>lab)?'유해인자 사용기준일':'연구소 발령일';
+    return{...h,due:addMonths(start,first),kind:'first',last:null,basis_date:start,basis_source:basisSource,applied_months:first};
+  }
+  function nextExamSummary(hazards){
+    const sorted=(hazards||[]).filter(h=>h.due).slice().sort((a,b)=>String(a.due).localeCompare(String(b.due))||String(a.cas_no||'').localeCompare(String(b.cas_no||'')));
+    if(!sorted.length)return null;
+    const due=sorted[0].due,same=sorted.filter(h=>h.due===due),kinds=[...new Set(same.map(h=>h.kind))];
+    const kindLabel=kinds.length>1?'최초·주기':kinds[0]==='cycle'?'주기':'최초';
+    const firstName=same[0].name_ko||same[0].name_en||same[0].cas_no||'유해인자';
+    return{due,kindLabel,hazards:same,summary:same.length>1?`${firstName} 외 ${same.length-1}건`:firstName};
+  }
+  function deadlineDetailRows(emp){return empHazards(emp).slice().sort((a,b)=>String(a.due||'9999-12-31').localeCompare(String(b.due||'9999-12-31'))||String(a.cas_no||'').localeCompare(String(b.cas_no||'')))}
+  function openDeadlineModal(no){
+    const emp=state.status.employees.find(e=>String(e.employee_no)===String(no));if(!emp)return;
+    const rows=deadlineDetailRows(emp),summary=nextExamSummary(rows);
+    $('#deadlineModalName').textContent=`${emp.name||'-'} (${emp.employee_no||'-'})`;
+    $('#deadlineModalMeta').textContent=`${divisionName(emp.division_code)} / ${teamName(emp.team_code)} · 연구소 발령일 ${labAssignDate(emp)||'-'}`;
+    $('#deadlineModalSummary').innerHTML=summary?`<strong>${esc(summary.due)}</strong><span>[${esc(summary.kindLabel)}] ${esc(summary.summary)}</span>`:'<span>산정된 다음 검진기한이 없습니다.</span>';
+    $('#deadlineModalBody').innerHTML=rows.length?rows.map(h=>{
+      const kind=h.kind==='cycle'?'주기검진':'최초검진';
+      const standard=h.kind==='cycle'?`검진주기 ${h.applied_months||'-'}개월`:`최초검진 ${h.applied_months||'-'}개월`;
+      return`<tr><td><b>${esc(h.cas_no||'-')}</b></td><td class="deadline-hazard-name"><b>${esc(h.name_ko||'-')}</b><small>${esc(h.name_en||'')}</small></td><td><span class="deadline-kind ${h.kind}">${kind}</span></td><td><b>${esc(h.basis_date||'-')}</b><small>${esc(h.basis_source||'')}</small></td><td>${esc(standard)}</td><td><b class="deadline-due ${h.due&&h.due<today()?'overdue':''}">${esc(h.due||'-')}</b></td></tr>`
+    }).join(''):'<tr><td colspan="6" class="empty">적용 중인 유해인자 또는 산정 가능한 검진기한이 없습니다.</td></tr>';
+    $('#deadlineModal').classList.remove('hidden');
+  }
+  function closeDeadlineModal(){$('#deadlineModal')?.classList.add('hidden')}
+  function bindDeadlineClicks(){$$('#statusBody [data-deadline-emp]').forEach(el=>{el.onclick=e=>{e.preventDefault();e.stopPropagation();openDeadlineModal(el.dataset.deadlineEmp)}})}
   const empHazards=emp=>state.status.hazards.filter(h=>h.active_usage).map(h=>dueFor(emp,h)).filter(h=>h.due);
   const divisionName=code=>state.status.divisions.find(x=>String(x.division_code)===String(code))?.division_name||code||'-';
   const teamName=code=>state.status.teams.find(x=>String(x.team_code)===String(code))?.team_name||code||'-';
@@ -270,7 +306,7 @@
       if(ex.length)doneP++;
       const ev=Array.from({length:12},()=>[]);
       hz.forEach(h=>{if(yearOf(h.due)===year){const type=h.due<now?'overdue':'due';ev[monthOf(h.due)-1]?.push({type,h});type==='overdue'?overN++:dueN++}});
-      const next=hz.map(h=>h.due).sort()[0]||null;
+      const nextInfo=nextExamSummary(hz),next=nextInfo?.due||null;
       const months=ev.map((a,i)=>{
         const m=i+1,period=monthPeriodState(emp,year,m),monthRows=displayMonthExams(emp.employee_no,year,m);
         const doneRows=monthRows.filter(e=>e.exam_date&&yearOf(e.exam_date)===year&&monthOf(e.exam_date)===m);
@@ -301,9 +337,10 @@
         const type=over.length?'overdue':'due',label=over.length?`초과 ${over.length}`:`예정 ${due.length}`;
         return`<td class="month-cell" data-entry-mode="special" data-emp="${esc(emp.employee_no)}" data-month="${m}"><span class="month-chip ${type}">${label}</span></td>`;
       }).join('');
-      return`<tr><td class="division-cell">${esc(divisionName(emp.division_code))}</td><td class="team-cell">${esc(teamName(emp.team_code))}</td><td class="employee-cell"><strong>${esc(emp.name||'-')}</strong><small>${esc(emp.employee_no)}</small></td><td><span class="next-date ${next&&next<now?'overdue':''}">${esc(next||'-')}</span></td>${months}</tr>`;
+      const nextCell=nextInfo?`<button type="button" class="next-date-card ${next&&next<now?'overdue':''}" data-deadline-emp="${esc(emp.employee_no)}" title="클릭하여 유해인자별 산정내역 확인"><strong>${esc(nextInfo.due)}</strong><small><span>[${esc(nextInfo.kindLabel)}]</span> ${esc(nextInfo.summary)}</small></button>`:'<span class="next-date">-</span>';
+      return`<tr><td class="division-cell">${esc(divisionName(emp.division_code))}</td><td class="team-cell">${esc(teamName(emp.team_code))}</td><td class="employee-cell"><strong>${esc(emp.name||'-')}</strong><small>${esc(emp.employee_no)}</small></td><td class="next-deadline-cell">${nextCell}</td>${months}</tr>`;
     }).join('')||`<tr><td colspan="16" class="empty">${category==='all'?'선택한 연도에 관리기간이 있는 직원이 없습니다.':category==='excluded'?'현재 기준 제외 상태이면서 선택한 연도에 관리기간이 있는 직원이 없습니다.':'현재 기준 대상 상태이면서 선택한 연도에 관리기간이 있는 직원이 없습니다.'}</td></tr>`;
-    $('#statusTargetCount').textContent=rows.length+'명';$('#statusDoneCount').textContent=doneP+'명';$('#statusDueCount').textContent=dueN+'건';$('#statusOverdueCount').textContent=overN+'건';bindMonthCellClicks();
+    $('#statusTargetCount').textContent=rows.length+'명';$('#statusDoneCount').textContent=doneP+'명';$('#statusDueCount').textContent=dueN+'건';$('#statusOverdueCount').textContent=overN+'건';bindMonthCellClicks();bindDeadlineClicks();
   }
 
   function showLabAssignWarning(){if(state.status.labWarningShown)return;const now=today(),missing=state.status.employees.filter(e=>isTrue(e.special_health_exam_target)).filter(e=>{const leave=dateOnly(e.leave_date);return(!leave||leave>=now)&&e.status!=='퇴사'&&!labAssignDate(e)}).sort((a,b)=>String(a.division_code||'').localeCompare(String(b.division_code||''),'ko',{numeric:true})||String(a.team_code||'').localeCompare(String(b.team_code||''),'ko',{numeric:true})||Number(a.sort_order??9999)-Number(b.sort_order??9999));if(!missing.length)return;state.status.labWarningShown=true;const body=$('#labAssignWarningList');if(body)body.innerHTML=missing.map(e=>`<div class="lab-warning-row"><b>${esc(e.name||'-')}</b><span>${esc(e.employee_no||'-')} · ${esc(divisionName(e.division_code))} / ${esc(teamName(e.team_code))}</span></div>`).join('');$('#labAssignWarningCount')&&($('#labAssignWarningCount').textContent=`${missing.length}명`);$('#labAssignWarningModal')?.classList.remove('hidden')}
@@ -413,7 +450,7 @@
 
   async function loadStatus(){const sb=client();if(!sb)return;try{const cid=companyId();let eq=sb.from('employees').select('*');if(cid)eq=eq.eq('company_id',cid);let dq=sb.from('divisions').select('division_code,division_name,company_id,is_active');let tq=sb.from('teams').select('team_code,team_name,division_code,company_id,is_active');if(cid){dq=dq.eq('company_id',cid);tq=tq.eq('company_id',cid)}const [er,pfr,nr,xr,hr,sr,cr,pr,ur,rr,dr,tr]=await Promise.all([eq,sb.from('research_staff_profiles').select('*'),sb.from('employee_special_notes').select('*'),sb.from('qa_special_health_exams').select('*'),sb.from('qa_special_health_exam_hazards').select('*'),sb.from('qa_special_health_exam_standards').select('*'),sb.from('qa_chemical_master').select('id,cas_no,chem_name_ko,chem_name_en'),sb.from('product_cas').select('product_id,cas_no'),sb.from('qa_reagent_usage_records').select('product_id,usage_date'),sb.from('reagent_collect_items').select('product_id,receipt_date'),dq,tq]);for(const r of[er,pfr,nr,xr,hr,sr,cr,pr,ur,dr,tr])if(r.error)throw r.error;if(rr.error)console.warn('최근입고일 조회 생략',rr.error);state.status.employees=er.data||[];const empNos=new Set(state.status.employees.map(e=>String(e.employee_no)));state.status.profiles=(pfr.data||[]).filter(p=>empNos.has(String(p.employee_no))&&(!cid||!p.company_id||String(p.company_id)===cid));state.status.divisions=(dr.data||[]).filter(x=>x.is_active!==false);state.status.teams=(tr.data||[]).filter(x=>x.is_active!==false);state.status.notes=(nr.data||[]).filter(n=>!cid||!n.company_id||String(n.company_id)===cid);state.status.exams=(xr.data||[]).filter(e=>!cid||String(e.company_id)===cid);state.status.examHazards=hr.data||[];const cm=new Map((cr.data||[]).map(c=>[c.id,c])),cp=new Map(),up=new Map(),rp=new Map();(pr.data||[]).forEach(x=>{const a=cp.get(x.cas_no)||[];a.push(x.product_id);cp.set(x.cas_no,a)});(ur.data||[]).forEach(u=>{if(!u.usage_date)return;const a=up.get(u.product_id)||[];a.push(dateOnly(u.usage_date));up.set(u.product_id,a)});(rr.data||[]).forEach(r=>{if(!r.receipt_date)return;const a=rp.get(r.product_id)||[];a.push(dateOnly(r.receipt_date));rp.set(r.product_id,a)});const cut=new Date();cut.setFullYear(cut.getFullYear()-1);const cs=cut.toISOString().slice(0,10);state.status.hazards=(sr.data||[]).filter(s=>s.is_target===true&&s.status!=='inactive'&&s.verification_status!=='kosha_not_found').map(s=>{const c=cm.get(s.chemical_id)||{},pids=cp.get(c.cas_no)||[],dates=pids.flatMap(id=>up.get(id)||[]).sort(),receipts=pids.flatMap(id=>rp.get(id)||[]).sort();return{...s,cas_no:c.cas_no||'',name_ko:c.chem_name_ko||'',name_en:c.chem_name_en||'',first_usage:dates[0]||null,latest_usage:dates.at(-1)||null,latest_receipt:receipts.at(-1)||null,active_usage:dates.some(d=>d>=cs)}});state.status.loaded=true;fillStatusFilters();renderStatus();showLabAssignWarning()}catch(e){console.error(e);$('#statusBody').innerHTML=`<tr><td colspan="16" class="empty">현황 조회 실패: ${esc(e.message||e)}</td></tr>`;toast('특수건강진단 현황을 불러오지 못했습니다.',true)}}
   // 월 셀 클릭 이벤트는 renderStatus() 직후 각 셀에 직접 바인딩한다.
-  $('#statusYear')?.addEventListener('change',()=>{state.status.year=Number($('#statusYear').value);syncStatusCategoryForYear(true);renderStatus()});$('#statusCategory')?.addEventListener('change',renderStatus);$('#statusDivision')?.addEventListener('change',()=>{updateTeams();renderStatus()});$('#statusTeam')?.addEventListener('change',renderStatus);$('#statusSearch')?.addEventListener('input',renderStatus);$('#drawerClose')?.addEventListener('click',closeDrawer);$('#healthDrawerBackdrop')?.addEventListener('click',closeDrawer);$('#hazardPickerClose')?.addEventListener('click',closeHazardPicker);$('#hazardPickerCancel')?.addEventListener('click',closeHazardPicker);$('#hazardPickerAdd')?.addEventListener('click',addPickedHazards);$('#hazardPickerSearch')?.addEventListener('input',renderHazardPicker);$('#labAssignWarningClose')?.addEventListener('click',()=>$('#labAssignWarningModal')?.classList.add('hidden'));$('#labAssignWarningOk')?.addEventListener('click',()=>$('#labAssignWarningModal')?.classList.add('hidden'));
+  $('#statusYear')?.addEventListener('change',()=>{state.status.year=Number($('#statusYear').value);syncStatusCategoryForYear(true);renderStatus()});$('#statusCategory')?.addEventListener('change',renderStatus);$('#statusDivision')?.addEventListener('change',()=>{updateTeams();renderStatus()});$('#statusTeam')?.addEventListener('change',renderStatus);$('#statusSearch')?.addEventListener('input',renderStatus);$('#drawerClose')?.addEventListener('click',closeDrawer);$('#healthDrawerBackdrop')?.addEventListener('click',closeDrawer);$('#hazardPickerClose')?.addEventListener('click',closeHazardPicker);$('#hazardPickerCancel')?.addEventListener('click',closeHazardPicker);$('#hazardPickerAdd')?.addEventListener('click',addPickedHazards);$('#hazardPickerSearch')?.addEventListener('input',renderHazardPicker);$('#labAssignWarningClose')?.addEventListener('click',()=>$('#labAssignWarningModal')?.classList.add('hidden'));$('#labAssignWarningOk')?.addEventListener('click',()=>$('#labAssignWarningModal')?.classList.add('hidden'));$('#deadlineModalClose')?.addEventListener('click',closeDeadlineModal);$('#deadlineModalOk')?.addEventListener('click',closeDeadlineModal);$('#deadlineModal')?.addEventListener('click',e=>{if(e.target?.id==='deadlineModal')closeDeadlineModal()});
 
   load();
   loadStatus();
