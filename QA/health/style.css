@@ -805,3 +805,7 @@ tbody tr:last-child td {
 .month-event-top em{font-style:normal;font-size:8px;font-weight:900;color:#64748b}
 .month-event-sub{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;font-size:8.5px;font-weight:800;color:#64748b}
 .month-event-sub.abnormal{color:#dc2626;font-weight:900}
+
+/* 월 셀 전체 클릭영역 유지: 내부 표시요소가 클릭을 가로채지 않도록 함 */
+.month-cell{cursor:pointer;position:relative}
+.month-cell .month-event,.month-cell .month-chip{pointer-events:none}
