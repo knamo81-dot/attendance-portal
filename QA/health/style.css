@@ -484,3 +484,119 @@ tbody tr:last-child td {
   }
 
 }
+
+
+/* =========================================================
+   기준관리 목록 가독성 / 컬럼 폭 조정
+   - QA CAS List와 유사한 밀도
+   - CAS / 국문명 / 영문명 고정폭
+   - 남는 폭은 보유제품에 우선 배정
+   ========================================================= */
+
+.standards-table {
+  width: 100%;
+  min-width: 1260px;
+  table-layout: fixed;
+}
+
+.standards-table th,
+.standards-table td {
+  padding: 11px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.standards-table th {
+  font-size: 12.5px;
+}
+
+/* CAS No. */
+.standards-table th:nth-child(1),
+.standards-table td:nth-child(1) {
+  width: 145px;
+  white-space: nowrap;
+}
+
+/* 국문명 */
+.standards-table th:nth-child(2),
+.standards-table td:nth-child(2) {
+  width: 190px;
+}
+
+/* 영문명 */
+.standards-table th:nth-child(3),
+.standards-table td:nth-child(3) {
+  width: 230px;
+}
+
+/* 출처 */
+.standards-table th:nth-child(4),
+.standards-table td:nth-child(4) {
+  width: 95px;
+  white-space: nowrap;
+}
+
+/* 최초검진 */
+.standards-table th:nth-child(5),
+.standards-table td:nth-child(5) {
+  width: 105px;
+  white-space: nowrap;
+}
+
+/* 검진주기 */
+.standards-table th:nth-child(6),
+.standards-table td:nth-child(6) {
+  width: 105px;
+  white-space: nowrap;
+}
+
+/* 보유제품: 남는 가로 공간을 사용 */
+.standards-table th:nth-child(7),
+.standards-table td:nth-child(7) {
+  width: auto;
+  min-width: 330px;
+}
+
+/* 최근입고일 */
+.standards-table th:nth-child(8),
+.standards-table td:nth-child(8) {
+  width: 120px;
+  white-space: nowrap;
+}
+
+/* 관리 */
+.standards-table th:nth-child(9),
+.standards-table td:nth-child(9) {
+  width: 90px;
+  white-space: nowrap;
+}
+
+.standards-table .products {
+  min-width: 0;
+  gap: 5px;
+}
+
+.standards-table .product-line {
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.standards-table .product-line small {
+  font-size: 11.5px;
+}
+
+.standards-table .badge {
+  min-height: 23px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.standards-table .status-ok {
+  font-size: 11px;
+}
+
+@media(max-width:900px) {
+  .standards-table {
+    min-width: 1260px;
+  }
+}
