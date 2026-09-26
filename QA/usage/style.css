@@ -792,3 +792,176 @@ button{cursor:pointer}
     box-sizing:border-box !important;
   }
 }
+
+
+/* 2026-09-26: 특별관리물질 추가정보 - 기존 입력카드 가로폭 유지, 세로 확장 */
+.special-usage-panel{
+  width:100%;
+  min-width:0;
+  margin-top:2px;
+  padding:12px;
+  border:1px solid #d9cff8;
+  border-radius:9px;
+  background:linear-gradient(180deg,#fbfaff,#f7f4ff);
+  box-sizing:border-box;
+}
+
+.special-usage-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+
+.special-usage-head strong{
+  min-width:0;
+  color:#45369b;
+  font-size:13px;
+  font-weight:900;
+}
+
+.special-usage-badge{
+  flex:0 0 auto;
+  padding:3px 7px;
+  border-radius:999px;
+  background:#6847d1;
+  color:#fff;
+  font-size:9px;
+  font-weight:900;
+  white-space:nowrap;
+}
+
+.special-usage-guide{
+  margin:7px 0 11px;
+  color:#667085;
+  font-size:10.5px;
+  line-height:1.45;
+}
+
+.special-field-block{
+  display:grid;
+  gap:7px;
+  margin-top:11px;
+  min-width:0;
+}
+
+.special-field-block:first-of-type{
+  margin-top:0;
+}
+
+.special-field-label,
+.special-accident-fields label>span{
+  color:#475467;
+  font-size:11px;
+  font-weight:900;
+}
+
+.special-field-label b,
+.special-accident-fields label>span b{
+  color:#b42318;
+}
+
+.special-field-block>select,
+.special-field-block>input[type="text"],
+.special-accident-fields textarea{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  border:1px solid #cfd5df;
+  border-radius:7px;
+  background:#fff;
+  color:var(--text);
+  outline:none;
+  box-sizing:border-box;
+  font:inherit;
+  font-size:12px;
+}
+
+.special-field-block>select,
+.special-field-block>input[type="text"]{
+  height:36px;
+  padding:0 10px;
+}
+
+.special-accident-fields textarea{
+  min-height:72px;
+  padding:9px 10px;
+  resize:vertical;
+  line-height:1.45;
+}
+
+.special-field-block>select:focus,
+.special-field-block>input[type="text"]:focus,
+.special-accident-fields textarea:focus{
+  border-color:#8d76de;
+  box-shadow:0 0 0 3px rgba(100,68,200,.10);
+}
+
+.ppe-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px 8px;
+  min-width:0;
+}
+
+.ppe-grid label,
+.accident-options label{
+  display:flex;
+  align-items:flex-start;
+  gap:6px;
+  min-width:0;
+  color:#344054;
+  font-size:10.5px;
+  font-weight:700;
+  line-height:1.35;
+  cursor:pointer;
+}
+
+.ppe-grid input,
+.accident-options input{
+  flex:0 0 auto;
+  width:15px;
+  height:15px;
+  margin:0;
+  accent-color:var(--qa);
+}
+
+.ppe-grid label span,
+.accident-options label span{
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+
+.accident-options{
+  display:flex;
+  align-items:center;
+  gap:18px;
+  min-height:24px;
+}
+
+.special-accident-fields{
+  display:grid;
+  gap:10px;
+  margin-top:11px;
+}
+
+.special-accident-fields label{
+  display:grid;
+  gap:6px;
+  min-width:0;
+}
+
+/* 기존 .input-layout의 420px/360px 열 정의는 변경하지 않는다. */
+.input-panel .special-usage-panel,
+.input-panel .special-field-block,
+.input-panel .ppe-grid,
+.input-panel .special-accident-fields{
+  min-width:0;
+  max-width:100%;
+}
+
+@media(max-width:560px){
+  .ppe-grid{
+    grid-template-columns:1fr;
+  }
+}
