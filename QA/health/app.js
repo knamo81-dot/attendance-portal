@@ -28,10 +28,10 @@
   
   function render(){const q=$('#searchInput').value.trim().toLowerCase(),source=$('#sourceFilter').value,first=$('#firstExamFilter').value,cycle=$('#cycleFilter').value;
     let rows=state.rows.filter(r=>state.filter==='unverified'?r.verification_status==='kosha_not_found':r.is_target===true&&r.verification_status!=='kosha_not_found').filter(r=>{const hay=[r.cas_no,r.name_ko,r.name_en,rowProducts(r).map(p=>p.name).join(' ')].join(' ').toLowerCase();
-    const src=r.data_source==='MANUAL'?'MANUAL':(r.source||'KOSHA');return(!q||hay.includes(q))&&(!source||src===source)&&(!first||String(r.first_exam_months||'')===first)&&(!cycle||String(r.exam_cycle_months||'')===cycle)});rows.sort((a,b)=>String(b.latest_receipt||'').localeCompare(String(a.latest_receipt||''))||String(a.cas_no).localeCompare(String(b.cas_no)));
+    const src=r.data_source==='MANUAL'?'MANUAL':(r.source||'KOSHA');return(!q||hay.includes(q))&&(!source||src===source)&&(!first||String(r.first_exam_months||'')===first)&&(!cycle||String(r.exam_cycle_months||'')===cycle)});rows.sort((a,b)=>String(b.latest_usage||'').localeCompare(String(a.latest_usage||''))||String(b.latest_receipt||'').localeCompare(String(a.latest_receipt||''))||String(a.cas_no).localeCompare(String(b.cas_no)));
     $('#standardsBody').innerHTML=rows.length?rows.map(r=>{const src=r.data_source==='MANUAL'?'수기':(r.source||'KOSHA');
     const action=state.filter==='unverified'?`<button class="mini" data-manual="${r.id}">수기확인</button>`:`<span class="status-ok">${r.status==='inactive'?'비대상':'적용중'}</span>`;
-    return `<tr><td><b>${esc(r.cas_no)}</b></td><td>${esc(r.name_ko||'-')}</td><td>${esc(r.name_en||'-')}</td><td><span class="badge ${src==='수기'?'manual':''}">${esc(src)}</span></td><td>${r.first_exam_months?`<span class="badge green">${esc(r.first_exam_months)}개월</span>`:'-'}</td><td>${r.exam_cycle_months?`<span class="badge">${esc(r.exam_cycle_months)}개월</span>`:'-'}</td><td><div class="products">${rowProducts(r).map(p=>`<div class="product-line">• <b>${esc(p.name)}</b> <small>${esc([p.manufacturer,p.code].filter(Boolean).join(' · '))}</small></div>`).join('')||'-'}</div></td><td class="date"><b>${esc(r.latest_receipt||'-')}</b></td><td>${action}</td></tr>`}).join(''):`<tr><td colspan="9" class="empty">${state.filter==='unverified'?'KOSHA 미확인 물질이 없습니다.':'표시할 특수건강진단 대상 유해인자가 없습니다.'}</td></tr>`;
+    return `<tr><td><b>${esc(r.cas_no)}</b></td><td>${esc(r.name_ko||'-')}</td><td>${esc(r.name_en||'-')}</td><td><span class="badge ${src==='수기'?'manual':''}">${esc(src)}</span></td><td>${r.first_exam_months?`<span class="badge green">${esc(r.first_exam_months)}개월</span>`:'-'}</td><td>${r.exam_cycle_months?`<span class="badge">${esc(r.exam_cycle_months)}개월</span>`:'-'}</td><td><div class="products">${rowProducts(r).map(p=>`<div class="product-line">• <b>${esc(p.name)}</b> <small>${esc([p.manufacturer,p.code].filter(Boolean).join(' · '))}</small></div>`).join('')||'-'}</div></td><td class="date"><b>${esc(r.latest_receipt||'-')}</b></td><td class="date"><b>${esc(r.latest_usage||'-')}</b></td><td>${action}</td></tr>`}).join(''):`<tr><td colspan="10" class="empty">${state.filter==='unverified'?'KOSHA 미확인 물질이 없습니다.':'표시할 특수건강진단 대상 유해인자가 없습니다.'}</td></tr>`;
     $$('[data-manual]').forEach(b=>b.addEventListener('click',()=>openManual(Number(b.dataset.manual))));
   }
   
@@ -40,24 +40,101 @@
     $('#cycleFilter').innerHTML='<option value="">전체</option>'+vals('exam_cycle_months').map(v=>`<option value="${v}">${v}개월</option>`).join('')}
   
   async function load(){const sb=client();
-    if(!sb){$('#standardsBody').innerHTML='<tr><td colspan="9" class="empty">포털 Supabase 연결을 찾을 수 없습니다.</td></tr>';return}try{const {data:standards,error}=await sb.from('qa_special_health_exam_standards').select('*').order('chemical_id');
+    if(!sb){$('#standardsBody').innerHTML='<tr><td colspan="10" class="empty">포털 Supabase 연결을 찾을 수 없습니다.</td></tr>';return}try{const {data:standards,error}=await sb.from('qa_special_health_exam_standards').select('*').order('chemical_id');
     if(error)throw error;
     const ids=[...new Set((standards||[]).map(x=>x.chemical_id))];
     let chemicals=[];
     if(ids.length){const q=await sb.from('qa_chemical_master').select('id,cas_no,chem_name_ko,chem_name_en,ke_no').in('id',ids);
     if(q.error)throw q.error;chemicals=q.data||[]}const cm=new Map(chemicals.map(x=>[x.id,x]));
     let productsByCas=new Map();
-    try {const cas=chemicals.map(x=>x.cas_no).filter(Boolean);
-    if(cas.length){const pc=await sb.from('product_cas').select('*').in('cas_no',cas);
-    if(!pc.error&&pc.data?.length){const pids=[...new Set(pc.data.map(x=>x.product_id).filter(Boolean))];
-    let pm=[];
-    if(pids.length){const pq=await sb.from('product_master').select('*').in('id',pids);
-    if(!pq.error)pm=pq.data||[]}const pmap=new Map(pm.map(p=>[p.id,p]));pc.data.forEach(link=>{const p=pmap.get(link.product_id);
-    if(!p)return;
-    const arr=productsByCas.get(link.cas_no)||[];arr.push({name:p.product_name||p.name||p.chem_name||p.item_name||`제품 #${p.id}`,manufacturer:p.manufacturer||p.maker||'',code:p.product_code||p.code||''});productsByCas.set(link.cas_no,arr)})}}}
-    catch (e){console.warn('제품 연결 조회 생략',e)}
-      state.rows=(standards||[]).map(s=>{const c=cm.get(s.chemical_id)||{};
-    return {...s,cas_no:c.cas_no||'',name_ko:c.chem_name_ko||'',name_en:c.chem_name_en||'',products:productsByCas.get(c.cas_no)||[],latest_receipt:null}});
+    let productIdsByCas=new Map();
+    let latestReceiptByProduct=new Map();
+    let latestUsageByProduct=new Map();
+
+    try {
+      const cas=chemicals.map(x=>x.cas_no).filter(Boolean);
+      if(cas.length){
+        const pc=await sb.from('product_cas').select('*').in('cas_no',cas);
+        if(!pc.error&&pc.data?.length){
+          const pids=[...new Set(pc.data.map(x=>x.product_id).filter(Boolean))];
+          let pm=[];
+
+          if(pids.length){
+            const pq=await sb.from('product_master').select('*').in('id',pids);
+            if(!pq.error)pm=pq.data||[];
+
+            const rq=await sb.from('reagent_collect_items')
+              .select('product_id,receipt_date')
+              .in('product_id',pids)
+              .not('receipt_date','is',null);
+
+            if(!rq.error){
+              (rq.data||[]).forEach(x=>{
+                const prev=latestReceiptByProduct.get(x.product_id);
+                if(!prev||String(x.receipt_date)>String(prev)){
+                  latestReceiptByProduct.set(x.product_id,x.receipt_date);
+                }
+              });
+            } else {
+              console.warn('최근입고일 조회 생략',rq.error);
+            }
+
+            const uq=await sb.from('qa_reagent_usage_records')
+              .select('product_id,usage_date')
+              .in('product_id',pids)
+              .not('usage_date','is',null);
+
+            if(!uq.error){
+              (uq.data||[]).forEach(x=>{
+                const prev=latestUsageByProduct.get(x.product_id);
+                if(!prev||String(x.usage_date)>String(prev)){
+                  latestUsageByProduct.set(x.product_id,x.usage_date);
+                }
+              });
+            } else {
+              console.warn('최근사용일 조회 생략',uq.error);
+            }
+          }
+
+          const pmap=new Map(pm.map(p=>[p.id,p]));
+          pc.data.forEach(link=>{
+            const p=pmap.get(link.product_id);
+            if(!p)return;
+
+            const arr=productsByCas.get(link.cas_no)||[];
+            arr.push({
+              id:p.id,
+              name:p.product_name||p.name||p.chem_name||p.item_name||`제품 #${p.id}`,
+              manufacturer:p.manufacturer||p.maker||'',
+              code:p.product_code||p.code||''
+            });
+            productsByCas.set(link.cas_no,arr);
+
+            const ids=productIdsByCas.get(link.cas_no)||[];
+            if(!ids.includes(p.id))ids.push(p.id);
+            productIdsByCas.set(link.cas_no,ids);
+          });
+        }
+      }
+    }
+    catch (e){console.warn('제품/입고/사용 연결 조회 생략',e)}
+
+    state.rows=(standards||[]).map(s=>{
+      const c=cm.get(s.chemical_id)||{};
+      const pids=productIdsByCas.get(c.cas_no)||[];
+      const receiptDates=pids.map(id=>latestReceiptByProduct.get(id)).filter(Boolean).sort();
+      const usageDates=pids.map(id=>latestUsageByProduct.get(id)).filter(Boolean).sort();
+
+      return {
+        ...s,
+        cas_no:c.cas_no||'',
+        name_ko:c.chem_name_ko||'',
+        name_en:c.chem_name_en||'',
+        products:productsByCas.get(c.cas_no)||[],
+        latest_receipt:receiptDates.at(-1)||null,
+        latest_usage:usageDates.at(-1)||null
+      };
+    });
       const targets=state.rows.filter(r=>r.is_target===true&&r.verification_status!=='kosha_not_found');
     const unv=state.rows.filter(r=>r.verification_status==='kosha_not_found');
     $('#hazardCount').textContent=targets.length+'종';
@@ -67,7 +144,7 @@
     $('#apiChecked').textContent=fmtDate(checked);fillFilters();render();
     }
     catch (e){console.error(e);
-    $('#standardsBody').innerHTML=`<tr><td colspan="9" class="empty">기준정보 조회 실패: ${esc(e.message||e)}</td></tr>`;toast('기준정보를 불러오지 못했습니다.',true)}}
+    $('#standardsBody').innerHTML=`<tr><td colspan="10" class="empty">기준정보 조회 실패: ${esc(e.message||e)}</td></tr>`;toast('기준정보를 불러오지 못했습니다.',true)}}
 
   // 검색 / 필터 이벤트
   ['searchInput','sourceFilter','firstExamFilter','cycleFilter'].forEach(id=>$('#'+id).addEventListener(id==='searchInput'?'input':'change',render));
