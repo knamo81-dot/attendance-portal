@@ -786,3 +786,10 @@ tbody tr:last-child td {
   #hazardPickerModal .hazard-picker-card{width:98vw}
   #hazardPickerModal .hazard-picker-search input{min-width:0}
 }
+
+/* 2026-09-26 상세입력 저장버튼/알림 레이어 수정 */
+#healthDrawer .drawer-actions{position:relative;z-index:5;pointer-events:auto}
+#healthDrawer #drawerSave{position:relative;z-index:6;pointer-events:auto!important;cursor:pointer!important;min-width:72px}
+#healthDrawer #drawerSave:disabled{cursor:wait!important;opacity:.7}
+#healthDrawer input,#healthDrawer select,#healthDrawer textarea,#healthDrawer button{pointer-events:auto}
+.toast{z-index:220!important;pointer-events:none}
