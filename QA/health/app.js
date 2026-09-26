@@ -20,8 +20,7 @@
   
   // 요약 카드 필터
   $$('.stat-card[data-filter]').forEach(b=>b.classList.toggle('active',b.dataset.filter===filter));
-    $('#listTitle').textContent=filter==='unverified'?'KOSHA 미확인 물질':'특수건강진단 대상 유해인자';
-    $('#listDesc').textContent=filter==='unverified'?'KOSHA API에서 확인되지 않은 CAS입니다. 수기 확인 후 기준정보로 관리할 수 있습니다.':'KOSHA 또는 수기로 확인된 대상 기준정보를 표시합니다.';render();}
+    render();}
   $$('.stat-card[data-filter]').forEach(b=>b.addEventListener('click',()=>setFilter(b.dataset.filter)));
   
   function rowProducts(r){return r.products||[]}
