@@ -521,6 +521,12 @@
       $('specialUsageBadge').textContent = visible ? `특별관리물질 ${materials.length}종` : '특별관리물질';
     }
 
+    if ($('specialMaterialNames')) {
+      $('specialMaterialNames').innerHTML = visible
+        ? materials.map((item) => `<span class="special-material-chip">${esc(item.substance_name || '물질명 미등록')}</span>`).join('')
+        : '';
+    }
+
     if (!visible) resetSpecialUsageForm();
   }
 
