@@ -21,18 +21,18 @@
       </p>
      </div>
      <nav aria-label="특수건강진단 기능" class="inner-tabs">
-      <button data-view="status">
+      <button class="active" data-view="status">
        특수건강진단 현황
       </button>
       <button data-view="results">
        검진결과
       </button>
-      <button class="active" data-view="standards">
+      <button data-view="standards">
        기준관리
       </button>
      </nav>
     </header>
-    <div class="view" id="standardsView">
+    <div class="view hidden" id="standardsView">
      <div class="stats">
       <button class="stat-card active" data-filter="target">
        <span>
@@ -172,15 +172,15 @@
       </table>
      </div>
     </div>
-    <div class="view hidden" id="emptyView">
-     <div class="coming">
-      <strong id="emptyTitle">
-      </strong>
-      <p>
-       화면 구조가 준비되어 있습니다. 다음 개발 단계에서 대상자&middot;검진결과 기능을 연결합니다.
-      </p>
-     </div>
+    <div class="view" id="statusView">
+     <div class="health-status-toolbar"><div class="health-filter-group">
+      <label><span>기준연도</span><select id="statusYear"></select></label><label><span>본부</span><select id="statusDivision"><option value="">전체</option></select></label><label><span>팀</span><select id="statusTeam"><option value="">전체</option></select></label><label class="health-search"><span>사원검색</span><input id="statusSearch" placeholder="이름 / 사번 검색"/></label>
+     </div><div class="health-legend"><span class="legend-dot due"></span>검진예정 <span class="legend-dot done"></span>검진완료 <span class="legend-dot overdue"></span>기한초과</div></div>
+     <div class="health-summary"><div><span>검진대상</span><strong id="statusTargetCount">-</strong></div><div><span>올해 검진완료</span><strong id="statusDoneCount">-</strong></div><div><span>검진예정</span><strong id="statusDueCount">-</strong></div><div class="warn"><span>기한초과</span><strong id="statusOverdueCount">-</strong></div></div>
+     <div class="health-calendar-wrap"><table class="health-calendar"><thead><tr><th class="emp-col">연구원</th><th class="next-col">다음 검진기한</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th></tr></thead><tbody id="statusBody"><tr><td colspan="14" class="empty">특수건강진단 현황을 불러오는 중입니다.</td></tr></tbody></table></div>
+     <div class="health-note">※ 특수검진대상 Y · 재직자 중 현재 ‘연구소 부재’ 기간에 해당하지 않는 인원만 표시합니다. 유해인자는 최근 12개월 사용기록을 기준으로 계산합니다.</div>
     </div>
+    <div class="view hidden" id="resultsView"><div class="coming"><strong>검진결과</strong><p>검진이력 등록/조회 화면은 다음 단계에서 연결합니다.</p></div></div>
    </section>
   </main>
   <div aria-modal="true" class="modal hidden" id="manualModal" role="dialog">
@@ -247,6 +247,7 @@
     </div>
    </div>
   </div>
+  <aside class="health-drawer hidden" id="healthDrawer" aria-hidden="true"><div class="health-drawer-head"><div><strong id="drawerName">-</strong><span id="drawerMeta">-</span></div><button class="icon-btn" id="drawerClose">&times;</button></div><div class="health-drawer-body" id="drawerBody"></div></aside><div class="health-drawer-backdrop hidden" id="healthDrawerBackdrop"></div>
   <div class="toast hidden" id="toast">
   </div>
   <script src="app.js">
