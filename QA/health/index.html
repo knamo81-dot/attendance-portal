@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ko">
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width,initial-scale=1" name="viewport"/>
+  <title>
+   특수건강진단
+  </title>
+  <link href="style.css" rel="stylesheet"/>
+ </head>
+ <body>
+  <main class="page">
+   <section class="card">
+    <header class="section-head">
+     <div>
+      <h1>
+       특수건강진단
+      </h1>
+      <p>
+       특수건강진단 대상 유해인자 기준, 검진 대상&middot;일정 및 검진결과를 통합 관리합니다.
+      </p>
+     </div>
+     <nav aria-label="특수건강진단 기능" class="inner-tabs">
+      <button data-view="status">
+       특수건강진단 현황
+      </button>
+      <button data-view="results">
+       검진결과
+      </button>
+      <button class="active" data-view="standards">
+       기준관리
+      </button>
+     </nav>
+    </header>
+    <div class="view" id="standardsView">
+     <div class="stats">
+      <button class="stat-card active" data-filter="target">
+       <span>
+        대상 유해인자
+       </span>
+       <strong id="hazardCount">
+        -
+       </strong>
+       <small>
+        KOSHA/수기 확인 대상
+       </small>
+      </button>
+      <button class="stat-card warning" data-filter="unverified">
+       <span>
+        KOSHA 미확인
+       </span>
+       <strong id="unverifiedCount">
+        -
+       </strong>
+       <small>
+        클릭하여 미확인 목록 확인
+       </small>
+      </button>
+      <div class="stat-card">
+       <span>
+        연결제품
+       </span>
+       <strong id="productCount">
+        -
+       </strong>
+       <small>
+        대상 CAS 연결 제품
+       </small>
+      </div>
+      <div class="stat-card">
+       <span>
+        API 기준정보 최종확인일
+       </span>
+       <strong id="apiChecked">
+        -
+       </strong>
+       <small>
+        KOSHA 최종 조회
+       </small>
+      </div>
+     </div>
+     <div class="list-head">
+      <div>
+       <strong id="listTitle">
+        특수건강진단 대상 유해인자
+       </strong>
+       <span id="listDesc">
+        확인된 대상 기준정보를 표시합니다.
+       </span>
+      </div>
+      <button class="primary" id="refreshBtn">
+       &orarr; API 기준정보 갱신
+      </button>
+     </div>
+     <div class="toolbar">
+      <label class="search">
+       <span>
+        검색
+       </span>
+       <input id="searchInput" placeholder="CAS / 국문명 / 영문명 / 제품명 검색"/>
+      </label>
+      <label>
+       <span>
+        출처
+       </span>
+       <select id="sourceFilter">
+        <option value="">
+         전체
+        </option>
+        <option value="KOSHA">
+         KOSHA
+        </option>
+        <option value="MANUAL">
+         수기
+        </option>
+       </select>
+      </label>
+      <label>
+       <span>
+        최초검진
+       </span>
+       <select id="firstExamFilter">
+        <option value="">
+         전체
+        </option>
+       </select>
+      </label>
+      <label>
+       <span>
+        검진주기
+       </span>
+       <select id="cycleFilter">
+        <option value="">
+         전체
+        </option>
+       </select>
+      </label>
+     </div>
+     <div class="table-wrap">
+      <table>
+       <thead>
+        <tr>
+         <th>
+          CAS No.
+         </th>
+         <th>
+          국문명
+         </th>
+         <th>
+          영문명
+         </th>
+         <th>
+          출처
+         </th>
+         <th>
+          최초검진
+         </th>
+         <th>
+          검진주기
+         </th>
+         <th>
+          보유제품
+         </th>
+         <th>
+          최근입고일
+         </th>
+         <th id="actionHead">
+          관리
+         </th>
+        </tr>
+       </thead>
+       <tbody id="standardsBody">
+        <tr>
+         <td class="empty" colspan="9">
+          기준정보를 불러오는 중입니다.
+         </td>
+        </tr>
+       </tbody>
+      </table>
+     </div>
+    </div>
+    <div class="view hidden" id="emptyView">
+     <div class="coming">
+      <strong id="emptyTitle">
+      </strong>
+      <p>
+       화면 구조가 준비되어 있습니다. 다음 개발 단계에서 대상자&middot;검진결과 기능을 연결합니다.
+      </p>
+     </div>
+    </div>
+   </section>
+  </main>
+  <div aria-modal="true" class="modal hidden" id="manualModal" role="dialog">
+   <div class="modal-card">
+    <div class="modal-head">
+     <div>
+      <h2>
+       미확인 물질 수기확인
+      </h2>
+      <p id="manualChemical">
+       -
+      </p>
+     </div>
+     <button class="icon-btn" id="modalClose">
+      &times;
+     </button>
+    </div>
+    <div class="modal-body">
+     <label>
+      <span>
+       특수건강진단 대상
+      </span>
+      <select id="manualTarget">
+       <option value="true">
+        대상
+       </option>
+       <option value="false">
+        비대상
+       </option>
+      </select>
+     </label>
+     <label>
+      <span>
+       검진주기 (개월)
+      </span>
+      <input id="manualCycle" min="1" placeholder="예: 12" type="number"/>
+     </label>
+     <label>
+      <span>
+       최초검진 (개월)
+      </span>
+      <input id="manualFirst" min="1" placeholder="확인 가능한 경우 입력" type="number"/>
+     </label>
+     <label class="wide">
+      <span>
+       확인 출처/근거
+      </span>
+      <input id="manualSource" placeholder="고시, 법령, 공단자료 등"/>
+     </label>
+     <label class="wide">
+      <span>
+       비고
+      </span>
+      <textarea id="manualNote" placeholder="수기 확인 내용 또는 참고사항" rows="3"></textarea>
+     </label>
+    </div>
+    <div class="modal-foot">
+     <button class="secondary" id="modalCancel">
+      취소
+     </button>
+     <button class="primary" id="manualSave">
+      확인완료
+     </button>
+    </div>
+   </div>
+  </div>
+  <div class="toast hidden" id="toast">
+  </div>
+  <script src="app.js">
+  </script>
+ </body>
+</html>
