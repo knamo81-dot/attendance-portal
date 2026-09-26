@@ -738,3 +738,13 @@ tbody tr:last-child td {
 .health-calendar .employee-cell small { display:block; margin-top:3px; color:#94a3b8; font-size:10px; font-weight:700; }
 .health-calendar .division-cell,
 .health-calendar .team-cell { font-weight:700; color:#334155; vertical-align:middle; }
+
+/* 2026-09-26 특수건강진단 현황 레이아웃 조정 */
+.health-summary{margin-top:0;margin-bottom:10px}
+.health-status-toolbar{margin-bottom:10px}
+.health-calendar .division-col,.health-calendar .division-cell{width:95px;min-width:95px;text-align:center;padding-left:5px;padding-right:5px}
+.health-calendar .team-col,.health-calendar .team-cell{width:105px;min-width:105px;text-align:center;padding-left:5px;padding-right:5px}
+.health-calendar .emp-col{width:95px;min-width:95px;left:auto;text-align:center}
+.health-calendar td.employee-cell{position:static;left:auto;width:95px;min-width:95px;text-align:center;padding-left:5px;padding-right:5px}
+.health-calendar .next-col{width:105px;min-width:105px;text-align:center}
+.health-calendar td:nth-child(4){text-align:center;padding-left:5px;padding-right:5px}
