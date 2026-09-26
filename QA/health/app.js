@@ -205,8 +205,23 @@
   function hasTargetPeriod(emp,year){const r=employeeYearRange(emp,year);return !!r&&!rangeFullyAbsent(r,absenceNotesForYear(emp,year))}
   function isAbsentOn(no,date){return absenceNotes(no).some(n=>{const s=dateOnly(n.start_date),e=dateOnly(n.end_date)||'9999-12-31';return !!s&&s<=date&&date<=e})}
   function currentSubjectState(emp){const ref=today(),lab=labAssignDate(emp),leave=dateOnly(emp.leave_date);if(!lab||lab>ref)return'not_started';if(leave&&leave<ref)return'excluded';if(isAbsentOn(emp.employee_no,ref))return'excluded';return'target'}
-  function monthPeriodState(emp,year,month){const mb=monthBounds(year,month),lab=labAssignDate(emp),leave=dateOnly(emp.leave_date);if(!lab)return{type:'outside',label:'발령일 미등록',reason:'연구소 발령일 미등록'};if(mb.end<lab)return{type:'outside',label:'발령 전',reason:`연구소 발령일 ${lab}`};if(leave&&mb.start>leave)return{type:'outside',label:'퇴사',reason:`퇴사일 ${leave}`};const activeStart=mb.start<lab?lab:mb.start,activeEnd=leave&&leave<mb.end?leave:mb.end;if(activeStart>activeEnd)return{type:'outside',label:'대상외',reason:'연구소 관리기간 외'};const notes=notesOverlapping(emp.employee_no,activeStart,activeEnd);if(notes.length){const labels=[...new Set(notes.map(n=>String(n.issue_type||n.note||'연구소 부재').trim()).filter(Boolean))],reason=labels.length>1?`${labels[0]} 외 ${labels.length-1}건`:(labels[0]||'연구소 부재'),detail=notes.map(n=>`${dateOnly(n.start_date)||'-'} ~ ${dateOnly(n.end_date)||'계속'} · ${n.issue_type||n.note||'연구소 부재'}${n.note&&n.issue_type?` · ${n.note}`:''}`).join('\n');return{type:'excluded',label:'제외',reason,detail}}
-    return null}
+  function monthPeriodState(emp,year,month){
+    const mb=monthBounds(year,month),lab=labAssignDate(emp),leave=dateOnly(emp.leave_date);
+    if(!lab)return{type:'missing',label:'발령일 미등록',reason:'연구소 발령일 미등록',exam_type:null,noteId:null};
+    if(mb.end<lab)return{type:'preassignment',label:'발령 전',reason:`연구소 발령일 ${lab}`,detail:`연구소 발령일 ${lab}`,exam_type:'preplacement',noteId:null};
+    if(leave&&mb.start>leave)return{type:'retired',label:'퇴사',reason:`퇴사일 ${leave}`,detail:`퇴사일 ${leave}`,exam_type:null,noteId:null};
+    const activeStart=mb.start<lab?lab:mb.start,activeEnd=leave&&leave<mb.end?leave:mb.end;
+    if(activeStart>activeEnd)return{type:'outside',label:'대상외',reason:'연구소 관리기간 외',exam_type:null,noteId:null};
+    const notes=notesOverlapping(emp.employee_no,activeStart,activeEnd).sort((a,b)=>String(b.start_date||'').localeCompare(String(a.start_date||'')));
+    if(notes.length){
+      const labels=[...new Set(notes.map(n=>String(n.issue_type||n.note||'연구소 부재').trim()).filter(Boolean))];
+      const reason=labels.length>1?`${labels[0]} 외 ${labels.length-1}건`:(labels[0]||'연구소 부재');
+      const detail=notes.map(n=>`${dateOnly(n.start_date)||'-'} ~ ${dateOnly(n.end_date)||'계속'} · ${n.issue_type||n.note||'연구소 부재'}${n.note&&n.issue_type?` · ${n.note}`:''}`).join('\n');
+      const primary=notes[0]||null;
+      return{type:'excluded',label:reason,reason,detail,exam_type:'return',noteId:primary?.id??null,note:primary};
+    }
+    return{type:'active',label:'',reason:'',exam_type:'special',noteId:null};
+  }
   function latestExam(empNo,chemId){const ids=new Set(state.status.exams.filter(e=>String(e.employee_no)===String(empNo)).map(e=>String(e.id)));return state.status.examHazards.filter(h=>ids.has(String(h.exam_id))&&String(h.chemical_id)===String(chemId)).map(h=>({h,e:state.status.exams.find(e=>String(e.id)===String(h.exam_id))})).filter(x=>x.e?.exam_date).sort((a,b)=>String(b.e.exam_date).localeCompare(String(a.e.exam_date)))[0]||null}
   function dueFor(emp,h){const last=latestExam(emp.employee_no,h.chemical_id);if(last)return{...h,due:addMonths(dateOnly(last.e.exam_date),last.h.exam_cycle_months||h.exam_cycle_months),kind:'cycle',last:dateOnly(last.e.exam_date)};const start=[labAssignDate(emp),h.first_usage].filter(Boolean).sort().at(-1);return{...h,due:addMonths(start,h.first_exam_months),kind:'first',last:null}}
   const empHazards=emp=>state.status.hazards.filter(h=>h.active_usage).map(h=>dueFor(emp,h)).filter(h=>h.due);
@@ -217,7 +232,78 @@
   function visibleEmps(){const year=+$('#statusYear').value,category=$('#statusCategory')?.value||'target',d=$('#statusDivision').value,t=$('#statusTeam').value,q=$('#statusSearch').value.trim().toLowerCase();return state.status.employees.filter(e=>isTrue(e.special_health_exam_target)&&employeeYearRange(e,year)).filter(e=>currentSubjectState(e)===category).filter(e=>(!d||String(e.division_code)===String(d))&&(!t||String(e.team_code)===String(t))&&(!q||`${e.name||''} ${e.employee_no||''}`.toLowerCase().includes(q))).sort((a,b)=>String(a.division_code||'').localeCompare(String(b.division_code||''),'ko',{numeric:true})||String(a.team_code||'').localeCompare(String(b.team_code||''),'ko',{numeric:true})||Number(a.sort_order??9999)-Number(b.sort_order??9999)||String(a.name||'').localeCompare(String(b.name||''),'ko'))}
   function monthExams(empNo,year,month){return state.status.exams.filter(e=>String(e.employee_no)===String(empNo)&&((yearOf(e.exam_date)===year&&monthOf(e.exam_date)===month)||(yearOf(e.reservation_date)===year&&monthOf(e.reservation_date)===month))).sort((a,b)=>String(b.exam_date||b.reservation_date||'').localeCompare(String(a.exam_date||a.reservation_date||'')))}
   function monthExam(empNo,year,month){return monthExams(empNo,year,month)[0]||null}
-  function renderStatus(){if(!state.status.loaded)return;const year=+$('#statusYear').value,category=$('#statusCategory')?.value||'target';state.status.year=year;const rows=visibleEmps(),now=today();let doneP=0,dueN=0,overN=0;$('#statusPrimaryLabel')&&($('#statusPrimaryLabel').textContent=category==='excluded'?'제외인원':'검진대상');$('#statusBody').innerHTML=rows.map(emp=>{const hz=empHazards(emp),ex=state.status.exams.filter(e=>String(e.employee_no)===String(emp.employee_no)&&yearOf(e.exam_date)===year&&e.exam_date);if(ex.length)doneP++;const ev=Array.from({length:12},()=>[]);state.status.exams.filter(e=>String(e.employee_no)===String(emp.employee_no)).forEach(e=>{if(e.exam_date&&yearOf(e.exam_date)===year)ev[monthOf(e.exam_date)-1]?.push({type:'done',exam:e});else if(e.reservation_date&&yearOf(e.reservation_date)===year)ev[monthOf(e.reservation_date)-1]?.push({type:'reserved',exam:e})});hz.forEach(h=>{if(yearOf(h.due)===year){const type=h.due<now?'overdue':'due';ev[monthOf(h.due)-1]?.push({type,h});type==='overdue'?overN++:dueN++}});const next=hz.map(h=>h.due).sort()[0]||null;const months=ev.map((a,i)=>{const m=i+1,period=monthPeriodState(emp,year,m),done=a.filter(x=>x.type==='done'),reserved=a.filter(x=>x.type==='reserved'),over=a.filter(x=>x.type==='overdue'),due=a.filter(x=>x.type==='due'),main=done[0]||reserved[0];if(period?.type==='outside')return`<td class="month-cell outside-period" data-disabled="true" data-emp="${esc(emp.employee_no)}" data-month="${m}" title="${esc(period.reason)}"><span class="period-label">${esc(period.label)}</span></td>`;if(main){const e=main.exam||{},isDone=main.type==='done',date=dateOnly(isDone?e.exam_date:e.reservation_date),md=date?date.slice(5).replace('-','.'):'-',inst=(e.exam_institution||'').trim(),result=isDone?(e.result_summary==='normal'?'정상':e.result_summary==='abnormal'?'이상소견':''):'';const second=[inst,result].filter(Boolean).join(' · ')||'-',extra=(done.length+reserved.length)-1,excluded=period?.type==='excluded';return`<td class="month-cell ${excluded?'exclusion-month':''}" data-emp="${esc(emp.employee_no)}" data-month="${m}" ${excluded?`title="${esc(period.detail||period.reason)}"`:''}><div class="month-event ${isDone?'done':'reserved'}"><div class="month-event-top"><span class="month-state">${isDone?'완료':'예약'}</span><b>${esc(md)}</b>${extra>0?`<em>+${extra}</em>`:''}</div><div class="month-event-sub ${result==='이상소견'?'abnormal':''}" title="${esc(second)}">${esc(second)}</div></div>${excluded?`<div class="exclusion-inline"><b>제외</b> ${esc(period.reason)}</div>`:''}</td>`}if(period?.type==='excluded')return`<td class="month-cell exclusion-month" data-disabled="true" data-emp="${esc(emp.employee_no)}" data-month="${m}" title="${esc(period.detail||period.reason)}"><div class="exclusion-card"><b>제외</b><span>${esc(period.reason)}</span></div></td>`;if(!a.length)return`<td class="month-cell" data-emp="${esc(emp.employee_no)}" data-month="${m}"></td>`;const type=over.length?'overdue':'due',label=over.length?`초과 ${over.length}`:`예정 ${due.length}`;return`<td class="month-cell" data-emp="${esc(emp.employee_no)}" data-month="${m}"><span class="month-chip ${type}">${label}</span></td>`}).join('');return`<tr><td class="division-cell">${esc(divisionName(emp.division_code))}</td><td class="team-cell">${esc(teamName(emp.team_code))}</td><td class="employee-cell"><strong>${esc(emp.name||'-')}</strong><small>${esc(emp.employee_no)}</small></td><td><span class="next-date ${next&&next<now?'overdue':''}">${esc(next||'-')}</span></td>${months}</tr>`}).join('')||`<tr><td colspan="16" class="empty">${category==='excluded'?'현재 기준 제외 상태이면서 선택한 연도에 관리기간이 있는 직원이 없습니다.':'현재 기준 대상 상태이면서 선택한 연도에 관리기간이 있는 직원이 없습니다.'}</td></tr>`;$('#statusTargetCount').textContent=rows.length+'명';$('#statusDoneCount').textContent=doneP+'명';$('#statusDueCount').textContent=dueN+'건';$('#statusOverdueCount').textContent=overN+'건';bindMonthCellClicks()}
+  function normalizedExamType(e){return String(e?.exam_type||'special')}
+  function examSortValue(e){return String(e?.exam_date||e?.reservation_date||e?.created_at||'')}
+  function examNoteFor(e){return state.status.notes.find(n=>String(n.id)===String(e?.special_note_id))||null}
+  function periodLabelForExam(e,period){
+    const type=normalizedExamType(e);
+    if(type==='preplacement')return '발령 전';
+    if(type==='return')return String(examNoteFor(e)?.issue_type||period?.label||'복귀 전').trim()||'복귀 전';
+    return period?.type==='excluded'?period.label:'';
+  }
+  function displayMonthExams(empNo,year,month){return monthExams(empNo,year,month)}
+  function drawerExamFor(emp,year,month,examType,noteId){
+    const empExams=state.status.exams.filter(e=>String(e.employee_no)===String(emp.employee_no)&&normalizedExamType(e)===examType);
+    if(examType==='return'&&noteId){
+      const linked=empExams.filter(e=>String(e.special_note_id||'')===String(noteId));
+      if(linked.length)return linked.sort((a,b)=>examSortValue(b).localeCompare(examSortValue(a)))[0];
+    }
+    const inMonth=empExams.filter(e=>(yearOf(e.exam_date)===year&&monthOf(e.exam_date)===month)||(yearOf(e.reservation_date)===year&&monthOf(e.reservation_date)===month));
+    if(inMonth.length)return inMonth.sort((a,b)=>examSortValue(b).localeCompare(examSortValue(a)))[0];
+    if(examType==='preplacement'){
+      const lab=labAssignDate(emp);
+      const candidates=empExams.filter(e=>{const d=dateOnly(e.exam_date)||dateOnly(e.reservation_date);return d&&(!lab||d<=lab)}).sort((a,b)=>examSortValue(b).localeCompare(examSortValue(a)));
+      return candidates[0]||null;
+    }
+    return null;
+  }
+  function renderStatus(){
+    if(!state.status.loaded)return;
+    const year=+$('#statusYear').value,category=$('#statusCategory')?.value||'target';
+    state.status.year=year;
+    const rows=visibleEmps(),now=today();
+    let doneP=0,dueN=0,overN=0;
+    $('#statusPrimaryLabel')&&($('#statusPrimaryLabel').textContent=category==='excluded'?'제외인원':'검진대상');
+    $('#statusBody').innerHTML=rows.map(emp=>{
+      const hz=empHazards(emp),ex=state.status.exams.filter(e=>String(e.employee_no)===String(emp.employee_no)&&yearOf(e.exam_date)===year&&e.exam_date);
+      if(ex.length)doneP++;
+      const ev=Array.from({length:12},()=>[]);
+      hz.forEach(h=>{if(yearOf(h.due)===year){const type=h.due<now?'overdue':'due';ev[monthOf(h.due)-1]?.push({type,h});type==='overdue'?overN++:dueN++}});
+      const next=hz.map(h=>h.due).sort()[0]||null;
+      const months=ev.map((a,i)=>{
+        const m=i+1,period=monthPeriodState(emp,year,m),monthRows=displayMonthExams(emp.employee_no,year,m);
+        const doneRows=monthRows.filter(e=>e.exam_date&&yearOf(e.exam_date)===year&&monthOf(e.exam_date)===m);
+        const reservedRows=monthRows.filter(e=>!e.exam_date&&e.reservation_date&&yearOf(e.reservation_date)===year&&monthOf(e.reservation_date)===m);
+        const exam=doneRows[0]||reservedRows[0]||null;
+        const over=a.filter(x=>x.type==='overdue'),due=a.filter(x=>x.type==='due');
+        const examType=exam?normalizedExamType(exam):(period?.exam_type||'special');
+        const examNoteId=examType==='return'?(exam?.special_note_id??period?.noteId??''):'';
+        const periodLabel=exam?periodLabelForExam(exam,period):(period?.label||'');
+        const shadedPre=period?.type==='preassignment';
+        const shadedLeave=period?.type==='excluded';
+        const disabled=['retired','missing','outside'].includes(period?.type);
+        const classes=['month-cell'];
+        if(shadedPre)classes.push('outside-period','preassignment-month','period-entry');
+        if(shadedLeave)classes.push('exclusion-month','period-entry');
+        if(disabled)classes.push('outside-period');
+        const attrs=`data-emp="${esc(emp.employee_no)}" data-month="${m}" ${disabled?'data-disabled="true"':`data-entry-mode="${esc(examType)}"`}${examNoteId!==''?` data-note-id="${esc(examNoteId)}"`:''}`;
+        const title=period?.detail||period?.reason||'';
+        if(exam){
+          const isDone=!!exam.exam_date,date=dateOnly(isDone?exam.exam_date:exam.reservation_date),md=date?date.slice(5).replace('-','.'):'-',inst=(exam.exam_institution||'').trim(),result=isDone?(exam.result_summary==='normal'?'정상':exam.result_summary==='abnormal'?'이상소견':''):'';
+          const second=[inst,result].filter(Boolean).join(' · ')||'-',extra=monthRows.length-1;
+          const contextBadge=(examType==='preplacement'||examType==='return'||shadedPre||shadedLeave)&&periodLabel?`<span class="period-state ${examType==='preplacement'?'preplacement':'return'}">${esc(periodLabel)}</span>`:'';
+          return`<td class="${classes.join(' ')}" ${attrs} ${title?`title="${esc(title)}"`:''}><div class="month-event ${isDone?'done':'reserved'} ${contextBadge?'with-period':''}"><div class="month-context-line">${contextBadge}</div><div class="month-event-top"><span class="month-state">${isDone?'완료':'예약'}</span><b>${esc(md)}</b>${extra>0?`<em>+${extra}</em>`:''}</div><div class="month-event-sub ${result==='이상소견'?'abnormal':''}" title="${esc(second)}">${esc(second)}</div></div></td>`;
+        }
+        if(disabled)return`<td class="${classes.join(' ')}" ${attrs} title="${esc(title)}"><span class="period-label">${esc(periodLabel)}</span></td>`;
+        if(shadedPre||shadedLeave)return`<td class="${classes.join(' ')}" ${attrs} title="${esc(title)}"><div class="period-only-card ${shadedPre?'preplacement':'return'}"><b>${esc(periodLabel)}</b><span>${shadedPre?'발령 전 검진 입력':'복귀 전 검진 입력'}</span></div></td>`;
+        if(!a.length)return`<td class="month-cell" data-entry-mode="special" data-emp="${esc(emp.employee_no)}" data-month="${m}"></td>`;
+        const type=over.length?'overdue':'due',label=over.length?`초과 ${over.length}`:`예정 ${due.length}`;
+        return`<td class="month-cell" data-entry-mode="special" data-emp="${esc(emp.employee_no)}" data-month="${m}"><span class="month-chip ${type}">${label}</span></td>`;
+      }).join('');
+      return`<tr><td class="division-cell">${esc(divisionName(emp.division_code))}</td><td class="team-cell">${esc(teamName(emp.team_code))}</td><td class="employee-cell"><strong>${esc(emp.name||'-')}</strong><small>${esc(emp.employee_no)}</small></td><td><span class="next-date ${next&&next<now?'overdue':''}">${esc(next||'-')}</span></td>${months}</tr>`;
+    }).join('')||`<tr><td colspan="16" class="empty">${category==='excluded'?'현재 기준 제외 상태이면서 선택한 연도에 관리기간이 있는 직원이 없습니다.':'현재 기준 대상 상태이면서 선택한 연도에 관리기간이 있는 직원이 없습니다.'}</td></tr>`;
+    $('#statusTargetCount').textContent=rows.length+'명';$('#statusDoneCount').textContent=doneP+'명';$('#statusDueCount').textContent=dueN+'건';$('#statusOverdueCount').textContent=overN+'건';bindMonthCellClicks();
+  }
 
   function showLabAssignWarning(){if(state.status.labWarningShown)return;const now=today(),missing=state.status.employees.filter(e=>isTrue(e.special_health_exam_target)).filter(e=>{const leave=dateOnly(e.leave_date);return(!leave||leave>=now)&&e.status!=='퇴사'&&!labAssignDate(e)}).sort((a,b)=>String(a.division_code||'').localeCompare(String(b.division_code||''),'ko',{numeric:true})||String(a.team_code||'').localeCompare(String(b.team_code||''),'ko',{numeric:true})||Number(a.sort_order??9999)-Number(b.sort_order??9999));if(!missing.length)return;state.status.labWarningShown=true;const body=$('#labAssignWarningList');if(body)body.innerHTML=missing.map(e=>`<div class="lab-warning-row"><b>${esc(e.name||'-')}</b><span>${esc(e.employee_no||'-')} · ${esc(divisionName(e.division_code))} / ${esc(teamName(e.team_code))}</span></div>`).join('');$('#labAssignWarningCount')&&($('#labAssignWarningCount').textContent=`${missing.length}명`);$('#labAssignWarningModal')?.classList.remove('hidden')}
 
@@ -226,7 +312,21 @@
   function addMonthSelection(cell){const month=Number(cell?.dataset?.month||0),emp=String(cell?.dataset?.emp||'');if(!month||!emp||month!==monthDrag.month)return;if(monthDrag.empNos.has(emp))return;monthDrag.empNos.add(emp);cell.classList.add('bulk-selected')}
   function startMonthDrag(cell,e){if(e.button!==0)return;e.preventDefault();e.stopPropagation();clearMonthSelection();monthDrag.active=true;monthDrag.month=Number(cell.dataset.month);addMonthSelection(cell)}
   function finishMonthDrag(){if(!monthDrag.active)return;monthDrag.active=false;const empNos=[...monthDrag.empNos],month=monthDrag.month;if(!empNos.length||!month)return;if(empNos.length===1)openDrawer(empNos[0],month);else openBulkDrawer(empNos,month)}
-  function bindMonthCellClicks(){$$('#statusBody .month-cell').forEach(cell=>{if(cell.dataset.disabled==='true'){cell.onmousedown=null;cell.onmouseenter=null;cell.onclick=e=>{e.preventDefault();e.stopPropagation()};return}cell.onmousedown=e=>startMonthDrag(cell,e);cell.onmouseenter=()=>{if(monthDrag.active)addMonthSelection(cell)};cell.onclick=e=>{e.preventDefault();e.stopPropagation()}})}
+  function bindMonthCellClicks(){$$('#statusBody .month-cell').forEach(cell=>{
+    if(cell.dataset.disabled==='true'){
+      cell.onmousedown=null;cell.onmouseenter=null;cell.onclick=e=>{e.preventDefault();e.stopPropagation()};return;
+    }
+    const mode=String(cell.dataset.entryMode||'special');
+    if(mode==='preplacement'||mode==='return'){
+      cell.onmousedown=e=>{if(e.button!==0)return;e.preventDefault();e.stopPropagation();monthDrag.active=false;clearMonthSelection()};
+      cell.onmouseenter=null;
+      cell.onclick=e=>{e.preventDefault();e.stopPropagation();openDrawer(cell.dataset.emp,Number(cell.dataset.month),mode,cell.dataset.noteId||null)};
+      return;
+    }
+    cell.onmousedown=e=>startMonthDrag(cell,e);
+    cell.onmouseenter=()=>{if(monthDrag.active)addMonthSelection(cell)};
+    cell.onclick=e=>{e.preventDefault();e.stopPropagation()};
+  })}
   document.addEventListener('mouseup',finishMonthDrag);
 
   let drawerCtx=null;
@@ -235,13 +335,28 @@
   function bindHazardRemove(){$$('#drawerSelectedHazards .remove-hazard').forEach(b=>b.onclick=()=>b.closest('.selected-hazard')?.remove())}
   function drawerActionsHtml(isBulk=false,hasData=true){return`<div class="drawer-actions"><button class="delete" id="drawerDelete" type="button" ${hasData?'':'disabled'}>${isBulk?'일괄삭제':'삭제'}</button><button class="save" id="drawerSave" type="button">${isBulk?'일괄저장':'저장'}</button></div>`}
 
-  function openDrawer(no,m){const emp=state.status.employees.find(e=>String(e.employee_no)===String(no)),year=state.status.year;if(!emp)return;const hz=empHazards(emp),due=hz.filter(h=>yearOf(h.due)===year&&monthOf(h.due)===m),exam=monthExam(no,year,m);drawerCtx={mode:'single',emp,year,month:m,examId:exam?.id||null};$('#drawerName').textContent=`${emp.name||'-'} · ${year}년 ${m}월`;$('#drawerMeta').textContent=`${emp.employee_no} · ${divisionName(emp.division_code)} / ${teamName(emp.team_code)} · 연구소 발령일 ${labAssignDate(emp)||'-'}`;
+  function openDrawer(no,m,forcedType=null,forcedNoteId=null){
+    const emp=state.status.employees.find(e=>String(e.employee_no)===String(no)),year=state.status.year;if(!emp)return;
+    const period=monthPeriodState(emp,year,m),examType=forcedType||period?.exam_type||'special';
+    if(!['special','preplacement','return'].includes(examType))return;
+    const noteId=examType==='return'?(forcedNoteId||period?.noteId||null):null;
+    const hz=empHazards(emp),due=examType==='special'?hz.filter(h=>yearOf(h.due)===year&&monthOf(h.due)===m):[];
+    const exam=drawerExamFor(emp,year,m,examType,noteId);
     const linked=exam?state.status.examHazards.filter(x=>String(x.exam_id)===String(exam.id)).map(x=>{const h=state.status.hazards.find(z=>String(z.chemical_id)===String(x.chemical_id));return h?{...h,source_type:x.source_type||'auto'}:null}).filter(Boolean):[];
     const initial=linked.length?linked:due.map(h=>({...h,source_type:'auto'}));
-    $('#drawerBody').innerHTML=`<section class="drawer-section"><h3>검진정보</h3><div class="drawer-form"><label><span>특수검진 예약일자</span><input id="drawerReservationDate" type="date" value="${esc(dateOnly(exam?.reservation_date)||'')}"></label><label><span>실제 검진일자</span><input id="drawerExamDate" type="date" value="${esc(dateOnly(exam?.exam_date)||'')}"></label><label class="wide"><span>검진기관</span><input id="drawerInstitution" value="${esc(exam?.exam_institution||'')}" placeholder="검진기관 입력"></label></div></section>
+    const note=examType==='return'?(state.status.notes.find(n=>String(n.id)===String(exam?.special_note_id||noteId))||period?.note||null):null;
+    const contextLabel=examType==='preplacement'?'발령 전 검진':examType==='return'?'복귀 전 검진':'특수건강진단';
+    const contextDetail=examType==='preplacement'?`연구소 발령일 ${labAssignDate(emp)||'-'}`:examType==='return'?`${note?.issue_type||period?.label||'연구소 부재'} · ${dateOnly(note?.start_date)||'-'} ~ ${dateOnly(note?.end_date)||'계속'}`:`연구소 발령일 ${labAssignDate(emp)||'-'}`;
+    drawerCtx={mode:'single',emp,year,month:m,examId:exam?.id||null,examType,noteId:note?.id??noteId??null,period};
+    $('#drawerName').textContent=`${emp.name||'-'} · ${year}년 ${m}월`;
+    $('#drawerMeta').textContent=`${emp.employee_no} · ${divisionName(emp.division_code)} / ${teamName(emp.team_code)} · ${contextLabel}`;
+    const bannerClass=examType==='preplacement'?'preplacement':examType==='return'?'return':'special';
+    $('#drawerBody').innerHTML=`<div class="exam-context-banner ${bannerClass}"><b>${esc(contextLabel)}</b><span>${esc(contextDetail)}</span></div>
+    <section class="drawer-section"><h3>검진정보</h3><div class="drawer-form"><label><span>${esc(contextLabel)} 예약일자</span><input id="drawerReservationDate" type="date" value="${esc(dateOnly(exam?.reservation_date)||'')}"></label><label><span>실제 검진일자</span><input id="drawerExamDate" type="date" value="${esc(dateOnly(exam?.exam_date)||'')}"></label><label class="wide"><span>검진기관</span><input id="drawerInstitution" value="${esc(exam?.exam_institution||'')}" placeholder="검진기관 입력"></label></div></section>
     <section class="drawer-section"><div class="drawer-section-head"><h3>검진대상 유해인자</h3><button class="add-hazard-btn" id="addHazardBtn" type="button">+ 유해인자 추가</button></div><div id="drawerSelectedHazards">${initial.length?initial.map(h=>selectedHazardHtml(h,h.source_type)).join(''):'<div class="drawer-empty">등록된 유해인자가 없습니다.</div>'}</div></section>
     <section class="drawer-section"><h3>검진결과</h3><div class="drawer-form"><label><span>결과 요약</span><select id="drawerResult"><option value="">미입력</option><option value="normal" ${exam?.result_summary==='normal'?'selected':''}>정상</option><option value="abnormal" ${exam?.result_summary==='abnormal'?'selected':''}>이상소견</option></select></label><label class="wide"><span>비고</span><textarea id="drawerNote" placeholder="필요한 참고사항 입력">${esc(exam?.note||'')}</textarea></label></div><div class="result-help">정상/이상소견은 포털 내부 현황용 요약값이며 원본 검진결과를 대체하지 않습니다.</div>${drawerActionsHtml(false,!!exam)}</section>`;
-    bindHazardRemove();$('#addHazardBtn').onclick=openHazardPicker;$('#drawerSave').onclick=saveDrawer;$('#drawerDelete').onclick=deleteDrawer;$('#healthDrawer').classList.remove('hidden');$('#healthDrawerBackdrop').classList.remove('hidden')}
+    bindHazardRemove();$('#addHazardBtn').onclick=openHazardPicker;$('#drawerSave').onclick=saveDrawer;$('#drawerDelete').onclick=deleteDrawer;$('#healthDrawer').classList.remove('hidden');$('#healthDrawerBackdrop').classList.remove('hidden');
+  }
 
   function openBulkDrawer(empNos,m){const year=state.status.year,emps=empNos.map(no=>state.status.employees.find(e=>String(e.employee_no)===String(no))).filter(Boolean);if(emps.length<2){if(emps[0])openDrawer(emps[0].employee_no,m);return}const existing=emps.filter(e=>monthExams(e.employee_no,year,m).length).length;drawerCtx={mode:'bulk',emps,empNos:emps.map(e=>String(e.employee_no)),year,month:m,dirty:new Set()};const names=emps.slice(0,4).map(e=>e.name||e.employee_no).join(', ')+(emps.length>4?` 외 ${emps.length-4}명`:'');$('#drawerName').textContent=`${emps.length}명 선택 · ${year}년 ${m}월 일괄입력`;$('#drawerMeta').textContent=`${names} · 기존 입력 ${existing}명`;
     $('#drawerBody').innerHTML=`<div class="bulk-guide"><strong>변경한 항목만 선택 인원 전체에 적용합니다.</strong><span>빈칸은 기존 값을 유지합니다. 이미 입력된 값도 새 값을 입력하면 덮어씁니다.</span></div>
@@ -256,13 +371,44 @@
   function closeHazardPicker(){$('#hazardPickerModal').classList.add('hidden')}
   function addPickedHazards(){const ids=$$('[data-pick-hazard]:checked').map(x=>String(x.dataset.pickHazard));if(!ids.length)return toast('추가할 유해인자를 선택해 주세요.',true);const box=$('#drawerSelectedHazards');box.querySelector('.drawer-empty')?.remove();ids.forEach(id=>{const h=state.status.hazards.find(x=>String(x.chemical_id)===id);if(h&&!box.querySelector(`[data-chemical-id="${CSS.escape(id)}"]`))box.insertAdjacentHTML('beforeend',selectedHazardHtml(h,'manual'))});bindHazardRemove();closeHazardPicker()}
 
-  async function saveSingleDrawer(){if(!drawerCtx||drawerCtx.mode!=='single')return;const sb=client(),cid=companyId(),ctx=drawerCtx,reservation=$('#drawerReservationDate').value||null,examDate=$('#drawerExamDate').value||null,institution=$('#drawerInstitution').value.trim()||null,result=$('#drawerResult').value||null,note=$('#drawerNote').value.trim()||null;if(!reservation&&!examDate)return toast('예약일자 또는 실제 검진일자를 입력해 주세요.',true);const btn=$('#drawerSave');btn.disabled=true;const originalText=btn.textContent;btn.textContent='저장 중…';try{let examId=ctx.examId;const payload={company_id:cid||null,employee_no:String(ctx.emp.employee_no),exam_type:'special',reservation_date:reservation,exam_date:examDate,exam_institution:institution,result_summary:result,note};let r;if(examId)r=await sb.from('qa_special_health_exams').update(payload).eq('id',examId).select('id').single();else r=await sb.from('qa_special_health_exams').insert(payload).select('id').single();if(r.error)throw r.error;examId=r.data.id;const del=await sb.from('qa_special_health_exam_hazards').delete().eq('exam_id',examId);if(del.error)throw del.error;const hazardRows=$$('#drawerSelectedHazards [data-chemical-id]').map(el=>{const h=state.status.hazards.find(x=>String(x.chemical_id)===String(el.dataset.chemicalId));return{exam_id:examId,chemical_id:Number(el.dataset.chemicalId),first_exam_months:h?.first_exam_months||null,exam_cycle_months:h?.exam_cycle_months||null,source_type:el.dataset.source||'manual'}});if(hazardRows.length){const ins=await sb.from('qa_special_health_exam_hazards').insert(hazardRows);if(ins.error)throw ins.error}toast('특수건강진단 정보가 저장되었습니다.');await loadStatus();openDrawer(ctx.emp.employee_no,ctx.month)}catch(e){console.error(e);const msg=String(e.message||e);toast(msg.includes('exam_date')&&msg.includes('null')?'DB에서 exam_date NOT NULL 해제가 필요합니다.':'저장에 실패했습니다: '+msg,true)}finally{btn.disabled=false;btn.textContent=originalText||'저장'}}
+  async function saveSingleDrawer(){
+    if(!drawerCtx||drawerCtx.mode!=='single')return;
+    const sb=client(),cid=companyId(),ctx=drawerCtx,reservation=$('#drawerReservationDate').value||null,examDate=$('#drawerExamDate').value||null,institution=$('#drawerInstitution').value.trim()||null,result=$('#drawerResult').value||null,note=$('#drawerNote').value.trim()||null;
+    if(!reservation&&!examDate)return toast('예약일자 또는 실제 검진일자를 입력해 주세요.',true);
+    const btn=$('#drawerSave');btn.disabled=true;const originalText=btn.textContent;btn.textContent='저장 중…';
+    try{
+      let examId=ctx.examId;
+      const payload={company_id:cid||null,employee_no:String(ctx.emp.employee_no),exam_type:ctx.examType||'special',special_note_id:(ctx.examType==='return'?(ctx.noteId||null):null),reservation_date:reservation,exam_date:examDate,exam_institution:institution,result_summary:result,note};
+      let r;
+      if(examId)r=await sb.from('qa_special_health_exams').update(payload).eq('id',examId).select('id').single();
+      else r=await sb.from('qa_special_health_exams').insert(payload).select('id').single();
+      if(r.error)throw r.error;examId=r.data.id;
+      const del=await sb.from('qa_special_health_exam_hazards').delete().eq('exam_id',examId);if(del.error)throw del.error;
+      const hazardRows=$$('#drawerSelectedHazards [data-chemical-id]').map(el=>{const h=state.status.hazards.find(x=>String(x.chemical_id)===String(el.dataset.chemicalId));return{exam_id:examId,chemical_id:Number(el.dataset.chemicalId),first_exam_months:h?.first_exam_months||null,exam_cycle_months:h?.exam_cycle_months||null,source_type:el.dataset.source||'manual'}});
+      if(hazardRows.length){const ins=await sb.from('qa_special_health_exam_hazards').insert(hazardRows);if(ins.error)throw ins.error}
+      const label=ctx.examType==='preplacement'?'발령 전 검진':ctx.examType==='return'?'복귀 전 검진':'특수건강진단';toast(`${label} 정보가 저장되었습니다.`);
+      await loadStatus();openDrawer(ctx.emp.employee_no,ctx.month,ctx.examType,ctx.noteId);
+    }catch(e){console.error(e);const msg=String(e.message||e);toast(msg.includes('exam_date')&&msg.includes('null')?'DB에서 exam_date NOT NULL 해제가 필요합니다.':'저장에 실패했습니다: '+msg,true)}
+    finally{btn.disabled=false;btn.textContent=originalText||'저장'}
+  }
 
   function bulkChanges(){const dirty=drawerCtx?.dirty||new Set(),changes={};const values={reservation_date:$('#drawerReservationDate')?.value||'',exam_date:$('#drawerExamDate')?.value||'',exam_institution:$('#drawerInstitution')?.value?.trim()||'',result_summary:$('#drawerResult')?.value||'',note:$('#drawerNote')?.value?.trim()||''};for(const k of dirty){if(values[k]!=='')changes[k]=values[k]}return changes}
   async function saveBulkDrawer(){if(!drawerCtx||drawerCtx.mode!=='bulk')return;const sb=client(),cid=companyId(),ctx=drawerCtx,changes=bulkChanges(),hazardIds=[...selectedHazardIds()];if(!Object.keys(changes).length&&!hazardIds.length)return toast('변경하거나 추가할 내용을 입력해 주세요.',true);const missing=ctx.emps.filter(emp=>!monthExam(emp.employee_no,ctx.year,ctx.month));if(missing.length&&!changes.reservation_date&&!changes.exam_date)return toast(`신규 입력 대상 ${missing.length}명은 예약일자 또는 실제 검진일자를 함께 입력해 주세요.`,true);const btn=$('#drawerSave');btn.disabled=true;const originalText=btn.textContent;btn.textContent='일괄 저장 중…';try{let saved=0;for(const emp of ctx.emps){let exam=monthExam(emp.employee_no,ctx.year,ctx.month),examId=exam?.id||null;if(examId&&Object.keys(changes).length){const up=await sb.from('qa_special_health_exams').update(changes).eq('id',examId).select('id').single();if(up.error)throw up.error;examId=up.data.id}else if(!examId){const payload={company_id:cid||null,employee_no:String(emp.employee_no),exam_type:'special',...changes};const ins=await sb.from('qa_special_health_exams').insert(payload).select('id').single();if(ins.error)throw ins.error;examId=ins.data.id}if(hazardIds.length){const existing=new Set(state.status.examHazards.filter(x=>String(x.exam_id)===String(examId)).map(x=>String(x.chemical_id)));const rows=hazardIds.filter(id=>!existing.has(String(id))).map(id=>{const h=state.status.hazards.find(x=>String(x.chemical_id)===String(id));return{exam_id:examId,chemical_id:Number(id),first_exam_months:h?.first_exam_months||null,exam_cycle_months:h?.exam_cycle_months||null,source_type:'manual'}});if(rows.length){const hi=await sb.from('qa_special_health_exam_hazards').insert(rows);if(hi.error)throw hi.error}}saved++}toast(`${saved}명의 특수건강진단 정보를 일괄 저장했습니다.`);closeDrawer();await loadStatus()}catch(e){console.error(e);toast('일괄 저장에 실패했습니다: '+String(e.message||e),true)}finally{btn.disabled=false;btn.textContent=originalText||'일괄저장'}}
   async function saveDrawer(){if(drawerCtx?.mode==='bulk')return saveBulkDrawer();return saveSingleDrawer()}
 
-  async function deleteDrawer(){if(!drawerCtx)return;const sb=client(),ctx=drawerCtx;let exams=[];if(ctx.mode==='bulk')exams=ctx.emps.flatMap(emp=>monthExams(emp.employee_no,ctx.year,ctx.month));else exams=monthExams(ctx.emp.employee_no,ctx.year,ctx.month);const uniq=[...new Map(exams.map(e=>[String(e.id),e])).values()];if(!uniq.length)return toast('삭제할 검진정보가 없습니다.',true);const label=ctx.mode==='bulk'?`선택한 ${ctx.emps.length}명의 ${ctx.year}년 ${ctx.month}월 검진정보 ${uniq.length}건`:`${ctx.emp.name||ctx.emp.employee_no}의 ${ctx.year}년 ${ctx.month}월 검진정보`;if(!window.confirm(`${label}을(를) 삭제하시겠습니까?\n예약일자, 검진일자, 병원, 결과, 비고, 연결 유해인자가 함께 삭제됩니다.`))return;const btn=$('#drawerDelete');btn.disabled=true;const originalText=btn.textContent;btn.textContent='삭제 중…';try{const ids=uniq.map(e=>e.id);const hd=await sb.from('qa_special_health_exam_hazards').delete().in('exam_id',ids);if(hd.error)throw hd.error;const ed=await sb.from('qa_special_health_exams').delete().in('id',ids);if(ed.error)throw ed.error;toast(ctx.mode==='bulk'?`${uniq.length}건의 검진정보를 일괄 삭제했습니다.`:'검진정보를 삭제했습니다.');closeDrawer();await loadStatus()}catch(e){console.error(e);toast('삭제에 실패했습니다: '+String(e.message||e),true)}finally{btn.disabled=false;btn.textContent=originalText}}
+  async function deleteDrawer(){
+    if(!drawerCtx)return;const sb=client(),ctx=drawerCtx;let exams=[];
+    if(ctx.mode==='bulk')exams=ctx.emps.flatMap(emp=>monthExams(emp.employee_no,ctx.year,ctx.month));
+    else if(ctx.examId){const hit=state.status.exams.find(e=>String(e.id)===String(ctx.examId));if(hit)exams=[hit]}
+    const uniq=[...new Map(exams.map(e=>[String(e.id),e])).values()];
+    if(!uniq.length)return toast('삭제할 검진정보가 없습니다.',true);
+    const typeLabel=ctx.examType==='preplacement'?'발령 전 검진':ctx.examType==='return'?'복귀 전 검진':'검진정보';
+    const label=ctx.mode==='bulk'?`선택한 ${ctx.emps.length}명의 ${ctx.year}년 ${ctx.month}월 검진정보 ${uniq.length}건`:`${ctx.emp.name||ctx.emp.employee_no}의 ${typeLabel}`;
+    if(!window.confirm(`${label}을(를) 삭제하시겠습니까?\n예약일자, 검진일자, 병원, 결과, 비고, 연결 유해인자가 함께 삭제됩니다.`))return;
+    const btn=$('#drawerDelete');btn.disabled=true;const originalText=btn.textContent;btn.textContent='삭제 중…';
+    try{const ids=uniq.map(e=>e.id);const hd=await sb.from('qa_special_health_exam_hazards').delete().in('exam_id',ids);if(hd.error)throw hd.error;const ed=await sb.from('qa_special_health_exams').delete().in('id',ids);if(ed.error)throw ed.error;toast(ctx.mode==='bulk'?`${uniq.length}건의 검진정보를 일괄 삭제했습니다.`:'검진정보를 삭제했습니다.');closeDrawer();await loadStatus()}
+    catch(e){console.error(e);toast('삭제에 실패했습니다: '+String(e.message||e),true)}finally{btn.disabled=false;btn.textContent=originalText}
+  }
 
   async function loadStatus(){const sb=client();if(!sb)return;try{const cid=companyId();let eq=sb.from('employees').select('*');if(cid)eq=eq.eq('company_id',cid);let dq=sb.from('divisions').select('division_code,division_name,company_id,is_active');let tq=sb.from('teams').select('team_code,team_name,division_code,company_id,is_active');if(cid){dq=dq.eq('company_id',cid);tq=tq.eq('company_id',cid)}const [er,pfr,nr,xr,hr,sr,cr,pr,ur,rr,dr,tr]=await Promise.all([eq,sb.from('research_staff_profiles').select('*'),sb.from('employee_special_notes').select('*'),sb.from('qa_special_health_exams').select('*'),sb.from('qa_special_health_exam_hazards').select('*'),sb.from('qa_special_health_exam_standards').select('*'),sb.from('qa_chemical_master').select('id,cas_no,chem_name_ko,chem_name_en'),sb.from('product_cas').select('product_id,cas_no'),sb.from('qa_reagent_usage_records').select('product_id,usage_date'),sb.from('reagent_collect_items').select('product_id,receipt_date'),dq,tq]);for(const r of[er,pfr,nr,xr,hr,sr,cr,pr,ur,dr,tr])if(r.error)throw r.error;if(rr.error)console.warn('최근입고일 조회 생략',rr.error);state.status.employees=er.data||[];const empNos=new Set(state.status.employees.map(e=>String(e.employee_no)));state.status.profiles=(pfr.data||[]).filter(p=>empNos.has(String(p.employee_no))&&(!cid||!p.company_id||String(p.company_id)===cid));state.status.divisions=(dr.data||[]).filter(x=>x.is_active!==false);state.status.teams=(tr.data||[]).filter(x=>x.is_active!==false);state.status.notes=(nr.data||[]).filter(n=>!cid||!n.company_id||String(n.company_id)===cid);state.status.exams=(xr.data||[]).filter(e=>!cid||String(e.company_id)===cid);state.status.examHazards=hr.data||[];const cm=new Map((cr.data||[]).map(c=>[c.id,c])),cp=new Map(),up=new Map(),rp=new Map();(pr.data||[]).forEach(x=>{const a=cp.get(x.cas_no)||[];a.push(x.product_id);cp.set(x.cas_no,a)});(ur.data||[]).forEach(u=>{if(!u.usage_date)return;const a=up.get(u.product_id)||[];a.push(dateOnly(u.usage_date));up.set(u.product_id,a)});(rr.data||[]).forEach(r=>{if(!r.receipt_date)return;const a=rp.get(r.product_id)||[];a.push(dateOnly(r.receipt_date));rp.set(r.product_id,a)});const cut=new Date();cut.setFullYear(cut.getFullYear()-1);const cs=cut.toISOString().slice(0,10);state.status.hazards=(sr.data||[]).filter(s=>s.is_target===true&&s.status!=='inactive'&&s.verification_status!=='kosha_not_found').map(s=>{const c=cm.get(s.chemical_id)||{},pids=cp.get(c.cas_no)||[],dates=pids.flatMap(id=>up.get(id)||[]).sort(),receipts=pids.flatMap(id=>rp.get(id)||[]).sort();return{...s,cas_no:c.cas_no||'',name_ko:c.chem_name_ko||'',name_en:c.chem_name_en||'',first_usage:dates[0]||null,latest_usage:dates.at(-1)||null,latest_receipt:receipts.at(-1)||null,active_usage:dates.some(d=>d>=cs)}});state.status.loaded=true;fillStatusFilters();renderStatus();showLabAssignWarning()}catch(e){console.error(e);$('#statusBody').innerHTML=`<tr><td colspan="16" class="empty">현황 조회 실패: ${esc(e.message||e)}</td></tr>`;toast('특수건강진단 현황을 불러오지 못했습니다.',true)}}
   // 월 셀 클릭 이벤트는 renderStatus() 직후 각 셀에 직접 바인딩한다.
