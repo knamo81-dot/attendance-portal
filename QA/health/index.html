@@ -264,6 +264,26 @@
     <div class="modal-foot"><button class="secondary" id="hazardPickerCancel">취소</button><button class="primary" id="hazardPickerAdd">선택 추가</button></div>
    </div>
   </div>
+  <div class="modal hidden" id="deadlineModal" role="dialog" aria-modal="true" aria-labelledby="deadlineModalTitle">
+   <div class="modal-card deadline-modal-card">
+    <div class="modal-head">
+     <div>
+      <h2 id="deadlineModalTitle">다음 검진기한 산정내역</h2>
+      <p><span id="deadlineModalName">-</span> · <span id="deadlineModalMeta">-</span></p>
+     </div>
+     <button class="icon-btn" id="deadlineModalClose" type="button">&times;</button>
+    </div>
+    <div class="deadline-summary" id="deadlineModalSummary"></div>
+    <div class="deadline-table-wrap">
+     <table class="deadline-table">
+      <thead><tr><th>CAS No.</th><th>유해인자</th><th>구분</th><th>산정 기준일</th><th>기준</th><th>다음 검진기한</th></tr></thead>
+      <tbody id="deadlineModalBody"></tbody>
+     </table>
+    </div>
+    <div class="deadline-help">※ 검진완료 시 해당 검진에 연결된 유해인자는 실제 검진일자를 기준으로 각 유해인자의 검진주기에 따라 다음 기한이 다시 산정됩니다.</div>
+    <div class="modal-foot"><button class="primary" id="deadlineModalOk" type="button">확인</button></div>
+   </div>
+  </div>
   <div class="toast hidden" id="toast">
   </div>
   <script src="app.js">
