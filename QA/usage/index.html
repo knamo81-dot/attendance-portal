@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QA 시약 사용일지</title>
-  <link rel="stylesheet" href="./style.css?v=20260925-ipad6box" />
+  <link rel="stylesheet" href="./style.css?v=20260926-special-usage-input" />
   <link rel="stylesheet" href="../../common/mobile.css" />
   <link rel="stylesheet" href="../../common/theme.css" />
 </head>
@@ -94,6 +94,64 @@
                   </optgroup>
                 </select>
               </label>
+
+              <section id="specialUsagePanel" class="special-usage-panel" hidden>
+                <div class="special-usage-head">
+                  <strong>특별관리물질 추가정보</strong>
+                  <span id="specialUsageBadge" class="special-usage-badge">특별관리물질</span>
+                </div>
+                <p class="special-usage-guide">특별관리물질 기준 CAS가 포함된 제품입니다. 실제 작업내용과 착용 보호구를 입력해 주세요.</p>
+
+                <div class="special-field-block">
+                  <span class="special-field-label">작업내용 <b>*</b></span>
+                  <select id="specialWorkType">
+                    <option value="">선택</option>
+                    <option value="시료 전처리">시료 전처리</option>
+                    <option value="분석/측정">분석/측정</option>
+                    <option value="배양/합성">배양/합성</option>
+                    <option value="희석/조제">희석/조제</option>
+                    <option value="소분/이동">소분/이동</option>
+                    <option value="세척">세척</option>
+                    <option value="폐기">폐기</option>
+                    <option value="기타">기타</option>
+                  </select>
+                  <input id="specialWorkDetail" type="text" maxlength="300" placeholder="필요 시 상세 작업내용 입력" />
+                </div>
+
+                <div class="special-field-block">
+                  <span class="special-field-label">착용 보호구 <b>*</b></span>
+                  <div id="specialPpeGroup" class="ppe-grid">
+                    <label><input type="checkbox" value="lab_coat" /> <span>실험복</span></label>
+                    <label><input type="checkbox" value="protective_gloves" /> <span>보호장갑</span></label>
+                    <label><input type="checkbox" value="safety_glasses" /> <span>보안경</span></label>
+                    <label><input type="checkbox" value="dust_mask" /> <span>방진마스크</span></label>
+                    <label><input type="checkbox" value="gas_mask" /> <span>방독마스크</span></label>
+                    <label><input type="checkbox" value="combined_mask" /> <span>방진·방독 겸용마스크</span></label>
+                    <label><input type="checkbox" value="supplied_air" /> <span>송기마스크 / 공기호흡기</span></label>
+                    <label><input id="specialPpeOtherCheck" type="checkbox" value="other" /> <span>기타</span></label>
+                  </div>
+                  <input id="specialPpeOther" type="text" maxlength="150" placeholder="기타 보호구 입력" hidden />
+                </div>
+
+                <div class="special-field-block">
+                  <span class="special-field-label">사고 발생 <b>*</b></span>
+                  <div class="accident-options">
+                    <label><input id="specialAccidentNo" type="radio" name="specialAccident" value="false" /> <span>없음</span></label>
+                    <label><input id="specialAccidentYes" type="radio" name="specialAccident" value="true" /> <span>있음</span></label>
+                  </div>
+                </div>
+
+                <div id="specialAccidentFields" class="special-accident-fields" hidden>
+                  <label>
+                    <span>피해 내용 <b>*</b></span>
+                    <textarea id="specialDamageDetail" rows="3" maxlength="1000" placeholder="누출·오염·흡입 등 피해 내용을 입력하세요."></textarea>
+                  </label>
+                  <label>
+                    <span>조치 사항 <b>*</b></span>
+                    <textarea id="specialActionDetail" rows="3" maxlength="1000" placeholder="응급조치·세척·보고 등 조치사항을 입력하세요."></textarea>
+                  </label>
+                </div>
+              </section>
             </div>
 
             <div id="inputMessage" class="message" aria-live="polite"></div>
@@ -241,7 +299,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../supabase.js"></script>
-  <script src="./app.js?v=20260925-usage82"></script>
+  <script src="./app.js?v=20260926-special-usage-input"></script>
   <script src="../../common/common.js"></script>
 </body>
 </html>
