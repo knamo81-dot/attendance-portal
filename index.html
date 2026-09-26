@@ -3063,6 +3063,12 @@ body.auth-loading .top-user-bar {
       desc: '특별관리물질 기준정보와 제품 연계 현황을 관리합니다.',
       gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
     },
+    'QA/health/index.html': {
+      top: 'Safety Management',
+      title: 'QA',
+      desc: '특수건강진단 대상 유해인자와 검진 현황·결과를 관리합니다.',
+      gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
+    },
     'travel-expense/index.html': {
       top: 'Expense Management',
       title: '출장비 정산',
@@ -3123,45 +3129,59 @@ body.auth-loading .top-user-bar {
     ],
     'QA/index.html': [
       { id: 'qa-usage', label: '사용일지' },
-      { id: 'qa-sds', label: 'SDS 관리' },
+      { id: 'qa-sds', label: '화학물질 관리' },
       { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' }
+      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/Mobile/sds/index.html': [
       { id: 'qa-usage', label: '사용일지' },
-      { id: 'qa-sds', label: 'SDS 관리' },
+      { id: 'qa-sds', label: '화학물질 관리' },
       { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' }
+      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/usage/index.html': [
       { id: 'qa-usage', label: '사용일지' },
-      { id: 'qa-sds', label: 'SDS 관리' },
+      { id: 'qa-sds', label: '화학물질 관리' },
       { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' }
+      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/Mobile/usage/index.html': [
       { id: 'qa-usage', label: '사용일지' },
-      { id: 'qa-sds', label: 'SDS 관리' },
+      { id: 'qa-sds', label: '화학물질 관리' },
       { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' }
+      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/special-storage/index.html': [
       { id: 'qa-usage', label: '사용일지' },
-      { id: 'qa-sds', label: 'SDS 관리' },
+      { id: 'qa-sds', label: '화학물질 관리' },
       { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' }
+      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/Mobile/special-storage/index.html': [
       { id: 'qa-usage', label: '사용일지' },
-      { id: 'qa-sds', label: 'SDS 관리' },
+      { id: 'qa-sds', label: '화학물질 관리' },
       { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' }
+      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/special/index.html': [
       { id: 'qa-usage', label: '사용일지' },
-      { id: 'qa-sds', label: 'SDS 관리' },
+      { id: 'qa-sds', label: '화학물질 관리' },
       { id: 'qa-storage', label: '특별관리물질 보관' },
-      { id: 'qa-special', label: '특별관리물질 현황' }
+      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-health', label: '특수건강진단' }
+    ],
+    'QA/health/index.html': [
+      { id: 'qa-usage', label: '사용일지' },
+      { id: 'qa-sds', label: '화학물질 관리' },
+      { id: 'qa-storage', label: '특별관리물질 보관' },
+      { id: 'qa-special', label: '특별관리물질 현황' },
+      { id: 'qa-health', label: '특수건강진단' }
     ],
     'travel-expense/index.html': [],
     'aic/index.html': [],
@@ -3457,6 +3477,10 @@ body.auth-loading .top-user-bar {
         replacePortalFrame('QA/special/index.html');
         return;
       }
+      if (tabId === 'qa-health' && currentSrc !== 'QA/health/index.html') {
+        replacePortalFrame('QA/health/index.html');
+        return;
+      }
       return;
     }
     if (currentSrc === 'travel-expense/index.html' && isTravelExpenseAdminTab({ id: tabId, label: tabId })) {
@@ -3494,6 +3518,7 @@ body.auth-loading .top-user-bar {
     if (isQaStorageSrc(key)) activeId = 'qa-storage';
     if (isQaSdsSrc(key)) activeId = 'qa-sds';
     if (key === 'QA/special/index.html') activeId = 'qa-special';
+    if (key === 'QA/health/index.html') activeId = 'qa-health';
     renderPortalSubtabs(tabs, activeId);
     renderPortalFilters([]);
   }
@@ -3668,7 +3693,7 @@ body.auth-loading .top-user-bar {
 
   function isQaProgramSrc(src) {
     const key = normalizePortalSrc(src);
-    return isQaUsageSrc(key) || isQaSdsSrc(key) || isQaStorageSrc(key) || key === 'QA/special/index.html';
+    return isQaUsageSrc(key) || isQaSdsSrc(key) || isQaStorageSrc(key) || key === 'QA/special/index.html' || key === 'QA/health/index.html';
   }
 
   function resolveResponsivePortalSrc(src) {
@@ -5801,6 +5826,10 @@ body.auth-loading .top-user-bar {
         }
         if (currentSrc === 'QA/special/index.html') {
           setPortalSubtabActive('qa-special', false);
+          return;
+        }
+        if (currentSrc === 'QA/health/index.html') {
+          setPortalSubtabActive('qa-health', false);
           return;
         }
 
