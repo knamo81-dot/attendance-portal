@@ -173,17 +173,24 @@
      </div>
     </div>
     <div class="view" id="statusView">
-     <div class="health-summary"><div><span>검진대상</span><strong id="statusTargetCount">-</strong></div><div><span>올해 검진완료</span><strong id="statusDoneCount">-</strong></div><div><span>검진예정</span><strong id="statusDueCount">-</strong></div><div class="warn"><span>기한초과</span><strong id="statusOverdueCount">-</strong></div></div>
+     <div class="health-summary"><div><span id="statusPrimaryLabel">검진대상</span><strong id="statusTargetCount">-</strong></div><div><span>올해 검진완료</span><strong id="statusDoneCount">-</strong></div><div><span>검진예정</span><strong id="statusDueCount">-</strong></div><div class="warn"><span>기한초과</span><strong id="statusOverdueCount">-</strong></div></div>
      <div class="health-status-toolbar"><div class="health-filter-group">
-      <label><span>기준연도</span><select id="statusYear"></select></label><label><span>본부</span><select id="statusDivision"><option value="">전체</option></select></label><label><span>팀</span><select id="statusTeam"><option value="">전체</option></select></label><label class="health-search"><span>사원검색</span><input id="statusSearch" placeholder="이름 / 사번 검색"/></label>
+      <label><span>기준연도</span><select id="statusYear"></select></label><label><span>구분</span><select id="statusCategory"><option value="target" selected>대상</option><option value="excluded">제외</option></select></label><label><span>본부</span><select id="statusDivision"><option value="">전체</option></select></label><label><span>팀</span><select id="statusTeam"><option value="">전체</option></select></label><label class="health-search"><span>사원검색</span><input id="statusSearch" placeholder="이름 / 사번 검색"/></label>
      </div><div class="health-legend"><span class="legend-dot due"></span>검진예정 <span class="legend-dot done"></span>검진완료 <span class="legend-dot overdue"></span>기한초과</div></div>
      <div class="health-calendar-wrap"><table class="health-calendar"><thead><tr><th class="division-col">본부</th><th class="team-col">팀</th><th class="emp-col">이름</th><th class="next-col">다음 검진기한</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th></tr></thead><tbody id="statusBody"><tr><td colspan="16" class="empty">특수건강진단 현황을 불러오는 중입니다.</td></tr></tbody></table></div>
      <div class="health-note bulk-hint">※ 월 칸 클릭: 개별 입력 · 같은 월 칸을 위/아래로 드래그: 여러 명 일괄 입력 · 일괄입력은 변경한 항목만 덮어씁니다.</div>
-     <div class="health-note">※ 특수검진대상 Y · 재직자 중 현재 ‘연구소 부재’ 기간에 해당하지 않는 인원만 표시합니다. 유해인자는 최근 12개월 사용기록을 기준으로 계산합니다.</div>
+     <div class="health-note">※ 연구소 발령일~퇴사일이 선택연도와 겹치는 특수검진대상만 표시합니다. ‘제외’는 설정-특이사항관리의 연구소 부재 기간을 기준으로 하며 해당 월은 음영 표시합니다. 유해인자는 최근 12개월 사용기록을 기준으로 계산합니다.</div>
     </div>
     <div class="view hidden" id="resultsView"><div class="coming"><strong>검진결과</strong><p>검진이력 등록/조회 화면은 다음 단계에서 연결합니다.</p></div></div>
    </section>
   </main>
+  <div aria-modal="true" class="modal hidden" id="labAssignWarningModal" role="dialog">
+   <div class="modal-card lab-warning-card">
+    <div class="modal-head"><div><h2>연구소 발령일 미등록</h2><p>특수건강진단 대상기간 계산을 위해 연구소 발령일 등록이 필요합니다.</p></div><button class="icon-btn" id="labAssignWarningClose">&times;</button></div>
+    <div class="lab-warning-body"><div class="lab-warning-summary">미등록 <strong id="labAssignWarningCount">0명</strong></div><div class="lab-warning-list" id="labAssignWarningList"></div><p>발령일이 등록되기 전까지 해당 직원은 연도별 현황에서 제외됩니다. 프로그램을 다시 열면 계속 안내됩니다.</p></div>
+    <div class="modal-foot"><button class="primary" id="labAssignWarningOk">확인</button></div>
+   </div>
+  </div>
   <div aria-modal="true" class="modal hidden" id="manualModal" role="dialog">
    <div class="modal-card">
     <div class="modal-head">
