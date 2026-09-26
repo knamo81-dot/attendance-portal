@@ -838,6 +838,46 @@ button{cursor:pointer}
   line-height:1.45;
 }
 
+
+.special-material-summary{
+  display:grid;
+  gap:6px;
+  margin:0 0 10px;
+  padding:9px 10px;
+  border:1px solid #e2daf9;
+  border-radius:8px;
+  background:#fff;
+  min-width:0;
+}
+
+.special-material-summary-label{
+  color:#475467;
+  font-size:10.5px;
+  font-weight:900;
+}
+
+.special-material-chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  min-width:0;
+}
+
+.special-material-chip{
+  display:inline-flex;
+  align-items:center;
+  max-width:100%;
+  min-height:24px;
+  padding:3px 8px;
+  border-radius:999px;
+  background:#eee9ff;
+  color:#4f36b5;
+  font-size:10.5px;
+  font-weight:900;
+  line-height:1.25;
+  overflow-wrap:anywhere;
+}
+
 .special-field-block{
   display:grid;
   gap:7px;
