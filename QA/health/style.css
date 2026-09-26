@@ -753,3 +753,36 @@ tbody tr:last-child td {
 .health-drawer{width:min(600px,94vw)}
 .drawer-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}.drawer-form label{display:grid;gap:5px}.drawer-form label.wide{grid-column:1/-1}.drawer-form label>span{font-size:10.5px;font-weight:800;color:#475569}.drawer-form input,.drawer-form select,.drawer-form textarea{width:100%;border:1px solid #cbd5e1;border-radius:8px;background:#fff;padding:8px 10px;font-size:11px;outline:none}.drawer-form input,.drawer-form select{height:36px}.drawer-form textarea{resize:vertical;min-height:64px}.drawer-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.drawer-actions button{height:34px;border-radius:8px;padding:0 14px;font-size:10.5px;font-weight:900}.drawer-actions .save{border:0;background:#6d28d9;color:#fff}.drawer-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.drawer-section-head h3{margin:0}.add-hazard-btn{border:1px solid #c4b5fd;background:#f5f3ff;color:#6d28d9;border-radius:8px;height:30px;padding:0 10px;font-size:10px;font-weight:900}.selected-hazard{display:grid;grid-template-columns:86px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:10.5px}.selected-hazard .hazard-name small{display:block;color:#64748b;margin-top:2px}.source-pill{font-size:9px;font-weight:900;border-radius:999px;padding:3px 7px;background:#eef2ff;color:#4338ca}.source-pill.manual{background:#fff7ed;color:#c2410c}.remove-hazard{border:0;background:transparent;color:#dc2626;font-weight:900;cursor:pointer}.drawer-empty{padding:8px 0;color:#64748b;font-size:10.5px}.result-help{font-size:9.5px;color:#64748b;line-height:1.5;margin-top:5px}.hazard-picker-card{width:min(820px,94vw)}.modal-head>div{display:grid;gap:3px}.modal-head small{font-size:10px;color:#64748b}.hazard-picker-search{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid #e5e7eb}.hazard-picker-search input{height:34px;min-width:300px;flex:1;border:1px solid #cbd5e1;border-radius:8px;padding:0 10px;font-size:11px}.hazard-picker-search span{font-size:9.5px;color:#64748b}.hazard-picker-table-wrap{max-height:420px;overflow:auto}.hazard-picker-table{width:100%;border-collapse:collapse}.hazard-picker-table th,.hazard-picker-table td{padding:9px 8px;border-bottom:1px solid #edf1f6;font-size:10.5px;text-align:center}.hazard-picker-table th{position:sticky;top:0;background:#f8fafc;z-index:1}.hazard-picker-table td:nth-child(3){text-align:left}.hazard-picker-table small{display:block;color:#64748b;margin-top:2px}.month-chip.reserved{background:#eef2ff;color:#4338ca}
 @media(max-width:700px){.drawer-form{grid-template-columns:1fr}.drawer-form label.wide{grid-column:auto}.hazard-picker-search{align-items:stretch;flex-direction:column}.hazard-picker-search input{min-width:0}.hazard-picker-card{width:96vw}}
+
+/* 2026-09-26 유해인자 선택창: 상세 drawer 위에 독립적으로 표시 */
+#hazardPickerModal{
+  z-index:130;
+  background:rgba(15,23,42,.32);
+}
+#hazardPickerModal .hazard-picker-card{
+  width:min(1180px,96vw);
+  max-width:none;
+}
+#hazardPickerModal .hazard-picker-table{
+  min-width:980px;
+  table-layout:fixed;
+}
+#hazardPickerModal .hazard-picker-table th:nth-child(1),
+#hazardPickerModal .hazard-picker-table td:nth-child(1){width:56px}
+#hazardPickerModal .hazard-picker-table th:nth-child(2),
+#hazardPickerModal .hazard-picker-table td:nth-child(2){width:130px}
+#hazardPickerModal .hazard-picker-table th:nth-child(3),
+#hazardPickerModal .hazard-picker-table td:nth-child(3){width:auto}
+#hazardPickerModal .hazard-picker-table th:nth-child(4),
+#hazardPickerModal .hazard-picker-table td:nth-child(4){width:105px}
+#hazardPickerModal .hazard-picker-table th:nth-child(5),
+#hazardPickerModal .hazard-picker-table td:nth-child(5),
+#hazardPickerModal .hazard-picker-table th:nth-child(6),
+#hazardPickerModal .hazard-picker-table td:nth-child(6){width:120px}
+#hazardPickerModal .hazard-picker-table-wrap{max-height:min(560px,62vh)}
+#hazardPickerModal .hazard-picker-search{padding:14px 18px}
+#hazardPickerModal .hazard-picker-search input{min-width:420px}
+@media(max-width:700px){
+  #hazardPickerModal .hazard-picker-card{width:98vw}
+  #hazardPickerModal .hazard-picker-search input{min-width:0}
+}
