@@ -3075,6 +3075,12 @@ body.auth-loading .top-user-bar {
       desc: '특수건강진단 대상 유해인자 기준, 검진 대상·일정 및 검진결과를 통합 관리합니다.',
       gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
     },
+    'QA/Mobile/health/index.html': {
+      top: 'Safety Management',
+      title: 'QA',
+      desc: '특수건강진단 현황과 유해인자 기준을 모바일에서 확인하고 관리합니다.',
+      gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
+    },
     'travel-expense/index.html': {
       top: 'Expense Management',
       title: '출장비 정산',
@@ -3190,6 +3196,13 @@ body.auth-loading .top-user-bar {
       { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/health/index.html': [
+      { id: 'qa-usage', label: '사용일지' },
+      { id: 'qa-sds', label: '화학물질 관리' },
+      { id: 'qa-storage', label: '특별관리물질 현황' },
+      { id: 'qa-special', label: '특별관리물질 관리' },
+      { id: 'qa-health', label: '특수건강진단' }
+    ],
+    'QA/Mobile/health/index.html': [
       { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: '화학물질 관리' },
       { id: 'qa-storage', label: '특별관리물질 현황' },
@@ -3491,8 +3504,9 @@ body.auth-loading .top-user-bar {
         replacePortalFrame(qaSpecialSrc);
         return;
       }
-      if (tabId === 'qa-health' && currentSrc !== 'QA/health/index.html') {
-        replacePortalFrame('QA/health/index.html');
+      const qaHealthSrc = getQaHealthSrc();
+      if (tabId === 'qa-health' && currentSrc !== qaHealthSrc) {
+        replacePortalFrame(qaHealthSrc);
         return;
       }
       return;
@@ -3532,7 +3546,7 @@ body.auth-loading .top-user-bar {
     if (isQaStorageSrc(key)) activeId = 'qa-storage';
     if (isQaSdsSrc(key)) activeId = 'qa-sds';
     if (isQaSpecialSrc(key)) activeId = 'qa-special';
-    if (key === 'QA/health/index.html') activeId = 'qa-health';
+    if (isQaHealthSrc(key)) activeId = 'qa-health';
     renderPortalSubtabs(tabs, activeId);
     renderPortalFilters([]);
   }
@@ -3679,6 +3693,8 @@ body.auth-loading .top-user-bar {
   const QA_STORAGE_MOBILE_SRC = 'QA/Mobile/special-storage/index.html';
   const QA_SPECIAL_DESKTOP_SRC = 'QA/special/index.html';
   const QA_SPECIAL_MOBILE_SRC = 'QA/Mobile/special/index.html';
+  const QA_HEALTH_DESKTOP_SRC = 'QA/health/index.html';
+  const QA_HEALTH_MOBILE_SRC = 'QA/Mobile/health/index.html';
 
   function getQaUsageSrc() {
     return isMobilePortalView() ? QA_USAGE_MOBILE_SRC : QA_USAGE_DESKTOP_SRC;
@@ -3694,6 +3710,10 @@ body.auth-loading .top-user-bar {
 
   function getQaSpecialSrc() {
     return isMobilePortalView() ? QA_SPECIAL_MOBILE_SRC : QA_SPECIAL_DESKTOP_SRC;
+  }
+
+  function getQaHealthSrc() {
+    return isMobilePortalView() ? QA_HEALTH_MOBILE_SRC : QA_HEALTH_DESKTOP_SRC;
   }
 
   function isQaUsageSrc(src) {
@@ -3716,9 +3736,14 @@ body.auth-loading .top-user-bar {
     return key === QA_SPECIAL_DESKTOP_SRC || key === QA_SPECIAL_MOBILE_SRC;
   }
 
+  function isQaHealthSrc(src) {
+    const key = normalizePortalSrc(src);
+    return key === QA_HEALTH_DESKTOP_SRC || key === QA_HEALTH_MOBILE_SRC;
+  }
+
   function isQaProgramSrc(src) {
     const key = normalizePortalSrc(src);
-    return isQaUsageSrc(key) || isQaSdsSrc(key) || isQaStorageSrc(key) || isQaSpecialSrc(key) || key === 'QA/health/index.html';
+    return isQaUsageSrc(key) || isQaSdsSrc(key) || isQaStorageSrc(key) || isQaSpecialSrc(key) || isQaHealthSrc(key);
   }
 
   function resolveResponsivePortalSrc(src) {
@@ -3730,6 +3755,7 @@ body.auth-loading .top-user-bar {
     if (isQaSdsSrc(raw)) return getQaSdsSrc() + suffix;
     if (isQaStorageSrc(raw)) return getQaStorageSrc() + suffix;
     if (isQaSpecialSrc(raw)) return getQaSpecialSrc() + suffix;
+    if (isQaHealthSrc(raw)) return getQaHealthSrc() + suffix;
     return src;
   }
 
@@ -5909,7 +5935,7 @@ body.auth-loading .top-user-bar {
           setPortalSubtabActive('qa-special', false);
           return;
         }
-        if (currentSrc === 'QA/health/index.html') {
+        if (isQaHealthSrc(currentSrc)) {
           setPortalSubtabActive('qa-health', false);
           return;
         }
