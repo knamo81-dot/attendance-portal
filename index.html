@@ -3063,6 +3063,12 @@ body.auth-loading .top-user-bar {
       desc: '특별관리물질 기준정보와 제품 연계 현황을 관리합니다.',
       gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
     },
+    'QA/Mobile/special/index.html': {
+      top: 'Safety Management',
+      title: 'QA',
+      desc: '특별관리물질 기준정보와 제품 연계 현황을 모바일에서 확인하고 관리합니다.',
+      gradient: 'linear-gradient(135deg, #5B3DB5 0%, #6D4CCB 55%, #8B6DDB 100%)'
+    },
     'QA/health/index.html': {
       top: 'Safety Management',
       title: 'QA',
@@ -3170,6 +3176,13 @@ body.auth-loading .top-user-bar {
       { id: 'qa-health', label: '특수건강진단' }
     ],
     'QA/special/index.html': [
+      { id: 'qa-usage', label: '사용일지' },
+      { id: 'qa-sds', label: '화학물질 관리' },
+      { id: 'qa-storage', label: '특별관리물질 현황' },
+      { id: 'qa-special', label: '특별관리물질 관리' },
+      { id: 'qa-health', label: '특수건강진단' }
+    ],
+    'QA/Mobile/special/index.html': [
       { id: 'qa-usage', label: '사용일지' },
       { id: 'qa-sds', label: '화학물질 관리' },
       { id: 'qa-storage', label: '특별관리물질 현황' },
@@ -3473,8 +3486,9 @@ body.auth-loading .top-user-bar {
         replacePortalFrame(qaSdsSrc);
         return;
       }
-      if (tabId === 'qa-special' && currentSrc !== 'QA/special/index.html') {
-        replacePortalFrame('QA/special/index.html');
+      const qaSpecialSrc = getQaSpecialSrc();
+      if (tabId === 'qa-special' && currentSrc !== qaSpecialSrc) {
+        replacePortalFrame(qaSpecialSrc);
         return;
       }
       if (tabId === 'qa-health' && currentSrc !== 'QA/health/index.html') {
@@ -3517,7 +3531,7 @@ body.auth-loading .top-user-bar {
     if (isQaUsageSrc(key)) activeId = 'qa-usage';
     if (isQaStorageSrc(key)) activeId = 'qa-storage';
     if (isQaSdsSrc(key)) activeId = 'qa-sds';
-    if (key === 'QA/special/index.html') activeId = 'qa-special';
+    if (isQaSpecialSrc(key)) activeId = 'qa-special';
     if (key === 'QA/health/index.html') activeId = 'qa-health';
     renderPortalSubtabs(tabs, activeId);
     renderPortalFilters([]);
@@ -3663,6 +3677,8 @@ body.auth-loading .top-user-bar {
   const QA_SDS_MOBILE_SRC = 'QA/Mobile/sds/index.html';
   const QA_STORAGE_DESKTOP_SRC = 'QA/special-storage/index.html';
   const QA_STORAGE_MOBILE_SRC = 'QA/Mobile/special-storage/index.html';
+  const QA_SPECIAL_DESKTOP_SRC = 'QA/special/index.html';
+  const QA_SPECIAL_MOBILE_SRC = 'QA/Mobile/special/index.html';
 
   function getQaUsageSrc() {
     return isMobilePortalView() ? QA_USAGE_MOBILE_SRC : QA_USAGE_DESKTOP_SRC;
@@ -3674,6 +3690,10 @@ body.auth-loading .top-user-bar {
 
   function getQaStorageSrc() {
     return isMobilePortalView() ? QA_STORAGE_MOBILE_SRC : QA_STORAGE_DESKTOP_SRC;
+  }
+
+  function getQaSpecialSrc() {
+    return isMobilePortalView() ? QA_SPECIAL_MOBILE_SRC : QA_SPECIAL_DESKTOP_SRC;
   }
 
   function isQaUsageSrc(src) {
@@ -3691,9 +3711,14 @@ body.auth-loading .top-user-bar {
     return key === QA_STORAGE_DESKTOP_SRC || key === QA_STORAGE_MOBILE_SRC;
   }
 
+  function isQaSpecialSrc(src) {
+    const key = normalizePortalSrc(src);
+    return key === QA_SPECIAL_DESKTOP_SRC || key === QA_SPECIAL_MOBILE_SRC;
+  }
+
   function isQaProgramSrc(src) {
     const key = normalizePortalSrc(src);
-    return isQaUsageSrc(key) || isQaSdsSrc(key) || isQaStorageSrc(key) || key === 'QA/special/index.html' || key === 'QA/health/index.html';
+    return isQaUsageSrc(key) || isQaSdsSrc(key) || isQaStorageSrc(key) || isQaSpecialSrc(key) || key === 'QA/health/index.html';
   }
 
   function resolveResponsivePortalSrc(src) {
@@ -3704,6 +3729,7 @@ body.auth-loading .top-user-bar {
     if (isQaUsageSrc(raw)) return getQaUsageSrc() + suffix;
     if (isQaSdsSrc(raw)) return getQaSdsSrc() + suffix;
     if (isQaStorageSrc(raw)) return getQaStorageSrc() + suffix;
+    if (isQaSpecialSrc(raw)) return getQaSpecialSrc() + suffix;
     return src;
   }
 
@@ -5879,7 +5905,7 @@ body.auth-loading .top-user-bar {
           setPortalSubtabActive('qa-sds', false);
           return;
         }
-        if (currentSrc === 'QA/special/index.html') {
+        if (isQaSpecialSrc(currentSrc)) {
           setPortalSubtabActive('qa-special', false);
           return;
         }
