@@ -20,8 +20,8 @@ button{cursor:pointer}
 [hidden]{display:none!important}
 .mobile-storage-shell{width:100%;min-width:0;padding:8px 8px calc(12px + env(safe-area-inset-bottom))}
 .mobile-storage-app{width:100%;min-width:0}
-.view-switch{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;background:#ebeef4;border:1px solid #dfe4ec;border-radius:12px;position:sticky;top:0;z-index:30;box-shadow:0 2px 8px rgba(15,23,42,.04)}
-.view-btn{height:38px;border:0;border-radius:9px;background:transparent;color:#475467;font-size:13px;font-weight:900;letter-spacing:-.03em}
+.view-switch{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:4px;background:#ebeef4;border:1px solid #dfe4ec;border-radius:12px;position:sticky;top:0;z-index:30;box-shadow:0 2px 8px rgba(15,23,42,.04)}
+.view-btn{height:38px;padding:0 4px;border:0;border-radius:9px;background:transparent;color:#475467;font-size:13px;font-weight:900;letter-spacing:-.03em}
 .view-btn.active{background:linear-gradient(90deg,#6847d1,#5b39c0);color:#fff;box-shadow:0 4px 10px rgba(91,57,192,.18)}
 .screen{margin-top:8px}
 .screen-head{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 14px 10px;background:#fff;border:1px solid var(--line);border-radius:12px 12px 0 0;border-bottom:0}
@@ -90,4 +90,38 @@ button{cursor:pointer}
 @media(min-width:520px){
   .mobile-storage-shell{max-width:720px;margin:0 auto}
   .monthly-toolbar{grid-template-columns:auto minmax(230px,1fr);align-items:center}
+}
+
+/* 2026-09-27: 모바일 특별관리물질 사용일지 */
+.usage-toolbar{border-radius:0 0 12px 12px}
+.usage-list{display:grid;gap:8px}
+.usage-card{overflow:hidden;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.03)}
+.usage-card-toggle{width:100%;border:0;background:#fff;color:var(--text);text-align:left;padding:11px 12px;display:grid;gap:7px}
+.usage-card-toggle:active{background:#faf9ff}
+.usage-line{min-width:0;display:grid;align-items:center;column-gap:8px;line-height:1.25}
+.usage-line-1{grid-template-columns:auto minmax(0,1fr) auto}
+.usage-no{color:var(--qa-deep);font-size:12px;font-weight:900;white-space:nowrap}
+.usage-date{color:#344054;font-size:11px;font-weight:800;text-align:center;white-space:nowrap}
+.usage-author{max-width:88px;color:#475467;font-size:11px;font-weight:800;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.usage-line-2{grid-template-columns:minmax(0,1fr) auto}
+.usage-substance{min-width:0;font-size:13px;font-weight:900;letter-spacing:-.025em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.usage-cas{color:#667085;font-size:10.5px;font-weight:800;white-space:nowrap}
+.usage-line-3{grid-template-columns:minmax(0,1fr) auto}
+.usage-product{min-width:0;color:#475467;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.usage-amount{color:#302487;font-size:11px;font-weight:900;white-space:nowrap}
+.usage-card-detail{display:none;border-top:1px solid var(--line-soft);background:#fbfbfd;padding:11px 12px}
+.usage-card.expanded{border-color:#cfc5f2;box-shadow:0 4px 12px rgba(91,57,192,.08)}
+.usage-card.expanded .usage-card-toggle{background:#faf9ff}
+.usage-card.expanded .usage-card-detail{display:block}
+.usage-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.usage-detail-item{min-width:0;padding:8px 9px;border:1px solid #ebe8f6;border-radius:9px;background:#fff}
+.usage-detail-item.full{grid-column:1/-1}
+.usage-detail-label{display:block;margin-bottom:4px;color:#7c6bc7;font-size:9.5px;font-weight:900}
+.usage-detail-value{color:#344054;font-size:11px;font-weight:700;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.usage-detail-item.accident{border-color:#f3c7c3;background:#fff8f7}
+@media(max-width:360px){
+  .view-switch{gap:3px;padding:3px}
+  .view-btn{font-size:11.5px;padding:0 2px}
+  .usage-date{font-size:10.5px}
+  .usage-author{max-width:72px}
 }
