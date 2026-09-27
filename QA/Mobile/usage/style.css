@@ -1362,3 +1362,90 @@ html, body{
     font-size: 9.5px;
   }
 }
+
+
+/* =========================================================
+   2026-09-27: 모바일 사용내역 수정 UI 위치/가로스크롤 FIX
+   - 수정영역은 선택한 사용내역 카드 바로 아래에 표시
+   - 모달은 세로 스크롤만 허용하고 좌우 흔들림/스크롤 제거
+   - iOS date input 포함 모든 수정 입력항목 폭을 카드 안으로 고정
+   ========================================================= */
+.usage-detail-list,
+.usage-detail-item,
+.usage-detail-main,
+.usage-edit-section,
+.edit-grid,
+.edit-grid label,
+.edit-grid input,
+.edit-grid select,
+.suffix-input{
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
+}
+
+.usage-detail-list > .usage-edit-section{
+  width:100%;
+  margin-top:0;
+}
+
+.edit-grid input,
+.edit-grid select{
+  display:block;
+  width:100%;
+  max-width:100%;
+}
+
+.edit-grid input[type="date"]{
+  -webkit-appearance:none;
+  appearance:none;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  box-sizing:border-box;
+}
+
+@media(max-width:680px){
+  .usage-modal,
+  .usage-modal-body,
+  .usage-detail-list,
+  .usage-detail-item,
+  .usage-edit-section{
+    max-width:100%;
+    min-width:0;
+  }
+
+  .usage-modal-body{
+    overflow-y:auto;
+    overflow-x:hidden;
+    overscroll-behavior-x:none;
+  }
+
+  .usage-edit-section{
+    width:100%;
+    padding:14px;
+    box-sizing:border-box;
+  }
+
+  .edit-grid{
+    width:100%;
+    grid-template-columns:minmax(0,1fr);
+  }
+
+  .edit-grid label,
+  .edit-grid label.full,
+  .edit-grid input,
+  .edit-grid select,
+  .edit-grid .suffix-input{
+    width:100%;
+    min-width:0;
+    max-width:100%;
+  }
+
+  .edit-grid input[type="date"]{
+    display:block;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+  }
+}
