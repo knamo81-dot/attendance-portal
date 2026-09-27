@@ -4330,6 +4330,22 @@ create table if not exists user_app_roles (
   window.loadPermissionAdminPage=loadPermissionAdminPage;
   function resetPermissionForm(){dataState.permissionEditingId=null; if($('permissionEmployeeSelect'))$('permissionEmployeeSelect').value=''; if($('permissionAppSelect'))$('permissionAppSelect').value='attendance'; fillPermissionRoleSelect(); if($('permissionRoleSelect'))$('permissionRoleSelect').value='operator'; if($('permissionMemoInput'))$('permissionMemoInput').value=''; if($('permissionSaveBtn'))$('permissionSaveBtn').textContent='저장'; setFeedback('permissionFeedback','');}
   function fillPermissionEdit(id){const r=(dataState.userAppRoles||[]).find(x=>String(x.id)===String(id)); if(!r)return; dataState.permissionEditingId=r.id; if($('permissionEmployeeSelect'))$('permissionEmployeeSelect').value=r.employee_no||r.email||''; if($('permissionAppSelect'))$('permissionAppSelect').value=r.app_key||'attendance'; fillPermissionRoleSelect(); if($('permissionRoleSelect'))$('permissionRoleSelect').value=r.role_key||'operator'; if($('permissionMemoInput'))$('permissionMemoInput').value=r.memo||''; if($('permissionSaveBtn'))$('permissionSaveBtn').textContent='수정 저장'; dataState.permissionView='manual'; renderPermissionAdmin(); setFeedback('permissionFeedback',(r.name||r.email||r.employee_no)+' 권한 수정 모드입니다.',true);}
+  function notifyPortalPermissionUpdated(detail={}){
+    const companyId=getPortalCompanyId()||'';
+    const message={
+      type:'portal-permissions-updated',
+      companyId,
+      company_id:companyId,
+      source:'settings-permission-admin',
+      changedAt:new Date().toISOString(),
+      ...detail
+    };
+    try{
+      if(window.parent&&window.parent!==window) window.parent.postMessage(message,'*');
+    }catch(_){}
+    try{ window.postMessage(message,'*'); }catch(_){}
+  }
+
   async function savePermissionRole(){
     const companyId = getPortalCompanyId();
     if(!companyId){setFeedback('permissionFeedback','회사 정보(company_id)를 확인하지 못했습니다. 포탈에서 다시 로그인한 뒤 저장해 주세요.',false);return;}
@@ -4347,6 +4363,7 @@ create table if not exists user_app_roles (
       updated_at:new Date().toISOString()
     };
     setFeedback('permissionFeedback','저장 중입니다...','loading');
+    const wasEditing=!!dataState.permissionEditingId;
     const res=dataState.permissionEditingId
       ? await sb.from('user_app_roles').update(payload).eq('id',dataState.permissionEditingId).eq('company_id',companyId)
       : await sb.from('user_app_roles').insert([payload]);
@@ -4355,6 +4372,13 @@ create table if not exists user_app_roles (
     await loadPermissionRoles();
     dataState.permissionView='manual';
     renderPermissionAdmin();
+    notifyPortalPermissionUpdated({
+      action:wasEditing?'update':'save',
+      employee_no:payload.employee_no||'',
+      email:payload.email||'',
+      app_key:payload.app_key||'',
+      role_key:payload.role_key||''
+    });
     setFeedback('permissionFeedback','권한을 저장했습니다.',true);
   }
   async function togglePermissionRole(id){
@@ -4367,6 +4391,13 @@ create table if not exists user_app_roles (
     if(res.error){setFeedback('permissionFeedback','상태 변경 실패: '+res.error.message,false);return;}
     await loadPermissionRoles();
     renderPermissionAdmin();
+    notifyPortalPermissionUpdated({
+      action:next?'enable':'disable',
+      employee_no:r.employee_no||'',
+      email:r.email||'',
+      app_key:r.app_key||'',
+      role_key:r.role_key||''
+    });
     setFeedback('permissionFeedback',next?'권한을 사용 상태로 변경했습니다.':'권한을 미사용 처리했습니다.',true);
   }
   async function deletePermissionRole(id){
@@ -4389,6 +4420,13 @@ create table if not exists user_app_roles (
     await loadPermissionRoles();
     dataState.permissionView='manual';
     renderPermissionAdmin();
+    notifyPortalPermissionUpdated({
+      action:'delete',
+      employee_no:r.employee_no||'',
+      email:r.email||'',
+      app_key:r.app_key||'',
+      role_key:r.role_key||''
+    });
     setFeedback('permissionFeedback','권한을 삭제했습니다.',true);
   }
 
