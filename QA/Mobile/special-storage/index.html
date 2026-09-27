@@ -2,122 +2,302 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>특별관리물질 현황</title>
-  <link rel="stylesheet" href="./style.css?v=20260927-mobile-storage2" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QA 시약 사용일지</title>
   <link rel="stylesheet" href="../../../common/mobile.css" />
   <link rel="stylesheet" href="../../../common/theme.css" />
+  <link rel="stylesheet" href="./style.css?v=20260927-mobile-editfix1?v=20260926-mobile-special3" />
 </head>
 <body>
-  <main class="mobile-storage-shell">
-    <section class="mobile-storage-app">
-      <div class="view-switch" role="tablist" aria-label="특별관리물질 현황 화면">
-        <button id="todayTab" class="view-btn active" type="button">당일 현황</button>
-        <button id="monthlyTab" class="view-btn" type="button">월간 현황</button>
-        <button id="usageTab" class="view-btn" type="button">사용일지</button>
-      </div>
+  <main class="usage-shell">
+    <section class="usage-app">
 
-      <section id="todayView" class="screen">
-        <div class="screen-head">
-          <div>
-            <h2>당일 현황</h2>
-            <p id="todayLabel">-</p>
+      <section id="usageInputView" class="screen">
+        <div class="screen-toolbar">
+          <div class="view-switch toolbar-view-switch" role="tablist" aria-label="사용일지 내부 화면">
+            <button id="usageInputTab" class="view-btn active" type="button">사용입력</button>
+            <button id="usageLogTab" class="view-btn" type="button">사용일지</button>
+          </div>
+
+          <div class="period-controls input-period-controls">
+            <span class="period-label">조회기간</span>
+            <select id="inputYear" aria-label="사용입력 조회 연도"></select>
+            <select id="inputMonth" aria-label="사용입력 조회 월"></select>
+          </div>
+
+          <div class="metric-toggle toolbar-metric-toggle">
+            <button class="metric-btn active" data-monthly-metric="amount" type="button">사용량</button>
+            <button class="metric-btn" data-monthly-metric="time" type="button">사용시간</button>
           </div>
         </div>
 
-        <div class="toolbar compact-toolbar">
-          <label class="search-field">
-            <span>검색</span>
-            <input id="todaySearch" type="search" placeholder="제품명 / 제조사 / 코드 / CAS / 특별관리물질" autocomplete="off" />
-          </label>
-        </div>
+        <div class="input-layout">
+          <section class="panel input-panel">
+            <div class="panel-title">사용정보 입력</div>
 
-        <div id="todayMessage" class="message" aria-live="polite"></div>
-        <div id="todayList" class="product-list">
-          <div class="empty-card">보관 현황을 불러오는 중입니다.</div>
-        </div>
+            <div class="form-stack">
+              <label class="field">
+                <span>사용일</span>
+                <input id="usageDate" type="date" />
+              </label>
 
-        <div class="save-dock-space" aria-hidden="true"></div>
-        <div class="save-dock">
-          <button id="saveQuantities" class="save-btn" type="button" disabled>수량 저장</button>
+              <div class="field product-search-wrap">
+                <span>사용제품</span>
+                <div class="search-input-row">
+                  <input id="productSearch" type="search" placeholder="제품명 / 제조사 / 코드 / CAS / 물질명 검색" autocomplete="off" />
+                </div>
+                <div id="productResults" class="product-results" hidden></div>
+              </div>
+
+              <div id="selectedProduct" class="selected-product" hidden>
+                <button id="clearProductBtn" class="selected-close" type="button" aria-label="선택 제품 해제">×</button>
+                <strong id="selectedProductName">-</strong>
+                <div id="selectedProductMeta" class="selected-meta">-</div>
+                <div class="selected-info-row">
+                  <span class="selected-label">CAS No.</span>
+                  <div id="selectedProductCas" class="selected-cas"></div>
+                </div>
+                <div class="selected-info-row">
+                  <span class="selected-label">물질명</span>
+                  <div id="selectedMaterialName" class="selected-materials">-</div>
+                </div>
+              </div>
+
+              <label class="field inline-field">
+                <span>사용시간</span>
+                <div class="suffix-input">
+                  <input id="usageHours" type="number" min="0.01" max="23.99" step="0.01" inputmode="decimal" placeholder="예: 0.5" />
+                  <b>시간</b>
+                </div>
+              </label>
+
+              <label class="field inline-field">
+                <span>사용량</span>
+                <input id="quantity" type="number" min="0" step="any" inputmode="decimal" placeholder="예: 100" />
+              </label>
+
+              <label class="field inline-field">
+                <span>단위</span>
+                <select id="unit">
+                  <optgroup label="부피">
+                    <option value="µL">µL</option>
+                    <option value="mL" selected>mL</option>
+                    <option value="L">L</option>
+                  </optgroup>
+                  <optgroup label="중량">
+                    <option value="µg">µg</option>
+                    <option value="mg">mg</option>
+                    <option value="g">g</option>
+                    <option value="kg">kg</option>
+                  </optgroup>
+                </select>
+              </label>
+
+              <section id="specialUsagePanel" class="special-usage-panel" hidden>
+                <div class="special-usage-head">
+                  <strong>특별관리물질 추가정보</strong>
+                  <span id="specialUsageBadge" class="special-usage-badge">특별관리물질</span>
+                </div>
+                <p class="special-usage-guide">특별관리물질 기준 CAS가 포함된 제품입니다. 실제 작업내용과 착용 보호구를 입력해 주세요.</p>
+
+                <div class="special-material-summary" aria-label="해당 특별관리물질">
+                  <span class="special-material-summary-label">해당 특별관리물질</span>
+                  <div id="specialMaterialNames" class="special-material-chips"></div>
+                </div>
+
+                <div class="special-field-block">
+                  <span class="special-field-label">작업내용 <b>*</b></span>
+                  <select id="specialWorkType">
+                    <option value="">선택</option>
+                    <option value="시료 전처리">시료 전처리</option>
+                    <option value="분석/측정">분석/측정</option>
+                    <option value="배양/합성">배양/합성</option>
+                    <option value="희석/조제">희석/조제</option>
+                    <option value="소분/이동">소분/이동</option>
+                    <option value="세척">세척</option>
+                    <option value="폐기">폐기</option>
+                    <option value="기타">기타</option>
+                  </select>
+                  <input id="specialWorkDetail" type="text" maxlength="300" placeholder="필요 시 상세 작업내용 입력" />
+                </div>
+
+                <div class="special-field-block">
+                  <span class="special-field-label">착용 보호구 <b>*</b></span>
+                  <div id="specialPpeGroup" class="ppe-grid">
+                    <label><input type="checkbox" value="lab_coat" /> <span>실험복</span></label>
+                    <label><input type="checkbox" value="protective_gloves" /> <span>보호장갑</span></label>
+                    <label><input type="checkbox" value="safety_glasses" /> <span>보안경</span></label>
+                    <label><input type="checkbox" value="dust_mask" /> <span>방진마스크</span></label>
+                    <label><input type="checkbox" value="gas_mask" /> <span>방독마스크</span></label>
+                    <label><input type="checkbox" value="combined_mask" /> <span>방진·방독 겸용마스크</span></label>
+                    <label><input type="checkbox" value="supplied_air" /> <span>송기/공기호흡기</span></label>
+                    <label><input id="specialPpeOtherCheck" type="checkbox" value="other" /> <span>기타</span></label>
+                  </div>
+                  <input id="specialPpeOther" type="text" maxlength="150" placeholder="기타 보호구 입력" hidden />
+                </div>
+
+                <div class="special-field-block">
+                  <span class="special-field-label">사고 발생 <b>*</b></span>
+                  <div class="accident-options">
+                    <label><input id="specialAccidentNo" type="radio" name="specialAccident" value="false" /> <span>없음</span></label>
+                    <label><input id="specialAccidentYes" type="radio" name="specialAccident" value="true" /> <span>있음</span></label>
+                  </div>
+                </div>
+
+                <div id="specialAccidentFields" class="special-accident-fields" hidden>
+                  <label>
+                    <span>피해 내용 <b>*</b></span>
+                    <textarea id="specialDamageDetail" rows="3" maxlength="1000" placeholder="누출·오염·흡입 등 피해 내용을 입력하세요."></textarea>
+                  </label>
+                  <label>
+                    <span>조치 사항 <b>*</b></span>
+                    <textarea id="specialActionDetail" rows="3" maxlength="1000" placeholder="응급조치·세척·보고 등 조치사항을 입력하세요."></textarea>
+                  </label>
+                </div>
+              </section>
+            </div>
+
+            <div id="inputMessage" class="message" aria-live="polite"></div>
+            <button id="saveUsageBtn" class="save-btn" type="button">
+              <span class="lock-icon">▣</span>
+              사용내역 등록
+            </button>
+          </section>
+
+          <section class="panel monthly-panel">
+            <div class="panel-head">
+              <h3>나의 월간 사용현황</h3>
+              <div class="month-nav">
+                <button id="prevMonthBtn" type="button" aria-label="이전 달">‹</button>
+                <strong id="monthLabel">-</strong>
+                <button id="nextMonthBtn" type="button" aria-label="다음 달">›</button>
+              </div>
+            </div>
+
+            <div id="monthlyMessage" class="message compact" aria-live="polite"></div>
+            <div id="monthlyCalendar" class="monthly-calendar" aria-label="나의 월간 사용현황 달력">
+              <div class="calendar-loading">월간 사용현황을 불러오는 중입니다.</div>
+            </div>
+          </section>
         </div>
       </section>
 
-      <section id="monthlyView" class="screen" hidden>
-        <div class="screen-head">
-          <div>
-            <h2>월간 현황</h2>
-            <p>날짜를 선택하면 해당 일자의 제품별 보관수량을 확인할 수 있습니다.</p>
+      <section id="usageLogView" class="screen" hidden>
+        <div class="screen-toolbar log-toolbar">
+          <div class="view-switch toolbar-view-switch" role="tablist" aria-label="사용일지 내부 화면">
+            <button id="usageInputTab2" class="view-btn" type="button">사용입력</button>
+            <button id="usageLogTab2" class="view-btn active" type="button">사용일지</button>
           </div>
-        </div>
 
-        <div class="toolbar monthly-toolbar">
           <div class="period-controls">
-            <span>조회기간</span>
-            <select id="yearSelect" aria-label="조회 연도"></select>
-            <select id="monthSelect" aria-label="조회 월"></select>
+            <span class="period-label">조회기간</span>
+            <select id="logYear"></select>
+            <div class="period-mode">
+              <button data-period-mode="month" type="button">월</button>
+              <button data-period-mode="quarter" type="button">분기</button>
+              <button data-period-mode="half" class="active" type="button">반기</button>
+              <button data-period-mode="year" type="button">년</button>
+            </div>
+            <select id="periodDetail"></select>
           </div>
-          <label class="search-field monthly-search">
-            <span>검색</span>
-            <input id="monthlySearch" type="search" placeholder="제품명 / CAS / 특별관리물질" autocomplete="off" />
-          </label>
+
+          <div class="metric-toggle toolbar-metric-toggle">
+            <button class="metric-btn active" data-log-metric="amount" type="button">사용량</button>
+            <button class="metric-btn" data-log-metric="time" type="button">사용시간</button>
+          </div>
         </div>
 
-        <div id="monthlyMessage" class="message" aria-live="polite"></div>
-
-        <section class="calendar-card">
-          <div class="calendar-head">
-            <button id="prevMonthBtn" class="month-nav" type="button" aria-label="이전 달">‹</button>
-            <strong id="monthLabel">-</strong>
-            <button id="nextMonthBtn" class="month-nav" type="button" aria-label="다음 달">›</button>
-          </div>
-          <div class="weekday-row" aria-hidden="true">
-            <span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span>
-          </div>
-          <div id="calendarGrid" class="calendar-grid"></div>
-        </section>
-
-        <section class="selected-day-section">
-          <div class="selected-day-head">
-            <h3 id="selectedDateTitle">-</h3>
-          </div>
-          <div id="monthlyList" class="product-list">
-            <div class="empty-card">날짜를 선택해 주세요.</div>
+        <section class="panel log-panel">
+          <div id="logMessage" class="message compact" aria-live="polite"></div>
+          <div class="matrix-wrap log-wrap">
+            <table id="logTable" class="matrix-table log-table">
+              <thead id="logHead"></thead>
+              <tbody id="logBody">
+                <tr><td class="empty">사용일지를 불러오는 중입니다.</td></tr>
+              </tbody>
+            </table>
           </div>
         </section>
-      </section>
-
-      <section id="usageView" class="screen" hidden>
-        <div class="screen-head">
-          <div>
-            <h2>특별관리물질 사용일지</h2>
-            <p>사용입력에서 등록한 특별관리물질 취급기록을 조회합니다.</p>
-          </div>
-        </div>
-
-        <div class="toolbar usage-toolbar">
-          <div class="period-controls">
-            <span>조회기간</span>
-            <select id="usageYearSelect" aria-label="사용일지 조회 연도"></select>
-            <select id="usageMonthSelect" aria-label="사용일지 조회 월"></select>
-          </div>
-          <label class="search-field usage-search">
-            <span>검색</span>
-            <input id="usageSearch" type="search" placeholder="No. / 물질 / CAS / 제품 / 작성자" autocomplete="off" />
-          </label>
-        </div>
-
-        <div id="usageMessage" class="message" aria-live="polite"></div>
-        <div id="usageList" class="usage-list">
-          <div class="empty-card">사용일지를 불러오는 중입니다.</div>
-        </div>
       </section>
     </section>
   </main>
 
+  <div class="usage-modal-backdrop" id="usageDetailModal" hidden>
+    <section class="usage-modal" role="dialog" aria-modal="true" aria-labelledby="usageDetailTitle">
+      <div class="usage-modal-head">
+        <div>
+          <h3 id="usageDetailTitle">사용내역 상세</h3>
+          <p id="usageDetailContext"></p>
+        </div>
+        <button id="usageDetailClose" class="modal-close-btn" type="button" aria-label="닫기">×</button>
+      </div>
+
+      <div class="usage-modal-body">
+        <div id="usageDetailMessage" class="message compact" aria-live="polite"></div>
+        <div id="usageDetailList" class="usage-detail-list"></div>
+
+        <section id="usageEditSection" class="usage-edit-section" hidden>
+          <div class="edit-section-head">
+            <strong>사용내역 수정</strong>
+            <button id="usageEditCancel" class="btn-secondary small" type="button">수정 취소</button>
+          </div>
+
+          <input id="usageEditId" type="hidden" />
+
+          <div class="edit-grid">
+            <label>
+              <span>사용일</span>
+              <input id="usageEditDate" type="date" />
+            </label>
+
+            <label class="full">
+              <span>사용제품</span>
+              <select id="usageEditProduct"></select>
+            </label>
+
+            <label>
+              <span>사용시간</span>
+              <div class="suffix-input">
+                <input id="usageEditHours" type="number" min="0.01" max="23.99" step="0.01" inputmode="decimal" />
+                <b>시간</b>
+              </div>
+            </label>
+
+            <label>
+              <span>사용량</span>
+              <input id="usageEditQuantity" type="number" min="0" step="any" inputmode="decimal" />
+            </label>
+
+            <label>
+              <span>단위</span>
+              <select id="usageEditUnit">
+                <optgroup label="부피">
+                  <option value="µL">µL</option>
+                  <option value="mL">mL</option>
+                  <option value="L">L</option>
+                </optgroup>
+                <optgroup label="중량">
+                  <option value="µg">µg</option>
+                  <option value="mg">mg</option>
+                  <option value="g">g</option>
+                  <option value="kg">kg</option>
+                </optgroup>
+              </select>
+            </label>
+          </div>
+
+          <div class="edit-actions">
+            <button id="usageEditSave" class="btn-primary" type="button">수정 저장</button>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../../supabase.js"></script>
-  <script src="./app.js?v=20260927-mobile-storage2"></script>
+  <script src="./app.js?v=20260927-mobile-editfix1"></script>
   <script src="../../../common/common.js"></script>
 </body>
 </html>
