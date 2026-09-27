@@ -909,3 +909,23 @@ tbody tr:last-child td {
 .drawer-viewer-note{margin-top:12px;padding:10px 12px;border:1px solid #dbe3ef;border-radius:12px;background:#f8fafc;color:#64748b;font-size:12px;font-weight:700;text-align:center}
 .qa-health-viewer .month-cell{cursor:default}
 .qa-health-viewer .month-cell:has(.month-event),.qa-health-viewer .next-date-card{cursor:pointer}
+
+
+/* ===== 본인 특수건강진단 예약일 자가입력 ===== */
+.self-reservation-guide{border:1px solid #c4b5fd;background:#f5f3ff;border-radius:12px;padding:12px 14px;display:grid;gap:4px;color:#5b21b6}
+.self-reservation-guide strong{font-size:12px;font-weight:900}
+.self-reservation-guide span{font-size:10.5px;line-height:1.55;color:#6d28d9}
+.self-reservation-section{border-color:#ddd6fe}
+.self-reservation-form{grid-template-columns:1fr}
+.self-reservation-deadline{margin-top:10px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:9px;padding:9px 11px;display:grid;grid-template-columns:auto 1fr;gap:3px 10px;align-items:center}
+.self-reservation-deadline span{font-size:10px;font-weight:800;color:#64748b}
+.self-reservation-deadline b{font-size:12px;color:#0f172a}
+.self-reservation-deadline small{grid-column:1/-1;font-size:9.5px;color:#64748b}
+.self-reservation-note{margin-top:9px;font-size:9.5px;line-height:1.5;color:#64748b}
+.self-reservation-locked{margin-top:9px;border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;border-radius:8px;padding:8px 10px;font-size:9.5px;font-weight:800;line-height:1.45}
+.self-reservation-actions{margin-top:12px}
+.self-reservation-actions .save{min-width:110px}
+.self-admin-info .drawer-row:last-child{border-bottom:0}
+.self-admin-info .drawer-row b{font-weight:800;line-height:1.45;word-break:keep-all}
+.qa-health-viewer #statusBody .month-cell:not([data-disabled="true"]){cursor:pointer}
+@media(max-width:700px){.self-reservation-deadline{grid-template-columns:1fr}.self-reservation-deadline small{grid-column:auto}.self-reservation-actions .save{width:100%}}
