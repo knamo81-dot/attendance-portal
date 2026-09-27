@@ -3,23 +3,24 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>특별관리물질 보관</title>
-  <link rel="stylesheet" href="./style.css?v=20260925-mobile-storage1" />
+  <title>특별관리물질 현황</title>
+  <link rel="stylesheet" href="./style.css?v=20260927-mobile-storage2" />
   <link rel="stylesheet" href="../../../common/mobile.css" />
   <link rel="stylesheet" href="../../../common/theme.css" />
 </head>
 <body>
   <main class="mobile-storage-shell">
     <section class="mobile-storage-app">
-      <div class="view-switch" role="tablist" aria-label="특별관리물질 보관 화면">
-        <button id="todayTab" class="view-btn active" type="button">오늘 수량입력</button>
-        <button id="monthlyTab" class="view-btn" type="button">월간 보관현황</button>
+      <div class="view-switch" role="tablist" aria-label="특별관리물질 현황 화면">
+        <button id="todayTab" class="view-btn active" type="button">당일 현황</button>
+        <button id="monthlyTab" class="view-btn" type="button">월간 현황</button>
+        <button id="usageTab" class="view-btn" type="button">사용일지</button>
       </div>
 
       <section id="todayView" class="screen">
         <div class="screen-head">
           <div>
-            <h2>오늘 수량입력</h2>
+            <h2>당일 현황</h2>
             <p id="todayLabel">-</p>
           </div>
         </div>
@@ -45,7 +46,7 @@
       <section id="monthlyView" class="screen" hidden>
         <div class="screen-head">
           <div>
-            <h2>월간 보관현황</h2>
+            <h2>월간 현황</h2>
             <p>날짜를 선택하면 해당 일자의 제품별 보관수량을 확인할 수 있습니다.</p>
           </div>
         </div>
@@ -85,12 +86,38 @@
           </div>
         </section>
       </section>
+
+      <section id="usageView" class="screen" hidden>
+        <div class="screen-head">
+          <div>
+            <h2>특별관리물질 사용일지</h2>
+            <p>사용입력에서 등록한 특별관리물질 취급기록을 조회합니다.</p>
+          </div>
+        </div>
+
+        <div class="toolbar usage-toolbar">
+          <div class="period-controls">
+            <span>조회기간</span>
+            <select id="usageYearSelect" aria-label="사용일지 조회 연도"></select>
+            <select id="usageMonthSelect" aria-label="사용일지 조회 월"></select>
+          </div>
+          <label class="search-field usage-search">
+            <span>검색</span>
+            <input id="usageSearch" type="search" placeholder="No. / 물질 / CAS / 제품 / 작성자" autocomplete="off" />
+          </label>
+        </div>
+
+        <div id="usageMessage" class="message" aria-live="polite"></div>
+        <div id="usageList" class="usage-list">
+          <div class="empty-card">사용일지를 불러오는 중입니다.</div>
+        </div>
+      </section>
     </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../../supabase.js"></script>
-  <script src="./app.js?v=20260925-mobile-storage1"></script>
+  <script src="./app.js?v=20260927-mobile-storage2"></script>
   <script src="../../../common/common.js"></script>
 </body>
 </html>
