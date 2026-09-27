@@ -26,7 +26,8 @@
     usageQuery: "",
     usageAccidentFilter: "all",
     usageRows: [],
-    usageLoaded: false
+    usageLoaded: false,
+    canManage: false
   };
 
   function pad2(v){ return String(v).padStart(2, "0"); }
@@ -315,7 +316,7 @@
     const rows=filteredRows();
     const dim=daysInMonth(state.year,state.month);
     const today=currentToday();
-    const canEdit=isTodayMonth() && state.dailyTableReady;
+    const canEdit=isTodayMonth() && state.dailyTableReady && state.canManage;
     if(!rows.length){ $("storageBody").innerHTML=`<tr><td class="empty" colspan="${4+dim}">조회기간에 표시할 특별관리물질 보관 제품이 없습니다.</td></tr>`; return; }
 
     $("storageBody").innerHTML=rows.map(row=>{
@@ -352,7 +353,7 @@
 
   function syncSaveButton(){
     const btn=$("saveQuantities");
-    const editable=isTodayMonth()&&state.dailyTableReady&&!state.saving;
+    const editable=isTodayMonth()&&state.dailyTableReady&&!state.saving&&state.canManage;
     const hasChanged=[...document.querySelectorAll("tr.changed-row .qty-input:not(:disabled)")].some(i=>i.value.trim()!=="");
     btn.disabled=!editable||!hasChanged;
     const guide=$("saveGuide");
@@ -362,6 +363,7 @@
   function render(){ renderHeader(); renderBody(); syncSaveButton(); }
 
   async function saveAll(){
+    if(!state.canManage){ setMessage("조회 전용 사용자입니다. 보관수량 입력·수정은 QA 운영자만 가능합니다.","error"); return; }
     if(state.saving||!isTodayMonth()||!state.dailyTableReady) return;
     const inputs=[...document.querySelectorAll("tr.changed-row .qty-input:not(:disabled)")].filter(i=>i.value.trim()!=="");
     if(!inputs.length){ setMessage("저장할 수량이 없습니다."); return; }
@@ -713,8 +715,16 @@
     window.addEventListener("message",e=>{const p=e?.data||{};if(p.type==="portal-tabs-request"||p.type==="portal-filters-request")notifyPortal();});
   }
 
+  function applyPermissionUi(){
+    state.canManage=!!window.SDSApp?.isQaOperator?.();
+    const saveBtn=$("saveQuantities");
+    if(saveBtn){saveBtn.hidden=!state.canManage;saveBtn.style.display=state.canManage?"":"none";}
+    const guide=$("saveGuide");
+    if(guide && !state.canManage) guide.textContent="조회 전용";
+  }
+
   async function init(){
-    fillPeriodOptions(); bindEvents(); notifyPortal(); await switchView("storage"); await refresh();
+    applyPermissionUi(); fillPeriodOptions(); bindEvents(); notifyPortal(); await switchView("storage"); await refresh();
   }
 
   document.addEventListener("DOMContentLoaded",init);
