@@ -19,7 +19,14 @@
     saving: false,
     companyId: "",
     userEmail: "",
-    userName: ""
+    userName: "",
+    currentView: "storage",
+    usageYear: 0,
+    usageMonth: 0,
+    usageQuery: "",
+    usageAccidentFilter: "all",
+    usageRows: [],
+    usageLoaded: false
   };
 
   function pad2(v){ return String(v).padStart(2, "0"); }
@@ -49,7 +56,7 @@
   }
   function notifyPortal(){
     try{
-      window.parent?.postMessage({ type:"portal-tabs-ready", tabs:[{id:"qa-storage",label:"특별관리물질 보관"}], source:"qa-storage" }, "*");
+      window.parent?.postMessage({ type:"portal-tabs-ready", tabs:[{id:"qa-storage",label:"특별관리물질 현황"}], source:"qa-storage" }, "*");
       window.parent?.postMessage({ type:"portal-tab-active", activeTabId:"qa-storage", tabId:"qa-storage", source:"qa-storage" }, "*");
       window.parent?.postMessage({ type:"portal-filters-ready", enabled:false, filters:[], source:"qa-storage" }, "*");
     }catch(_){ }
@@ -70,6 +77,15 @@
     }
     state.year=currentYear; state.month=now.getMonth()+1;
     yearEl.value=String(state.year); monthEl.value=String(state.month);
+
+    const usageYearEl = $("usageYearSelect");
+    const usageMonthEl = $("usageMonthSelect");
+    if(usageYearEl && usageMonthEl){
+      usageYearEl.innerHTML = yearEl.innerHTML;
+      usageMonthEl.innerHTML = monthEl.innerHTML;
+      state.usageYear=currentYear; state.usageMonth=now.getMonth()+1;
+      usageYearEl.value=String(state.usageYear); usageMonthEl.value=String(state.usageMonth);
+    }
   }
 
   function specialActiveInMonth(row){
@@ -384,6 +400,260 @@
     }
   }
 
+
+  const PPE_LABELS = {
+    lab_coat:"실험복",
+    protective_gloves:"보호장갑",
+    safety_glasses:"보안경",
+    dust_mask:"방진마스크",
+    gas_mask:"방독마스크",
+    combined_mask:"방진·방독 겸용마스크",
+    supplied_air:"송기마스크 / 공기호흡기",
+    other:"기타"
+  };
+
+  function formatUsageTime(value){
+    const parts=String(value||"").split(":").map(Number);
+    if(!Number.isFinite(parts[0])) return "-";
+    const hours=(parts[0]||0)+(parts[1]||0)/60+(parts[2]||0)/3600;
+    if(!hours) return "-";
+    return `${Number(hours.toFixed(2))}시간`;
+  }
+
+  function ppeText(row){
+    const values=Array.isArray(row?.ppe)?row.ppe:[];
+    const labels=values.map(code=>{
+      if(code==="other" && row?.ppe_other) return `기타(${row.ppe_other})`;
+      return PPE_LABELS[code]||code;
+    }).filter(Boolean);
+    return labels.length?labels.join(" · "):"-";
+  }
+
+  function usagePeriodRange(){
+    return {
+      start:monthStart(state.usageYear,state.usageMonth),
+      end:monthEnd(state.usageYear,state.usageMonth)
+    };
+  }
+
+  function usageSetMessage(text="",type=""){
+    const el=$("usageMessage");
+    if(!el) return;
+    el.textContent=text;
+    el.classList.toggle("error",type==="error");
+    el.classList.toggle("success",type==="success");
+  }
+
+  async function fetchInChunks(table, select, column, values, extraBuilder=null){
+    const result=[];
+    const list=[...new Set((values||[]).filter(v=>v!==null&&v!==undefined&&v!==""))];
+    for(let i=0;i<list.length;i+=200){
+      let q=db.from(table).select(select).in(column,list.slice(i,i+200));
+      if(typeof extraBuilder==="function") q=extraBuilder(q);
+      const {data,error}=await q;
+      if(error) throw error;
+      result.push(...(data||[]));
+    }
+    return result;
+  }
+
+  async function loadUsageLog(showLoading=true){
+    if(!db) return;
+    if(!state.companyId){
+      const info=sessionInfo();
+      state.companyId=info.companyId; state.userEmail=info.email; state.userName=info.name;
+    }
+    if(!state.companyId){ usageSetMessage("회사 정보를 확인할 수 없습니다.","error"); return; }
+    const {start,end}=usagePeriodRange();
+    if(showLoading) usageSetMessage("특별관리물질 사용일지를 불러오는 중입니다.");
+    try{
+      const baseResult=await db.from("qa_reagent_usage_records")
+        .select("id,company_id,employee_no,employee_name,employee_email,product_id,usage_date,usage_time,quantity_type,quantity,unit,created_at")
+        .eq("company_id",state.companyId)
+        .gte("usage_date",start)
+        .lte("usage_date",end)
+        .order("usage_date",{ascending:true})
+        .order("id",{ascending:true});
+      if(baseResult.error) throw baseResult.error;
+      const baseRows=baseResult.data||[];
+      if(!baseRows.length){ state.usageRows=[]; state.usageLoaded=true; renderUsageLog(); usageSetMessage(""); return; }
+
+      const usageIds=baseRows.map(r=>r.id);
+      const specialRows=await fetchInChunks(
+        "qa_special_substance_usage_records",
+        "id,usage_record_id,company_id,journal_no,work_content,ppe,ppe_other,accident_occurred,damage_detail,action_detail,created_by,created_at,updated_at",
+        "usage_record_id",
+        usageIds,
+        q=>q.eq("company_id",state.companyId)
+      );
+      if(!specialRows.length){ state.usageRows=[]; state.usageLoaded=true; renderUsageLog(); usageSetMessage(""); return; }
+
+      const specialIds=specialRows.map(r=>r.id);
+      const itemRows=await fetchInChunks(
+        "qa_special_substance_usage_items",
+        "id,special_usage_id,substance_id,substance_name_snapshot,cas_no_snapshot,percent_snapshot,created_at",
+        "special_usage_id",
+        specialIds
+      );
+
+      const productIds=[...new Set(baseRows.map(r=>r.product_id).filter(Boolean))];
+      const products=productIds.length ? await fetchInChunks(
+        "product_master",
+        "id,name,maker,code,capacity,grade",
+        "id",
+        productIds
+      ) : [];
+
+      const usageById=new Map(baseRows.map(r=>[Number(r.id),r]));
+      const productById=new Map(products.map(p=>[Number(p.id),p]));
+      const specialById=new Map(specialRows.map(r=>[Number(r.id),r]));
+      const itemsBySpecial=new Map();
+      itemRows.forEach(item=>{
+        const key=Number(item.special_usage_id);
+        if(!itemsBySpecial.has(key)) itemsBySpecial.set(key,[]);
+        itemsBySpecial.get(key).push(item);
+      });
+      itemsBySpecial.forEach(list=>list.sort((a,b)=>Number(a.id)-Number(b.id)));
+
+      const rows=[];
+      specialRows.forEach(sr=>{
+        const usage=usageById.get(Number(sr.usage_record_id));
+        if(!usage) return;
+        const product=productById.get(Number(usage.product_id))||null;
+        const items=itemsBySpecial.get(Number(sr.id))||[];
+        const journalNo=Number(sr.journal_no);
+        items.forEach(item=>{
+          rows.push({
+            journal_no:journalNo,
+            item_id:Number(item.id),
+            special_usage_id:Number(sr.id),
+            usage_record_id:Number(usage.id),
+            usage_date:usage.usage_date,
+            usage_time:usage.usage_time,
+            employee_no:usage.employee_no||"",
+            employee_name:usage.employee_name||usage.employee_email||"-",
+            product_id:usage.product_id,
+            product_name:product?.name||`제품 #${usage.product_id||"-"}`,
+            product_meta:[product?.maker,product?.code,product?.capacity,product?.grade].filter(Boolean).join(" · "),
+            quantity:usage.quantity,
+            unit:usage.unit||"",
+            substance_name:item.substance_name_snapshot||"-",
+            cas_no:item.cas_no_snapshot||"-",
+            percent:item.percent_snapshot||"-",
+            work_content:sr.work_content||"-",
+            ppe:sr.ppe||[],
+            ppe_other:sr.ppe_other||"",
+            accident_occurred:sr.accident_occurred===true,
+            damage_detail:sr.damage_detail||"",
+            action_detail:sr.action_detail||"",
+            created_at:sr.created_at||usage.created_at||""
+          });
+        });
+      });
+      rows.sort((a,b)=>Number(a.journal_no)-Number(b.journal_no) || Number(a.item_id)-Number(b.item_id));
+      state.usageRows=rows;
+      state.usageLoaded=true;
+      renderUsageLog();
+      usageSetMessage("");
+    }catch(error){
+      console.error("[QA Special Usage Log] load failed",error);
+      state.usageRows=[]; state.usageLoaded=true;
+      renderUsageLog();
+      const msg=String(error?.message||"알 수 없는 오류");
+      if(/qa_special_substance_usage_records|qa_special_substance_usage_items|relation .* does not exist|schema cache/i.test(msg)){
+        usageSetMessage("특별관리물질 사용일지 DB 테이블을 확인해 주세요. qa_special_substance_usage_records / qa_special_substance_usage_items가 필요합니다.","error");
+      }else{
+        usageSetMessage(`사용일지 불러오기 실패: ${msg}`,"error");
+      }
+    }
+  }
+
+  function filteredUsageRows(){
+    const q=state.usageQuery.trim().toLowerCase();
+    return state.usageRows.filter(row=>{
+      if(state.usageAccidentFilter==="yes" && !row.accident_occurred) return false;
+      if(state.usageAccidentFilter==="none" && row.accident_occurred) return false;
+      if(!q) return true;
+      const hay=[
+        row.journal_no,row.usage_date,row.employee_name,row.employee_no,
+        row.substance_name,row.cas_no,row.product_name,row.product_meta,row.quantity,row.unit,row.percent,
+        row.work_content,ppeText(row),row.accident_occurred?"사고 있음":"사고 없음"
+      ].join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  function renderUsageLog(){
+    const body=$("usageLogBody");
+    if(!body) return;
+    const rows=filteredUsageRows();
+    if(!rows.length){
+      body.innerHTML='<tr><td class="empty" colspan="12">조회기간에 등록된 특별관리물질 사용기록이 없습니다.</td></tr>';
+      return;
+    }
+    body.innerHTML=rows.map(row=>{
+      const product=`<div class="log-main">${esc(row.product_name)}</div>${row.product_meta?`<div class="log-sub">${esc(row.product_meta)}</div>`:""}`;
+      const author=`<div class="log-main">${esc(row.employee_name)}</div>${row.employee_no?`<div class="log-sub">${esc(row.employee_no)}</div>`:""}`;
+      const accident=row.accident_occurred?'<span class="accident-badge yes">있음</span>':'<span class="accident-badge">없음</span>';
+      return `<tr data-journal-no="${row.journal_no}" data-item-id="${row.item_id}">
+        <td class="journal-no-col">${row.journal_no}</td>
+        <td class="date-col">${esc(row.usage_date||"-")}</td>
+        <td class="author-col">${author}</td>
+        <td class="substance-col">${esc(row.substance_name||"-")}</td>
+        <td class="cas-col">${esc(row.cas_no||"-")}</td>
+        <td class="usage-product-col">${product}</td>
+        <td class="amount-col">${esc(`${row.quantity ?? "-"}${row.unit?` ${row.unit}`:""}`)}</td>
+        <td class="percent-col">${esc(row.percent||"-")}</td>
+        <td class="work-col">${esc(row.work_content||"-")}</td>
+        <td class="ppe-col">${esc(ppeText(row))}</td>
+        <td class="accident-col">${accident}</td>
+        <td class="detail-col"><button type="button" class="detail-btn" data-usage-detail="${row.item_id}">상세</button></td>
+      </tr>`;
+    }).join("");
+  }
+
+  function openUsageDetail(itemId){
+    const row=state.usageRows.find(r=>Number(r.item_id)===Number(itemId));
+    if(!row) return;
+    $("usageDetailTitle").textContent=`특별관리물질 사용기록 No.${row.journal_no}`;
+    $("usageDetailSubtitle").textContent=`${row.usage_date||"-"} · ${row.employee_name||"-"}`;
+    const accidentHtml=row.accident_occurred
+      ? `<div class="detail-item full detail-accident"><span class="detail-label">피해 내용</span><div class="detail-value">${esc(row.damage_detail||"-")}</div></div><div class="detail-item full detail-accident"><span class="detail-label">조치 사항</span><div class="detail-value">${esc(row.action_detail||"-")}</div></div>`
+      : "";
+    $("usageDetailBody").innerHTML=`<div class="detail-grid">
+      <div class="detail-item"><span class="detail-label">사용일지 No.</span><div class="detail-value">${row.journal_no}</div></div>
+      <div class="detail-item"><span class="detail-label">취급일자 / 작성자</span><div class="detail-value">${esc(row.usage_date||"-")} / ${esc(row.employee_name||"-")}${row.employee_no?` (${esc(row.employee_no)})`:""}</div></div>
+      <div class="detail-item full"><span class="detail-label">사용제품</span><div class="detail-value">${esc(row.product_name)}${row.product_meta?`\n${esc(row.product_meta)}`:""}</div></div>
+      <div class="detail-item"><span class="detail-label">제품 취급량</span><div class="detail-value">${esc(`${row.quantity ?? "-"}${row.unit?` ${row.unit}`:""}`)}</div></div>
+      <div class="detail-item"><span class="detail-label">사용시간</span><div class="detail-value">${esc(formatUsageTime(row.usage_time))}</div></div>
+      <div class="detail-item"><span class="detail-label">특별관리물질</span><div class="detail-value">${esc(row.substance_name||"-")}</div></div>
+      <div class="detail-item"><span class="detail-label">CAS No. / 함유량</span><div class="detail-value">${esc(row.cas_no||"-")} / ${esc(row.percent||"-")}</div></div>
+      <div class="detail-item full"><span class="detail-label">작업내용</span><div class="detail-value">${esc(row.work_content||"-")}</div></div>
+      <div class="detail-item full"><span class="detail-label">착용 보호구</span><div class="detail-value">${esc(ppeText(row))}</div></div>
+      <div class="detail-item full${row.accident_occurred?" detail-accident":""}"><span class="detail-label">사고 발생</span><div class="detail-value">${row.accident_occurred?"있음":"없음"}</div></div>
+      ${accidentHtml}
+    </div>`;
+    $("usageDetailModal").hidden=false;
+  }
+
+  function closeUsageDetail(){
+    if($("usageDetailModal")) $("usageDetailModal").hidden=true;
+  }
+
+  async function switchView(view){
+    state.currentView=view==="usage"?"usage":"storage";
+    const usage=state.currentView==="usage";
+    $("storageView").hidden=usage;
+    $("usageView").hidden=!usage;
+    $("storageViewBtn").classList.toggle("active",!usage);
+    $("usageViewBtn").classList.toggle("active",usage);
+    $("pageTitle").textContent=usage?"특별관리물질 사용일지":"특별관리물질 보관";
+    $("pageDesc").textContent=usage
+      ? "QA 사용일지의 사용정보 입력에서 등록된 특별관리물질 취급기록을 조회합니다."
+      : "특별관리물질이 포함된 제품의 보관 병수를 일자별로 확인하고 관리합니다.";
+    if(usage && !state.usageLoaded) await loadUsageLog();
+  }
+
   function shiftMonth(delta){
     let y=state.year;
     let m=state.month + delta;
@@ -414,6 +684,9 @@
   }
 
   function bindEvents(){
+    $("storageViewBtn").addEventListener("click",()=>switchView("storage"));
+    $("usageViewBtn").addEventListener("click",()=>switchView("usage"));
+
     $("yearSelect").addEventListener("change",async()=>{state.year=Number($("yearSelect").value);await refresh();});
     $("monthSelect").addEventListener("change",async()=>{state.month=Number($("monthSelect").value);await refresh();});
     $("storageHead").addEventListener("click",(e)=>{
@@ -424,11 +697,24 @@
     $("searchInput").addEventListener("input",()=>{state.query=$("searchInput").value;renderBody();syncSaveButton();});
     $("stockFilter").addEventListener("change",()=>{state.stockFilter=$("stockFilter").value;renderBody();syncSaveButton();});
     $("saveQuantities").addEventListener("click",saveAll);
+
+    $("usageYearSelect").addEventListener("change",async()=>{state.usageYear=Number($("usageYearSelect").value);await loadUsageLog();});
+    $("usageMonthSelect").addEventListener("change",async()=>{state.usageMonth=Number($("usageMonthSelect").value);await loadUsageLog();});
+    $("usageSearchInput").addEventListener("input",()=>{state.usageQuery=$("usageSearchInput").value;renderUsageLog();});
+    $("usageAccidentFilter").addEventListener("change",()=>{state.usageAccidentFilter=$("usageAccidentFilter").value;renderUsageLog();});
+    $("usageLogBody").addEventListener("click",e=>{
+      const detail=e.target.closest("[data-usage-detail]");
+      if(detail) openUsageDetail(detail.dataset.usageDetail);
+    });
+    $("usageDetailClose").addEventListener("click",closeUsageDetail);
+    $("usageDetailModal").addEventListener("click",e=>{ if(e.target===$("usageDetailModal")) closeUsageDetail(); });
+    document.addEventListener("keydown",e=>{ if(e.key==="Escape" && !$("usageDetailModal").hidden) closeUsageDetail(); });
+
     window.addEventListener("message",e=>{const p=e?.data||{};if(p.type==="portal-tabs-request"||p.type==="portal-filters-request")notifyPortal();});
   }
 
   async function init(){
-    fillPeriodOptions(); bindEvents(); notifyPortal(); await refresh();
+    fillPeriodOptions(); bindEvents(); notifyPortal(); await switchView("storage"); await refresh();
   }
 
   document.addEventListener("DOMContentLoaded",init);
