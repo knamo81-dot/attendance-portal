@@ -929,3 +929,20 @@ tbody tr:last-child td {
 .self-admin-info .drawer-row b{font-weight:800;line-height:1.45;word-break:keep-all}
 .qa-health-viewer #statusBody .month-cell:not([data-disabled="true"]){cursor:pointer}
 @media(max-width:700px){.self-reservation-deadline{grid-template-columns:1fr}.self-reservation-deadline small{grid-column:auto}.self-reservation-actions .save{width:100%}}
+
+
+/* ===== 2026-09-27 본인 예약 취소 ===== */
+.self-reservation-actions .self-reservation-cancel{
+  margin-right:auto;
+  border:1px solid #fecaca;
+  background:#fff;
+  color:#dc2626;
+  cursor:pointer;
+}
+.self-reservation-actions .self-reservation-cancel:hover{background:#fef2f2}
+.self-reservation-actions .self-reservation-cancel:disabled{opacity:.55;cursor:wait}
+@media(max-width:700px){
+  .self-reservation-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .self-reservation-actions .self-reservation-cancel,
+  .self-reservation-actions .save{width:100%;margin:0}
+}
