@@ -904,3 +904,8 @@ tbody tr:last-child td {
 .deadline-due.overdue{color:#dc2626}
 .deadline-help{padding:10px 18px 2px;font-size:9.5px;line-height:1.5;color:#64748b}
 @media(max-width:700px){.deadline-modal-card{width:98vw}.deadline-summary{align-items:flex-start;flex-direction:column;gap:4px}}
+
+/* QA 권한: 조회 전용 특수건강진단 상세 */
+.drawer-viewer-note{margin-top:12px;padding:10px 12px;border:1px solid #dbe3ef;border-radius:12px;background:#f8fafc;color:#64748b;font-size:12px;font-weight:700;text-align:center}
+.qa-health-viewer .month-cell{cursor:default}
+.qa-health-viewer .month-cell:has(.month-event),.qa-health-viewer .next-date-card{cursor:pointer}
