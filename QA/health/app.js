@@ -5,9 +5,70 @@
   const client=()=>window.parent?.portalSupabase||window.portalSupabase||null;
   const fmtDate=v=>v?new Date(v).toLocaleDateString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\. /g,'.').replace(/\.$/,''):'-';
   
+  function portalSession(){
+    try{if(window.parent&&typeof window.parent.getPortalSession==='function')return window.parent.getPortalSession()||{}}catch(_){}
+    try{if(window.parent&&window.parent.portalSession)return window.parent.portalSession}catch(_){}
+    try{return window.portalSession||window.currentPortalSession||{}}catch(_){return{}}
+  }
+  function normalizeRole(role,fallback='user'){
+    const clean=String(role||'').trim().toLowerCase();
+    if(['admin','administrator','관리자'].includes(clean))return'admin';
+    if(['operator','manager','운영자'].includes(clean))return'operator';
+    if(['viewer','readonly','read_only','조회','조회자'].includes(clean))return'viewer';
+    return fallback;
+  }
+  function canManageQa(){
+    const s=portalSession(),appRoles=s.appRoles||s.app_roles||{},q=appRoles.qa||{};
+    if(s.isServiceAdmin===true||s.is_service_admin===true||s.serviceAdmin===true||s.service_admin===true)return true;
+    const globalRole=normalizeRole(s.role||s.workspaceRole||s.workspace_role||s.user?.role||s.profile?.workspace_role||s.profile?.portal_role||s.profile?.company_role||s.profile?.tenant_role||s.profile?.user_role||s.profile?.role||s.employee?.role||'','user');
+    if(globalRole==='admin')return true;
+    const qaRole=normalizeRole(typeof q==='string'?q:(q.role||q.role_key||q.permission||q.permission_key||''),'user');
+    return qaRole==='admin'||qaRole==='operator';
+  }
+  function parseTeamCodes(value){
+    if(Array.isArray(value))return value.map(v=>String(v||'').trim()).filter(Boolean);
+    const text=String(value||'').trim();if(!text)return[];
+    try{const parsed=JSON.parse(text);if(Array.isArray(parsed))return parsed.map(v=>String(v||'').trim()).filter(Boolean)}catch(_){}
+    return text.split(',').map(v=>v.trim()).filter(Boolean);
+  }
+  function healthScope(){
+    if(canManageQa())return{type:'all'};
+    const s=portalSession(),e=s.employee||{},raw=e.raw||{};
+    const authority=String(e.authority||raw.authority||e.duty||raw.duty||raw.job_duty||raw.job_title||raw.responsibility||raw.role_title||'').trim();
+    const employeeNo=String(e.employee_no||e.employeeNo||s.employee_no||s.employeeNo||s.user?.employee_no||s.user?.employeeNo||'').trim();
+    const divisionCode=String(e.division_code||raw.division_code||'').trim();
+    const teamCode=String(e.team_code||raw.team_code||'').trim();
+    if(authority.includes('대표이사'))return{type:'all'};
+    if(authority.includes('소장')||authority.includes('본부장'))return{type:'division',division_code:divisionCode};
+    if(authority.includes('담당')){
+      const teams=parseTeamCodes(e.managed_team_codes||raw.managed_team_codes||raw.managedTeamCodes);
+      if(!teams.length&&teamCode)teams.push(teamCode);
+      return{type:'teams',team_codes:teams};
+    }
+    if(authority.includes('팀장'))return{type:'teams',team_codes:teamCode?[teamCode]:[]};
+    return{type:'self',employee_no:employeeNo};
+  }
+  function employeeAllowed(emp){
+    const scope=healthScope();
+    if(scope.type==='all')return true;
+    if(scope.type==='division')return !!scope.division_code&&String(emp?.division_code||'')===String(scope.division_code);
+    if(scope.type==='teams')return(scope.team_codes||[]).map(String).includes(String(emp?.team_code||''));
+    return !!scope.employee_no&&String(emp?.employee_no||'')===String(scope.employee_no);
+  }
+  function applyPermissionUi(){
+    const manage=canManageQa();
+    const standardsTab=$('.inner-tabs button[data-view="standards"]');
+    if(standardsTab){standardsTab.hidden=!manage;standardsTab.style.display=manage?'':'none';}
+    if($('#refreshBtn')){$('#refreshBtn').hidden=!manage;$('#refreshBtn').style.display=manage?'':'none';}
+    if($('#actionHead'))$('#actionHead').hidden=!manage;
+    if($('.bulk-hint'))$('.bulk-hint').hidden=!manage;
+    document.body.classList.toggle('qa-health-viewer',!manage);
+    if(!manage&&state.view==='standards')setView('status');
+  }
+
   function toast(msg,bad=false){const t=$('#toast');t.textContent=msg;t.className='toast '+(bad?'bad':'');setTimeout(()=>t.classList.add('hidden'),2600)}
   
-  function setView(view){state.view=view;$$('.inner-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===view));$('#standardsView').classList.toggle('hidden',view!=='standards');$('#statusView').classList.toggle('hidden',view!=='status');$('#resultsView').classList.toggle('hidden',view!=='results');if(view==='status'&&!state.status.loaded)loadStatus();}
+  function setView(view){if(view==='standards'&&!canManageQa())view='status';state.view=view;$$('.inner-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===view));$('#standardsView').classList.toggle('hidden',view!=='standards');$('#statusView').classList.toggle('hidden',view!=='status');$('#resultsView').classList.toggle('hidden',view!=='results');if(view==='status'&&!state.status.loaded)loadStatus();}
   $$('.inner-tabs button').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
   
   function setFilter(filter){state.filter=filter;
@@ -23,7 +84,7 @@
     let rows=state.rows.filter(r=>state.filter==='unverified'?r.verification_status==='kosha_not_found':r.is_target===true&&r.verification_status!=='kosha_not_found').filter(r=>{const hay=[r.cas_no,r.name_ko,r.name_en,rowProducts(r).map(p=>p.name).join(' ')].join(' ').toLowerCase();
     const src=r.data_source==='MANUAL'?'MANUAL':(r.source||'KOSHA');return(!q||hay.includes(q))&&(!source||src===source)&&(!first||String(r.first_exam_months||'')===first)&&(!cycle||String(r.exam_cycle_months||'')===cycle)});rows.sort((a,b)=>String(b.latest_usage||'').localeCompare(String(a.latest_usage||''))||String(b.latest_receipt||'').localeCompare(String(a.latest_receipt||''))||String(a.cas_no).localeCompare(String(b.cas_no)));
     $('#standardsBody').innerHTML=rows.length?rows.map(r=>{const src=r.data_source==='MANUAL'?'수기':(r.source||'KOSHA');
-    const action=state.filter==='unverified'?`<button class="mini" data-manual="${r.id}">수기확인</button>`:`<span class="status-ok">${r.status==='inactive'?'비대상':'적용중'}</span>`;
+    const action=state.filter==='unverified'?(canManageQa()?`<button class="mini" data-manual="${r.id}">수기확인</button>`:'-'):`<span class="status-ok">${r.status==='inactive'?'비대상':'적용중'}</span>`;
     return `<tr><td><b>${esc(r.cas_no)}</b></td><td>${esc(r.name_ko||'-')}</td><td>${esc(r.name_en||'-')}</td><td><span class="badge ${src==='수기'?'manual':''}">${esc(src)}</span></td><td>${r.first_exam_months?`<span class="badge green">${esc(r.first_exam_months)}개월</span>`:'-'}</td><td>${r.exam_cycle_months?`<span class="badge">${esc(r.exam_cycle_months)}개월</span>`:'-'}</td><td><div class="products">${rowProducts(r).map(p=>`<div class="product-line">• <b>${esc(p.name)}</b> <small>${esc([p.manufacturer,p.code].filter(Boolean).join(' · '))}</small></div>`).join('')||'-'}</div></td><td class="date"><b>${esc(r.latest_receipt||'-')}</b></td><td class="date"><b>${esc(r.latest_usage||'-')}</b></td><td>${action}</td></tr>`}).join(''):`<tr><td colspan="10" class="empty">${state.filter==='unverified'?'KOSHA 미확인 물질이 없습니다.':'표시할 특수건강진단 대상 유해인자가 없습니다.'}</td></tr>`;
     $$('[data-manual]').forEach(b=>b.addEventListener('click',()=>openManual(Number(b.dataset.manual))));
   }
@@ -143,7 +204,7 @@
   ['searchInput','sourceFilter','firstExamFilter','cycleFilter'].forEach(id=>$('#'+id).addEventListener(id==='searchInput'?'input':'change',render));
 
   // KOSHA 기준정보 전체 갱신
-  $('#refreshBtn').addEventListener('click',async()=>{if(state.loading)return;
+  $('#refreshBtn').addEventListener('click',async()=>{if(!canManageQa())return toast('조회 전용 사용자입니다. 기준정보 갱신은 QA 운영자만 가능합니다.',true);if(state.loading)return;
     const sb=client();
     if(!sb)return toast('Supabase 연결을 찾을 수 없습니다.',true);
     state.loading=true;
@@ -155,7 +216,7 @@
     catch (e){console.error(e);toast('API 기준정보 갱신에 실패했습니다.',true)}
     finally {state.loading=false;b.disabled=false;b.textContent='↻ API 기준정보 갱신'}});
   
-  function openManual(id){const r=state.rows.find(x=>x.id===id);
+  function openManual(id){if(!canManageQa())return toast('조회 전용 사용자입니다. 수기확인은 QA 운영자만 가능합니다.',true);const r=state.rows.find(x=>x.id===id);
     if(!r)return;
     state.manualId=id;
     $('#manualChemical').textContent=`${r.cas_no} · ${r.name_ko||r.name_en||'-'}`;
@@ -173,7 +234,7 @@
     $('#manualModal').addEventListener('click',e=>{if(e.target===$('#manualModal'))closeManual()});
 
   // 미확인 물질 수기 확인 저장
-  $('#manualSave').addEventListener('click',async()=>{const sb=client(),r=state.rows.find(x=>x.id===state.manualId);
+  $('#manualSave').addEventListener('click',async()=>{if(!canManageQa())return toast('조회 전용 사용자입니다. 수기확인은 QA 운영자만 가능합니다.',true);const sb=client(),r=state.rows.find(x=>x.id===state.manualId);
     if(!sb||!r)return;
     const isTarget=$('#manualTarget').value==='true',cycle=$('#manualCycle').value?Number($('#manualCycle').value):null,first=$('#manualFirst').value?Number($('#manualFirst').value):null,source=$('#manualSource').value.trim(),note=$('#manualNote').value.trim();
     if(isTarget&&!cycle)return toast('대상 물질은 검진주기를 입력해 주세요.',true);
@@ -187,7 +248,7 @@
     finally {btn.disabled=false}});
 
   const dateOnly=v=>v?String(v).slice(0,10):null, isTrue=v=>v===true||v==='true'||v==='Y'||v===1||v==='1';
-  const companyId=()=>String(window.parent?.portalSession?.activeCompanyId||window.portalSession?.activeCompanyId||'').trim();
+  const companyId=()=>{const s=portalSession();return String(s.activeCompanyId||s.active_company_id||s.companyId||s.company_id||s.activeCompany?.id||s.company?.id||'').trim()};
   const yearOf=v=>v?+String(v).slice(0,4):null, monthOf=v=>v?+String(v).slice(5,7):null, today=()=>new Date().toISOString().slice(0,10);
   function addMonths(s,m){if(!s||!m)return null;const d=new Date(s+'T00:00:00'),day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+Number(m));d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));return d.toISOString().slice(0,10)}
   const inRange=(d,s,e)=>!!d&&(!s||d>=s)&&(!e||d<=e);
@@ -343,7 +404,7 @@
     $('#statusTargetCount').textContent=rows.length+'명';$('#statusDoneCount').textContent=doneP+'명';$('#statusDueCount').textContent=dueN+'건';$('#statusOverdueCount').textContent=overN+'건';bindMonthCellClicks();bindDeadlineClicks();
   }
 
-  function showLabAssignWarning(){if(state.status.labWarningShown)return;const now=today(),missing=state.status.employees.filter(e=>isTrue(e.special_health_exam_target)).filter(e=>{const leave=dateOnly(e.leave_date);return(!leave||leave>=now)&&e.status!=='퇴사'&&!labAssignDate(e)}).sort((a,b)=>String(a.division_code||'').localeCompare(String(b.division_code||''),'ko',{numeric:true})||String(a.team_code||'').localeCompare(String(b.team_code||''),'ko',{numeric:true})||Number(a.sort_order??9999)-Number(b.sort_order??9999));if(!missing.length)return;state.status.labWarningShown=true;const body=$('#labAssignWarningList');if(body)body.innerHTML=missing.map(e=>`<div class="lab-warning-row"><b>${esc(e.name||'-')}</b><span>${esc(e.employee_no||'-')} · ${esc(divisionName(e.division_code))} / ${esc(teamName(e.team_code))}</span></div>`).join('');$('#labAssignWarningCount')&&($('#labAssignWarningCount').textContent=`${missing.length}명`);$('#labAssignWarningModal')?.classList.remove('hidden')}
+  function showLabAssignWarning(){if(!canManageQa()||state.status.labWarningShown)return;const now=today(),missing=state.status.employees.filter(e=>isTrue(e.special_health_exam_target)).filter(e=>{const leave=dateOnly(e.leave_date);return(!leave||leave>=now)&&e.status!=='퇴사'&&!labAssignDate(e)}).sort((a,b)=>String(a.division_code||'').localeCompare(String(b.division_code||''),'ko',{numeric:true})||String(a.team_code||'').localeCompare(String(b.team_code||''),'ko',{numeric:true})||Number(a.sort_order??9999)-Number(b.sort_order??9999));if(!missing.length)return;state.status.labWarningShown=true;const body=$('#labAssignWarningList');if(body)body.innerHTML=missing.map(e=>`<div class="lab-warning-row"><b>${esc(e.name||'-')}</b><span>${esc(e.employee_no||'-')} · ${esc(divisionName(e.division_code))} / ${esc(teamName(e.team_code))}</span></div>`).join('');$('#labAssignWarningCount')&&($('#labAssignWarningCount').textContent=`${missing.length}명`);$('#labAssignWarningModal')?.classList.remove('hidden')}
 
   const monthDrag={active:false,month:null,empNos:new Set()};
   function clearMonthSelection(){$$('#statusBody .month-cell.bulk-selected').forEach(c=>c.classList.remove('bulk-selected'));monthDrag.empNos.clear();monthDrag.month=null}
@@ -355,6 +416,18 @@
       cell.onmousedown=null;cell.onmouseenter=null;cell.onclick=e=>{e.preventDefault();e.stopPropagation()};return;
     }
     const mode=String(cell.dataset.entryMode||'special');
+    if(!canManageQa()){
+      cell.onmousedown=null;cell.onmouseenter=null;
+      cell.onclick=e=>{
+        e.preventDefault();e.stopPropagation();
+        const emp=state.status.employees.find(x=>String(x.employee_no)===String(cell.dataset.emp));
+        if(!emp)return;
+        const month=Number(cell.dataset.month),year=state.status.year;
+        const exam=drawerExamFor(emp,year,month,mode,cell.dataset.noteId||null);
+        if(exam)openDrawer(cell.dataset.emp,month,mode,cell.dataset.noteId||null);
+      };
+      return;
+    }
     if(mode==='preplacement'||mode==='return'){
       cell.onmousedown=e=>{if(e.button!==0)return;e.preventDefault();e.stopPropagation();monthDrag.active=false;clearMonthSelection()};
       cell.onmouseenter=null;
@@ -369,9 +442,9 @@
 
   let drawerCtx=null;
   const selectedHazardIds=()=>new Set($$('#drawerSelectedHazards [data-chemical-id]').map(x=>String(x.dataset.chemicalId)));
-  function selectedHazardHtml(h,source='manual'){return`<div class="selected-hazard" data-chemical-id="${esc(h.chemical_id)}" data-source="${esc(source)}"><b>${esc(h.cas_no||'-')}</b><div class="hazard-name"><strong>${esc(h.name_ko||h.name_en||'-')}</strong><small>${esc(h.name_en||'')} · 주기 ${esc(h.exam_cycle_months||'-')}개월</small></div><div><span class="source-pill ${source==='manual'?'manual':''}">${source==='manual'?'수동추가':'자동'}</span>${source==='manual'?'<button class="remove-hazard" type="button" title="삭제">×</button>':''}</div></div>`}
+  function selectedHazardHtml(h,source='manual'){return`<div class="selected-hazard" data-chemical-id="${esc(h.chemical_id)}" data-source="${esc(source)}"><b>${esc(h.cas_no||'-')}</b><div class="hazard-name"><strong>${esc(h.name_ko||h.name_en||'-')}</strong><small>${esc(h.name_en||'')} · 주기 ${esc(h.exam_cycle_months||'-')}개월</small></div><div><span class="source-pill ${source==='manual'?'manual':''}">${source==='manual'?'수동추가':'자동'}</span>${source==='manual'&&canManageQa()?'<button class="remove-hazard" type="button" title="삭제">×</button>':''}</div></div>`}
   function bindHazardRemove(){$$('#drawerSelectedHazards .remove-hazard').forEach(b=>b.onclick=()=>b.closest('.selected-hazard')?.remove())}
-  function drawerActionsHtml(isBulk=false,hasData=true){return`<div class="drawer-actions"><button class="delete" id="drawerDelete" type="button" ${hasData?'':'disabled'}>${isBulk?'일괄삭제':'삭제'}</button><button class="save" id="drawerSave" type="button">${isBulk?'일괄저장':'저장'}</button></div>`}
+  function drawerActionsHtml(isBulk=false,hasData=true){if(!canManageQa())return'<div class="drawer-viewer-note">조회 전용</div>';return`<div class="drawer-actions"><button class="delete" id="drawerDelete" type="button" ${hasData?'':'disabled'}>${isBulk?'일괄삭제':'삭제'}</button><button class="save" id="drawerSave" type="button">${isBulk?'일괄저장':'저장'}</button></div>`}
 
   function openDrawer(no,m,forcedType=null,forcedNoteId=null){
     const emp=state.status.employees.find(e=>String(e.employee_no)===String(no)),year=state.status.year;if(!emp)return;
@@ -380,6 +453,8 @@
     const noteId=examType==='return'?(forcedNoteId||period?.noteId||null):null;
     const hz=empHazards(emp),due=examType==='special'?hz.filter(h=>yearOf(h.due)===year&&monthOf(h.due)===m):[];
     const exam=drawerExamFor(emp,year,m,examType,noteId);
+    const readonly=!canManageQa();
+    if(readonly&&!exam)return;
     const linked=exam?state.status.examHazards.filter(x=>String(x.exam_id)===String(exam.id)).map(x=>{const h=state.status.hazards.find(z=>String(z.chemical_id)===String(x.chemical_id));return h?{...h,source_type:x.source_type||'auto'}:null}).filter(Boolean):[];
     const initial=linked.length?linked:due.map(h=>({...h,source_type:'auto'}));
     const note=examType==='return'?(state.status.notes.find(n=>String(n.id)===String(exam?.special_note_id||noteId))||period?.note||null):null;
@@ -393,10 +468,19 @@
     <section class="drawer-section"><h3>검진정보</h3><div class="drawer-form"><label><span>${esc(contextLabel)} 예약일자</span><input id="drawerReservationDate" type="date" value="${esc(dateOnly(exam?.reservation_date)||'')}"></label><label><span>실제 검진일자</span><input id="drawerExamDate" type="date" value="${esc(dateOnly(exam?.exam_date)||'')}"></label><label class="wide"><span>검진기관</span><input id="drawerInstitution" value="${esc(exam?.exam_institution||'')}" placeholder="검진기관 입력"></label></div></section>
     <section class="drawer-section"><div class="drawer-section-head"><h3>검진대상 유해인자</h3><button class="add-hazard-btn" id="addHazardBtn" type="button">+ 유해인자 추가</button></div><div id="drawerSelectedHazards">${initial.length?initial.map(h=>selectedHazardHtml(h,h.source_type)).join(''):'<div class="drawer-empty">등록된 유해인자가 없습니다.</div>'}</div></section>
     <section class="drawer-section"><h3>검진결과</h3><div class="drawer-form"><label><span>결과 요약</span><select id="drawerResult"><option value="">미입력</option><option value="normal" ${exam?.result_summary==='normal'?'selected':''}>정상</option><option value="abnormal" ${exam?.result_summary==='abnormal'?'selected':''}>이상소견</option></select></label><label class="wide"><span>비고</span><textarea id="drawerNote" placeholder="필요한 참고사항 입력">${esc(exam?.note||'')}</textarea></label></div><div class="result-help">정상/이상소견은 포털 내부 현황용 요약값이며 원본 검진결과를 대체하지 않습니다.</div>${drawerActionsHtml(false,!!exam)}</section>`;
-    bindHazardRemove();$('#addHazardBtn').onclick=openHazardPicker;$('#drawerSave').onclick=saveDrawer;$('#drawerDelete').onclick=deleteDrawer;$('#healthDrawer').classList.remove('hidden');$('#healthDrawerBackdrop').classList.remove('hidden');
+    if(readonly){
+      $('#addHazardBtn')?.remove();
+      $$('#drawerBody input, #drawerBody select, #drawerBody textarea, #drawerBody button.remove-hazard').forEach(el=>{el.disabled=true});
+    }else{
+      bindHazardRemove();
+      if($('#addHazardBtn'))$('#addHazardBtn').onclick=openHazardPicker;
+      if($('#drawerSave'))$('#drawerSave').onclick=saveDrawer;
+      if($('#drawerDelete'))$('#drawerDelete').onclick=deleteDrawer;
+    }
+    $('#healthDrawer').classList.remove('hidden');$('#healthDrawerBackdrop').classList.remove('hidden');
   }
 
-  function openBulkDrawer(empNos,m){const year=state.status.year,emps=empNos.map(no=>state.status.employees.find(e=>String(e.employee_no)===String(no))).filter(Boolean);if(emps.length<2){if(emps[0])openDrawer(emps[0].employee_no,m);return}const existing=emps.filter(e=>monthExams(e.employee_no,year,m).length).length;drawerCtx={mode:'bulk',emps,empNos:emps.map(e=>String(e.employee_no)),year,month:m,dirty:new Set()};const names=emps.slice(0,4).map(e=>e.name||e.employee_no).join(', ')+(emps.length>4?` 외 ${emps.length-4}명`:'');$('#drawerName').textContent=`${emps.length}명 선택 · ${year}년 ${m}월 일괄입력`;$('#drawerMeta').textContent=`${names} · 기존 입력 ${existing}명`;
+  function openBulkDrawer(empNos,m){if(!canManageQa())return;const year=state.status.year,emps=empNos.map(no=>state.status.employees.find(e=>String(e.employee_no)===String(no))).filter(Boolean);if(emps.length<2){if(emps[0])openDrawer(emps[0].employee_no,m);return}const existing=emps.filter(e=>monthExams(e.employee_no,year,m).length).length;drawerCtx={mode:'bulk',emps,empNos:emps.map(e=>String(e.employee_no)),year,month:m,dirty:new Set()};const names=emps.slice(0,4).map(e=>e.name||e.employee_no).join(', ')+(emps.length>4?` 외 ${emps.length-4}명`:'');$('#drawerName').textContent=`${emps.length}명 선택 · ${year}년 ${m}월 일괄입력`;$('#drawerMeta').textContent=`${names} · 기존 입력 ${existing}명`;
     $('#drawerBody').innerHTML=`<div class="bulk-guide"><strong>변경한 항목만 선택 인원 전체에 적용합니다.</strong><span>빈칸은 기존 값을 유지합니다. 이미 입력된 값도 새 값을 입력하면 덮어씁니다.</span></div>
     <section class="drawer-section"><h3>검진정보</h3><div class="drawer-form"><label><span>특수검진 예약일자</span><input id="drawerReservationDate" data-bulk-field="reservation_date" type="date"></label><label><span>실제 검진일자</span><input id="drawerExamDate" data-bulk-field="exam_date" type="date"></label><label class="wide"><span>검진기관</span><input id="drawerInstitution" data-bulk-field="exam_institution" placeholder="변경할 경우에만 입력"></label></div><div class="bulk-field-note">※ 입력하지 않은 항목은 각 직원의 기존 데이터가 유지됩니다.</div></section>
     <section class="drawer-section"><div class="drawer-section-head"><h3>검진대상 유해인자 추가</h3><button class="add-hazard-btn" id="addHazardBtn" type="button">+ 유해인자 추가</button></div><div id="drawerSelectedHazards"><div class="drawer-empty">추가할 유해인자만 선택하세요. 각 직원의 기존 유해인자는 유지됩니다.</div></div></section>
@@ -405,11 +489,12 @@
 
   function closeDrawer(){closeHazardPicker();$('#healthDrawer').classList.add('hidden');$('#healthDrawerBackdrop').classList.add('hidden');drawerCtx=null;monthDrag.active=false;clearMonthSelection()}
   function renderHazardPicker(){const q=$('#hazardPickerSearch').value.trim().toLowerCase(),selected=selectedHazardIds();const rows=state.status.hazards.filter(h=>!selected.has(String(h.chemical_id))).filter(h=>!q||`${h.cas_no} ${h.name_ko} ${h.name_en}`.toLowerCase().includes(q)).sort((a,b)=>String(b.latest_usage||'').localeCompare(String(a.latest_usage||''))||String(b.latest_receipt||'').localeCompare(String(a.latest_receipt||''))||String(a.cas_no).localeCompare(String(b.cas_no)));$('#hazardPickerBody').innerHTML=rows.map(h=>`<tr><td><input type="checkbox" data-pick-hazard="${esc(h.chemical_id)}"></td><td><b>${esc(h.cas_no||'-')}</b></td><td><b>${esc(h.name_ko||'-')}</b><small>${esc(h.name_en||'')}</small></td><td>${esc(h.exam_cycle_months||'-')}개월</td><td>${esc(h.latest_receipt||'-')}</td><td>${esc(h.latest_usage||'-')}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">추가할 수 있는 유해인자가 없습니다.</td></tr>'}
-  function openHazardPicker(){$('#hazardPickerSearch').value='';renderHazardPicker();$('#hazardPickerModal').classList.remove('hidden')}
+  function openHazardPicker(){if(!canManageQa())return toast('조회 전용 사용자입니다.',true);$('#hazardPickerSearch').value='';renderHazardPicker();$('#hazardPickerModal').classList.remove('hidden')}
   function closeHazardPicker(){$('#hazardPickerModal').classList.add('hidden')}
-  function addPickedHazards(){const ids=$$('[data-pick-hazard]:checked').map(x=>String(x.dataset.pickHazard));if(!ids.length)return toast('추가할 유해인자를 선택해 주세요.',true);const box=$('#drawerSelectedHazards');box.querySelector('.drawer-empty')?.remove();ids.forEach(id=>{const h=state.status.hazards.find(x=>String(x.chemical_id)===id);if(h&&!box.querySelector(`[data-chemical-id="${CSS.escape(id)}"]`))box.insertAdjacentHTML('beforeend',selectedHazardHtml(h,'manual'))});bindHazardRemove();closeHazardPicker()}
+  function addPickedHazards(){if(!canManageQa())return toast('조회 전용 사용자입니다.',true);const ids=$$('[data-pick-hazard]:checked').map(x=>String(x.dataset.pickHazard));if(!ids.length)return toast('추가할 유해인자를 선택해 주세요.',true);const box=$('#drawerSelectedHazards');box.querySelector('.drawer-empty')?.remove();ids.forEach(id=>{const h=state.status.hazards.find(x=>String(x.chemical_id)===id);if(h&&!box.querySelector(`[data-chemical-id="${CSS.escape(id)}"]`))box.insertAdjacentHTML('beforeend',selectedHazardHtml(h,'manual'))});bindHazardRemove();closeHazardPicker()}
 
   async function saveSingleDrawer(){
+    if(!canManageQa())return toast('조회 전용 사용자입니다. 검진정보 등록·수정은 QA 운영자만 가능합니다.',true);
     if(!drawerCtx||drawerCtx.mode!=='single')return;
     const sb=client(),cid=companyId(),ctx=drawerCtx,reservation=$('#drawerReservationDate').value||null,examDate=$('#drawerExamDate').value||null,institution=$('#drawerInstitution').value.trim()||null,result=$('#drawerResult').value||null,note=$('#drawerNote').value.trim()||null;
     if(!reservation&&!examDate)return toast('예약일자 또는 실제 검진일자를 입력해 주세요.',true);
@@ -431,10 +516,11 @@
   }
 
   function bulkChanges(){const dirty=drawerCtx?.dirty||new Set(),changes={};const values={reservation_date:$('#drawerReservationDate')?.value||'',exam_date:$('#drawerExamDate')?.value||'',exam_institution:$('#drawerInstitution')?.value?.trim()||'',result_summary:$('#drawerResult')?.value||'',note:$('#drawerNote')?.value?.trim()||''};for(const k of dirty){if(values[k]!=='')changes[k]=values[k]}return changes}
-  async function saveBulkDrawer(){if(!drawerCtx||drawerCtx.mode!=='bulk')return;const sb=client(),cid=companyId(),ctx=drawerCtx,changes=bulkChanges(),hazardIds=[...selectedHazardIds()];if(!Object.keys(changes).length&&!hazardIds.length)return toast('변경하거나 추가할 내용을 입력해 주세요.',true);const missing=ctx.emps.filter(emp=>!monthExam(emp.employee_no,ctx.year,ctx.month));if(missing.length&&!changes.reservation_date&&!changes.exam_date)return toast(`신규 입력 대상 ${missing.length}명은 예약일자 또는 실제 검진일자를 함께 입력해 주세요.`,true);const btn=$('#drawerSave');btn.disabled=true;const originalText=btn.textContent;btn.textContent='일괄 저장 중…';try{let saved=0;for(const emp of ctx.emps){let exam=monthExam(emp.employee_no,ctx.year,ctx.month),examId=exam?.id||null;if(examId&&Object.keys(changes).length){const up=await sb.from('qa_special_health_exams').update(changes).eq('id',examId).select('id').single();if(up.error)throw up.error;examId=up.data.id}else if(!examId){const payload={company_id:cid||null,employee_no:String(emp.employee_no),exam_type:'special',...changes};const ins=await sb.from('qa_special_health_exams').insert(payload).select('id').single();if(ins.error)throw ins.error;examId=ins.data.id}if(hazardIds.length){const existing=new Set(state.status.examHazards.filter(x=>String(x.exam_id)===String(examId)).map(x=>String(x.chemical_id)));const rows=hazardIds.filter(id=>!existing.has(String(id))).map(id=>{const h=state.status.hazards.find(x=>String(x.chemical_id)===String(id));return{exam_id:examId,chemical_id:Number(id),first_exam_months:h?.first_exam_months||null,exam_cycle_months:h?.exam_cycle_months||null,source_type:'manual'}});if(rows.length){const hi=await sb.from('qa_special_health_exam_hazards').insert(rows);if(hi.error)throw hi.error}}saved++}toast(`${saved}명의 특수건강진단 정보를 일괄 저장했습니다.`);closeDrawer();await loadStatus()}catch(e){console.error(e);toast('일괄 저장에 실패했습니다: '+String(e.message||e),true)}finally{btn.disabled=false;btn.textContent=originalText||'일괄저장'}}
+  async function saveBulkDrawer(){if(!canManageQa())return toast('조회 전용 사용자입니다. 검진정보 등록·수정은 QA 운영자만 가능합니다.',true);if(!drawerCtx||drawerCtx.mode!=='bulk')return;const sb=client(),cid=companyId(),ctx=drawerCtx,changes=bulkChanges(),hazardIds=[...selectedHazardIds()];if(!Object.keys(changes).length&&!hazardIds.length)return toast('변경하거나 추가할 내용을 입력해 주세요.',true);const missing=ctx.emps.filter(emp=>!monthExam(emp.employee_no,ctx.year,ctx.month));if(missing.length&&!changes.reservation_date&&!changes.exam_date)return toast(`신규 입력 대상 ${missing.length}명은 예약일자 또는 실제 검진일자를 함께 입력해 주세요.`,true);const btn=$('#drawerSave');btn.disabled=true;const originalText=btn.textContent;btn.textContent='일괄 저장 중…';try{let saved=0;for(const emp of ctx.emps){let exam=monthExam(emp.employee_no,ctx.year,ctx.month),examId=exam?.id||null;if(examId&&Object.keys(changes).length){const up=await sb.from('qa_special_health_exams').update(changes).eq('id',examId).select('id').single();if(up.error)throw up.error;examId=up.data.id}else if(!examId){const payload={company_id:cid||null,employee_no:String(emp.employee_no),exam_type:'special',...changes};const ins=await sb.from('qa_special_health_exams').insert(payload).select('id').single();if(ins.error)throw ins.error;examId=ins.data.id}if(hazardIds.length){const existing=new Set(state.status.examHazards.filter(x=>String(x.exam_id)===String(examId)).map(x=>String(x.chemical_id)));const rows=hazardIds.filter(id=>!existing.has(String(id))).map(id=>{const h=state.status.hazards.find(x=>String(x.chemical_id)===String(id));return{exam_id:examId,chemical_id:Number(id),first_exam_months:h?.first_exam_months||null,exam_cycle_months:h?.exam_cycle_months||null,source_type:'manual'}});if(rows.length){const hi=await sb.from('qa_special_health_exam_hazards').insert(rows);if(hi.error)throw hi.error}}saved++}toast(`${saved}명의 특수건강진단 정보를 일괄 저장했습니다.`);closeDrawer();await loadStatus()}catch(e){console.error(e);toast('일괄 저장에 실패했습니다: '+String(e.message||e),true)}finally{btn.disabled=false;btn.textContent=originalText||'일괄저장'}}
   async function saveDrawer(){if(drawerCtx?.mode==='bulk')return saveBulkDrawer();return saveSingleDrawer()}
 
   async function deleteDrawer(){
+    if(!canManageQa())return toast('조회 전용 사용자입니다. 검진정보 삭제는 QA 운영자만 가능합니다.',true);
     if(!drawerCtx)return;const sb=client(),ctx=drawerCtx;let exams=[];
     if(ctx.mode==='bulk')exams=ctx.emps.flatMap(emp=>monthExams(emp.employee_no,ctx.year,ctx.month));
     else if(ctx.examId){const hit=state.status.exams.find(e=>String(e.id)===String(ctx.examId));if(hit)exams=[hit]}
@@ -448,10 +534,98 @@
     catch(e){console.error(e);toast('삭제에 실패했습니다: '+String(e.message||e),true)}finally{btn.disabled=false;btn.textContent=originalText}
   }
 
-  async function loadStatus(){const sb=client();if(!sb)return;try{const cid=companyId();let eq=sb.from('employees').select('*');if(cid)eq=eq.eq('company_id',cid);let dq=sb.from('divisions').select('division_code,division_name,company_id,is_active');let tq=sb.from('teams').select('team_code,team_name,division_code,company_id,is_active');if(cid){dq=dq.eq('company_id',cid);tq=tq.eq('company_id',cid)}const [er,pfr,nr,xr,hr,sr,cr,pr,ur,rr,dr,tr]=await Promise.all([eq,sb.from('research_staff_profiles').select('*'),sb.from('employee_special_notes').select('*'),sb.from('qa_special_health_exams').select('*'),sb.from('qa_special_health_exam_hazards').select('*'),sb.from('qa_special_health_exam_standards').select('*'),sb.from('qa_chemical_master').select('id,cas_no,chem_name_ko,chem_name_en'),sb.from('product_cas').select('product_id,cas_no'),sb.from('qa_reagent_usage_records').select('product_id,usage_date'),sb.from('reagent_collect_items').select('product_id,receipt_date'),dq,tq]);for(const r of[er,pfr,nr,xr,hr,sr,cr,pr,ur,dr,tr])if(r.error)throw r.error;if(rr.error)console.warn('최근입고일 조회 생략',rr.error);state.status.employees=er.data||[];const empNos=new Set(state.status.employees.map(e=>String(e.employee_no)));state.status.profiles=(pfr.data||[]).filter(p=>empNos.has(String(p.employee_no))&&(!cid||!p.company_id||String(p.company_id)===cid));state.status.divisions=(dr.data||[]).filter(x=>x.is_active!==false);state.status.teams=(tr.data||[]).filter(x=>x.is_active!==false);state.status.notes=(nr.data||[]).filter(n=>!cid||!n.company_id||String(n.company_id)===cid);state.status.exams=(xr.data||[]).filter(e=>!cid||String(e.company_id)===cid);state.status.examHazards=hr.data||[];const cm=new Map((cr.data||[]).map(c=>[c.id,c])),cp=new Map(),up=new Map(),rp=new Map();(pr.data||[]).forEach(x=>{const a=cp.get(x.cas_no)||[];a.push(x.product_id);cp.set(x.cas_no,a)});(ur.data||[]).forEach(u=>{if(!u.usage_date)return;const a=up.get(u.product_id)||[];a.push(dateOnly(u.usage_date));up.set(u.product_id,a)});(rr.data||[]).forEach(r=>{if(!r.receipt_date)return;const a=rp.get(r.product_id)||[];a.push(dateOnly(r.receipt_date));rp.set(r.product_id,a)});const cut=new Date();cut.setFullYear(cut.getFullYear()-1);const cs=cut.toISOString().slice(0,10);state.status.hazards=(sr.data||[]).filter(s=>s.is_target===true&&s.status!=='inactive'&&s.verification_status!=='kosha_not_found').map(s=>{const c=cm.get(s.chemical_id)||{},pids=cp.get(c.cas_no)||[],dates=pids.flatMap(id=>up.get(id)||[]).sort(),receipts=pids.flatMap(id=>rp.get(id)||[]).sort();return{...s,cas_no:c.cas_no||'',name_ko:c.chem_name_ko||'',name_en:c.chem_name_en||'',first_usage:dates[0]||null,latest_usage:dates.at(-1)||null,latest_receipt:receipts.at(-1)||null,active_usage:dates.some(d=>d>=cs)}});state.status.loaded=true;fillStatusFilters();renderStatus();showLabAssignWarning()}catch(e){console.error(e);$('#statusBody').innerHTML=`<tr><td colspan="16" class="empty">현황 조회 실패: ${esc(e.message||e)}</td></tr>`;toast('특수건강진단 현황을 불러오지 못했습니다.',true)}}
+  async function loadStatus(){
+    const sb=client();
+    if(!sb)return;
+    try{
+      const cid=companyId();
+
+      // 1) 먼저 현재 회사의 사원/조직만 조회한 뒤, 세션 권한범위로 대상자를 제한합니다.
+      let eq=sb.from('employees').select('*');
+      if(cid)eq=eq.eq('company_id',cid);
+      let dq=sb.from('divisions').select('division_code,division_name,company_id,is_active');
+      let tq=sb.from('teams').select('team_code,team_name,division_code,company_id,is_active');
+      if(cid){dq=dq.eq('company_id',cid);tq=tq.eq('company_id',cid)}
+      const [er,dr,tr]=await Promise.all([eq,dq,tq]);
+      for(const r of[er,dr,tr])if(r.error)throw r.error;
+
+      state.status.employees=(er.data||[]).filter(employeeAllowed);
+      state.status.divisions=(dr.data||[]).filter(x=>x.is_active!==false);
+      state.status.teams=(tr.data||[]).filter(x=>x.is_active!==false);
+
+      const empNoList=state.status.employees.map(e=>String(e.employee_no||'')).filter(Boolean);
+      const empNos=new Set(empNoList);
+
+      // 2) 건강검진 개인정보는 권한범위에 포함된 사번만 조회합니다.
+      //    UI 필터뿐 아니라 브라우저로 내려오는 데이터 자체도 범위 밖 인원을 제외합니다.
+      let pfrQ=sb.from('research_staff_profiles').select('*');
+      let noteQ=sb.from('employee_special_notes').select('*');
+      let examQ=sb.from('qa_special_health_exams').select('*');
+      if(empNoList.length){
+        pfrQ=pfrQ.in('employee_no',empNoList);
+        noteQ=noteQ.in('employee_no',empNoList);
+        examQ=examQ.in('employee_no',empNoList);
+      }else{
+        // 빈 범위에서 전체 조회로 풀리는 것을 막기 위한 존재하지 않는 사번 조건
+        pfrQ=pfrQ.eq('employee_no','__NO_QA_HEALTH_SCOPE__');
+        noteQ=noteQ.eq('employee_no','__NO_QA_HEALTH_SCOPE__');
+        examQ=examQ.eq('employee_no','__NO_QA_HEALTH_SCOPE__');
+      }
+      if(cid)examQ=examQ.eq('company_id',cid);
+
+      let usageQ=sb.from('qa_reagent_usage_records').select('product_id,usage_date');
+      if(cid)usageQ=usageQ.eq('company_id',cid);
+
+      const [pfr,nr,xr,sr,cr,pr,ur,rr]=await Promise.all([
+        pfrQ,
+        noteQ,
+        examQ,
+        sb.from('qa_special_health_exam_standards').select('*'),
+        sb.from('qa_chemical_master').select('id,cas_no,chem_name_ko,chem_name_en'),
+        sb.from('product_cas').select('product_id,cas_no'),
+        usageQ,
+        sb.from('reagent_collect_items').select('product_id,receipt_date')
+      ]);
+      for(const r of[pfr,nr,xr,sr,cr,pr,ur])if(r.error)throw r.error;
+      if(rr.error)console.warn('최근입고일 조회 생략',rr.error);
+
+      state.status.profiles=(pfr.data||[]).filter(p=>empNos.has(String(p.employee_no))&&(!cid||!p.company_id||String(p.company_id)===cid));
+      state.status.notes=(nr.data||[]).filter(n=>empNos.has(String(n.employee_no))&&(!cid||!n.company_id||String(n.company_id)===cid));
+      state.status.exams=(xr.data||[]).filter(e=>empNos.has(String(e.employee_no))&&(!cid||String(e.company_id)===cid));
+
+      // 3) 검진별 유해인자도 현재 권한범위의 검진 ID만 조회합니다.
+      const examIds=state.status.exams.map(e=>e.id).filter(v=>v!==null&&v!==undefined&&v!=='');
+      let hrData=[];
+      if(examIds.length){
+        const hr=await sb.from('qa_special_health_exam_hazards').select('*').in('exam_id',examIds);
+        if(hr.error)throw hr.error;
+        hrData=hr.data||[];
+      }
+      state.status.examHazards=hrData;
+
+      const cm=new Map((cr.data||[]).map(c=>[c.id,c])),cp=new Map(),up=new Map(),rp=new Map();
+      (pr.data||[]).forEach(x=>{const a=cp.get(x.cas_no)||[];a.push(x.product_id);cp.set(x.cas_no,a)});
+      (ur.data||[]).forEach(u=>{if(!u.usage_date)return;const a=up.get(u.product_id)||[];a.push(dateOnly(u.usage_date));up.set(u.product_id,a)});
+      (rr.data||[]).forEach(r=>{if(!r.receipt_date)return;const a=rp.get(r.product_id)||[];a.push(dateOnly(r.receipt_date));rp.set(r.product_id,a)});
+      const cut=new Date();cut.setFullYear(cut.getFullYear()-1);const cs=cut.toISOString().slice(0,10);
+      state.status.hazards=(sr.data||[])
+        .filter(s=>s.is_target===true&&s.status!=='inactive'&&s.verification_status!=='kosha_not_found')
+        .map(s=>{const c=cm.get(s.chemical_id)||{},pids=cp.get(c.cas_no)||[],dates=pids.flatMap(id=>up.get(id)||[]).sort(),receipts=pids.flatMap(id=>rp.get(id)||[]).sort();return{...s,cas_no:c.cas_no||'',name_ko:c.chem_name_ko||'',name_en:c.chem_name_en||'',first_usage:dates[0]||null,latest_usage:dates.at(-1)||null,latest_receipt:receipts.at(-1)||null,active_usage:dates.some(d=>d>=cs)}});
+
+      state.status.loaded=true;
+      fillStatusFilters();
+      renderStatus();
+      showLabAssignWarning();
+    }catch(e){
+      console.error(e);
+      $('#statusBody').innerHTML=`<tr><td colspan="16" class="empty">현황 조회 실패: ${esc(e.message||e)}</td></tr>`;
+      toast('특수건강진단 현황을 불러오지 못했습니다.',true);
+    }
+  }
   // 월 셀 클릭 이벤트는 renderStatus() 직후 각 셀에 직접 바인딩한다.
   $('#statusYear')?.addEventListener('change',()=>{state.status.year=Number($('#statusYear').value);syncStatusCategoryForYear(true);renderStatus()});$('#statusCategory')?.addEventListener('change',renderStatus);$('#statusDivision')?.addEventListener('change',()=>{updateTeams();renderStatus()});$('#statusTeam')?.addEventListener('change',renderStatus);$('#statusSearch')?.addEventListener('input',renderStatus);$('#drawerClose')?.addEventListener('click',closeDrawer);$('#healthDrawerBackdrop')?.addEventListener('click',closeDrawer);$('#hazardPickerClose')?.addEventListener('click',closeHazardPicker);$('#hazardPickerCancel')?.addEventListener('click',closeHazardPicker);$('#hazardPickerAdd')?.addEventListener('click',addPickedHazards);$('#hazardPickerSearch')?.addEventListener('input',renderHazardPicker);$('#labAssignWarningClose')?.addEventListener('click',()=>$('#labAssignWarningModal')?.classList.add('hidden'));$('#labAssignWarningOk')?.addEventListener('click',()=>$('#labAssignWarningModal')?.classList.add('hidden'));$('#deadlineModalClose')?.addEventListener('click',closeDeadlineModal);$('#deadlineModalOk')?.addEventListener('click',closeDeadlineModal);$('#deadlineModal')?.addEventListener('click',e=>{if(e.target?.id==='deadlineModal')closeDeadlineModal()});
 
-  load();
+  applyPermissionUi();
+  if(canManageQa())load();
   loadStatus();
 })();
