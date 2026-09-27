@@ -1078,10 +1078,32 @@
     }).join('');
   }
 
+  function parkUsageEditSection() {
+    const list = $('usageDetailList');
+    const section = $('usageEditSection');
+    if (!list || !section) return;
+    if (section.parentElement === list) {
+      list.insertAdjacentElement('afterend', section);
+    }
+  }
+
+  function placeUsageEditBelowRecord(id) {
+    const list = $('usageDetailList');
+    const section = $('usageEditSection');
+    if (!list || !section) return;
+    const card = list.querySelector(`[data-detail-record="${Number(id)}"]`);
+    if (!card) return;
+    card.insertAdjacentElement('afterend', section);
+  }
+
   function renderUsageDetail() {
     const records = recordsByIds(state.detailRecordIds);
     $('usageDetailContext').textContent = state.detailContext || '';
     const list = $('usageDetailList');
+
+    // 수정영역이 특정 카드 아래로 이동된 상태에서 목록을 다시 그리면
+    // innerHTML에 의해 삭제될 수 있으므로 먼저 기본 위치로 복귀시킨다.
+    parkUsageEditSection();
 
     if (!records.length) {
       list.innerHTML = '<div class="usage-detail-empty">표시할 사용내역이 없습니다.</div>';
@@ -1128,6 +1150,7 @@
   function closeUsageDetail() {
     $('usageDetailModal').hidden = true;
     $('usageEditSection').hidden = true;
+    parkUsageEditSection();
     state.detailRecordIds = [];
     state.detailContext = '';
     state.detailReadonly = false;
@@ -1146,8 +1169,12 @@
     $('usageEditQuantity').value = String(r.quantity ?? '');
     $('usageEditUnit').value = r.unit || 'mL';
     renderEditProductOptions(r.product_id);
+
+    // 모바일에서는 수정하려는 제품 카드 바로 아래에 수정영역을 배치한다.
+    // 다른 기록을 수정하면 동일한 수정영역이 해당 카드 아래로 이동한다.
+    placeUsageEditBelowRecord(r.id);
     $('usageEditSection').hidden = false;
-    $('usageEditSection').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    $('usageEditSection').scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
   }
 
   async function saveUsageEdit() {
@@ -1425,6 +1452,7 @@
     });
     $('usageEditCancel').addEventListener('click', () => {
       $('usageEditSection').hidden = true;
+      parkUsageEditSection();
       state.isEditing = false;
       setMessage('usageDetailMessage');
     });
