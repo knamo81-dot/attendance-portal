@@ -5783,6 +5783,31 @@ body.auth-loading .top-user-bar {
     window.addEventListener('message', function (event) {
       const payload = event?.data || {};
 
+      if (payload.type === 'portal-permissions-updated' || payload.type === 'PORTAL_PERMISSIONS_UPDATED') {
+        // 설정 > 권한관리에서 수동 권한이 변경되면 현재 로그인 사용자의
+        // user_app_roles를 즉시 다시 읽어 부모 세션과 현재 iframe에 반영합니다.
+        (async function () {
+          try {
+            await refreshPortalIdentityContext();
+            publishPortalSession();
+            applyRoleUI();
+            updateSettingsButtonVisibility();
+            updateQaButtonVisibility();
+            scheduleResearchStaffButtonVisibilityRefresh();
+            postAuthToFrame();
+
+            try {
+              window.dispatchEvent(new CustomEvent('portal-permissions-refreshed', {
+                detail: window.portalSession || {}
+              }));
+            } catch (_) {}
+          } catch (error) {
+            console.error('[PortalPermission] permission refresh failed:', error);
+          }
+        })();
+        return;
+      }
+
       if (payload.type === 'portal-brand-updated') {
         const brandValue = payload.settingValue || payload.setting_value || payload;
         const nextColor = brandValue.brandColor || brandValue.brand_color || brandValue.color;
