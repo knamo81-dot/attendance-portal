@@ -31,11 +31,22 @@
     try{const parsed=JSON.parse(text);if(Array.isArray(parsed))return parsed.map(v=>String(v||'').trim()).filter(Boolean)}catch(_){}
     return text.split(',').map(v=>v.trim()).filter(Boolean);
   }
+  function currentEmployeeNo(){
+    const s=portalSession(),e=s.employee||{},raw=e.raw||{};
+    return String(e.employee_no||e.employeeNo||raw.employee_no||raw.employeeNo||s.employee_no||s.employeeNo||s.user?.employee_no||s.user?.employeeNo||'').trim();
+  }
+  function isSelfEmployee(emp){
+    const no=currentEmployeeNo();
+    return !!no&&String(emp?.employee_no||'').trim()===no;
+  }
+  function canEditOwnReservation(emp){
+    return !canManageQa()&&isSelfEmployee(emp);
+  }
   function healthScope(){
     if(canManageQa())return{type:'all'};
     const s=portalSession(),e=s.employee||{},raw=e.raw||{};
     const authority=String(e.authority||raw.authority||e.duty||raw.duty||raw.job_duty||raw.job_title||raw.responsibility||raw.role_title||'').trim();
-    const employeeNo=String(e.employee_no||e.employeeNo||s.employee_no||s.employeeNo||s.user?.employee_no||s.user?.employeeNo||'').trim();
+    const employeeNo=currentEmployeeNo();
     const divisionCode=String(e.division_code||raw.division_code||'').trim();
     const teamCode=String(e.team_code||raw.team_code||'').trim();
     if(authority.includes('대표이사'))return{type:'all'};
@@ -424,7 +435,9 @@
         if(!emp)return;
         const month=Number(cell.dataset.month),year=state.status.year;
         const exam=drawerExamFor(emp,year,month,mode,cell.dataset.noteId||null);
-        if(exam)openDrawer(cell.dataset.emp,month,mode,cell.dataset.noteId||null);
+        // 일반사용자/자동권한 사용자는 타인 기록은 조회만 가능하지만,
+        // 본인 기록은 검진정보가 아직 없어도 예약일자를 직접 등록할 수 있습니다.
+        if(canEditOwnReservation(emp)||exam)openDrawer(cell.dataset.emp,month,mode,cell.dataset.noteId||null);
       };
       return;
     }
@@ -453,22 +466,41 @@
     const noteId=examType==='return'?(forcedNoteId||period?.noteId||null):null;
     const hz=empHazards(emp),due=examType==='special'?hz.filter(h=>yearOf(h.due)===year&&monthOf(h.due)===m):[];
     const exam=drawerExamFor(emp,year,m,examType,noteId);
-    const readonly=!canManageQa();
-    if(readonly&&!exam)return;
+    const manage=canManageQa();
+    const selfReservationOnly=canEditOwnReservation(emp);
+    const viewerOnly=!manage&&!selfReservationOnly;
+    if(viewerOnly&&!exam)return;
     const linked=exam?state.status.examHazards.filter(x=>String(x.exam_id)===String(exam.id)).map(x=>{const h=state.status.hazards.find(z=>String(z.chemical_id)===String(x.chemical_id));return h?{...h,source_type:x.source_type||'auto'}:null}).filter(Boolean):[];
     const initial=linked.length?linked:due.map(h=>({...h,source_type:'auto'}));
     const note=examType==='return'?(state.status.notes.find(n=>String(n.id)===String(exam?.special_note_id||noteId))||period?.note||null):null;
     const contextLabel=examType==='preplacement'?'발령 전 검진':examType==='return'?'복귀 전 검진':'특수건강진단';
     const contextDetail=examType==='preplacement'?`연구소 발령일 ${labAssignDate(emp)||'-'}`:examType==='return'?`${note?.issue_type||period?.label||'연구소 부재'} · ${dateOnly(note?.start_date)||'-'} ~ ${dateOnly(note?.end_date)||'계속'}`:`연구소 발령일 ${labAssignDate(emp)||'-'}`;
-    drawerCtx={mode:'single',emp,year,month:m,examId:exam?.id||null,examType,noteId:note?.id??noteId??null,period};
+    drawerCtx={mode:'single',emp,year,month:m,examId:exam?.id||null,examType,noteId:note?.id??noteId??null,period,selfReservationOnly};
     $('#drawerName').textContent=`${emp.name||'-'} · ${year}년 ${m}월`;
     $('#drawerMeta').textContent=`${emp.employee_no} · ${divisionName(emp.division_code)} / ${teamName(emp.team_code)} · ${contextLabel}`;
     const bannerClass=examType==='preplacement'?'preplacement':examType==='return'?'return':'special';
+
+    if(selfReservationOnly){
+      const completed=!!exam?.exam_date;
+      const nextInfo=nextExamSummary(hz);
+      const hazardNames=(linked.length?linked:due).map(h=>`${h.name_ko||h.name_en||'-'}${h.cas_no?` (${h.cas_no})`:''}`);
+      $('#drawerBody').innerHTML=`<div class="exam-context-banner ${bannerClass}"><b>${esc(contextLabel)}</b><span>${esc(contextDetail)}</span></div>
+      <div class="self-reservation-guide"><strong>본인 예약일자 입력</strong><span>예약일자만 직접 입력·수정할 수 있습니다. 검진기관·유해인자·검진결과는 QA 운영자가 관리합니다.</span></div>
+      <section class="drawer-section self-reservation-section"><h3>예약정보</h3><div class="drawer-form self-reservation-form"><label class="wide"><span>${esc(contextLabel)} 예약일자</span><input id="drawerReservationDate" type="date" value="${esc(dateOnly(exam?.reservation_date)||'')}" ${completed?'disabled':''}></label></div>
+      ${nextInfo?`<div class="self-reservation-deadline"><span>다음 검진기한</span><b>${esc(nextInfo.due||'-')}</b><small>[${esc(nextInfo.kindLabel||'')}] ${esc(nextInfo.summary||'')}</small></div>`:''}
+      ${completed?'<div class="self-reservation-locked">실제 검진일이 등록된 완료 건은 예약일자를 수정할 수 없습니다.</div>':'<div class="self-reservation-note">예약일을 선택하면 해당 날짜가 속한 월 칸에 예약으로 표시됩니다.</div>'}
+      ${completed?'':`<div class="drawer-actions self-reservation-actions"><button class="save" id="drawerSave" type="button">예약일 저장</button></div>`}</section>
+      <section class="drawer-section self-admin-info"><h3>관리정보</h3><div class="drawer-row"><span>실제 검진일</span><b>${esc(dateOnly(exam?.exam_date)||'-')}</b></div><div class="drawer-row"><span>검진기관</span><b>${esc(exam?.exam_institution||'-')}</b></div><div class="drawer-row"><span>유해인자</span><b>${hazardNames.length?esc(hazardNames.join(', ')):'-'}</b></div></section>`;
+      if($('#drawerSave'))$('#drawerSave').onclick=saveDrawer;
+      $('#healthDrawer').classList.remove('hidden');$('#healthDrawerBackdrop').classList.remove('hidden');
+      return;
+    }
+
     $('#drawerBody').innerHTML=`<div class="exam-context-banner ${bannerClass}"><b>${esc(contextLabel)}</b><span>${esc(contextDetail)}</span></div>
     <section class="drawer-section"><h3>검진정보</h3><div class="drawer-form"><label><span>${esc(contextLabel)} 예약일자</span><input id="drawerReservationDate" type="date" value="${esc(dateOnly(exam?.reservation_date)||'')}"></label><label><span>실제 검진일자</span><input id="drawerExamDate" type="date" value="${esc(dateOnly(exam?.exam_date)||'')}"></label><label class="wide"><span>검진기관</span><input id="drawerInstitution" value="${esc(exam?.exam_institution||'')}" placeholder="검진기관 입력"></label></div></section>
     <section class="drawer-section"><div class="drawer-section-head"><h3>검진대상 유해인자</h3><button class="add-hazard-btn" id="addHazardBtn" type="button">+ 유해인자 추가</button></div><div id="drawerSelectedHazards">${initial.length?initial.map(h=>selectedHazardHtml(h,h.source_type)).join(''):'<div class="drawer-empty">등록된 유해인자가 없습니다.</div>'}</div></section>
     <section class="drawer-section"><h3>검진결과</h3><div class="drawer-form"><label><span>결과 요약</span><select id="drawerResult"><option value="">미입력</option><option value="normal" ${exam?.result_summary==='normal'?'selected':''}>정상</option><option value="abnormal" ${exam?.result_summary==='abnormal'?'selected':''}>이상소견</option></select></label><label class="wide"><span>비고</span><textarea id="drawerNote" placeholder="필요한 참고사항 입력">${esc(exam?.note||'')}</textarea></label></div><div class="result-help">정상/이상소견은 포털 내부 현황용 요약값이며 원본 검진결과를 대체하지 않습니다.</div>${drawerActionsHtml(false,!!exam)}</section>`;
-    if(readonly){
+    if(viewerOnly){
       $('#addHazardBtn')?.remove();
       $$('#drawerBody input, #drawerBody select, #drawerBody textarea, #drawerBody button.remove-hazard').forEach(el=>{el.disabled=true});
     }else{
@@ -493,7 +525,43 @@
   function closeHazardPicker(){$('#hazardPickerModal').classList.add('hidden')}
   function addPickedHazards(){if(!canManageQa())return toast('조회 전용 사용자입니다.',true);const ids=$$('[data-pick-hazard]:checked').map(x=>String(x.dataset.pickHazard));if(!ids.length)return toast('추가할 유해인자를 선택해 주세요.',true);const box=$('#drawerSelectedHazards');box.querySelector('.drawer-empty')?.remove();ids.forEach(id=>{const h=state.status.hazards.find(x=>String(x.chemical_id)===id);if(h&&!box.querySelector(`[data-chemical-id="${CSS.escape(id)}"]`))box.insertAdjacentHTML('beforeend',selectedHazardHtml(h,'manual'))});bindHazardRemove();closeHazardPicker()}
 
+  async function saveOwnReservation(){
+    if(!drawerCtx||drawerCtx.mode!=='single'||drawerCtx.selfReservationOnly!==true)return;
+    const ctx=drawerCtx;
+    if(!canEditOwnReservation(ctx.emp))return toast('본인 예약일자만 입력할 수 있습니다.',true);
+    if(ctx.examId){
+      const existing=state.status.exams.find(e=>String(e.id)===String(ctx.examId));
+      if(existing?.exam_date)return toast('검진완료 건은 예약일자를 수정할 수 없습니다.',true);
+    }
+    const reservation=$('#drawerReservationDate')?.value||null;
+    if(!reservation)return toast('예약일자를 입력해 주세요.',true);
+    const sb=client(),cid=companyId();
+    if(!sb)return toast('DB 연결 정보를 확인하지 못했습니다.',true);
+    const btn=$('#drawerSave');if(btn){btn.disabled=true;btn.textContent='저장 중…'}
+    try{
+      let r;
+      if(ctx.examId){
+        r=await sb.from('qa_special_health_exams').update({reservation_date:reservation}).eq('id',ctx.examId).eq('employee_no',currentEmployeeNo()).select('id').single();
+      }else{
+        const payload={company_id:cid||null,employee_no:currentEmployeeNo(),exam_type:ctx.examType||'special',special_note_id:(ctx.examType==='return'?(ctx.noteId||null):null),reservation_date:reservation};
+        r=await sb.from('qa_special_health_exams').insert(payload).select('id').single();
+      }
+      if(r.error)throw r.error;
+      toast('특수건강진단 예약일자가 저장되었습니다.');
+      const savedDate=reservation;
+      await loadStatus();
+      const reopenMonth=monthOf(savedDate)||ctx.month;
+      openDrawer(currentEmployeeNo(),reopenMonth,ctx.examType,ctx.noteId);
+    }catch(e){
+      console.error(e);
+      toast('예약일자 저장에 실패했습니다: '+String(e.message||e),true);
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='예약일 저장'}
+    }
+  }
+
   async function saveSingleDrawer(){
+    if(drawerCtx?.selfReservationOnly===true)return saveOwnReservation();
     if(!canManageQa())return toast('조회 전용 사용자입니다. 검진정보 등록·수정은 QA 운영자만 가능합니다.',true);
     if(!drawerCtx||drawerCtx.mode!=='single')return;
     const sb=client(),cid=companyId(),ctx=drawerCtx,reservation=$('#drawerReservationDate').value||null,examDate=$('#drawerExamDate').value||null,institution=$('#drawerInstitution').value.trim()||null,result=$('#drawerResult').value||null,note=$('#drawerNote').value.trim()||null;
