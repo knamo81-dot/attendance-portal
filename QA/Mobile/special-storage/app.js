@@ -29,7 +29,8 @@
     usageQuery: "",
     usageRows: [],
     usageLoaded: false,
-    expandedUsage: new Set()
+    expandedUsage: new Set(),
+    canManage: false
   };
 
   const pad2 = (v) => String(v).padStart(2, "0");
@@ -260,10 +261,11 @@
     $("todayList").innerHTML=rows.map(row=>{
       const p=row.product,expanded=state.expandedToday.has(String(p.id));
       const value=row.todayRecord?numberText(row.todayRecord.quantity):"";
-      return `<article class="product-card${expanded?" expanded":""}" data-product-card="${esc(p.id)}"><div class="product-main-row">${productInfoHtml(row,expanded,"today")}<div class="qty-cell"><div class="qty-input-wrap"><input class="qty-input" data-qty-product="${esc(p.id)}" type="number" min="0" step="1" inputmode="numeric" value="${esc(value)}"><span class="qty-unit">병</span></div><span class="qty-caption">보관수량</span></div></div>${specialDetailHtml(row)}</article>`;
+      const disabled=state.canManage?"":"disabled";
+      return `<article class="product-card${expanded?" expanded":""}" data-product-card="${esc(p.id)}"><div class="product-main-row">${productInfoHtml(row,expanded,"today")}<div class="qty-cell${state.canManage?"":" readonly"}"><div class="qty-input-wrap"><input class="qty-input" data-qty-product="${esc(p.id)}" type="number" min="0" step="1" inputmode="numeric" value="${esc(value)}" ${disabled}><span class="qty-unit">병</span></div><span class="qty-caption">보관수량</span></div></div>${specialDetailHtml(row)}</article>`;
     }).join("");
     bindProductToggles("todayList");
-    document.querySelectorAll("#todayList .qty-input").forEach(input=>input.addEventListener("input",()=>{
+    document.querySelectorAll("#todayList .qty-input:not(:disabled)").forEach(input=>input.addEventListener("input",()=>{
       const raw=input.value.trim();
       if(raw!=="")input.value=String(Math.max(0,Math.trunc(Number(raw)||0)));
       input.closest(".product-card")?.classList.add("changed");
@@ -316,12 +318,13 @@
 
   function syncSaveButton(){
     const btn=$("saveQuantities");
-    const editable=state.view==="today"&&state.dailyTableReady&&!state.saving;
+    const editable=state.view==="today"&&state.dailyTableReady&&!state.saving&&state.canManage;
     const hasChanged=[...document.querySelectorAll("#todayList .product-card.changed .qty-input")].some(i=>i.value.trim()!=="");
     btn.disabled=!editable||!hasChanged;
   }
 
   async function saveAll(){
+    if(!state.canManage){setMessage("todayMessage","조회 전용 사용자입니다. 보관수량 입력·수정은 QA 운영자만 가능합니다.","error");return;}
     if(state.saving||state.view!=="today"||!state.dailyTableReady)return;
     const inputs=[...document.querySelectorAll("#todayList .product-card.changed .qty-input")].filter(i=>i.value.trim()!=="");
     if(!inputs.length){setMessage("todayMessage","저장할 수량이 없습니다.");return;}
@@ -618,8 +621,16 @@
     window.addEventListener("message",e=>{const p=e?.data||{};if(p.type==="portal-tabs-request"||p.type==="portal-filters-request")notifyPortal();});
   }
 
+  function applyPermissionUi(){
+    state.canManage=!!window.SDSApp?.isQaOperator?.();
+    const dock=document.querySelector(".save-dock");
+    const space=document.querySelector(".save-dock-space");
+    if(dock){dock.hidden=!state.canManage;dock.style.display=state.canManage?"":"none";}
+    if(space){space.hidden=!state.canManage;space.style.display=state.canManage?"":"none";}
+  }
+
   async function init(){
-    fillPeriodOptions();bindEvents();notifyPortal();await refresh();
+    applyPermissionUi();fillPeriodOptions();bindEvents();notifyPortal();await refresh();
   }
 
   document.addEventListener("DOMContentLoaded",init);
