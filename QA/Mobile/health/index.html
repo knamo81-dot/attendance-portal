@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>특수건강진단</title>
+  <link rel="stylesheet" href="style.css?v=20260927-mobile-health1" />
+</head>
+<body>
+<main class="page">
+  <section class="card">
+    <header class="section-head mobile-section-head">
+      <nav class="inner-tabs" aria-label="특수건강진단 기능">
+        <button class="active" data-view="status">특수건강진단 현황</button>
+        <button data-view="standards">유해인자 기준</button>
+      </nav>
+    </header>
+
+    <div class="view" id="statusView">
+      <div class="health-summary">
+        <div><span id="statusPrimaryLabel">검진대상</span><strong id="statusTargetCount">-</strong></div>
+        <div><span>올해 검진완료</span><strong id="statusDoneCount">-</strong></div>
+        <div><span>검진예정</span><strong id="statusDueCount">-</strong></div>
+        <div class="warn"><span>기한초과</span><strong id="statusOverdueCount">-</strong></div>
+      </div>
+
+      <div class="health-status-toolbar" id="statusToolbar">
+        <div class="health-filter-group">
+          <label><span>기준연도</span><select id="statusYear"></select></label>
+          <label><span>구분</span><select id="statusCategory"><option value="all">전체</option><option value="target" selected>대상</option><option value="excluded">제외</option></select></label>
+          <label><span>본부</span><select id="statusDivision"><option value="">전체</option></select></label>
+          <label><span>팀</span><select id="statusTeam"><option value="">전체</option></select></label>
+          <label class="health-search"><span>사원검색</span><input id="statusSearch" placeholder="이름 / 사번 검색" /></label>
+        </div>
+        <div class="health-legend"><span><i class="legend-dot due"></i>검진예정</span><span><i class="legend-dot done"></i>검진완료</span><span><i class="legend-dot overdue"></i>기한초과</span></div>
+      </div>
+
+      <div class="employee-list" id="statusBody"><div class="empty-card">특수건강진단 현황을 불러오는 중입니다.</div></div>
+      <div class="health-note">직원 카드를 누르면 1~12월 검진현황을 확인할 수 있습니다. 다음검진기한을 누르면 유해인자별 산정내역이 열립니다.</div>
+
+      <section class="employee-calendar-view hidden" id="employeeCalendarView">
+        <div class="employee-calendar-head">
+          <button class="back-btn" id="employeeCalendarBack" type="button">‹ 목록</button>
+          <div class="employee-calendar-title">
+            <strong id="employeeCalendarName">-</strong>
+            <span id="employeeCalendarMeta">-</span>
+          </div>
+          <div class="employee-calendar-year" id="employeeCalendarYear">-</div>
+        </div>
+        <div class="month-grid" id="employeeMonthGrid"></div>
+        <div class="health-note">월을 누르면 PC와 동일한 검진정보 입력/수정창이 열립니다. 발령 전·연구소 부재 월도 기존 정책에 따라 입력할 수 있습니다.</div>
+      </section>
+    </div>
+
+    <div class="view hidden" id="standardsView">
+      <div class="stats compact-stats">
+        <button class="stat-card active" data-filter="target"><span>대상 유해인자</span><strong id="hazardCount">-</strong><small>KOSHA/수기 확인 대상</small></button>
+        <button class="stat-card warning" data-filter="unverified"><span>KOSHA 미확인</span><strong id="unverifiedCount">-</strong><small>수기확인 필요</small></button>
+        <div class="stat-card"><span>연결제품</span><strong id="productCount">-</strong><small>대상 CAS 연결 제품</small></div>
+        <div class="stat-card"><span>최종확인일</span><strong id="apiChecked">-</strong><small>KOSHA 기준정보</small></div>
+      </div>
+
+      <div class="toolbar mobile-toolbar">
+        <label class="search"><span>검색</span><input id="searchInput" placeholder="CAS / 국문명 / 영문명 / 제품명 검색" /></label>
+        <div class="filter-row">
+          <label><span>출처</span><select id="sourceFilter"><option value="">전체</option><option value="KOSHA">KOSHA</option><option value="MANUAL">수기</option></select></label>
+          <label><span>최초검진</span><select id="firstExamFilter"><option value="">전체</option></select></label>
+          <label><span>검진주기</span><select id="cycleFilter"><option value="">전체</option></select></label>
+        </div>
+        <button class="primary toolbar-refresh" id="refreshBtn">↻ API 기준정보 갱신</button>
+      </div>
+
+      <div class="hazard-list" id="standardsBody"><div class="empty-card">기준정보를 불러오는 중입니다.</div></div>
+    </div>
+
+    <div class="view hidden" id="resultsView"></div>
+  </section>
+</main>
+
+<div class="modal hidden" id="labAssignWarningModal" role="dialog" aria-modal="true">
+  <div class="modal-card lab-warning-card">
+    <div class="modal-head"><div><h2>연구소 발령일 미등록</h2><p>특수건강진단 대상기간 계산을 위해 연구소 발령일 등록이 필요합니다.</p></div><button class="icon-btn" id="labAssignWarningClose">×</button></div>
+    <div class="lab-warning-body"><div class="lab-warning-summary">미등록 <strong id="labAssignWarningCount">0명</strong></div><div class="lab-warning-list" id="labAssignWarningList"></div><p>발령일이 등록되기 전까지 해당 직원은 연도별 현황에서 제외됩니다. 프로그램을 다시 열면 계속 안내됩니다.</p></div>
+    <div class="modal-foot"><button class="primary" id="labAssignWarningOk">확인</button></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="manualModal" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <div class="modal-head"><div><h2>미확인 물질 수기확인</h2><p id="manualChemical">-</p></div><button class="icon-btn" id="modalClose">×</button></div>
+    <div class="modal-body">
+      <label><span>특수건강진단 대상</span><select id="manualTarget"><option value="true">대상</option><option value="false">비대상</option></select></label>
+      <label><span>검진주기 (개월)</span><input id="manualCycle" min="1" placeholder="예: 12" type="number" /></label>
+      <label><span>최초검진 (개월)</span><input id="manualFirst" min="1" placeholder="확인 가능한 경우 입력" type="number" /></label>
+      <label class="wide"><span>확인 출처/근거</span><input id="manualSource" placeholder="고시, 법령, 공단자료 등" /></label>
+      <label class="wide"><span>비고</span><textarea id="manualNote" placeholder="수기 확인 내용 또는 참고사항" rows="3"></textarea></label>
+    </div>
+    <div class="modal-foot"><button class="secondary" id="modalCancel">취소</button><button class="primary" id="manualSave">확인완료</button></div>
+  </div>
+</div>
+
+<aside class="health-drawer hidden" id="healthDrawer" aria-hidden="true">
+  <div class="health-drawer-head"><div><strong id="drawerName">-</strong><span id="drawerMeta">-</span></div><button class="icon-btn" id="drawerClose">×</button></div>
+  <div class="health-drawer-body" id="drawerBody"></div>
+</aside>
+<div class="health-drawer-backdrop hidden" id="healthDrawerBackdrop"></div>
+
+<div class="modal hidden" id="hazardPickerModal">
+  <div class="modal-card hazard-picker-card">
+    <div class="modal-head"><div><strong>유해인자 추가</strong><small>특수건강진단 유해인자 기준 대상에서 선택합니다.</small></div><button class="icon-btn" id="hazardPickerClose">×</button></div>
+    <div class="hazard-picker-search"><input id="hazardPickerSearch" placeholder="CAS No. / 국문명 / 영문명 검색" /><span>최근입고일·최근사용일은 회사 전체 기준</span></div>
+    <div class="hazard-picker-table-wrap"><table class="hazard-picker-table"><thead><tr><th>선택</th><th>CAS No.</th><th>유해인자</th><th>검진주기</th><th>최근입고일</th><th>최근사용일</th></tr></thead><tbody id="hazardPickerBody"></tbody></table></div>
+    <div class="modal-foot"><button class="secondary" id="hazardPickerCancel">취소</button><button class="primary" id="hazardPickerAdd">선택 추가</button></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="deadlineModal" role="dialog" aria-modal="true" aria-labelledby="deadlineModalTitle">
+  <div class="modal-card deadline-modal-card">
+    <div class="modal-head"><div><h2 id="deadlineModalTitle">다음 검진기한 산정내역</h2><p><span id="deadlineModalName">-</span> · <span id="deadlineModalMeta">-</span></p></div><button class="icon-btn" id="deadlineModalClose" type="button">×</button></div>
+    <div class="deadline-summary" id="deadlineModalSummary"></div>
+    <div class="deadline-table-wrap"><table class="deadline-table"><thead><tr><th>CAS No.</th><th>유해인자</th><th>구분</th><th>산정 기준일</th><th>기준</th><th>다음 검진기한</th></tr></thead><tbody id="deadlineModalBody"></tbody></table></div>
+    <div class="deadline-help">※ 검진완료 시 해당 검진에 연결된 유해인자는 실제 검진일자를 기준으로 각 유해인자의 검진주기에 따라 다음 기한이 다시 산정됩니다.</div>
+    <div class="modal-foot"><button class="primary" id="deadlineModalOk" type="button">확인</button></div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+<script src="app.js?v=20260927-mobile-health1"></script>
+</body>
+</html>
