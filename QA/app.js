@@ -3,6 +3,12 @@
   const state = { products: [], query: '', status: 'all', orderYear: 'all', checkedExcludeYear: 'all', selected: null, pdfFiles: [], pdfIndex: 0, pdfUrl: '', currentFileActions: [], view: 'sds', chemicals: [], casQuery: '', casStatus: 'all', casSource: 'all', selectedChemical: null };
   const $ = (id) => document.getElementById(id);
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  const canManageQa = () => {
+    try { return !!window.SDSApp?.isQaOperator?.(); } catch (_) { return false; }
+  };
+  function denyManageAction() {
+    setMessage('조회 전용 사용자입니다. 등록·갱신·수정 기능은 QA 운영자만 사용할 수 있습니다.', 'error');
+  }
 
   function setMessage(text, type = '') {
     const el = $('sdsMessage');
@@ -181,7 +187,7 @@
       const matched = isChemicalMatched(row);
       const stateHtml = matched
         ? '<span class="cas-status-badge matched">완료</span>'
-        : `<div class="cas-state-actions"><span class="cas-status-badge unmatched">미매칭</span><button class="btn small primary" type="button" data-cas-action="manual" data-cas-id="${row.id || ''}" data-cas-no="${esc(row.cas_no || '')}">수기입력</button></div>`;
+        : `<div class="cas-state-actions"><span class="cas-status-badge unmatched">미매칭</span>${canManageQa() ? `<button class="btn small primary" type="button" data-cas-action="manual" data-cas-id="${row.id || ''}" data-cas-no="${esc(row.cas_no || '')}">수기입력</button>` : ''}</div>`;
       const source = String(row.source || '').trim();
       const sourceHtml = matched && source
         ? `<span class="cas-source-badge ${chemicalSourceClass(source)}">${esc(source)}</span>`
@@ -256,6 +262,7 @@
   }
 
   function openCasManual(row) {
+    if (!canManageQa()) { setCasMessage('조회 전용 사용자입니다. 수기입력은 QA 운영자만 사용할 수 있습니다.', 'error'); return; }
     if (!row) return;
     state.selectedChemical = row;
     $('casEditNo').textContent = row.cas_no || '-';
@@ -268,6 +275,7 @@
   }
 
   async function saveCasManual() {
+    if (!canManageQa()) { setCasMessage('조회 전용 사용자입니다. 수기입력은 QA 운영자만 사용할 수 있습니다.', 'error'); return; }
     const row = state.selectedChemical;
     if (!row) return;
 
@@ -379,7 +387,7 @@
       return `<tr>
         <td>${esc(product.name || '-')}</td><td>${esc(product.maker || '-')}</td><td>${esc(product.code || '-')}</td>
         <td>${esc(product.capacity || '-')}</td><td>${productCasHtml(product)}</td><td>${esc(product.grade || '-')}</td>
-        <td><div class="sds-actions"><span class="status-badge ${status}${status === 'none' ? ' two-line-status' : ''}">${statusLabel(status)}</span>${fileButton}<button class="btn small primary" type="button" data-action="edit" data-id="${product.id}">${mainAction}</button></div></td>
+        <td><div class="sds-actions"><span class="status-badge ${status}${status === 'none' ? ' two-line-status' : ''}">${statusLabel(status)}</span>${fileButton}${canManageQa() ? `<button class="btn small primary" type="button" data-action="edit" data-id="${product.id}">${mainAction}</button>` : ''}</div></td>
         <td><div class="date-stack"><span><b>개정</b>${dateOnly(current.revision_date)}</span><span><b>등록</b>${dateOnly(current.registered_at)}</span></div></td>
         <td><div class="date-stack"><span><b>확인</b>${dateOnly(doc.last_checked_date)}</span><span><b>발주</b>${dateOnly(product.last_order_date)}</span></div></td>
         <td><button class="btn small" type="button" data-action="history" data-id="${product.id}">이력</button></td>
@@ -519,6 +527,7 @@
   }
 
   function openEdit(product) {
+    if (!canManageQa()) { denyManageAction(); return; }
     state.selected = product;
     const status = statusOf(product);
     $('sdsEditTitle').textContent = status === 'registered' ? 'SDS 갱신' : 'SDS 등록';
@@ -712,6 +721,7 @@
   }
 
   async function saveSds() {
+    if (!canManageQa()) { denyManageAction(); return; }
     const product = state.selected;
     if (!product) return;
     const button = $('sdsSave');
@@ -883,7 +893,7 @@
       if (!files.length && row.file_path) files = [{ file_path: row.file_path, file_name: row.file_name || 'SDS PDF' }];
       const buttons = files.map((f, i) => `<button class="btn small history-file-btn" type="button" data-history-action="open" data-path="${esc(f.file_path)}" data-file-name="${esc(f.file_name || `PDF ${i + 1}`)}">${esc(f.file_name || `PDF ${i + 1}`)}</button>`).join('');
       const changes = changesByVersion.get(Number(row.id)) || [];
-      const cancelButton = isRegisteredToday(row.registered_at)
+      const cancelButton = canManageQa() && isRegisteredToday(row.registered_at)
         ? `<button class="btn small danger" type="button" data-history-action="cancel" data-version-id="${row.id}" data-current="${row.is_current ? '1' : '0'}">등록취소</button>`
         : '<span class="history-locked">-</span>';
       return `<tr><td>${row.is_current ? '<span class="status-badge registered">현재</span>' : '이전'}</td><td>${changeHtml(changes)}</td><td>${dateOnly(row.revision_date)}</td><td>${dateOnly(row.registered_at)}</td><td>${esc(row.registered_by || '-')}</td><td><div class="history-files">${buttons || '-'}</div></td><td>${cancelButton}</td></tr>`;
@@ -891,6 +901,7 @@
   }
 
   async function cancelVersion(versionId, isCurrent) {
+    if (!canManageQa()) { denyManageAction(); return; }
     const row = await window.SDSApp.db.from('qa_sds_versions').select('registered_at').eq('id', versionId).maybeSingle();
     if (row.error) { setMessage(`등록일 확인에 실패했습니다: ${row.error.message}`, 'error'); return; }
     if (!row.data?.registered_at || !isRegisteredToday(row.data.registered_at)) {
@@ -933,6 +944,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    document.body.classList.toggle('qa-viewer-mode', !canManageQa());
     $('sdsSearch').addEventListener('input', (e) => { state.query = e.target.value; render(); });
     $('sdsStatus').addEventListener('change', (e) => { state.status = e.target.value; render(); });
     $('sdsOrderYear').addEventListener('change', (e) => { state.orderYear = e.target.value; render(); });
@@ -1017,6 +1029,7 @@
 
       const replaceBtn = e.target.closest('[data-current-replace]');
       if (replaceBtn) {
+        if (!canManageQa()) { denyManageAction(); return; }
         const i = Number(replaceBtn.dataset.currentReplace);
         if (state.currentFileActions[i]) {
           state.currentFileActions[i].action = 'replace';
@@ -1039,6 +1052,7 @@
 
       const deleteBtn = e.target.closest('[data-current-delete]');
       if (deleteBtn) {
+        if (!canManageQa()) { denyManageAction(); return; }
         const i = Number(deleteBtn.dataset.currentDelete);
         if (state.currentFileActions[i]) {
           const item = state.currentFileActions[i];
