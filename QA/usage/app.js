@@ -48,7 +48,9 @@
     detailContext: '',
     detailReadonly: false,
     isSaving: false,
-    isEditing: false
+    isEditing: false,
+    editSpecialUsage: null,
+    editSpecialMaterials: []
   };
 
   const $ = (id) => document.getElementById(id);
@@ -444,9 +446,9 @@
     state.specialSubstancesByCas = map;
   }
 
-  function specialMaterialsForProduct(product) {
+  function specialMaterialsForProduct(product, dateStr = '') {
     if (!product) return [];
-    const usageDate = $('usageDate')?.value || localDateString();
+    const usageDate = String(dateStr || $('usageDate')?.value || localDateString());
     const result = [];
     const seen = new Set();
 
@@ -602,6 +604,182 @@
 
     const itemResult = await db.from('qa_special_substance_usage_items').insert(itemRows);
     if (itemResult.error) throw itemResult.error;
+  }
+
+  const SPECIAL_WORK_TYPES = ['시료 전처리', '분석/측정', '배양/합성', '희석/조제', '소분/이동', '세척', '폐기', '기타'];
+
+  function parseSpecialWorkContent(value) {
+    const text = String(value || '').trim();
+    if (!text) return { workType: '', workDetail: '' };
+    for (const type of SPECIAL_WORK_TYPES) {
+      if (text === type) return { workType: type, workDetail: '' };
+      const prefix = `${type} - `;
+      if (text.startsWith(prefix)) return { workType: type, workDetail: text.slice(prefix.length).trim() };
+    }
+    return { workType: '기타', workDetail: text };
+  }
+
+  async function loadEditSpecialUsage(usageRecordId) {
+    const parentResult = await db
+      .from('qa_special_substance_usage_records')
+      .select('id, journal_no, usage_record_id, work_content, ppe, ppe_other, accident_occurred, damage_detail, action_detail, created_by, updated_by')
+      .eq('usage_record_id', Number(usageRecordId))
+      .maybeSingle();
+
+    if (parentResult.error) throw parentResult.error;
+    const parent = parentResult.data || null;
+    if (!parent) return null;
+
+    const itemResult = await db
+      .from('qa_special_substance_usage_items')
+      .select('id, special_usage_id, substance_id, substance_name_snapshot, cas_no_snapshot, percent_snapshot')
+      .eq('special_usage_id', Number(parent.id))
+      .order('id', { ascending: true });
+
+    if (itemResult.error) throw itemResult.error;
+    return { ...parent, items: itemResult.data || [] };
+  }
+
+  function resetEditSpecialUsageForm() {
+    state.editSpecialUsage = null;
+    state.editSpecialMaterials = [];
+    if ($('usageEditSpecialPanel')) $('usageEditSpecialPanel').hidden = true;
+    if ($('usageEditSpecialBadge')) $('usageEditSpecialBadge').textContent = '특별관리물질';
+    if ($('usageEditSpecialMaterialNames')) $('usageEditSpecialMaterialNames').innerHTML = '';
+    if ($('usageEditSpecialWorkType')) $('usageEditSpecialWorkType').value = '';
+    if ($('usageEditSpecialWorkDetail')) $('usageEditSpecialWorkDetail').value = '';
+    document.querySelectorAll('#usageEditSpecialPpeGroup input[type="checkbox"]').forEach((el) => { el.checked = false; });
+    if ($('usageEditSpecialPpeOther')) {
+      $('usageEditSpecialPpeOther').value = '';
+      $('usageEditSpecialPpeOther').hidden = true;
+    }
+    document.querySelectorAll('input[name="usageEditSpecialAccident"]').forEach((el) => { el.checked = false; });
+    if ($('usageEditSpecialDamageDetail')) $('usageEditSpecialDamageDetail').value = '';
+    if ($('usageEditSpecialActionDetail')) $('usageEditSpecialActionDetail').value = '';
+    if ($('usageEditSpecialAccidentFields')) $('usageEditSpecialAccidentFields').hidden = true;
+  }
+
+  function syncEditSpecialPpeOther() {
+    const checked = $('usageEditSpecialPpeOtherCheck')?.checked === true;
+    if ($('usageEditSpecialPpeOther')) {
+      $('usageEditSpecialPpeOther').hidden = !checked;
+      if (!checked) $('usageEditSpecialPpeOther').value = '';
+    }
+  }
+
+  function syncEditSpecialAccidentFields() {
+    const yes = $('usageEditSpecialAccidentYes')?.checked === true;
+    if ($('usageEditSpecialAccidentFields')) $('usageEditSpecialAccidentFields').hidden = !yes;
+    if (!yes) {
+      if ($('usageEditSpecialDamageDetail')) $('usageEditSpecialDamageDetail').value = '';
+      if ($('usageEditSpecialActionDetail')) $('usageEditSpecialActionDetail').value = '';
+    }
+  }
+
+  function renderEditSpecialUsage(special, product, usageDate) {
+    resetEditSpecialUsageForm();
+
+    const savedItems = Array.isArray(special?.items) ? special.items : [];
+    const fallbackMaterials = savedItems.length ? [] : specialMaterialsForProduct(product, usageDate);
+    const materials = savedItems.length
+      ? savedItems.map((item) => ({
+          substance_id: item.substance_id,
+          substance_name: item.substance_name_snapshot,
+          cas_no: item.cas_no_snapshot,
+          percent_snapshot: item.percent_snapshot
+        }))
+      : fallbackMaterials;
+
+    if (!special && !materials.length) return;
+
+    state.editSpecialUsage = special || null;
+    state.editSpecialMaterials = materials;
+    $('usageEditSpecialPanel').hidden = false;
+    $('usageEditSpecialBadge').textContent = `특별관리물질 ${materials.length}종`;
+    $('usageEditSpecialMaterialNames').innerHTML = materials.length
+      ? materials.map((item) => `<span class="special-material-chip">${esc(item.substance_name || '물질명 미등록')}</span>`).join('')
+      : '<span class="special-material-chip">물질정보 없음</span>';
+
+    if (!special) return;
+
+    const parsed = parseSpecialWorkContent(special.work_content);
+    $('usageEditSpecialWorkType').value = parsed.workType;
+    $('usageEditSpecialWorkDetail').value = parsed.workDetail;
+
+    const ppe = Array.isArray(special.ppe) ? special.ppe : [];
+    document.querySelectorAll('#usageEditSpecialPpeGroup input[type="checkbox"]').forEach((el) => {
+      el.checked = ppe.includes(el.value);
+    });
+    $('usageEditSpecialPpeOther').value = String(special.ppe_other || '');
+    syncEditSpecialPpeOther();
+
+    if (special.accident_occurred === true) $('usageEditSpecialAccidentYes').checked = true;
+    else $('usageEditSpecialAccidentNo').checked = true;
+    $('usageEditSpecialDamageDetail').value = String(special.damage_detail || '');
+    $('usageEditSpecialActionDetail').value = String(special.action_detail || '');
+    syncEditSpecialAccidentFields();
+  }
+
+  function buildEditSpecialUsageInput() {
+    if ($('usageEditSpecialPanel')?.hidden) return null;
+
+    const workType = String($('usageEditSpecialWorkType')?.value || '').trim();
+    const workDetail = String($('usageEditSpecialWorkDetail')?.value || '').trim();
+    if (!workType) throw new Error('특별관리물질 작업내용을 선택해 주세요.');
+    if (workType === '기타' && !workDetail) throw new Error('기타 작업내용을 입력해 주세요.');
+
+    const ppe = [...document.querySelectorAll('#usageEditSpecialPpeGroup input[type="checkbox"]:checked')]
+      .map((el) => el.value);
+    if (!ppe.length) throw new Error('착용 보호구를 1개 이상 선택해 주세요.');
+
+    const ppeOther = String($('usageEditSpecialPpeOther')?.value || '').trim();
+    if (ppe.includes('other') && !ppeOther) throw new Error('기타 보호구 내용을 입력해 주세요.');
+
+    const accidentChoice = document.querySelector('input[name="usageEditSpecialAccident"]:checked');
+    if (!accidentChoice) throw new Error('사고 발생 여부를 선택해 주세요.');
+    const accidentOccurred = accidentChoice.value === 'true';
+    const damageDetail = String($('usageEditSpecialDamageDetail')?.value || '').trim();
+    const actionDetail = String($('usageEditSpecialActionDetail')?.value || '').trim();
+    if (accidentOccurred && (!damageDetail || !actionDetail)) {
+      throw new Error('사고 발생 시 피해 내용과 조치 사항을 모두 입력해 주세요.');
+    }
+
+    return {
+      work_content: workDetail ? `${workType} - ${workDetail}` : workType,
+      ppe,
+      ppe_other: ppe.includes('other') ? ppeOther : null,
+      accident_occurred: accidentOccurred,
+      damage_detail: accidentOccurred ? damageDetail : null,
+      action_detail: accidentOccurred ? actionDetail : null,
+      materials: state.editSpecialMaterials || []
+    };
+  }
+
+  async function saveEditedSpecialUsage(usageRecordId, specialInput) {
+    if (!specialInput) return;
+    const employee = state.employee || {};
+
+    if (state.editSpecialUsage?.id) {
+      const result = await db
+        .from('qa_special_substance_usage_records')
+        .update({
+          work_content: specialInput.work_content,
+          ppe: specialInput.ppe,
+          ppe_other: specialInput.ppe_other,
+          accident_occurred: specialInput.accident_occurred,
+          damage_detail: specialInput.damage_detail,
+          action_detail: specialInput.action_detail,
+          updated_by: employee.email || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', Number(state.editSpecialUsage.id))
+        .eq('usage_record_id', Number(usageRecordId));
+      if (result.error) throw result.error;
+      return;
+    }
+
+    // 기존 일반기록 중 현재 기준상 특별관리물질 제품인 경우 수정 시 상세정보를 신규 연결할 수 있다.
+    await saveSpecialUsage(usageRecordId, specialInput);
   }
 
   function buildPayload() {
@@ -1053,10 +1231,12 @@
   function renderEditProductOptions(selectedId) {
     const select = $('usageEditProduct');
     if (!select) return;
-    select.innerHTML = state.products.map((p) => {
-      const label = [p.name, p.maker, p.code, p.capacity, p.grade].filter(Boolean).join(' · ');
-      return `<option value="${Number(p.id)}" ${Number(p.id) === Number(selectedId) ? 'selected' : ''}>${esc(label || `제품 #${p.id}`)}</option>`;
-    }).join('');
+    const p = state.productsById.get(Number(selectedId));
+    const label = p
+      ? [p.name, p.maker, p.code, p.capacity, p.grade].filter(Boolean).join(' · ')
+      : `제품 #${selectedId}`;
+    select.innerHTML = `<option value="${Number(selectedId)}" selected>${esc(label)}</option>`;
+    select.disabled = true;
   }
 
   function renderUsageDetail() {
@@ -1113,20 +1293,33 @@
     state.detailContext = '';
     state.detailReadonly = false;
     state.isEditing = false;
+    resetEditSpecialUsageForm();
     setMessage('usageDetailMessage');
   }
 
-  function openUsageEdit(id) {
+  async function openUsageEdit(id) {
     if (state.detailReadonly) return;
     const r = findRecordById(id);
     if (!r) return;
     state.isEditing = true;
+    setMessage('usageDetailMessage');
     $('usageEditId').value = String(r.id);
     $('usageEditDate').value = r.usage_date || '';
     $('usageEditHours').value = numberText(dbTimeToHours(r.usage_time), 4).replaceAll(',', '');
     $('usageEditQuantity').value = String(r.quantity ?? '');
     $('usageEditUnit').value = r.unit || 'mL';
     renderEditProductOptions(r.product_id);
+    resetEditSpecialUsageForm();
+
+    try {
+      const special = await loadEditSpecialUsage(r.id);
+      const product = state.productsById.get(Number(r.product_id));
+      renderEditSpecialUsage(special, product, r.usage_date || localDateString());
+    } catch (e) {
+      console.error('[QA Usage] special edit load failed', e);
+      setMessage('usageDetailMessage', `특별관리물질 상세정보 조회 실패: ${e?.message || '알 수 없는 오류'}`, 'error');
+    }
+
     $('usageEditSection').hidden = false;
     $('usageEditSection').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
@@ -1134,7 +1327,6 @@
   async function saveUsageEdit() {
     if (state.detailReadonly || state.isEditing === false) return;
     const id = Number($('usageEditId').value);
-    const productId = Number($('usageEditProduct').value);
     const usageDate = $('usageEditDate').value;
     const quantity = Number($('usageEditQuantity').value);
     const unit = $('usageEditUnit').value;
@@ -1142,14 +1334,15 @@
 
     if (!Number.isFinite(id)) return;
     if (!usageDate) { setMessage('usageDetailMessage', '사용일을 입력해 주세요.', 'error'); return; }
-    if (!Number.isFinite(productId)) { setMessage('usageDetailMessage', '사용제품을 선택해 주세요.', 'error'); return; }
     if (!Number.isFinite(quantity) || quantity <= 0) { setMessage('usageDetailMessage', '사용량은 0보다 큰 숫자로 입력해 주세요.', 'error'); return; }
 
     let usageTime;
+    let specialInput = null;
     try {
       usageTime = hoursToDbTime(hours);
+      specialInput = buildEditSpecialUsageInput();
     } catch (e) {
-      setMessage('usageDetailMessage', e.message || '사용시간을 확인해 주세요.', 'error');
+      setMessage('usageDetailMessage', e.message || '수정 내용을 확인해 주세요.', 'error');
       return;
     }
 
@@ -1159,9 +1352,9 @@
     btn.textContent = '저장 중...';
 
     try {
+      // 제품(product_id)은 수정하지 않는다. 잘못 선택한 제품은 삭제 후 신규 등록한다.
       const { error } = await db.from(TABLE)
         .update({
-          product_id: productId,
           usage_date: usageDate,
           usage_time: usageTime,
           quantity_type: quantityTypeForUnit(unit),
@@ -1174,9 +1367,12 @@
 
       if (error) throw error;
 
+      if (specialInput) await saveEditedSpecialUsage(id, specialInput);
+
       setMessage('usageDetailMessage', '사용내역이 수정되었습니다.', 'success');
       $('usageEditSection').hidden = true;
       state.isEditing = false;
+      resetEditSpecialUsageForm();
       await Promise.all([loadMonthlyRows(), loadLogRows()]);
       renderUsageDetail();
     } catch (e) {
@@ -1416,9 +1612,15 @@
     $('usageEditCancel').addEventListener('click', () => {
       $('usageEditSection').hidden = true;
       state.isEditing = false;
+      resetEditSpecialUsageForm();
       setMessage('usageDetailMessage');
     });
     $('usageEditSave').addEventListener('click', saveUsageEdit);
+
+    $('usageEditSpecialPpeOtherCheck')?.addEventListener('change', syncEditSpecialPpeOther);
+    document.querySelectorAll('input[name="usageEditSpecialAccident"]').forEach((el) => {
+      el.addEventListener('change', syncEditSpecialAccidentFields);
+    });
 
     $('usageDetailList').addEventListener('click', (e) => {
       const editBtn = e.target.closest('[data-detail-edit]');
