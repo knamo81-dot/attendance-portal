@@ -489,9 +489,10 @@
       <section class="drawer-section self-reservation-section"><h3>예약정보</h3><div class="drawer-form self-reservation-form"><label class="wide"><span>${esc(contextLabel)} 예약일자</span><input id="drawerReservationDate" type="date" value="${esc(dateOnly(exam?.reservation_date)||'')}" ${completed?'disabled':''}></label></div>
       ${nextInfo?`<div class="self-reservation-deadline"><span>다음 검진기한</span><b>${esc(nextInfo.due||'-')}</b><small>[${esc(nextInfo.kindLabel||'')}] ${esc(nextInfo.summary||'')}</small></div>`:''}
       ${completed?'<div class="self-reservation-locked">실제 검진일이 등록된 완료 건은 예약일자를 수정할 수 없습니다.</div>':'<div class="self-reservation-note">예약일을 선택하면 해당 날짜가 속한 월 칸에 예약으로 표시됩니다.</div>'}
-      ${completed?'':`<div class="drawer-actions self-reservation-actions"><button class="save" id="drawerSave" type="button">예약일 저장</button></div>`}</section>
+      ${completed?'':`<div class="drawer-actions self-reservation-actions">${exam?.reservation_date?'<button class="delete self-reservation-cancel" id="drawerReservationCancel" type="button">예약 취소</button>':''}<button class="save" id="drawerSave" type="button">예약일 저장</button></div>`}</section>
       <section class="drawer-section self-admin-info"><h3>관리정보</h3><div class="drawer-row"><span>실제 검진일</span><b>${esc(dateOnly(exam?.exam_date)||'-')}</b></div><div class="drawer-row"><span>검진기관</span><b>${esc(exam?.exam_institution||'-')}</b></div><div class="drawer-row"><span>유해인자</span><b>${hazardNames.length?esc(hazardNames.join(', ')):'-'}</b></div></section>`;
       if($('#drawerSave'))$('#drawerSave').onclick=saveDrawer;
+      if($('#drawerReservationCancel'))$('#drawerReservationCancel').onclick=cancelOwnReservation;
       $('#healthDrawer').classList.remove('hidden');$('#healthDrawerBackdrop').classList.remove('hidden');
       return;
     }
@@ -524,6 +525,64 @@
   function openHazardPicker(){if(!canManageQa())return toast('조회 전용 사용자입니다.',true);$('#hazardPickerSearch').value='';renderHazardPicker();$('#hazardPickerModal').classList.remove('hidden')}
   function closeHazardPicker(){$('#hazardPickerModal').classList.add('hidden')}
   function addPickedHazards(){if(!canManageQa())return toast('조회 전용 사용자입니다.',true);const ids=$$('[data-pick-hazard]:checked').map(x=>String(x.dataset.pickHazard));if(!ids.length)return toast('추가할 유해인자를 선택해 주세요.',true);const box=$('#drawerSelectedHazards');box.querySelector('.drawer-empty')?.remove();ids.forEach(id=>{const h=state.status.hazards.find(x=>String(x.chemical_id)===id);if(h&&!box.querySelector(`[data-chemical-id="${CSS.escape(id)}"]`))box.insertAdjacentHTML('beforeend',selectedHazardHtml(h,'manual'))});bindHazardRemove();closeHazardPicker()}
+
+  async function cancelOwnReservation(){
+    if(!drawerCtx||drawerCtx.mode!=='single'||drawerCtx.selfReservationOnly!==true)return;
+    const ctx=drawerCtx;
+    if(!canEditOwnReservation(ctx.emp))return toast('본인 예약일자만 취소할 수 있습니다.',true);
+    if(!ctx.examId)return toast('취소할 예약일자가 없습니다.',true);
+
+    const existing=state.status.exams.find(e=>String(e.id)===String(ctx.examId));
+    if(!existing?.reservation_date)return toast('취소할 예약일자가 없습니다.',true);
+    if(existing?.exam_date)return toast('검진완료 건은 예약일자를 취소할 수 없습니다.',true);
+
+    if(!window.confirm(`${ctx.emp?.name||ctx.emp?.employee_no||'본인'}의 ${dateOnly(existing.reservation_date)} 예약을 취소하시겠습니까?\n검진기관·유해인자·검진결과 등 관리자가 입력한 정보는 삭제되지 않습니다.`))return;
+
+    const sb=client();
+    if(!sb)return toast('DB 연결 정보를 확인하지 못했습니다.',true);
+    const btn=$('#drawerReservationCancel');
+    if(btn){btn.disabled=true;btn.textContent='취소 중…'}
+
+    try{
+      const examId=ctx.examId;
+      const linkedHazards=state.status.examHazards.filter(x=>String(x.exam_id)===String(examId));
+      const hasAdminData=!!(
+        existing.exam_date ||
+        String(existing.exam_institution||'').trim() ||
+        String(existing.result_summary||'').trim() ||
+        String(existing.note||'').trim() ||
+        linkedHazards.length
+      );
+
+      let r;
+      if(hasAdminData){
+        // 관리자가 입력한 다른 정보가 있으면 예약일만 제거합니다.
+        r=await sb.from('qa_special_health_exams')
+          .update({reservation_date:null})
+          .eq('id',examId)
+          .eq('employee_no',currentEmployeeNo())
+          .select('id')
+          .single();
+      }else{
+        // 본인이 예약일만 만든 빈 기록이면 행 자체를 정리합니다.
+        r=await sb.from('qa_special_health_exams')
+          .delete()
+          .eq('id',examId)
+          .eq('employee_no',currentEmployeeNo())
+          .select('id')
+          .single();
+      }
+      if(r.error)throw r.error;
+
+      toast('특수건강진단 예약이 취소되었습니다.');
+      closeDrawer();
+      await loadStatus();
+    }catch(e){
+      console.error(e);
+      toast('예약 취소에 실패했습니다: '+String(e.message||e),true);
+      if(btn){btn.disabled=false;btn.textContent='예약 취소'}
+    }
+  }
 
   async function saveOwnReservation(){
     if(!drawerCtx||drawerCtx.mode!=='single'||drawerCtx.selfReservationOnly!==true)return;
