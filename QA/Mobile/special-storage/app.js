@@ -23,7 +23,13 @@
     userEmail: "",
     userName: "",
     expandedToday: new Set(),
-    expandedMonthly: new Set()
+    expandedMonthly: new Set(),
+    usageYear: 0,
+    usageMonth: 0,
+    usageQuery: "",
+    usageRows: [],
+    usageLoaded: false,
+    expandedUsage: new Set()
   };
 
   const pad2 = (v) => String(v).padStart(2, "0");
@@ -55,7 +61,7 @@
 
   function notifyPortal(){
     try{
-      window.parent?.postMessage({type:"portal-tabs-ready",tabs:[{id:"qa-storage",label:"특별관리물질 보관"}],source:"qa-storage-mobile"},"*");
+      window.parent?.postMessage({type:"portal-tabs-ready",tabs:[{id:"qa-storage",label:"특별관리물질 현황"}],source:"qa-storage-mobile"},"*");
       window.parent?.postMessage({type:"portal-tab-active",activeTabId:"qa-storage",tabId:"qa-storage",source:"qa-storage-mobile"},"*");
       window.parent?.postMessage({type:"portal-filters-ready",enabled:false,filters:[],source:"qa-storage-mobile"},"*");
     }catch(_){ }
@@ -96,6 +102,13 @@
     }
     state.year=currentYear; state.month=now.getMonth()+1; state.selectedDay=now.getDate();
     yearEl.value=String(state.year);monthEl.value=String(state.month);
+
+    const usageYearEl=$("usageYearSelect"), usageMonthEl=$("usageMonthSelect");
+    usageYearEl.innerHTML=yearEl.innerHTML;
+    usageMonthEl.innerHTML=monthEl.innerHTML;
+    state.usageYear=currentYear; state.usageMonth=now.getMonth()+1;
+    usageYearEl.value=String(state.usageYear); usageMonthEl.value=String(state.usageMonth);
+
     $("todayLabel").textContent=`${currentYear}.${pad2(now.getMonth()+1)}.${pad2(now.getDate())}`;
   }
 
@@ -329,6 +342,214 @@
     finally{state.saving=false;syncSaveButton();}
   }
 
+
+  const PPE_LABELS = {
+    lab_coat:"실험복",
+    protective_gloves:"보호장갑",
+    safety_glasses:"보안경",
+    dust_mask:"방진마스크",
+    gas_mask:"방독마스크",
+    combined_mask:"방진·방독 겸용마스크",
+    supplied_air:"송기마스크 / 공기호흡기",
+    other:"기타"
+  };
+
+  function formatUsageTime(value){
+    if(value===null||value===undefined||value==="") return "-";
+    const raw=String(value).trim();
+    if(/^\d+(?:\.\d+)?$/.test(raw)){
+      const n=Number(raw);
+      return Number.isFinite(n)&&n>0?`${Number(n.toFixed(2))}시간`:"-";
+    }
+    const parts=raw.split(":").map(Number);
+    if(!Number.isFinite(parts[0])) return "-";
+    const hours=(parts[0]||0)+(parts[1]||0)/60+(parts[2]||0)/3600;
+    if(!hours) return "-";
+    return `${Number(hours.toFixed(2))}시간`;
+  }
+
+  function ppeText(row){
+    const values=Array.isArray(row?.ppe)?row.ppe:[];
+    const labels=values.map(code=>{
+      if(code==="other"&&row?.ppe_other) return `기타(${row.ppe_other})`;
+      return PPE_LABELS[code]||code;
+    }).filter(Boolean);
+    return labels.length?labels.join(" · "):"-";
+  }
+
+  async function fetchInChunks(table,select,column,values,extraBuilder=null){
+    const result=[];
+    const list=[...new Set((values||[]).filter(v=>v!==null&&v!==undefined&&v!==""))];
+    for(let i=0;i<list.length;i+=200){
+      let q=db.from(table).select(select).in(column,list.slice(i,i+200));
+      if(typeof extraBuilder==="function")q=extraBuilder(q);
+      const {data,error}=await q;
+      if(error)throw error;
+      result.push(...(data||[]));
+    }
+    return result;
+  }
+
+  function usagePeriodRange(){
+    return {start:monthStart(state.usageYear,state.usageMonth),end:monthEnd(state.usageYear,state.usageMonth)};
+  }
+
+  function usageSetMessage(text="",type=""){
+    setMessage("usageMessage",text,type);
+  }
+
+  async function loadUsageLog(showLoading=true){
+    if(!db)return;
+    if(!state.companyId){
+      const info=sessionInfo();
+      state.companyId=info.companyId;state.userEmail=info.email;state.userName=info.name;
+    }
+    if(!state.companyId){usageSetMessage("회사 정보를 확인할 수 없습니다.","error");return;}
+    const {start,end}=usagePeriodRange();
+    if(showLoading)usageSetMessage("특별관리물질 사용일지를 불러오는 중입니다.");
+    try{
+      const baseResult=await db.from("qa_reagent_usage_records")
+        .select("id,company_id,employee_no,employee_name,employee_email,product_id,usage_date,usage_time,quantity_type,quantity,unit,created_at")
+        .eq("company_id",state.companyId)
+        .gte("usage_date",start)
+        .lte("usage_date",end)
+        .order("usage_date",{ascending:true})
+        .order("id",{ascending:true});
+      if(baseResult.error)throw baseResult.error;
+      const baseRows=baseResult.data||[];
+      if(!baseRows.length){state.usageRows=[];state.usageLoaded=true;renderUsageLog();usageSetMessage("");return;}
+
+      const usageIds=baseRows.map(r=>r.id);
+      const specialRows=await fetchInChunks(
+        "qa_special_substance_usage_records",
+        "id,usage_record_id,company_id,journal_no,work_content,ppe,ppe_other,accident_occurred,damage_detail,action_detail,created_by,created_at,updated_at",
+        "usage_record_id",
+        usageIds,
+        q=>q.eq("company_id",state.companyId)
+      );
+      if(!specialRows.length){state.usageRows=[];state.usageLoaded=true;renderUsageLog();usageSetMessage("");return;}
+
+      const specialIds=specialRows.map(r=>r.id);
+      const itemRows=await fetchInChunks(
+        "qa_special_substance_usage_items",
+        "id,special_usage_id,substance_id,substance_name_snapshot,cas_no_snapshot,percent_snapshot,created_at",
+        "special_usage_id",
+        specialIds
+      );
+
+      const productIds=[...new Set(baseRows.map(r=>r.product_id).filter(Boolean))];
+      const products=productIds.length?await fetchInChunks(
+        "product_master",
+        "id,name,maker,code,capacity,grade",
+        "id",
+        productIds
+      ):[];
+
+      const usageById=new Map(baseRows.map(r=>[Number(r.id),r]));
+      const productById=new Map(products.map(p=>[Number(p.id),p]));
+      const itemsBySpecial=new Map();
+      itemRows.forEach(item=>{
+        const key=Number(item.special_usage_id);
+        if(!itemsBySpecial.has(key))itemsBySpecial.set(key,[]);
+        itemsBySpecial.get(key).push(item);
+      });
+      itemsBySpecial.forEach(list=>list.sort((a,b)=>Number(a.id)-Number(b.id)));
+
+      const rows=[];
+      specialRows.forEach(sr=>{
+        const usage=usageById.get(Number(sr.usage_record_id));
+        if(!usage)return;
+        const product=productById.get(Number(usage.product_id))||null;
+        const items=itemsBySpecial.get(Number(sr.id))||[];
+        items.forEach(item=>rows.push({
+          journal_no:Number(sr.journal_no),
+          item_id:Number(item.id),
+          special_usage_id:Number(sr.id),
+          usage_record_id:Number(usage.id),
+          usage_date:usage.usage_date,
+          usage_time:usage.usage_time,
+          employee_no:usage.employee_no||"",
+          employee_name:usage.employee_name||usage.employee_email||"-",
+          product_id:usage.product_id,
+          product_name:product?.name||`제품 #${usage.product_id||"-"}`,
+          product_meta:[product?.maker,product?.code,product?.capacity,product?.grade].filter(Boolean).join(" · "),
+          quantity:usage.quantity,
+          unit:usage.unit||"",
+          substance_name:item.substance_name_snapshot||"-",
+          cas_no:item.cas_no_snapshot||"-",
+          percent:item.percent_snapshot||"-",
+          work_content:sr.work_content||"-",
+          ppe:sr.ppe||[],
+          ppe_other:sr.ppe_other||"",
+          accident_occurred:sr.accident_occurred===true,
+          damage_detail:sr.damage_detail||"",
+          action_detail:sr.action_detail||"",
+          created_at:sr.created_at||usage.created_at||""
+        }));
+      });
+      rows.sort((a,b)=>Number(b.journal_no)-Number(a.journal_no)||Number(a.item_id)-Number(b.item_id));
+      state.usageRows=rows;state.usageLoaded=true;
+      renderUsageLog();usageSetMessage("");
+    }catch(error){
+      console.error("[QA Mobile Special Usage Log] load failed",error);
+      state.usageRows=[];state.usageLoaded=true;renderUsageLog();
+      const msg=String(error?.message||"알 수 없는 오류");
+      if(/qa_special_substance_usage_records|qa_special_substance_usage_items|relation .* does not exist|schema cache/i.test(msg)){
+        usageSetMessage("특별관리물질 사용일지 DB 테이블을 확인해 주세요.","error");
+      }else usageSetMessage(`사용일지 불러오기 실패: ${msg}`,"error");
+    }
+  }
+
+  function filteredUsageRows(){
+    const q=state.usageQuery.trim().toLowerCase();
+    if(!q)return state.usageRows;
+    return state.usageRows.filter(row=>[
+      row.journal_no,row.usage_date,row.employee_name,row.employee_no,row.substance_name,row.cas_no,
+      row.product_name,row.product_meta,row.quantity,row.unit,row.percent,row.work_content,ppeText(row),
+      row.accident_occurred?"사고 있음":"사고 없음"
+    ].join(" ").toLowerCase().includes(q));
+  }
+
+  function usageDetailHtml(row){
+    const accidentExtra=row.accident_occurred
+      ? `<div class="usage-detail-item full accident"><span class="usage-detail-label">피해 내용</span><div class="usage-detail-value">${esc(row.damage_detail||"-")}</div></div><div class="usage-detail-item full accident"><span class="usage-detail-label">조치 사항</span><div class="usage-detail-value">${esc(row.action_detail||"-")}</div></div>`
+      : "";
+    return `<div class="usage-card-detail"><div class="usage-detail-grid">
+      <div class="usage-detail-item"><span class="usage-detail-label">함유량</span><div class="usage-detail-value">${esc(row.percent||"-")}</div></div>
+      <div class="usage-detail-item"><span class="usage-detail-label">사용시간</span><div class="usage-detail-value">${esc(formatUsageTime(row.usage_time))}</div></div>
+      <div class="usage-detail-item full"><span class="usage-detail-label">제품 정보</span><div class="usage-detail-value">${esc(row.product_meta||"-")}</div></div>
+      <div class="usage-detail-item full"><span class="usage-detail-label">작업내용</span><div class="usage-detail-value">${esc(row.work_content||"-")}</div></div>
+      <div class="usage-detail-item full"><span class="usage-detail-label">착용 보호구</span><div class="usage-detail-value">${esc(ppeText(row))}</div></div>
+      <div class="usage-detail-item full${row.accident_occurred?" accident":""}"><span class="usage-detail-label">사고 발생</span><div class="usage-detail-value">${row.accident_occurred?"있음":"없음"}</div></div>
+      ${accidentExtra}
+    </div></div>`;
+  }
+
+  function renderUsageLog(){
+    const list=$("usageList");if(!list)return;
+    const rows=filteredUsageRows();
+    if(!rows.length){list.innerHTML='<div class="empty-card">조회기간에 등록된 특별관리물질 사용기록이 없습니다.</div>';return;}
+    list.innerHTML=rows.map(row=>{
+      const key=String(row.item_id),expanded=state.expandedUsage.has(key);
+      const amount=`${row.quantity??"-"}${row.unit?` ${row.unit}`:""}`;
+      return `<article class="usage-card${expanded?" expanded":""}" data-usage-card="${row.item_id}">
+        <button class="usage-card-toggle" type="button" data-usage-toggle="${row.item_id}" aria-expanded="${expanded?"true":"false"}">
+          <span class="usage-line usage-line-1"><span class="usage-no">No.${Number.isFinite(row.journal_no)?row.journal_no:"-"}</span><span class="usage-date">${esc(row.usage_date||"-")}</span><span class="usage-author">${esc(row.employee_name||"-")}</span></span>
+          <span class="usage-line usage-line-2"><span class="usage-substance">${esc(row.substance_name||"-")}</span><span class="usage-cas">CAS ${esc(row.cas_no||"-")}</span></span>
+          <span class="usage-line usage-line-3"><span class="usage-product">${esc(row.product_name||"-")}</span><span class="usage-amount">· ${esc(amount)}</span></span>
+        </button>
+        ${usageDetailHtml(row)}
+      </article>`;
+    }).join("");
+    list.querySelectorAll("[data-usage-toggle]").forEach(btn=>btn.addEventListener("click",()=>{
+      const key=String(btn.dataset.usageToggle);
+      if(state.expandedUsage.has(key))state.expandedUsage.delete(key);else state.expandedUsage.add(key);
+      const card=btn.closest(".usage-card");
+      const expanded=state.expandedUsage.has(key);
+      card?.classList.toggle("expanded",expanded);btn.setAttribute("aria-expanded",expanded?"true":"false");
+    }));
+  }
+
   async function refresh(showLoading=true){
     const messageId=state.view==="today"?"todayMessage":"monthlyMessage";
     if(showLoading)setMessage(messageId,"특별관리물질 보관 현황을 불러오는 중입니다.");
@@ -341,10 +562,26 @@
   }
 
   async function switchView(view){
-    if(view===state.view)return;
+    if(!["today","monthly","usage"].includes(view))view="today";
+    if(view===state.view){
+      if(view==="usage"&&!state.usageLoaded)await loadUsageLog();
+      return;
+    }
     state.view=view;
-    $("todayTab").classList.toggle("active",view==="today");$("monthlyTab").classList.toggle("active",view==="monthly");
-    $("todayView").hidden=view!=="today";$("monthlyView").hidden=view!=="monthly";
+    $("todayTab").classList.toggle("active",view==="today");
+    $("monthlyTab").classList.toggle("active",view==="monthly");
+    $("usageTab").classList.toggle("active",view==="usage");
+    $("todayView").hidden=view!=="today";
+    $("monthlyView").hidden=view!=="monthly";
+    $("usageView").hidden=view!=="usage";
+
+    if(view==="usage"){
+      $("usageYearSelect").value=String(state.usageYear);
+      $("usageMonthSelect").value=String(state.usageMonth);
+      await loadUsageLog();
+      return;
+    }
+
     const now=new Date();
     if(view==="today"){
       state.year=now.getFullYear();state.month=now.getMonth()+1;
@@ -367,6 +604,7 @@
   function bindEvents(){
     $("todayTab").addEventListener("click",()=>switchView("today"));
     $("monthlyTab").addEventListener("click",()=>switchView("monthly"));
+    $("usageTab").addEventListener("click",()=>switchView("usage"));
     $("todaySearch").addEventListener("input",()=>{state.todayQuery=$("todaySearch").value;renderToday();});
     $("monthlySearch").addEventListener("input",()=>{state.monthlyQuery=$("monthlySearch").value;renderMonthlyList();});
     $("yearSelect").addEventListener("change",async()=>{state.year=Number($("yearSelect").value);state.selectedDay=1;await refresh();});
@@ -374,6 +612,9 @@
     $("prevMonthBtn").addEventListener("click",()=>shiftMonth(-1));
     $("nextMonthBtn").addEventListener("click",()=>shiftMonth(1));
     $("saveQuantities").addEventListener("click",saveAll);
+    $("usageYearSelect").addEventListener("change",async()=>{state.usageYear=Number($("usageYearSelect").value);state.expandedUsage.clear();await loadUsageLog();});
+    $("usageMonthSelect").addEventListener("change",async()=>{state.usageMonth=Number($("usageMonthSelect").value);state.expandedUsage.clear();await loadUsageLog();});
+    $("usageSearch").addEventListener("input",()=>{state.usageQuery=$("usageSearch").value;renderUsageLog();});
     window.addEventListener("message",e=>{const p=e?.data||{};if(p.type==="portal-tabs-request"||p.type==="portal-filters-request")notifyPortal();});
   }
 
