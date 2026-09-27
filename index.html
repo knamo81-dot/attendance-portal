@@ -3873,11 +3873,38 @@ body.auth-loading .top-user-bar {
     els.settingsNavBtn.tabIndex = allowed ? 0 : -1;
   }
 
+  function isTestDivisionUser() {
+    const employee = normalizePortalEmployee(currentEmployee) || {};
+    const divisionCode = String(
+      employee.division_code ||
+      currentEmployee?.division_code ||
+      currentEmployee?.divisionCode ||
+      ''
+    ).trim().toUpperCase();
+    return divisionCode === 'TEST01';
+  }
+
+  function canAccessQaApp() {
+    // 서비스관리자 / 회사관리자는 기존처럼 항상 QA 접근을 허용합니다.
+    if (isServiceAdminRole()) return true;
+    if (canUseSettingsMenu()) return true;
+
+    // 테스트본부(TEST01)는 권한 검증을 위해 QA 메뉴를 항상 노출합니다.
+    if (isTestDivisionUser()) return true;
+
+    // 권한설정에서 QA 운영자로 지정된 사용자도 QA 메뉴를 표시합니다.
+    const qaRole = normalizePortalRole(
+      currentAppRoles?.qa?.role ||
+      currentAppRoles?.qa?.role_key ||
+      '',
+      'user'
+    );
+    return qaRole === 'admin' || qaRole === 'operator';
+  }
+
   function updateQaButtonVisibility() {
     if (!els.qaNavBtn) return;
-    // QA는 개발 중이므로 서비스관리자와 회사 관리자에게만 표시합니다.
-    // 기존 설정 메뉴와 동일한 관리자 판별 로직을 재사용합니다.
-    const allowed = Boolean(currentUser && canUseSettingsMenu());
+    const allowed = Boolean(currentUser && canAccessQaApp());
     els.qaNavBtn.hidden = !allowed;
     els.qaNavBtn.style.display = allowed ? '' : 'none';
     els.qaNavBtn.setAttribute('aria-hidden', allowed ? 'false' : 'true');
@@ -3908,6 +3935,9 @@ body.auth-loading .top-user-bar {
   function canAccessResearchStaffApp() {
     // 서비스관리자는 회사 전환 검증과 운영 관리를 위해 접근을 허용합니다.
     if (isServiceAdminRole()) return true;
+
+    // 테스트본부(TEST01)는 테스트용으로 세로바의 모든 프로그램을 표시합니다.
+    if (isTestDivisionUser()) return true;
 
     // 회사 관리자도 인력 운영현황 접근을 허용합니다.
     if (canUseSettingsMenu()) return true;
