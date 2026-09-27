@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>특별관리물질 보관</title>
-  <link rel="stylesheet" href="./style.css?v=20260925-storage3" />
+  <title>특별관리물질 현황</title>
+  <link rel="stylesheet" href="./style.css?v=20260927-storage-usage2" />
   <link rel="stylesheet" href="../../common/mobile.css" />
   <link rel="stylesheet" href="../../common/theme.css" />
 </head>
@@ -13,68 +13,146 @@
     <section class="storage-card">
       <header class="storage-head">
         <div>
-          <h2>특별관리물질 보관</h2>
-          <p>특별관리물질이 포함된 제품의 보관 병수를 일자별로 확인하고 관리합니다.</p>
+          <h2 id="pageTitle">특별관리물질 보관</h2>
+          <p id="pageDesc">특별관리물질이 포함된 제품의 보관 병수를 일자별로 확인하고 관리합니다.</p>
         </div>
-        <div class="head-actions">
-          <button id="saveQuantities" class="save-btn" type="button">수량 저장</button>
-          <span id="saveGuide" class="save-guide"></span>
+        <div class="view-switch" role="tablist" aria-label="특별관리물질 현황 내부 화면">
+          <button id="storageViewBtn" class="view-btn active" type="button">보관 현황</button>
+          <button id="usageViewBtn" class="view-btn" type="button">사용일지</button>
         </div>
       </header>
 
-      <div class="toolbar">
-        <div class="period-controls">
-          <span class="toolbar-label">조회기간</span>
-          <select id="yearSelect" aria-label="조회 연도"></select>
-          <select id="monthSelect" aria-label="조회 월"></select>
+      <section id="storageView">
+        <div class="toolbar">
+          <div class="period-controls">
+            <span class="toolbar-label">조회기간</span>
+            <select id="yearSelect" aria-label="조회 연도"></select>
+            <select id="monthSelect" aria-label="조회 월"></select>
+          </div>
+
+          <label class="search-field">
+            <span class="toolbar-label">검색</span>
+            <input id="searchInput" type="search" placeholder="제품명 / 제조사 / 코드 / CAS / 특별관리물질 검색" autocomplete="off" />
+          </label>
+
+          <label class="filter-field">
+            <span class="toolbar-label">표시</span>
+            <select id="stockFilter">
+              <option value="all">전체</option>
+              <option value="positive">보관수량 있음</option>
+              <option value="zero">0병</option>
+            </select>
+          </label>
+
+          <div class="toolbar-spacer"></div>
+          <button id="saveQuantities" class="save-btn toolbar-save-btn" type="button">수량 저장</button>
+          <span id="saveGuide" class="save-guide"></span>
         </div>
 
-        <label class="search-field">
-          <span class="toolbar-label">검색</span>
-          <input id="searchInput" type="search" placeholder="제품명 / 제조사 / 코드 / CAS / 특별관리물질 검색" autocomplete="off" />
-        </label>
+        <div id="message" class="message" aria-live="polite"></div>
 
-        <label class="filter-field">
-          <span class="toolbar-label">표시</span>
-          <select id="stockFilter">
-            <option value="all">전체</option>
-            <option value="positive">보관수량 있음</option>
-            <option value="zero">0병</option>
-          </select>
-        </label>
-      </div>
-
-      <div id="message" class="message" aria-live="polite"></div>
-
-      <div class="table-wrap">
-        <table class="storage-table">
-          <thead id="storageHead"></thead>
-          <tbody id="storageBody">
-            <tr><td class="empty">보관 현황을 불러오는 중입니다.</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <footer class="storage-footer">
-        <div class="notice-box">
-          <strong>안내사항</strong>
-          <span>보관수량은 내용물의 잔량과 관계없이 실제 보관 중인 용기 1개를 1병으로 입력합니다.</span>
-          <span>수량 입력·수정은 오늘 날짜만 가능하며, 과거 날짜는 조회만 가능합니다.</span>
-          <span>미입력일은 직전 유효수량과 입고수량을 기준으로 달력에 연속 표시됩니다.</span>
+        <div class="table-wrap">
+          <table class="storage-table">
+            <thead id="storageHead"></thead>
+            <tbody id="storageBody">
+              <tr><td class="empty">보관 현황을 불러오는 중입니다.</td></tr>
+            </tbody>
+          </table>
         </div>
-        <div class="legend-box">
-          <strong>달력 안내</strong>
-          <span><i class="legend-swatch weekend"></i> 토·일</span>
-          <span><i class="legend-swatch today"></i> 오늘</span>
-          <span><b>-</b> 데이터 없음</span>
+
+        <footer class="storage-footer">
+          <div class="notice-box">
+            <strong>안내사항</strong>
+            <span>보관수량은 내용물의 잔량과 관계없이 실제 보관 중인 용기 1개를 1병으로 입력합니다.</span>
+            <span>수량 입력·수정은 오늘 날짜만 가능하며, 과거 날짜는 조회만 가능합니다.</span>
+            <span>미입력일은 직전 유효수량과 입고수량을 기준으로 달력에 연속 표시됩니다.</span>
+          </div>
+          <div class="legend-box">
+            <strong>달력 안내</strong>
+            <span><i class="legend-swatch weekend"></i> 토·일</span>
+            <span><i class="legend-swatch today"></i> 오늘</span>
+            <span><b>-</b> 데이터 없음</span>
+          </div>
+        </footer>
+      </section>
+
+      <section id="usageView" hidden>
+        <div class="toolbar usage-toolbar">
+          <div class="period-controls">
+            <span class="toolbar-label">조회기간</span>
+            <select id="usageYearSelect" aria-label="사용일지 조회 연도"></select>
+            <select id="usageMonthSelect" aria-label="사용일지 조회 월"></select>
+          </div>
+
+          <label class="search-field usage-search-field">
+            <span class="toolbar-label">검색</span>
+            <input id="usageSearchInput" type="search" placeholder="No. / 작성자 / 물질명 / CAS / 제품 / 작업내용 검색" autocomplete="off" />
+          </label>
+
+          <label class="filter-field">
+            <span class="toolbar-label">사고</span>
+            <select id="usageAccidentFilter">
+              <option value="all">전체</option>
+              <option value="none">없음</option>
+              <option value="yes">있음</option>
+            </select>
+          </label>
         </div>
-      </footer>
+
+        <div id="usageMessage" class="message" aria-live="polite"></div>
+
+        <div class="usage-table-wrap">
+          <table class="usage-log-table">
+            <thead>
+              <tr>
+                <th class="journal-no-col">No.</th>
+                <th class="date-col">취급일자</th>
+                <th class="author-col">작성자</th>
+                <th class="substance-col">특별관리물질</th>
+                <th class="cas-col">CAS No.</th>
+                <th class="usage-product-col">사용제품</th>
+                <th class="amount-col">제품 취급량</th>
+                <th class="percent-col">함유량</th>
+                <th class="work-col">작업내용</th>
+                <th class="ppe-col">착용 보호구</th>
+                <th class="accident-col">사고</th>
+                <th class="detail-col">상세</th>
+              </tr>
+            </thead>
+            <tbody id="usageLogBody">
+              <tr><td class="empty" colspan="12">특별관리물질 사용일지를 불러오는 중입니다.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <footer class="usage-footer">
+          <div class="notice-box usage-notice">
+            <strong>안내사항</strong>
+            <span>특별관리물질 사용일지는 QA &gt; 사용일지 &gt; 사용입력에서 등록된 자료를 자동으로 불러옵니다.</span>
+            <span>혼합제품 1회 사용에서 여러 특별관리물질이 생성된 경우 같은 사용등록 No.를 공유하여 물질별 행으로 표시합니다.</span>
+            <span>이 화면은 취급기록 조회용이며 수정은 원본 사용기록 기준으로 관리합니다.</span>
+          </div>
+        </footer>
+      </section>
     </section>
   </main>
 
+  <div id="usageDetailModal" class="detail-backdrop" hidden>
+    <section class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="usageDetailTitle">
+      <div class="detail-modal-head">
+        <div>
+          <h3 id="usageDetailTitle">특별관리물질 사용기록 상세</h3>
+          <p id="usageDetailSubtitle"></p>
+        </div>
+        <button id="usageDetailClose" class="detail-close" type="button" aria-label="닫기">×</button>
+      </div>
+      <div id="usageDetailBody" class="detail-modal-body"></div>
+    </section>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../supabase.js"></script>
-  <script src="./app.js?v=20260925-storage3"></script>
+  <script src="./app.js?v=20260927-storage-usage2"></script>
   <script src="../../common/common.js"></script>
 </body>
 </html>
