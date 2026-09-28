@@ -1449,3 +1449,11 @@ html, body{
     max-width:100%!important;
   }
 }
+
+/* 2026-09-28: iOS Safari 입력 포커스 자동 확대 방지
+   기존 16px 보정에서 빠진 기간 선택 및 특별관리물질 select까지 공통 보완. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+select,
+textarea {
+  font-size: 16px !important;
+}
