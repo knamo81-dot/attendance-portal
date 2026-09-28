@@ -1463,3 +1463,104 @@ html, body{
     font-size: 16px !important;
   }
 }
+
+/* =========================================================
+   2026-09-29: 모바일 사용일지 내부탭 UI 통일
+   - 특별관리물질 / 기준관리 탭과 동일한 전체폭 2분할 UI
+   - 사용입력 / 사용일지 탭을 화면 상단으로 이동
+   - 조회기간/지표 기능 및 JS 로직 변경 없음
+   ========================================================= */
+@media (max-width: 760px) {
+  /* 기존 screen 상단 여백 때문에 탭이 다른 QA 화면보다 아래로 내려오던 부분 제거 */
+  .usage-shell {
+    padding-top: 8px;
+  }
+
+  .screen {
+    padding-top: 0;
+  }
+
+  .screen-toolbar {
+    width: 100%;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 0 0 8px;
+  }
+
+  /* 특별관리물질 / 기준관리와 동일한 탭 컨테이너 */
+  .toolbar-view-switch {
+    grid-column: 1 / -1;
+    order: initial;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    justify-self: stretch;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+    padding: 4px;
+    border: 1px solid #dfe4ec;
+    border-radius: 12px;
+    overflow: visible;
+    background: #ebeef4;
+    box-shadow: 0 2px 8px rgba(15,23,42,.04);
+  }
+
+  .toolbar-view-switch .view-btn {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #475467;
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: -.03em;
+  }
+
+  .toolbar-view-switch .view-btn:last-child {
+    border-right: 0;
+  }
+
+  .toolbar-view-switch .view-btn.active {
+    background: linear-gradient(90deg,#6847d1,#5b39c0);
+    color: #fff;
+    box-shadow: 0 4px 10px rgba(91,57,192,.18);
+  }
+
+  /* 탭 아래 조회기간은 다음 행, 사용일지의 지표 토글은 우측 유지 */
+  .screen-toolbar .period-controls {
+    grid-column: 1;
+    order: initial;
+    width: auto;
+    max-width: 100%;
+    margin: 0;
+    padding-bottom: 0;
+    overflow-x: auto;
+    justify-self: start;
+  }
+
+  .toolbar-metric-toggle {
+    grid-column: 2;
+    order: initial;
+    justify-self: end;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  /* 기존 420px 규칙과 동일한 좌우 여백을 유지하면서 상단은 더 내려가지 않게 고정 */
+  .usage-shell {
+    padding-top: 8px;
+  }
+
+  .screen-toolbar {
+    padding-top: 0;
+  }
+}
+
