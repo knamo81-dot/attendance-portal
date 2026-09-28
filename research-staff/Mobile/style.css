@@ -27,24 +27,37 @@ button{cursor:pointer}
 .drawer-form input[type="date"]{min-width:0;max-width:100%;padding-left:8px;padding-right:5px}
 
 /* ===== Staff Detail Date / Horizontal Swipe FIX 2026-09-28 ===== */
-/* 생년월일 / 연구소 발령일을 구분 / 성별과 동일한 2열 간격으로 배치 */
-.drawer-form label:nth-child(3),
-.drawer-form label:nth-child(4){
+/* 날짜 필드는 구분/성별과 같은 2열을 사용하되 iOS date input의 고유 최소폭을 차단 */
+.drawer-form .date-field{
   grid-column:auto;
   width:100%;
   min-width:0;
+  max-width:100%;
+  overflow:hidden;
 }
 
-.drawer-form label:nth-child(3) input[type="date"],
-.drawer-form label:nth-child(4) input[type="date"]{
+.drawer-form .date-field input[type="date"]{
   display:block;
-  width:100% !important;
+  box-sizing:border-box !important;
+  inline-size:calc(100% - 2px) !important;
+  width:calc(100% - 2px) !important;
+  min-inline-size:0 !important;
   min-width:0 !important;
-  max-width:100% !important;
-  box-sizing:border-box;
+  max-inline-size:calc(100% - 2px) !important;
+  max-width:calc(100% - 2px) !important;
+  margin:0 !important;
   padding-left:7px !important;
   padding-right:4px !important;
   font-size:16px !important;
+}
+
+.drawer-form .date-field-left input[type="date"]{
+  justify-self:start;
+}
+
+.drawer-form .date-field-right input[type="date"]{
+  justify-self:end;
+  margin-left:2px !important;
 }
 
 /* 상세창 내부는 세로 스크롤만 허용 */
