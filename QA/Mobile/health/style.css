@@ -1048,10 +1048,27 @@ body{min-height:100dvh}
   .health-summary span{font-size:8.5px!important}.month-grid{gap:5px}.month-tile{min-height:88px;padding:9px 7px}.filter-row{grid-template-columns:1fr 1fr}.filter-row label:last-child{grid-column:1/-1}
 }
 
-/* 2026-09-28: iOS Safari 입력 포커스 자동 확대 방지
-   검색/필터, 검진 입력·수정 Drawer, 유해인자 선택/수기입력까지 공통 적용. */
-input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
-select,
-textarea {
-  font-size: 16px !important;
+/* =========================================================
+   2026-09-28 iOS Safari 입력 포커스 자동 확대 방지
+   - 특수건강진단 현황 검색/필터
+   - 검진 신규/수정 Drawer
+   - 유해인자/수기확인 Modal 및 검색창
+   - 레이아웃/기능은 변경하지 않고 입력 컨트롤 폰트만 16px 보정
+========================================================= */
+@media (max-width: 768px) {
+  .health-filter-group input,
+  .health-filter-group select,
+  .mobile-toolbar input,
+  .mobile-toolbar select,
+  .toolbar input,
+  .toolbar select,
+  .modal-body input,
+  .modal-body select,
+  .modal-body textarea,
+  .drawer-form input,
+  .drawer-form select,
+  .drawer-form textarea,
+  .hazard-picker-search input {
+    font-size: 16px !important;
+  }
 }
