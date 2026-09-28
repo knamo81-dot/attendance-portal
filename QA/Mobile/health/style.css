@@ -1047,3 +1047,11 @@ body{min-height:100dvh}
   .employee-card{padding:11px 10px;gap:7px}.employee-deadline{min-width:108px}.employee-name{font-size:14px}.employee-deadline-value{font-size:12px}
   .health-summary span{font-size:8.5px!important}.month-grid{gap:5px}.month-tile{min-height:88px;padding:9px 7px}.filter-row{grid-template-columns:1fr 1fr}.filter-row label:last-child{grid-column:1/-1}
 }
+
+/* 2026-09-28: iOS Safari 입력 포커스 자동 확대 방지
+   검색/필터, 검진 입력·수정 Drawer, 유해인자 선택/수기입력까지 공통 적용. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+select,
+textarea {
+  font-size: 16px !important;
+}
