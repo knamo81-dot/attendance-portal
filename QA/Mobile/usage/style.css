@@ -1564,3 +1564,92 @@ html, body{
   }
 }
 
+/* =========================================================
+   2026-09-29: 모바일 사용일지 조회기간 버튼 노출 FIX
+   - 사용일지 화면에서 월/분기/반기/년 버튼 4개를 항상 표시
+   - 조회기간 영역의 가로 overflow 때문에 버튼이 밀리던 문제 제거
+   - 사용입력 화면에는 영향 없음
+   ========================================================= */
+@media (max-width: 760px) {
+  /* 사용일지 화면만 조회기간/지표를 세로 행으로 안정적으로 배치 */
+  #usageLogView .log-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  #usageLogView .log-toolbar .period-controls {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 7px 8px;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+
+  #usageLogView .log-toolbar .period-label {
+    grid-column: 1;
+    grid-row: 1;
+    white-space: nowrap;
+  }
+
+  #usageLogView #logYear {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+  }
+
+  /* 월 / 분기 / 반기 / 년을 화면폭 4등분으로 고정 */
+  #usageLogView .period-mode {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-radius: 9px;
+    overflow: hidden;
+  }
+
+  #usageLogView .period-mode button {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    padding: 0 4px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  /* 월/분기/반기 선택 상세값 */
+  #usageLogView #periodDetail {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+  }
+
+  /* 사용량 / 사용시간도 별도 한 줄로 두어 조회기간 폭을 침범하지 않게 함 */
+  #usageLogView .toolbar-metric-toggle {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-self: stretch;
+    margin: 0;
+  }
+
+  #usageLogView .toolbar-metric-toggle .metric-btn {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+  }
+}
+
