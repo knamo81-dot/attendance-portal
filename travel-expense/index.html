@@ -1605,6 +1605,39 @@
     .admin-view .admin-console-head .admin-toolbar .admin-search-wrap{grid-column:auto !important;}
   }
 </style>
+
+<style id="travel-mobile-date-field-fix">
+  /* 출장자 화면의 관리팀 처리일정은 조회 전용 */
+  body:not(.admin) .user-view #voucherDateDisplay:disabled,
+  body:not(.admin) .user-view #paymentDueDateDisplay:disabled{
+    pointer-events:none !important;
+    cursor:default !important;
+    opacity:1 !important;
+    -webkit-text-fill-color:#475569 !important;
+    color:#475569 !important;
+    background:#f1f5f9 !important;
+  }
+
+  @media (max-width:760px){
+    /* 출장일을 다른 모바일 입력필드와 동일한 크기의 명확한 터치 영역으로 표시 */
+    body:not(.admin) .user-view #tripDate.trip-date-input{
+      display:block !important;
+      width:100% !important;
+      min-width:0 !important;
+      min-height:56px !important;
+      height:56px !important;
+      padding:0 14px !important;
+      box-sizing:border-box !important;
+      font-size:16px !important;
+      line-height:1.2 !important;
+      font-weight:700 !important;
+      -webkit-appearance:auto !important;
+      appearance:auto !important;
+      touch-action:manipulation !important;
+    }
+  }
+</style>
+
 </head>
 <body>
   <div class="topbar">
@@ -2327,7 +2360,7 @@
               </div>
               <div>
                 <label>출장일</label>
-                <input id="tripDate" type="date" value=""/>
+                <input id="tripDate" class="trip-date-input" type="date" value=""/>
               </div>
               <div>
                 <label>이동수단</label>
@@ -2344,11 +2377,11 @@
               </div>
               <div>
                 <label>지결작성일</label>
-                <input id="voucherDateDisplay" type="date" readonly title="관리팀 검토 화면에서 입력한 지결작성일이 표시됩니다." />
+                <input id="voucherDateDisplay" type="date" readonly disabled aria-disabled="true" title="관리팀 검토 화면에서 입력한 지결작성일이 표시됩니다." />
               </div>
               <div>
                 <label>입금예정일</label>
-                <input id="paymentDueDateDisplay" type="date" readonly title="관리팀 검토 화면에서 입력한 입금예정일이 표시됩니다." />
+                <input id="paymentDueDateDisplay" type="date" readonly disabled aria-disabled="true" title="관리팀 검토 화면에서 입력한 입금예정일이 표시됩니다." />
               </div>
               <div class="settlement-help">관리팀 처리일정은 관리팀 검토 화면에서 입력한 값이 자동 표시됩니다.</div>
 
