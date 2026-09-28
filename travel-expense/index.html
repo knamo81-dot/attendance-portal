@@ -1606,37 +1606,6 @@
   }
 </style>
 
-<style id="travel-mobile-date-field-fix">
-  /* 출장자 화면의 관리팀 처리일정은 조회 전용 */
-  body:not(.admin) .user-view #voucherDateDisplay:disabled,
-  body:not(.admin) .user-view #paymentDueDateDisplay:disabled{
-    pointer-events:none !important;
-    cursor:default !important;
-    opacity:1 !important;
-    -webkit-text-fill-color:#475569 !important;
-    color:#475569 !important;
-    background:#f1f5f9 !important;
-  }
-
-  @media (max-width:760px){
-    /* 출장일을 다른 모바일 입력필드와 동일한 크기의 명확한 터치 영역으로 표시 */
-    body:not(.admin) .user-view #tripDate.trip-date-input{
-      display:block !important;
-      width:100% !important;
-      min-width:0 !important;
-      min-height:56px !important;
-      height:56px !important;
-      padding:0 14px !important;
-      box-sizing:border-box !important;
-      font-size:16px !important;
-      line-height:1.2 !important;
-      font-weight:700 !important;
-      -webkit-appearance:auto !important;
-      appearance:auto !important;
-      touch-action:manipulation !important;
-    }
-  }
-</style>
 
 </head>
 <body>
@@ -2263,6 +2232,81 @@
   };
 })();
 </script>
+
+
+<style id="travel-mobile-date-field-fix">
+  /* 출장자 화면: 관리팀 처리일정은 표시 전용 */
+  body:not(.admin) .user-view #voucherDateDisplay:disabled,
+  body:not(.admin) .user-view #paymentDueDateDisplay:disabled{
+    pointer-events:none !important;
+    cursor:default !important;
+    opacity:1 !important;
+    -webkit-text-fill-color:#475569 !important;
+    color:#475569 !important;
+    background:#f1f5f9 !important;
+  }
+
+  @media (max-width:760px){
+    /* iOS Safari/WebView: 값이 비어 있어도 출장일 필드 높이를 항상 동일하게 유지 */
+    body:not(.admin) .user-view #tripDate.trip-date-input{
+      display:block !important;
+      width:100% !important;
+      max-width:100% !important;
+      min-width:0 !important;
+      height:56px !important;
+      min-height:56px !important;
+      max-height:56px !important;
+      padding:0 14px !important;
+      margin:0 !important;
+      border:1px solid var(--line) !important;
+      border-radius:12px !important;
+      box-sizing:border-box !important;
+      background:#fff !important;
+      font-size:16px !important;
+      font-weight:700 !important;
+      line-height:56px !important;
+      -webkit-appearance:none !important;
+      appearance:none !important;
+      touch-action:manipulation !important;
+    }
+
+    body:not(.admin) .user-view #tripDate.trip-date-input::-webkit-date-and-time-value{
+      display:flex !important;
+      align-items:center !important;
+      width:100% !important;
+      height:54px !important;
+      min-height:54px !important;
+      line-height:54px !important;
+      padding:0 !important;
+      margin:0 !important;
+      text-align:left !important;
+    }
+
+    body:not(.admin) .user-view #tripDate.trip-date-input::-webkit-datetime-edit{
+      display:flex !important;
+      align-items:center !important;
+      height:54px !important;
+      min-height:54px !important;
+      padding:0 !important;
+      margin:0 !important;
+    }
+
+    body:not(.admin) .user-view #tripDate.trip-date-input::-webkit-datetime-edit-fields-wrapper{
+      display:flex !important;
+      align-items:center !important;
+      height:54px !important;
+      padding:0 !important;
+    }
+
+    body:not(.admin) .user-view #tripDate.trip-date-input::-webkit-calendar-picker-indicator{
+      min-width:32px !important;
+      min-height:32px !important;
+      margin:0 !important;
+      padding:8px !important;
+      cursor:pointer !important;
+    }
+  }
+</style>
 
 </head>
 <body>
