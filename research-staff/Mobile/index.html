@@ -1,1 +1,180 @@
-.
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="color-scheme" content="light" />
+  <title>인력운영현황 · Mobile</title>
+  <link rel="stylesheet" href="./style.css?v=20260928-mobile-staff1" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <main class="mobile-app">
+    <!-- 포털 상단 탭/필터와 동기화하기 위한 내부 컨트롤. 모바일 화면에는 표시하지 않습니다. -->
+    <section class="portal-bridge-controls" aria-hidden="true">
+      <div class="tabs">
+        <button class="tab-btn active" data-view="dashboard" type="button">메인 대시보드</button>
+        <button class="tab-btn" data-view="analysis" type="button">현황분석</button>
+        <button class="tab-btn" data-view="admin" type="button">운영인력 리스트</button>
+      </div>
+      <input id="referenceMonth" type="month" />
+      <select id="filterDivision"><option value="">전체 본부</option></select>
+      <select id="filterTeam"><option value="">전체 팀</option></select>
+      <button class="leave-toggle-btn active" data-leave-mode="exclude" type="button">휴직 제외</button>
+      <button class="leave-toggle-btn" data-leave-mode="include" type="button">휴직 포함</button>
+      <span id="connectionStatus" hidden>서버 연결 대기</span>
+    </section>
+
+    <section id="view-dashboard" class="view active">
+      <section class="summary-grid" aria-label="인력 요약">
+        <article class="summary-card accent">
+          <span>총 연구개발인력</span><strong id="cardTotal">0</strong><em id="cardTotalSub">휴직 제외 기준</em>
+        </article>
+        <article class="summary-card">
+          <span>전담요원</span><strong id="cardDedicated">0</strong><em id="cardDedicatedSub">-</em>
+        </article>
+        <article class="summary-card">
+          <span>보조원</span><strong id="cardAssistant">0</strong><em id="cardAssistantSub">-</em>
+        </article>
+        <article class="summary-card">
+          <span>관리직원</span><strong id="cardManager">0</strong><em id="cardManagerSub">-</em>
+        </article>
+        <article class="summary-card">
+          <span>여성 연구인력</span><strong id="cardFemale">0</strong><em id="cardFemaleRate">0%</em>
+        </article>
+        <article class="summary-card">
+          <span>석사 이상</span><strong id="cardMasterPlus">0</strong><em id="cardMasterPlusRate">0%</em>
+        </article>
+      </section>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div><h2>연구개발인력현황</h2><p>구분별 전체 · 남 · 여 현황</p></div>
+          <span class="mini-note">전체 / 남 / 여</span>
+        </div>
+        <div id="researchTypeCards" class="type-card-list"></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div><h2>학위 구성비</h2><p>최종학위 기준 인력 구성</p></div>
+          <span class="mini-note">학위별 인원</span>
+        </div>
+        <div id="dashboardDegreeBars" class="bar-list"></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div><h2>학위별 현황</h2><p>합계를 먼저 보고, 필요할 때 구분별 상세를 펼칩니다.</p></div>
+          <span class="mini-note">남 / 여</span>
+        </div>
+        <div id="mobileDegreeSummary" class="metric-grid"></div>
+        <button id="degreeDetailToggle" class="detail-toggle" type="button" aria-expanded="false">구분별 상세보기 <span>⌄</span></button>
+        <div id="mobileDegreeDetail" class="breakdown-list hidden"></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div><h2>연령별 현황</h2><p>생년월일 기준 자동 계산</p></div>
+          <span class="mini-note">남 / 여</span>
+        </div>
+        <div id="mobileAgeSummary" class="metric-grid age-grid"></div>
+        <button id="ageDetailToggle" class="detail-toggle" type="button" aria-expanded="false">구분별 상세보기 <span>⌄</span></button>
+        <div id="mobileAgeDetail" class="breakdown-list hidden"></div>
+      </article>
+
+      <article class="panel compact-panel">
+        <div class="panel-head">
+          <div><h2>학위 · 성별 인력구조</h2><p>남성 ← 학위 → 여성</p></div>
+        </div>
+        <div id="degreePyramidChart" class="pyramid degree-pyramid"></div>
+      </article>
+
+      <article class="panel compact-panel">
+        <div class="panel-head">
+          <div><h2>연령 · 성별 인력구조</h2><p>남성 ← 연령대 → 여성</p></div>
+        </div>
+        <div id="pyramidChart" class="pyramid"></div>
+        <div id="shapeInsight" class="insight-box">데이터 입력 후 인력구조 해석이 표시됩니다.</div>
+      </article>
+    </section>
+
+    <section id="view-analysis" class="view">
+      <article class="analysis-standard-card">
+        <strong>최신 조직 기준</strong>
+        <p>현황분석은 최신 조직 데이터를 기준으로 생성됩니다. 휴직인력 포함 기준이며, 직급/부서 정보는 현재 등록 정보를 사용합니다.</p>
+      </article>
+
+      <article class="panel trend-panel">
+        <div class="panel-head">
+          <div><h2>월별 운영 가능 전담인력 추이</h2><p>최근 12개월 총전담 대비 실전담 변화</p></div>
+          <span class="mini-note">총전담 / 실전담</span>
+        </div>
+        <div id="dedicatedTrendChart" class="dedicated-trend-chart"></div>
+        <div id="trendPointDetail" class="trend-point-detail"></div>
+        <div id="dedicatedTrendSummary" class="dedicated-trend-summary">최근 12개월 전담인력 데이터를 불러오는 중입니다.</div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div><h2>조직 분석 코멘트</h2><p>최신 조직 데이터를 기준으로 핵심 인사이트를 요약합니다.</p></div>
+        </div>
+        <div id="analysisComment" class="comment-box">데이터 입력 후 분석 코멘트가 표시됩니다.</div>
+      </article>
+
+      <article class="panel"><div class="panel-head"><div><h2>근속연수 분포</h2><p>입사일 기준 조직 근속 분포</p></div></div><div id="tenureBars" class="bar-list"></div></article>
+      <article class="panel"><div class="panel-head"><div><h2>직급 분포</h2><p>사원정보의 직위 기준</p></div></div><div id="positionBars" class="bar-list"></div></article>
+      <article class="panel"><div class="panel-head"><div><h2>부서/팀별 인력현황</h2><p>사원정보의 부서/팀 기준</p></div></div><div id="teamBars" class="bar-list"></div></article>
+      <article class="panel"><div class="panel-head"><div><h2>연구소 발령연도 추이</h2><p>연구소 발령일 기준 유입 흐름</p></div></div><div id="assignYearBars" class="bar-list"></div></article>
+    </section>
+
+    <section id="view-admin" class="view">
+      <article class="panel admin-panel">
+        <div class="panel-head admin-heading">
+          <div><h2>연구인력 관리</h2><p>목록은 핵심 정보만 표시하고, 직원을 누르면 상세정보가 열립니다.</p></div>
+          <span id="adminReadonlyBadge" class="mode-badge">조회 전용</span>
+        </div>
+        <div class="admin-search-row">
+          <input id="adminSearch" type="search" placeholder="이름 / 사번 / 본부 / 팀 검색" />
+          <span id="adminListCount" class="count-badge">전체 0명</span>
+        </div>
+        <div class="notice">목록에는 사번 · 이름 · 본부 · 팀만 표시합니다. 직위, 재직상태, 구분, 성별, 생년월일, 연구소 발령일, 최종학위, 비고는 직원 상세에서 확인합니다.</div>
+        <div id="adminCardList" class="staff-card-list"></div>
+      </article>
+      <button id="saveAllBtn" type="button" hidden></button>
+    </section>
+  </main>
+
+  <div id="staffDrawerBackdrop" class="drawer-backdrop hidden"></div>
+  <aside id="staffDrawer" class="staff-drawer hidden" aria-hidden="true">
+    <header class="drawer-head">
+      <div><strong id="staffDrawerName">-</strong><span id="staffDrawerMeta">-</span></div>
+      <button id="staffDrawerClose" class="icon-btn" type="button" aria-label="닫기">×</button>
+    </header>
+    <div class="drawer-body">
+      <div class="detail-static-grid">
+        <div><span>본부</span><strong id="detailDepartment">-</strong></div>
+        <div><span>팀</span><strong id="detailTeam">-</strong></div>
+        <div><span>직위</span><strong id="detailPosition">-</strong></div>
+        <div><span>재직상태</span><strong id="detailStatus">-</strong></div>
+      </div>
+
+      <div class="drawer-form">
+        <label><span>구분</span><select id="detailResearchType"><option value="">선택</option><option value="전담요원">전담요원</option><option value="보조원">보조원</option><option value="관리직원">관리직원</option></select></label>
+        <label><span>성별</span><select id="detailGender"><option value="">선택</option><option value="남">남</option><option value="여">여</option></select></label>
+        <label><span>생년월일</span><input id="detailBirthDate" type="date" /></label>
+        <label><span>연구소 발령일</span><input id="detailLabAssignDate" type="date" /></label>
+        <label><span>최종학위</span><select id="detailDegree"><option value="">선택</option><option value="박사">박사</option><option value="석사">석사</option><option value="학사">학사</option><option value="전문학사">전문학사</option><option value="기타">기타</option></select></label>
+        <label class="wide"><span>비고</span><textarea id="detailRemarks" rows="3" placeholder="비고"></textarea></label>
+      </div>
+    </div>
+    <footer class="drawer-foot">
+      <button id="staffDrawerCancel" class="secondary-btn" type="button">닫기</button>
+      <button id="staffDrawerSave" class="primary-btn" type="button">저장</button>
+    </footer>
+  </aside>
+
+  <div id="mobileToast" class="toast hidden"></div>
+  <script src="./app.js?v=20260928-mobile-staff1"></script>
+</body>
+</html>
