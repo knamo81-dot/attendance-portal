@@ -27,9 +27,10 @@ button{cursor:pointer}
 .drawer-form input[type="date"]{min-width:0;max-width:100%;padding-left:8px;padding-right:5px}
 
 /* ===== Staff Detail Date / Horizontal Swipe FIX 2026-09-28 ===== */
+/* 생년월일 / 연구소 발령일을 구분 / 성별과 동일한 2열 간격으로 배치 */
 .drawer-form label:nth-child(3),
 .drawer-form label:nth-child(4){
-  grid-column:1 / -1;
+  grid-column:auto;
   width:100%;
   min-width:0;
 }
@@ -41,6 +42,9 @@ button{cursor:pointer}
   min-width:0 !important;
   max-width:100% !important;
   box-sizing:border-box;
+  padding-left:7px !important;
+  padding-right:4px !important;
+  font-size:16px !important;
 }
 
 /* 상세창 내부는 세로 스크롤만 허용 */
