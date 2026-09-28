@@ -1831,6 +1831,60 @@ input[type="radio"]{
   .service-company-modal-overlay { padding: 14px; }
   .service-company-modal { width: calc(100vw - 28px); max-height: calc(100dvh - 28px); }
 }
+
+/* ===== Research Staff Mobile Portal Filter Compact FIX 2026-09-28 ===== */
+@media (max-width: 768px) {
+  body.portal-research-staff-active .portal-filters.show {
+    gap: 4px;
+    padding-bottom: 1px;
+  }
+
+  body.portal-research-staff-active .portal-filter-item {
+    height: 30px;
+    gap: 4px;
+    padding: 0 6px;
+    border-radius: 9px;
+  }
+
+  body.portal-research-staff-active .portal-filter-item label {
+    font-size: 9px;
+    line-height: 1;
+  }
+
+  /* iOS 포커스 확대 방지를 위해 실제 입력 글자는 16px 유지 */
+  body.portal-research-staff-active .portal-filter-control {
+    min-height: 24px;
+    min-width: 0;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+  }
+
+  body.portal-research-staff-active
+  .portal-filter-item:has([data-portal-filter="referenceMonth"])
+  .portal-filter-control {
+    width: 92px;
+  }
+
+  body.portal-research-staff-active
+  .portal-filter-item:has([data-portal-filter="filterDivision"])
+  .portal-filter-control {
+    width: 76px;
+  }
+
+  body.portal-research-staff-active
+  .portal-filter-item:has([data-portal-filter="filterTeam"])
+  .portal-filter-control {
+    width: 72px;
+  }
+
+  body.portal-research-staff-active
+  .portal-filter-item:has([data-portal-filter="leaveMode"])
+  .portal-filter-control {
+    width: 76px;
+  }
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -3665,6 +3719,11 @@ body.auth-loading .top-user-bar {
 
   function updatePortalHeader(src) {
     const key = normalizePortalSrc(src);
+    // 인력운영현황에서만 모바일 상단 필터를 컴팩트하게 표시하기 위한 상태 클래스
+    document.body.classList.toggle(
+      'portal-research-staff-active',
+      key === 'research-staff/index.html' || key === 'research-staff/Mobile/index.html'
+    );
     const meta = portalHeaderMeta[key] || portalHeaderMeta[HOME_SRC];
     const header = document.getElementById('portalCommonHeader');
     const top = document.getElementById('portalHeaderTop');
