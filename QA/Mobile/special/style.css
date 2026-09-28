@@ -38,3 +38,11 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}[hidden]{display
 #editForm{padding:11px 12px 12px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.form-grid label,.cas-field{display:grid;gap:4px;min-width:0;font-size:9.5px;font-weight:900;color:#475467}.form-grid .full{grid-column:1/-1}.form-grid input,.form-grid select,.form-grid textarea{width:100%;min-width:0;border:1px solid #d4dae4;border-radius:9px;background:#fff;color:#101828;outline:none;font-size:14px;font-weight:500}.form-grid input,.form-grid select{height:38px;padding:0 9px}.form-grid textarea{padding:8px 9px;resize:vertical}.form-grid input:focus,.form-grid select:focus,.form-grid textarea:focus{border-color:#8d76de;box-shadow:0 0 0 3px rgba(100,68,200,.09)}
 .field-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.cas-inputs{display:grid;gap:5px}.cas-input-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px}.modal-actions{position:sticky;bottom:-12px;display:flex;justify-content:flex-end;gap:7px;margin:12px -12px -12px;padding:9px 12px calc(9px + env(safe-area-inset-bottom));border-top:1px solid var(--line-soft);background:#fff}
 @media(max-width:360px){.mobile-special-shell{padding-left:6px;padding-right:6px}.toolbar{gap:5px;padding:8px}.substance-toggle{padding:6px 8px}.name-ko{font-size:12px}.cas-main{font-size:10px}.summary-grid{gap:3px}.summary-tile{padding-left:3px;padding-right:3px}.summary-tile span{font-size:8px}.form-grid{grid-template-columns:1fr}.form-grid .full{grid-column:auto}}
+
+/* 2026-09-28: iOS Safari 입력 포커스 자동 확대 방지
+   모바일 전용 화면의 실제 입력 컨트롤은 16px 이상을 유지한다. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+select,
+textarea {
+  font-size: 16px !important;
+}
