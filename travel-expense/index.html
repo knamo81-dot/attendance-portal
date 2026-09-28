@@ -3952,6 +3952,14 @@
 
   function applyProfile(p){
     state.profile=p||{}; state.companyId=p.companyId||''; state.userId=p.userId||null; state.employeeNo=p.employeeNo||'';
+    // 신규 작성 시에도 조직 코드가 아닌 현재 로그인 사용자의 국문 본부/팀명을 복원할 수 있도록 보관합니다.
+    window.__travelExpenseCurrentApplicantProfile = {
+      name:p.name||'',
+      divisionName:p.divisionName||p.divisionCode||'',
+      teamName:p.teamName||p.teamCode||'',
+      divisionCode:p.divisionCode||'',
+      teamCode:p.teamCode||''
+    };
     setVal('applicantName',p.name||''); setVal('applicantDivision',p.divisionName||p.divisionCode||''); setVal('applicantTeam',p.teamName||p.teamCode||''); setVal('requestDate',getVal('requestDate')||today());
     ['applicantName','applicantDivision','applicantTeam','requestDate','voucherDateDisplay','paymentDueDateDisplay'].forEach(id=>{const e=$(id); if(e)e.readOnly=true;});
   }
@@ -4212,9 +4220,10 @@
 
   function clearForm(){
     const p=profile();
-    setVal('applicantName', p.name);
-    setVal('applicantDivision', p.division);
-    setVal('applicantTeam', p.team);
+    const displayProfile=window.__travelExpenseCurrentApplicantProfile||{};
+    setVal('applicantName', displayProfile.name || p.name);
+    setVal('applicantDivision', displayProfile.divisionName || p.division);
+    setVal('applicantTeam', displayProfile.teamName || p.team);
     setVal('tripType','출장');
     setVal('tripDate','');
     setVal('transport','자차');
