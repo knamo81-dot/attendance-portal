@@ -39,10 +39,20 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}[hidden]{display
 .field-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.cas-inputs{display:grid;gap:5px}.cas-input-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px}.modal-actions{position:sticky;bottom:-12px;display:flex;justify-content:flex-end;gap:7px;margin:12px -12px -12px;padding:9px 12px calc(9px + env(safe-area-inset-bottom));border-top:1px solid var(--line-soft);background:#fff}
 @media(max-width:360px){.mobile-special-shell{padding-left:6px;padding-right:6px}.toolbar{gap:5px;padding:8px}.substance-toggle{padding:6px 8px}.name-ko{font-size:12px}.cas-main{font-size:10px}.summary-grid{gap:3px}.summary-tile{padding-left:3px;padding-right:3px}.summary-tile span{font-size:8px}.form-grid{grid-template-columns:1fr}.form-grid .full{grid-column:auto}}
 
-/* 2026-09-28: iOS Safari 입력 포커스 자동 확대 방지
-   모바일 전용 화면의 실제 입력 컨트롤은 16px 이상을 유지한다. */
-input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
-select,
-textarea {
-  font-size: 16px !important;
+/* =========================================================
+   2026-09-28 iOS Safari 입력 포커스 자동 확대 방지
+   - 검색/필터 입력
+   - 특별관리물질 기준관리 신규/수정 팝업
+   - 레이아웃/기능은 변경하지 않고 입력 컨트롤 폰트만 16px 보정
+========================================================= */
+@media (max-width: 768px) {
+  .search-field input,
+  .select-field select,
+  .custom-period input,
+  .form-grid input,
+  .form-grid select,
+  .form-grid textarea,
+  .cas-input-row input {
+    font-size: 16px !important;
+  }
 }
