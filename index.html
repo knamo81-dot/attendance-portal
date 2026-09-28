@@ -3015,6 +3015,12 @@ body.auth-loading .top-user-bar {
       desc: '조직과 인력 운영 현황을 확인합니다.',
       gradient: 'linear-gradient(135deg, #111827 0%, #1f2937 55%, #374151 100%)'
     },
+    'research-staff/Mobile/index.html': {
+      top: 'Organization Management',
+      title: '인력운영현황',
+      desc: '조직과 인력 운영 현황을 모바일에서 확인합니다.',
+      gradient: 'linear-gradient(135deg, #111827 0%, #1f2937 55%, #374151 100%)'
+    },
     'reagent/index.html': {
       top: 'Resource Management',
       title: '시약·초자 주문 시스템',
@@ -3129,6 +3135,11 @@ body.auth-loading .top-user-bar {
       { id: 'attendance-missing', label: '출퇴근 누락 분석' }
     ],
     'research-staff/index.html': [
+      { id: 'dashboard', label: '메인 대시보드' },
+      { id: 'analysis', label: '현황분석' },
+      { id: 'admin', label: '운영인력 리스트' }
+    ],
+    'research-staff/Mobile/index.html': [
       { id: 'dashboard', label: '메인 대시보드' },
       { id: 'analysis', label: '현황분석' },
       { id: 'admin', label: '운영인력 리스트' }
@@ -3685,6 +3696,18 @@ body.auth-loading .top-user-bar {
     return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
   }
 
+  const RESEARCH_STAFF_DESKTOP_SRC = 'research-staff/index.html';
+  const RESEARCH_STAFF_MOBILE_SRC = 'research-staff/Mobile/index.html';
+
+  function getResearchStaffSrc() {
+    return isMobilePortalView() ? RESEARCH_STAFF_MOBILE_SRC : RESEARCH_STAFF_DESKTOP_SRC;
+  }
+
+  function isResearchStaffResponsiveSrc(src) {
+    const key = normalizePortalSrc(src);
+    return key === RESEARCH_STAFF_DESKTOP_SRC || key === RESEARCH_STAFF_MOBILE_SRC;
+  }
+
   const QA_USAGE_DESKTOP_SRC = 'QA/usage/index.html';
   const QA_USAGE_MOBILE_SRC = 'QA/Mobile/usage/index.html';
   const QA_SDS_DESKTOP_SRC = 'QA/index.html';
@@ -3751,6 +3774,7 @@ body.auth-loading .top-user-bar {
     if (!raw) return src;
     const suffixMatch = raw.match(/([?#].*)$/);
     const suffix = suffixMatch ? suffixMatch[1] : '';
+    if (isResearchStaffResponsiveSrc(raw)) return getResearchStaffSrc() + suffix;
     if (isQaUsageSrc(raw)) return getQaUsageSrc() + suffix;
     if (isQaSdsSrc(raw)) return getQaSdsSrc() + suffix;
     if (isQaStorageSrc(raw)) return getQaStorageSrc() + suffix;
@@ -4002,7 +4026,7 @@ body.auth-loading .top-user-bar {
   }
 
   function isResearchStaffSrc(src) {
-    return normalizePortalSrc(src) === 'research-staff/index.html';
+    return isResearchStaffResponsiveSrc(src);
   }
 
   function findResearchStaffNavButton() {
