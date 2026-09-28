@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="color-scheme" content="light" />
   <title>인력운영현황 · Mobile</title>
-  <link rel="stylesheet" href="./style.css?v=20260928-mobile-staff4" />
+  <link rel="stylesheet" href="./style.css?v=20260928-mobile-staff5" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -162,8 +162,8 @@
       <div class="drawer-form">
         <label><span>구분</span><select id="detailResearchType"><option value="">선택</option><option value="전담요원">전담요원</option><option value="보조원">보조원</option><option value="관리직원">관리직원</option></select></label>
         <label><span>성별</span><select id="detailGender"><option value="">선택</option><option value="남">남</option><option value="여">여</option></select></label>
-        <label><span>생년월일</span><input id="detailBirthDate" type="date" /></label>
-        <label><span>연구소 발령일</span><input id="detailLabAssignDate" type="date" /></label>
+        <label class="date-field date-field-left"><span>생년월일</span><input id="detailBirthDate" type="date" /></label>
+        <label class="date-field date-field-right"><span>연구소 발령일</span><input id="detailLabAssignDate" type="date" /></label>
         <label><span>최종학위</span><select id="detailDegree"><option value="">선택</option><option value="박사">박사</option><option value="석사">석사</option><option value="학사">학사</option><option value="전문학사">전문학사</option><option value="기타">기타</option></select></label>
         <label class="wide"><span>비고</span><textarea id="detailRemarks" rows="3" placeholder="비고"></textarea></label>
       </div>
