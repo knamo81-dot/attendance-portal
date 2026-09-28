@@ -1,1074 +1,1465 @@
-* {
-  box-sizing:border-box
+:root{
+  --qa:#6444c8;
+  --qa-deep:#5233b6;
+  --qa-soft:#f2efff;
+  --qa-row:#f4f1ff;
+  --qa-grid:#dfe3eb;
+  --line:#e2e6ed;
+  --text:#111827;
+  --muted:#657086;
+  --bg:#f5f6fa;
+  --danger:#b42318;
+  --success:#137a42;
+  --shadow:0 4px 18px rgba(33,42,66,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Arial,"Noto Sans KR",sans-serif}
+button,input,select{font:inherit}
+button{cursor:pointer}
+[hidden]{display:none!important}
+
+.usage-shell{padding:12px}
+.usage-app{max-width:1680px;margin:0 auto}
+
+.screen{padding:10px 2px 0}
+.screen-title-row{
+  display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px 8px
+}
+.title-side{display:flex;align-items:center;gap:10px;min-width:max-content}
+.screen-title-row h2{margin:0;font-size:22px;letter-spacing:-.04em}
+.screen-title-row h2 span{font-size:15px}
+.view-switch{
+  margin-left:auto;display:flex;align-items:center;border:1px solid #d9dde6;
+  border-radius:8px;overflow:hidden;background:#fff;flex:0 0 auto
+}
+.view-btn{
+  min-width:82px;height:34px;border:0;border-right:1px solid #e4e7ee;
+  background:#fff;color:#667085;font-size:12px;font-weight:900
+}
+.view-btn:last-child{border-right:0}
+.view-btn.active{background:var(--qa);color:#fff}
+.screen-index{
+  width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:999px;background:var(--qa);color:#fff;font-size:20px;font-weight:900
 }
 
-html,body {
-  margin:0;
-  min-height:100%;
-  font-family:Arial,"Noto Sans KR",sans-serif;
-  color:#0f172a;
-  background:#f4f7fb
+.input-layout{display:grid;grid-template-columns:420px minmax(0,1fr);gap:10px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}
+.input-panel{padding:15px 20px 16px}
+.panel-title{font-size:18px;font-weight:900;margin-bottom:14px}
+.form-stack{display:flex;flex-direction:column;gap:10px}
+.field{display:grid;grid-template-columns:95px minmax(0,1fr);align-items:center;gap:10px}
+.field>span{font-size:13px;font-weight:800}
+.field input,.field select,.search-input-row input{
+  width:100%;height:38px;border:1px solid #cfd5df;border-radius:7px;background:#fff;
+  color:var(--text);padding:0 11px;outline:none;font-size:13px
+}
+.field input:focus,.field select:focus,.search-input-row input:focus{
+  border-color:#8d76de;box-shadow:0 0 0 3px rgba(100,68,200,.11)
+}
+.product-search-wrap{position:relative}
+.product-search-wrap>span{align-self:center}
+.search-input-row{display:grid;grid-template-columns:minmax(0,1fr) 38px}
+.search-input-row input{border-radius:7px 0 0 7px}
+.search-btn{
+  border:0;border-radius:0 7px 7px 0;background:var(--qa);color:#fff;font-size:22px;font-weight:900
+}
+.product-results{
+  position:absolute;left:105px;right:0;top:42px;z-index:30;max-height:320px;overflow:auto;
+  border:1px solid #cfd5df;border-radius:8px;background:#fff;box-shadow:0 14px 32px rgba(28,35,52,.18)
+}
+.product-result{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:10px 12px;border-bottom:1px solid #eef0f4}
+.product-result:last-child{border-bottom:0}
+.product-result:hover{background:#f8f6ff}
+.result-name{font-size:13px;font-weight:900}.result-meta{margin-top:3px;font-size:11px;color:var(--muted)}
+.result-cas{display:flex;flex-direction:column;gap:2px;text-align:right;font-size:11px;color:var(--qa-deep)}
+.result-empty{padding:16px;text-align:center;color:var(--muted);font-size:12px}
+
+.selected-product{
+  position:relative;margin:0 0 2px 0;padding:11px 16px;border:1px solid #d9cff8;border-radius:8px;
+  background:linear-gradient(135deg,#fbfaff,#f4f0ff)
+}
+.selected-product strong{display:block;padding-right:28px;font-size:15px}
+.selected-meta{margin-top:3px;color:#4e5668;font-size:12px}
+.selected-close{position:absolute;right:9px;top:7px;border:0;background:transparent;color:#6652a0;font-size:24px;line-height:1}
+.selected-info-row{display:grid;grid-template-columns:80px minmax(0,1fr);gap:8px;margin-top:8px;font-size:12px}
+.selected-label{color:var(--muted);font-weight:800}
+.selected-cas{display:flex;flex-direction:column;gap:2px}
+.cas-line{display:flex;gap:7px;align-items:center}.cas-content{color:#7b6b9f;font-size:11px}
+.suffix-input{display:grid;grid-template-columns:minmax(0,1fr) 48px;align-items:center}
+.suffix-input input{border-radius:7px 0 0 7px}
+.suffix-input b{
+  height:38px;display:flex;align-items:center;justify-content:center;border:1px solid #cfd5df;border-left:0;
+  border-radius:0 7px 7px 0;background:#f8fafc;font-size:12px
+}
+.message{min-height:20px;margin:8px 0 4px;font-size:12px;color:var(--muted)}
+.message.compact{min-height:14px;margin:0 0 4px}
+.message.error{color:var(--danger)}.message.success{color:var(--success)}
+.save-btn{
+  width:100%;height:42px;border:0;border-radius:7px;background:linear-gradient(90deg,#6847d1,#5b39c0);
+  color:#fff;font-size:14px;font-weight:900;box-shadow:0 5px 12px rgba(91,57,192,.18)
+}
+.save-btn:disabled{opacity:.6;cursor:not-allowed}.lock-icon{margin-right:7px;font-size:12px}
+
+.monthly-panel{padding:12px 12px 11px;min-width:0}
+.panel-head{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;margin-bottom:9px}
+.panel-head h3{margin:0;font-size:21px;letter-spacing:-.04em}
+.month-nav{display:flex;justify-content:center;align-items:center;gap:22px}
+.month-nav button{
+  width:37px;height:37px;border:1px solid #d6dbe4;border-radius:7px;background:#fff;color:#606b7f;font-size:26px;line-height:1
+}
+.month-nav strong{min-width:120px;text-align:center;font-size:17px}
+.metric-toggle{display:flex;border:1px solid #d9dde6;border-radius:8px;overflow:hidden;background:#fff}
+.metric-btn{min-width:78px;height:36px;border:0;background:#fff;color:#667085;font-size:12px;font-weight:800}
+.metric-btn.active{background:var(--qa);color:#fff}
+
+.matrix-wrap{width:100%;overflow:auto;border:1px solid var(--line);border-radius:7px;background:#fff}
+.matrix-table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;font-size:11px}
+.matrix-table th,.matrix-table td{
+  height:40px;padding:6px 8px;border-right:1px solid var(--qa-grid);border-bottom:1px solid var(--qa-grid);
+  text-align:center;vertical-align:middle;background:#fff
+}
+.matrix-table th{background:#fafbfe;color:#384152;font-weight:900;white-space:nowrap}
+.matrix-table tr:last-child td{border-bottom:0}
+.matrix-table th:last-child,.matrix-table td:last-child{border-right:0}
+.monthly-table .material-col{position:sticky;left:0;z-index:4;width:280px;min-width:280px;text-align:left;background:#f9f9fd}
+.monthly-table thead .material-col{z-index:7}
+.monthly-table .day-col{width:42px;min-width:42px;padding:4px}
+.group-row td{background:#f4f2fb;font-weight:800}
+.group-row .material-col{background:#f4f2fb}
+.product-row .material-col{padding-left:28px;background:#fff}
+.material-main{display:flex;align-items:flex-start;gap:7px}
+.expand-btn{border:0;background:transparent;width:18px;padding:0;color:#111827;font-size:14px;line-height:18px}
+.material-text{min-width:0}.material-name{font-size:12px;font-weight:900;line-height:1.25}
+.material-cas,.material-en,.product-meta{margin-top:2px;color:#475467;font-size:10px;font-weight:500;line-height:1.25}
+.product-row .material-name{font-weight:600}
+.value-cell{font-weight:900;color:#2f2a88;background:#fff}
+.group-row .value-cell{background:#f4f2fb}
+.value-cell.has-value{background:linear-gradient(180deg,#f1efff,#fbfaff);color:#3d2fb6}
+.empty{padding:26px!important;text-align:center!important;color:var(--muted)!important;background:#fff!important}
+
+.log-title-row{flex-wrap:wrap}
+.period-controls{display:flex;align-items:center;gap:8px;margin-left:24px}
+.period-label{font-size:13px;font-weight:900}
+.period-controls select{height:36px;border:1px solid #d4dae4;border-radius:7px;background:#fff;padding:0 11px;font-size:12px}
+.period-mode{display:flex;border:1px solid #d8dde6;border-radius:7px;overflow:hidden}
+.period-mode button{height:34px;min-width:54px;border:0;border-right:1px solid #e5e8ef;background:#fff;color:#677084;font-size:12px;font-weight:800}
+.period-mode button:last-child{border-right:0}
+.period-mode button.active{background:var(--qa);color:#fff}
+.log-metric-toggle{margin-left:auto}
+.log-panel{padding:8px 12px 12px}
+.log-table .material-col{position:sticky;left:0;z-index:4;width:255px;min-width:255px;text-align:left}
+.log-table .cas-col{position:sticky;left:255px;z-index:4;width:130px;min-width:130px;background:#fff}
+.log-table .total-col{position:sticky;left:385px;z-index:4;width:100px;min-width:100px;font-weight:900;background:#fff}
+.log-table thead .material-col,.log-table thead .cas-col,.log-table thead .total-col{z-index:7;background:#fafbfe}
+.log-table .person-col{width:88px;min-width:88px;max-width:88px;padding-left:5px;padding-right:5px}
+.log-table .group-row .material-col,.log-table .group-row .cas-col,.log-table .group-row .total-col{background:#f4f2fb}
+.log-table .product-row .material-col,.log-table .product-row .cas-col,.log-table .product-row .total-col{background:#fff}
+.person-name{display:block;font-size:11px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.person-no{display:block;font-size:9px;color:#667085;margin-top:2px;white-space:nowrap}
+.amount-lines{display:flex;flex-direction:column;gap:2px;font-weight:800}
+.group-row .amount-lines{color:#3d2fb6;font-size:12px}
+.time-value{font-weight:900;color:#3d2fb6}
+
+@media(max-width:1100px){
+  .input-layout{grid-template-columns:360px minmax(0,1fr)}
+}
+@media(max-width:860px){
+  .usage-shell{padding:8px}
+  .input-layout{grid-template-columns:1fr}
+  .panel-head{grid-template-columns:1fr auto}
+  .month-nav{grid-column:1 / -1;grid-row:2;justify-content:flex-start}
+  .metric-toggle{justify-self:end}
+  .period-controls{order:3;width:100%;margin-left:0;overflow:auto;padding-bottom:2px}
+  .log-metric-toggle{margin-left:0}
+}
+@media(max-width:560px){
+  .usage-shell{padding:6px}
+  .screen-title-row{padding-left:4px;padding-right:4px}
+  .screen-index{width:32px;height:32px;font-size:17px}
+  .screen-title-row h2{font-size:18px}
+  .input-panel{padding:13px}
+  .field{grid-template-columns:82px minmax(0,1fr)}
+  .product-results{left:92px}
+  .panel-head h3{font-size:18px}
 }
 
-.page {
-  padding:12px
+/* v3: 포털 공통 QA 헤더를 사용하므로 usage 내부 중복 헤더 제거 */
+.usage-app{max-width:none}
+@media(max-width:980px){
+  .log-title-row{align-items:flex-start}
+}
+@media(max-width:640px){
+  .screen-title-row{align-items:flex-start;flex-wrap:wrap}
+  .view-switch{margin-left:0}
 }
 
-.card {
-  background:#fff;
-  border:1px solid #dfe7f1;
-  border-radius:16px;
-  min-height:calc(100vh - 24px);
-  overflow:hidden
-}
 
-.section-head {
+/* v4: 사용일지의 사용량/사용시간 토글을 사용입력 화면과 동일하게
+   데이터 카드 내부 우측 상단으로 배치 */
+.log-view-switch{
+  margin-left:auto;
+}
+.log-panel-head{
   display:flex;
   align-items:center;
-  justify-content:space-between;
-  gap:20px;
-  padding:16px 18px;
-  border-bottom:1px solid #e2e8f0
-}
-
-.section-head h1 {
-  margin:0 0 5px;
-  font-size:18px;
-  letter-spacing:-.04em
-}
-
-.section-head p {
-  margin:0;
-  font-size:11px;
-  color:#64748b;
-  font-weight:700
-}
-
-.inner-tabs {
-  display:flex;
-  gap:6px;
-  padding:4px;
-  border:1px solid #dbe3ec;
-  border-radius:11px;
-  background:#f8fafc;
-  flex:0 0 auto
-}
-
-.inner-tabs button {
-  height:32px;
-  padding:0 14px;
-  border:1px solid transparent;
-  border-radius:8px;
-  background:#fff;
-  color:#334155;
-  font-size:11px;
-  font-weight:800;
-  cursor:pointer
-}
-
-.inner-tabs button.active {
-  background:#6845c7;
-  color:#fff;
-  border-color:#6845c7;
-  box-shadow:0 3px 8px rgba(91,61,181,.18)
-}
-
-.view {
-  padding:14px 18px 18px
-}
-
-.hidden {
-  display:none!important
-}
-
-.stats {
-  display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
-  gap:12px;
-  margin-bottom:12px
-}
-
-.stat-card {
-  min-height:82px;
-  border:1px solid #dbe3ec;
-  border-radius:12px;
-  padding:13px 15px;
-  background:#fff;
-  text-align:left;
-  color:inherit
-}
-
-.stat-card[data-filter] {
-  cursor:pointer
-}
-
-.stat-card[data-filter]:hover,.stat-card.active {
-  border-color:#8b6bd8;
-  box-shadow:0 0 0 2px rgba(104,69,199,.08)
-}
-
-.stat-card.warning strong {
-  color:#d97706
-}
-
-.stat-card span {
-  display:block;
-  font-size:10.5px;
-  font-weight:800;
-  color:#64748b;
-  margin-bottom:7px
-}
-
-.stat-card strong {
-  display:block;
-  font-size:20px;
-  margin-bottom:4px
-}
-
-.stat-card small {
-  font-size:9.5px;
-  color:#94a3b8;
-  font-weight:700
-}
-
-.list-head {
-  display:flex;
-  justify-content:space-between;
-  align-items:end;
-  gap:16px;
-  margin:3px 0 12px
-}
-
-.list-head>div {
-  display:grid;
-  gap:4px
-}
-
-.list-head strong {
-  font-size:13px
-}
-
-.list-head span {
-  font-size:10.5px;
-  color:#64748b
-}
-
-.toolbar {
-  display:grid;
-  grid-template-columns:minmax(280px,1fr) 170px 170px 170px;
-  gap:10px;
-  align-items:end;
-  margin-bottom:12px
-}
-
-.toolbar label {
-  display:flex;
-  flex-direction:column;
-  gap:5px
-}
-
-.toolbar label>span,.modal-body label>span {
-  font-size:10.5px;
-  font-weight:800;
-  color:#475569
-}
-
-.toolbar input,.toolbar select,.modal-body input,.modal-body select,.modal-body textarea {
-  width:100%;
-  border:1px solid #cbd5e1;
-  border-radius:9px;
-  padding:0 11px;
-  background:#fff;
-  font-size:11px;
-  outline:none
-}
-
-.toolbar input,.toolbar select,.modal-body input,.modal-body select {
-  height:36px
-}
-
-.modal-body textarea {
-  padding:10px 11px;
-  resize:vertical
-}
-
-.toolbar input:focus,.toolbar select:focus,.modal-body input:focus,.modal-body select:focus,.modal-body textarea:focus {
-  border-color:#6845c7;
-  box-shadow:0 0 0 3px rgba(104,69,199,.09)
-}
-
-.primary,.secondary,.mini,.icon-btn {
-  border-radius:9px;
-  font-weight:900;
-  cursor:pointer
-}
-
-.primary {
-  height:36px;
-  border:0;
-  padding:0 14px;
-  background:#6845c7;
-  color:#fff;
-  font-size:11px;
-  white-space:nowrap
-}
-
-.primary:disabled {
-  opacity:.6;
-  cursor:wait
-}
-
-.secondary {
-  height:36px;
-  border:1px solid #cbd5e1;
-  background:#fff;
-  padding:0 14px;
-  color:#475569;
-  font-size:11px
-}
-
-.mini {
-  height:28px;
-  padding:0 10px;
-  border:1px solid #d5c9f4;
-  background:#f6f2ff;
-  color:#6845c7;
-  font-size:10px
-}
-
-.table-wrap {
-  border:1px solid #dbe3ec;
-  border-radius:12px;
-  overflow:auto;
-  background:#fff
-}
-
-table {
-  width:100%;
-  border-collapse:collapse;
-  min-width:1180px
-}
-
-th,td {
-  padding:10px 12px;
-  border-bottom:1px solid #e5ebf3;
-  text-align:left;
-  font-size:11px;
-  vertical-align:top
-}
-
-th {
-  position:sticky;
-  top:0;
-  background:#f8fafc;
-  color:#334155;
-  font-weight:900;
-  z-index:1
-}
-
-tbody tr:last-child td {
-  border-bottom:0
-}
-
-.date {
-  white-space:nowrap
-}
-
-.badge {
-  display:inline-flex;
-  align-items:center;
-  min-height:22px;
-  padding:2px 8px;
-  border-radius:999px;
-  background:#eaf2ff;
-  color:#2563eb;
-  font-size:10px;
-  font-weight:900
-}
-
-.badge.green {
-  background:#eaf8ef;
-  color:#15803d
-}
-
-.badge.manual {
-  background:#fff4df;
-  color:#b45309
-}
-
-.status-ok {
-  font-size:10px;
-  font-weight:900;
-  color:#64748b
-}
-
-.products {
-  display:grid;
-  gap:4px;
-  min-width:260px
-}
-
-.product-line {
-  font-size:10.5px;
-  line-height:1.35
-}
-
-.product-line small {
-  color:#64748b
-}
-
-.empty {
-  text-align:center!important;
-  padding:42px!important;
-  color:#94a3b8!important
-}
-
-.coming {
-  min-height:340px;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  border:1px dashed #cbd5e1;
-  border-radius:14px;
-  color:#64748b
-}
-
-.coming strong {
-  font-size:18px;
-  color:#334155;
-  margin-bottom:8px
-}
-
-.coming p {
-  font-size:11px
-}
-
-.modal {
-  position:fixed;
-  inset:0;
-  background:rgba(15,23,42,.42);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:18px;
-  z-index:50
-}
-
-.modal-card {
-  width:min(620px,100%);
-  background:#fff;
-  border-radius:16px;
-  box-shadow:0 24px 70px rgba(15,23,42,.22);
-  overflow:hidden
-}
-
-.modal-head {
-  display:flex;
-  justify-content:space-between;
-  gap:12px;
-  padding:17px 18px;
-  border-bottom:1px solid #e5e7eb
-}
-
-.modal-head h2 {
-  margin:0 0 4px;
-  font-size:16px
-}
-
-.modal-head p {
-  margin:0;
-  color:#64748b;
-  font-size:11px;
-  font-weight:800
-}
-
-.icon-btn {
-  border:0;
-  background:#f1f5f9;
-  width:32px;
-  height:32px;
-  font-size:20px;
-  color:#64748b
-}
-
-.modal-body {
-  padding:16px 18px;
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:12px
-}
-
-.modal-body label {
-  display:grid;
-  gap:6px
-}
-
-.modal-body .wide {
-  grid-column:1/-1
-}
-
-.modal-foot {
-  display:flex;
   justify-content:flex-end;
-  gap:8px;
-  padding:14px 18px;
-  border-top:1px solid #e5e7eb;
-  background:#f8fafc
+  min-height:40px;
+  padding:0 0 8px;
+}
+.log-panel-head .log-metric-toggle{
+  margin-left:auto;
 }
 
-.toast {
-  position:fixed;
-  right:20px;
-  bottom:20px;
-  z-index:80;
-  background:#172033;
-  color:#fff;
-  padding:11px 14px;
-  border-radius:10px;
-  font-size:11px;
-  font-weight:800;
-  box-shadow:0 12px 30px rgba(15,23,42,.2)
-}
-
-.toast.bad {
-  background:#991b1b
-}
-
-@media(max-width:900px) {
-  .section-head {
-    align-items:flex-start;
-    flex-direction:column
+@media(max-width:860px){
+  .log-panel-head{
+    justify-content:flex-start;
   }
-
-  .inner-tabs {
-    width:100%;
-    overflow:auto
-  }
-
-  .stats {
-    grid-template-columns:repeat(2,1fr)
-  }
-
-  .list-head {
-    align-items:stretch;
-    flex-direction:column
-  }
-
-  .toolbar {
-    grid-template-columns:1fr 1fr
-  }
-
-  .search {
-    grid-column:1/-1
-  }
-
-  .view {
-    padding:12px
-  }
-
-  .page {
-    padding:8px
-  }
-
-  .card {
-    min-height:calc(100vh - 16px)
-  }
-
-  .modal-body {
-    grid-template-columns:1fr
-  }
-
-  .modal-body .wide {
-    grid-column:auto
-  }
-
-}
-
-
-/* =========================================================
-   기준관리 목록 가독성 / 컬럼 폭 조정
-   - QA CAS List와 유사한 밀도
-   - CAS / 국문명 / 영문명 고정폭
-   - 남는 폭은 보유제품에 우선 배정
-   ========================================================= */
-
-.standards-table {
-  width: 100%;
-  min-width: 1260px;
-  table-layout: fixed;
-}
-
-.standards-table th,
-.standards-table td {
-  padding: 11px 12px;
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.standards-table th {
-  font-size: 12.5px;
-}
-
-/* CAS No. */
-.standards-table th:nth-child(1),
-.standards-table td:nth-child(1) {
-  width: 145px;
-  white-space: nowrap;
-}
-
-/* 국문명 */
-.standards-table th:nth-child(2),
-.standards-table td:nth-child(2) {
-  width: 190px;
-}
-
-/* 영문명 */
-.standards-table th:nth-child(3),
-.standards-table td:nth-child(3) {
-  width: 230px;
-}
-
-/* 출처 */
-.standards-table th:nth-child(4),
-.standards-table td:nth-child(4) {
-  width: 95px;
-  white-space: nowrap;
-}
-
-/* 최초검진 */
-.standards-table th:nth-child(5),
-.standards-table td:nth-child(5) {
-  width: 105px;
-  white-space: nowrap;
-}
-
-/* 검진주기 */
-.standards-table th:nth-child(6),
-.standards-table td:nth-child(6) {
-  width: 105px;
-  white-space: nowrap;
-}
-
-/* 보유제품: 남는 가로 공간을 사용 */
-.standards-table th:nth-child(7),
-.standards-table td:nth-child(7) {
-  width: auto;
-  min-width: 330px;
-}
-
-/* 최근입고일 */
-.standards-table th:nth-child(8),
-.standards-table td:nth-child(8) {
-  width: 120px;
-  white-space: nowrap;
-}
-
-/* 관리 */
-.standards-table th:nth-child(9),
-.standards-table td:nth-child(9) {
-  width: 90px;
-  white-space: nowrap;
-}
-
-.standards-table .products {
-  min-width: 0;
-  gap: 5px;
-}
-
-.standards-table .product-line {
-  font-size: 12.5px;
-  line-height: 1.4;
-}
-
-.standards-table .product-line small {
-  font-size: 11.5px;
-}
-
-.standards-table .badge {
-  min-height: 23px;
-  padding: 2px 8px;
-  font-size: 11px;
-}
-
-.standards-table .status-ok {
-  font-size: 11px;
-}
-
-@media(max-width:900px) {
-  .standards-table {
-    min-width: 1260px;
+  .log-panel-head .log-metric-toggle{
+    margin-left:0;
   }
 }
 
 
-/* 2026-09-26: 화학물질 관리와 동일한 밀도의 컴팩트 기준관리 */
-.stats {
-  gap:12px;
-  margin-bottom:10px;
+/* v5: 화면명/번호 제거 + 내부 화면전환/조회기간/지표 토글 위치 통일 */
+.screen-title-row,
+.screen-index,
+.title-side,
+.log-panel-head {
+  display:none !important;
 }
-.stat-card {
-  min-height:70px;
-  height:70px;
-  padding:11px 14px;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-}
-.stat-card span {
-  font-size:11px;
-  margin-bottom:7px;
-}
-.stat-card strong {
-  font-size:17px;
-  line-height:1.1;
-  margin-bottom:0;
-}
-.stat-card small {
-  display:none;
-}
-.list-head {
-  margin:2px 0 9px;
-}
-.toolbar {
+
+.screen-toolbar{
+  min-height:46px;
   display:grid;
-  grid-template-columns:minmax(260px,520px) 155px 155px 155px;
-  justify-content:start;
-  gap:10px;
-  margin-bottom:10px;
-}
-.toolbar input,.toolbar select {
-  height:34px;
-  font-size:11px;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:14px;
+  padding:0 12px 8px;
 }
 
-/* 최근사용일 추가에 따른 10열 구성 */
-.standards-table {
-  min-width:1380px;
-}
-.standards-table th:nth-child(7),
-.standards-table td:nth-child(7) {
-  width:auto;
-  min-width:300px;
-}
-.standards-table th:nth-child(8),
-.standards-table td:nth-child(8),
-.standards-table th:nth-child(9),
-.standards-table td:nth-child(9) {
-  width:115px;
-  white-space:nowrap;
-}
-.standards-table th:nth-child(10),
-.standards-table td:nth-child(10) {
-  width:90px;
-  white-space:nowrap;
-}
-@media(max-width:900px) {
-  .toolbar {grid-template-columns:1fr 1fr}
-  .search {grid-column:1/-1}
-  .stat-card {height:68px;min-height:68px}
-  .standards-table {min-width:1380px}
+.toolbar-view-switch{
+  margin-left:0;
+  justify-self:start;
 }
 
-
-/* 2026-09-26 최종 보정: 검색행 / 10열 헤더 / 전체폭 */
-.toolbar {
-  display: grid;
-  grid-template-columns: minmax(300px, 520px) 145px 145px 145px 1fr auto;
-  align-items: end;
-  gap: 10px;
-  width: 100%;
-}
-.toolbar-refresh {
-  grid-column: 6;
-  justify-self: end;
-  align-self: end;
-  width: auto;
-  min-width: 140px;
-  height: 34px;
-  margin: 0;
-}
-.table-wrap {
-  width: 100%;
-  overflow-x: auto;
-}
-.standards-table {
-  width: 100%;
-  min-width: 0;
-  table-layout: fixed;
-}
-.standards-table th,
-.standards-table td {
-  box-sizing: border-box;
-}
-.standards-table th:nth-child(1), .standards-table td:nth-child(1) { width: 7%; }
-.standards-table th:nth-child(2), .standards-table td:nth-child(2) { width: 10%; }
-.standards-table th:nth-child(3), .standards-table td:nth-child(3) { width: 12%; }
-.standards-table th:nth-child(4), .standards-table td:nth-child(4) { width: 5%; }
-.standards-table th:nth-child(5), .standards-table td:nth-child(5) { width: 5.5%; }
-.standards-table th:nth-child(6), .standards-table td:nth-child(6) { width: 5.5%; }
-.standards-table th:nth-child(7), .standards-table td:nth-child(7) { width: 31%; min-width: 0; }
-.standards-table th:nth-child(8), .standards-table td:nth-child(8) { width: 8%; white-space: nowrap; }
-.standards-table th:nth-child(9), .standards-table td:nth-child(9) { width: 8%; white-space: nowrap; }
-.standards-table th:nth-child(10), .standards-table td:nth-child(10) { width: 8%; white-space: nowrap; }
-@media (max-width: 1100px) {
-  .standards-table { min-width: 1350px; }
-}
-@media (max-width: 900px) {
-  .toolbar { grid-template-columns: 1fr 1fr; }
-  .search { grid-column: 1 / -1; }
-  .toolbar-refresh { grid-column: 1 / -1; justify-self: end; }
+.screen-toolbar .period-controls{
+  margin-left:0;
+  justify-self:start;
+  min-width:0;
 }
 
-/* 2026-09-26 특수건강진단 현황 - 연간 월별 관리 */
-.health-status-toolbar{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:10px}.health-filter-group{display:grid;grid-template-columns:110px 95px 145px 145px minmax(220px,360px);gap:10px;align-items:end}.health-filter-group label{display:grid;gap:5px}.health-filter-group label>span{font-size:10.5px;font-weight:800;color:#475569}.health-filter-group select,.health-filter-group input{height:34px;width:100%;border:1px solid #cbd5e1;border-radius:9px;background:#fff;padding:0 10px;font-size:11px;outline:none}.health-legend{font-size:10.5px;color:#64748b;font-weight:800;white-space:nowrap;padding-bottom:8px;display:flex;align-items:center;gap:5px}.legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-left:7px}.legend-dot.due{background:#f59e0b}.legend-dot.done{background:#16a34a}.legend-dot.overdue{background:#dc2626}.health-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:10px}.health-summary>div{height:62px;border:1px solid #dbe3ec;border-radius:11px;padding:10px 13px;background:#fff;display:flex;flex-direction:column;justify-content:center}.health-summary span{font-size:10px;color:#64748b;font-weight:800;margin-bottom:5px}.health-summary strong{font-size:17px}.health-summary .warn strong{color:#dc2626}.health-calendar-wrap{border:1px solid #dbe3ec;border-radius:12px;overflow:auto;background:#fff;max-height:calc(100vh - 310px)}.health-calendar{width:100%;min-width:1480px;table-layout:fixed;border-collapse:separate;border-spacing:0}.health-calendar th,.health-calendar td{padding:8px 7px;font-size:10.5px;text-align:center;vertical-align:middle;border-bottom:1px solid #e5ebf3;border-right:1px solid #edf1f6;height:50px}.health-calendar th{position:sticky;top:0;z-index:3;background:#f8fafc;color:#334155;font-weight:900}.health-calendar .emp-col{width:180px;left:0;z-index:5}.health-calendar .next-col{width:120px}.health-calendar td.employee-cell{position:sticky;left:0;z-index:2;background:#fff;text-align:left;padding-left:12px}.employee-cell strong{display:block;font-size:11px}.employee-cell small{display:block;color:#64748b;margin-top:3px;font-size:9.5px}.next-date{font-weight:900;white-space:nowrap}.next-date.overdue{color:#dc2626}.month-cell{cursor:pointer;background:#fff}.month-cell:hover{background:#faf8ff}.month-chip{display:inline-flex;align-items:center;justify-content:center;min-height:24px;padding:3px 7px;border-radius:7px;font-size:9.5px;font-weight:900;white-space:nowrap}.month-chip.done{background:#eaf8ef;color:#15803d}.month-chip.due{background:#fff7e6;color:#b45309}.month-chip.overdue{background:#fef2f2;color:#b91c1c}.health-note{font-size:10px;color:#64748b;margin-top:8px}.health-drawer{position:fixed;top:0;right:0;width:min(520px,92vw);height:100vh;background:#fff;z-index:101;box-shadow:-18px 0 45px rgba(15,23,42,.18);display:flex;flex-direction:column}.health-drawer.hidden{display:none!important}.health-drawer-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.28);z-index:100}.health-drawer-backdrop.hidden{display:none!important}.health-drawer-head{display:flex;justify-content:space-between;align-items:flex-start;padding:18px;border-bottom:1px solid #e5e7eb}.health-drawer-head>div{display:grid;gap:4px}.health-drawer-head strong{font-size:17px}.health-drawer-head span{font-size:11px;color:#64748b;font-weight:700}.health-drawer-body{padding:16px 18px;overflow:auto;display:grid;gap:12px}.drawer-section{border:1px solid #e2e8f0;border-radius:12px;padding:13px}.drawer-section h3{font-size:12px;margin:0 0 9px}.drawer-row{display:grid;grid-template-columns:120px 1fr;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:10.5px}.drawer-hazard{padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:10.5px;line-height:1.45}.drawer-hazard b{display:block}.drawer-hazard small{color:#64748b}@media(max-width:1000px){.health-status-toolbar{align-items:stretch;flex-direction:column}.health-filter-group{grid-template-columns:1fr 1fr}.health-search{grid-column:1/-1}.health-summary{grid-template-columns:1fr 1fr}.health-calendar-wrap{max-height:none}}
-
-/* 2026-09-26 현황표: 이름/사번, 본부/팀 분리 */
-.health-calendar .emp-col{width:125px}.health-calendar .org-col{width:165px}.health-calendar .next-col{width:120px}.health-calendar td.org-cell{text-align:left;padding-left:10px}.org-cell strong{display:block;font-size:10.5px}.org-cell small{display:block;color:#64748b;margin-top:3px;font-size:9.5px}
-
-
-/* 2026-09-26 특수건강진단 현황: 본부 / 팀 / 이름 컬럼 분리 */
-.health-calendar .division-col,
-.health-calendar .division-cell { width: 120px; min-width: 120px; white-space: nowrap; }
-.health-calendar .team-col,
-.health-calendar .team-cell { width: 130px; min-width: 130px; white-space: nowrap; }
-.health-calendar .emp-col,
-.health-calendar .employee-cell { width: 100px; min-width: 100px; }
-.health-calendar .employee-cell strong { display:block; }
-.health-calendar .employee-cell small { display:block; margin-top:3px; color:#94a3b8; font-size:10px; font-weight:700; }
-.health-calendar .division-cell,
-.health-calendar .team-cell { font-weight:700; color:#334155; vertical-align:middle; }
-
-/* 2026-09-26 특수건강진단 현황 레이아웃 조정 */
-.health-summary{margin-top:0;margin-bottom:10px}
-.health-status-toolbar{margin-bottom:10px}
-.health-calendar .division-col,.health-calendar .division-cell{width:95px;min-width:95px;text-align:center;padding-left:5px;padding-right:5px}
-.health-calendar .team-col,.health-calendar .team-cell{width:105px;min-width:105px;text-align:center;padding-left:5px;padding-right:5px}
-.health-calendar .emp-col{width:95px;min-width:95px;left:auto;text-align:center}
-.health-calendar td.employee-cell{position:static;left:auto;width:95px;min-width:95px;text-align:center;padding-left:5px;padding-right:5px}
-.health-calendar .next-col{width:105px;min-width:105px;text-align:center}
-.health-calendar td:nth-child(4){text-align:center;padding-left:5px;padding-right:5px}
-
-/* 특수건강진단 월 상세 입력 */
-.health-drawer{width:min(600px,94vw)}
-.drawer-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}.drawer-form label{display:grid;gap:5px}.drawer-form label.wide{grid-column:1/-1}.drawer-form label>span{font-size:10.5px;font-weight:800;color:#475569}.drawer-form input,.drawer-form select,.drawer-form textarea{width:100%;border:1px solid #cbd5e1;border-radius:8px;background:#fff;padding:8px 10px;font-size:11px;outline:none}.drawer-form input,.drawer-form select{height:36px}.drawer-form textarea{resize:vertical;min-height:64px}.drawer-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.drawer-actions button{height:34px;border-radius:8px;padding:0 14px;font-size:10.5px;font-weight:900}.drawer-actions .save{border:0;background:#6d28d9;color:#fff}.drawer-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.drawer-section-head h3{margin:0}.add-hazard-btn{border:1px solid #c4b5fd;background:#f5f3ff;color:#6d28d9;border-radius:8px;height:30px;padding:0 10px;font-size:10px;font-weight:900}.selected-hazard{display:grid;grid-template-columns:86px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:10.5px}.selected-hazard .hazard-name small{display:block;color:#64748b;margin-top:2px}.source-pill{font-size:9px;font-weight:900;border-radius:999px;padding:3px 7px;background:#eef2ff;color:#4338ca}.source-pill.manual{background:#fff7ed;color:#c2410c}.remove-hazard{border:0;background:transparent;color:#dc2626;font-weight:900;cursor:pointer}.drawer-empty{padding:8px 0;color:#64748b;font-size:10.5px}.result-help{font-size:9.5px;color:#64748b;line-height:1.5;margin-top:5px}.hazard-picker-card{width:min(820px,94vw)}.modal-head>div{display:grid;gap:3px}.modal-head small{font-size:10px;color:#64748b}.hazard-picker-search{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid #e5e7eb}.hazard-picker-search input{height:34px;min-width:300px;flex:1;border:1px solid #cbd5e1;border-radius:8px;padding:0 10px;font-size:11px}.hazard-picker-search span{font-size:9.5px;color:#64748b}.hazard-picker-table-wrap{max-height:420px;overflow:auto}.hazard-picker-table{width:100%;border-collapse:collapse}.hazard-picker-table th,.hazard-picker-table td{padding:9px 8px;border-bottom:1px solid #edf1f6;font-size:10.5px;text-align:center}.hazard-picker-table th{position:sticky;top:0;background:#f8fafc;z-index:1}.hazard-picker-table td:nth-child(3){text-align:left}.hazard-picker-table small{display:block;color:#64748b;margin-top:2px}.month-chip.reserved{background:#eef2ff;color:#4338ca}
-@media(max-width:700px){.drawer-form{grid-template-columns:1fr}.drawer-form label.wide{grid-column:auto}.hazard-picker-search{align-items:stretch;flex-direction:column}.hazard-picker-search input{min-width:0}.hazard-picker-card{width:96vw}}
-
-/* 2026-09-26 유해인자 선택창: 상세 drawer 위에 독립적으로 표시 */
-#hazardPickerModal{
-  z-index:130;
-  background:rgba(15,23,42,.32);
-}
-#hazardPickerModal .hazard-picker-card{
-  width:min(1180px,96vw);
-  max-width:none;
-}
-#hazardPickerModal .hazard-picker-table{
-  min-width:980px;
-  table-layout:fixed;
-}
-#hazardPickerModal .hazard-picker-table th:nth-child(1),
-#hazardPickerModal .hazard-picker-table td:nth-child(1){width:56px}
-#hazardPickerModal .hazard-picker-table th:nth-child(2),
-#hazardPickerModal .hazard-picker-table td:nth-child(2){width:130px}
-#hazardPickerModal .hazard-picker-table th:nth-child(3),
-#hazardPickerModal .hazard-picker-table td:nth-child(3){width:auto}
-#hazardPickerModal .hazard-picker-table th:nth-child(4),
-#hazardPickerModal .hazard-picker-table td:nth-child(4){width:105px}
-#hazardPickerModal .hazard-picker-table th:nth-child(5),
-#hazardPickerModal .hazard-picker-table td:nth-child(5),
-#hazardPickerModal .hazard-picker-table th:nth-child(6),
-#hazardPickerModal .hazard-picker-table td:nth-child(6){width:120px}
-#hazardPickerModal .hazard-picker-table-wrap{max-height:min(560px,62vh)}
-#hazardPickerModal .hazard-picker-search{padding:14px 18px}
-#hazardPickerModal .hazard-picker-search input{min-width:420px}
-@media(max-width:700px){
-  #hazardPickerModal .hazard-picker-card{width:98vw}
-  #hazardPickerModal .hazard-picker-search input{min-width:0}
+.toolbar-metric-toggle{
+  justify-self:end;
+  margin-left:auto;
 }
 
-/* 2026-09-26 상세입력 저장버튼/알림 레이어 수정 */
-#healthDrawer .drawer-actions{position:relative;z-index:5;pointer-events:auto}
-#healthDrawer #drawerSave{position:relative;z-index:6;pointer-events:auto!important;cursor:pointer!important;min-width:72px}
-#healthDrawer #drawerSave:disabled{cursor:wait!important;opacity:.7}
-#healthDrawer input,#healthDrawer select,#healthDrawer textarea,#healthDrawer button{pointer-events:auto}
-.toast{z-index:220!important;pointer-events:none}
+.input-period-controls select{
+  min-width:86px;
+}
 
-/* 월별 검진정보 2줄 표시: [예약/완료] MM.DD / 병원 · 결과 */
-.health-calendar th,.health-calendar td{height:56px}
-.month-event{width:100%;min-width:0;display:grid;gap:3px;padding:4px 3px;line-height:1.15}
-.month-event-top{display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap}
-.month-event-top b{font-size:9.5px;color:#334155}
-.month-state{display:inline-flex;align-items:center;justify-content:center;border-radius:5px;padding:3px 5px;font-size:8.5px;font-weight:900}
-.month-event.reserved .month-state{background:#eef2ff;color:#4338ca}
-.month-event.done .month-state{background:#eaf8ef;color:#15803d}
-.month-event-top em{font-style:normal;font-size:8px;font-weight:900;color:#64748b}
-.month-event-sub{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;font-size:8.5px;font-weight:800;color:#64748b}
-.month-event-sub.abnormal{color:#dc2626;font-weight:900}
+#inputMonth{
+  min-width:72px;
+}
 
-/* 월 셀 전체 클릭영역 유지: 내부 표시요소가 클릭을 가로채지 않도록 함 */
-.month-cell{cursor:pointer;position:relative}
-.month-cell .month-event,.month-cell .month-chip{pointer-events:none}
+.monthly-panel .panel-head{
+  grid-template-columns:auto 1fr;
+}
 
+.monthly-panel .month-nav{
+  justify-self:center;
+}
 
-/* 2026-09-26 특수건강진단 다중선택/일괄입력 */
-.health-note.bulk-hint{color:#6d28d9;font-weight:800;margin-top:9px}
-.month-cell{user-select:none;-webkit-user-select:none}
-.month-cell.bulk-selected{background:#f3efff!important;box-shadow:inset 0 0 0 2px #7c3aed;position:relative;z-index:1}
-.month-cell.bulk-selected .month-event,.month-cell.bulk-selected .month-chip{filter:saturate(1.05)}
-.bulk-guide{display:grid;gap:4px;padding:11px 12px;border:1px solid #ddd6fe;border-radius:10px;background:#f5f3ff;color:#5b21b6;font-size:10.5px;line-height:1.45}
-.bulk-guide strong{font-size:11px}.bulk-guide span{color:#6b7280;font-weight:700}
-.bulk-field-note{margin-top:7px;font-size:9.5px;color:#64748b}
-#healthDrawer .drawer-actions{align-items:center}
-#healthDrawer .drawer-actions .delete{margin-right:auto;border:1px solid #fecaca;background:#fff;color:#dc2626;cursor:pointer!important}
-#healthDrawer .drawer-actions .delete:hover{background:#fef2f2}
-#healthDrawer .drawer-actions .delete:disabled{opacity:.45;cursor:not-allowed!important}
-#healthDrawer #drawerSave{cursor:pointer!important}
+.log-view-switch{
+  margin-left:0;
+}
 
+/* v4에서 추가했던 카드 내부 지표토글 영역은 더 이상 사용하지 않음 */
+.log-panel-head{
+  min-height:0 !important;
+  padding:0 !important;
+}
 
-/* 2026-09-26 연구소 발령일/연구소 부재 연도별 관리 */
-.month-cell.outside-period{background:#f3f4f6!important;color:#94a3b8;cursor:default}
-.period-label{display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#94a3b8;white-space:nowrap}
-.month-cell.exclusion-month{background:#eef1f5!important}
-.exclusion-card{display:grid;gap:3px;align-items:center;justify-items:center;line-height:1.15}
-.exclusion-card b,.exclusion-inline b{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#64748b;color:#fff;font-size:8px;font-weight:900;padding:2px 6px}
-.exclusion-card span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#475569;font-size:8.5px;font-weight:800}
-.exclusion-inline{margin-top:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#475569;font-size:8px;font-weight:800}
-.month-cell[data-disabled="true"] .month-event,.month-cell[data-disabled="true"] .month-chip{pointer-events:none}
-.lab-warning-card{width:min(620px,94vw)}
-.lab-warning-body{padding:15px 18px;display:grid;gap:10px}
-.lab-warning-summary{font-size:11px;color:#475569;font-weight:800}.lab-warning-summary strong{color:#dc2626;margin-left:4px}
-.lab-warning-list{max-height:280px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc}
-.lab-warning-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 11px;border-bottom:1px solid #e5e7eb;font-size:10.5px}.lab-warning-row:last-child{border-bottom:0}.lab-warning-row b{font-size:11px}.lab-warning-row span{color:#64748b;text-align:right}
-.lab-warning-body p{margin:0;font-size:10px;line-height:1.5;color:#64748b}
+@media(max-width:1000px){
+  .screen-toolbar{
+    grid-template-columns:auto 1fr auto;
+    gap:8px;
+  }
+  .screen-toolbar .period-controls{
+    overflow-x:auto;
+    max-width:100%;
+  }
+}
 
-
-/* 2026-09-26: 발령 전 / 연구소 부재 월의 검진 입력 및 동시 표시 */
-.month-cell.period-entry{cursor:pointer!important}
-.month-cell.period-entry:hover{box-shadow:inset 0 0 0 2px rgba(99,102,241,.28)}
-.month-cell.preassignment-month{background:#f5f6f8!important}
-.month-context-line{min-height:12px;display:flex;align-items:center;justify-content:center;margin-bottom:1px;overflow:hidden}
-.month-context-line:empty{display:none}
-.period-state{display:inline-flex;max-width:100%;align-items:center;justify-content:center;padding:2px 5px;border-radius:999px;font-size:7.5px;line-height:1;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.period-state.preplacement{background:#e2e8f0;color:#475569}
-.period-state.return{background:#64748b;color:#fff}
-.period-only-card{display:grid;gap:3px;justify-items:center;align-items:center;line-height:1.05;pointer-events:none}
-.period-only-card b{display:inline-flex;max-width:100%;align-items:center;justify-content:center;border-radius:999px;padding:3px 6px;font-size:8px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.period-only-card.preplacement b{background:#e2e8f0;color:#475569}
-.period-only-card.return b{background:#64748b;color:#fff}
-.period-only-card span{font-size:7.5px;font-weight:800;color:#94a3b8;white-space:nowrap}
-.month-event.with-period{gap:1px;padding-top:2px;padding-bottom:2px}
-.month-event.with-period .month-event-top{gap:3px}
-.exam-context-banner{border:1px solid #dbe3ec;border-radius:11px;padding:10px 12px;display:grid;gap:4px;background:#f8fafc}
-.exam-context-banner b{font-size:12px}
-.exam-context-banner span{font-size:10px;color:#64748b;font-weight:700}
-.exam-context-banner.preplacement{background:#f8fafc;border-color:#cbd5e1}
-.exam-context-banner.return{background:#f1f5f9;border-color:#cbd5e1}
-.exam-context-banner.special{background:#f8fafc}
-
-/* 기준연도 정책: 현재연도가 아니면 구분=전체 고정 */
-#statusCategory:disabled{background:#f3f4f6;color:#6b7280;cursor:not-allowed;opacity:1}
-
-/* 2026-09-26 다음 검진기한: 최초/주기 구분 + 유해인자 산정내역 모달 */
-.next-deadline-cell{padding:5px 4px!important}
-.next-date-card{width:100%;border:0;background:transparent;padding:3px 2px;display:grid;gap:3px;justify-items:center;cursor:pointer;border-radius:8px;color:#0f172a}
-.next-date-card:hover{background:#f5f3ff;box-shadow:inset 0 0 0 1px #ddd6fe}
-.next-date-card strong{font-size:10.5px;font-weight:900;white-space:nowrap}
-.next-date-card small{max-width:100%;font-size:8.5px;font-weight:800;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.next-date-card small span{color:#6d28d9;font-weight:900}
-.next-date-card.overdue strong{color:#dc2626}
-.next-date-card.overdue small span{color:#dc2626}
-
-#deadlineModal{z-index:140}
-.deadline-modal-card{width:min(980px,96vw);max-width:none}
-.deadline-summary{margin:14px 18px 0;padding:11px 13px;border:1px solid #ddd6fe;border-radius:11px;background:#f7f5ff;display:flex;align-items:center;gap:12px;min-height:44px}
-.deadline-summary strong{font-size:15px;color:#4c1d95;white-space:nowrap}
-.deadline-summary span{font-size:10.5px;font-weight:900;color:#6d28d9}
-.deadline-table-wrap{margin:12px 18px 0;border:1px solid #e2e8f0;border-radius:11px;overflow:auto;max-height:min(500px,58vh)}
-.deadline-table{width:100%;min-width:820px;border-collapse:collapse;table-layout:fixed}
-.deadline-table th,.deadline-table td{padding:10px 9px;border-bottom:1px solid #edf1f6;text-align:center;font-size:10.5px;vertical-align:middle}
-.deadline-table th{position:sticky;top:0;z-index:1;background:#f8fafc;color:#334155;font-weight:900}
-.deadline-table th:nth-child(1){width:120px}
-.deadline-table th:nth-child(2){width:220px}
-.deadline-table th:nth-child(3){width:95px}
-.deadline-table th:nth-child(4){width:150px}
-.deadline-table th:nth-child(5){width:120px}
-.deadline-table th:nth-child(6){width:130px}
-.deadline-hazard-name{text-align:left!important}
-.deadline-hazard-name b{display:block;font-size:10.5px}
-.deadline-hazard-name small,.deadline-table td:nth-child(4) small{display:block;margin-top:3px;color:#64748b;font-size:9px}
-.deadline-kind{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:4px 7px;font-size:9px;font-weight:900;white-space:nowrap}
-.deadline-kind.first{background:#eef2ff;color:#4338ca}
-.deadline-kind.cycle{background:#ecfdf5;color:#047857}
-.deadline-due{white-space:nowrap;font-size:10.5px}
-.deadline-due.overdue{color:#dc2626}
-.deadline-help{padding:10px 18px 2px;font-size:9.5px;line-height:1.5;color:#64748b}
-@media(max-width:700px){.deadline-modal-card{width:98vw}.deadline-summary{align-items:flex-start;flex-direction:column;gap:4px}}
-
-/* QA 권한: 조회 전용 특수건강진단 상세 */
-.drawer-viewer-note{margin-top:12px;padding:10px 12px;border:1px solid #dbe3ef;border-radius:12px;background:#f8fafc;color:#64748b;font-size:12px;font-weight:700;text-align:center}
-.qa-health-viewer .month-cell{cursor:default}
-.qa-health-viewer .month-cell:has(.month-event),.qa-health-viewer .next-date-card{cursor:pointer}
+@media(max-width:760px){
+  .screen-toolbar{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .toolbar-view-switch{
+    order:1;
+  }
+  .toolbar-metric-toggle{
+    order:2;
+    margin-left:auto;
+  }
+  .screen-toolbar .period-controls{
+    order:3;
+    width:100%;
+    overflow-x:auto;
+  }
+}
 
 
-/* ===== 본인 특수건강진단 예약일 자가입력 ===== */
-.self-reservation-guide{border:1px solid #c4b5fd;background:#f5f3ff;border-radius:12px;padding:12px 14px;display:grid;gap:4px;color:#5b21b6}
-.self-reservation-guide strong{font-size:12px;font-weight:900}
-.self-reservation-guide span{font-size:10.5px;line-height:1.55;color:#6d28d9}
-.self-reservation-section{border-color:#ddd6fe}
-.self-reservation-form{grid-template-columns:1fr}
-.self-reservation-deadline{margin-top:10px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:9px;padding:9px 11px;display:grid;grid-template-columns:auto 1fr;gap:3px 10px;align-items:center}
-.self-reservation-deadline span{font-size:10px;font-weight:800;color:#64748b}
-.self-reservation-deadline b{font-size:12px;color:#0f172a}
-.self-reservation-deadline small{grid-column:1/-1;font-size:9.5px;color:#64748b}
-.self-reservation-note{margin-top:9px;font-size:9.5px;line-height:1.5;color:#64748b}
-.self-reservation-locked{margin-top:9px;border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;border-radius:8px;padding:8px 10px;font-size:9.5px;font-weight:800;line-height:1.45}
-.self-reservation-actions{margin-top:12px}
-.self-reservation-actions .save{min-width:110px}
-.self-admin-info .drawer-row:last-child{border-bottom:0}
-.self-admin-info .drawer-row b{font-weight:800;line-height:1.45;word-break:keep-all}
-.qa-health-viewer #statusBody .month-cell:not([data-disabled="true"]){cursor:pointer}
-@media(max-width:700px){.self-reservation-deadline{grid-template-columns:1fr}.self-reservation-deadline small{grid-column:auto}.self-reservation-actions .save{width:100%}}
+/* v6: 사용제품 실시간 검색 - 돋보기 버튼 제거 */
+.search-input-row{
+  display:block;
+}
+.search-input-row input{
+  border-radius:7px;
+}
+.search-btn{
+  display:none !important;
+}
 
-
-/* ===== 2026-09-27 본인 예약 취소 ===== */
-.self-reservation-actions .self-reservation-cancel{
-  margin-right:auto;
-  border:1px solid #fecaca;
-  background:#fff;
-  color:#dc2626;
+/* 집계 셀 클릭 상세 */
+.value-cell.detail-cell,
+.log-table td.detail-cell,
+.log-table .total-col.detail-cell{
   cursor:pointer;
 }
-.self-reservation-actions .self-reservation-cancel:hover{background:#fef2f2}
-.self-reservation-actions .self-reservation-cancel:disabled{opacity:.55;cursor:wait}
-@media(max-width:700px){
-  .self-reservation-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .self-reservation-actions .self-reservation-cancel,
-  .self-reservation-actions .save{width:100%;margin:0}
+.value-cell.detail-cell:hover,
+.log-table td.detail-cell:hover,
+.log-table .total-col.detail-cell:hover{
+  outline:2px solid rgba(100,68,200,.22);
+  outline-offset:-2px;
+  background:#eeeaff !important;
+}
+
+/* 사용내역 상세/수정 */
+.usage-modal-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:22px;
+  background:rgba(15,23,42,.48);
+  backdrop-filter:blur(3px);
+}
+.usage-modal{
+  width:min(820px, calc(100vw - 32px));
+  max-height:calc(100dvh - 44px);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  border:1px solid #dfe3eb;
+  border-radius:16px;
+  background:#fff;
+  box-shadow:0 26px 80px rgba(15,23,42,.28);
+}
+.usage-modal-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  padding:18px 20px 14px;
+  border-bottom:1px solid #e7eaf0;
+}
+.usage-modal-head h3{
+  margin:0;
+  font-size:19px;
+  font-weight:900;
+  letter-spacing:-.035em;
+}
+.usage-modal-head p{
+  margin:5px 0 0;
+  color:#667085;
+  font-size:12px;
+  line-height:1.45;
+}
+.modal-close-btn{
+  width:34px;
+  height:34px;
+  flex:0 0 auto;
+  border:1px solid #d6dbe4;
+  border-radius:9px;
+  background:#fff;
+  color:#344054;
+  font-size:22px;
+  line-height:1;
+}
+.usage-modal-body{
+  padding:14px 20px 20px;
+  overflow:auto;
+}
+.usage-detail-list{
+  display:grid;
+  gap:9px;
+}
+.usage-detail-item{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:14px;
+  align-items:center;
+  padding:12px 14px;
+  border:1px solid #e2e6ed;
+  border-radius:10px;
+  background:#fff;
+}
+.usage-detail-main{
+  min-width:0;
+}
+.usage-detail-product{
+  font-size:13px;
+  font-weight:900;
+}
+.usage-detail-meta{
+  margin-top:3px;
+  color:#667085;
+  font-size:11px;
+  line-height:1.45;
+}
+.usage-detail-values{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px 14px;
+  margin-top:8px;
+  font-size:12px;
+}
+.usage-detail-values b{
+  color:#3d2fb6;
+}
+.usage-detail-actions{
+  display:flex;
+  gap:6px;
+}
+.btn-secondary,
+.btn-danger,
+.btn-primary{
+  height:34px;
+  border-radius:8px;
+  padding:0 12px;
+  font-size:11px;
+  font-weight:900;
+}
+.btn-secondary{
+  border:1px solid #d5dae4;
+  background:#fff;
+  color:#344054;
+}
+.btn-secondary.small{
+  height:30px;
+  padding:0 10px;
+}
+.btn-danger{
+  border:1px solid #fecaca;
+  background:#fff5f5;
+  color:#b42318;
+}
+.btn-primary{
+  border:0;
+  background:var(--qa);
+  color:#fff;
+}
+.usage-detail-empty{
+  padding:30px 14px;
+  text-align:center;
+  color:#667085;
+  font-size:12px;
+}
+.usage-edit-section{
+  margin-top:14px;
+  padding:14px;
+  border:1px solid #d9cff8;
+  border-radius:11px;
+  background:#faf9ff;
+}
+.edit-section-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+.edit-section-head strong{
+  font-size:14px;
+}
+.edit-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px 12px;
+}
+.edit-grid label{
+  display:grid;
+  gap:6px;
+}
+.edit-grid label.full{
+  grid-column:1 / -1;
+}
+.edit-grid label>span{
+  font-size:11px;
+  font-weight:900;
+  color:#475467;
+}
+.edit-grid input,
+.edit-grid select{
+  width:100%;
+  height:36px;
+  border:1px solid #cfd5df;
+  border-radius:7px;
+  background:#fff;
+  padding:0 10px;
+  outline:none;
+  font-size:12px;
+}
+.edit-grid input:focus,
+.edit-grid select:focus{
+  border-color:#8d76de;
+  box-shadow:0 0 0 3px rgba(100,68,200,.10);
+}
+.edit-actions{
+  display:flex;
+  justify-content:flex-end;
+  margin-top:12px;
+}
+@media(max-width:680px){
+  .usage-modal-backdrop{padding:10px}
+  .usage-modal{width:calc(100vw - 20px);max-height:calc(100dvh - 20px)}
+  .usage-modal-head{padding:15px}
+  .usage-modal-body{padding:12px 15px 16px}
+  .usage-detail-item{grid-template-columns:1fr}
+  .usage-detail-actions{justify-content:flex-end}
+  .edit-grid{grid-template-columns:1fr}
+  .edit-grid label.full{grid-column:auto}
+}
+
+/* v7: CAS List(qa_chemical_master) 물질명 연동 */
+.selected-materials,
+.material-stack,
+.cas-stack{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  min-width:0;
+}
+
+.selected-materials .material-entry,
+.material-stack .material-entry{
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+  min-width:0;
+  line-height:1.25;
+}
+
+.selected-materials .material-entry b,
+.material-stack .material-entry b{
+  font-size:12px;
+  font-weight:800;
+  overflow-wrap:anywhere;
+}
+
+.selected-materials .material-entry small,
+.material-stack .material-entry small{
+  color:#667085;
+  font-size:10px;
+  font-weight:500;
+  overflow-wrap:anywhere;
+}
+
+.selected-cas .cas-stack-line,
+.cas-stack .cas-stack-line{
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+  min-width:0;
+  line-height:1.25;
+}
+
+.selected-cas .cas-stack-line b,
+.cas-stack .cas-stack-line b{
+  font-size:11px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.selected-cas .cas-stack-line small,
+.cas-stack .cas-stack-line small{
+  color:#7b6b9f;
+  font-size:10px;
+  font-weight:500;
+  white-space:nowrap;
+}
+
+.monthly-table .material-col .material-stack,
+.log-table .material-col .material-stack{
+  gap:5px;
+}
+
+.monthly-table .material-col .material-entry + .material-entry,
+.log-table .material-col .material-entry + .material-entry{
+  padding-top:4px;
+  border-top:1px dashed #d9dde6;
+}
+
+.monthly-table .material-cas.cas-stack{
+  margin-top:5px;
+  gap:3px;
+}
+
+.log-table .cas-col .cas-stack{
+  align-items:flex-start;
+  text-align:left;
+  gap:5px;
+}
+
+.log-table .cas-col .cas-stack .cas-stack-line + .cas-stack-line{
+  padding-top:4px;
+  border-top:1px dashed #e1e5ec;
+}
+
+.usage-detail-materials{
+  display:grid;
+  gap:5px;
+  margin-top:8px;
+  padding:8px 10px;
+  border:1px solid #ebe7fb;
+  border-radius:8px;
+  background:#faf9ff;
+}
+
+.usage-detail-materials>span{
+  display:grid;
+  grid-template-columns:100px minmax(0,1fr) auto;
+  gap:4px 8px;
+  align-items:start;
+  font-size:11px;
+}
+
+.usage-detail-materials b{
+  color:#4b3ca7;
+  white-space:nowrap;
+}
+
+.usage-detail-materials em{
+  color:#344054;
+  font-style:normal;
+  font-weight:700;
+  overflow-wrap:anywhere;
+}
+
+.usage-detail-materials small{
+  grid-column:2 / -1;
+  color:#667085;
+  font-size:10px;
+  overflow-wrap:anywhere;
+}
+
+.usage-detail-materials i{
+  color:#7b6b9f;
+  font-size:10px;
+  font-style:normal;
+  white-space:nowrap;
+}
+
+@media(max-width:680px){
+  .usage-detail-materials>span{
+    grid-template-columns:1fr;
+  }
+  .usage-detail-materials small{
+    grid-column:auto;
+  }
+}
+
+
+/* v8-2: 나의 월간 사용현황 - 제품 기준 표시 */
+.monthly-product-row .material-name{
+  font-size:12px;
+  font-weight:900;
+  line-height:1.35;
+}
+.monthly-product-row .product-meta{
+  margin-top:4px;
+  color:#667085;
+  font-size:10px;
+  font-weight:500;
+  line-height:1.35;
+  overflow-wrap:anywhere;
 }
 
 
 /* =========================================================
-   Mobile Health UI - 2026-09-27
-========================================================= */
-html,body{width:100%;max-width:100%;overflow-x:hidden;background:#f4f7fb}
-body{min-height:100dvh}
-.page{padding:8px;min-height:100dvh}
-.card{min-height:calc(100dvh - 16px);border-radius:18px;background:#f8fafc;overflow:visible}
-.mobile-section-head{padding:8px;border-bottom:0;background:#eef2f8;position:sticky;top:0;z-index:20}
-.mobile-section-head>div{display:none}
-.inner-tabs{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:14px;background:#e9eef6}
-.inner-tabs button{width:100%;height:42px;border-radius:11px;font-size:13px;background:transparent}
-.inner-tabs button.active{background:linear-gradient(135deg,#6d4ccf,#5b3db5);box-shadow:0 5px 14px rgba(91,61,181,.22)}
-.view{padding:8px 8px 14px}
+   QA / Mobile / usage 전용
+   - 입력폼 자동 폭 조정
+   - iOS 입력 포커스 자동 줌 방지(폼 컨트롤 16px 이상)
+   - 나의 월간 사용현황: 모바일 달력 + 날짜별 건수
+   - 날짜 상세: 모바일 전체화면 수정/삭제
+   ========================================================= */
+html, body{
+  width:100%;
+  max-width:100%;
+  overflow-x:hidden;
+}
+.usage-shell{
+  width:100%;
+  max-width:100%;
+  padding:10px;
+}
+.usage-app,
+.screen,
+.input-layout,
+.panel,
+.form-stack,
+.field,
+.field > *,
+.search-input-row,
+.suffix-input{
+  min-width:0;
+  max-width:100%;
+}
+.input-layout{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:12px;
+}
+.input-panel,
+.monthly-panel{
+  width:100%;
+  padding:14px;
+}
+.field{
+  grid-template-columns:88px minmax(0,1fr);
+  gap:9px;
+}
+.field input,
+.field select,
+.search-input-row input,
+.edit-grid input,
+.edit-grid select{
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  font-size:16px;
+}
+.field input[type="date"]{
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  -webkit-appearance:none;
+  appearance:none;
+}
+.search-input-row,
+.suffix-input{
+  width:100%;
+}
+.product-results{
+  left:97px;
+  right:0;
+  width:auto;
+  max-width:calc(100% - 97px);
+}
+.selected-product{
+  width:100%;
+  overflow:hidden;
+}
+.selected-info-row{
+  grid-template-columns:72px minmax(0,1fr);
+}
+.selected-meta,
+.selected-materials,
+.selected-cas,
+.cas-line,
+.material-entry{
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.save-btn{
+  min-height:46px;
+  font-size:16px;
+}
 
-.health-summary{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 0 8px!important}
-.health-summary>div{min-width:0;padding:9px 7px!important;border:1px solid #e1e7f0;border-radius:12px;background:#fff;display:grid;gap:4px}
-.health-summary span{font-size:9px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.health-summary strong{font-size:15px!important}
+/* 모바일 월간 현황은 건수 달력으로 사용하므로 사용량/시간 토글은 표시하지 않음 */
+#usageInputView .toolbar-metric-toggle{
+  display:none !important;
+}
+.monthly-panel .panel-head{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:12px;
+  margin-bottom:10px;
+}
+.monthly-panel .panel-head h3{
+  font-size:20px;
+}
+.month-nav{
+  width:100%;
+  display:grid;
+  grid-template-columns:44px 1fr 44px;
+  justify-content:stretch;
+  align-items:center;
+  gap:10px;
+}
+.month-nav strong{
+  min-width:0;
+  text-align:center;
+  font-size:18px;
+}
+.month-nav button{
+  width:44px;
+  height:44px;
+}
+.monthly-calendar{
+  width:100%;
+  min-width:0;
+  border:1px solid var(--line);
+  border-radius:10px;
+  overflow:hidden;
+  background:#fff;
+}
+.calendar-weekdays{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  border-bottom:1px solid var(--qa-grid);
+  background:#fafbfe;
+}
+.calendar-weekdays span{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:36px;
+  font-size:12px;
+  font-weight:900;
+  color:#475467;
+}
+.calendar-weekdays .sun{color:#b42318}
+.calendar-weekdays .sat{color:#2757b8}
+.calendar-grid{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+}
+.calendar-day{
+  position:relative;
+  min-width:0;
+  min-height:68px;
+  padding:7px 4px 6px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:7px;
+  border:0;
+  border-right:1px solid var(--qa-grid);
+  border-bottom:1px solid var(--qa-grid);
+  border-radius:0;
+  background:#fff;
+  color:#344054;
+  text-align:center;
+}
+.calendar-day:nth-child(7n){border-right:0}
+.calendar-day.is-empty{
+  background:#fafbfc;
+}
+.calendar-day:disabled{
+  cursor:default;
+  opacity:1;
+}
+.calendar-date{
+  align-self:flex-start;
+  min-width:22px;
+  font-size:12px;
+  font-weight:800;
+  line-height:22px;
+}
+.calendar-count{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:34px;
+  min-height:24px;
+  padding:3px 7px;
+  border-radius:999px;
+  background:var(--qa);
+  color:#fff;
+  font-size:11px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.calendar-count.empty-count{
+  background:transparent;
+  color:#c0c6d0;
+  padding:0;
+}
+.calendar-day.has-usage{
+  background:#faf9ff;
+}
+.calendar-day.has-usage:active{
+  background:#eeeaff;
+}
+.calendar-day.is-today .calendar-date{
+  border-radius:999px;
+  background:var(--qa);
+  color:#fff;
+  text-align:center;
+}
+.calendar-empty-message{
+  padding:16px 10px;
+  text-align:center;
+  color:var(--muted);
+  font-size:12px;
+  background:#fff;
+}
+.calendar-loading{
+  padding:28px 12px;
+  text-align:center;
+  color:var(--muted);
+  font-size:13px;
+}
 
-.health-status-toolbar{display:block!important;margin:0 0 8px}
-.health-filter-group{display:grid!important;grid-template-columns:1fr 1fr;gap:6px!important;padding:10px;border:1px solid #dde5ef;border-radius:14px;background:#fff}
-.health-filter-group label{display:grid!important;gap:4px!important;min-width:0}
-.health-filter-group label>span{font-size:10px!important;font-weight:900!important;color:#475569}
-.health-filter-group select,.health-filter-group input{width:100%!important;min-width:0!important;height:36px!important;border:1px solid #cbd5e1!important;border-radius:10px!important;padding:0 9px!important;background:#fff!important;font-size:12px!important}
-.health-filter-group .health-search{grid-column:1/-1}
-.health-legend{display:flex!important;align-items:center;gap:12px!important;padding:9px 4px 2px!important;font-size:10px!important;color:#64748b;flex-wrap:wrap}
-.health-legend>span{display:inline-flex;align-items:center;gap:5px}
-.legend-dot{width:9px!important;height:9px!important;border-radius:50%;display:inline-block}
+/* 날짜 클릭 상세는 모바일 전체화면 */
+@media(max-width:680px){
+  .usage-modal-backdrop{
+    padding:0;
+    align-items:stretch;
+    justify-content:stretch;
+  }
+  .usage-modal{
+    width:100vw;
+    height:100dvh;
+    max-height:none;
+    border:0;
+    border-radius:0;
+  }
+  .usage-modal-head{
+    position:sticky;
+    top:0;
+    z-index:4;
+    padding:14px 16px;
+    background:#fff;
+  }
+  .usage-modal-body{
+    flex:1 1 auto;
+    padding:12px 14px calc(20px + env(safe-area-inset-bottom));
+    overflow:auto;
+  }
+  .usage-detail-item{
+    grid-template-columns:1fr;
+    gap:10px;
+    padding:13px;
+  }
+  .usage-detail-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    width:100%;
+  }
+  .usage-detail-actions button{
+    width:100%;
+    height:40px;
+    font-size:13px;
+  }
+  .edit-grid{
+    grid-template-columns:1fr;
+  }
+  .edit-grid label.full{
+    grid-column:auto;
+  }
+}
 
-.employee-list{display:grid;gap:8px}
-.employee-card{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 13px;border:1px solid #dbe3ec;border-radius:14px;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.035);text-align:left;cursor:pointer}
-.employee-card:active{transform:scale(.995)}
-.employee-main{min-width:0}
-.employee-org{font-size:10px;font-weight:800;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px}
-.employee-name-line{display:flex;align-items:baseline;gap:5px;min-width:0}
-.employee-name{font-size:15px;font-weight:900;color:#0f172a;white-space:nowrap}
-.employee-no{font-size:10.5px;font-weight:800;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.employee-deadline{min-width:116px;max-width:142px;border:0;background:transparent;padding:3px 0 3px 8px;text-align:right;cursor:pointer;border-left:1px solid #eef2f6}
-.employee-deadline-label{display:block;font-size:9.5px;font-weight:900;color:#64748b;margin-bottom:5px}
-.employee-deadline-value{display:flex;justify-content:flex-end;align-items:center;gap:5px;font-size:13px;font-weight:900;color:#0f172a;white-space:nowrap}
-.employee-deadline.overdue .employee-deadline-value{color:#dc2626}
-.status-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:#f59e0b}
-.status-dot.done{background:#16a34a}.status-dot.overdue{background:#dc2626}.status-dot.due{background:#f59e0b}.status-dot.none{background:#cbd5e1}
-.empty-card{padding:28px 15px;border:1px dashed #cbd5e1;border-radius:14px;background:#fff;color:#94a3b8;font-size:12px;text-align:center}
-.health-note{margin:9px 2px 0!important;padding:0!important;font-size:9.5px!important;line-height:1.5!important;color:#64748b!important;background:transparent!important;border:0!important}
+@media(max-width:420px){
+  .usage-shell{padding:8px}
+  .input-panel,.monthly-panel{padding:12px}
+  .panel-title{font-size:19px}
+  .field{
+    grid-template-columns:82px minmax(0,1fr);
+    gap:7px;
+  }
+  .field>span{font-size:13px}
+  .product-results{
+    left:89px;
+    max-width:calc(100% - 89px);
+  }
+  .calendar-day{
+    min-height:62px;
+    padding-left:2px;
+    padding-right:2px;
+  }
+  .calendar-count{
+    min-width:30px;
+    padding-left:5px;
+    padding-right:5px;
+    font-size:10px;
+  }
+}
 
-.employee-calendar-view{margin-top:0}
-.employee-calendar-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:9px;align-items:center;padding:10px 4px 12px}
-.back-btn{height:34px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#334155;font-size:11px;font-weight:900;padding:0 10px}
-.employee-calendar-title{min-width:0;display:grid;gap:2px}
-.employee-calendar-title strong{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.employee-calendar-title span{font-size:9.5px;font-weight:800;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.employee-calendar-year{font-size:12px;font-weight:900;color:#5b3db5;white-space:nowrap}
-.month-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
-.month-tile{position:relative;min-height:94px;border:1px solid #dbe3ec;border-radius:13px;background:#fff;padding:10px 9px;text-align:left;cursor:pointer;overflow:hidden}
-.month-tile:active{transform:scale(.985)}
-.month-tile.disabled{cursor:default;background:#f1f5f9;color:#94a3b8}
-.month-tile.preassignment,.month-tile.excluded{background:#f8fafc}
-.month-label{font-size:13px;font-weight:900;margin-bottom:9px;color:#334155}
-.month-state-mobile{display:inline-flex;align-items:center;min-height:22px;padding:3px 7px;border-radius:999px;font-size:9px;font-weight:900;line-height:1.2}
-.month-state-mobile.done{background:#ecfdf5;color:#047857}.month-state-mobile.due,.month-state-mobile.reserved{background:#fff7ed;color:#c2410c}.month-state-mobile.overdue{background:#fef2f2;color:#dc2626}.month-state-mobile.period{background:#eef2ff;color:#4338ca}.month-state-mobile.disabled{background:#e2e8f0;color:#64748b}
-.month-detail-mobile{display:block;margin-top:7px;font-size:9.5px;font-weight:800;color:#64748b;line-height:1.35;word-break:keep-all}
-.month-detail-mobile strong{display:block;font-size:11px;color:#334155;margin-bottom:2px}
-.month-extra{position:absolute;right:8px;top:8px;font-size:8.5px;font-weight:900;color:#7c3aed}
 
-.compact-stats{display:grid!important;grid-template-columns:1fr 1fr!important;gap:6px!important;margin-bottom:8px!important}
-.stat-card{min-height:72px!important;border-radius:12px!important;padding:10px 11px!important}
-.stat-card span{font-size:9.5px!important;margin-bottom:5px!important}.stat-card strong{font-size:17px!important;margin-bottom:2px!important}.stat-card small{font-size:8.5px!important;line-height:1.3}
-.mobile-toolbar{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;margin-bottom:9px!important;padding:10px;border:1px solid #dde5ef;border-radius:14px;background:#fff}
-.mobile-toolbar label{display:grid!important;gap:4px!important}.mobile-toolbar label>span{font-size:10px!important}
-.mobile-toolbar input,.mobile-toolbar select{height:36px!important;border-radius:10px!important;font-size:12px!important}
-.filter-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.toolbar-refresh{width:100%;height:36px!important;border-radius:10px!important}
+/* =========================================================
+   2026-09-26: 모바일 특별관리물질 추가정보
+   - 기존 모바일 입력카드 가로폭 유지
+   - 단위 아래에 100% 폭으로 세로 확장
+   - iOS 포커스 확대 방지를 위해 텍스트 입력 16px 유지
+   ========================================================= */
+.special-usage-panel{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  margin-top:2px;
+  padding:12px;
+  border:1px solid #d9cff8;
+  border-radius:10px;
+  background:linear-gradient(180deg,#fbfaff,#f7f4ff);
+  box-sizing:border-box;
+  overflow:hidden;
+}
+.special-usage-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  min-width:0;
+}
+.special-usage-head strong{
+  min-width:0;
+  color:#45369b;
+  font-size:14px;
+  font-weight:900;
+}
+.special-usage-badge{
+  flex:0 0 auto;
+  padding:4px 8px;
+  border-radius:999px;
+  background:#6847d1;
+  color:#fff;
+  font-size:10px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.special-usage-guide{
+  margin:7px 0 11px;
+  color:#667085;
+  font-size:11px;
+  line-height:1.5;
+}
+.special-material-summary{
+  display:grid;
+  gap:7px;
+  width:100%;
+  min-width:0;
+  margin:0 0 11px;
+  padding:10px;
+  border:1px solid #e2daf9;
+  border-radius:9px;
+  background:#fff;
+  box-sizing:border-box;
+}
+.special-material-summary-label{
+  color:#475467;
+  font-size:11px;
+  font-weight:900;
+}
+.special-material-chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  min-width:0;
+}
+.special-material-chip{
+  display:inline-flex;
+  align-items:center;
+  max-width:100%;
+  min-height:26px;
+  padding:4px 9px;
+  border-radius:999px;
+  background:#eee9ff;
+  color:#4f36b5;
+  font-size:11px;
+  font-weight:900;
+  line-height:1.3;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.special-field-block{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:7px;
+  width:100%;
+  min-width:0;
+  margin-top:12px;
+}
+.special-field-label,
+.special-accident-fields label>span{
+  color:#475467;
+  font-size:12px;
+  font-weight:900;
+}
+.special-field-label b,
+.special-accident-fields label>span b{color:#b42318}
+.special-field-block>select,
+.special-field-block>input[type="text"],
+.special-accident-fields textarea{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  border:1px solid #cfd5df;
+  border-radius:8px;
+  background:#fff;
+  color:var(--text);
+  outline:none;
+  box-sizing:border-box;
+  font:inherit;
+  font-size:16px;
+}
+.special-field-block>select,
+.special-field-block>input[type="text"]{
+  min-height:44px;
+  padding:0 11px;
+}
+.special-accident-fields textarea{
+  min-height:88px;
+  padding:10px 11px;
+  resize:vertical;
+  line-height:1.45;
+}
+.special-field-block>select:focus,
+.special-field-block>input[type="text"]:focus,
+.special-accident-fields textarea:focus{
+  border-color:#8d76de;
+  box-shadow:0 0 0 3px rgba(100,68,200,.10);
+}
+.ppe-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px 8px;
+  width:100%;
+  min-width:0;
+}
+.ppe-grid label,
+.accident-options label{
+  display:flex;
+  align-items:flex-start;
+  gap:7px;
+  min-width:0;
+  color:#344054;
+  font-size:12px;
+  font-weight:700;
+  line-height:1.35;
+  cursor:pointer;
+}
+.ppe-grid input,
+.accident-options input{
+  flex:0 0 auto;
+  width:18px;
+  height:18px;
+  margin:0;
+  accent-color:var(--qa);
+}
+.ppe-grid label span,
+.accident-options label span{
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+.accident-options{
+  display:flex;
+  align-items:center;
+  gap:22px;
+  min-height:30px;
+}
+.special-accident-fields{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:11px;
+  width:100%;
+  min-width:0;
+  margin-top:12px;
+}
+.special-accident-fields label{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:7px;
+  min-width:0;
+}
+.input-panel .special-usage-panel,
+.input-panel .special-field-block,
+.input-panel .ppe-grid,
+.input-panel .special-accident-fields{
+  min-width:0;
+  max-width:100%;
+}
+@media(max-width:360px){
+  .ppe-grid{grid-template-columns:1fr}
+  .special-usage-panel{padding:11px}
+}
 
-.hazard-list{display:grid;gap:8px}
-.hazard-card{border:1px solid #dbe3ec;border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 2px 8px rgba(15,23,42,.03)}
-.hazard-card-header{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:0;background:#fff;padding:11px 12px;text-align:left;cursor:pointer}
-.hazard-card-name{min-width:0;display:grid;gap:3px}.hazard-card-name strong{font-size:14px;line-height:1.2}.hazard-card-name span{font-size:10.5px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hazard-card-cas{font-size:12px;font-weight:900;color:#334155;white-space:nowrap;text-align:right}
-.hazard-card-detail{display:none;border-top:1px solid #edf1f6;padding:11px 12px;background:#fbfcfe}
-.hazard-card.open .hazard-card-detail{display:block}
-.hazard-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.hazard-detail-item{padding:8px 9px;border:1px solid #e5eaf1;border-radius:10px;background:#fff;min-width:0}
-.hazard-detail-item.wide{grid-column:1/-1}.hazard-detail-item span{display:block;font-size:9px;font-weight:900;color:#64748b;margin-bottom:4px}.hazard-detail-item b{display:block;font-size:11px;color:#0f172a;word-break:break-word}
-.hazard-products{display:grid;gap:5px}.hazard-product{padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:10px}.hazard-product:last-child{border-bottom:0}.hazard-product small{display:block;color:#64748b;margin-top:2px}
-.hazard-action{display:flex;justify-content:flex-end;margin-top:9px}
+/* =========================================================
+   2026-09-26: 모바일 특별관리물질 추가정보 UI 컴팩트 보정
+   - 기능/저장 로직 변경 없음
+   - 입력카드 가로폭 유지, 세로 확장 유지
+   - PC 버전과 동일한 정보 계층/밀도로 정리
+   ========================================================= */
+@media (max-width: 760px) {
+  .special-usage-panel {
+    margin-top: 4px;
+    padding: 10px 11px 11px;
+    border-radius: 9px;
+    background: #faf8ff;
+  }
 
-.modal{padding:12px!important;align-items:center!important}.modal-card{width:calc(100vw - 24px)!important;max-width:520px!important;max-height:calc(100dvh - 24px)!important;border-radius:18px!important;overflow:auto!important}
-.modal-head{padding:15px 16px!important}.modal-head h2{font-size:17px!important}.modal-head p{font-size:10px!important;line-height:1.4!important}.modal-body{grid-template-columns:1fr!important;padding:14px 16px!important}.modal-body .wide{grid-column:auto!important}.modal-foot{padding:12px 16px!important;position:sticky;bottom:0;background:#fff}
-.health-drawer{position:fixed!important;left:0!important;right:0!important;top:auto!important;bottom:0!important;width:100%!important;max-width:none!important;height:min(82dvh,760px)!important;border-radius:20px 20px 0 0!important;box-shadow:0 -20px 60px rgba(15,23,42,.25)!important}
-.health-drawer-head{padding:14px 16px!important}.health-drawer-body{padding:12px 14px 22px!important;overflow-y:auto!important}.drawer-form{grid-template-columns:1fr!important}.drawer-form label.wide{grid-column:auto!important}.selected-hazard{grid-template-columns:70px minmax(0,1fr) auto!important;gap:6px!important}.drawer-actions{position:sticky;bottom:0;background:#fff;padding:9px 0 0;z-index:2}.drawer-actions button{min-width:84px;height:38px!important}
-.hazard-picker-card{width:calc(100vw - 24px)!important}.hazard-picker-search{display:grid!important;gap:6px!important;padding:11px 14px!important}.hazard-picker-search input{min-width:0!important;width:100%!important}.hazard-picker-table-wrap{overflow:auto!important;max-height:52dvh!important}.hazard-picker-table{min-width:680px!important}
-.deadline-modal-card{width:calc(100vw - 24px)!important;max-width:none!important}.deadline-summary{margin:10px 14px 0!important;padding:10px!important;display:grid!important;gap:4px!important}.deadline-summary strong{font-size:16px!important}.deadline-table-wrap{margin:10px 14px 0!important;max-height:52dvh!important}.deadline-table{min-width:780px!important}.deadline-help{padding:9px 14px 2px!important}
-.toast{left:12px!important;right:12px!important;bottom:18px!important;transform:none!important;width:auto!important;text-align:center}
+  .special-usage-head {
+    min-height: 24px;
+    gap: 8px;
+  }
 
-@media (max-width:390px){
-  .employee-card{padding:11px 10px;gap:7px}.employee-deadline{min-width:108px}.employee-name{font-size:14px}.employee-deadline-value{font-size:12px}
-  .health-summary span{font-size:8.5px!important}.month-grid{gap:5px}.month-tile{min-height:88px;padding:9px 7px}.filter-row{grid-template-columns:1fr 1fr}.filter-row label:last-child{grid-column:1/-1}
+  .special-usage-head strong {
+    font-size: 12px;
+    line-height: 1.25;
+    letter-spacing: -0.025em;
+  }
+
+  .special-usage-badge {
+    min-height: 20px;
+    padding: 2px 7px;
+    font-size: 9px;
+    line-height: 1.2;
+  }
+
+  .special-usage-guide {
+    margin: 5px 0 9px;
+    font-size: 10px;
+    line-height: 1.45;
+    letter-spacing: -0.015em;
+  }
+
+  .special-material-summary {
+    gap: 5px;
+    margin-bottom: 10px;
+    padding: 8px 9px;
+    border-radius: 8px;
+  }
+
+  .special-material-summary-label {
+    font-size: 10px;
+    line-height: 1.25;
+  }
+
+  .special-material-chips {
+    gap: 5px;
+  }
+
+  .special-material-chip {
+    min-height: 22px;
+    padding: 3px 7px;
+    font-size: 10px;
+    line-height: 1.25;
+  }
+
+  .special-field-block {
+    gap: 5px;
+    margin-top: 10px;
+  }
+
+  .special-field-label,
+  .special-accident-fields label > span {
+    font-size: 10.5px;
+    line-height: 1.3;
+  }
+
+  .special-field-block > select {
+    width: 100%;
+    min-height: 38px;
+    height: 38px;
+    padding: 0 10px;
+    border-radius: 7px;
+    font-size: 13px;
+  }
+
+  .special-field-block > input[type="text"] {
+    width: 100%;
+    min-height: 38px;
+    height: 38px;
+    padding: 0 10px;
+    border-radius: 7px;
+    font-size: 16px; /* iOS 입력 포커스 확대 방지 */
+  }
+
+  .special-field-block > input[type="text"]::placeholder,
+  .special-accident-fields textarea::placeholder {
+    font-size: 12px;
+  }
+
+  .ppe-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 8px;
+    row-gap: 6px;
+  }
+
+  .ppe-grid label,
+  .accident-options label {
+    align-items: center;
+    gap: 5px;
+    font-size: 10.5px;
+    line-height: 1.25;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .ppe-grid label span {
+    word-break: keep-all;
+    overflow-wrap: normal;
+  }
+
+  .ppe-grid input,
+  .accident-options input {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* 긴 보호구명도 가능한 한 한 줄로 유지 */
+  .ppe-grid label:nth-child(6) span,
+  .ppe-grid label:nth-child(7) span {
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .accident-options {
+    gap: 18px;
+    min-height: 24px;
+  }
+
+  .special-accident-fields {
+    gap: 9px;
+    margin-top: 10px;
+  }
+
+  .special-accident-fields label {
+    gap: 5px;
+  }
+
+  .special-accident-fields textarea {
+    min-height: 74px;
+    padding: 8px 9px;
+    border-radius: 7px;
+    font-size: 16px; /* iOS 입력 포커스 확대 방지 */
+    line-height: 1.4;
+  }
+}
+
+@media (max-width: 380px) {
+  .special-usage-panel {
+    padding: 9px;
+  }
+
+  .ppe-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 6px;
+  }
+
+  .ppe-grid label,
+  .accident-options label {
+    font-size: 10px;
+  }
+
+  .ppe-grid label:nth-child(6) span,
+  .ppe-grid label:nth-child(7) span {
+    font-size: 9.5px;
+  }
+}
+
+
+/* =========================================================
+   2026-09-27: 모바일 사용내역 수정 UI 위치/가로스크롤 FIX
+   - 수정영역은 선택한 사용내역 카드 바로 아래에 표시
+   - 모달은 세로 스크롤만 허용하고 좌우 흔들림/스크롤 제거
+   - iOS date input 포함 모든 수정 입력항목 폭을 카드 안으로 고정
+   ========================================================= */
+.usage-detail-list,
+.usage-detail-item,
+.usage-detail-main,
+.usage-edit-section,
+.edit-grid,
+.edit-grid label,
+.edit-grid input,
+.edit-grid select,
+.suffix-input{
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
+}
+
+.usage-detail-list > .usage-edit-section{
+  width:100%;
+  margin-top:0;
+}
+
+.edit-grid input,
+.edit-grid select{
+  display:block;
+  width:100%;
+  max-width:100%;
+}
+
+.edit-grid input[type="date"]{
+  -webkit-appearance:none;
+  appearance:none;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  box-sizing:border-box;
+}
+
+@media(max-width:680px){
+  .usage-modal,
+  .usage-modal-body,
+  .usage-detail-list,
+  .usage-detail-item,
+  .usage-edit-section{
+    max-width:100%;
+    min-width:0;
+  }
+
+  .usage-modal-body{
+    overflow-y:auto;
+    overflow-x:hidden;
+    overscroll-behavior-x:none;
+  }
+
+  .usage-edit-section{
+    width:100%;
+    padding:14px;
+    box-sizing:border-box;
+  }
+
+  .edit-grid{
+    width:100%;
+    grid-template-columns:minmax(0,1fr);
+  }
+
+  .edit-grid label,
+  .edit-grid label.full,
+  .edit-grid input,
+  .edit-grid select,
+  .edit-grid .suffix-input{
+    width:100%;
+    min-width:0;
+    max-width:100%;
+  }
+
+  .edit-grid input[type="date"]{
+    display:block;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+  }
 }
 
 /* =========================================================
    2026-09-28 iOS Safari 입력 포커스 자동 확대 방지
-   - 특수건강진단 현황 검색/필터
-   - 검진 신규/수정 Drawer
-   - 유해인자/수기확인 Modal 및 검색창
-   - 레이아웃/기능은 변경하지 않고 입력 컨트롤 폰트만 16px 보정
+   - 기존 16px 입력폼은 유지
+   - 잔여 기간선택/특별관리물질 select만 16px 보정
+   - 레이아웃/기능 변경 없음
 ========================================================= */
 @media (max-width: 768px) {
-  .health-filter-group input,
-  .health-filter-group select,
-  .mobile-toolbar input,
-  .mobile-toolbar select,
-  .toolbar input,
-  .toolbar select,
-  .modal-body input,
-  .modal-body select,
-  .modal-body textarea,
-  .drawer-form input,
-  .drawer-form select,
-  .drawer-form textarea,
-  .hazard-picker-search input {
+  .period-controls select,
+  .input-period-controls select,
+  .special-field-block > select {
     font-size: 16px !important;
   }
 }
