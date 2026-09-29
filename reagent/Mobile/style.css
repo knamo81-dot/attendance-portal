@@ -875,3 +875,157 @@ body.reagent-mobile-ui{
     font-size:9.4px !important;
   }
 }
+
+
+/* =========================================================
+   2026-09-29 Mobile 제품관리 신규입력 컴팩트 배치
+   구분 30% / 품명 70%
+   제조사 / 제품코드 50:50
+   규격 / 등급 50:50
+   CAS 전체폭
+   기본거래처 / 선정사유 50:50
+   비고 전체폭
+========================================================= */
+@media (max-width:760px){
+
+  /* 제품 마스터 신규입력 폼 */
+  #page-product-management #pmProductMasterPanel .form-grid:has(#pmCategory){
+    display:grid !important;
+    grid-template-columns:repeat(10,minmax(0,1fr)) !important;
+    gap:8px !important;
+    align-items:end !important;
+    width:100% !important;
+  }
+
+  #page-product-management #pmProductMasterPanel .form-grid:has(#pmCategory) > .field{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+  }
+
+  /* 1행: 구분 / 품명 */
+  #page-product-management #pmProductMasterPanel .field:has(#pmCategory){
+    grid-column:span 3 !important;
+    order:1;
+  }
+
+  #page-product-management #pmProductMasterPanel .field:has(#pmName){
+    grid-column:span 7 !important;
+    order:2;
+  }
+
+  /* 2행: 제조사 / 제품코드 */
+  #page-product-management #pmProductMasterPanel .field:has(#pmMaker){
+    grid-column:span 5 !important;
+    order:3;
+  }
+
+  #page-product-management #pmProductMasterPanel .field:has(#pmCode){
+    grid-column:span 5 !important;
+    order:4;
+  }
+
+  /* 3행: 규격 / 등급 */
+  #page-product-management #pmProductMasterPanel .field:has(#pmCapacity){
+    grid-column:span 5 !important;
+    order:5;
+  }
+
+  #page-product-management #pmProductMasterPanel .field:has(#pmGrade){
+    grid-column:span 5 !important;
+    order:6;
+  }
+
+  /* 4행: CAS 전체폭 */
+  #page-product-management #pmProductMasterPanel .field:has(#pmCas){
+    grid-column:1 / -1 !important;
+    order:7;
+  }
+
+  /* 5행: 기본거래처 / 선정사유 */
+  #page-product-management #pmProductMasterPanel .field:has(#pmDefaultVendor){
+    grid-column:span 5 !important;
+    order:8;
+  }
+
+  #page-product-management #pmProductMasterPanel .field:has(#pmDefaultVendorReason){
+    grid-column:span 5 !important;
+    order:9;
+  }
+
+  /* 모든 입력창은 모바일 터치 크기/자동확대 방지 유지 */
+  #page-product-management #pmProductMasterPanel #pmCategory,
+  #page-product-management #pmProductMasterPanel #pmName,
+  #page-product-management #pmProductMasterPanel #pmMaker,
+  #page-product-management #pmProductMasterPanel #pmCode,
+  #page-product-management #pmProductMasterPanel #pmCapacity,
+  #page-product-management #pmProductMasterPanel #pmCas,
+  #page-product-management #pmProductMasterPanel #pmGrade,
+  #page-product-management #pmProductMasterPanel #pmDefaultVendor,
+  #page-product-management #pmProductMasterPanel #pmDefaultVendorReason,
+  #page-product-management #pmProductMasterPanel #pmMemo{
+    width:100% !important;
+    min-width:0 !important;
+    height:42px !important;
+    min-height:42px !important;
+    padding:0 10px !important;
+    font-size:16px !important;
+    border-radius:10px !important;
+  }
+
+  #page-product-management #pmProductMasterPanel .field label{
+    font-size:11px !important;
+    margin-bottom:4px !important;
+  }
+
+  /* 비고는 전체폭이되 세로공간을 과하게 먹지 않도록 */
+  #page-product-management #pmProductMasterPanel .field:has(#pmMemo){
+    width:100% !important;
+    margin-top:8px !important;
+  }
+
+  /* 하단 제품등록 영역도 모바일에 맞게 간결하게 */
+  #page-product-management #pmProductMasterPanel .actions:has(#pmSaveProduct){
+    margin-top:10px !important;
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) auto !important;
+    align-items:center !important;
+    gap:8px !important;
+  }
+
+  #page-product-management #pmProductMasterPanel .actions:has(#pmSaveProduct) > div:first-child{
+    min-width:0 !important;
+  }
+
+  #page-product-management #pmProductMasterPanel .actions:has(#pmSaveProduct) > div:last-child{
+    display:grid !important;
+    grid-auto-flow:column !important;
+    gap:6px !important;
+  }
+
+  #page-product-management #pmProductMasterPanel #pmSaveProduct,
+  #page-product-management #pmProductMasterPanel #pmDeactivateProduct{
+    min-width:72px !important;
+    height:38px !important;
+    padding:0 12px !important;
+    white-space:nowrap !important;
+  }
+}
+
+@media (max-width:360px){
+  #page-product-management #pmProductMasterPanel .form-grid:has(#pmCategory){
+    gap:7px !important;
+  }
+
+  #page-product-management #pmProductMasterPanel .field:has(#pmCategory){
+    grid-column:span 4 !important;
+  }
+
+  #page-product-management #pmProductMasterPanel .field:has(#pmName){
+    grid-column:span 6 !important;
+  }
+
+  #page-product-management #pmProductMasterPanel .field label{
+    font-size:10.5px !important;
+  }
+}
