@@ -75,9 +75,28 @@
       wrap.innerHTML = '<label for="mobileRequestMonthFilter">조회년월</label><select id="mobileRequestMonthFilter" aria-label="제품신청 조회년월"></select>';
       panel.insertBefore(wrap, panel.firstChild);
       const select = wrap.querySelector('select');
-      select.addEventListener('change',(event)=>{
-        request.setCurrentOrderMonth?.(event.target.value);
-      });
+      const applyMonth = (event)=>{
+        const value = String(event?.target?.value || '').trim();
+        if (!value) return;
+
+        const current = String(request.getCurrentOrderMonth?.() || '').trim();
+
+        // 모바일 브라우저는 native select에서 change가 picker 종료 뒤에 늦게 오는 경우가 있어
+        // input 이벤트에서도 즉시 주문월을 적용합니다.
+        if (current !== value){
+          request.setCurrentOrderMonth?.(value);
+        } else {
+          // 같은 값을 다시 선택한 경우에도 현재 화면을 즉시 다시 그려 필터 반응을 보장합니다.
+          request.renderRequest?.();
+        }
+
+        window.requestAnimationFrame(()=>{
+          try { syncRequestMonthFilter(); } catch (_) {}
+        });
+      };
+
+      select.addEventListener('input', applyMonth);
+      select.addEventListener('change', applyMonth);
     }
 
     const select = document.getElementById('mobileRequestMonthFilter');
@@ -165,17 +184,22 @@
 
       return `
         <article class="mobile-data-card mobile-collect-card" data-key="${attr(key)}">
-          <div class="mobile-data-summary mobile-grid-collect" role="button" tabindex="0" aria-expanded="false">
+          <div class="mobile-data-summary mobile-two-line-summary mobile-two-line-summary-select" role="button" tabindex="0" aria-expanded="false">
             <label class="mobile-collect-check-wrap" onclick="event.stopPropagation();">
               <input type="checkbox" class="mobile-collect-check" data-key="${attr(key)}" ${checked} ${disabled} aria-label="${attr(group.name || '품목')} 선택">
             </label>
-            <strong>${esc(group.name || '-')}</strong>
-            <span class="muted-value">${esc(group.maker || '-')}</span>
-            <span class="muted-value">${esc(group.code || '-')}</span>
+            <span class="mobile-category-badge">${esc(group.category || '-')}</span>
+            <div class="mobile-two-line-info">
+              <strong class="mobile-two-line-name">${esc(group.name || '-')}</strong>
+              <div class="mobile-two-line-meta">
+                <span>${esc(group.maker || '-')}</span>
+                <i>/</i>
+                <span>${esc(group.code || '-')}</span>
+              </div>
+            </div>
           </div>
           <div class="mobile-data-detail">
             <div class="mobile-detail-grid">
-              <span>구분</span><b>${esc(group.category || '-')}</b>
               <span>CAS</span><b>${casHtml || '-'}</b>
               <span>등급 / 규격</span><b>${esc([group.grade,group.capacity].filter(Boolean).join(' / ') || '-')}</b>
               <span>총수량</span><b>${esc(qtyText)}</b>
@@ -206,9 +230,7 @@
         </article>`;
     }).join('');
 
-    container.innerHTML = `
-      <div class="mobile-data-head mobile-grid-collect"><span>선택</span><span>품명</span><span>제조사</span><span>제품코드</span></div>
-      ${cards}`;
+    container.innerHTML = cards;
 
     bindCardToggles(container);
 
@@ -300,11 +322,16 @@
   function prepareCard(row){
     return `
       <article class="mobile-data-card">
-        <div class="mobile-data-summary mobile-grid-four" role="button" tabindex="0" aria-expanded="false">
-          <span>${esc(row.category || '-')}</span>
-          <strong>${esc(row.name || '-')}</strong>
-          <span class="muted-value">${esc(row.maker || '-')}</span>
-          <span class="muted-value">${esc(row.code || '-')}</span>
+        <div class="mobile-data-summary mobile-two-line-summary" role="button" tabindex="0" aria-expanded="false">
+          <span class="mobile-category-badge">${esc(row.category || '-')}</span>
+          <div class="mobile-two-line-info">
+            <strong class="mobile-two-line-name">${esc(row.name || '-')}</strong>
+            <div class="mobile-two-line-meta">
+              <span>${esc(row.maker || '-')}</span>
+              <i>/</i>
+              <span>${esc(row.code || '-')}</span>
+            </div>
+          </div>
         </div>
         <div class="mobile-data-detail">
           <div class="mobile-detail-grid">
@@ -336,10 +363,8 @@
     const view = collect.getPrepareActiveView?.() || 'main';
     const summaryRows = collect.getPrepareRowsByView?.(view,'summary') || [];
     const quoteRows = collect.getPrepareRowsByView?.(view,'quote') || [];
-    const head = '<div class="mobile-data-head mobile-grid-four"><span>구분</span><span>품명</span><span>제조사</span><span>제품코드</span></div>';
-
-    summaryContainer.innerHTML = summaryRows.length ? head + summaryRows.map(prepareCard).join('') : '<div class="mobile-empty">취합 정리 반영된 자료가 없습니다.</div>';
-    quoteContainer.innerHTML = quoteRows.length ? head + quoteRows.map(prepareCard).join('') : '<div class="mobile-empty">비교견적 자료가 없습니다.</div>';
+    summaryContainer.innerHTML = summaryRows.length ? summaryRows.map(prepareCard).join('') : '<div class="mobile-empty">취합 정리 반영된 자료가 없습니다.</div>';
+    quoteContainer.innerHTML = quoteRows.length ? quoteRows.map(prepareCard).join('') : '<div class="mobile-empty">비교견적 자료가 없습니다.</div>';
     bindCardToggles(summaryContainer);
     bindCardToggles(quoteContainer);
   }
@@ -374,16 +399,20 @@
     }
 
     container.innerHTML = `
-      <div class="mobile-data-head mobile-grid-four"><span>구분</span><span>품명</span><span>제조사</span><span>제품코드</span></div>
       ${rows.map((p)=>{
         const cas = pm.getProductCasNumbers?.(p)?.join(', ') || p.cas || '-';
         return `
           <article class="mobile-data-card ${p.is_active === false ? 'is-inactive' : ''}" data-product-id="${attr(p.id)}">
-            <div class="mobile-data-summary mobile-grid-four" role="button" tabindex="0" aria-expanded="false">
-              <span>${esc(p.category || '-')}</span>
-              <strong>${esc(p.name || '-')}</strong>
-              <span class="muted-value">${esc(p.maker || '-')}</span>
-              <span class="muted-value">${esc(p.code || '-')}</span>
+            <div class="mobile-data-summary mobile-two-line-summary" role="button" tabindex="0" aria-expanded="false">
+              <span class="mobile-category-badge">${esc(p.category || '-')}</span>
+              <div class="mobile-two-line-info">
+                <strong class="mobile-two-line-name">${esc(p.name || '-')}</strong>
+                <div class="mobile-two-line-meta">
+                  <span>${esc(p.maker || '-')}</span>
+                  <i>/</i>
+                  <span>${esc(p.code || '-')}</span>
+                </div>
+              </div>
             </div>
             <div class="mobile-data-detail">
               <div class="mobile-detail-grid">
