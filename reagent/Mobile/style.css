@@ -580,3 +580,142 @@ body.reagent-mobile-ui{
   .mobile-data-summary > span,.mobile-data-summary > strong{font-size:10px;}
   .mobile-detail-grid{grid-template-columns:78px minmax(0,1fr);}
 }
+
+
+/* =========================================================
+   2026-09-29 Mobile UI follow-up
+   - 제품신청 조회년월 native select 즉시 반응 보정
+   - 제품취합 / 취합정리 / 제품관리 카드 2줄 요약형
+========================================================= */
+
+.mobile-request-month-filter select{
+  font-size:16px !important;
+  touch-action:manipulation;
+  cursor:pointer;
+}
+
+/* 구분은 카드 왼쪽 중앙, 오른쪽은 품명 + 제조사/제품코드 두 줄 */
+.mobile-two-line-summary{
+  grid-template-columns:auto minmax(0,1fr) !important;
+  grid-template-rows:auto !important;
+  align-items:center !important;
+  gap:9px !important;
+  min-height:58px !important;
+  padding-top:9px !important;
+  padding-bottom:9px !important;
+}
+
+.mobile-two-line-summary-select{
+  grid-template-columns:22px auto minmax(0,1fr) !important;
+  gap:8px !important;
+}
+
+.mobile-category-badge{
+  align-self:center !important;
+  justify-self:start;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:42px !important;
+  max-width:64px;
+  min-height:28px;
+  padding:4px 7px;
+  border-radius:999px;
+  background:#eff6ff;
+  color:#1d4ed8 !important;
+  font-size:10px !important;
+  line-height:1.15;
+  font-weight:900;
+  text-align:center;
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  word-break:keep-all;
+}
+
+.mobile-two-line-info{
+  min-width:0;
+  display:grid;
+  grid-template-rows:auto auto;
+  gap:4px;
+}
+
+.mobile-two-line-name{
+  display:block;
+  min-width:0;
+  color:#111827;
+  font-size:12px !important;
+  line-height:1.25;
+  font-weight:900;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.mobile-two-line-meta{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  color:#64748b;
+  font-size:10.5px;
+  line-height:1.25;
+}
+
+.mobile-two-line-meta span{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.mobile-two-line-meta span:first-child{
+  flex:0 1 auto;
+  max-width:58%;
+}
+
+.mobile-two-line-meta span:last-child{
+  flex:1 1 auto;
+}
+
+.mobile-two-line-meta i{
+  flex:0 0 auto;
+  color:#cbd5e1;
+  font-style:normal;
+}
+
+.mobile-two-line-summary .mobile-collect-check-wrap{
+  align-self:center;
+  justify-self:center;
+}
+
+/* 새 2줄 카드에서는 별도 컬럼 헤더가 필요 없음 */
+#collectMobileCards .mobile-data-head,
+#prepareSummaryMobileCards .mobile-data-head,
+#prepareQuoteMobileCards .mobile-data-head,
+#pmProductMobileCards .mobile-data-head{
+  display:none !important;
+}
+
+@media (max-width:360px){
+  .mobile-two-line-summary{
+    gap:7px !important;
+    padding-left:8px !important;
+  }
+
+  .mobile-two-line-summary-select{
+    grid-template-columns:20px auto minmax(0,1fr) !important;
+    gap:6px !important;
+  }
+
+  .mobile-category-badge{
+    min-width:38px !important;
+    max-width:56px;
+    padding-left:5px;
+    padding-right:5px;
+    font-size:9.3px !important;
+  }
+
+  .mobile-two-line-name{font-size:11.3px !important;}
+  .mobile-two-line-meta{font-size:9.8px;}
+}
