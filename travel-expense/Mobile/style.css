@@ -1,32 +1,3 @@
-/* =========================================================
-   출장비 정산 Mobile UI
-   - PC 원본 로직/DB/권한은 그대로 사용
-   - Mobile/index.html 에서만 로드
-========================================================= */
-
-:root{
-  --tm-gap:10px;
-  --tm-radius:14px;
-  --tm-line:#e5e9f2;
-  --tm-muted:#64748b;
-  --tm-main:#2563eb;
-}
-
-html,body{
-  width:100%;
-  max-width:100%;
-  overflow-x:hidden;
-}
-
-body.travel-mobile-ui{
-  -webkit-text-size-adjust:100%;
-  text-size-adjust:100%;
-}
-
-.travel-mobile-detail-nav,
-.travel-mobile-admin-detail-nav{
-  display:none;
-}
 
 @media (max-width:768px){
   html,body{background:#f3f6fb!important;}
@@ -750,4 +721,63 @@ body.travel-mobile-ui{
   .user-view .form-panel .sum-card b{font-size:11.5px!important;}
   .admin-trip-title-row b{font-size:11px!important;}
   .admin-bulk-actions button{font-size:8.8px!important;}
+}
+
+
+/* =========================================================
+   2026-09-29 Mobile 관리팀 검토 - 검토결과 날짜 입력 겹침 보정
+   - 지결작성일 / 입금예정일 2열 유지
+   - date input intrinsic width 때문에 서로 밀리는 현상 방지
+========================================================= */
+@media (max-width:760px){
+  body.travel-mobile-ui .admin-view .admin-schedule-grid{
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    column-gap:10px !important;
+    row-gap:8px !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    box-sizing:border-box !important;
+  }
+
+  body.travel-mobile-ui .admin-view .admin-schedule-grid > div{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    box-sizing:border-box !important;
+  }
+
+  body.travel-mobile-ui .admin-view .admin-schedule-grid label{
+    display:block !important;
+    width:100% !important;
+    min-width:0 !important;
+    margin-bottom:5px !important;
+    font-size:11px !important;
+    line-height:1.25 !important;
+    white-space:nowrap !important;
+  }
+
+  body.travel-mobile-ui .admin-view .admin-schedule-grid input[type="date"]{
+    display:block !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    height:42px !important;
+    min-height:42px !important;
+    padding:0 8px !important;
+    box-sizing:border-box !important;
+    border-radius:10px !important;
+    font-size:16px !important;
+    line-height:42px !important;
+    -webkit-appearance:none;
+    appearance:none;
+  }
+}
+
+/* 아주 좁은 화면에서는 날짜 입력을 1열로 전환 */
+@media (max-width:350px){
+  body.travel-mobile-ui .admin-view .admin-schedule-grid{
+    grid-template-columns:1fr !important;
+  }
 }
