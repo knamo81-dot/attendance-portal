@@ -1,10 +1,28 @@
 (() => {
-  const state = { rows: [], filter: 'target', manualId: null, loading: false };
+  const STORAGE_BUCKET = 'qa-sds-files';
+  const state = {
+    rows: [],
+    filter: 'target',
+    manualId: null,
+    loading: false,
+    currentView: 'status',
+    statusRows: [],
+    targetEditId: null,
+    measurementTargetId: null,
+    measurementEditId: null,
+    historyTargetId: null,
+    historyRows: []
+  };
+
   const $ = s => document.querySelector(s);
   const $$ = s => Array.from(document.querySelectorAll(s));
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const client = () => window.parent?.portalSupabase || window.portalSupabase || null;
   const fmtDate = v => v ? new Date(v).toLocaleDateString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\. /g,'.').replace(/\.$/,'') : '-';
+  const isoToday = () => {
+    const d=new Date(), y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  };
   const normCas = v => String(v || '').trim().replace(/\s+/g,'');
 
   function portalSession(){
@@ -15,6 +33,10 @@
   function companyId(){
     const s=portalSession(), e=s.employee||{}, u=s.user||{}, c=s.company||s.activeCompany||{};
     return String(s.activeCompanyId||s.companyId||s.company_id||c.id||c.company_id||e.company_id||u.company_id||'').trim();
+  }
+  function userName(){
+    const s=portalSession(), e=s.employee||{}, u=s.user||{}, p=s.profile||{};
+    return String(e.name||e.employee_name||u.name||u.user_name||p.name||p.full_name||s.name||'').trim() || null;
   }
   function normalizeRole(role,fallback='user'){
     const clean=String(role||'').trim().toLowerCase();
@@ -34,26 +56,32 @@
   function toast(msg,bad=false){
     const t=$('#toast'); if(!t)return;
     t.textContent=msg; t.className='toast '+(bad?'bad':'');
-    clearTimeout(toast._timer); toast._timer=setTimeout(()=>t.classList.add('hidden'),2800);
+    clearTimeout(toast._timer); toast._timer=setTimeout(()=>t.classList.add('hidden'),3000);
   }
   function applyPermissionUi(){
     const manage=canManageQa();
     $('#refreshBtn').hidden=!manage;
+    $('#newTargetBtn').hidden=!manage;
     $('#actionHead').hidden=!manage;
+    $('#statusActionHead').hidden=!manage;
     document.body.classList.toggle('qa-workenv-viewer',!manage);
   }
   function setView(view){
+    state.currentView=view;
     $$('.inner-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
     $('#statusView').classList.toggle('hidden',view!=='status');
     $('#standardsView').classList.toggle('hidden',view!=='standards');
+    if(view==='status') loadStatus();
   }
   $$('.inner-tabs button').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
-  $('#openStandardsBtn')?.addEventListener('click',()=>setView('standards'));
 
+  // =========================================================
+  // 대상물질기준
+  // =========================================================
   function setFilter(filter){
     state.filter=filter;
     $$('.stat-card[data-filter]').forEach(b=>b.classList.toggle('active',b.dataset.filter===filter));
-    render();
+    renderStandards();
   }
   $$('.stat-card[data-filter]').forEach(b=>b.addEventListener('click',()=>setFilter(b.dataset.filter)));
 
@@ -92,7 +120,7 @@
     return `<div class="row-status">${matchBadge(agg)}<small>${(r.products||[]).length}개 제품 연결</small></div>`;
   }
 
-  function render(){
+  function renderStandards(){
     const q=$('#searchInput').value.trim().toLowerCase();
     const source=$('#sourceFilter').value;
     const threshold=$('#thresholdFilter').value;
@@ -115,7 +143,7 @@
     $$('[data-manual]').forEach(b=>b.addEventListener('click',()=>openManual(Number(b.dataset.manual))));
   }
 
-  function fillFilters(){
+  function fillStandardFilters(){
     const values=[...new Set(state.rows.filter(r=>r.is_target===true).map(thresholdText).filter(v=>v&&v!=='-'))].sort();
     $('#thresholdFilter').innerHTML='<option value="">전체</option>'+values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
   }
@@ -132,18 +160,12 @@
     return r.data||[];
   }
 
-  async function load(){
+  async function loadStandards(){
     const sb=client();
     if(!sb){ $('#standardsBody').innerHTML='<tr><td colspan="10" class="empty">포털 Supabase 연결을 찾을 수 없습니다.</td></tr>'; return; }
     try{
       const cid=companyId();
-      // 기준정보는 DB 1단계에서 만든 VIEW를 통해 조회한다.
-      // base table을 직접 읽으면 프로젝트의 RLS/권한 구성에 따라 Edge Function으로
-      // 정상 저장된 행이 브라우저에서는 0건으로 보일 수 있다.
-      const sr=await sb
-        .from('vw_qa_work_environment_standards')
-        .select('*')
-        .order('chemical_id');
+      const sr=await sb.from('vw_qa_work_environment_standards').select('*').order('chemical_id');
       if(sr.error)throw sr.error;
       const standards=sr.data||[];
 
@@ -184,10 +206,6 @@
         };
       });
 
-      if(!state.rows.length){
-        console.warn('vw_qa_work_environment_standards 조회 결과가 0건입니다.');
-      }
-
       const targets=state.rows.filter(r=>r.is_target===true&&r.verification_status!=='kosha_not_found');
       const unv=state.rows.filter(r=>r.verification_status==='kosha_not_found');
       const linked=new Set(targets.flatMap(r=>(r.products||[]).map(p=>String(p.product_id))));
@@ -196,7 +214,8 @@
       $('#productCount').textContent=linked.size+'개';
       const checked=state.rows.map(r=>r.api_checked_at).filter(Boolean).sort().at(-1);
       $('#apiChecked').textContent=fmtDate(checked);
-      fillFilters(); render();
+      fillStandardFilters();
+      renderStandards();
     }catch(e){
       console.error(e);
       $('#standardsBody').innerHTML=`<tr><td colspan="10" class="empty">기준정보 조회 실패: ${esc(e.message||e)}</td></tr>`;
@@ -204,7 +223,7 @@
     }
   }
 
-  ['searchInput','sourceFilter','thresholdFilter','matchFilter'].forEach(id=>$('#'+id)?.addEventListener(id==='searchInput'?'input':'change',render));
+  ['searchInput','sourceFilter','thresholdFilter','matchFilter'].forEach(id=>$('#'+id)?.addEventListener(id==='searchInput'?'input':'change',renderStandards));
 
   $('#refreshBtn')?.addEventListener('click',async()=>{
     if(!canManageQa())return toast('조회 전용 사용자입니다. 기준정보 갱신은 QA 운영자만 가능합니다.',true);
@@ -215,11 +234,398 @@
       const {data,error}=await sb.functions.invoke('kosha-work-environment-sync',{body:{mode:'all'}});
       if(error)throw error; if(!data?.success)throw new Error(data?.error||'API 갱신 실패');
       toast(`갱신 완료 · 대상 ${data.summary?.target??0} / 미확인 ${data.summary?.not_found??0}`);
-      await load(); setFilter('target');
+      await loadStandards(); setFilter('target');
     }catch(e){ console.error(e); toast('API 기준정보 갱신에 실패했습니다: '+String(e.message||e),true); }
     finally{ state.loading=false; b.disabled=false; b.textContent='↻ API 기준정보 갱신'; }
   });
 
+  // =========================================================
+  // 작업환경측정 현황
+  // =========================================================
+  function scheduleState(r){
+    if(!r.latest_measurement_id) return 'unmeasured';
+    if(r.latest_result_status==='exceeded') return 'exceeded';
+    const next=String(r.next_measurement_date||'');
+    if(next){
+      if(next < isoToday()) return 'overdue';
+      return 'due';
+    }
+    return 'done';
+  }
+  function scheduleBadge(status){
+    const map={
+      unmeasured:['미측정','unmeasured'],
+      done:['측정완료','done'],
+      due:['측정예정','due'],
+      overdue:['기한초과','overdue'],
+      exceeded:['기준초과','exceeded']
+    };
+    const [label,cls]=map[status]||['-','unmeasured'];
+    return `<span class="schedule-badge ${cls}">${label}</span>`;
+  }
+  function resultBadge(status){
+    if(status==='within_limit')return '<span class="badge green">기준 이하</span>';
+    if(status==='exceeded')return '<span class="badge red">기준 초과</span>';
+    if(status==='review')return '<span class="badge warn">확인 필요</span>';
+    return '<span class="badge gray">미입력</span>';
+  }
+  function measurementText(r){
+    const hasVal=r.latest_measurement_value!==null && r.latest_measurement_value!==undefined && r.latest_measurement_value!=='';
+    const value=hasVal ? `${r.latest_measurement_value}${r.latest_measurement_unit?' '+r.latest_measurement_unit:''}` : '-';
+    const limit=r.latest_exposure_limit_text||'';
+    return `<div class="measurement-result"><b>${esc(value)}</b>${limit?`<small>${esc(limit)}</small>`:''}${resultBadge(r.latest_result_status)}</div>`;
+  }
+  function yearOf(v){ return String(v||'').slice(0,4); }
+  function fillStatusYears(){
+    const sel=$('#statusYear'); if(!sel)return;
+    const current=new Date().getFullYear();
+    const years=new Set([current-2,current-1,current,current+1]);
+    state.statusRows.forEach(r=>{
+      if(r.latest_measurement_date)years.add(Number(yearOf(r.latest_measurement_date)));
+      if(r.next_measurement_date)years.add(Number(yearOf(r.next_measurement_date)));
+    });
+    const prev=sel.value;
+    sel.innerHTML=[...years].filter(Number.isFinite).sort((a,b)=>b-a).map(y=>`<option value="${y}">${y}년</option>`).join('');
+    sel.value=prev && [...years].map(String).includes(prev) ? prev : String(current);
+  }
+  function fillStatusOrgFilters(){
+    const divSel=$('#statusDivision'), teamSel=$('#statusTeam');
+    const prevDiv=divSel.value, prevTeam=teamSel.value;
+    const divisions=[...new Set(state.statusRows.map(r=>String(r.division_name||'').trim()).filter(Boolean))].sort();
+    divSel.innerHTML='<option value="">전체</option>'+divisions.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    if(divisions.includes(prevDiv))divSel.value=prevDiv;
+    const selectedDiv=divSel.value;
+    const teams=[...new Set(state.statusRows.filter(r=>!selectedDiv||r.division_name===selectedDiv).map(r=>String(r.team_name||'').trim()).filter(Boolean))].sort();
+    teamSel.innerHTML='<option value="">전체</option>'+teams.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    if(teams.includes(prevTeam))teamSel.value=prevTeam;
+  }
+  function relevantToYear(r,year){
+    if(!year)return true;
+    if(!r.latest_measurement_id)return true;
+    return yearOf(r.latest_measurement_date)===year || yearOf(r.next_measurement_date)===year;
+  }
+  function filteredStatusRows(){
+    const year=$('#statusYear').value;
+    const status=$('#statusState').value;
+    const division=$('#statusDivision').value;
+    const team=$('#statusTeam').value;
+    const q=$('#statusSearch').value.trim().toLowerCase();
+    return state.statusRows.filter(r=>{
+      const s=scheduleState(r);
+      const hay=[r.cas_no,r.chem_name_ko,r.chem_name_en,r.division_name,r.team_name,r.work_area,r.process_name,r.latest_measurement_company].join(' ').toLowerCase();
+      return relevantToYear(r,year) && (!status||s===status) && (!division||r.division_name===division) && (!team||r.team_name===team) && (!q||hay.includes(q));
+    });
+  }
+  function renderStatus(){
+    const rows=filteredStatusRows();
+    const year=$('#statusYear').value;
+    const base=state.statusRows.filter(r=>relevantToYear(r,year));
+    $('#statusTargetCount').textContent=base.length+'건';
+    $('#statusDoneCount').textContent=base.filter(r=>yearOf(r.latest_measurement_date)===year).length+'건';
+    $('#statusDueCount').textContent=base.filter(r=>scheduleState(r)==='due').length+'건';
+    $('#statusOverdueCount').textContent=base.filter(r=>scheduleState(r)==='overdue').length+'건';
+
+    $('#statusBody').innerHTML=rows.length?rows.map(r=>{
+      const status=scheduleState(r);
+      const location=[r.division_name,r.team_name].filter(Boolean).join(' / ')||'-';
+      const place=[r.work_area,r.process_name].filter(Boolean).join(' · ')||'-';
+      const report=r.report_file_path?`<button type="button" class="report-btn" data-report="${r.latest_measurement_id}">보기</button>`:'<button type="button" class="report-btn" disabled>없음</button>';
+      const actions=canManageQa()?`<div class="status-actions"><button class="mini" data-measure="${r.target_id}">측정입력</button><button class="mini gray" data-history="${r.target_id}">이력</button><button class="mini gray" data-target-edit="${r.target_id}">대상수정</button><button class="mini red" data-target-end="${r.target_id}">대상종료</button></div>`:'-';
+      return `<tr>
+        <td>${scheduleBadge(status)}</td>
+        <td><b>${esc(r.cas_no||'-')}</b></td>
+        <td><div class="hazard-main"><b>${esc(r.chem_name_ko||r.chem_name_en||'-')}</b><small>${esc(r.chem_name_en||'')}</small></div></td>
+        <td><div class="location-main"><b>${esc(location)}</b></div></td>
+        <td><div class="location-main"><b>${esc(place)}</b>${r.first_applied_date?`<small>관리시작 ${esc(r.first_applied_date)}</small>`:''}</div></td>
+        <td><b>${esc(r.latest_measurement_date||'-')}</b></td>
+        <td>${measurementText(r)}</td>
+        <td>${esc(r.latest_measurement_company||'-')}</td>
+        <td><b>${esc(r.next_measurement_date||'-')}</b></td>
+        <td>${report}</td>
+        <td>${actions}</td>
+      </tr>`;
+    }).join(''):`<tr><td colspan="11" class="empty">조건에 맞는 작업환경측정 현황이 없습니다.</td></tr>`;
+
+    $$('[data-measure]').forEach(b=>b.addEventListener('click',()=>openMeasurementModal(Number(b.dataset.measure))));
+    $$('[data-history]').forEach(b=>b.addEventListener('click',()=>openHistoryModal(Number(b.dataset.history))));
+    $$('[data-target-edit]').forEach(b=>b.addEventListener('click',()=>openTargetModal(Number(b.dataset.targetEdit))));
+    $$('[data-target-end]').forEach(b=>b.addEventListener('click',()=>endTarget(Number(b.dataset.targetEnd))));
+    $$('[data-report]').forEach(b=>b.addEventListener('click',()=>openLatestReport(Number(b.dataset.report))));
+  }
+
+  async function loadStatus(){
+    const sb=client(); if(!sb)return;
+    const cid=companyId();
+    try{
+      let q=sb.from('vw_qa_work_environment_status').select('*').eq('target_status','active');
+      if(cid)q=q.eq('company_id',cid);
+      const {data,error}=await q.order('cas_no').order('division_name').order('team_name');
+      if(error)throw error;
+      state.statusRows=data||[];
+      fillStatusYears();
+      fillStatusOrgFilters();
+      renderStatus();
+    }catch(e){
+      console.error(e);
+      $('#statusBody').innerHTML=`<tr><td colspan="11" class="empty">현황 DB 조회 실패: ${esc(e.message||e)}<br>database/QA_작업환경측정_현황_DB_2단계.sql 실행 여부를 확인해 주세요.</td></tr>`;
+      $('#statusTargetCount').textContent='-'; $('#statusDoneCount').textContent='-'; $('#statusDueCount').textContent='-'; $('#statusOverdueCount').textContent='-';
+    }
+  }
+
+  function eligibleStandards(){
+    return state.rows.filter(r=>r.is_target===true&&r.verification_status!=='kosha_not_found');
+  }
+  function standardOptionLabel(r){
+    return `${r.cas_no} · ${r.name_ko||r.name_en||'-'} · ${thresholdText(r)}`;
+  }
+  function populateTargetStandards(selected){
+    const sel=$('#targetStandard');
+    const rows=eligibleStandards().sort((a,b)=>String(a.cas_no).localeCompare(String(b.cas_no)));
+    sel.innerHTML=rows.map(r=>`<option value="${r.id}">${esc(standardOptionLabel(r))}</option>`).join('');
+    if(selected!=null)sel.value=String(selected);
+  }
+  function closeTargetModal(){state.targetEditId=null;$('#targetModal').classList.add('hidden')}
+  function openTargetModal(id=null){
+    if(!canManageQa())return toast('조회 전용 사용자입니다.',true);
+    state.targetEditId=id;
+    const row=id?state.statusRows.find(r=>Number(r.target_id)===Number(id)):null;
+    $('#targetModalTitle').textContent=row?'측정대상 수정':'측정대상 등록';
+    populateTargetStandards(row?.standard_id);
+    $('#targetStandard').disabled=!!row;
+    $('#targetDivision').value=row?.division_name||'';
+    $('#targetTeam').value=row?.team_name||'';
+    $('#targetWorkArea').value=row?.work_area||'';
+    $('#targetProcess').value=row?.process_name||'';
+    $('#targetFirstDate').value=row?.first_applied_date||'';
+    $('#targetNote').value=row?.target_note||'';
+    $('#targetModal').classList.remove('hidden');
+  }
+
+  $('#newTargetBtn')?.addEventListener('click',()=>openTargetModal());
+  $('#targetModalClose')?.addEventListener('click',closeTargetModal);
+  $('#targetModalCancel')?.addEventListener('click',closeTargetModal);
+  $('#targetModal')?.addEventListener('click',e=>{if(e.target===$('#targetModal'))closeTargetModal()});
+
+  $('#targetSave')?.addEventListener('click',async()=>{
+    if(!canManageQa())return toast('조회 전용 사용자입니다.',true);
+    const sb=client(), cid=companyId(); if(!sb||!cid)return toast('회사정보 또는 Supabase 연결을 확인해 주세요.',true);
+    const standardId=Number($('#targetStandard').value);
+    const standard=state.rows.find(r=>Number(r.id)===standardId);
+    const workArea=$('#targetWorkArea').value.trim();
+    if(!standard)return toast('대상물질을 선택해 주세요.',true);
+    if(!workArea)return toast('작업장 / 장소를 입력해 주세요.',true);
+    const payload={
+      company_id:cid,
+      standard_id:standardId,
+      chemical_id:standard.chemical_id,
+      division_name:$('#targetDivision').value.trim()||null,
+      team_name:$('#targetTeam').value.trim()||null,
+      work_area:workArea,
+      process_name:$('#targetProcess').value.trim()||null,
+      first_applied_date:$('#targetFirstDate').value||null,
+      note:$('#targetNote').value.trim()||null,
+      status:'active',
+      updated_by:userName()
+    };
+    const btn=$('#targetSave');btn.disabled=true;
+    try{
+      if(state.targetEditId){
+        const {error}=await sb.from('qa_work_environment_targets').update(payload).eq('id',state.targetEditId).eq('company_id',cid);
+        if(error)throw error;
+      }else{
+        payload.created_by=userName();
+        const {error}=await sb.from('qa_work_environment_targets').insert(payload);
+        if(error)throw error;
+      }
+      closeTargetModal();toast(state.targetEditId?'측정대상을 수정했습니다.':'측정대상을 등록했습니다.');await loadStatus();
+    }catch(e){console.error(e);toast('측정대상 저장 실패: '+String(e.message||e),true)}
+    finally{btn.disabled=false}
+  });
+
+  async function endTarget(id){
+    if(!canManageQa())return;
+    const row=state.statusRows.find(r=>Number(r.target_id)===Number(id)); if(!row)return;
+    if(!confirm(`${row.cas_no} · ${row.chem_name_ko||row.chem_name_en||'-'}\n${row.work_area||'-'} 측정대상을 종료할까요?\n기존 측정이력은 보존됩니다.`))return;
+    const sb=client(),cid=companyId();
+    const {error}=await sb.from('qa_work_environment_targets').update({status:'inactive',updated_by:userName()}).eq('id',id).eq('company_id',cid);
+    if(error)return toast('측정대상 종료 실패: '+error.message,true);
+    toast('측정대상을 종료했습니다.');await loadStatus();
+  }
+
+  function targetSummary(row){
+    return `${row.cas_no||'-'} · ${row.chem_name_ko||row.chem_name_en||'-'} · ${[row.division_name,row.team_name,row.work_area,row.process_name].filter(Boolean).join(' / ')}`;
+  }
+  function closeMeasurementModal(){
+    state.measurementTargetId=null;state.measurementEditId=null;
+    $('#measurementModal').classList.add('hidden');
+    $('#measurementReport').value='';
+  }
+  async function openMeasurementModal(targetId,measurement=null){
+    if(!canManageQa())return toast('조회 전용 사용자입니다.',true);
+    const target=state.statusRows.find(r=>Number(r.target_id)===Number(targetId)); if(!target)return;
+    state.measurementTargetId=targetId;
+    state.measurementEditId=measurement?.id||null;
+    $('#measurementModalTitle').textContent=measurement?'측정결과 수정':'측정결과 입력';
+    $('#measurementTargetSummary').textContent=targetSummary(target);
+    $('#measurementDate').value=measurement?.measurement_date||isoToday();
+    $('#measurementResultStatus').value=measurement?.result_status||'within_limit';
+    $('#measurementValue').value=measurement?.measurement_value??'';
+    $('#measurementUnit').value=measurement?.measurement_unit||'';
+    $('#measurementLimit').value=measurement?.exposure_limit_text||'';
+    $('#measurementCompany').value=measurement?.measurement_company||'';
+    $('#measurementNextDate').value=measurement?.next_measurement_date||'';
+    $('#measurementNote').value=measurement?.note||'';
+    $('#measurementReport').value='';
+    const hasReport=!!measurement?.report_file_path;
+    $('#currentReportBox').classList.toggle('hidden',!hasReport);
+    $('#currentReportName').textContent=measurement?.report_file_name||'-';
+    $('#currentReportOpen').dataset.path=measurement?.report_file_path||'';
+    $('#measurementModal').classList.remove('hidden');
+  }
+  $('#measurementModalClose')?.addEventListener('click',closeMeasurementModal);
+  $('#measurementModalCancel')?.addEventListener('click',closeMeasurementModal);
+  $('#measurementModal')?.addEventListener('click',e=>{if(e.target===$('#measurementModal'))closeMeasurementModal()});
+  $('#currentReportOpen')?.addEventListener('click',()=>openStoragePath($('#currentReportOpen').dataset.path));
+
+  function safeFileName(name){return String(name||'report.pdf').replace(/[^0-9A-Za-z가-힣._-]+/g,'_')}
+  function validateReport(file){
+    if(!file)return;
+    const isPdf=file.type==='application/pdf'||/\.pdf$/i.test(file.name);
+    if(!isPdf)throw new Error('성적서는 PDF 파일만 등록할 수 있습니다.');
+    if(file.size>20*1024*1024)throw new Error('성적서는 20MB 이하만 등록할 수 있습니다.');
+  }
+  async function uploadReport(sb,file,targetId,cid){
+    validateReport(file);
+    const path=`${cid}/work-environment/${targetId}/${Date.now()}_${safeFileName(file.name)}`;
+    const {error}=await sb.storage.from(STORAGE_BUCKET).upload(path,file,{contentType:'application/pdf',upsert:false});
+    if(error)throw error;
+    return {report_file_path:path,report_file_name:file.name,report_file_size:file.size};
+  }
+  async function openStoragePath(path){
+    if(!path)return;
+    const sb=client();if(!sb)return;
+    const {data,error}=await sb.storage.from(STORAGE_BUCKET).createSignedUrl(path,300);
+    if(error)return toast('성적서를 열 수 없습니다: '+error.message,true);
+    if(data?.signedUrl)window.open(data.signedUrl,'_blank','noopener');
+  }
+
+  $('#measurementSave')?.addEventListener('click',async()=>{
+    if(!canManageQa())return toast('조회 전용 사용자입니다.',true);
+    const sb=client(),cid=companyId(); if(!sb||!cid)return toast('회사정보 또는 Supabase 연결을 확인해 주세요.',true);
+    const target=state.statusRows.find(r=>Number(r.target_id)===Number(state.measurementTargetId)); if(!target)return;
+    const date=$('#measurementDate').value;
+    if(!date)return toast('측정일을 입력해 주세요.',true);
+    const file=$('#measurementReport').files?.[0]||null;
+    try{validateReport(file)}catch(e){return toast(e.message,true)}
+    const btn=$('#measurementSave');btn.disabled=true;
+    let uploaded=null;
+    try{
+      let current=null;
+      if(state.measurementEditId){
+        const {data,error}=await sb.from('qa_work_environment_measurements').select('*').eq('id',state.measurementEditId).eq('company_id',cid).maybeSingle();
+        if(error)throw error;current=data;
+      }
+      if(file)uploaded=await uploadReport(sb,file,target.target_id,cid);
+      const valRaw=$('#measurementValue').value.trim();
+      const payload={
+        company_id:cid,
+        target_id:target.target_id,
+        measurement_date:date,
+        measurement_value:valRaw===''?null:Number(valRaw),
+        measurement_unit:$('#measurementUnit').value.trim()||null,
+        exposure_limit_text:$('#measurementLimit').value.trim()||null,
+        result_status:$('#measurementResultStatus').value,
+        measurement_company:$('#measurementCompany').value.trim()||null,
+        next_measurement_date:$('#measurementNextDate').value||null,
+        note:$('#measurementNote').value.trim()||null,
+        updated_by:userName(),
+        ...(uploaded||{})
+      };
+      if(state.measurementEditId){
+        const {error}=await sb.from('qa_work_environment_measurements').update(payload).eq('id',state.measurementEditId).eq('company_id',cid);
+        if(error)throw error;
+        if(uploaded && current?.report_file_path && current.report_file_path!==uploaded.report_file_path){
+          sb.storage.from(STORAGE_BUCKET).remove([current.report_file_path]).then(()=>{}).catch(()=>{});
+        }
+      }else{
+        payload.created_by=userName();
+        const {error}=await sb.from('qa_work_environment_measurements').insert(payload);
+        if(error)throw error;
+      }
+      closeMeasurementModal();toast(state.measurementEditId?'측정결과를 수정했습니다.':'측정결과를 등록했습니다.');
+      await loadStatus();
+      if(state.historyTargetId)await loadHistory(state.historyTargetId);
+    }catch(e){
+      console.error(e);
+      if(uploaded?.report_file_path){try{await sb.storage.from(STORAGE_BUCKET).remove([uploaded.report_file_path])}catch(_){}}
+      toast('측정결과 저장 실패: '+String(e.message||e),true);
+    }finally{btn.disabled=false}
+  });
+
+  async function openLatestReport(measurementId){
+    const sb=client(),cid=companyId();if(!sb)return;
+    const {data,error}=await sb.from('qa_work_environment_measurements').select('report_file_path').eq('id',measurementId).eq('company_id',cid).maybeSingle();
+    if(error||!data?.report_file_path)return toast('성적서를 찾을 수 없습니다.',true);
+    openStoragePath(data.report_file_path);
+  }
+
+  function closeHistoryModal(){state.historyTargetId=null;state.historyRows=[];$('#historyModal').classList.add('hidden')}
+  async function openHistoryModal(targetId){
+    const target=state.statusRows.find(r=>Number(r.target_id)===Number(targetId));if(!target)return;
+    state.historyTargetId=targetId;
+    $('#historyTargetSummary').textContent=targetSummary(target);
+    $('#historyModal').classList.remove('hidden');
+    await loadHistory(targetId);
+  }
+  $('#historyModalClose')?.addEventListener('click',closeHistoryModal);
+  $('#historyModalCloseBottom')?.addEventListener('click',closeHistoryModal);
+  $('#historyModal')?.addEventListener('click',e=>{if(e.target===$('#historyModal'))closeHistoryModal()});
+  $('#historyAddMeasurement')?.addEventListener('click',()=>{const id=state.historyTargetId;closeHistoryModal();if(id)openMeasurementModal(id)});
+
+  async function loadHistory(targetId){
+    const sb=client(),cid=companyId(); if(!sb)return;
+    let q=sb.from('qa_work_environment_measurements').select('*').eq('target_id',targetId).eq('status','active');
+    if(cid)q=q.eq('company_id',cid);
+    const {data,error}=await q.order('measurement_date',{ascending:false}).order('id',{ascending:false});
+    if(error){$('#historyBody').innerHTML=`<tr><td colspan="7" class="empty">이력 조회 실패: ${esc(error.message)}</td></tr>`;return}
+    state.historyRows=data||[];
+    $('#historyBody').innerHTML=state.historyRows.length?state.historyRows.map(m=>{
+      const value=m.measurement_value!=null?`${m.measurement_value}${m.measurement_unit?' '+m.measurement_unit:''}`:'-';
+      const actions=canManageQa()?`<div class="history-actions"><button class="mini gray" data-history-edit="${m.id}">수정</button><button class="mini red" data-history-delete="${m.id}">삭제</button></div>`:'-';
+      const report=m.report_file_path?`<button class="report-btn" data-history-report="${m.id}">보기</button>`:'-';
+      return `<tr><td><b>${esc(m.measurement_date||'-')}</b></td><td>${esc(value)}${m.exposure_limit_text?`<br><small>${esc(m.exposure_limit_text)}</small>`:''}</td><td>${resultBadge(m.result_status)}</td><td>${esc(m.measurement_company||'-')}</td><td>${esc(m.next_measurement_date||'-')}</td><td>${report}</td><td>${actions}</td></tr>`;
+    }).join(''):'<tr><td colspan="7" class="empty">등록된 측정이력이 없습니다.</td></tr>';
+    $$('[data-history-report]').forEach(b=>b.addEventListener('click',()=>{
+      const m=state.historyRows.find(x=>Number(x.id)===Number(b.dataset.historyReport));if(m?.report_file_path)openStoragePath(m.report_file_path);
+    }));
+    $$('[data-history-edit]').forEach(b=>b.addEventListener('click',()=>{
+      const m=state.historyRows.find(x=>Number(x.id)===Number(b.dataset.historyEdit));const tid=state.historyTargetId;closeHistoryModal();if(tid&&m)openMeasurementModal(tid,m);
+    }));
+    $$('[data-history-delete]').forEach(b=>b.addEventListener('click',()=>deleteMeasurement(Number(b.dataset.historyDelete))));
+  }
+
+  async function deleteMeasurement(id){
+    if(!canManageQa())return;
+    const m=state.historyRows.find(x=>Number(x.id)===Number(id));if(!m)return;
+    if(!confirm(`${m.measurement_date||'-'} 측정이력을 삭제할까요?`))return;
+    const sb=client(),cid=companyId();
+    const {error}=await sb.from('qa_work_environment_measurements').delete().eq('id',id).eq('company_id',cid);
+    if(error)return toast('측정이력 삭제 실패: '+error.message,true);
+    if(m.report_file_path){try{await sb.storage.from(STORAGE_BUCKET).remove([m.report_file_path])}catch(_){}}
+    toast('측정이력을 삭제했습니다.');
+    await loadStatus();
+    if(state.historyTargetId)await loadHistory(state.historyTargetId);
+  }
+
+  ['statusYear','statusState','statusDivision','statusTeam'].forEach(id=>$('#'+id)?.addEventListener('change',()=>{
+    if(id==='statusDivision')fillStatusOrgFilters();
+    renderStatus();
+  }));
+  $('#statusSearch')?.addEventListener('input',renderStatus);
+
+  // =========================================================
+  // KOSHA 미확인 수기확인
+  // =========================================================
   function openManual(id){
     if(!canManageQa())return toast('조회 전용 사용자입니다. 수기확인은 QA 운영자만 가능합니다.',true);
     const r=state.rows.find(x=>Number(x.id)===Number(id)); if(!r)return;
@@ -268,7 +674,7 @@
       const {error}=await sb.from('qa_work_environment_standards').update(payload).eq('id',r.id);
       if(error)throw error;
       closeManual(); toast(isTarget?'수기 확인 완료 · 대상물질기준에 반영했습니다.':'수기 확인 완료 · 비대상 기록을 보존합니다.');
-      await load(); setFilter('target');
+      await loadStandards(); setFilter('target');
     }catch(e){ console.error(e); toast('수기 확인 저장에 실패했습니다: '+String(e.message||e),true); }
     finally{ btn.disabled=false; }
   });
@@ -282,6 +688,5 @@
   try{window.parent?.postMessage({type:'portal-tab-active',activeTabId:'qa-work-environment',source:'qa-work-environment'},'*')}catch(_){}
 
   applyPermissionUi();
-  setView('standards');
-  load();
+  Promise.all([loadStandards(),loadStatus()]).finally(()=>setView('status'));
 })();
