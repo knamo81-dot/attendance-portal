@@ -1,0 +1,753 @@
+/* =========================================================
+   출장비 정산 Mobile UI
+   - PC 원본 로직/DB/권한은 그대로 사용
+   - Mobile/index.html 에서만 로드
+========================================================= */
+
+:root{
+  --tm-gap:10px;
+  --tm-radius:14px;
+  --tm-line:#e5e9f2;
+  --tm-muted:#64748b;
+  --tm-main:#2563eb;
+}
+
+html,body{
+  width:100%;
+  max-width:100%;
+  overflow-x:hidden;
+}
+
+body.travel-mobile-ui{
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+}
+
+.travel-mobile-detail-nav,
+.travel-mobile-admin-detail-nav{
+  display:none;
+}
+
+@media (max-width:768px){
+  html,body{background:#f3f6fb!important;}
+
+  body.travel-mobile-ui main,
+  html.portal-embedded body.travel-mobile-ui main{
+    width:100%!important;
+    max-width:none!important;
+    margin:0!important;
+    padding:10px 8px 34px!important;
+  }
+
+  body.travel-mobile-ui header{
+    padding:10px 12px!important;
+  }
+
+  body.travel-mobile-ui .header-inner{
+    align-items:center!important;
+    flex-direction:row!important;
+  }
+
+  body.travel-mobile-ui .header-inner .brand{font-size:16px!important;}
+  body.travel-mobile-ui .header-inner > div > div:nth-child(2){display:none!important;}
+  body.travel-mobile-ui .pill{font-size:10px!important;padding:5px 8px!important;}
+
+  body.travel-mobile-ui main > .tabs{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:6px!important;
+    margin:0 0 10px!important;
+    overflow:visible!important;
+  }
+
+  body.travel-mobile-ui main > .tabs .tab{
+    width:100%!important;
+    min-width:0!important;
+    padding:9px 7px!important;
+    border-radius:11px!important;
+    font-size:11px!important;
+  }
+
+  body.travel-mobile-ui .section{
+    width:100%!important;
+    min-width:0!important;
+    margin:0 0 10px!important;
+    padding:12px!important;
+    border-radius:var(--tm-radius)!important;
+    box-shadow:0 5px 16px rgba(15,23,42,.045)!important;
+  }
+
+  body.travel-mobile-ui h2{
+    font-size:15px!important;
+    margin:0 0 10px!important;
+  }
+
+  body.travel-mobile-ui h3{
+    font-size:13px!important;
+    margin:14px 0 8px!important;
+  }
+
+  body.travel-mobile-ui label{
+    margin-bottom:4px!important;
+    font-size:10.5px!important;
+    line-height:1.25!important;
+  }
+
+  body.travel-mobile-ui input:not([type="checkbox"]):not([type="radio"]),
+  body.travel-mobile-ui select,
+  body.travel-mobile-ui textarea{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+    font-size:16px!important;
+    line-height:1.25!important;
+    border-radius:10px!important;
+  }
+
+  body.travel-mobile-ui input:not([type="checkbox"]):not([type="radio"]),
+  body.travel-mobile-ui select{
+    height:42px!important;
+    min-height:42px!important;
+    padding:0 9px!important;
+  }
+
+  body.travel-mobile-ui textarea{
+    min-height:72px!important;
+    padding:9px!important;
+  }
+
+  body.travel-mobile-ui button{
+    min-width:0!important;
+    border-radius:10px!important;
+    font-size:11px!important;
+    padding:10px 11px!important;
+    white-space:nowrap;
+  }
+
+  /* ---------------- Applicant: list screen ---------------- */
+  body.travel-mobile-ui:not(.admin).travel-mobile-list .user-view .expense-workspace{
+    display:block!important;
+  }
+
+  body.travel-mobile-ui:not(.admin).travel-mobile-list .user-view .status-panel{
+    display:block!important;
+    position:static!important;
+    width:100%!important;
+    min-width:0!important;
+    height:auto!important;
+    max-height:none!important;
+    overflow:visible!important;
+  }
+
+  body.travel-mobile-ui:not(.admin).travel-mobile-list .user-view .form-panel{
+    display:none!important;
+  }
+
+  .process-title-row{
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    gap:8px!important;
+    margin-bottom:9px!important;
+  }
+
+  .process-title-row h2{margin:0!important;white-space:nowrap;}
+  #processMonthFilter{
+    width:132px!important;
+    max-width:132px!important;
+    flex:0 0 132px!important;
+    height:36px!important;
+    min-height:36px!important;
+    font-size:14px!important;
+  }
+
+  /* 처리내역 표를 3개의 compact 카드로 전환 */
+  .user-view .process-table,
+  .user-view .process-table tbody{
+    display:block!important;
+    width:100%!important;
+  }
+  .user-view .process-table thead{display:none!important;}
+  .user-view .process-table tbody{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:7px!important;
+  }
+  .user-view .process-table tbody tr{
+    display:grid!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:0!important;
+    overflow:hidden!important;
+    border:1px solid var(--tm-line)!important;
+    border-radius:12px!important;
+    background:#fff!important;
+  }
+  .user-view .process-table tbody td{
+    display:flex!important;
+    flex-direction:column!important;
+    justify-content:center!important;
+    min-width:0!important;
+    padding:7px 6px!important;
+    border:0!important;
+    border-right:1px solid #eef2f7!important;
+    text-align:right!important;
+    font-size:11px!important;
+    white-space:nowrap!important;
+    background:#fff!important;
+  }
+  .user-view .process-table tbody td:last-child{border-right:0!important;}
+  .user-view .process-table tbody td:first-child{
+    grid-column:1/-1!important;
+    padding:6px 8px!important;
+    border-right:0!important;
+    border-bottom:1px solid #eef2f7!important;
+    background:#f8fafc!important;
+    color:#334155!important;
+    font-size:11px!important;
+    font-weight:900!important;
+    text-align:left!important;
+  }
+  .user-view .process-table tbody td:nth-child(2)::before,
+  .user-view .process-table tbody td:nth-child(3)::before,
+  .user-view .process-table tbody td:nth-child(4)::before{
+    display:block;
+    margin-bottom:2px;
+    color:#94a3b8;
+    font-size:9px;
+    font-weight:800;
+    text-align:right;
+  }
+  .user-view .process-table tbody td:nth-child(2)::before{content:'요청';}
+  .user-view .process-table tbody td:nth-child(3)::before{content:'처리';}
+  .user-view .process-table tbody td:nth-child(4)::before{content:'미처리';}
+
+  .user-view .status-panel .section-title-row{
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    gap:8px!important;
+    margin-bottom:9px!important;
+  }
+  .user-view .status-panel .section-title-row h2{margin:0!important;}
+  .user-view .status-panel .btn-small{
+    height:34px!important;
+    padding:0 10px!important;
+    font-size:11px!important;
+  }
+
+  .user-view .submission-scroll{
+    display:grid!important;
+    gap:8px!important;
+    max-height:none!important;
+    overflow:visible!important;
+    padding-right:0!important;
+  }
+  .user-view .submission-scroll .list-card{
+    margin:0!important;
+    padding:11px 12px!important;
+    border-radius:13px!important;
+    box-shadow:0 3px 10px rgba(15,23,42,.035);
+  }
+  .user-view .submission-scroll .list-top{
+    margin-bottom:5px!important;
+    align-items:center!important;
+  }
+  .user-view .submission-scroll .list-title{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-size:13px!important;
+  }
+  .user-view .submission-scroll .meta{
+    font-size:10.5px!important;
+    line-height:1.45!important;
+  }
+  .user-view .submission-scroll .status{
+    padding:4px 7px!important;
+    font-size:9.5px!important;
+  }
+
+  /* ---------------- Applicant: detail/form screen ---------------- */
+  body.travel-mobile-ui:not(.admin).travel-mobile-detail .user-view .status-panel{
+    display:none!important;
+  }
+  body.travel-mobile-ui:not(.admin).travel-mobile-detail .user-view .form-panel{
+    display:block!important;
+    width:100%!important;
+    min-width:0!important;
+  }
+
+  .travel-mobile-detail-nav{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    position:sticky;
+    top:0;
+    z-index:20;
+    margin:0 0 8px;
+    padding:7px 8px;
+    border:1px solid var(--tm-line);
+    border-radius:12px;
+    background:rgba(255,255,255,.96);
+    box-shadow:0 4px 14px rgba(15,23,42,.08);
+    backdrop-filter:blur(8px);
+  }
+  html.portal-embedded .travel-mobile-detail-nav{top:0;}
+  .travel-mobile-detail-nav button{
+    flex:0 0 auto;
+    height:34px!important;
+    padding:0 10px!important;
+    background:#eef2ff!important;
+    color:#3730a3!important;
+  }
+  .travel-mobile-detail-nav strong{
+    min-width:0;
+    font-size:13px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  body.travel-mobile-ui .user-view .basic-info-grid{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:9px!important;
+  }
+  .basic-info-grid > div{min-width:0!important;width:auto!important;}
+  .basic-info-grid > div:has(#applicantName){grid-column:1/-1!important;}
+  .basic-info-grid > .settlement-help,
+  .basic-info-grid > .route-panel{grid-column:1/-1!important;}
+  .settlement-help{
+    margin:0!important;
+    font-size:9.5px!important;
+    line-height:1.35!important;
+  }
+  #voucherDateDisplay:disabled,
+  #paymentDueDateDisplay:disabled{
+    opacity:1!important;
+    -webkit-text-fill-color:#64748b!important;
+    color:#64748b!important;
+    background:#f8fafc!important;
+  }
+
+  .route-panel{
+    margin-top:2px!important;
+    padding:10px!important;
+    border-radius:12px!important;
+    overflow:hidden!important;
+  }
+  .route-head{
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    gap:8px!important;
+    margin-bottom:8px!important;
+  }
+  .route-head > div > div:nth-child(2){display:none!important;}
+  .route-title{font-size:12px!important;}
+  .route-head button{
+    width:auto!important;
+    flex:0 0 auto!important;
+    height:34px!important;
+    padding:0 8px!important;
+  }
+  .route-row{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+    width:100%!important;
+    margin:0 0 9px!important;
+    padding:9px!important;
+    border:1px solid #e9eef6!important;
+    border-radius:11px!important;
+    background:#fff!important;
+  }
+  .route-row .route-num,
+  .route-row .route-arrow{display:none!important;}
+  .route-row > div:not(.route-num):not(.route-arrow){
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    grid-column:auto!important;
+  }
+  .route-row .distance-wrap{grid-column:1!important;}
+  .route-row button.btn-danger,
+  .route-row > button{
+    grid-column:2!important;
+    width:100%!important;
+    height:42px!important;
+    align-self:end!important;
+    padding:0 8px!important;
+    writing-mode:horizontal-tb!important;
+  }
+  .route-summary{
+    margin-top:4px!important;
+    padding:8px 9px!important;
+    font-size:9.5px!important;
+    line-height:1.45!important;
+  }
+
+  .travel-document-upload{
+    padding:10px!important;
+    border-radius:12px!important;
+  }
+  .travel-document-drop{
+    margin:0!important;
+    font-size:10.5px!important;
+    line-height:1.4!important;
+  }
+  .travel-document-list{font-size:10px!important;line-height:1.45!important;}
+
+  #fuelSection .grid{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+  }
+  .fuel-result{
+    margin-top:8px!important;
+    padding:9px!important;
+    border-radius:11px!important;
+  }
+  .fuel-result > div > div:nth-child(2){display:none!important;}
+  .fuel-result b{font-size:16px!important;}
+
+  .cost-row{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+    padding:9px!important;
+    margin-bottom:8px!important;
+    border-radius:12px!important;
+  }
+  .cost-row > div{min-width:0!important;max-width:100%!important;}
+  .cost-row > div:nth-child(1){grid-column:1!important;grid-row:1!important;}
+  .cost-row > div:nth-child(2){grid-column:2!important;grid-row:1!important;}
+  .cost-row > div:nth-child(3){grid-column:1!important;grid-row:2!important;}
+  .cost-row > .receipt-wrap{grid-column:2!important;grid-row:2!important;}
+  .cost-row > button.btn-danger{
+    grid-column:2!important;
+    grid-row:3!important;
+    justify-self:stretch!important;
+    width:100%!important;
+    height:36px!important;
+    padding:0 8px!important;
+  }
+  .cost-row > .receipt-file-list{
+    grid-column:1/-1!important;
+    grid-row:4!important;
+    min-width:0!important;
+    font-size:10px!important;
+  }
+  .receipt-btn{
+    height:42px!important;
+    padding:0 7px!important;
+    font-size:10px!important;
+  }
+  #costList + .btn-sub{
+    width:100%!important;
+    height:40px!important;
+  }
+  #costList + .btn-sub + .notice{display:none!important;}
+
+  .user-view .form-panel .summary{
+    display:grid!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:6px!important;
+  }
+  .user-view .form-panel .sum-card{
+    min-height:62px!important;
+    padding:9px 7px!important;
+    border-radius:11px!important;
+  }
+  .user-view .form-panel .sum-card small{
+    margin-bottom:4px!important;
+    font-size:9px!important;
+    line-height:1.2!important;
+  }
+  .user-view .form-panel .sum-card b{
+    font-size:13px!important;
+    line-height:1.2!important;
+    white-space:nowrap!important;
+  }
+  .user-view .form-panel .summary + .notice{
+    margin-top:8px!important;
+    padding:8px!important;
+    font-size:9.5px!important;
+    line-height:1.4!important;
+  }
+  .user-view .form-panel .actions{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:7px!important;
+    margin-top:9px!important;
+  }
+  .user-view .form-panel .actions button{
+    width:100%!important;
+    min-width:0!important;
+    height:42px!important;
+  }
+
+  /* ---------------- Admin: mobile list ---------------- */
+  body.travel-mobile-ui.admin .admin-console-head{
+    padding:10px!important;
+    margin-bottom:9px!important;
+  }
+  body.travel-mobile-ui.admin .admin-toolbar{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:7px!important;
+    margin-bottom:9px!important;
+  }
+  body.travel-mobile-ui.admin .admin-toolbar > div{
+    width:auto!important;
+    min-width:0!important;
+    grid-column:auto!important;
+    grid-row:auto!important;
+  }
+  body.travel-mobile-ui.admin .admin-toolbar .admin-search-wrap{
+    grid-column:1/-1!important;
+  }
+  body.travel-mobile-ui.admin .admin-toolbar label{font-size:9.5px!important;}
+  body.travel-mobile-ui.admin .admin-toolbar select,
+  body.travel-mobile-ui.admin .admin-toolbar input{
+    width:100%!important;
+    height:38px!important;
+    min-height:38px!important;
+    padding:0 8px!important;
+    font-size:14px!important;
+  }
+
+  body.travel-mobile-ui.admin .admin-selected-summary{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:7px!important;
+  }
+  body.travel-mobile-ui.admin .admin-selected-summary > div:not(.admin-bulk-actions){
+    min-height:52px!important;
+    padding:8px 9px!important;
+    border-radius:11px!important;
+  }
+  body.travel-mobile-ui.admin .admin-selected-summary span{font-size:9.5px!important;margin-bottom:2px!important;}
+  body.travel-mobile-ui.admin .admin-selected-summary b{font-size:14px!important;}
+  body.travel-mobile-ui.admin .admin-bulk-actions{
+    grid-column:1/-1!important;
+    display:grid!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:5px!important;
+    width:100%!important;
+  }
+  body.travel-mobile-ui.admin .admin-bulk-actions button{
+    width:100%!important;
+    min-width:0!important;
+    height:36px!important;
+    padding:0 4px!important;
+    font-size:9.5px!important;
+    letter-spacing:-.04em!important;
+  }
+
+  body.travel-mobile-ui.admin .admin-review-layout{
+    display:block!important;
+    width:100%!important;
+  }
+  body.travel-mobile-ui.admin .admin-list-panel,
+  body.travel-mobile-ui.admin .admin-detail-panel{
+    position:static!important;
+    top:auto!important;
+    width:100%!important;
+    max-height:none!important;
+    min-width:0!important;
+    overflow:visible!important;
+  }
+  body.travel-mobile-ui.admin .admin-list-panel{
+    padding:10px!important;
+  }
+  body.travel-mobile-ui.admin .admin-list-panel .section-title-row{
+    margin-bottom:8px!important;
+  }
+  body.travel-mobile-ui.admin .admin-list-panel .section-title-row h2{font-size:15px!important;}
+  body.travel-mobile-ui.admin .admin-count-badge{padding:5px 8px!important;font-size:10px!important;}
+  .admin-applicant-group{
+    margin-bottom:8px!important;
+    border-radius:12px!important;
+  }
+  .admin-group-head{
+    padding:8px 9px!important;
+    font-size:10.5px!important;
+  }
+  .admin-trip-row{
+    grid-template-columns:20px minmax(0,1fr)!important;
+    gap:7px!important;
+    padding:9px!important;
+  }
+  .admin-trip-row input[type="checkbox"]{width:16px!important;height:16px!important;}
+  .admin-trip-title-row{margin-bottom:3px!important;}
+  .admin-trip-title-row b{font-size:12px!important;}
+  .admin-trip-meta,
+  .admin-trip-amounts{font-size:10px!important;line-height:1.35!important;}
+  .admin-trip-title-row .status{padding:3px 6px!important;font-size:9px!important;}
+
+  /* Admin list/detail split */
+  body.travel-mobile-ui.admin:not(.travel-admin-detail) .admin-detail-panel,
+  body.travel-mobile-ui.admin:not(.travel-admin-detail) .travel-mobile-admin-detail-nav{
+    display:none!important;
+  }
+  body.travel-mobile-ui.admin.travel-admin-detail .admin-console-head,
+  body.travel-mobile-ui.admin.travel-admin-detail .admin-list-panel{
+    display:none!important;
+  }
+  body.travel-mobile-ui.admin.travel-admin-detail .admin-detail-panel{
+    display:block!important;
+    padding:10px!important;
+  }
+  body.travel-mobile-ui.admin.travel-admin-detail .travel-mobile-admin-detail-nav{
+    display:flex!important;
+  }
+
+  .travel-mobile-admin-detail-nav{
+    align-items:center;
+    gap:8px;
+    position:sticky;
+    top:0;
+    z-index:20;
+    margin:0 0 8px;
+    padding:7px 8px;
+    border:1px solid var(--tm-line);
+    border-radius:12px;
+    background:rgba(255,255,255,.96);
+    box-shadow:0 4px 14px rgba(15,23,42,.08);
+    backdrop-filter:blur(8px);
+  }
+  .travel-mobile-admin-detail-nav button{
+    height:34px!important;
+    padding:0 10px!important;
+    background:#eef2ff!important;
+    color:#3730a3!important;
+  }
+  .travel-mobile-admin-detail-nav strong{font-size:13px;}
+
+  .admin-detail-top{margin-bottom:9px!important;}
+  .admin-detail-title h2{font-size:15px!important;margin:0 0 3px!important;}
+  .admin-detail-title p{font-size:10px!important;line-height:1.35!important;}
+  .admin-mini-summary{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:7px!important;
+    margin-bottom:9px!important;
+  }
+  .admin-mini-card{
+    padding:8px 9px!important;
+    border-radius:11px!important;
+  }
+  .admin-mini-card small{font-size:9px!important;margin-bottom:2px!important;}
+  .admin-mini-card b{font-size:13px!important;}
+
+  .admin-review-section{
+    margin-bottom:8px!important;
+    border-radius:12px!important;
+  }
+  .admin-review-section h3{
+    padding:9px 10px!important;
+    font-size:11.5px!important;
+  }
+  .admin-section-body{padding:9px!important;}
+  .admin-info-grid,
+  .admin-basic-info-grid{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:6px!important;
+  }
+  .admin-info-item{
+    min-width:0!important;
+    padding:7px!important;
+    border-radius:9px!important;
+  }
+  .admin-info-item span{font-size:8.8px!important;margin-bottom:2px!important;}
+  .admin-info-item b{
+    display:block;
+    min-width:0;
+    font-size:10.5px!important;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .admin-fuel-formula{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:6px!important;
+    margin-bottom:7px!important;
+  }
+  .admin-doc-list{grid-template-columns:1fr!important;gap:6px!important;}
+  .admin-doc-card{padding:8px!important;border-radius:10px!important;}
+  .admin-doc-card b{font-size:10.5px!important;}
+  .admin-doc-card span{font-size:9.5px!important;}
+
+  .admin-table-wrap{
+    width:100%!important;
+    overflow-x:auto!important;
+    -webkit-overflow-scrolling:touch;
+  }
+  .admin-check-table{
+    width:max-content!important;
+    min-width:520px!important;
+    font-size:10px!important;
+  }
+  .admin-check-table th,
+  .admin-check-table td{
+    padding:7px 6px!important;
+    font-size:10px!important;
+  }
+  .admin-total-line{
+    margin-top:6px!important;
+    padding:8px!important;
+    font-size:10px!important;
+  }
+  .admin-total-line b{font-size:12px!important;}
+
+  .admin-schedule-grid{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:7px!important;
+    margin-bottom:8px!important;
+  }
+  .admin-schedule-grid input{height:40px!important;min-height:40px!important;}
+  .admin-manager-memo textarea{min-height:66px!important;}
+  .admin-final-actions{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:6px!important;
+    margin-top:8px!important;
+  }
+  .admin-final-actions button{width:100%!important;min-width:0!important;}
+
+  .admin-empty-small,
+  .admin-detail-empty,
+  .notice{
+    font-size:10px!important;
+    line-height:1.45!important;
+  }
+
+  /* standalone/iframe 공통 가로 흔들림 방지 */
+  body.travel-mobile-ui .user-view,
+  body.travel-mobile-ui .admin-view,
+  body.travel-mobile-ui .expense-workspace,
+  body.travel-mobile-ui .status-panel,
+  body.travel-mobile-ui .form-panel,
+  body.travel-mobile-ui .admin-review-layout,
+  body.travel-mobile-ui .admin-list-panel,
+  body.travel-mobile-ui .admin-detail-panel{
+    min-width:0!important;
+    max-width:100%!important;
+    overflow-x:hidden!important;
+  }
+}
+
+@media (max-width:360px){
+  body.travel-mobile-ui main,
+  html.portal-embedded body.travel-mobile-ui main{padding-left:6px!important;padding-right:6px!important;}
+
+  body.travel-mobile-ui .section{padding:10px!important;}
+  .user-view .form-panel .sum-card b{font-size:11.5px!important;}
+  .admin-trip-title-row b{font-size:11px!important;}
+  .admin-bulk-actions button{font-size:8.8px!important;}
+}
