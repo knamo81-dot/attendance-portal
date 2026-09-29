@@ -3057,6 +3057,12 @@ body.auth-loading .top-user-bar {
       desc: '폐수/폐기물 배출시설 운영 기록과 수거 내역을 관리합니다.',
       gradient: 'linear-gradient(135deg, #047857 0%, #14b8a6 100%)'
     },
+    'wastewater/Mobile/index.html': {
+      top: 'Operations Management',
+      title: '폐수/폐기물 운영일지',
+      desc: '폐수/폐기물 배출시설 운영 기록과 수거 내역을 관리합니다.',
+      gradient: 'linear-gradient(135deg, #047857 0%, #14b8a6 100%)'
+    },
     'attendance/index.html': {
       top: 'Workforce Analytics',
       title: '근태 리스크 및 운영 분석',
@@ -3175,6 +3181,13 @@ body.auth-loading .top-user-bar {
       { id: 'schedule', label: '일정/예약' }
     ],
     'wastewater/index.html': [
+      { id: 'daily', label: '일일입력' },
+      { id: 'pickup', label: '수거등록' },
+      { id: 'ledger', label: '운영일지' },
+      { id: 'reference', label: '관련자료' },
+      { id: 'relatedDocs', label: '관련서류' }
+    ],
+    'wastewater/Mobile/index.html': [
       { id: 'daily', label: '일일입력' },
       { id: 'pickup', label: '수거등록' },
       { id: 'ledger', label: '운영일지' },
@@ -3755,6 +3768,18 @@ body.auth-loading .top-user-bar {
     return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
   }
 
+  const WASTEWATER_DESKTOP_SRC = 'wastewater/index.html';
+  const WASTEWATER_MOBILE_SRC = 'wastewater/Mobile/index.html';
+
+  function getWastewaterSrc() {
+    return isMobilePortalView() ? WASTEWATER_MOBILE_SRC : WASTEWATER_DESKTOP_SRC;
+  }
+
+  function isWastewaterResponsiveSrc(src) {
+    const key = normalizePortalSrc(src);
+    return key === WASTEWATER_DESKTOP_SRC || key === WASTEWATER_MOBILE_SRC;
+  }
+
   const RESEARCH_STAFF_DESKTOP_SRC = 'research-staff/index.html';
   const RESEARCH_STAFF_MOBILE_SRC = 'research-staff/Mobile/index.html';
 
@@ -3833,6 +3858,7 @@ body.auth-loading .top-user-bar {
     if (!raw) return src;
     const suffixMatch = raw.match(/([?#].*)$/);
     const suffix = suffixMatch ? suffixMatch[1] : '';
+    if (isWastewaterResponsiveSrc(raw)) return getWastewaterSrc() + suffix;
     if (isResearchStaffResponsiveSrc(raw)) return getResearchStaffSrc() + suffix;
     if (isQaUsageSrc(raw)) return getQaUsageSrc() + suffix;
     if (isQaSdsSrc(raw)) return getQaSdsSrc() + suffix;
