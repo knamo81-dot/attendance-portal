@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>작업환경측정</title>
+  <link rel="stylesheet" href="style.css?v=20260929-1" />
+</head>
+<body>
+  <main class="page">
+    <section class="card">
+      <header class="section-head">
+        <div>
+          <h1>작업환경측정</h1>
+          <p>작업환경측정 대상물질 기준과 보유 시약의 CAS·함유량 연계 현황을 관리합니다.</p>
+        </div>
+        <nav class="inner-tabs" aria-label="작업환경측정 기능">
+          <button type="button" data-view="status">작업환경측정 현황</button>
+          <button type="button" class="active" data-view="standards">대상물질기준</button>
+        </nav>
+      </header>
+
+      <div class="view hidden" id="statusView">
+        <div class="coming">
+          <strong>작업환경측정 현황</strong>
+          <p>실제 측정일·측정기관·측정결과·성적서·다음 측정일 관리는 다음 단계에서 연결합니다.</p>
+          <button type="button" class="secondary" id="openStandardsBtn">대상물질기준 보기</button>
+        </div>
+      </div>
+
+      <div class="view" id="standardsView">
+        <div class="stats">
+          <button type="button" class="stat-card active" data-filter="target">
+            <span>대상 유해인자</span>
+            <strong id="hazardCount">-</strong>
+            <small>KOSHA/수기 확인 대상</small>
+          </button>
+          <button type="button" class="stat-card warning" data-filter="unverified">
+            <span>KOSHA 미확인</span>
+            <strong id="unverifiedCount">-</strong>
+            <small>클릭하여 미확인 목록 확인</small>
+          </button>
+          <div class="stat-card">
+            <span>연결제품</span>
+            <strong id="productCount">-</strong>
+            <small>대상 CAS 연결 활성 시약</small>
+          </div>
+          <div class="stat-card">
+            <span>API 기준정보 최종확인일</span>
+            <strong id="apiChecked">-</strong>
+            <small>KOSHA 최종 조회</small>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <label class="search">
+            <span>검색</span>
+            <input id="searchInput" placeholder="CAS / 국문명 / 영문명 / 제품명 검색" />
+          </label>
+          <label>
+            <span>출처</span>
+            <select id="sourceFilter">
+              <option value="">전체</option>
+              <option value="KOSHA">KOSHA</option>
+              <option value="MANUAL">수기</option>
+            </select>
+          </label>
+          <label>
+            <span>적용기준</span>
+            <select id="thresholdFilter"><option value="">전체</option></select>
+          </label>
+          <label>
+            <span>제품판정</span>
+            <select id="matchFilter">
+              <option value="">전체</option>
+              <option value="applicable">적용</option>
+              <option value="review_required">검토필요</option>
+              <option value="not_applicable">기준미만</option>
+            </select>
+          </label>
+          <button type="button" class="primary toolbar-refresh" id="refreshBtn">↻ API 기준정보 갱신</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="standards-table">
+            <thead>
+              <tr>
+                <th>CAS No.</th>
+                <th>국문명</th>
+                <th>영문명</th>
+                <th>출처</th>
+                <th>적용기준</th>
+                <th>제품판정</th>
+                <th>보유제품</th>
+                <th>최근입고일</th>
+                <th>최근사용일</th>
+                <th id="actionHead">관리</th>
+              </tr>
+            </thead>
+            <tbody id="standardsBody">
+              <tr><td colspan="10" class="empty">기준정보를 불러오는 중입니다.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="foot-note">※ 제품 함유량이 미입력된 경우 원본 DB는 변경하지 않고 대상 판정 시에만 100%로 간주합니다. 실제 작업환경측정 대상 작업장 여부는 노출·작업조건을 별도로 확인해야 합니다.</div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal hidden" id="manualModal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h2>KOSHA 미확인 물질 수기확인</h2>
+          <p id="manualChemical">-</p>
+        </div>
+        <button type="button" class="icon-btn" id="modalClose">×</button>
+      </div>
+      <div class="modal-body">
+        <label>
+          <span>작업환경측정 대상</span>
+          <select id="manualTarget">
+            <option value="true">대상</option>
+            <option value="false">비대상</option>
+          </select>
+        </label>
+        <label>
+          <span>판정방식</span>
+          <select id="manualRule">
+            <option value="gte">함유량 기준 이상</option>
+            <option value="manual_review">작업조건 별도 검토</option>
+          </select>
+        </label>
+        <label>
+          <span>최소 함유량 기준 (%)</span>
+          <input id="manualThreshold" type="number" min="0" max="100" step="0.0001" placeholder="예: 1" />
+        </label>
+        <label>
+          <span>화면 표시 기준</span>
+          <input id="manualThresholdText" placeholder="예: 1% 이상" />
+        </label>
+        <label class="wide">
+          <span>확인 출처/근거</span>
+          <input id="manualSource" placeholder="법령, 고시, 공단자료 등" />
+        </label>
+        <label class="wide">
+          <span>비고</span>
+          <textarea id="manualNote" rows="3" placeholder="수기 확인 내용 또는 참고사항"></textarea>
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="secondary" id="modalCancel">취소</button>
+        <button type="button" class="primary" id="manualSave">확인완료</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+  <script src="app.js?v=20260929-1"></script>
+</body>
+</html>
