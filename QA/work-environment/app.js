@@ -11,7 +11,12 @@
     measurementTargetId: null,
     measurementEditId: null,
     historyTargetId: null,
-    historyRows: []
+    historyRows: [],
+    targetStandardIds: new Set(),
+    pickerDraftIds: new Set(),
+    targetOrgRows: [],
+    targetTaskRows: [],
+    orgDirectory: { divisions: [], teams: [] }
   };
 
   const $ = s => document.querySelector(s);
@@ -57,6 +62,38 @@
     const t=$('#toast'); if(!t)return;
     t.textContent=msg; t.className='toast '+(bad?'bad':'');
     clearTimeout(toast._timer); toast._timer=setTimeout(()=>t.classList.add('hidden'),3000);
+  }
+
+  function arr(v){
+    if(Array.isArray(v))return v;
+    if(v==null)return [];
+    if(typeof v==='string'){
+      try{const p=JSON.parse(v);return Array.isArray(p)?p:[]}catch(_){return []}
+    }
+    return [];
+  }
+  function uniqBy(list,keyFn){
+    const out=[],seen=new Set();
+    for(const item of list||[]){const k=keyFn(item);if(seen.has(k))continue;seen.add(k);out.push(item)}
+    return out;
+  }
+  async function loadOrgDirectory(){
+    const sb=client(); if(!sb)return;
+    try{
+      const [divRes,teamRes]=await Promise.all([
+        sb.from('divisions').select('division_code,division_name,is_active').eq('is_active',true).order('division_code'),
+        sb.from('teams').select('team_code,team_name,division_code,is_virtual,is_active').eq('is_active',true).order('division_code').order('team_code')
+      ]);
+      if(divRes.error)throw divRes.error;
+      if(teamRes.error)throw teamRes.error;
+      state.orgDirectory.divisions=divRes.data||[];
+      state.orgDirectory.teams=teamRes.data||[];
+    }catch(e){
+      console.error('조직관리 조회 실패',e);
+      state.orgDirectory.divisions=[];
+      state.orgDirectory.teams=[];
+      toast('설정의 조직정보를 불러오지 못했습니다.',true);
+    }
   }
   function applyPermissionUi(){
     const manage=canManageQa();
@@ -288,14 +325,19 @@
     sel.innerHTML=[...years].filter(Number.isFinite).sort((a,b)=>b-a).map(y=>`<option value="${y}">${y}년</option>`).join('');
     sel.value=prev && [...years].map(String).includes(prev) ? prev : String(current);
   }
+  function rowSubstances(r){ return arr(r.substances); }
+  function rowOrganizations(r){ return arr(r.organizations); }
+  function rowTasks(r){ return arr(r.tasks); }
+
   function fillStatusOrgFilters(){
     const divSel=$('#statusDivision'), teamSel=$('#statusTeam');
     const prevDiv=divSel.value, prevTeam=teamSel.value;
-    const divisions=[...new Set(state.statusRows.map(r=>String(r.division_name||'').trim()).filter(Boolean))].sort();
+    const allOrgs=state.statusRows.flatMap(rowOrganizations);
+    const divisions=[...new Set(allOrgs.map(o=>String(o.division_name||'').trim()).filter(Boolean))].sort();
     divSel.innerHTML='<option value="">전체</option>'+divisions.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
     if(divisions.includes(prevDiv))divSel.value=prevDiv;
     const selectedDiv=divSel.value;
-    const teams=[...new Set(state.statusRows.filter(r=>!selectedDiv||r.division_name===selectedDiv).map(r=>String(r.team_name||'').trim()).filter(Boolean))].sort();
+    const teams=[...new Set(allOrgs.filter(o=>!selectedDiv||o.division_name===selectedDiv).map(o=>String(o.team_name||'').trim()).filter(Boolean))].sort();
     teamSel.innerHTML='<option value="">전체</option>'+teams.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
     if(teams.includes(prevTeam))teamSel.value=prevTeam;
   }
@@ -312,9 +354,22 @@
     const q=$('#statusSearch').value.trim().toLowerCase();
     return state.statusRows.filter(r=>{
       const s=scheduleState(r);
-      const hay=[r.cas_no,r.chem_name_ko,r.chem_name_en,r.division_name,r.team_name,r.work_area,r.process_name,r.latest_measurement_company].join(' ').toLowerCase();
-      return relevantToYear(r,year) && (!status||s===status) && (!division||r.division_name===division) && (!team||r.team_name===team) && (!q||hay.includes(q));
+      const subs=rowSubstances(r), orgs=rowOrganizations(r), tasks=rowTasks(r);
+      const hay=[
+        ...subs.flatMap(x=>[x.cas_no,x.chem_name_ko,x.chem_name_en]),
+        ...orgs.flatMap(x=>[x.division_name,x.team_name]),
+        ...tasks.flatMap(x=>[x.work_area,x.process_name]),
+        r.latest_measurement_company
+      ].join(' ').toLowerCase();
+      const orgMatch=(!division&&!team) || orgs.some(o=>(!division||o.division_name===division)&&(!team||o.team_name===team));
+      return relevantToYear(r,year) && (!status||s===status) && orgMatch && (!q||hay.includes(q));
     });
+  }
+  function compactLines(items,renderer,max=3){
+    if(!items.length)return '-';
+    const shown=items.slice(0,max).map(renderer).join('');
+    const more=items.length>max?`<span class="more">외 ${items.length-max}건</span>`:'';
+    return `<div class="multi-lines">${shown}${more}</div>`;
   }
   function renderStatus(){
     const rows=filteredStatusRows();
@@ -327,16 +382,19 @@
 
     $('#statusBody').innerHTML=rows.length?rows.map(r=>{
       const status=scheduleState(r);
-      const location=[r.division_name,r.team_name].filter(Boolean).join(' / ')||'-';
-      const place=[r.work_area,r.process_name].filter(Boolean).join(' · ')||'-';
+      const subs=rowSubstances(r),orgs=rowOrganizations(r),tasks=rowTasks(r);
+      const casHtml=compactLines(subs,s=>`<div class="multi-line"><b>${esc(s.cas_no||'-')}</b></div>`);
+      const subHtml=compactLines(subs,s=>`<div class="multi-line"><b>${esc(s.chem_name_ko||s.chem_name_en||'-')}</b><small>${esc(s.chem_name_en||'')}</small></div>`);
+      const orgHtml=compactLines(orgs,o=>`<div class="multi-line"><b>${esc([o.division_name,o.team_name].filter(Boolean).join(' / ')||'-')}</b></div>`);
+      const taskHtml=compactLines(tasks,t=>`<div class="multi-line"><b>${esc(t.work_area||'-')}</b><small>${esc(t.process_name||'')}</small></div>`);
       const report=r.report_file_path?`<button type="button" class="report-btn" data-report="${r.latest_measurement_id}">보기</button>`:'<button type="button" class="report-btn" disabled>없음</button>';
       const actions=canManageQa()?`<div class="status-actions"><button class="mini" data-measure="${r.target_id}">측정입력</button><button class="mini gray" data-history="${r.target_id}">이력</button><button class="mini gray" data-target-edit="${r.target_id}">대상수정</button><button class="mini red" data-target-end="${r.target_id}">대상종료</button></div>`:'-';
       return `<tr>
         <td>${scheduleBadge(status)}</td>
-        <td><b>${esc(r.cas_no||'-')}</b></td>
-        <td><div class="hazard-main"><b>${esc(r.chem_name_ko||r.chem_name_en||'-')}</b><small>${esc(r.chem_name_en||'')}</small></div></td>
-        <td><div class="location-main"><b>${esc(location)}</b></div></td>
-        <td><div class="location-main"><b>${esc(place)}</b>${r.first_applied_date?`<small>관리시작 ${esc(r.first_applied_date)}</small>`:''}</div></td>
+        <td>${casHtml}</td>
+        <td>${subHtml}</td>
+        <td>${orgHtml}</td>
+        <td>${taskHtml}${r.first_applied_date?`<small>관리시작 ${esc(r.first_applied_date)}</small>`:''}</td>
         <td><b>${esc(r.latest_measurement_date||'-')}</b></td>
         <td>${measurementText(r)}</td>
         <td>${esc(r.latest_measurement_company||'-')}</td>
@@ -359,7 +417,7 @@
     try{
       let q=sb.from('vw_qa_work_environment_status').select('*').eq('target_status','active');
       if(cid)q=q.eq('company_id',cid);
-      const {data,error}=await q.order('cas_no').order('division_name').order('team_name');
+      const {data,error}=await q.order('target_id',{ascending:true});
       if(error)throw error;
       state.statusRows=data||[];
       fillStatusYears();
@@ -367,7 +425,7 @@
       renderStatus();
     }catch(e){
       console.error(e);
-      $('#statusBody').innerHTML=`<tr><td colspan="11" class="empty">현황 DB 조회 실패: ${esc(e.message||e)}<br>database/QA_작업환경측정_현황_DB_2단계.sql 실행 여부를 확인해 주세요.</td></tr>`;
+      $('#statusBody').innerHTML=`<tr><td colspan="11" class="empty">현황 DB 조회 실패: ${esc(e.message||e)}<br>database/QA_작업환경측정_복수연결_DB_3단계.sql 실행 여부를 확인해 주세요.</td></tr>`;
       $('#statusTargetCount').textContent='-'; $('#statusDoneCount').textContent='-'; $('#statusDueCount').textContent='-'; $('#statusOverdueCount').textContent='-';
     }
   }
@@ -378,24 +436,147 @@
   function standardOptionLabel(r){
     return `${r.cas_no} · ${r.name_ko||r.name_en||'-'} · ${thresholdText(r)}`;
   }
-  function populateTargetStandards(selected){
-    const sel=$('#targetStandard');
-    const rows=eligibleStandards().sort((a,b)=>String(a.cas_no).localeCompare(String(b.cas_no)));
-    sel.innerHTML=rows.map(r=>`<option value="${r.id}">${esc(standardOptionLabel(r))}</option>`).join('');
-    if(selected!=null)sel.value=String(selected);
+  function selectedStandards(){
+    const map=new Map(state.rows.map(r=>[Number(r.id),r]));
+    return [...state.targetStandardIds].map(id=>map.get(Number(id))).filter(Boolean);
   }
-  function closeTargetModal(){state.targetEditId=null;$('#targetModal').classList.add('hidden')}
-  function openTargetModal(id=null){
+  function renderSelectedSubstances(){
+    const box=$('#targetSubstanceSummary');
+    const rows=selectedStandards();
+    const has=rows.length>0;
+    box.classList.toggle('empty',!has);
+    box.innerHTML=has?rows.sort((a,b)=>String(a.cas_no).localeCompare(String(b.cas_no))).map(r=>`<span class="selected-chip"><b>${esc(r.cas_no)}</b><span>${esc(r.name_ko||r.name_en||'-')}</span><small>${esc(thresholdText(r))}</small></span>`).join(''):'선택된 대상물질이 없습니다.';
+    $('#targetSubstanceSelect').classList.toggle('hidden',has);
+    $('#targetSubstanceEdit').classList.toggle('hidden',!has);
+    $('#targetSubstanceClear').classList.toggle('hidden',!has);
+  }
+  function renderSubstancePicker(){
+    const q=$('#substancePickerSearch').value.trim().toLowerCase();
+    const rows=eligibleStandards().filter(r=>!q||[r.cas_no,r.name_ko,r.name_en].join(' ').toLowerCase().includes(q)).sort((a,b)=>String(a.cas_no).localeCompare(String(b.cas_no)));
+    $('#substancePickerCount').textContent=`${state.pickerDraftIds.size}종 선택`;
+    $('#substancePickerList').innerHTML=rows.length?rows.map(r=>`<label class="picker-item"><input type="checkbox" value="${r.id}" ${state.pickerDraftIds.has(Number(r.id))?'checked':''}><span class="cas">${esc(r.cas_no)}</span><span class="name"><b>${esc(r.name_ko||'-')}</b><small>${esc(r.name_en||'')}</small></span><span class="threshold">${esc(thresholdText(r))}</span></label>`).join(''):'<div class="empty">검색 결과가 없습니다.</div>';
+    $$('#substancePickerList input[type="checkbox"]').forEach(ch=>ch.addEventListener('change',()=>{
+      const id=Number(ch.value);
+      if(ch.checked)state.pickerDraftIds.add(id);else state.pickerDraftIds.delete(id);
+      $('#substancePickerCount').textContent=`${state.pickerDraftIds.size}종 선택`;
+    }));
+  }
+  function openSubstancePicker(){
+    state.pickerDraftIds=new Set([...state.targetStandardIds].map(Number));
+    $('#substancePickerSearch').value='';
+    renderSubstancePicker();
+    $('#substancePickerModal').classList.remove('hidden');
+  }
+  function closeSubstancePicker(){ $('#substancePickerModal').classList.add('hidden'); }
+  $('#targetSubstanceSelect')?.addEventListener('click',openSubstancePicker);
+  $('#targetSubstanceEdit')?.addEventListener('click',openSubstancePicker);
+  $('#targetSubstanceClear')?.addEventListener('click',()=>{
+    state.targetStandardIds.clear();
+    renderSelectedSubstances();
+  });
+  $('#substancePickerClose')?.addEventListener('click',closeSubstancePicker);
+  $('#substancePickerCancel')?.addEventListener('click',closeSubstancePicker);
+  $('#substancePickerModal')?.addEventListener('click',e=>{if(e.target===$('#substancePickerModal'))closeSubstancePicker()});
+  $('#substancePickerSearch')?.addEventListener('input',renderSubstancePicker);
+  $('#substancePickerApply')?.addEventListener('click',()=>{
+    state.targetStandardIds=new Set([...state.pickerDraftIds].map(Number));
+    renderSelectedSubstances();
+    closeSubstancePicker();
+  });
+
+  function divisionOptions(selected=''){
+    const rows=state.orgDirectory.divisions||[];
+    return '<option value="">본부 선택</option>'+rows.map(d=>`<option value="${esc(d.division_code)}" ${String(d.division_code)===String(selected)?'selected':''}>${esc(d.division_name)} (${esc(d.division_code)})</option>`).join('');
+  }
+  function teamOptions(divisionCode,selected=''){
+    const rows=(state.orgDirectory.teams||[]).filter(t=>String(t.division_code)===String(divisionCode));
+    return '<option value="">팀 선택</option>'+rows.map(t=>`<option value="${esc(t.team_code)}" ${String(t.team_code)===String(selected)?'selected':''}>${esc(t.team_name)}${t.is_virtual?' · 가상팀':''}</option>`).join('');
+  }
+  function addOrgRow(seed={}){
+    state.targetOrgRows.push({
+      key:crypto?.randomUUID?.()||String(Date.now()+Math.random()),
+      division_code:seed.division_code||'',
+      division_name:seed.division_name||'',
+      team_code:seed.team_code||'',
+      team_name:seed.team_name||''
+    });
+    renderOrgRows();
+  }
+  function renderOrgRows(){
+    const box=$('#targetOrgRows');
+    if(!state.targetOrgRows.length){
+      box.innerHTML='<div class="selected-summary empty">대상조직을 추가해 주세요.</div>';
+      return;
+    }
+    box.innerHTML=state.targetOrgRows.map((o,i)=>`<div class="repeat-row" data-org-row="${i}">
+      <label><span>본부</span><select data-org-division="${i}">${divisionOptions(o.division_code)}</select></label>
+      <label><span>팀</span><select data-org-team="${i}">${teamOptions(o.division_code,o.team_code)}</select></label>
+      <button type="button" class="row-remove" data-org-remove="${i}">삭제</button>
+    </div>`).join('');
+    $$('[data-org-division]').forEach(sel=>sel.addEventListener('change',()=>{
+      const i=Number(sel.dataset.orgDivision),row=state.targetOrgRows[i];
+      row.division_code=sel.value;
+      const d=state.orgDirectory.divisions.find(x=>String(x.division_code)===String(sel.value));
+      row.division_name=d?.division_name||'';
+      row.team_code='';row.team_name='';
+      renderOrgRows();
+    }));
+    $$('[data-org-team]').forEach(sel=>sel.addEventListener('change',()=>{
+      const i=Number(sel.dataset.orgTeam),row=state.targetOrgRows[i];
+      row.team_code=sel.value;
+      const t=state.orgDirectory.teams.find(x=>String(x.team_code)===String(sel.value));
+      row.team_name=t?.team_name||'';
+    }));
+    $$('[data-org-remove]').forEach(b=>b.addEventListener('click',()=>{
+      state.targetOrgRows.splice(Number(b.dataset.orgRemove),1);renderOrgRows();
+    }));
+  }
+  $('#targetOrgAdd')?.addEventListener('click',()=>addOrgRow());
+
+  function addTaskRow(seed={}){
+    state.targetTaskRows.push({
+      key:crypto?.randomUUID?.()||String(Date.now()+Math.random()),
+      work_area:seed.work_area||'',
+      process_name:seed.process_name||''
+    });
+    renderTaskRows();
+  }
+  function renderTaskRows(){
+    const box=$('#targetTaskRows');
+    if(!state.targetTaskRows.length){
+      box.innerHTML='<div class="selected-summary empty">작업장/장소와 공정/작업을 추가해 주세요.</div>';
+      return;
+    }
+    box.innerHTML=state.targetTaskRows.map((t,i)=>`<div class="repeat-row" data-task-row="${i}">
+      <label><span>작업장 / 장소 *</span><input data-task-area="${i}" value="${esc(t.work_area)}" placeholder="예: 제제실험실"></label>
+      <label><span>공정 / 작업</span><input data-task-process="${i}" value="${esc(t.process_name)}" placeholder="예: 용매 조제"></label>
+      <button type="button" class="row-remove" data-task-remove="${i}">삭제</button>
+    </div>`).join('');
+    $$('[data-task-area]').forEach(inp=>inp.addEventListener('input',()=>{state.targetTaskRows[Number(inp.dataset.taskArea)].work_area=inp.value}));
+    $$('[data-task-process]').forEach(inp=>inp.addEventListener('input',()=>{state.targetTaskRows[Number(inp.dataset.taskProcess)].process_name=inp.value}));
+    $$('[data-task-remove]').forEach(b=>b.addEventListener('click',()=>{state.targetTaskRows.splice(Number(b.dataset.taskRemove),1);renderTaskRows()}));
+  }
+  $('#targetTaskAdd')?.addEventListener('click',()=>addTaskRow());
+
+  function closeTargetModal(){
+    state.targetEditId=null;
+    state.targetStandardIds=new Set();
+    state.targetOrgRows=[];
+    state.targetTaskRows=[];
+    $('#targetModal').classList.add('hidden');
+  }
+  async function openTargetModal(id=null){
     if(!canManageQa())return toast('조회 전용 사용자입니다.',true);
+    if(!state.orgDirectory.divisions.length)await loadOrgDirectory();
     state.targetEditId=id;
     const row=id?state.statusRows.find(r=>Number(r.target_id)===Number(id)):null;
     $('#targetModalTitle').textContent=row?'측정대상 수정':'측정대상 등록';
-    populateTargetStandards(row?.standard_id);
-    $('#targetStandard').disabled=!!row;
-    $('#targetDivision').value=row?.division_name||'';
-    $('#targetTeam').value=row?.team_name||'';
-    $('#targetWorkArea').value=row?.work_area||'';
-    $('#targetProcess').value=row?.process_name||'';
+    state.targetStandardIds=new Set(row?rowSubstances(row).map(x=>Number(x.standard_id)).filter(Number.isFinite):[]);
+    state.targetOrgRows=row?rowOrganizations(row).map(x=>({...x,key:crypto?.randomUUID?.()||String(Math.random())})):[];
+    state.targetTaskRows=row?rowTasks(row).map(x=>({...x,key:crypto?.randomUUID?.()||String(Math.random())})):[];
+    if(!state.targetOrgRows.length)addOrgRow(); else renderOrgRows();
+    if(!state.targetTaskRows.length)addTaskRow(); else renderTaskRows();
+    renderSelectedSubstances();
     $('#targetFirstDate').value=row?.first_applied_date||'';
     $('#targetNote').value=row?.target_note||'';
     $('#targetModal').classList.remove('hidden');
@@ -406,38 +587,49 @@
   $('#targetModalCancel')?.addEventListener('click',closeTargetModal);
   $('#targetModal')?.addEventListener('click',e=>{if(e.target===$('#targetModal'))closeTargetModal()});
 
+  function normalizedOrgPayload(){
+    return state.targetOrgRows.map(o=>{
+      const d=state.orgDirectory.divisions.find(x=>String(x.division_code)===String(o.division_code));
+      const t=state.orgDirectory.teams.find(x=>String(x.team_code)===String(o.team_code));
+      return {
+        division_code:o.division_code||null,
+        division_name:d?.division_name||o.division_name||null,
+        team_code:o.team_code||null,
+        team_name:t?.team_name||o.team_name||null
+      };
+    }).filter(o=>o.division_code&&o.team_code);
+  }
+  function normalizedTaskPayload(){
+    return state.targetTaskRows.map(t=>({work_area:String(t.work_area||'').trim(),process_name:String(t.process_name||'').trim()||null})).filter(t=>t.work_area);
+  }
+
   $('#targetSave')?.addEventListener('click',async()=>{
     if(!canManageQa())return toast('조회 전용 사용자입니다.',true);
-    const sb=client(), cid=companyId(); if(!sb||!cid)return toast('회사정보 또는 Supabase 연결을 확인해 주세요.',true);
-    const standardId=Number($('#targetStandard').value);
-    const standard=state.rows.find(r=>Number(r.id)===standardId);
-    const workArea=$('#targetWorkArea').value.trim();
-    if(!standard)return toast('대상물질을 선택해 주세요.',true);
-    if(!workArea)return toast('작업장 / 장소를 입력해 주세요.',true);
-    const payload={
-      company_id:cid,
-      standard_id:standardId,
-      chemical_id:standard.chemical_id,
-      division_name:$('#targetDivision').value.trim()||null,
-      team_name:$('#targetTeam').value.trim()||null,
-      work_area:workArea,
-      process_name:$('#targetProcess').value.trim()||null,
-      first_applied_date:$('#targetFirstDate').value||null,
-      note:$('#targetNote').value.trim()||null,
-      status:'active',
-      updated_by:userName()
-    };
+    const sb=client(),cid=companyId(); if(!sb||!cid)return toast('회사정보 또는 Supabase 연결을 확인해 주세요.',true);
+    const standardIds=[...state.targetStandardIds].map(Number).filter(Number.isFinite);
+    const orgs=normalizedOrgPayload();
+    const tasks=normalizedTaskPayload();
+    if(!standardIds.length)return toast('대상물질을 1개 이상 선택해 주세요.',true);
+    if(!orgs.length)return toast('대상조직의 본부와 팀을 선택해 주세요.',true);
+    if(!tasks.length)return toast('작업장 / 장소를 1개 이상 입력해 주세요.',true);
+
     const btn=$('#targetSave');btn.disabled=true;
+    const wasEdit=!!state.targetEditId;
     try{
-      if(state.targetEditId){
-        const {error}=await sb.from('qa_work_environment_targets').update(payload).eq('id',state.targetEditId).eq('company_id',cid);
-        if(error)throw error;
-      }else{
-        payload.created_by=userName();
-        const {error}=await sb.from('qa_work_environment_targets').insert(payload);
-        if(error)throw error;
-      }
-      closeTargetModal();toast(state.targetEditId?'측정대상을 수정했습니다.':'측정대상을 등록했습니다.');await loadStatus();
+      const {data,error}=await sb.rpc('save_qa_work_environment_target',{
+        p_company_id:cid,
+        p_target_id:state.targetEditId||null,
+        p_first_applied_date:$('#targetFirstDate').value||null,
+        p_note:$('#targetNote').value.trim()||null,
+        p_user_name:userName(),
+        p_standard_ids:standardIds,
+        p_orgs:orgs,
+        p_tasks:tasks
+      });
+      if(error)throw error;
+      closeTargetModal();
+      toast(wasEdit?'측정대상을 수정했습니다.':'측정대상을 등록했습니다.');
+      await loadStatus();
     }catch(e){console.error(e);toast('측정대상 저장 실패: '+String(e.message||e),true)}
     finally{btn.disabled=false}
   });
@@ -445,7 +637,9 @@
   async function endTarget(id){
     if(!canManageQa())return;
     const row=state.statusRows.find(r=>Number(r.target_id)===Number(id)); if(!row)return;
-    if(!confirm(`${row.cas_no} · ${row.chem_name_ko||row.chem_name_en||'-'}\n${row.work_area||'-'} 측정대상을 종료할까요?\n기존 측정이력은 보존됩니다.`))return;
+    if(!confirm(`${targetSummary(row)}
+측정대상을 종료할까요?
+기존 측정이력은 보존됩니다.`))return;
     const sb=client(),cid=companyId();
     const {error}=await sb.from('qa_work_environment_targets').update({status:'inactive',updated_by:userName()}).eq('id',id).eq('company_id',cid);
     if(error)return toast('측정대상 종료 실패: '+error.message,true);
@@ -453,7 +647,11 @@
   }
 
   function targetSummary(row){
-    return `${row.cas_no||'-'} · ${row.chem_name_ko||row.chem_name_en||'-'} · ${[row.division_name,row.team_name,row.work_area,row.process_name].filter(Boolean).join(' / ')}`;
+    const subs=rowSubstances(row),orgs=rowOrganizations(row),tasks=rowTasks(row);
+    const subText=subs.length?`${subs[0].cas_no||''} ${subs[0].chem_name_ko||subs[0].chem_name_en||''}${subs.length>1?` 외 ${subs.length-1}종`:''}`:'대상물질 없음';
+    const orgText=orgs.length?`${[orgs[0].division_name,orgs[0].team_name].filter(Boolean).join('/')}${orgs.length>1?` 외 ${orgs.length-1}개 조직`:''}`:'조직 없음';
+    const taskText=tasks.length?`${[tasks[0].work_area,tasks[0].process_name].filter(Boolean).join('/')}${tasks.length>1?` 외 ${tasks.length-1}개 작업`:''}`:'작업 없음';
+    return `${subText} · ${orgText} · ${taskText}`;
   }
   function closeMeasurementModal(){
     state.measurementTargetId=null;state.measurementEditId=null;
@@ -688,5 +886,5 @@
   try{window.parent?.postMessage({type:'portal-tab-active',activeTabId:'qa-work-environment',source:'qa-work-environment'},'*')}catch(_){}
 
   applyPermissionUi();
-  Promise.all([loadStandards(),loadStatus()]).finally(()=>setView('status'));
+  Promise.all([loadStandards(),loadStatus(),loadOrgDirectory()]).finally(()=>setView('status'));
 })();
