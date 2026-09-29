@@ -146,9 +146,11 @@
     const end=monthEnd(state.year,state.month);
     for(let i=0;i<ids.length;i+=150){
       const part=ids.slice(i,i+150);
+      // product_master에서 이미 현재 회사의 product_id만 추렸으므로,
+      // 기존 입고이력의 company_id 누락 여부와 관계없이 product_id 기준으로 조회합니다.
       const {data,error}=await db.from("reagent_collect_items")
         .select("id,product_id,collected_qty,receipt_date")
-        .eq("company_id",state.companyId).in("product_id",part).not("receipt_date","is",null).lte("receipt_date",end);
+        .in("product_id",part).not("receipt_date","is",null).lte("receipt_date",end);
       if(error)throw error; state.receipts.push(...(data||[]));
 
       const {data:daily,error:dErr}=await db.from("qa_special_storage_daily")
