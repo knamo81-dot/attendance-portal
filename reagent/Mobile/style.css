@@ -749,3 +749,129 @@ body.reagent-mobile-ui{
     display:none !important;
   }
 }
+
+
+/* =========================================================
+   2026-09-29 Mobile 신청목록 헤더 / 발주입고 버튼 배치 보정
+========================================================= */
+@media (max-width:760px){
+
+  /* 제품신청: '신청 목록' 제목은 한 줄 유지 */
+  #page-request #requestListSectionTitle{
+    white-space:nowrap !important;
+    word-break:keep-all !important;
+    font-size:15px !important;
+    line-height:1.2 !important;
+  }
+
+  /* 신청목록 헤더는 제목 + 주요 버튼이 같은 줄에 최대한 유지되도록 */
+  #page-request .card-head:has(#requestListSectionTitle){
+    display:grid !important;
+    grid-template-columns:max-content minmax(0,1fr) !important;
+    align-items:center !important;
+    column-gap:7px !important;
+    row-gap:6px !important;
+    padding-left:12px !important;
+    padding-right:12px !important;
+  }
+
+  #page-request .card-head:has(#requestListSectionTitle) > div:first-child{
+    min-width:max-content !important;
+  }
+
+  #page-request .card-head:has(#requestListSectionTitle) > div:nth-child(2){
+    min-width:0 !important;
+    width:100% !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-end !important;
+    gap:5px !important;
+    flex-wrap:wrap !important;
+  }
+
+  /* 제품 신청하기 / 제품 등록 요청 버튼을 조금 더 작게 */
+  #page-request .card-head:has(#requestListSectionTitle) .mobile-request-action-pair{
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:4px !important;
+    width:min(100%, 178px) !important;
+    flex:0 1 178px !important;
+  }
+
+  #page-request .card-head:has(#requestListSectionTitle) .mobile-request-action-pair .btn{
+    width:100% !important;
+    min-width:0 !important;
+    height:32px !important;
+    min-height:32px !important;
+    padding:0 5px !important;
+    border-radius:9px !important;
+    font-size:10px !important;
+    letter-spacing:-.04em !important;
+    white-space:nowrap !important;
+  }
+
+  /* 목록 선택 토글은 폭이 부족하면 다음 줄에서 정렬 */
+  #page-request .card-head:has(#requestListSectionTitle) .request-list-toggle{
+    flex:1 1 100% !important;
+    width:100% !important;
+    min-width:0 !important;
+    justify-content:flex-end !important;
+  }
+
+  /* 발주/입고: 후속 inline style보다 우선하도록 specificity 강화 */
+  html body #page-order-receipt .order-receipt-month-wrap{
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:7px !important;
+    width:100% !important;
+    min-width:0 !important;
+  }
+
+  html body #page-order-receipt .order-receipt-month-wrap .label{
+    grid-column:1 !important;
+  }
+
+  html body #page-order-receipt #orderReceiptMonth{
+    grid-column:2 !important;
+    width:100% !important;
+    min-width:0 !important;
+  }
+
+  /* 미입고 품목 / 년월 보기: 반드시 한 줄 2칸 */
+  html body #page-order-receipt #showUnreceivedOrders{
+    grid-column:1 !important;
+    grid-row:auto !important;
+    width:100% !important;
+    min-width:0 !important;
+    white-space:nowrap !important;
+  }
+
+  html body #page-order-receipt #resetOrderReceiptFilter{
+    grid-column:2 !important;
+    grid-row:auto !important;
+    width:100% !important;
+    min-width:0 !important;
+    white-space:nowrap !important;
+  }
+
+  html body #page-order-receipt #refreshOrderReceipt{
+    grid-column:1 / -1 !important;
+    width:100% !important;
+  }
+}
+
+@media (max-width:360px){
+  #page-request #requestListSectionTitle{
+    font-size:14px !important;
+  }
+
+  #page-request .card-head:has(#requestListSectionTitle) .mobile-request-action-pair{
+    width:min(100%, 164px) !important;
+    flex-basis:164px !important;
+  }
+
+  #page-request .card-head:has(#requestListSectionTitle) .mobile-request-action-pair .btn{
+    padding:0 3px !important;
+    font-size:9.4px !important;
+  }
+}
