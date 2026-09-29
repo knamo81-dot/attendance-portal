@@ -1,6 +1,6 @@
 (function () {
   const BUCKET = 'qa-sds-files';
-  const state = { products: [], query: '', status: 'all', orderYear: 'all', checkedExcludeYear: 'all', selected: null, pdfFiles: [], pdfIndex: 0, pdfUrl: '', currentFileActions: [], view: 'sds', chemicals: [], casQuery: '', casStatus: 'all', casSource: 'all', selectedChemical: null };
+  const state = { products: [], query: '', status: 'all', orderYear: 'all', checkedExcludeYear: 'all', selected: null, pdfFiles: [], pdfIndex: 0, pdfUrl: '', currentFileActions: [], view: 'sds', chemicals: [], casQuery: '', casStatus: 'all', casSource: 'all', selectedChemical: null, regulationByCas: new Map() };
   const $ = (id) => document.getElementById(id);
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
   const canManageQa = () => {
@@ -116,6 +116,123 @@
     }).join('')}</div>`;
   }
 
+
+  function normalizeRegCas(value) {
+    return String(value || '').trim().replace(/\s+/g, '');
+  }
+
+  function isCurrentSpecialStandard(row) {
+    const t = today();
+    if (row?.effective_from && t < String(row.effective_from).slice(0, 10)) return false;
+    if (row?.effective_to && t >= String(row.effective_to).slice(0, 10)) return false;
+    return true;
+  }
+
+  function specialCasValues(row) {
+    const related = Array.isArray(row?.qa_special_substance_cas)
+      ? row.qa_special_substance_cas
+          .slice()
+          .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || (a.id ?? 0) - (b.id ?? 0))
+          .map((item) => normalizeRegCas(item.cas_no))
+          .filter(Boolean)
+      : [];
+    if (related.length) return related;
+    const legacy = normalizeRegCas(row?.cas_no);
+    return legacy ? [legacy] : [];
+  }
+
+  function regulationFlags(casNo) {
+    return state.regulationByCas.get(normalizeRegCas(casNo)) || {
+      special: false,
+      health: false,
+      work: false
+    };
+  }
+
+  function regulationBadgesHtml(casNo) {
+    const flags = regulationFlags(casNo);
+    const badges = [];
+    if (flags.special) badges.push('<span class="cas-reg-badge special" title="특별관리물질">특별</span>');
+    if (flags.health) badges.push('<span class="cas-reg-badge health" title="특수건강진단 대상 유해인자">유해</span>');
+    if (flags.work) badges.push('<span class="cas-reg-badge work" title="작업환경측정 대상물질">작업</span>');
+    return badges.length ? `<div class="cas-reg-badges">${badges.join('')}</div>` : '-';
+  }
+
+  async function loadRegulationFlags() {
+    const db = window.SDSApp.db;
+    const casRows = state.chemicals || [];
+    const chemicalCasById = new Map(
+      casRows
+        .filter((row) => row?.id != null)
+        .map((row) => [Number(row.id), normalizeRegCas(row.cas_no)])
+    );
+
+    const next = new Map();
+    const ensure = (casNo) => {
+      const key = normalizeRegCas(casNo);
+      if (!key) return null;
+      if (!next.has(key)) next.set(key, { special: false, health: false, work: false });
+      return next.get(key);
+    };
+
+    const [specialRes, healthRes, workRes] = await Promise.all([
+      db.from('qa_special_substances')
+        .select('id, cas_no, effective_from, effective_to, qa_special_substance_cas(id, cas_no, sort_order)'),
+      db.from('qa_special_health_exam_standards')
+        .select('chemical_id, is_target, status')
+        .eq('is_target', true)
+        .eq('status', 'active'),
+      db.from('qa_work_environment_standards')
+        .select('chemical_id, is_target, status')
+        .eq('is_target', true)
+        .eq('status', 'active')
+    ]);
+
+    const errors = [];
+
+    if (specialRes.error) {
+      console.warn('[CAS 규제] 특별관리물질 조회 실패', specialRes.error);
+      errors.push(`특별: ${specialRes.error.message}`);
+    } else {
+      (specialRes.data || [])
+        .filter(isCurrentSpecialStandard)
+        .forEach((row) => {
+          specialCasValues(row).forEach((casNo) => {
+            const flags = ensure(casNo);
+            if (flags) flags.special = true;
+          });
+        });
+    }
+
+    if (healthRes.error) {
+      console.warn('[CAS 규제] 특수건강진단 조회 실패', healthRes.error);
+      errors.push(`유해: ${healthRes.error.message}`);
+    } else {
+      (healthRes.data || []).forEach((row) => {
+        const casNo = chemicalCasById.get(Number(row.chemical_id));
+        const flags = ensure(casNo);
+        if (flags) flags.health = true;
+      });
+    }
+
+    if (workRes.error) {
+      console.warn('[CAS 규제] 작업환경측정 조회 실패', workRes.error);
+      errors.push(`작업: ${workRes.error.message}`);
+    } else {
+      (workRes.data || []).forEach((row) => {
+        const casNo = chemicalCasById.get(Number(row.chemical_id));
+        const flags = ensure(casNo);
+        if (flags) flags.work = true;
+      });
+    }
+
+    state.regulationByCas = next;
+
+    if (errors.length) {
+      setCasMessage(`규제구분 일부 정보를 불러오지 못했습니다. ${errors.join(' / ')}`, 'error');
+    }
+  }
+
   function filteredChemicals() {
     const q = state.casQuery.trim().toLowerCase();
     return state.chemicals.filter((row) => {
@@ -179,7 +296,7 @@
 
     const rows = filteredChemicals();
     if (!rows.length) {
-      body.innerHTML = '<tr><td colspan="6" class="empty">조회된 CAS 정보가 없습니다.</td></tr>';
+      body.innerHTML = '<tr><td colspan="7" class="empty">조회된 CAS 정보가 없습니다.</td></tr>';
       return;
     }
 
@@ -198,6 +315,7 @@
         <td class="cas-material-name">${esc(row.chem_name_ko || '-')}</td>
         <td class="cas-material-name">${esc(row.chem_name_en || '-')}</td>
         <td>${sourceHtml}</td>
+        <td class="cas-reg-cell">${regulationBadgesHtml(row.cas_no)}</td>
         <td>${connectedProductsHtml(row.cas_no)}</td>
       </tr>`;
     }).join('');
@@ -238,6 +356,7 @@
     });
 
     setCasMessage('');
+    await loadRegulationFlags();
     renderCasList();
   }
 
