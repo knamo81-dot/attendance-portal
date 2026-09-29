@@ -137,13 +137,15 @@
     if(!sb){ $('#standardsBody').innerHTML='<tr><td colspan="10" class="empty">포털 Supabase 연결을 찾을 수 없습니다.</td></tr>'; return; }
     try{
       const cid=companyId();
-      const [sr,cr]=await Promise.all([
-        sb.from('qa_work_environment_standards').select('*').order('chemical_id'),
-        sb.from('qa_chemical_master').select('id,cas_no,chem_name_ko,chem_name_en,ke_no')
-      ]);
-      if(sr.error)throw sr.error; if(cr.error)throw cr.error;
-      const standards=sr.data||[], chemicals=cr.data||[];
-      const cm=new Map(chemicals.map(c=>[c.id,c]));
+      // 기준정보는 DB 1단계에서 만든 VIEW를 통해 조회한다.
+      // base table을 직접 읽으면 프로젝트의 RLS/권한 구성에 따라 Edge Function으로
+      // 정상 저장된 행이 브라우저에서는 0건으로 보일 수 있다.
+      const sr=await sb
+        .from('vw_qa_work_environment_standards')
+        .select('*')
+        .order('chemical_id');
+      if(sr.error)throw sr.error;
+      const standards=sr.data||[];
 
       let mq=sb.from('vw_qa_work_environment_product_matches').select('*').eq('is_active',true);
       if(cid) mq=mq.eq('company_id',cid);
@@ -168,12 +170,23 @@
       });
 
       state.rows=standards.map(s=>{
-        const c=cm.get(s.chemical_id)||{};
         const products=matchesByStandard.get(String(s.id))||[];
         const rec=products.map(p=>latestReceipt.get(p.product_id)).filter(Boolean).sort().at(-1)||null;
         const use=products.map(p=>latestUsage.get(p.product_id)).filter(Boolean).sort().at(-1)||null;
-        return {...s,cas_no:c.cas_no||'',name_ko:c.chem_name_ko||'',name_en:c.chem_name_en||'',products,latest_receipt:rec,latest_usage:use};
+        return {
+          ...s,
+          cas_no:s.cas_no||'',
+          name_ko:s.chem_name_ko||'',
+          name_en:s.chem_name_en||'',
+          products,
+          latest_receipt:rec,
+          latest_usage:use
+        };
       });
+
+      if(!state.rows.length){
+        console.warn('vw_qa_work_environment_standards 조회 결과가 0건입니다.');
+      }
 
       const targets=state.rows.filter(r=>r.is_target===true&&r.verification_status!=='kosha_not_found');
       const unv=state.rows.filter(r=>r.verification_status==='kosha_not_found');
