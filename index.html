@@ -3159,6 +3159,12 @@ body.auth-loading .top-user-bar {
       desc: '출장비 신청, 증빙 업로드, 관리팀 검토 및 지출결의 작성을 관리합니다.',
       gradient: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #38bdf8 100%)'
     },
+    'travel-expense/Mobile/index.html': {
+      top: 'Expense Management',
+      title: '출장비 정산',
+      desc: '출장비 신청, 제출내역 확인 및 관리팀 검토를 모바일에서 관리합니다.',
+      gradient: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #38bdf8 100%)'
+    },
     'aic/index.html': {
       top: 'Global Communication',
       title: 'AI Communication',
@@ -3301,6 +3307,7 @@ body.auth-loading .top-user-bar {
       { id: 'qa-health', label: '특수건강진단' }
     ],
     'travel-expense/index.html': [],
+    'travel-expense/Mobile/index.html': [],
     'aic/index.html': [],
     'settings.html': [
       { id: 'org', label: '조직관리' },
@@ -3418,7 +3425,7 @@ body.auth-loading .top-user-bar {
 
   function filterPortalTabsByAppRole(tabs) {
     const normalizedTabs = normalizePortalTabs(tabs);
-    const currentSrc = normalizePortalSrc(frame?.getAttribute('src') || frame?.src || '');
+    const currentSrc = normalizePortalSrc(frame?.dataset?.currentSrc || frame?.getAttribute('src') || frame?.src || '');
 
     if (currentSrc === 'reagent/index.html' || currentSrc === 'reagent/Mobile/index.html') {
       const reagentRole = getPortalAppRoleForTabs('reagent');
@@ -3430,7 +3437,7 @@ body.auth-loading .top-user-bar {
       return requestTabs.length ? requestTabs : [{ id: 'request', label: '제품신청' }];
     }
 
-    if (currentSrc === 'travel-expense/index.html') {
+    if (currentSrc === 'travel-expense/index.html' || currentSrc === 'travel-expense/Mobile/index.html') {
       const travelRole = getPortalAppRoleForTabs('travel_expense');
       const canReview = isPortalOperatorRole(travelRole);
 
@@ -3602,7 +3609,7 @@ body.auth-loading .top-user-bar {
       }
       return;
     }
-    if (currentSrc === 'travel-expense/index.html' && isTravelExpenseAdminTab({ id: tabId, label: tabId })) {
+    if ((currentSrc === 'travel-expense/index.html' || currentSrc === 'travel-expense/Mobile/index.html') && isTravelExpenseAdminTab({ id: tabId, label: tabId })) {
       const travelRole = getPortalAppRoleForTabs('travel_expense');
       if (!isPortalOperatorRole(travelRole)) {
         const fallbackTab = currentPortalTabs.find(isTravelExpenseApplicantTab) || currentPortalTabs[0] || { id: 'expense-user', label: '출장자 입력 화면' };
@@ -3817,6 +3824,18 @@ body.auth-loading .top-user-bar {
     return key === RESEARCH_STAFF_DESKTOP_SRC || key === RESEARCH_STAFF_MOBILE_SRC;
   }
 
+  const TRAVEL_EXPENSE_DESKTOP_SRC = 'travel-expense/index.html';
+  const TRAVEL_EXPENSE_MOBILE_SRC = 'travel-expense/Mobile/index.html';
+
+  function getTravelExpenseSrc() {
+    return isMobilePortalView() ? TRAVEL_EXPENSE_MOBILE_SRC : TRAVEL_EXPENSE_DESKTOP_SRC;
+  }
+
+  function isTravelExpenseResponsiveSrc(src) {
+    const key = normalizePortalSrc(src);
+    return key === TRAVEL_EXPENSE_DESKTOP_SRC || key === TRAVEL_EXPENSE_MOBILE_SRC;
+  }
+
   const QA_USAGE_DESKTOP_SRC = 'QA/usage/index.html';
   const QA_USAGE_MOBILE_SRC = 'QA/Mobile/usage/index.html';
   const QA_SDS_DESKTOP_SRC = 'QA/index.html';
@@ -3886,6 +3905,7 @@ body.auth-loading .top-user-bar {
     if (isReagentResponsiveSrc(raw)) return getReagentSrc() + suffix;
     if (isWastewaterResponsiveSrc(raw)) return getWastewaterSrc() + suffix;
     if (isResearchStaffResponsiveSrc(raw)) return getResearchStaffSrc() + suffix;
+    if (isTravelExpenseResponsiveSrc(raw)) return getTravelExpenseSrc() + suffix;
     if (isQaUsageSrc(raw)) return getQaUsageSrc() + suffix;
     if (isQaSdsSrc(raw)) return getQaSdsSrc() + suffix;
     if (isQaStorageSrc(raw)) return getQaStorageSrc() + suffix;
