@@ -844,13 +844,13 @@ body {
 
 .cas-table {
   width: 100%;
-  min-width: 1120px;
+  min-width: 1240px;
   table-layout: fixed;
   font-size: 13px;
   border-collapse: collapse;
 }
 
-/* CAS List 열 너비 조정: CAS No.는 넓게, 영문명은 과도하게 넓어지지 않도록 제한 */
+/* CAS List 열 너비: 규제구분(특별/유해/작업) 컬럼 추가 */
 .cas-table th:nth-child(1),
 .cas-table td:nth-child(1) { width: 92px; }
 
@@ -864,13 +864,16 @@ body {
 .cas-table td:nth-child(3) { width: 190px; }
 
 .cas-table th:nth-child(4),
-.cas-table td:nth-child(4) { width: 31%; }
+.cas-table td:nth-child(4) { width: 27%; }
 
 .cas-table th:nth-child(5),
 .cas-table td:nth-child(5) { width: 105px; }
 
 .cas-table th:nth-child(6),
-.cas-table td:nth-child(6) { width: auto; }
+.cas-table td:nth-child(6) { width: 142px; }
+
+.cas-table th:nth-child(7),
+.cas-table td:nth-child(7) { width: auto; }
 
 .cas-table th,
 .cas-table td {
@@ -895,7 +898,9 @@ body {
 .cas-table th:nth-child(1),
 .cas-table td:nth-child(1),
 .cas-table th:nth-child(5),
-.cas-table td:nth-child(5) {
+.cas-table td:nth-child(5),
+.cas-table th:nth-child(6),
+.cas-table td:nth-child(6) {
   text-align: center;
 }
 
@@ -1046,3 +1051,66 @@ body {
     width: 100%;
   }
 }
+
+
+/* CAS List 규제구분: 특별 / 유해 / 작업 */
+.cas-reg-cell {
+  white-space: normal;
+}
+
+.cas-reg-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+}
+
+.cas-reg-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  white-space: nowrap;
+}
+
+.cas-reg-badge.special {
+  color: #6b21a8;
+  background: #f3e8ff;
+  border-color: #e9d5ff;
+}
+
+.cas-reg-badge.health {
+  color: #b42318;
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.cas-reg-badge.work {
+  color: #075985;
+  background: #e0f2fe;
+  border-color: #bae6fd;
+}
+
+@media (max-width: 760px) {
+  .cas-reg-badges {
+    gap: 4px;
+  }
+
+  .cas-reg-badge {
+    min-width: 34px;
+    min-height: 23px;
+    padding: 0 7px;
+    font-size: 10.5px;
+  }
+}
+
