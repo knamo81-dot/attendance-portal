@@ -182,8 +182,8 @@
         .select('chemical_id, is_target, status')
         .eq('is_target', true)
         .eq('status', 'active'),
-      db.from('qa_work_environment_standards')
-        .select('chemical_id, is_target, status')
+      db.from('vw_qa_work_environment_standards')
+        .select('cas_no, is_target, status')
         .eq('is_target', true)
         .eq('status', 'active')
     ]);
@@ -220,8 +220,7 @@
       errors.push(`작업: ${workRes.error.message}`);
     } else {
       (workRes.data || []).forEach((row) => {
-        const casNo = chemicalCasById.get(Number(row.chemical_id));
-        const flags = ensure(casNo);
+        const flags = ensure(row.cas_no);
         if (flags) flags.work = true;
       });
     }
