@@ -3087,6 +3087,12 @@ body.auth-loading .top-user-bar {
       desc: '제품 신청, 취합, 정리 업무를 관리합니다.',
       gradient: 'linear-gradient(135deg, #173a7a 0%, #2251a3 100%)'
     },
+    'reagent/Mobile/index.html': {
+      top: 'Resource Management',
+      title: '시약·초자 주문 시스템',
+      desc: '제품 신청, 취합, 정리 및 발주·입고 업무를 모바일에서 관리합니다.',
+      gradient: 'linear-gradient(135deg, #173a7a 0%, #2251a3 100%)'
+    },
     'QA/index.html': {
       top: 'Safety Management',
       title: 'QA',
@@ -3216,6 +3222,13 @@ body.auth-loading .top-user-bar {
       { id: 'collect', label: '제품취합' },
       { id: 'summary', label: '취합정리' },
       { id: 'products', label: '제품관리' }
+    ],
+    'reagent/Mobile/index.html': [
+      { id: 'request', label: '제품신청' },
+      { id: 'collect', label: '제품취합' },
+      { id: 'prepare', label: '취합정리' },
+      { id: 'order-receipt', label: '발주/입고 관리' },
+      { id: 'product-management', label: '제품관리' }
     ],
     'QA/index.html': [
       { id: 'qa-usage', label: '사용일지' },
@@ -3407,7 +3420,7 @@ body.auth-loading .top-user-bar {
     const normalizedTabs = normalizePortalTabs(tabs);
     const currentSrc = normalizePortalSrc(frame?.getAttribute('src') || frame?.src || '');
 
-    if (currentSrc === 'reagent/index.html') {
+    if (currentSrc === 'reagent/index.html' || currentSrc === 'reagent/Mobile/index.html') {
       const reagentRole = getPortalAppRoleForTabs('reagent');
       const canOperate = isPortalOperatorRole(reagentRole);
 
@@ -3768,6 +3781,18 @@ body.auth-loading .top-user-bar {
     return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
   }
 
+  const REAGENT_DESKTOP_SRC = 'reagent/index.html';
+  const REAGENT_MOBILE_SRC = 'reagent/Mobile/index.html';
+
+  function getReagentSrc() {
+    return isMobilePortalView() ? REAGENT_MOBILE_SRC : REAGENT_DESKTOP_SRC;
+  }
+
+  function isReagentResponsiveSrc(src) {
+    const key = normalizePortalSrc(src);
+    return key === REAGENT_DESKTOP_SRC || key === REAGENT_MOBILE_SRC;
+  }
+
   const WASTEWATER_DESKTOP_SRC = 'wastewater/index.html';
   const WASTEWATER_MOBILE_SRC = 'wastewater/Mobile/index.html';
 
@@ -3858,6 +3883,7 @@ body.auth-loading .top-user-bar {
     if (!raw) return src;
     const suffixMatch = raw.match(/([?#].*)$/);
     const suffix = suffixMatch ? suffixMatch[1] : '';
+    if (isReagentResponsiveSrc(raw)) return getReagentSrc() + suffix;
     if (isWastewaterResponsiveSrc(raw)) return getWastewaterSrc() + suffix;
     if (isResearchStaffResponsiveSrc(raw)) return getResearchStaffSrc() + suffix;
     if (isQaUsageSrc(raw)) return getQaUsageSrc() + suffix;
@@ -5166,7 +5192,8 @@ body.auth-loading .top-user-bar {
   }
 
   function isReagentSrc(src) {
-    return String(src || '').includes('reagent/index.html');
+    const key = normalizePortalSrc(src);
+    return key === 'reagent/index.html' || key === 'reagent/Mobile/index.html';
   }
 
   function getPersonalServiceAppInfo(src) {
