@@ -1,0 +1,582 @@
+/* =========================================================
+   Reagent Mobile UI 2026-09-29
+   - PC CSS/logic stays shared from ../ files.
+   - This file contains mobile-only layout/card overrides.
+========================================================= */
+
+:root{
+  --mobile-gap:8px;
+  --mobile-card-radius:14px;
+}
+
+html,body{
+  width:100%;
+  max-width:100%;
+  overflow-x:hidden !important;
+}
+
+body.reagent-mobile-ui{
+  padding:0 !important;
+  background:var(--bg,#f5f7fb);
+}
+
+.reagent-mobile-ui .shell,
+.reagent-mobile-ui .page,
+.reagent-mobile-ui .card,
+.reagent-mobile-ui .card-body,
+.reagent-mobile-ui .card-head{
+  min-width:0 !important;
+  max-width:100% !important;
+}
+
+.reagent-mobile-ui .shell{
+  gap:8px !important;
+}
+
+/* Portal header tabs are used; keep internal tabs only as a functional DOM bridge. */
+.reagent-mobile-ui .shell > .tabs{
+  display:none !important;
+  height:0 !important;
+  min-height:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  overflow:hidden !important;
+}
+
+.reagent-mobile-ui .card{
+  border-radius:15px !important;
+  box-shadow:0 4px 14px rgba(15,23,42,.045) !important;
+}
+
+.reagent-mobile-ui .card-head{
+  padding:12px 12px 10px !important;
+  gap:8px !important;
+}
+
+.reagent-mobile-ui .card-head h2{font-size:17px !important;}
+.reagent-mobile-ui .card-head h3{font-size:16px !important;}
+.reagent-mobile-ui .card-head p{
+  margin-top:4px !important;
+  font-size:11px !important;
+  line-height:1.4 !important;
+}
+
+.reagent-mobile-ui .card-body{
+  padding:12px !important;
+}
+
+.reagent-mobile-ui input:not([type="checkbox"]):not([type="radio"]),
+.reagent-mobile-ui select,
+.reagent-mobile-ui textarea{
+  font-size:16px !important;
+}
+
+/* =========================================================
+   Shared compact KPI tiles
+========================================================= */
+.reagent-mobile-ui .summary{
+  gap:7px !important;
+}
+
+.reagent-mobile-ui .summary .tile{
+  min-width:0 !important;
+  min-height:0 !important;
+  padding:9px 9px !important;
+  border-radius:12px !important;
+}
+
+.reagent-mobile-ui .summary .tile .k{
+  margin-bottom:3px !important;
+  font-size:10px !important;
+  line-height:1.2 !important;
+  word-break:keep-all;
+}
+
+.reagent-mobile-ui .summary .tile .v{
+  font-size:17px !important;
+  line-height:1.15 !important;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* 제품신청: 4 KPI cards in one row */
+#page-request .summary{
+  grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+  gap:5px !important;
+}
+
+#page-request .summary .tile{
+  padding:8px 4px !important;
+  text-align:center;
+}
+
+#page-request .summary .tile .k{
+  font-size:9px !important;
+  letter-spacing:-.045em;
+}
+
+#page-request .summary .tile .v{
+  font-size:16px !important;
+}
+
+/* 제품취합 / 취합정리 / 제품관리: 2 x 2 */
+#page-collect .summary,
+#page-prepare .summary,
+#page-product-management > .card:first-child .summary{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+}
+
+/* =========================================================
+   제품신청 - 조회년월 filter
+========================================================= */
+.mobile-request-month-filter{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  align-items:center;
+  gap:8px;
+  padding:9px 10px;
+  margin-bottom:10px;
+  border:1px solid var(--line,#d9e2ec);
+  border-radius:12px;
+  background:#f8fafc;
+}
+
+.mobile-request-month-filter label{
+  color:#475569;
+  font-size:11px;
+  font-weight:850;
+  white-space:nowrap;
+}
+
+.mobile-request-month-filter select{
+  width:100%;
+  min-width:0;
+  height:38px;
+  border:1px solid var(--line,#d9e2ec);
+  border-radius:10px;
+  background:#fff;
+  padding:0 9px;
+  font-weight:750;
+}
+
+/* Existing request cards stay as the list UI. */
+#page-request .request-mobile-list{
+  gap:8px !important;
+  margin-top:10px !important;
+}
+
+#page-request .request-mobile-card-main{
+  padding:11px 11px !important;
+}
+
+/* =========================================================
+   Generic expandable mobile list/card
+========================================================= */
+.mobile-data-list{
+  display:grid;
+  gap:8px;
+  width:100%;
+  min-width:0;
+  margin-top:12px;
+}
+
+.mobile-data-head{
+  display:grid;
+  align-items:center;
+  gap:5px;
+  padding:0 9px 2px;
+  color:#667085;
+  font-size:9.5px;
+  font-weight:850;
+  letter-spacing:-.03em;
+}
+
+.mobile-grid-collect{
+  grid-template-columns:42px minmax(0,1.45fr) minmax(0,.9fr) minmax(0,.9fr);
+}
+
+.mobile-grid-four{
+  grid-template-columns:minmax(0,.65fr) minmax(0,1.45fr) minmax(0,.9fr) minmax(0,.95fr);
+}
+
+.mobile-data-card{
+  position:relative;
+  width:100%;
+  min-width:0;
+  overflow:hidden;
+  border:1px solid var(--line,#d9e2ec);
+  border-radius:var(--mobile-card-radius);
+  background:#fff;
+  box-shadow:0 3px 10px rgba(15,23,42,.04);
+}
+
+.mobile-data-card.open{
+  border-color:#bfdbfe;
+  box-shadow:0 5px 14px rgba(37,99,235,.09);
+}
+
+.mobile-data-summary{
+  position:relative;
+  display:grid;
+  align-items:center;
+  gap:5px;
+  width:100%;
+  min-width:0;
+  min-height:48px;
+  padding:10px 26px 10px 9px;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.mobile-data-summary::after{
+  content:'⌄';
+  position:absolute;
+  right:8px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#64748b;
+  font-size:15px;
+  font-weight:900;
+  transition:transform .15s ease;
+}
+
+.mobile-data-card.open .mobile-data-summary::after{
+  transform:translateY(-50%) rotate(180deg);
+}
+
+.mobile-data-summary > span,
+.mobile-data-summary > strong{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:11px;
+}
+
+.mobile-data-summary > strong{
+  color:#111827;
+  font-weight:850;
+}
+
+.mobile-data-summary .muted-value{color:#64748b;}
+
+.mobile-data-detail{
+  display:none;
+  padding:10px 11px 12px;
+  border-top:1px solid #edf1f5;
+  background:#fbfcfe;
+}
+
+.mobile-data-card.open .mobile-data-detail{display:block;}
+
+.mobile-detail-grid{
+  display:grid;
+  grid-template-columns:88px minmax(0,1fr);
+  gap:0 10px;
+  width:100%;
+  min-width:0;
+}
+
+.mobile-detail-grid > span,
+.mobile-detail-grid > b{
+  min-width:0;
+  padding:7px 0;
+  border-bottom:1px solid #eef2f6;
+  font-size:11px;
+  line-height:1.4;
+}
+
+.mobile-detail-grid > span{
+  color:#667085;
+  font-weight:750;
+}
+
+.mobile-detail-grid > b{
+  color:#1f2937;
+  font-weight:780;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+
+.mobile-detail-grid > :nth-last-child(-n+2){border-bottom:0;}
+
+.mobile-detail-actions{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px;
+  margin-top:10px;
+}
+
+.mobile-detail-actions .btn,
+.mobile-detail-actions .ghost-btn{
+  width:100% !important;
+  min-height:38px;
+}
+
+.mobile-empty{
+  padding:20px 12px;
+  border:1px dashed #cbd5e1;
+  border-radius:13px;
+  background:#fff;
+  color:#94a3b8;
+  text-align:center;
+  font-size:11px;
+  font-weight:750;
+}
+
+/* =========================================================
+   제품취합
+========================================================= */
+#page-collect .collect-table-wrap{
+  display:none !important;
+}
+
+#page-collect .collect-filters{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:8px !important;
+}
+
+#page-collect .collect-filters .field,
+#page-collect .collect-filters .field input,
+#page-collect .collect-filters .field select,
+#page-collect .collect-filters .field button{
+  width:100% !important;
+  min-width:0 !important;
+}
+
+.mobile-collect-check-wrap{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.mobile-collect-check{
+  width:18px !important;
+  height:18px !important;
+  min-width:18px !important;
+  min-height:18px !important;
+  padding:0 !important;
+  margin:0 !important;
+  accent-color:var(--primary,#1d4ed8);
+}
+
+.mobile-vendor-section{
+  margin-top:9px;
+  padding-top:9px;
+  border-top:1px solid #e5e7eb;
+}
+
+.mobile-vendor-title{
+  margin-bottom:7px;
+  color:#334155;
+  font-size:11px;
+  font-weight:900;
+}
+
+.mobile-vendor-grid{
+  display:grid;
+  grid-template-columns:72px minmax(0,1fr);
+  gap:6px 8px;
+  align-items:center;
+}
+
+.mobile-vendor-grid label{
+  color:#64748b;
+  font-size:10px;
+  font-weight:750;
+}
+
+.mobile-vendor-grid input{
+  width:100%;
+  min-width:0;
+  height:36px;
+  border:1px solid var(--line,#d9e2ec);
+  border-radius:9px;
+  padding:0 8px;
+  background:#fff;
+}
+
+.mobile-vendor-block{
+  padding:9px;
+  border:1px solid #e5e7eb;
+  border-radius:11px;
+  background:#fff;
+  margin-top:7px;
+}
+
+.mobile-vendor-block.auto-selected{
+  border-color:#93c5fd;
+  background:#eff6ff;
+}
+
+.mobile-entry-list{
+  display:grid;
+  gap:6px;
+  margin-top:9px;
+}
+
+.mobile-entry-item{
+  padding:8px 9px;
+  border:1px solid #e5e7eb;
+  border-radius:10px;
+  background:#fff;
+  font-size:10.5px;
+  line-height:1.45;
+  color:#475569;
+}
+
+.mobile-entry-item b{color:#0f172a;}
+
+/* =========================================================
+   취합정리
+========================================================= */
+#prepareSummaryPanel .table-wrap,
+#prepareQuotePanel .table-wrap{
+  display:none !important;
+}
+
+#page-prepare .prepare-control-wrap,
+#page-prepare .actions > div:first-child{
+  width:100% !important;
+  min-width:0 !important;
+}
+
+#page-prepare .prepare-control-group{
+  width:100% !important;
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:6px !important;
+}
+
+#page-prepare .prepare-control-label{
+  grid-column:1/-1;
+  font-size:10px !important;
+}
+
+#page-prepare .prepare-control-group .btn{
+  width:100% !important;
+  min-width:0 !important;
+}
+
+/* =========================================================
+   발주/입고 관리
+========================================================= */
+#page-order-receipt .order-receipt-month-wrap{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:7px !important;
+  width:100% !important;
+  min-width:0 !important;
+}
+
+#page-order-receipt .order-receipt-month-wrap .label{
+  grid-column:1;
+  align-self:center;
+}
+
+#page-order-receipt #orderReceiptMonth{
+  grid-column:2;
+  width:100% !important;
+  min-width:0 !important;
+}
+
+#page-order-receipt #showUnreceivedOrders{
+  grid-column:1;
+  width:100% !important;
+  min-width:0 !important;
+}
+
+#page-order-receipt #resetOrderReceiptFilter{
+  grid-column:2;
+  width:100% !important;
+  min-width:0 !important;
+}
+
+#page-order-receipt #refreshOrderReceipt{
+  grid-column:1/-1;
+  width:100% !important;
+  min-width:0 !important;
+}
+
+#page-order-receipt .order-receipt-bulk-actions{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:7px !important;
+  width:100% !important;
+}
+
+#page-order-receipt .order-receipt-bulk-actions .btn{
+  width:100% !important;
+  min-width:0 !important;
+  padding-left:5px !important;
+  padding-right:5px !important;
+  font-size:11px !important;
+}
+
+#page-order-receipt .order-receipt-bulk-actions .small{
+  grid-column:1/-1;
+  line-height:1.4;
+}
+
+/* =========================================================
+   제품관리
+========================================================= */
+.mobile-hide-pm-table{display:none !important;}
+
+#pmProductMasterPanel .collect-filters{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:8px !important;
+}
+
+#pmProductMasterPanel .collect-filters .field:first-child{
+  grid-column:1/-1;
+}
+
+#pmProductMasterPanel .collect-filters .field:last-child{
+  grid-column:1/-1;
+}
+
+#pmProductMasterPanel .collect-filters .field,
+#pmProductMasterPanel .collect-filters input,
+#pmProductMasterPanel .collect-filters select,
+#pmProductMasterPanel .collect-filters button{
+  width:100% !important;
+  min-width:0 !important;
+}
+
+#pmProductMasterPanel .form-grid{
+  grid-template-columns:1fr !important;
+}
+
+#pmProductEditModal .form-grid{
+  grid-template-columns:1fr !important;
+}
+
+#page-product-management .request-list-toggle{
+  width:100%;
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+
+#page-product-management .request-list-toggle > span{
+  grid-column:1/-1;
+  padding:0 2px 4px !important;
+}
+
+#page-product-management .request-list-toggle .btn{
+  width:100%;
+  min-width:0;
+  padding:0 5px !important;
+  font-size:11px !important;
+}
+
+@media (max-width:360px){
+  #page-request .summary .tile .k{font-size:8.4px !important;}
+  #page-request .summary .tile .v{font-size:15px !important;}
+  .mobile-data-head{font-size:8.8px;}
+  .mobile-data-summary > span,.mobile-data-summary > strong{font-size:10px;}
+  .mobile-detail-grid{grid-template-columns:78px minmax(0,1fr);}
+}
