@@ -1,3 +1,32 @@
+/* =========================================================
+   출장비 정산 Mobile UI
+   - PC 원본 로직/DB/권한은 그대로 사용
+   - Mobile/index.html 에서만 로드
+========================================================= */
+
+:root{
+  --tm-gap:10px;
+  --tm-radius:14px;
+  --tm-line:#e5e9f2;
+  --tm-muted:#64748b;
+  --tm-main:#2563eb;
+}
+
+html,body{
+  width:100%;
+  max-width:100%;
+  overflow-x:hidden;
+}
+
+body.travel-mobile-ui{
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+}
+
+.travel-mobile-detail-nav,
+.travel-mobile-admin-detail-nav{
+  display:none;
+}
 
 @media (max-width:768px){
   html,body{background:#f3f6fb!important;}
@@ -779,5 +808,17 @@
 @media (max-width:350px){
   body.travel-mobile-ui .admin-view .admin-schedule-grid{
     grid-template-columns:1fr !important;
+  }
+}
+
+
+/* =========================================================
+   2026-09-29 Portal embedded 중복 탭 제거
+   - 포털 공통 서브탭만 표시
+   - Mobile 페이지 단독 실행 시 내부 탭은 유지
+========================================================= */
+@media (max-width:768px){
+  html.portal-embedded body.travel-mobile-ui main > .tabs{
+    display:none !important;
   }
 }
