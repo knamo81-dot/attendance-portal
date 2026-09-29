@@ -719,3 +719,33 @@ body.reagent-mobile-ui{
   .mobile-two-line-name{font-size:11.3px !important;}
   .mobile-two-line-meta{font-size:9.8px;}
 }
+
+
+/* =========================================================
+   2026-09-29 Mobile 안내문구 숨김
+   - PC 화면에는 영향 없음
+========================================================= */
+@media (max-width:760px){
+
+  /* 제품신청 - 신청 목록 안내 */
+  #page-request #requestListSectionDesc{
+    display:none !important;
+  }
+
+  /* 제품취합 - 주문월 설명 + 상단 안내문구 */
+  #page-collect #collectOrderMonthDesc,
+  #page-collect > .card > .card-head > div > p{
+    display:none !important;
+  }
+
+  /* 취합정리 - 진행상태 설명 + 상단 안내문구 */
+  #page-prepare #prepareOrderMonthDesc,
+  #page-prepare > .card:first-child > .card-head > div > p{
+    display:none !important;
+  }
+
+  /* 제품관리 - 관리자/운영자 전용 안내 */
+  #page-product-management #pmPageDesc{
+    display:none !important;
+  }
+}
