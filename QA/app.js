@@ -1053,6 +1053,130 @@
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'SDS 관리'); XLSX.writeFile(wb, `SDS관리_${today().replaceAll('-', '')}.xlsx`);
   }
 
+
+  function styleCasWorkbookSheet(ws, colWidths) {
+    if (!ws || !ws['!ref']) return;
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let c = range.s.c; c <= range.e.c; c += 1) {
+      const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+      if (!cell) continue;
+      cell.s = {
+        font: { bold: true },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        fill: { fgColor: { rgb: 'EDE9FE' } },
+        border: {
+          top: { style: 'thin', color: { rgb: 'D1D5DB' } },
+          bottom: { style: 'thin', color: { rgb: 'D1D5DB' } },
+          left: { style: 'thin', color: { rgb: 'D1D5DB' } },
+          right: { style: 'thin', color: { rgb: 'D1D5DB' } }
+        }
+      };
+    }
+
+    for (let r = 1; r <= range.e.r; r += 1) {
+      for (let c = range.s.c; c <= range.e.c; c += 1) {
+        const cell = ws[XLSX.utils.encode_cell({ r, c })];
+        if (!cell) continue;
+        cell.s = {
+          alignment: {
+            vertical: 'top',
+            horizontal: c === 0 || (c >= 5 && c <= 7) ? 'center' : 'left'
+          }
+        };
+      }
+    }
+
+    ws['!cols'] = colWidths.map((wch) => ({ wch }));
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ r: 0, c: 0 }, { r: range.e.r, c: range.e.c }) };
+    ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft', state: 'frozen' };
+  }
+
+  function downloadCasExcel() {
+    const rows = filteredChemicals();
+    if (!rows.length) {
+      setCasMessage('엑셀로 다운로드할 CAS 정보가 없습니다.', 'error');
+      return;
+    }
+    if (!window.XLSX) {
+      setCasMessage('엑셀 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.', 'error');
+      return;
+    }
+
+    // 현재 화면 필터/검색이 적용된 CAS 순서대로 번호를 부여한다.
+    const noByCas = new Map();
+    rows.forEach((row, index) => noByCas.set(normalizeRegCas(row.cas_no), index + 1));
+
+    // 1시트: CAS 기준정보 + 규제구분(각각 독립 셀)
+    const sheet1 = rows.map((row) => {
+      const flags = regulationFlags(row.cas_no);
+      return {
+        'No.': noByCas.get(normalizeRegCas(row.cas_no)),
+        'CAS No.': row.cas_no || '',
+        '국문명': row.chem_name_ko || '',
+        '영문명': row.chem_name_en || '',
+        '출처': row.source || '',
+        '특별': flags.special ? '특별' : '',
+        '유해': flags.health ? '유해' : '',
+        '작업': flags.work ? '작업' : ''
+      };
+    });
+
+    // 2시트: 연결제품을 제품 1건당 한 행으로 세로 전개.
+    // 같은 CAS는 1시트와 동일한 No.를 반복 사용한다.
+    const sheet2 = [];
+    rows.forEach((row) => {
+      const flags = regulationFlags(row.cas_no);
+      const no = noByCas.get(normalizeRegCas(row.cas_no));
+      const products = connectedProducts(row.cas_no);
+
+      if (!products.length) {
+        sheet2.push({
+          'No.': no,
+          'CAS No.': row.cas_no || '',
+          '국문명': row.chem_name_ko || '',
+          '영문명': row.chem_name_en || '',
+          '출처': row.source || '',
+          '특별': flags.special ? '특별' : '',
+          '유해': flags.health ? '유해' : '',
+          '작업': flags.work ? '작업' : '',
+          '제품명': '',
+          '제조사': '',
+          '제품코드': ''
+        });
+        return;
+      }
+
+      products.forEach((product) => {
+        sheet2.push({
+          'No.': no,
+          'CAS No.': row.cas_no || '',
+          '국문명': row.chem_name_ko || '',
+          '영문명': row.chem_name_en || '',
+          '출처': row.source || '',
+          '특별': flags.special ? '특별' : '',
+          '유해': flags.health ? '유해' : '',
+          '작업': flags.work ? '작업' : '',
+          '제품명': product.name || '',
+          '제조사': product.maker || '',
+          '제품코드': product.code || ''
+        });
+      });
+    });
+
+    const ws1 = XLSX.utils.json_to_sheet(sheet1);
+    const ws2 = XLSX.utils.json_to_sheet(sheet2);
+
+    styleCasWorkbookSheet(ws1, [7, 16, 24, 40, 13, 9, 9, 9]);
+    styleCasWorkbookSheet(ws2, [7, 16, 24, 40, 13, 9, 9, 9, 34, 22, 20]);
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, 'CAS 규제현황');
+    XLSX.utils.book_append_sheet(wb, ws2, 'CAS 연결제품');
+
+    XLSX.writeFile(wb, `CAS_List_${today().replaceAll('-', '')}.xlsx`);
+    setCasMessage(`엑셀 다운로드 완료 · CAS ${rows.length}종 / 연결제품 ${sheet2.length}행`, 'success');
+  }
+
   function notifyPortal() {
     try {
       window.parent?.postMessage({ type: 'portal-tabs-ready', tabs: [{ id: 'sds', label: 'SDS 관리' }], source: 'qa' }, '*');
@@ -1074,6 +1198,7 @@
     $('casSearch').addEventListener('input', (e) => { state.casQuery = e.target.value; renderCasList(); });
     $('casStatus').addEventListener('change', (e) => { state.casStatus = e.target.value; renderCasList(); });
     $('casSource').addEventListener('change', (e) => { state.casSource = e.target.value; renderCasList(); });
+    $('casDownloadExcel').addEventListener('click', downloadCasExcel);
     $('casManualSave').addEventListener('click', saveCasManual);
 
     $('sdsSave').addEventListener('click', saveSds);
