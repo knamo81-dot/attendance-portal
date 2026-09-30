@@ -4134,21 +4134,20 @@ body.auth-loading .top-user-bar {
   }
 
   function canAccessQaApp() {
-    // 서비스관리자 / 회사관리자는 기존처럼 항상 QA 접근을 허용합니다.
+    // QA 운영 오픈(REL-QA-v1.2.10):
+    // 로그인한 회사 사용자는 QA 사이드바 메뉴를 기본 노출합니다.
+    // 단, 권한설정에서 QA가 명시적으로 blocked 처리된 사용자는 제외합니다.
+    if (!currentUser) return false;
     if (isServiceAdminRole()) return true;
     if (canUseSettingsMenu()) return true;
 
-    // 테스트본부(TEST01)는 권한 검증을 위해 QA 메뉴를 항상 노출합니다.
-    if (isTestDivisionUser()) return true;
-
-    // 권한설정에서 QA 운영자로 지정된 사용자도 QA 메뉴를 표시합니다.
     const qaRole = normalizePortalRole(
       currentAppRoles?.qa?.role ||
       currentAppRoles?.qa?.role_key ||
       '',
       'user'
     );
-    return qaRole === 'admin' || qaRole === 'operator';
+    return qaRole !== 'blocked';
   }
 
   function updateQaButtonVisibility() {
