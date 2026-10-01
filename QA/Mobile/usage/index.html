@@ -241,10 +241,16 @@
       <div class="usage-modal-body product-scan-body">
         <section id="productScanCameraSection" class="scan-camera-section">
           <div class="scan-video-wrap">
-            <div id="productScanReader" class="product-scan-reader"></div>
+            <div id="productScanReader" class="product-scan-reader" aria-hidden="true"></div>
             <video id="productScanVideo" playsinline muted hidden></video>
+            <canvas id="productScanCanvas" hidden></canvas>
             <div class="scan-guide" aria-hidden="true">
               <i></i><i></i><i></i><i></i>
+              <span></span>
+            </div>
+            <div class="scan-tools" aria-label="카메라 도구">
+              <button id="productScanTorch" class="scan-tool-btn" type="button" hidden aria-label="손전등 켜기">⌁</button>
+              <button id="productScanZoom" class="scan-tool-btn" type="button" hidden aria-label="카메라 확대">1×</button>
             </div>
           </div>
           <div id="productScanStatus" class="scan-status" aria-live="polite">카메라를 준비하고 있습니다.</div>
@@ -364,7 +370,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../../supabase.js?v=20260927-perm2"></script>
-  <script src="./app.js?v=20261001-productscan1"></script>
+  <script src="./app.js?v=20261001-productscan2"></script>
   <script src="../../../common/common.js"></script>
 </body>
 </html>
