@@ -1653,3 +1653,290 @@ html, body{
   }
 }
 
+/* =========================================================
+   2026-10-01 Mobile Usage Product Scan
+   - QR / DataMatrix / 1D barcode camera scan
+   - first-use product identifier linking
+   ========================================================= */
+.scan-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:38px;
+  min-width:38px;
+  padding:0;
+  cursor:pointer;
+}
+.scan-btn svg{
+  width:20px;
+  height:20px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.scan-btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+#productScanModal[hidden]{display:none !important}
+.product-scan-modal{
+  width:min(640px, calc(100vw - 24px));
+  max-height:calc(100dvh - 24px);
+}
+.product-scan-body{
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+}
+.scan-camera-section{
+  display:grid;
+  gap:12px;
+}
+.scan-video-wrap{
+  position:relative;
+  width:100%;
+  aspect-ratio:4/3;
+  overflow:hidden;
+  border-radius:14px;
+  background:#0f172a;
+}
+.scan-video-wrap video{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:cover;
+  background:#0f172a;
+}
+.scan-guide{
+  position:absolute;
+  inset:18% 12%;
+  pointer-events:none;
+}
+.scan-guide i{
+  position:absolute;
+  width:34px;
+  height:34px;
+  border-color:#fff;
+  border-style:solid;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.55));
+}
+.scan-guide i:nth-child(1){left:0;top:0;border-width:3px 0 0 3px;border-radius:8px 0 0 0}
+.scan-guide i:nth-child(2){right:0;top:0;border-width:3px 3px 0 0;border-radius:0 8px 0 0}
+.scan-guide i:nth-child(3){left:0;bottom:0;border-width:0 0 3px 3px;border-radius:0 0 0 8px}
+.scan-guide i:nth-child(4){right:0;bottom:0;border-width:0 3px 3px 0;border-radius:0 0 8px 0}
+.scan-status{
+  min-height:38px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:9px 11px;
+  border-radius:10px;
+  background:#f4f1ff;
+  color:#5b39c0;
+  font-size:12px;
+  font-weight:800;
+  text-align:center;
+  line-height:1.45;
+}
+.scan-camera-actions{
+  display:flex;
+  justify-content:center;
+}
+.scan-link-section{
+  display:grid;
+  gap:12px;
+}
+.scan-read-card{
+  border:1px solid #ddd6fe;
+  border-radius:12px;
+  background:#faf8ff;
+  padding:12px;
+}
+.scan-read-title{
+  margin-bottom:8px;
+  color:#4c1d95;
+  font-size:13px;
+  font-weight:900;
+}
+.scan-read-summary{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px;
+}
+.scan-read-summary span{
+  min-width:0;
+  padding:7px 8px;
+  border-radius:8px;
+  background:#fff;
+  border:1px solid #ebe7f8;
+}
+.scan-read-summary b,
+.scan-read-summary em{
+  display:block;
+  overflow-wrap:anywhere;
+}
+.scan-read-summary b{
+  color:#667085;
+  font-size:10px;
+}
+.scan-read-summary em{
+  margin-top:2px;
+  color:#111827;
+  font-style:normal;
+  font-size:12px;
+  font-weight:900;
+}
+.scan-raw-value{
+  margin-top:8px;
+  max-height:64px;
+  overflow:auto;
+  color:#667085;
+  font-size:10px;
+  line-height:1.45;
+  overflow-wrap:anywhere;
+}
+.scan-link-notice{
+  display:grid;
+  gap:3px;
+  padding:10px 11px;
+  border:1px solid #fde68a;
+  border-radius:10px;
+  background:#fffbeb;
+}
+.scan-link-notice b{font-size:12px;color:#92400e}
+.scan-link-notice span{font-size:11px;color:#a16207;line-height:1.45}
+.scan-link-search{
+  display:grid;
+  gap:7px;
+}
+.scan-link-search label{
+  font-size:12px;
+  font-weight:900;
+}
+.scan-link-search input{
+  width:100%;
+  height:40px;
+  border:1px solid #cfd5df;
+  border-radius:9px;
+  padding:0 11px;
+  font-size:16px;
+  outline:none;
+}
+.scan-link-search input:focus{
+  border-color:#8d76de;
+  box-shadow:0 0 0 3px rgba(100,68,200,.11);
+}
+.scan-link-results{
+  max-height:210px;
+  overflow:auto;
+  border:1px solid #e2e6ed;
+  border-radius:10px;
+  background:#fff;
+}
+.scan-link-result{
+  width:100%;
+  display:grid;
+  gap:2px;
+  padding:10px 11px;
+  border:0;
+  border-bottom:1px solid #eef0f4;
+  background:#fff;
+  text-align:left;
+}
+.scan-link-result:last-child{border-bottom:0}
+.scan-link-result:active{background:#f6f3ff}
+.scan-link-result strong{font-size:12px;color:#101828}
+.scan-link-result span{font-size:11px;color:#475467}
+.scan-link-result small{font-size:10px;color:#7f56d9}
+.scan-link-empty{
+  padding:14px;
+  color:#98a2b3;
+  font-size:11px;
+  text-align:center;
+}
+.scan-link-selected{
+  display:grid;
+  gap:2px;
+  padding:10px 11px;
+  border:1px solid #c4b5fd;
+  border-radius:10px;
+  background:#f5f3ff;
+}
+.scan-link-selected>span{font-size:10px;color:#7c3aed;font-weight:900}
+.scan-link-selected strong{font-size:13px;color:#3b1c78}
+.scan-link-selected small{font-size:11px;color:#6d5a94;overflow-wrap:anywhere}
+.scan-fixed-confirm{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  padding:10px 11px;
+  border:1px solid #fecaca;
+  border-radius:10px;
+  background:#fef2f2;
+  color:#991b1b;
+  font-size:11px;
+  font-weight:800;
+  line-height:1.45;
+}
+.scan-fixed-confirm input{
+  flex:0 0 auto;
+  margin-top:2px;
+}
+.scan-link-actions{
+  display:grid;
+  grid-template-columns:1fr 1.4fr;
+  gap:8px;
+}
+.scan-link-actions .btn-secondary,
+.scan-link-actions .btn-primary,
+.scan-camera-actions .btn-secondary{
+  min-height:42px;
+  border-radius:9px;
+  font-size:12px;
+  font-weight:900;
+}
+.scan-link-actions .btn-primary:disabled{
+  opacity:.5;
+}
+@media(max-width:768px){
+  .product-scan-backdrop{
+    padding:6px;
+    align-items:stretch;
+  }
+  .product-scan-modal{
+    width:100%;
+    max-height:calc(100dvh - 12px);
+    border-radius:16px;
+  }
+  .product-scan-head{
+    padding:13px 14px 11px;
+  }
+  .product-scan-body{
+    padding:10px 12px 14px;
+  }
+  .scan-video-wrap{
+    aspect-ratio:3/4;
+    max-height:62dvh;
+  }
+  .scan-read-summary{
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+
+/* product scan camera button restores the second search cell removed by the old no-search-button patch */
+.product-search-wrap .search-input-row{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 44px !important;
+}
+.product-search-wrap .search-input-row input{
+  border-radius:7px 0 0 7px !important;
+}
+.search-btn.scan-btn{
+  display:flex !important;
+  width:44px;
+  min-width:44px;
+  height:38px;
+}
