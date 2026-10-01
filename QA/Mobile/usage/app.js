@@ -1243,22 +1243,49 @@
     return VOLUME_UNITS.includes(unit) ? 'volume' : 'weight';
   }
 
-  function hoursToDbTime(hours) {
-    const value = Number(hours);
-    if (!Number.isFinite(value) || value <= 0 || value >= 24) {
-      throw new Error('사용시간은 0보다 크고 24시간 미만으로 입력해 주세요.');
+  function hoursMinutesToDbTime(hours, minutes) {
+    const h = Number(hours);
+    const m = Number(minutes);
+    if (!Number.isInteger(h) || h < 0 || h > 23) {
+      throw new Error('사용시간의 시간은 0~23 사이 정수로 입력해 주세요.');
     }
-    const totalSeconds = Math.round(value * 3600);
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    if (!Number.isInteger(m) || m < 0 || m > 59) {
+      throw new Error('사용시간의 분은 0~59 사이 정수로 입력해 주세요.');
+    }
+    if (h === 0 && m === 0) {
+      throw new Error('사용시간은 1분 이상 입력해 주세요.');
+    }
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
   }
 
   function dbTimeToHours(value) {
     const parts = String(value || '').split(':').map(Number);
     if (!Number.isFinite(parts[0])) return 0;
     return (parts[0] || 0) + (parts[1] || 0) / 60 + (parts[2] || 0) / 3600;
+  }
+
+  function dbTimeToHourMinute(value) {
+    const parts = String(value || '').split(':').map(Number);
+    if (!Number.isFinite(parts[0])) return { hours: 0, minutes: 0 };
+    const totalSeconds = Math.max(0, Math.round(
+      (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0)
+    ));
+    const totalMinutes = Math.round(totalSeconds / 60);
+    return {
+      hours: Math.min(23, Math.floor(totalMinutes / 60)),
+      minutes: totalMinutes % 60
+    };
+  }
+
+  function bindBoundedIntegerInput(id, max) {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('input', () => {
+      if (el.value === '') return;
+      const n = Number(el.value);
+      if (!Number.isFinite(n)) { el.value = ''; return; }
+      el.value = String(Math.max(0, Math.min(max, Math.trunc(n))));
+    });
   }
 
   function normalizeAmount(quantity, unit) {
@@ -1652,6 +1679,7 @@
     const quantity = Number($('quantity').value);
     const unit = $('unit').value;
     const hours = Number($('usageHours').value);
+    const minutes = Number($('usageMinutes').value);
     const usageDate = $('usageDate').value;
 
     if (!state.companyId) throw new Error('회사 정보가 없습니다.');
@@ -1667,7 +1695,7 @@
       employee_email: employee.email || null,
       product_id: Number(p.id),
       usage_date: usageDate,
-      usage_time: hoursToDbTime(hours),
+      usage_time: hoursMinutesToDbTime(hours, minutes),
       quantity_type: quantityTypeForUnit(unit),
       quantity,
       unit,
@@ -1705,7 +1733,8 @@
       if (specialInput) await saveSpecialUsage(insertedUsageId, specialInput);
 
       setMessage('inputMessage', specialInput ? '사용내역과 특별관리물질 기록이 등록되었습니다.' : '사용내역이 등록되었습니다.', 'success');
-      $('usageHours').value = '';
+      $('usageHours').value = '0';
+      $('usageMinutes').value = '0';
       $('quantity').value = '';
       clearSelectedProduct();
       await Promise.all([loadMonthlyRows(), loadLogRows()]);
@@ -2207,7 +2236,9 @@
     state.isEditing = true;
     $('usageEditId').value = String(r.id);
     $('usageEditDate').value = r.usage_date || '';
-    $('usageEditHours').value = numberText(dbTimeToHours(r.usage_time), 4).replaceAll(',', '');
+    const editDuration = dbTimeToHourMinute(r.usage_time);
+    $('usageEditHours').value = String(editDuration.hours);
+    $('usageEditMinutes').value = String(editDuration.minutes);
     $('usageEditQuantity').value = String(r.quantity ?? '');
     $('usageEditUnit').value = r.unit || 'mL';
     renderEditProductOptions(r.product_id);
@@ -2227,6 +2258,7 @@
     const quantity = Number($('usageEditQuantity').value);
     const unit = $('usageEditUnit').value;
     const hours = Number($('usageEditHours').value);
+    const minutes = Number($('usageEditMinutes').value);
 
     if (!Number.isFinite(id)) return;
     if (!usageDate) { setMessage('usageDetailMessage', '사용일을 입력해 주세요.', 'error'); return; }
@@ -2235,7 +2267,7 @@
 
     let usageTime;
     try {
-      usageTime = hoursToDbTime(hours);
+      usageTime = hoursMinutesToDbTime(hours, minutes);
     } catch (e) {
       setMessage('usageDetailMessage', e.message || '사용시간을 확인해 주세요.', 'error');
       return;
@@ -2445,6 +2477,11 @@
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.product-search-wrap')) $('productResults').hidden = true;
     });
+
+    bindBoundedIntegerInput('usageHours', 23);
+    bindBoundedIntegerInput('usageMinutes', 59);
+    bindBoundedIntegerInput('usageEditHours', 23);
+    bindBoundedIntegerInput('usageEditMinutes', 59);
 
     $('saveUsageBtn').addEventListener('click', saveUsage);
     $('usageDate').addEventListener('change', syncSpecialUsagePanel);
