@@ -59,6 +59,8 @@
   let productScanNativeRaf = 0;
   let productScanNativeDetector = null;
   let productScanNativeDetecting = false;
+  let productScanFallbackTimer = 0;
+  let productScanSwitchingToZxing = false;
   let zxingLoadPromise = null;
 
   const $ = (id) => document.getElementById(id);
@@ -370,6 +372,8 @@
   }
 
   function stopProductScanner() {
+    if (productScanFallbackTimer) clearTimeout(productScanFallbackTimer);
+    productScanFallbackTimer = 0;
     try { productScanControls?.stop?.(); } catch (_) {}
     productScanControls = null;
     productScanReader = null;
@@ -658,8 +662,25 @@
     });
     const video = $('productScanVideo');
     video.srcObject = stream;
+
+    // 1D 바코드는 초점 품질에 민감하므로 지원 기기에서는 연속 AF를 요청한다.
+    try {
+      const track = stream.getVideoTracks?.()[0];
+      const caps = track?.getCapabilities?.() || {};
+      if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+        await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+      }
+    } catch (_) {}
+
     await video.play();
-    $('productScanStatus').textContent = '코드를 카메라 중앙에 맞춰주세요.';
+    $('productScanStatus').textContent = '코드를 카메라 중앙에 맞춰주세요. 자동으로 인식합니다.';
+
+    // Chrome의 BarcodeDetector가 CODE_128 지원을 보고해도 실제 1D 인식이
+    // 기기별로 불안정한 경우가 있어, 잠시 인식되지 않으면 ZXing으로 자동 전환한다.
+    productScanFallbackTimer = window.setTimeout(() => {
+      if ($('productScanModal').hidden || state.scanBusy || productScanSwitchingToZxing) return;
+      switchToZxingBarcodeScanner();
+    }, 1800);
 
     const detectLoop = async () => {
       if ($('productScanModal').hidden || state.scanBusy || !productScanNativeDetector) return;
@@ -669,6 +690,8 @@
           const codes = await productScanNativeDetector.detect(video);
           const code = Array.isArray(codes) ? codes[0] : null;
           if (code?.rawValue) {
+            if (productScanFallbackTimer) clearTimeout(productScanFallbackTimer);
+            productScanFallbackTimer = 0;
             await handleScannedCode(code.rawValue, code.format || '');
             productScanNativeDetecting = false;
             return;
@@ -682,6 +705,30 @@
       productScanNativeRaf = requestAnimationFrame(detectLoop);
     };
     productScanNativeRaf = requestAnimationFrame(detectLoop);
+  }
+
+  async function switchToZxingBarcodeScanner() {
+    if (productScanSwitchingToZxing || $('productScanModal').hidden || state.scanBusy) return;
+    productScanSwitchingToZxing = true;
+    $('productScanStatus').textContent = '1D 바코드 정밀 인식으로 전환하고 있습니다.';
+
+    // ZXing을 미리 로드해 둔 뒤 카메라 스트림만 교체해 화면 공백을 줄인다.
+    try {
+      await ensureZXingLoaded();
+      if ($('productScanModal').hidden || state.scanBusy) return;
+      stopProductScanner();
+      state.scanBusy = false;
+      await startZxingBarcodeScanner();
+      $('productScanStatus').textContent = '바코드에 가까이 맞춰주세요. 자동으로 인식합니다.';
+    } catch (error) {
+      console.warn('[QA Usage Scan] ZXing fallback failed', error);
+      // 보조 인식기 로딩 실패 시 카메라를 완전히 닫지 않고 재시도 안내
+      stopProductScanner();
+      $('productScanStatus').textContent = `바코드 인식기 전환 실패: ${error?.message || '네트워크 상태를 확인해 주세요.'}`;
+      $('productScanRetry').hidden = false;
+    } finally {
+      productScanSwitchingToZxing = false;
+    }
   }
 
   async function startZxingBarcodeScanner() {
@@ -703,8 +750,18 @@
         if (!result || state.scanBusy) return;
         let fmt = '';
         try { fmt = result.getBarcodeFormat?.(); } catch (_) {}
+        const zxingFormats = {
+          0: 'AZTEC', 1: 'CODABAR', 2: 'CODE_39', 3: 'CODE_93', 4: 'CODE_128',
+          5: 'DATA_MATRIX', 6: 'EAN_8', 7: 'EAN_13', 8: 'ITF', 10: 'PDF_417',
+          11: 'QR_CODE', 14: 'UPC_A', 15: 'UPC_E'
+        };
+        if (typeof fmt === 'number' && zxingFormats[fmt]) fmt = zxingFormats[fmt];
         const text = result.getText?.() ?? String(result.text || '');
-        if (String(text || '').trim()) handleScannedCode(text, fmt);
+        if (String(text || '').trim()) {
+          if (productScanFallbackTimer) clearTimeout(productScanFallbackTimer);
+          productScanFallbackTimer = 0;
+          handleScannedCode(text, fmt);
+        }
       }
     );
   }
@@ -723,13 +780,17 @@
     showScanCamera();
     stopProductScanner();
     state.scanBusy = false;
+    productScanSwitchingToZxing = false;
 
     try {
-      // Android/Chromium에서는 브라우저 내장 BarcodeDetector를 우선 사용해
-      // 별도 네트워크 로딩 없이 가장 빠르게 스캔한다.
-      // 미지원 브라우저에서만 ZXing을 동적 로드해 보조한다.
-      if (window.BarcodeDetector) await startNativeBarcodeScanner();
-      else await startZxingBarcodeScanner();
+      // 내장 인식기를 먼저 사용하되, ZXing도 백그라운드에서 미리 준비한다.
+      // 내장 인식기가 1.8초 동안 코드를 못 읽으면 자동으로 ZXing으로 전환한다.
+      if (window.BarcodeDetector) {
+        ensureZXingLoaded().catch(() => null);
+        await startNativeBarcodeScanner();
+      } else {
+        await startZxingBarcodeScanner();
+      }
     } catch (error) {
       console.error('[QA Usage Scan] camera start failed', error);
       stopProductScanner();
