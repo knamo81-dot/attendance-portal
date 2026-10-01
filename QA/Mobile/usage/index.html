@@ -6,7 +6,7 @@
   <title>QA 시약 사용일지</title>
   <link rel="stylesheet" href="../../../common/mobile.css" />
   <link rel="stylesheet" href="../../../common/theme.css" />
-  <link rel="stylesheet" href="./style.css?v=20260928-ios-zoomfix1" />
+  <link rel="stylesheet" href="./style.css?v=20261001-productscan1" />
 </head>
 <body>
   <main class="usage-shell">
@@ -45,6 +45,12 @@
                 <span>사용제품</span>
                 <div class="search-input-row">
                   <input id="productSearch" type="search" placeholder="제품명 / 제조사 / 코드 / CAS / 물질명 검색" autocomplete="off" />
+                  <button id="scanProductBtn" class="search-btn scan-btn" type="button" title="QR/바코드로 제품 찾기" aria-label="QR/바코드로 제품 찾기">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M8.5 6.5 9.6 5h4.8l1.1 1.5H18A2.5 2.5 0 0 1 20.5 9v7A2.5 2.5 0 0 1 18 18.5H6A2.5 2.5 0 0 1 3.5 16V9A2.5 2.5 0 0 1 6 6.5h2.5Z"/>
+                      <circle cx="12" cy="12.5" r="3.25"/>
+                    </svg>
+                  </button>
                 </div>
                 <div id="productResults" class="product-results" hidden></div>
               </div>
@@ -222,6 +228,66 @@
     </section>
   </main>
 
+  <div class="usage-modal-backdrop product-scan-backdrop" id="productScanModal" hidden>
+    <section class="usage-modal product-scan-modal" role="dialog" aria-modal="true" aria-labelledby="productScanTitle">
+      <div class="usage-modal-head product-scan-head">
+        <div>
+          <h3 id="productScanTitle">제품 코드 스캔</h3>
+          <p>QR · DataMatrix · 바코드를 카메라에 보여주세요.</p>
+        </div>
+        <button id="productScanClose" class="modal-close-btn" type="button" aria-label="닫기">×</button>
+      </div>
+
+      <div class="usage-modal-body product-scan-body">
+        <section id="productScanCameraSection" class="scan-camera-section">
+          <div class="scan-video-wrap">
+            <video id="productScanVideo" playsinline muted></video>
+            <div class="scan-guide" aria-hidden="true">
+              <i></i><i></i><i></i><i></i>
+            </div>
+          </div>
+          <div id="productScanStatus" class="scan-status" aria-live="polite">카메라를 준비하고 있습니다.</div>
+          <div class="scan-camera-actions">
+            <button id="productScanRetry" class="btn-secondary" type="button" hidden>다시 스캔</button>
+          </div>
+        </section>
+
+        <section id="scanLinkSection" class="scan-link-section" hidden>
+          <div class="scan-read-card">
+            <div class="scan-read-title">스캔된 정보</div>
+            <div id="scanReadSummary" class="scan-read-summary"></div>
+            <div id="scanRawValue" class="scan-raw-value"></div>
+          </div>
+
+          <div id="scanLinkNotice" class="scan-link-notice"></div>
+
+          <div class="scan-link-search">
+            <label for="scanLinkSearch">연결할 기존 제품</label>
+            <input id="scanLinkSearch" type="search" placeholder="제품명 / 제조사 / 제품코드 / CAS 검색" autocomplete="off" />
+            <div id="scanLinkResults" class="scan-link-results"></div>
+          </div>
+
+          <div id="scanLinkSelected" class="scan-link-selected" hidden>
+            <span>연결 제품</span>
+            <strong id="scanLinkSelectedName">-</strong>
+            <small id="scanLinkSelectedMeta">-</small>
+          </div>
+
+          <label id="scanFixedConfirmWrap" class="scan-fixed-confirm" hidden>
+            <input id="scanFixedConfirm" type="checkbox" />
+            <span>이 바코드/QR은 LOT 번호가 아니라 이 제품에 고정된 식별코드임을 확인합니다.</span>
+          </label>
+
+          <div id="scanLinkMessage" class="message compact" aria-live="polite"></div>
+          <div class="scan-link-actions">
+            <button id="scanLinkRescan" class="btn-secondary" type="button">다시 스캔</button>
+            <button id="scanLinkSave" class="btn-primary" type="button" disabled>이 제품과 연결</button>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+
   <div class="usage-modal-backdrop" id="usageDetailModal" hidden>
     <section class="usage-modal" role="dialog" aria-modal="true" aria-labelledby="usageDetailTitle">
       <div class="usage-modal-head">
@@ -297,7 +363,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../../supabase.js?v=20260927-perm2"></script>
-  <script src="./app.js?v=20260927-mobile-editfix1"></script>
+  <script src="./app.js?v=20261001-productscan1"></script>
   <script src="../../../common/common.js"></script>
 </body>
 </html>
