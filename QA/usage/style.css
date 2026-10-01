@@ -1033,3 +1033,54 @@ button{cursor:pointer}
     grid-template-columns:1fr 1fr;
   }
 }
+
+
+/* 2026-10-01: 사용시간을 시간/분으로 분리 입력 */
+.time-hm-input{
+  width:100%;
+  min-width:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:8px;
+}
+.time-part{
+  min-width:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 42px;
+  align-items:center;
+}
+.time-part input{
+  min-width:0;
+  width:100%;
+  border-radius:7px 0 0 7px !important;
+  text-align:right;
+}
+.time-part b{
+  height:38px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #cfd5df;
+  border-left:0;
+  border-radius:0 7px 7px 0;
+  background:#f8fafc;
+  color:#475467;
+  font-size:12px;
+  font-weight:800;
+}
+.edit-time-field{
+  display:grid;
+  gap:6px;
+}
+.edit-time-field>span{
+  font-size:11px;
+  font-weight:900;
+  color:#475467;
+}
+.edit-time-field .time-part b{
+  height:36px;
+}
+@media(max-width:560px){
+  .time-hm-input{gap:6px}
+  .time-part{grid-template-columns:minmax(0,1fr) 38px}
+}
