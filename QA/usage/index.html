@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QA 시약 사용일지</title>
-  <link rel="stylesheet" href="./style.css?v=20260927-special-edit-fixed-product" />
+  <link rel="stylesheet" href="./style.css?v=20261001-time-hour-minute" />
   <link rel="stylesheet" href="../../common/mobile.css" />
   <link rel="stylesheet" href="../../common/theme.css" />
 </head>
@@ -65,13 +65,19 @@
                 </div>
               </div>
 
-              <label class="field inline-field">
+              <div class="field inline-field">
                 <span>사용시간</span>
-                <div class="suffix-input">
-                  <input id="usageHours" type="number" min="0.01" max="23.99" step="0.01" inputmode="decimal" placeholder="예: 0.5" />
-                  <b>시간</b>
+                <div class="time-hm-input" aria-label="사용시간 입력">
+                  <div class="time-part">
+                    <input id="usageHours" type="number" min="0" max="23" step="1" inputmode="numeric" placeholder="0" aria-label="사용시간 시간" />
+                    <b>시간</b>
+                  </div>
+                  <div class="time-part">
+                    <input id="usageMinutes" type="number" min="0" max="59" step="1" inputmode="numeric" placeholder="0" aria-label="사용시간 분" />
+                    <b>분</b>
+                  </div>
                 </div>
-              </label>
+              </div>
 
               <label class="field inline-field">
                 <span>사용량</span>
@@ -263,13 +269,19 @@
               <small class="edit-product-guide">제품은 수정할 수 없습니다. 제품을 잘못 선택한 경우 기존 기록을 삭제한 후 다시 등록해 주세요.</small>
             </label>
 
-            <label>
+            <div class="edit-time-field">
               <span>사용시간</span>
-              <div class="suffix-input">
-                <input id="usageEditHours" type="number" min="0.01" max="23.99" step="0.01" inputmode="decimal" />
-                <b>시간</b>
+              <div class="time-hm-input" aria-label="사용시간 수정">
+                <div class="time-part">
+                  <input id="usageEditHours" type="number" min="0" max="23" step="1" inputmode="numeric" placeholder="0" aria-label="수정 사용시간 시간" />
+                  <b>시간</b>
+                </div>
+                <div class="time-part">
+                  <input id="usageEditMinutes" type="number" min="0" max="59" step="1" inputmode="numeric" placeholder="0" aria-label="수정 사용시간 분" />
+                  <b>분</b>
+                </div>
               </div>
-            </label>
+            </div>
 
             <label>
               <span>사용량</span>
@@ -368,7 +380,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../supabase.js?v=20260927-perm1"></script>
-  <script src="./app.js?v=20260927-special-edit-fixed-product"></script>
+  <script src="./app.js?v=20261001-time-hour-minute"></script>
   <script src="../../common/common.js"></script>
 </body>
 </html>
