@@ -221,6 +221,77 @@
       .replace(/[\s.,-]+/g, '');
   }
 
+  // 스캐너 엔진/기기마다 같은 코드 앞뒤에 symbology identifier,
+  // FNC1/GS, CR/LF 같은 제어문자가 붙을 수 있다. DB에는 원본값을 보존하되
+  // 조회할 때만 안전한 비교용 값을 만든다.
+  function normalizeScannerRaw(value) {
+    let v = String(value ?? '')
+      .replace(/<GS>/gi, '\x1d')
+      .replace(/\u241d/g, '\x1d')
+      .replace(/\u0000/g, '')
+      .trim();
+
+    // AIM symbology identifier 예: ]C0 / ]C1(Code128), ]d1 / ]d2(DataMatrix)
+    // 엔진에 따라 원본 문자열 앞에 포함되기도 한다.
+    v = v.replace(/^\][A-Za-z][0-9A-Za-z]/, '');
+
+    // 일반 바코드/QR의 앞뒤 제어문자는 데이터가 아니라 디코더 부가문자이므로 제거한다.
+    v = v.replace(/^[\x00-\x1f\x7f]+|[\x00-\x1f\x7f]+$/g, '');
+    return v.trim();
+  }
+
+  function canonicalIdentifierValue(type, value) {
+    const t = String(type || '').toUpperCase();
+    const raw = normalizeScannerRaw(value);
+    if (!raw) return '';
+
+    if (['PRODUCT_CODE','CAT_NO','P_N','REORDER'].includes(t)) {
+      return normalizeProductCode(raw);
+    }
+    if (t === 'GTIN') {
+      // GTIN은 숫자 식별자이므로 표시용 구분기호/공백만 무시한다.
+      return raw.replace(/[^0-9]/g, '');
+    }
+    return raw;
+  }
+
+  function scanIdentifierCandidates(scan) {
+    const candidates = [];
+    const add = (kind, value) => {
+      const canonical = canonicalIdentifierValue(kind, value);
+      if (!canonical) return;
+      const key = `${kind}:${canonical}`;
+      if (!candidates.some((x) => x.key === key)) candidates.push({ key, kind, canonical });
+    };
+
+    if (scan?.raw) add('RAW', scan.raw);
+    if (scan?.gs1?.gtin) add('GTIN', scan.gs1.gtin);
+    if (scan?.gs1?.additionalId) {
+      add('PRODUCT_CODE', scan.gs1.additionalId);
+      add('RAW', scan.gs1.additionalId);
+    }
+    return candidates;
+  }
+
+  function identifierRowMatchesScan(row, scan) {
+    const type = String(row?.identifier_type || '').toUpperCase();
+    const rowValue = row?.identifier_value ?? '';
+    const candidates = scanIdentifierCandidates(scan);
+
+    if (type === 'GTIN') {
+      const rowCanonical = canonicalIdentifierValue('GTIN', rowValue);
+      return candidates.some((c) => c.kind === 'GTIN' && c.canonical === rowCanonical);
+    }
+
+    if (['PRODUCT_CODE','CAT_NO','P_N','REORDER'].includes(type)) {
+      const rowCanonical = String(row?.normalized_value || '').trim() || canonicalIdentifierValue(type, rowValue);
+      return candidates.some((c) => c.kind === 'PRODUCT_CODE' && c.canonical === rowCanonical);
+    }
+
+    const rowCanonical = canonicalIdentifierValue(type, rowValue);
+    return candidates.some((c) => c.kind === 'RAW' && c.canonical === rowCanonical);
+  }
+
   function barcodeFormatName(value) {
     const numeric = {
       0: 'AZTEC', 1: 'CODABAR', 2: 'CODE_39', 3: 'CODE_93', 4: 'CODE_128',
@@ -569,53 +640,24 @@
   }
 
   async function findRegisteredProductForScan(scan) {
+    // DB의 원본값은 그대로 보존하고, 조회 시 현재 사용자가 접근 가능한 활성 식별값을
+    // 가져와 클라이언트에서 안전하게 정규화 비교한다.
+    // 이렇게 하면 스캐너 엔진 변경으로 ]C1 / ]d2 / CR/LF / GS 등이 붙어도
+    // 이미 연결된 제품을 다시 '신규 코드'로 오인하지 않는다.
+    const result = await db.from('product_identifiers')
+      .select('id, product_id, identifier_type, identifier_value, normalized_value, code_format')
+      .eq('is_active', true);
+
+    if (result.error) throw result.error;
+
     const productIds = new Set();
-    const queries = [];
-
-    if (scan?.raw) {
-      queries.push(
-        db.from('product_identifiers')
-          .select('product_id, identifier_type, identifier_value, normalized_value')
-          .eq('is_active', true)
-          .eq('identifier_value', scan.raw)
-      );
-    }
-    if (scan?.gs1?.gtin) {
-      queries.push(
-        db.from('product_identifiers')
-          .select('product_id, identifier_type, identifier_value, normalized_value')
-          .eq('is_active', true)
-          .eq('identifier_type', 'GTIN')
-          .eq('identifier_value', scan.gs1.gtin)
-      );
-    }
-    if (scan?.gs1?.additionalId) {
-      const normalized = normalizeProductCode(scan.gs1.additionalId);
-      if (normalized) {
-        queries.push(
-          db.from('product_identifiers')
-            .select('product_id, identifier_type, identifier_value, normalized_value')
-            .eq('is_active', true)
-            .in('identifier_type', ['PRODUCT_CODE','CAT_NO','P_N','REORDER'])
-            .eq('normalized_value', normalized)
-        );
-      }
-      queries.push(
-        db.from('product_identifiers')
-          .select('product_id, identifier_type, identifier_value, normalized_value')
-          .eq('is_active', true)
-          .eq('identifier_value', scan.gs1.additionalId)
-      );
-    }
-
-    const results = await Promise.all(queries);
-    results.forEach((result) => {
-      if (result.error) throw result.error;
-      (result.data || []).forEach((row) => productIds.add(Number(row.product_id)));
+    (result.data || []).forEach((row) => {
+      if (identifierRowMatchesScan(row, scan)) productIds.add(Number(row.product_id));
     });
 
-    const products = [...productIds].map((id) => state.productsById.get(id)).filter(Boolean);
-    return products;
+    return [...productIds]
+      .map((id) => state.productsById.get(id))
+      .filter(Boolean);
   }
 
   function findProductMasterCodeMatch(scan) {
@@ -632,33 +674,26 @@
     const identifiers = stableIdentifiersForRegistration(scan, product);
     if (!identifiers.length) throw new Error('등록할 제품 식별값이 없습니다.');
 
-    for (const item of identifiers) {
-      const checks = [
-        db.from('product_identifiers')
-          .select('id, product_id, identifier_type, identifier_value, normalized_value')
-          .eq('is_active', true)
-          .eq('identifier_value', item.value)
-      ];
+    // 같은 코드를 엔진/표기 차이 때문에 중복 등록하지 않도록 현재 활성 식별값을
+    // 한 번 읽고 canonical 비교한다.
+    const existingResult = await db.from('product_identifiers')
+      .select('id, product_id, identifier_type, identifier_value, normalized_value, code_format')
+      .eq('is_active', true);
+    if (existingResult.error) throw existingResult.error;
+    const existingRows = existingResult.data || [];
 
+    for (const item of identifiers) {
+      const itemScan = buildScanResult(item.value, item.code_format || scan?.format || 'UNKNOWN');
+      // item.type의 의미가 제품코드 계열일 때는 GS1 여부와 무관하게 제품코드 후보도 추가한다.
       if (['PRODUCT_CODE','CAT_NO','P_N','REORDER'].includes(item.type)) {
-        checks.push(
-          db.from('product_identifiers')
-            .select('id, product_id, identifier_type, identifier_value, normalized_value')
-            .eq('is_active', true)
-            .in('identifier_type', ['PRODUCT_CODE','CAT_NO','P_N','REORDER'])
-            .eq('normalized_value', normalizeProductCode(item.value))
-        );
+        itemScan.gs1 = itemScan.gs1 || {};
+        itemScan.gs1.additionalId = item.value;
+      } else if (item.type === 'GTIN') {
+        itemScan.gs1 = itemScan.gs1 || {};
+        itemScan.gs1.gtin = item.value;
       }
 
-      const checkResults = await Promise.all(checks);
-      const rows = [];
-      checkResults.forEach((result) => {
-        if (result.error) throw result.error;
-        (result.data || []).forEach((row) => {
-          if (!rows.some((x) => Number(x.id) === Number(row.id))) rows.push(row);
-        });
-      });
-
+      const rows = existingRows.filter((row) => identifierRowMatchesScan(row, itemScan));
       const conflict = rows.find((row) => Number(row.product_id) !== Number(product.id));
       if (conflict) throw new Error('이 식별코드는 같은 회사의 다른 제품에 이미 연결되어 있습니다.');
       if (rows.some((row) => Number(row.product_id) === Number(product.id))) continue;
@@ -671,8 +706,9 @@
         is_primary: false,
         is_active: true,
         note: item.note || '모바일 사용입력 스캔 등록'
-      });
+      }).select('id, product_id, identifier_type, identifier_value, normalized_value, code_format').single();
       if (insert.error) throw insert.error;
+      if (insert.data) existingRows.push(insert.data);
     }
   }
 
