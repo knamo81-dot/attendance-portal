@@ -2177,3 +2177,30 @@ body.product-scan-open{
   .scan-link-section[hidden]{display:none !important}
   .scan-link-section>*+*{margin-top:12px}
 }
+
+
+/* =========================================================
+   2026-10-01: 모바일 사용시간 입력을 시간 + 분으로 분리
+   - 시간: 0~23 정수
+   - 분: 0~59 정수
+   - 사용일지/집계 표시는 기존 시간 기준 유지
+   ========================================================= */
+.duration-input{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:8px;
+  width:100%;
+  min-width:0;
+}
+.duration-input .duration-part{
+  width:100%;
+  min-width:0;
+  grid-template-columns:minmax(0,1fr) 42px;
+}
+.duration-input .duration-part b{
+  height:38px;
+}
+@media(max-width:420px){
+  .duration-input{gap:6px}
+  .duration-input .duration-part{grid-template-columns:minmax(0,1fr) 38px}
+}
