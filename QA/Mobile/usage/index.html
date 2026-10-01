@@ -71,9 +71,15 @@
 
               <label class="field inline-field">
                 <span>사용시간</span>
-                <div class="suffix-input">
-                  <input id="usageHours" type="number" min="0.01" max="23.99" step="0.01" inputmode="decimal" placeholder="예: 0.5" />
-                  <b>시간</b>
+                <div class="duration-input">
+                  <div class="suffix-input duration-part">
+                    <input id="usageHours" type="number" min="0" max="23" step="1" inputmode="numeric" value="0" aria-label="사용시간 시간" />
+                    <b>시간</b>
+                  </div>
+                  <div class="suffix-input duration-part">
+                    <input id="usageMinutes" type="number" min="0" max="59" step="1" inputmode="numeric" value="0" aria-label="사용시간 분" />
+                    <b>분</b>
+                  </div>
                 </div>
               </label>
 
@@ -330,9 +336,15 @@
 
             <label>
               <span>사용시간</span>
-              <div class="suffix-input">
-                <input id="usageEditHours" type="number" min="0.01" max="23.99" step="0.01" inputmode="decimal" />
-                <b>시간</b>
+              <div class="duration-input">
+                <div class="suffix-input duration-part">
+                  <input id="usageEditHours" type="number" min="0" max="23" step="1" inputmode="numeric" value="0" aria-label="수정 사용시간 시간" />
+                  <b>시간</b>
+                </div>
+                <div class="suffix-input duration-part">
+                  <input id="usageEditMinutes" type="number" min="0" max="59" step="1" inputmode="numeric" value="0" aria-label="수정 사용시간 분" />
+                  <b>분</b>
+                </div>
               </div>
             </label>
 
@@ -374,3 +386,4 @@
   <script src="../../../common/common.js"></script>
 </body>
 </html>
+
