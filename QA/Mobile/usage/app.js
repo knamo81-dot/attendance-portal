@@ -48,8 +48,18 @@
     detailContext: '',
     detailReadonly: false,
     isSaving: false,
-    isEditing: false
+    isEditing: false,
+    scanResult: null,
+    scanLinkProductId: null,
+    scanBusy: false
   };
+
+  let productScanReader = null;
+  let productScanControls = null;
+  let productScanNativeRaf = 0;
+  let productScanNativeDetector = null;
+  let productScanNativeDetecting = false;
+  let zxingLoadPromise = null;
 
   const $ = (id) => document.getElementById(id);
   const esc = (value) => String(value ?? '')
@@ -191,6 +201,574 @@
     ].join(' '));
   }
 
+  function normalizeProductCode(value) {
+    return String(value ?? '')
+      .trim()
+      .toUpperCase()
+      .replace(/[\s.,-]+/g, '');
+  }
+
+  function barcodeFormatName(value) {
+    if (typeof value === 'string' && value.trim()) return value.trim().toUpperCase();
+    const map = {
+      0: 'AZTEC', 1: 'CODABAR', 2: 'CODE_39', 3: 'CODE_93', 4: 'CODE_128',
+      5: 'DATA_MATRIX', 6: 'EAN_8', 7: 'EAN_13', 8: 'ITF', 9: 'MAXICODE',
+      10: 'PDF_417', 11: 'QR_CODE', 12: 'RSS_14', 13: 'RSS_EXPANDED',
+      14: 'UPC_A', 15: 'UPC_E', 16: 'UPC_EAN_EXTENSION'
+    };
+    return map[Number(value)] || String(value ?? 'UNKNOWN').toUpperCase();
+  }
+
+  function isUrlValue(value) {
+    return /^https?:\/\//i.test(String(value || '').trim());
+  }
+
+  function parseParenthesizedGs1(text) {
+    const src = String(text || '').trim();
+    if (!/\(0?1\)/.test(src)) return null;
+    const out = {};
+    const re = /\((01|10|17|21|240|422)\)(.*?)(?=\((?:01|10|17|21|240|422)\)|$)/g;
+    let m;
+    while ((m = re.exec(src))) {
+      const ai = m[1];
+      const value = String(m[2] || '').trim();
+      if (value) out[ai] = value;
+    }
+    return out['01'] ? out : null;
+  }
+
+  function parseRawGs1(text) {
+    let src = String(text || '');
+    src = src.replace(/^\]d2/i, '');
+    if (!src.startsWith('01') || src.length < 16) return null;
+    const out = {};
+    let i = 0;
+    const GS = '\x1d';
+    const readVariable = (maxLen) => {
+      const start = i;
+      const gsPos = src.indexOf(GS, i);
+      const end = gsPos >= 0 ? Math.min(gsPos, start + maxLen) : Math.min(src.length, start + maxLen);
+      const value = src.slice(start, end);
+      i = gsPos >= 0 && gsPos <= start + maxLen ? gsPos + 1 : end;
+      return value;
+    };
+    while (i < src.length) {
+      if (src[i] === GS) { i += 1; continue; }
+      if (src.startsWith('01', i) && src.length >= i + 16) {
+        i += 2; out['01'] = src.slice(i, i + 14); i += 14; continue;
+      }
+      if (src.startsWith('422', i) && src.length >= i + 6) {
+        i += 3; out['422'] = src.slice(i, i + 3); i += 3; continue;
+      }
+      if (src.startsWith('17', i) && src.length >= i + 8) {
+        i += 2; out['17'] = src.slice(i, i + 6); i += 6; continue;
+      }
+      if (src.startsWith('10', i)) {
+        i += 2; out['10'] = readVariable(20); continue;
+      }
+      if (src.startsWith('240', i)) {
+        i += 3; out['240'] = readVariable(30); continue;
+      }
+      if (src.startsWith('21', i)) {
+        i += 2; out['21'] = readVariable(20); continue;
+      }
+      break;
+    }
+    return out['01'] ? out : null;
+  }
+
+  function parseGs1(text) {
+    const data = parseParenthesizedGs1(text) || parseRawGs1(text);
+    if (!data) return null;
+    return {
+      gtin: String(data['01'] || '').trim(),
+      lot: String(data['10'] || '').trim(),
+      expiry: String(data['17'] || '').trim(),
+      serial: String(data['21'] || '').trim(),
+      additionalId: String(data['240'] || '').trim(),
+      origin: String(data['422'] || '').trim()
+    };
+  }
+
+  function buildScanResult(rawValue, format) {
+    const raw = String(rawValue || '').trim();
+    const fmt = barcodeFormatName(format);
+    const gs1 = parseGs1(raw);
+    const stable = [];
+
+    if (gs1?.gtin) stable.push({ type: 'GTIN', value: gs1.gtin, label: 'GTIN' });
+    if (gs1?.additionalId) stable.push({ type: 'OTHER', value: gs1.additionalId, label: 'GS1 추가 제품식별값 (240)', ai240: true });
+
+    return {
+      raw,
+      format: fmt,
+      gs1,
+      stable,
+      hasSafeStableIdentifier: stable.length > 0,
+      scannedAt: Date.now()
+    };
+  }
+
+  function scanFallbackIdentifier(scan, selectedProduct = null) {
+    if (!scan?.raw) return null;
+    const format = String(scan.format || '').toUpperCase();
+    if (format === 'QR_CODE' && isUrlValue(scan.raw)) return { type: 'QR_URL', value: scan.raw, label: 'QR URL' };
+    if (format === 'QR_CODE') return { type: 'QR', value: scan.raw, label: 'QR' };
+    if (format === 'DATA_MATRIX') return { type: 'DATAMATRIX', value: scan.raw, label: 'DataMatrix' };
+    if (['EAN_8','EAN_13','UPC_A','UPC_E','CODE_128','CODE_39','CODE_93','CODABAR','ITF','RSS_14','RSS_EXPANDED'].includes(format)) {
+      return { type: 'BARCODE', value: scan.raw, label: format };
+    }
+    return { type: 'OTHER', value: scan.raw, label: format || '기타 코드' };
+  }
+
+  function stableIdentifiersForRegistration(scan, product) {
+    if (!scan) return [];
+    const list = [];
+    if (scan.gs1?.gtin) list.push({ type: 'GTIN', value: scan.gs1.gtin, code_format: scan.format || 'DATA_MATRIX', note: '모바일 사용입력 스캔 / GS1 AI (01)' });
+    if (scan.gs1?.additionalId) {
+      const productCode = normalizeProductCode(product?.code);
+      const scannedCode = normalizeProductCode(scan.gs1.additionalId);
+      list.push({
+        type: productCode && scannedCode && productCode === scannedCode ? 'PRODUCT_CODE' : 'OTHER',
+        value: scan.gs1.additionalId,
+        code_format: scan.format || 'DATA_MATRIX',
+        note: '모바일 사용입력 스캔 / GS1 AI (240)'
+      });
+    }
+    if (!list.length) {
+      const fallback = scanFallbackIdentifier(scan, product);
+      if (fallback) list.push({
+        type: fallback.type,
+        value: fallback.value,
+        code_format: scan.format || null,
+        note: '모바일 사용입력 최초 연결'
+      });
+    }
+    return list;
+  }
+
+  function formatGs1Expiry(value) {
+    const v = String(value || '');
+    if (!/^\d{6}$/.test(v)) return v;
+    const yy = Number(v.slice(0,2));
+    const mm = v.slice(2,4);
+    const dd = v.slice(4,6);
+    return `20${String(yy).padStart(2,'0')}-${mm}-${dd}`;
+  }
+
+  function renderScanReadSummary(scan) {
+    if (!scan) return;
+    const rows = [];
+    rows.push(`<span><b>형식</b><em>${esc(scan.format || '-')}</em></span>`);
+    if (scan.gs1?.gtin) rows.push(`<span><b>GTIN</b><em>${esc(scan.gs1.gtin)}</em></span>`);
+    if (scan.gs1?.additionalId) rows.push(`<span><b>제품식별(240)</b><em>${esc(scan.gs1.additionalId)}</em></span>`);
+    if (scan.gs1?.lot) rows.push(`<span><b>LOT</b><em>${esc(scan.gs1.lot)}</em></span>`);
+    if (scan.gs1?.expiry) rows.push(`<span><b>유효기간</b><em>${esc(formatGs1Expiry(scan.gs1.expiry))}</em></span>`);
+    if (scan.gs1?.serial) rows.push(`<span><b>Serial</b><em>${esc(scan.gs1.serial)}</em></span>`);
+    $('scanReadSummary').innerHTML = rows.join('');
+    $('scanRawValue').textContent = `원본: ${scan.raw}`;
+  }
+
+  function stopProductScanner() {
+    try { productScanControls?.stop?.(); } catch (_) {}
+    productScanControls = null;
+    productScanReader = null;
+    if (productScanNativeRaf) cancelAnimationFrame(productScanNativeRaf);
+    productScanNativeRaf = 0;
+    productScanNativeDetector = null;
+    productScanNativeDetecting = false;
+    const video = $('productScanVideo');
+    try {
+      const stream = video?.srcObject;
+      stream?.getTracks?.().forEach((track) => track.stop());
+    } catch (_) {}
+    if (video) video.srcObject = null;
+  }
+
+  function closeProductScanModal() {
+    stopProductScanner();
+    state.scanBusy = false;
+    $('productScanModal').hidden = true;
+  }
+
+  function resetScanLinkUi() {
+    state.scanLinkProductId = null;
+    $('scanLinkSearch').value = '';
+    $('scanLinkResults').innerHTML = '';
+    $('scanLinkSelected').hidden = true;
+    $('scanLinkSelectedName').textContent = '-';
+    $('scanLinkSelectedMeta').textContent = '-';
+    $('scanFixedConfirm').checked = false;
+    $('scanLinkSave').disabled = true;
+    setMessage('scanLinkMessage');
+  }
+
+  function showScanCamera() {
+    resetScanLinkUi();
+    $('scanLinkSection').hidden = true;
+    $('productScanCameraSection').hidden = false;
+    $('productScanRetry').hidden = true;
+    $('productScanStatus').textContent = '카메라를 준비하고 있습니다.';
+  }
+
+  function renderScanLinkResults() {
+    const box = $('scanLinkResults');
+    const q = normalize($('scanLinkSearch').value);
+    if (!q) {
+      box.innerHTML = '<div class="scan-link-empty">제품명·제조사·제품코드·CAS로 검색해 주세요.</div>';
+      return;
+    }
+    const items = state.products.filter((p) => productSearchText(p).includes(q)).slice(0, 30);
+    box.innerHTML = items.length ? items.map((p) => `
+      <button type="button" class="scan-link-result" data-scan-link-product="${Number(p.id)}">
+        <strong>${esc(p.name || '-')}</strong>
+        <span>${esc([p.maker, p.code, p.capacity].filter(Boolean).join(' · ') || '-')}</span>
+        <small>${esc(productCasRows(p).map((r) => r.cas_no).join(' / ') || 'CAS 없음')}</small>
+      </button>`).join('') : '<div class="scan-link-empty">검색 결과가 없습니다.</div>';
+  }
+
+  function selectScanLinkProduct(productId) {
+    const product = state.productsById.get(Number(productId));
+    if (!product) return;
+    state.scanLinkProductId = Number(product.id);
+    $('scanLinkSelectedName').textContent = product.name || '-';
+    $('scanLinkSelectedMeta').textContent = [product.maker, product.code, product.capacity, primaryCas(product)].filter(Boolean).join(' · ') || '-';
+    $('scanLinkSelected').hidden = false;
+    $('scanLinkSave').disabled = false;
+    setMessage('scanLinkMessage');
+  }
+
+  function showScanLink(scan, suggestedProduct = null, reason = '') {
+    stopProductScanner();
+    state.scanResult = scan;
+    state.scanBusy = false;
+    $('productScanCameraSection').hidden = true;
+    $('scanLinkSection').hidden = false;
+    renderScanReadSummary(scan);
+    resetScanLinkUi();
+
+    const needsFixedConfirm = !scan.hasSafeStableIdentifier;
+    $('scanFixedConfirmWrap').hidden = !needsFixedConfirm;
+    if (needsFixedConfirm) {
+      $('scanLinkNotice').innerHTML = '<b>제품 고정코드 확인 필요</b><span>일반 바코드/QR에는 LOT 번호가 들어갈 수 있습니다. LOT가 아니라 제품에 고정된 코드인지 확인한 뒤 연결해 주세요.</span>';
+    } else {
+      const lotText = scan.gs1?.lot ? ` LOT ${esc(scan.gs1.lot)}은 제품 식별값에 저장하지 않습니다.` : '';
+      $('scanLinkNotice').innerHTML = `<b>GS1 제품 식별정보를 확인했습니다.</b><span>GTIN/제품식별값만 제품에 연결합니다.${lotText}</span>`;
+    }
+
+    if (reason) setMessage('scanLinkMessage', reason);
+    if (suggestedProduct) {
+      selectScanLinkProduct(suggestedProduct.id);
+      $('scanLinkSearch').value = [suggestedProduct.name, suggestedProduct.maker, suggestedProduct.code].filter(Boolean).join(' ');
+    } else {
+      renderScanLinkResults();
+      setTimeout(() => $('scanLinkSearch')?.focus(), 60);
+    }
+  }
+
+  async function findRegisteredProductForScan(scan) {
+    const productIds = new Set();
+    const queries = [];
+
+    if (scan?.raw) {
+      queries.push(
+        db.from('product_identifiers')
+          .select('product_id, identifier_type, identifier_value, normalized_value')
+          .eq('is_active', true)
+          .eq('identifier_value', scan.raw)
+      );
+    }
+    if (scan?.gs1?.gtin) {
+      queries.push(
+        db.from('product_identifiers')
+          .select('product_id, identifier_type, identifier_value, normalized_value')
+          .eq('is_active', true)
+          .eq('identifier_type', 'GTIN')
+          .eq('identifier_value', scan.gs1.gtin)
+      );
+    }
+    if (scan?.gs1?.additionalId) {
+      const normalized = normalizeProductCode(scan.gs1.additionalId);
+      if (normalized) {
+        queries.push(
+          db.from('product_identifiers')
+            .select('product_id, identifier_type, identifier_value, normalized_value')
+            .eq('is_active', true)
+            .in('identifier_type', ['PRODUCT_CODE','CAT_NO','P_N','REORDER'])
+            .eq('normalized_value', normalized)
+        );
+      }
+      queries.push(
+        db.from('product_identifiers')
+          .select('product_id, identifier_type, identifier_value, normalized_value')
+          .eq('is_active', true)
+          .eq('identifier_value', scan.gs1.additionalId)
+      );
+    }
+
+    const results = await Promise.all(queries);
+    results.forEach((result) => {
+      if (result.error) throw result.error;
+      (result.data || []).forEach((row) => productIds.add(Number(row.product_id)));
+    });
+
+    const products = [...productIds].map((id) => state.productsById.get(id)).filter(Boolean);
+    return products;
+  }
+
+  function findProductMasterCodeMatch(scan) {
+    // GS1 AI(240)가 있으면 그 값을 우선 사용한다.
+    // 일반 1D/QR은 원본값이 기존 제품코드와 정확히 정규화 일치할 때만 후보로 제시하고,
+    // 최초 연결 화면에서 제품 고정코드 여부를 사용자가 한 번 더 확인한다.
+    const rawCandidate = scan?.gs1?.additionalId || (!scan?.gs1 ? scan?.raw : '');
+    const candidate = normalizeProductCode(rawCandidate || '');
+    if (!candidate || candidate.length < 3) return [];
+    return state.products.filter((p) => normalizeProductCode(p.code) === candidate);
+  }
+
+  async function registerScanIdentifiers(product, scan) {
+    const identifiers = stableIdentifiersForRegistration(scan, product);
+    if (!identifiers.length) throw new Error('등록할 제품 식별값이 없습니다.');
+
+    for (const item of identifiers) {
+      const checks = [
+        db.from('product_identifiers')
+          .select('id, product_id, identifier_type, identifier_value, normalized_value')
+          .eq('is_active', true)
+          .eq('identifier_value', item.value)
+      ];
+
+      if (['PRODUCT_CODE','CAT_NO','P_N','REORDER'].includes(item.type)) {
+        checks.push(
+          db.from('product_identifiers')
+            .select('id, product_id, identifier_type, identifier_value, normalized_value')
+            .eq('is_active', true)
+            .in('identifier_type', ['PRODUCT_CODE','CAT_NO','P_N','REORDER'])
+            .eq('normalized_value', normalizeProductCode(item.value))
+        );
+      }
+
+      const checkResults = await Promise.all(checks);
+      const rows = [];
+      checkResults.forEach((result) => {
+        if (result.error) throw result.error;
+        (result.data || []).forEach((row) => {
+          if (!rows.some((x) => Number(x.id) === Number(row.id))) rows.push(row);
+        });
+      });
+
+      const conflict = rows.find((row) => Number(row.product_id) !== Number(product.id));
+      if (conflict) throw new Error('이 식별코드는 같은 회사의 다른 제품에 이미 연결되어 있습니다.');
+      if (rows.some((row) => Number(row.product_id) === Number(product.id))) continue;
+
+      const insert = await db.from('product_identifiers').insert({
+        product_id: Number(product.id),
+        identifier_type: item.type,
+        identifier_value: item.value,
+        code_format: item.code_format || null,
+        is_primary: false,
+        is_active: true,
+        note: item.note || '모바일 사용입력 스캔 등록'
+      });
+      if (insert.error) throw insert.error;
+    }
+  }
+
+  async function handleScannedCode(rawValue, format) {
+    if (state.scanBusy) return;
+    state.scanBusy = true;
+    const scan = buildScanResult(rawValue, format);
+    state.scanResult = scan;
+    $('productScanStatus').textContent = '제품정보를 확인하고 있습니다.';
+    try { navigator.vibrate?.(70); } catch (_) {}
+
+    try {
+      const registered = await findRegisteredProductForScan(scan);
+      if (registered.length === 1) {
+        stopProductScanner();
+        selectProduct(registered[0].id);
+        setMessage('inputMessage', `${registered[0].name || '제품'}을(를) 스캔으로 선택했습니다.`, 'success');
+        try { navigator.vibrate?.([60, 40, 60]); } catch (_) {}
+        closeProductScanModal();
+        return;
+      }
+      if (registered.length > 1) {
+        showScanLink(scan, null, '동일 식별코드에 연결된 제품이 여러 건입니다. 사용할 제품을 선택해 주세요.');
+        return;
+      }
+
+      const codeMatches = findProductMasterCodeMatch(scan);
+      if (codeMatches.length === 1) {
+        showScanLink(scan, codeMatches[0], '스캔한 제품식별값과 포털 제품코드가 일치합니다. 연결 후 바로 사용할 수 있습니다.');
+        return;
+      }
+
+      showScanLink(scan, null, '아직 등록되지 않은 코드입니다. 기존 제품을 찾아 최초 1회 연결해 주세요.');
+    } catch (error) {
+      console.error('[QA Usage Scan] lookup failed', error);
+      state.scanBusy = false;
+      $('productScanStatus').textContent = `조회 실패: ${error?.message || '알 수 없는 오류'}`;
+      $('productScanRetry').hidden = false;
+    }
+  }
+
+  async function ensureZXingLoaded() {
+    if (window.ZXingBrowser?.BrowserMultiFormatReader) return window.ZXingBrowser;
+    if (zxingLoadPromise) return zxingLoadPromise;
+    zxingLoadPromise = new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[data-zxing-browser]');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(window.ZXingBrowser));
+        existing.addEventListener('error', () => reject(new Error('코드 인식 모듈을 불러오지 못했습니다.')));
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/@zxing/browser@0.2.1';
+      script.async = true;
+      script.dataset.zxingBrowser = '1';
+      script.onload = () => window.ZXingBrowser?.BrowserMultiFormatReader
+        ? resolve(window.ZXingBrowser)
+        : reject(new Error('코드 인식 모듈 초기화에 실패했습니다.'));
+      script.onerror = () => reject(new Error('코드 인식 모듈을 불러오지 못했습니다.'));
+      document.head.appendChild(script);
+    }).catch((error) => {
+      zxingLoadPromise = null;
+      throw error;
+    });
+    return zxingLoadPromise;
+  }
+
+  async function startNativeBarcodeScanner() {
+    const supported = await window.BarcodeDetector.getSupportedFormats();
+    const wanted = [
+      'qr_code', 'data_matrix', 'code_128', 'code_39', 'code_93', 'codabar',
+      'ean_8', 'ean_13', 'itf', 'upc_a', 'upc_e', 'aztec', 'pdf417'
+    ];
+    const formats = wanted.filter((format) => supported.includes(format));
+    if (!formats.length) throw new Error('이 기기에서 지원되는 QR/바코드 형식을 확인할 수 없습니다.');
+
+    productScanNativeDetector = new window.BarcodeDetector({ formats });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    });
+    const video = $('productScanVideo');
+    video.srcObject = stream;
+    await video.play();
+    $('productScanStatus').textContent = '코드를 카메라 중앙에 맞춰주세요.';
+
+    const detectLoop = async () => {
+      if ($('productScanModal').hidden || state.scanBusy || !productScanNativeDetector) return;
+      if (!productScanNativeDetecting && video.readyState >= 2) {
+        productScanNativeDetecting = true;
+        try {
+          const codes = await productScanNativeDetector.detect(video);
+          const code = Array.isArray(codes) ? codes[0] : null;
+          if (code?.rawValue) {
+            await handleScannedCode(code.rawValue, code.format || '');
+            productScanNativeDetecting = false;
+            return;
+          }
+        } catch (error) {
+          // 프레임 단위 인식 실패는 정상적인 대기 상태이므로 계속 스캔한다.
+        } finally {
+          productScanNativeDetecting = false;
+        }
+      }
+      productScanNativeRaf = requestAnimationFrame(detectLoop);
+    };
+    productScanNativeRaf = requestAnimationFrame(detectLoop);
+  }
+
+  async function startZxingBarcodeScanner() {
+    await ensureZXingLoaded();
+    productScanReader = new window.ZXingBrowser.BrowserMultiFormatReader();
+    const constraints = {
+      audio: false,
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    };
+    $('productScanStatus').textContent = '코드를 카메라 중앙에 맞춰주세요.';
+    productScanControls = await productScanReader.decodeFromConstraints(
+      constraints,
+      $('productScanVideo'),
+      (result) => {
+        if (!result || state.scanBusy) return;
+        let fmt = '';
+        try { fmt = result.getBarcodeFormat?.(); } catch (_) {}
+        const text = result.getText?.() ?? String(result.text || '');
+        if (String(text || '').trim()) handleScannedCode(text, fmt);
+      }
+    );
+  }
+
+  async function startProductScanner() {
+    if (!db) {
+      setMessage('inputMessage', 'DB 연결을 확인할 수 없어 스캔을 시작할 수 없습니다.', 'error');
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMessage('inputMessage', '이 브라우저에서는 카메라를 사용할 수 없습니다.', 'error');
+      return;
+    }
+
+    $('productScanModal').hidden = false;
+    showScanCamera();
+    stopProductScanner();
+    state.scanBusy = false;
+
+    try {
+      // Android/Chromium에서는 브라우저 내장 BarcodeDetector를 우선 사용해
+      // 별도 네트워크 로딩 없이 가장 빠르게 스캔한다.
+      // 미지원 브라우저에서만 ZXing을 동적 로드해 보조한다.
+      if (window.BarcodeDetector) await startNativeBarcodeScanner();
+      else await startZxingBarcodeScanner();
+    } catch (error) {
+      console.error('[QA Usage Scan] camera start failed', error);
+      stopProductScanner();
+      const name = String(error?.name || '');
+      const msg = /NotAllowed|Permission/i.test(name)
+        ? '카메라 권한이 필요합니다. 브라우저의 카메라 권한을 허용한 뒤 다시 시도해 주세요.'
+        : `카메라 실행 실패: ${error?.message || '카메라를 확인해 주세요.'}`;
+      $('productScanStatus').textContent = msg;
+      $('productScanRetry').hidden = false;
+    }
+  }
+
+  async function saveScanProductLink() {
+    const product = state.productsById.get(Number(state.scanLinkProductId));
+    const scan = state.scanResult;
+    if (!product || !scan) {
+      setMessage('scanLinkMessage', '연결할 제품을 선택해 주세요.', 'error');
+      return;
+    }
+    if (!scan.hasSafeStableIdentifier && !$('scanFixedConfirm').checked) {
+      setMessage('scanLinkMessage', 'LOT가 아닌 제품 고정코드인지 확인해 주세요.', 'error');
+      return;
+    }
+
+    $('scanLinkSave').disabled = true;
+    setMessage('scanLinkMessage', '제품 식별코드를 등록하고 있습니다.');
+    try {
+      await registerScanIdentifiers(product, scan);
+      selectProduct(product.id);
+      setMessage('inputMessage', `${product.name || '제품'} 식별코드를 등록하고 사용제품으로 선택했습니다.`, 'success');
+      try { navigator.vibrate?.([60, 40, 60]); } catch (_) {}
+      closeProductScanModal();
+    } catch (error) {
+      console.error('[QA Usage Scan] register failed', error);
+      setMessage('scanLinkMessage', `등록 실패: ${error?.message || '알 수 없는 오류'}`, 'error');
+      $('scanLinkSave').disabled = false;
+    }
+  }
+
   function setMessage(id, msg = '', type = '') {
     const el = $(id);
     if (!el) return;
@@ -310,6 +888,7 @@
     if (!p) {
       wrap.hidden = true;
       $('productSearch').disabled = false;
+      if ($('scanProductBtn')) $('scanProductBtn').disabled = false;
       syncSpecialUsagePanel();
       return;
     }
@@ -325,6 +904,7 @@
     wrap.hidden = false;
     $('productSearch').value = '';
     $('productSearch').disabled = true;
+    if ($('scanProductBtn')) $('scanProductBtn').disabled = true;
     $('productResults').hidden = true;
     syncSpecialUsagePanel();
   }
@@ -1384,6 +1964,20 @@
       if (item) selectProduct(item.dataset.productId);
     });
     $('clearProductBtn').addEventListener('click', clearSelectedProduct);
+    $('scanProductBtn').addEventListener('click', startProductScanner);
+    $('productScanClose').addEventListener('click', closeProductScanModal);
+    $('productScanRetry').addEventListener('click', startProductScanner);
+    $('scanLinkRescan').addEventListener('click', startProductScanner);
+    $('scanLinkSearch').addEventListener('input', renderScanLinkResults);
+    $('scanLinkResults').addEventListener('click', (e) => {
+      const item = e.target.closest('[data-scan-link-product]');
+      if (item) selectScanLinkProduct(item.dataset.scanLinkProduct);
+    });
+    $('scanFixedConfirm').addEventListener('change', () => setMessage('scanLinkMessage'));
+    $('scanLinkSave').addEventListener('click', saveScanProductLink);
+    $('productScanModal').addEventListener('click', (e) => {
+      if (e.target === $('productScanModal')) closeProductScanModal();
+    });
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.product-search-wrap')) $('productResults').hidden = true;
     });
@@ -1476,6 +2070,7 @@
     });
 
     document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !$('productScanModal').hidden) { closeProductScanModal(); return; }
       if (e.key === 'Escape' && !$('usageDetailModal').hidden) closeUsageDetail();
     });
   }
