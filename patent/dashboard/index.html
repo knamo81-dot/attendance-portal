@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>특허현황</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="pat-app">
+    <div class="pat-toolbar">
+      <div>
+        <div class="pat-title">특허현황</div>
+        <div class="pat-subtitle">특허 권리상태와 납부·기한 임박 항목을 한눈에 확인합니다.</div>
+      </div>
+      <div class="pat-toolbar-right">
+        <span id="companyName" class="pat-badge gold"></span>
+        <button id="refreshBtn" class="pat-btn">↻ 새로고침</button>
+      </div>
+    </div>
+
+    <section id="kpis" class="pat-kpis"></section>
+
+    <section class="pat-grid dashboard-main-grid">
+      <article class="pat-card pat-card-pad">
+        <div class="pat-card-head"><div><div class="pat-card-title">특허 상태 현황</div><div class="pat-card-desc">현재 저장된 특허의 법적 상태 기준</div></div></div>
+        <div class="status-chart-wrap">
+          <div id="statusDonut" class="status-donut"><div class="status-donut-center"><strong id="donutTotal">0</strong><span>총 특허</span></div></div>
+          <div id="statusLegend" class="status-legend"></div>
+        </div>
+      </article>
+
+      <article class="pat-card pat-card-pad">
+        <div class="pat-card-head"><div><div class="pat-card-title">연도별 출원/등록 현황</div><div class="pat-card-desc">최근 6개년 기준</div></div></div>
+        <div id="yearChart" class="year-chart"></div>
+      </article>
+
+      <article class="pat-card pat-card-pad">
+        <div class="pat-card-head">
+          <div><div class="pat-card-title">납부 / 기한 임박</div><div class="pat-card-desc">가까운 순서로 표시합니다.</div></div>
+          <button id="goManagementBtn" class="pat-btn secondary">더보기</button>
+        </div>
+        <div id="dueList" class="due-list"></div>
+      </article>
+    </section>
+
+    <section class="pat-grid dashboard-bottom-grid">
+      <article class="pat-card pat-card-pad">
+        <div class="pat-card-head"><div class="pat-card-title">최근 등록된 특허</div><button id="goListBtn" class="pat-btn">특허목록</button></div>
+        <div class="pat-table-wrap">
+          <table class="pat-table compact-table">
+            <thead><tr><th>등록번호</th><th>발명의 명칭</th><th>국가</th><th>등록일</th><th>상태</th></tr></thead>
+            <tbody id="recentPatentBody"></tbody>
+          </table>
+        </div>
+      </article>
+      <article class="pat-card pat-card-pad">
+        <div class="pat-card-head"><div class="pat-card-title">최근 상태 변경 이력</div></div>
+        <div id="eventList" class="event-list"></div>
+      </article>
+    </section>
+  </main>
+  <script src="../shared/patent-common.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
