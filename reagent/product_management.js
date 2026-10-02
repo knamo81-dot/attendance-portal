@@ -3,6 +3,7 @@ window.ReagentApp = window.ReagentApp || {};
 window.ReagentApp.productManagement = {
   products: [],
   productCasMap: {},
+  productIdentifierMap: {},
   requests: [],
   editingProductId: null,
   activeRequestStatus: "",
@@ -745,8 +746,77 @@ window.ReagentApp.productManagement = {
     }
 
     this.products = Array.isArray(data) ? data : [];
-    await this.loadProductCasMap();
+    await Promise.all([
+      this.loadProductCasMap(),
+      this.loadProductIdentifierMap()
+    ]);
     this.renderProducts();
+  },
+
+  async loadProductIdentifierMap() {
+    this.productIdentifierMap = {};
+    if (!this.sb) return;
+
+    const productIds = (this.products || [])
+      .map((product) => Number(product.id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+
+    if (!productIds.length) return;
+
+    const chunkSize = 500;
+    for (let offset = 0; offset < productIds.length; offset += chunkSize) {
+      const ids = productIds.slice(offset, offset + chunkSize);
+      const { data, error } = await this.sb
+        .from("product_identifiers")
+        .select("product_id, identifier_type, identifier_value, code_format, is_primary, is_active")
+        .in("product_id", ids)
+        .eq("is_active", true);
+
+      if (error) {
+        console.warn("제품 QR/바코드 식별정보 조회 실패:", error);
+        return;
+      }
+
+      (Array.isArray(data) ? data : []).forEach((item) => {
+        const productId = Number(item.product_id);
+        if (!productId) return;
+        if (!this.productIdentifierMap[productId]) this.productIdentifierMap[productId] = [];
+        this.productIdentifierMap[productId].push(item);
+      });
+    }
+  },
+
+  getProductIdentifierStatus(product = {}) {
+    const rows = this.productIdentifierMap?.[Number(product.id)] || [];
+    let hasQr = false;
+    let hasBarcode = false;
+
+    rows.forEach((item) => {
+      const type = String(item?.identifier_type || "").trim().toUpperCase();
+      const format = String(item?.code_format || "").trim().toUpperCase();
+
+      if (type === "QR" || type === "QR_URL" || format.includes("QR")) {
+        hasQr = true;
+      }
+
+      if (
+        ["BARCODE", "GTIN", "DATAMATRIX"].includes(type) ||
+        /(BARCODE|CODE128|CODE39|EAN|UPC|ITF|DATAMATRIX|DATA MATRIX|GS1)/.test(format)
+      ) {
+        hasBarcode = true;
+      }
+    });
+
+    const hasAny = hasQr || hasBarcode;
+    const label = hasQr && hasBarcode
+      ? "QR+바코드"
+      : hasQr
+        ? "QR"
+        : hasBarcode
+          ? "바코드"
+          : "없음";
+
+    return { hasAny, hasQr, hasBarcode, label };
   },
 
   async loadProductCasMap() {
@@ -847,11 +917,13 @@ window.ReagentApp.productManagement = {
     this.updateManagementKpi();
 
     if (!rows.length) {
-      els.productList.innerHTML = `<tr><td class="empty" colspan="12">등록된 제품이 없습니다.</td></tr>`;
+      els.productList.innerHTML = `<tr><td class="empty" colspan="13">등록된 제품이 없습니다.</td></tr>`;
       return;
     }
 
-    els.productList.innerHTML = rows.map((p) => `
+    els.productList.innerHTML = rows.map((p) => {
+      const identifierStatus = this.getProductIdentifierStatus(p);
+      return `
       <tr class="${p.is_active ? "" : "request-row-collected"}">
         <td>${this.html(p.category)}</td>
         <td>${this.html(p.name)}</td>
@@ -860,13 +932,14 @@ window.ReagentApp.productManagement = {
         <td>${this.html(p.capacity)}</td>
         <td>${this.renderProductCasCell(p)}</td>
         <td>${this.html(p.grade)}</td>
+        <td>${this.html(identifierStatus.label)}</td>
         <td>${this.html(p.default_vendor)}</td>
         <td>${this.html(p.default_vendor_reason || "")}</td>
         <td>${p.is_active ? "사용" : "사용중지"}</td>
         <td>${this.html(p.updated_by || p.created_by || "")}</td>
         <td><button class="ghost-btn" data-pm-edit="${p.id}" type="button">수정</button></td>
-      </tr>
-    `).join("");
+      </tr>`;
+    }).join("");
 
     els.productList.querySelectorAll("[data-pm-edit]").forEach((btn) => {
       btn.addEventListener("click", () => this.fillProductForm(Number(btn.dataset.pmEdit)));
