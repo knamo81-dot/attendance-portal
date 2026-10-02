@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="../style.css?v=20260929-mobile-base1"/>
 <link rel="stylesheet" href="../../common/mobile.css"/>
 <link rel="stylesheet" href="../../common/theme.css"/>
-<link rel="stylesheet" href="./style.css?v=20261002-mobile-scan1"/>
+<link rel="stylesheet" href="./style.css?v=20261002-mobile-qascan1"/>
 <script>
   /*
     초기 권한 표시 보정
@@ -589,19 +589,35 @@
 <div class="modal-search"><div class="field"><label>키워드</label><input id="searchInput" placeholder="예: ethanol, 459844, Sigma, 64-17-5"/><div class="search-hint">부분 검색 가능</div></div><div class="field"><label>분류</label><select id="searchCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div><div class="field"><label>제조사</label><select id="searchMaker"><option value="">전체</option></select></div><div class="field"><label>정렬</label><select id="sortMode"><option value="relevance">관련도순</option><option value="name">품명순</option><option value="maker">제조사순</option></select></div></div>
 <div class="modal-body" id="searchResults"></div><div class="modal-foot"><div class="small" id="resultInfo">검색 결과 0건</div><div class="small">원하는 제품이 없으면 <span class="product-link" id="inlineRequest">제품 등록 요청</span>으로 넘길 수 있습니다.</div></div></div></div>
 <div class="modal-backdrop product-scan-modal-backdrop" id="productScanModal" aria-hidden="true">
-  <div class="modal product-scan-modal" role="dialog" aria-modal="true" aria-labelledby="productScanTitle">
+  <section class="modal product-scan-modal" role="dialog" aria-modal="true" aria-labelledby="productScanTitle">
     <div class="modal-head product-scan-head">
-      <div><h3 id="productScanTitle">QR/바코드 스캔</h3><div class="small">제품의 QR·바코드를 카메라 중앙에 맞춰 주세요.</div></div>
-      <button class="btn" id="closeProductScan" type="button">닫기</button>
+      <div>
+        <h3 id="productScanTitle">제품 코드 스캔</h3>
+        <p>QR · DataMatrix · 바코드를 카메라에 보여주세요.</p>
+      </div>
+      <button id="closeProductScan" class="modal-close-btn product-scan-close" type="button" aria-label="닫기">×</button>
     </div>
-    <div class="product-scan-camera">
-      <video id="productScanVideo" autoplay muted playsinline></video>
-      <div class="product-scan-guide" aria-hidden="true"><span></span></div>
+    <div class="product-scan-body">
+      <section id="productScanCameraSection" class="scan-camera-section">
+        <div class="scan-video-wrap">
+          <video id="productScanVideo" playsinline muted hidden></video>
+          <canvas id="productScanCanvas" hidden></canvas>
+          <div class="scan-guide" aria-hidden="true">
+            <i></i><i></i><i></i><i></i>
+            <span></span>
+          </div>
+          <div class="scan-tools" aria-label="카메라 도구">
+            <button id="productScanTorch" class="scan-tool-btn" type="button" hidden aria-label="손전등 켜기">⌁</button>
+            <button id="productScanZoom" class="scan-tool-btn" type="button" hidden aria-label="카메라 확대">1×</button>
+          </div>
+        </div>
+        <div id="productScanStatus" class="product-scan-status scan-status" aria-live="polite">카메라를 준비하고 있습니다.</div>
+        <div class="scan-camera-actions">
+          <button id="productScanRetry" class="btn" type="button" hidden>다시 스캔</button>
+        </div>
+      </section>
     </div>
-    <canvas id="productScanCanvas" hidden></canvas>
-    <div class="product-scan-status" id="productScanStatus">카메라를 준비하는 중입니다.</div>
-    <div class="product-scan-foot">등록된 QR/바코드가 인식되면 제품정보가 자동으로 입력됩니다.</div>
-  </div>
+  </section>
 </div>
 <div class="toast-wrap" id="toastWrap"></div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -613,7 +629,7 @@
   }
 </script>
 <script src="../supabase.js"></script>
-<script src="../request.js?v=20261002-mobile-scan1"></script>
+<script src="../request.js?v=20261002-mobile-qascan1"></script>
 <!--
   COLUMN ORDER NOTE
   - HTML header/colgroup order updated:
