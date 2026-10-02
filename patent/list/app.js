@@ -47,6 +47,7 @@
   let duplicatePatentId = null;
   let duplicateCheckTimer = null;
   let bulkRefreshRunning = false;
+  let editingEventId = null;
 
   function arrayFromText(value) {
     return String(value || '')
@@ -733,11 +734,15 @@
       return;
     }
 
-    document.getElementById('newPatentBtn').disabled =
-      !ctx.access.write;
+    const newPatentBtn = document.getElementById('newPatentBtn');
+    const bulkRefreshBtn = document.getElementById('bulkKiprisRefreshBtn');
 
-    document.getElementById('bulkKiprisRefreshBtn').disabled =
-      !ctx.access.write;
+    [newPatentBtn, bulkRefreshBtn].forEach((button) => {
+      if (!button) return;
+      button.disabled = !ctx.access.write;
+      button.hidden = !ctx.access.write;
+      button.style.display = ctx.access.write ? '' : 'none';
+    });
 
     await Promise.all([
       loadEmployees(),
@@ -2036,17 +2041,28 @@
       .getElementById('detailView')
       .classList.remove('hidden');
 
-    document.getElementById(
+    const editPatentBtn = document.getElementById(
       'editPatentBtn'
-    ).disabled = !ctx.access.write;
+    );
 
-    document.getElementById(
+    const deletePatentBtn = document.getElementById(
       'deletePatentBtn'
-    ).disabled = !ctx.access.admin;
+    );
 
-    document.getElementById(
+    const kiprisRefreshBtn = document.getElementById(
       'kiprisRefreshBtn'
-    ).disabled = !ctx.access.write;
+    );
+
+    [
+      [editPatentBtn, ctx.access.write],
+      [deletePatentBtn, ctx.access.admin],
+      [kiprisRefreshBtn, ctx.access.write]
+    ].forEach(([button, allowed]) => {
+      if (!button) return;
+      button.disabled = !allowed;
+      button.hidden = !allowed;
+      button.style.display = allowed ? '' : 'none';
+    });
 
     renderHero();
     switchDetailTab('basic');
@@ -2410,57 +2426,254 @@
     `;
   }
 
+  function currentEmployeeNo() {
+    return String(
+      ctx?.session?.employeeNo ||
+      ctx?.session?.employee_no ||
+      ''
+    ).trim();
+  }
+
+  function canManageEvent(event) {
+    if (!event) return false;
+    if (ctx.access.write) return true;
+
+    const mine =
+      String(event.created_by_employee_no || '').trim() ===
+      currentEmployeeNo();
+
+    return mine && String(event.source || '').toUpperCase() === 'MANUAL';
+  }
+
+  function cancelEventEdit() {
+    editingEventId = null;
+
+    const element = document.getElementById(
+      'detailContent'
+    );
+
+    if (element) {
+      renderEvents(element);
+    }
+  }
+
+  function startEventEdit(id) {
+    const event = detailData.events.find(
+      (item) => String(item.id) === String(id)
+    );
+
+    if (!canManageEvent(event)) {
+      P.toast(
+        '본인이 작성한 진행이력만 수정할 수 있습니다.',
+        'warn'
+      );
+      return;
+    }
+
+    editingEventId = event.id;
+
+    const element = document.getElementById(
+      'detailContent'
+    );
+
+    renderEvents(element);
+
+    P.setVal(
+      'eventDate',
+      event.event_date || ''
+    );
+
+    P.setVal(
+      'eventType',
+      event.event_type || 'MANUAL'
+    );
+
+    P.setVal(
+      'eventTitle',
+      event.title || ''
+    );
+
+    document
+      .getElementById('eventTitle')
+      ?.focus();
+  }
+
+  async function deleteEvent(id) {
+    const event = detailData.events.find(
+      (item) => String(item.id) === String(id)
+    );
+
+    if (!canManageEvent(event)) {
+      P.toast(
+        '본인이 작성한 진행이력만 삭제할 수 있습니다.',
+        'warn'
+      );
+      return;
+    }
+
+    if (!confirm('이 진행이력을 삭제할까요?')) {
+      return;
+    }
+
+    const result = await P.state.client
+      .from('pat_events')
+      .delete()
+      .eq('id', event.id)
+      .eq(
+        'company_id',
+        ctx.session.companyId
+      );
+
+    if (result.error) {
+      P.toast(
+        result.error.message,
+        'error'
+      );
+      return;
+    }
+
+    P.toast('진행이력을 삭제했습니다.');
+
+    editingEventId = null;
+
+    await openDetail(
+      currentPatent.id
+    );
+
+    switchDetailTab('events');
+  }
+
   function renderEvents(element) {
-    const addForm = ctx.access.write
+    const editingEvent = editingEventId
+      ? detailData.events.find(
+        (item) =>
+          String(item.id) ===
+          String(editingEventId)
+      )
+      : null;
+
+    const canAddEvent =
+      ctx.access.read &&
+      !!currentEmployeeNo();
+
+    const addForm = canAddEvent
       ? `
         <div class="events-add">
+          <div class="event-add-head">
+            ${
+              editingEvent
+                ? '진행이력 수정'
+                : '진행이력 작성'
+            }
+          </div>
+
           <div class="event-add-row">
             <input
               id="eventDate"
               type="date"
               class="pat-input"
             />
+
             <input
               id="eventType"
               class="pat-input"
               placeholder="유형"
+              value="MANUAL"
             />
+
             <input
               id="eventTitle"
               class="pat-input"
               placeholder="진행이력 제목"
             />
+
             <button
               id="addEventBtn"
               class="pat-btn primary"
               type="button"
             >
-              이력 추가
+              ${
+                editingEvent
+                  ? '수정 저장'
+                  : '이력 추가'
+              }
             </button>
+
+            ${
+              editingEvent
+                ? `
+                  <button
+                    id="cancelEventEditBtn"
+                    class="pat-btn secondary"
+                    type="button"
+                  >
+                    취소
+                  </button>
+                `
+                : ''
+            }
           </div>
+
+          ${
+            ctx.access.write
+              ? ''
+              : `
+                <div class="event-permission-note">
+                  진행이력은 작성할 수 있으며,
+                  본인이 작성한 이력만 수정·삭제할 수 있습니다.
+                </div>
+              `
+          }
         </div>
       `
       : '';
 
     const timeline = detailData.events.length
       ? detailData.events
-        .map((event) => `
-          <div class="pat-timeline-item">
-            <div class="pat-timeline-date">
-              ${P.fmtDate(event.event_date)}
+        .map((event) => {
+          const actionButtons = canManageEvent(event)
+            ? `
+              <div class="event-actions">
+                <button
+                  class="pat-btn secondary small"
+                  type="button"
+                  data-event-edit="${P.escapeHtml(event.id)}"
+                >
+                  수정
+                </button>
+                <button
+                  class="pat-btn danger small"
+                  type="button"
+                  data-event-delete="${P.escapeHtml(event.id)}"
+                >
+                  삭제
+                </button>
+              </div>
+            `
+            : '';
+
+          return `
+            <div class="pat-timeline-item">
+              <div class="pat-timeline-date">
+                ${P.fmtDate(event.event_date)}
+              </div>
+
+              <div class="pat-timeline-title">
+                ${P.escapeHtml(event.title)}
+              </div>
+
+              <div class="pat-timeline-desc">
+                ${P.escapeHtml(
+                  event.description ||
+                  event.event_type ||
+                  ''
+                )}
+              </div>
+
+              ${actionButtons}
             </div>
-            <div class="pat-timeline-title">
-              ${P.escapeHtml(event.title)}
-            </div>
-            <div class="pat-timeline-desc">
-              ${P.escapeHtml(
-                event.description ||
-                event.event_type ||
-                ''
-              )}
-            </div>
-          </div>
-        `)
+          `;
+        })
         .join('')
       : (
         '<div class="pat-empty">' +
@@ -2475,18 +2688,73 @@
       </div>
     `;
 
+    if (editingEvent) {
+      P.setVal(
+        'eventDate',
+        editingEvent.event_date || ''
+      );
+
+      P.setVal(
+        'eventType',
+        editingEvent.event_type || 'MANUAL'
+      );
+
+      P.setVal(
+        'eventTitle',
+        editingEvent.title || ''
+      );
+    }
+
     document
       .getElementById('addEventBtn')
       ?.addEventListener(
         'click',
-        addEvent
+        saveEvent
       );
+
+    document
+      .getElementById('cancelEventEditBtn')
+      ?.addEventListener(
+        'click',
+        cancelEventEdit
+      );
+
+    element
+      .querySelectorAll('[data-event-edit]')
+      .forEach((button) => {
+        button.addEventListener(
+          'click',
+          () => startEventEdit(
+            button.dataset.eventEdit
+          )
+        );
+      });
+
+    element
+      .querySelectorAll('[data-event-delete]')
+      .forEach((button) => {
+        button.addEventListener(
+          'click',
+          () => deleteEvent(
+            button.dataset.eventDelete
+          )
+        );
+      });
   }
 
-  async function addEvent() {
+  async function saveEvent() {
     const date = P.val('eventDate');
     const type = P.val('eventType') || 'MANUAL';
     const title = P.val('eventTitle');
+    const employeeNo = currentEmployeeNo();
+
+    if (!employeeNo) {
+      P.toast(
+        '로그인 사번을 확인할 수 없습니다.',
+        'error'
+      );
+      return;
+    }
 
     if (!title) {
       P.toast(
@@ -2496,19 +2764,50 @@
       return;
     }
 
-    const result = await P.state.client
-      .from('pat_events')
-      .insert(
-        P.companyPayload({
-          patent_id: currentPatent.id,
+    let result;
+
+    if (editingEventId) {
+      const target = detailData.events.find(
+        (item) =>
+          String(item.id) ===
+          String(editingEventId)
+      );
+
+      if (!canManageEvent(target)) {
+        P.toast(
+          '수정 권한이 없습니다.',
+          'warn'
+        );
+        return;
+      }
+
+      result = await P.state.client
+        .from('pat_events')
+        .update({
           event_date: date || null,
           event_type: type,
-          title,
-          source: 'MANUAL',
-          created_by_employee_no:
-            ctx.session.employeeNo || null
+          title
         })
-      );
+        .eq('id', editingEventId)
+        .eq(
+          'company_id',
+          ctx.session.companyId
+        );
+    } else {
+      result = await P.state.client
+        .from('pat_events')
+        .insert(
+          P.companyPayload({
+            patent_id: currentPatent.id,
+            event_date: date || null,
+            event_type: type,
+            title,
+            source: 'MANUAL',
+            created_by_employee_no:
+              employeeNo
+          })
+        );
+    }
 
     if (result.error) {
       P.toast(
@@ -2519,8 +2818,12 @@
     }
 
     P.toast(
-      '진행이력을 추가했습니다.'
+      editingEventId
+        ? '진행이력을 수정했습니다.'
+        : '진행이력을 추가했습니다.'
     );
+
+    editingEventId = null;
 
     await openDetail(
       currentPatent.id
@@ -2639,20 +2942,26 @@
         </table>
       </div>
 
-      <div style="margin-top: 10px;">
-        <button
-          class="pat-btn secondary"
-          id="goPaymentsBtn"
-          type="button"
-        >
-          납부관리로 이동
-        </button>
-      </div>
+      ${
+        ctx.access.write
+          ? `
+            <div style="margin-top: 10px;">
+              <button
+                class="pat-btn secondary"
+                id="goPaymentsBtn"
+                type="button"
+              >
+                납부관리로 이동
+              </button>
+            </div>
+          `
+          : ''
+      }
     `;
 
     document
       .getElementById('goPaymentsBtn')
-      .addEventListener(
+      ?.addEventListener(
         'click',
         () => P.navigate(
           'management',
