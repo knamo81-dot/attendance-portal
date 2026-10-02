@@ -1152,10 +1152,11 @@ body.reagent-mobile-ui{
   #requestFormCard .request-scan-label{display:none !important;}
 }
 
-/* 제품 QR/바코드 카메라 모달 */
+/* 제품 QR/바코드 카메라 - QA 모바일 스캐너 UI/조작 방식 공통화 */
 html.product-scan-open,
 body.product-scan-open{
   overflow:hidden !important;
+  overscroll-behavior:none;
 }
 
 #productScanModal{
@@ -1167,82 +1168,299 @@ body.product-scan-open{
 }
 
 #productScanModal .product-scan-modal{
-  width:min(520px,100%) !important;
+  width:min(640px,calc(100vw - 24px)) !important;
   max-height:calc(100dvh - 24px) !important;
   overflow:hidden !important;
-  border-radius:20px !important;
+  border-radius:16px !important;
   background:#fff !important;
 }
 
 #productScanModal .product-scan-head{
-  padding:13px 14px !important;
+  display:flex !important;
+  align-items:flex-start !important;
+  justify-content:space-between !important;
+  gap:12px !important;
+  padding:13px 14px 11px !important;
 }
-
 #productScanModal .product-scan-head h3{
   margin:0 !important;
-  font-size:18px !important;
+  font-size:19px !important;
+  font-weight:900 !important;
+}
+#productScanModal .product-scan-head p{
+  margin:4px 0 0 !important;
+  color:#667085 !important;
+  font-size:11px !important;
+  line-height:1.45 !important;
+}
+#productScanModal .product-scan-close{
+  width:38px !important;
+  min-width:38px !important;
+  height:38px !important;
+  border:1px solid #d6dbe4 !important;
+  border-radius:10px !important;
+  background:#fff !important;
+  color:#344054 !important;
+  font-size:24px !important;
+  line-height:1 !important;
 }
 
-.product-scan-camera{
+.product-scan-body{
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+  padding:10px 12px 14px;
+}
+.scan-camera-section{
+  display:grid;
+  gap:12px;
+}
+.scan-video-wrap{
   position:relative;
   width:100%;
-  aspect-ratio:3 / 4;
-  max-height:66dvh;
+  aspect-ratio:4 / 3;
   overflow:hidden;
-  background:#05070b;
+  border-radius:14px;
+  background:#0f172a;
 }
-
-#productScanVideo{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  display:block;
-  background:#05070b;
-}
-
-.product-scan-guide{
+.scan-video-wrap>video{
   position:absolute;
   inset:0;
+  width:100% !important;
+  height:100% !important;
+  display:block;
+  object-fit:cover !important;
+  background:#0f172a;
+}
+.scan-video-wrap>video[hidden]{display:none !important}
+
+.scan-guide{
+  position:absolute;
+  inset:14% 6%;
   pointer-events:none;
+  z-index:6;
+}
+.scan-guide i{
+  position:absolute;
+  width:34px;
+  height:34px;
+  border-color:#fff;
+  border-style:solid;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.55));
+}
+.scan-guide i:nth-child(1){left:0;top:0;border-width:3px 0 0 3px;border-radius:8px 0 0 0}
+.scan-guide i:nth-child(2){right:0;top:0;border-width:3px 3px 0 0;border-radius:0 8px 0 0}
+.scan-guide i:nth-child(3){left:0;bottom:0;border-width:0 0 3px 3px;border-radius:0 0 0 8px}
+.scan-guide i:nth-child(4){right:0;bottom:0;border-width:0 3px 3px 0;border-radius:0 0 8px 0}
+.scan-guide span{
+  position:absolute;
+  left:6%;
+  right:6%;
+  top:50%;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.95),transparent);
+  box-shadow:0 0 8px rgba(255,255,255,.5);
+  animation:reagentScanLine 2.1s ease-in-out infinite;
+}
+@keyframes reagentScanLine{
+  0%,100%{transform:translateY(-70px);opacity:.35}
+  50%{transform:translateY(70px);opacity:1}
+}
+
+.scan-tools{
+  position:absolute;
+  right:14px;
+  bottom:14px;
+  z-index:8;
+  display:flex;
+  gap:8px;
+}
+.scan-tool-btn{
+  width:44px;
+  height:44px;
   display:flex;
   align-items:center;
   justify-content:center;
+  border:1px solid rgba(255,255,255,.5);
+  border-radius:999px;
+  background:rgba(15,23,42,.66);
+  color:#fff;
+  box-shadow:0 4px 18px rgba(0,0,0,.22);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  font-size:14px;
+  font-weight:900;
 }
+.scan-tool-btn.active{background:#fff;color:#174ea6}
+.scan-tool-btn[hidden]{display:none !important}
 
-.product-scan-guide::before{
-  content:"";
-  width:78%;
-  height:34%;
-  border:3px solid rgba(255,255,255,.92);
-  border-radius:18px;
-  box-shadow:0 0 0 999px rgba(15,23,42,.22);
-}
-
-.product-scan-guide span{
-  position:absolute;
-  width:66%;
-  height:2px;
-  background:rgba(59,130,246,.95);
-  box-shadow:0 0 10px rgba(59,130,246,.8);
-}
-
-.product-scan-status{
-  padding:12px 14px 5px;
+.product-scan-status,
+.scan-status{
+  min-height:38px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:9px 12px;
+  border-radius:10px;
+  background:#f8fafc;
   color:#334155;
-  font-size:13px;
-  font-weight:800;
+  font-size:12px;
+  font-weight:850;
   text-align:center;
   line-height:1.45;
-  min-height:36px;
 }
+.product-scan-status.success{color:#166534}
+.product-scan-status.warn{color:#b45309}
+.scan-camera-actions{text-align:center}
+.scan-camera-actions .btn{min-height:40px;border-radius:9px;font-size:12px;font-weight:900}
+.scan-camera-actions .btn[hidden]{display:none !important}
 
-.product-scan-status.success{color:#166534;}
-.product-scan-status.warn{color:#b45309;}
-
-.product-scan-foot{
-  padding:4px 14px 14px;
-  color:#64748b;
-  font-size:11px;
-  text-align:center;
-  line-height:1.45;
+@media(max-width:768px){
+  #productScanModal.product-scan-modal-backdrop{
+    position:fixed !important;
+    inset:0 !important;
+    z-index:99999 !important;
+    padding:0 !important;
+    align-items:stretch !important;
+    justify-content:stretch !important;
+    background:#000 !important;
+  }
+  #productScanModal .product-scan-modal{
+    position:relative !important;
+    width:100vw !important;
+    height:100dvh !important;
+    max-width:none !important;
+    max-height:none !important;
+    margin:0 !important;
+    border:0 !important;
+    border-radius:0 !important;
+    background:#000 !important;
+    overflow:hidden !important;
+  }
+  #productScanModal .product-scan-head{
+    position:absolute !important;
+    z-index:20 !important;
+    top:0 !important;
+    left:0 !important;
+    right:0 !important;
+    min-height:86px !important;
+    padding:calc(env(safe-area-inset-top, 0px) + 10px) 16px 18px !important;
+    border:0 !important;
+    background:linear-gradient(180deg,rgba(0,0,0,.78),rgba(0,0,0,.38) 72%,transparent) !important;
+    color:#fff !important;
+    pointer-events:none;
+  }
+  #productScanModal .product-scan-head>div{min-width:0}
+  #productScanModal .product-scan-head h3{
+    color:#fff !important;
+    font-size:19px !important;
+    line-height:1.25 !important;
+  }
+  #productScanModal .product-scan-head p{
+    color:rgba(255,255,255,.78) !important;
+    font-size:11px !important;
+  }
+  #productScanModal .product-scan-head .product-scan-close{
+    pointer-events:auto;
+    width:42px !important;
+    min-width:42px !important;
+    height:42px !important;
+    border-color:rgba(255,255,255,.38) !important;
+    background:rgba(0,0,0,.36) !important;
+    color:#fff !important;
+    backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+  }
+  .product-scan-body{
+    position:absolute !important;
+    inset:0 !important;
+    width:100% !important;
+    height:100% !important;
+    padding:0 !important;
+    overflow:hidden !important;
+    background:#000 !important;
+  }
+  .scan-camera-section{
+    position:absolute !important;
+    inset:0 !important;
+    display:block !important;
+    width:100% !important;
+    height:100% !important;
+    background:#000 !important;
+  }
+  .scan-video-wrap{
+    position:absolute !important;
+    inset:0 !important;
+    width:100% !important;
+    height:100% !important;
+    max-height:none !important;
+    aspect-ratio:auto !important;
+    border-radius:0 !important;
+    background:#000 !important;
+  }
+  .scan-video-wrap>video{
+    position:absolute !important;
+    inset:0 !important;
+    width:100% !important;
+    height:100% !important;
+    object-fit:cover !important;
+    background:#000 !important;
+  }
+  .scan-guide{
+    position:absolute !important;
+    z-index:6 !important;
+    left:7% !important;
+    right:7% !important;
+    top:24% !important;
+    bottom:25% !important;
+    pointer-events:none !important;
+  }
+  .scan-guide i{
+    width:44px !important;
+    height:44px !important;
+    border-color:#fff !important;
+    filter:drop-shadow(0 1px 3px rgba(0,0,0,.75)) !important;
+  }
+  .scan-guide i:nth-child(1){border-width:4px 0 0 4px !important}
+  .scan-guide i:nth-child(2){border-width:4px 4px 0 0 !important}
+  .scan-guide i:nth-child(3){border-width:0 0 4px 4px !important}
+  .scan-guide i:nth-child(4){border-width:0 4px 4px 0 !important}
+  .scan-tools{
+    right:14px !important;
+    bottom:calc(env(safe-area-inset-bottom, 0px) + 82px) !important;
+  }
+  .product-scan-status,
+  .scan-status{
+    position:absolute !important;
+    z-index:10 !important;
+    left:14px !important;
+    right:14px !important;
+    bottom:calc(env(safe-area-inset-bottom, 0px) + 16px) !important;
+    min-height:46px !important;
+    padding:10px 14px !important;
+    border:1px solid rgba(255,255,255,.25) !important;
+    border-radius:14px !important;
+    background:rgba(15,23,42,.70) !important;
+    color:#fff !important;
+    box-shadow:0 6px 24px rgba(0,0,0,.22) !important;
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+    font-size:12px !important;
+    line-height:1.45 !important;
+  }
+  .product-scan-status.success,
+  .product-scan-status.warn{color:#fff !important}
+  .scan-camera-actions{
+    position:absolute !important;
+    z-index:12 !important;
+    left:50% !important;
+    bottom:calc(env(safe-area-inset-bottom, 0px) + 78px) !important;
+    transform:translateX(-50%) !important;
+  }
+  .scan-camera-actions .btn{
+    min-width:120px !important;
+    background:rgba(255,255,255,.92) !important;
+    color:#174ea6 !important;
+    border-color:transparent !important;
+  }
 }
