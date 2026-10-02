@@ -60,6 +60,93 @@
   }
   function patentName(id){const p=patents.find(x=>x.id===id);return p?.invention_title||'-';}
   function employeeName(no){return employees.find(x=>x.employee_no===no)?.name||no||'-';}
+
+  function agencyName(id){
+    if(!id)return '';
+    return agencies.find(x=>x.id===id)?.agency_name||'';
+  }
+
+  function paymentForDeadline(deadline){
+    if(!deadline?.related_payment_id)return null;
+    return payments.find(x=>x.id===deadline.related_payment_id)||null;
+  }
+
+  function deadlineCalendarInfo(deadline){
+    const payment=paymentForDeadline(deadline);
+    const patentTitle=patentName(deadline.patent_id);
+
+    if(!payment){
+      return {
+        main:deadline.title||P.deadlineTypeLabel(deadline.deadline_type),
+        sub:patentTitle,
+        tooltip:`${deadline.title||P.deadlineTypeLabel(deadline.deadline_type)} · ${patentTitle}`
+      };
+    }
+
+    const annual=P.annualRangeLabel(
+      payment.annual_year_from,
+      payment.annual_year_to
+    );
+
+    const annualText=annual&&annual!=='-'
+      ? annual.replace(/\s*\([^)]*\)\s*$/,'')
+      : '';
+
+    const paymentLabel=payment.payment_title
+      ||P.paymentTypeLabel(payment.payment_type)
+      ||deadline.title
+      ||'납부';
+
+    const tag=annualText||paymentLabel;
+
+    let methodText='직접납부';
+
+    if(payment.payment_method==='AGENCY'){
+      methodText=agencyName(payment.agency_id)||'대행업체 미지정';
+    }else if(payment.payment_method){
+      methodText=P.paymentMethodLabel(payment.payment_method)||'직접납부';
+    }
+
+    return {
+      main:`[${tag}] ${patentTitle}`,
+      sub:methodText,
+      tooltip:`${tag} · ${patentTitle} · ${methodText} · ${P.fmtDate(deadline.due_date)}`
+    };
+  }
+
+  function upcomingDeadlineInfo(deadline){
+    const info=deadlineCalendarInfo(deadline);
+    const payment=paymentForDeadline(deadline);
+
+    if(!payment){
+      return {
+        title:deadline.title||P.deadlineTypeLabel(deadline.deadline_type),
+        sub:`${patentName(deadline.patent_id)} · ${P.fmtDate(deadline.due_date)}`
+      };
+    }
+
+    const annual=P.annualRangeLabel(
+      payment.annual_year_from,
+      payment.annual_year_to
+    );
+
+    const annualText=annual&&annual!=='-'
+      ? annual.replace(/\s*\([^)]*\)\s*$/,'')
+      : (payment.payment_title||P.paymentTypeLabel(payment.payment_type)||'납부');
+
+    let methodText='직접납부';
+
+    if(payment.payment_method==='AGENCY'){
+      methodText=agencyName(payment.agency_id)||'대행업체 미지정';
+    }else if(payment.payment_method){
+      methodText=P.paymentMethodLabel(payment.payment_method)||'직접납부';
+    }
+
+    return {
+      title:`[${annualText}] ${patentName(deadline.patent_id)}`,
+      sub:`${methodText} · ${P.fmtDate(deadline.due_date)}`
+    };
+  }
   function fillSelects(){
     const opts='<option value="">선택</option>'+patents.map(p=>`<option value="${p.id}">${P.escapeHtml((p.internal_no?p.internal_no+' · ':'')+p.invention_title)}</option>`).join(''); $('pay_patent_id').innerHTML=opts;$('dead_patent_id').innerHTML=opts;
     $('pay_agency_id').innerHTML='<option value="">선택</option>'+agencies.map(a=>`<option value="${a.id}">${P.escapeHtml(a.agency_name)}</option>`).join('');
@@ -353,8 +440,109 @@
     });
     $('deadlineTypeFilter').addEventListener('change',renderDeadlineTable);$('prevMonth').addEventListener('click',()=>{calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()-1,1);renderCalendar();});$('nextMonth').addEventListener('click',()=>{calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1);renderCalendar();});$('todayMonth').addEventListener('click',()=>{calendarDate=new Date();renderCalendar();});renderCalendar();renderDeadlineTable();renderUpcoming();
   }
-  function renderCalendar(){const y=calendarDate.getFullYear(),m=calendarDate.getMonth();$('calendarMonth').textContent=`${y}년 ${m+1}월`;const first=new Date(y,m,1),start=new Date(y,m,1-first.getDay());const heads=['일','월','화','수','목','금','토'].map(x=>`<div class="pat-cal-head">${x}</div>`).join('');let cells='';for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;const ev=deadlines.filter(x=>x.due_date===ds&&x.status==='OPEN').slice(0,3);cells+=`<div class="pat-cal-cell ${d.getMonth()!==m?'muted':''}"><div class="pat-cal-date">${d.getDate()}</div>${ev.map(x=>`<span class="pat-cal-event ${P.daysUntil(x.due_date)<=7?'red':P.deadlineTypeLabel(x.deadline_type)==='연차료'?'gold':'blue'}" title="${P.escapeHtml(x.title)}">${P.escapeHtml(x.title)}</span>`).join('')}</div>`;}$('calendar').innerHTML=heads+cells;}
-  function renderUpcoming(){const rows=deadlines.filter(x=>x.status==='OPEN').sort((a,b)=>String(a.due_date).localeCompare(String(b.due_date))).slice(0,8);$('upcomingDeadlines').innerHTML=rows.length?rows.map(x=>`<div class="upcoming-item"><div class="upcoming-top"><div class="upcoming-title">${P.escapeHtml(x.title)}</div><div class="pat-dday ${P.ddayClass(x.due_date)}">${P.dday(x.due_date)}</div></div><div class="upcoming-sub">${P.escapeHtml(patentName(x.patent_id))} · ${P.fmtDate(x.due_date)}</div></div>`).join(''):'<div class="pat-empty">다가오는 기한이 없습니다.</div>';}
+  function renderCalendar(){
+    const y=calendarDate.getFullYear();
+    const m=calendarDate.getMonth();
+
+    $('calendarMonth').textContent=`${y}년 ${m+1}월`;
+
+    const first=new Date(y,m,1);
+    const start=new Date(y,m,1-first.getDay());
+
+    const heads=['일','월','화','수','목','금','토']
+      .map(x=>`<div class="pat-cal-head">${x}</div>`)
+      .join('');
+
+    let cells='';
+
+    for(let i=0;i<42;i++){
+      const d=new Date(start);
+      d.setDate(start.getDate()+i);
+
+      const ds=[
+        d.getFullYear(),
+        String(d.getMonth()+1).padStart(2,'0'),
+        String(d.getDate()).padStart(2,'0')
+      ].join('-');
+
+      const dayEvents=deadlines
+        .filter(x=>x.due_date===ds&&x.status==='OPEN')
+        .sort((a,b)=>String(a.title||'').localeCompare(String(b.title||'')));
+
+      const visibleEvents=dayEvents.slice(0,2);
+
+      const eventHtml=visibleEvents.map(deadline=>{
+        const info=deadlineCalendarInfo(deadline);
+        const isPayment=!!deadline.related_payment_id;
+
+        const colorClass=P.daysUntil(deadline.due_date)<=7
+          ? 'red'
+          : isPayment
+            ? 'gold'
+            : 'blue';
+
+        return `
+          <div
+            class="pat-cal-event pat-cal-event-detail ${colorClass}"
+            title="${P.escapeHtml(info.tooltip)}"
+          >
+            <div class="pat-cal-event-main">
+              ${P.escapeHtml(info.main)}
+            </div>
+            <div class="pat-cal-event-sub">
+              ${P.escapeHtml(info.sub)}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const moreCount=dayEvents.length-visibleEvents.length;
+
+      const moreHtml=moreCount>0
+        ? `<div class="pat-cal-more">+${moreCount}건 더보기</div>`
+        : '';
+
+      cells+=`
+        <div class="pat-cal-cell ${d.getMonth()!==m?'muted':''}">
+          <div class="pat-cal-date">${d.getDate()}</div>
+          ${eventHtml}
+          ${moreHtml}
+        </div>
+      `;
+    }
+
+    $('calendar').innerHTML=heads+cells;
+  }
+
+  function renderUpcoming(){
+    const rows=deadlines
+      .filter(x=>x.status==='OPEN')
+      .sort((a,b)=>String(a.due_date).localeCompare(String(b.due_date)))
+      .slice(0,8);
+
+    $('upcomingDeadlines').innerHTML=rows.length
+      ? rows.map(deadline=>{
+          const info=upcomingDeadlineInfo(deadline);
+
+          return `
+            <div class="upcoming-item">
+              <div class="upcoming-top">
+                <div class="upcoming-title">
+                  ${P.escapeHtml(info.title)}
+                </div>
+                <div class="pat-dday ${P.ddayClass(deadline.due_date)}">
+                  ${P.dday(deadline.due_date)}
+                </div>
+              </div>
+              <div class="upcoming-sub">
+                ${P.escapeHtml(info.sub)}
+              </div>
+            </div>
+          `;
+        }).join('')
+      : '<div class="pat-empty">다가오는 기한이 없습니다.</div>';
+  }
+
   function renderDeadlineTable(){const type=$('deadlineTypeFilter')?.value||'';const rows=deadlines.filter(x=>!type||x.deadline_type===type);$('deadlineTable').innerHTML=`<div class="pat-card pat-card-pad"><div class="pat-table-wrap"><table class="pat-table"><thead><tr><th>특허</th><th>구분</th><th>기한명</th><th>기한일</th><th>D-Day</th><th>상태</th><th>관리</th></tr></thead><tbody>${rows.length?rows.map(x=>`<tr><td>${P.escapeHtml(patentName(x.patent_id))}</td><td>${P.deadlineTypeLabel(x.deadline_type)}</td><td>${P.escapeHtml(x.title)}</td><td>${P.fmtDate(x.due_date)}</td><td><span class="pat-dday ${P.ddayClass(x.due_date)}">${P.dday(x.due_date)}</span></td><td>${P.badge(x.status,x.status==='OPEN'?'진행중':x.status==='COMPLETED'?'완료':x.status)}</td><td>${ctx.access.write?`<button class="pat-btn" data-dead-edit="${x.id}">수정</button> ${x.status==='OPEN'?`<button class="pat-btn success" data-dead-complete="${x.id}">완료</button>`:''}`:'-'}</td></tr>`).join(''):'<tr><td colspan="7" class="pat-empty">기한정보가 없습니다.</td></tr>'}</tbody></table></div></div>`;document.querySelectorAll('[data-dead-edit]').forEach(b=>b.addEventListener('click',()=>openDeadlineModal(deadlines.find(x=>x.id===b.dataset.deadEdit))));document.querySelectorAll('[data-dead-complete]').forEach(b=>b.addEventListener('click',()=>completeDeadline(b.dataset.deadComplete)));}
   function clearDead(){['patent_id','deadline_type','title','base_date','due_date','additional_due_date','status','completed_date','note'].forEach(k=>P.setVal('dead_'+k,''));P.setVal('dead_deadline_type','ANNUAL_FEE');P.setVal('dead_status','OPEN');P.setVal('dead_alert_days_before',(settings?.alert_days_before||[90,30,7]).join(','));}
   function openDeadlineModal(x=null){if(!ctx.access.write)return;editingDeadline=x?.id||null;clearDead();$('deadlineModalTitle').textContent=x?'기한 수정':'기한 등록';if(x){Object.keys(x).forEach(k=>{if($('dead_'+k))P.setVal('dead_'+k,Array.isArray(x[k])?x[k].join(','):x[k]??'');});}P.modalOpen('deadlineModal');}
