@@ -41,6 +41,14 @@
     settings=set.error?null:set.data;
 
     /*
+     * 납부기한이 지난 미완료 납부건은 자동으로 OVERDUE(기한초과) 처리합니다.
+     * PAID/CANCELLED 건은 자동 변경하지 않습니다.
+     */
+    if(ctx.access.write){
+      await syncOverduePaymentStatuses();
+    }
+
+    /*
      * 기존 납부관리 데이터도 기한관리로 자동 보정합니다.
      * - related_payment_id 기준으로 중복 생성 방지
      * - 납부 수정 시 연결 기한도 동기화
@@ -155,6 +163,126 @@
   function renderCurrent(){if(section==='payments')renderPayments();if(section==='deadlines')renderDeadlines();if(section==='settings')renderSettings();}
 
   function paymentDue(x){return x.official_due_date||x.invoice_due_date||x.planned_payment_date;}
+
+  function paymentStatusRank(status){
+    if(status==='OVERDUE')return 0;
+
+    if([
+      'PLANNED',
+      'INVOICE_RECEIVED',
+      'PAYMENT_REQUESTED',
+      'APPROVING'
+    ].includes(status)){
+      return 1;
+    }
+
+    if(status==='PAID')return 2;
+    if(status==='CANCELLED')return 3;
+
+    return 1;
+  }
+
+  function paymentDueSortValue(payment){
+    const due=paymentDue(payment);
+
+    if(!due){
+      return Number.POSITIVE_INFINITY;
+    }
+
+    const time=new Date(`${due}T00:00:00`).getTime();
+
+    return Number.isFinite(time)
+      ? time
+      : Number.POSITIVE_INFINITY;
+  }
+
+  function sortPaymentsForList(rows){
+    return [...rows].sort((a,b)=>{
+      const rankDiff=
+        paymentStatusRank(a.status)-
+        paymentStatusRank(b.status);
+
+      if(rankDiff!==0){
+        return rankDiff;
+      }
+
+      const dueDiff=
+        paymentDueSortValue(a)-
+        paymentDueSortValue(b);
+
+      if(dueDiff!==0){
+        return dueDiff;
+      }
+
+      return String(
+        patentName(a.patent_id)
+      ).localeCompare(
+        String(
+          patentName(b.patent_id)
+        ),
+        'ko'
+      );
+    });
+  }
+
+  async function syncOverduePaymentStatuses(){
+    const overdueIds=payments
+      .filter(payment=>{
+        if([
+          'PAID',
+          'CANCELLED',
+          'OVERDUE'
+        ].includes(payment.status)){
+          return false;
+        }
+
+        const due=paymentDue(payment);
+        const days=P.daysUntil(due);
+
+        return (
+          due &&
+          days!==null &&
+          days<0
+        );
+      })
+      .map(payment=>payment.id);
+
+    if(!overdueIds.length){
+      return false;
+    }
+
+    const {error}=await P.state.client
+      .from('pat_payments')
+      .update({
+        status:'OVERDUE',
+        updated_by_employee_no:
+          ctx.session.employeeNo||null
+      })
+      .eq(
+        'company_id',
+        ctx.session.companyId
+      )
+      .in(
+        'id',
+        overdueIds
+      );
+
+    if(error){
+      throw error;
+    }
+
+    const overdueSet=new Set(overdueIds);
+
+    payments.forEach(payment=>{
+      if(overdueSet.has(payment.id)){
+        payment.status='OVERDUE';
+        payment.updated_by_employee_no=
+          ctx.session.employeeNo||null;
+      }
+    });
+
+    return true;
+  }
 
   function paymentDeadlineType(paymentType){
     const map={
@@ -317,9 +445,204 @@
     <div class="pat-filterbar"><input id="paymentSearch" class="pat-input" placeholder="특허명, 납부구분 검색"><select id="paymentStatus" class="pat-select"><option value="">전체 상태</option>${['PLANNED','INVOICE_RECEIVED','PAYMENT_REQUESTED','APPROVING','PAID','OVERDUE','CANCELLED'].map(x=>`<option value="${x}">${P.paymentStatusLabel(x)}</option>`).join('')}</select><select id="paymentMethod" class="pat-select"><option value="">전체 방식</option><option value="DIRECT">직접납부</option><option value="AGENCY">특허사무소 대행</option></select>${ctx.access.write?'<button id="newPaymentBtn" class="pat-btn primary">＋ 납부 등록</button>':''}</div><div id="paymentTable"></div>`;
     $('newPaymentBtn')?.addEventListener('click',()=>openPaymentModal()); ['paymentSearch','paymentStatus','paymentMethod'].forEach(id=>$(id).addEventListener(id==='paymentSearch'?'input':'change',renderPaymentTable)); renderPaymentTable();
   }
-  function renderPaymentTable(){const search=P.clean($('paymentSearch')?.value).toLowerCase(),st=$('paymentStatus')?.value||'',method=$('paymentMethod')?.value||'';const rows=payments.filter(x=>(!st||x.status===st)&&(!method||x.payment_method===method)&&(!search||[patentName(x.patent_id),P.paymentTypeLabel(x.payment_type),x.payment_title].join(' ').toLowerCase().includes(search)));
-    $('paymentTable').innerHTML=`<div class="pat-card pat-card-pad"><div class="pat-table-wrap"><table class="pat-table management-table"><thead><tr><th>특허</th><th>납부구분</th><th>대상연차</th><th>방식</th><th>납부기한</th><th>청구금액</th><th>지급금액</th><th>상태</th><th>지급일</th><th>관리</th></tr></thead><tbody>${rows.length?rows.map(x=>`<tr><td>${P.escapeHtml(patentName(x.patent_id))}</td><td>${P.escapeHtml(x.payment_title||P.paymentTypeLabel(x.payment_type))}</td><td>${P.annualRangeLabel(x.annual_year_from,x.annual_year_to)}</td><td>${P.paymentMethodLabel(x.payment_method)}${x.agency_id?'<div class="pat-card-desc">'+P.escapeHtml(agencies.find(a=>a.id===x.agency_id)?.agency_name||'')+'</div>':''}</td><td>${P.fmtDate(paymentDue(x))}<div class="pat-dday ${P.ddayClass(paymentDue(x))}">${P.dday(paymentDue(x))}</div></td><td class="num">${P.fmtMoney(x.billed_amount,x.currency)}</td><td class="num">${P.fmtMoney(x.paid_amount,x.currency)}</td><td>${P.badge(x.status,P.paymentStatusLabel(x.status))}</td><td>${P.fmtDate(x.paid_date)}</td><td>${ctx.access.write?`<button class="pat-btn" data-pay-edit="${x.id}">수정</button>`:'-'}</td></tr>`).join(''):'<tr><td colspan="10" class="pat-empty">납부내역이 없습니다.</td></tr>'}</tbody></table></div></div>`;
-    document.querySelectorAll('[data-pay-edit]').forEach(b=>b.addEventListener('click',()=>openPaymentModal(payments.find(x=>x.id===b.dataset.payEdit))));
+  function paymentActionHtml(payment){
+    if(!ctx.access.write)return '-';
+
+    const editButton=`
+      <button
+        class="pat-btn"
+        data-pay-edit="${payment.id}"
+      >
+        수정
+      </button>
+    `;
+
+    /*
+     * 실제 지급완료(PAID) 건은 회계/이력 보존을 위해 삭제하지 않습니다.
+     * 그 외 미지급/진행/취소 건은 잘못 등록한 경우 삭제할 수 있습니다.
+     */
+    const deleteButton=(
+      ctx.access.admin &&
+      payment.status!=='PAID'
+    )
+      ? `
+        <button
+          class="pat-btn danger"
+          data-pay-delete="${payment.id}"
+        >
+          삭제
+        </button>
+      `
+      : '';
+
+    return `
+      <div class="file-actions">
+        ${editButton}
+        ${deleteButton}
+      </div>
+    `;
+  }
+
+  function renderPaymentTable(){
+    const search=P.clean(
+      $('paymentSearch')?.value
+    ).toLowerCase();
+
+    const st=$('paymentStatus')?.value||'';
+    const method=$('paymentMethod')?.value||'';
+
+    const rows=sortPaymentsForList(
+      payments.filter(x=>
+        (!st||x.status===st)&&
+        (!method||x.payment_method===method)&&
+        (
+          !search||
+          [
+            patentName(x.patent_id),
+            P.paymentTypeLabel(x.payment_type),
+            x.payment_title
+          ]
+            .join(' ')
+            .toLowerCase()
+            .includes(search)
+        )
+      )
+    );
+
+    $('paymentTable').innerHTML=`
+      <div class="pat-card pat-card-pad">
+        <div class="pat-table-wrap">
+          <table class="pat-table management-table">
+            <thead>
+              <tr>
+                <th>특허</th>
+                <th>납부구분</th>
+                <th>대상연차</th>
+                <th>방식</th>
+                <th>납부기한</th>
+                <th>청구금액</th>
+                <th>지급금액</th>
+                <th>상태</th>
+                <th>지급일</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                rows.length
+                  ? rows.map(x=>`
+                    <tr>
+                      <td>
+                        ${P.escapeHtml(
+                          patentName(x.patent_id)
+                        )}
+                      </td>
+                      <td>
+                        ${P.escapeHtml(
+                          x.payment_title||
+                          P.paymentTypeLabel(
+                            x.payment_type
+                          )
+                        )}
+                      </td>
+                      <td>
+                        ${P.annualRangeLabel(
+                          x.annual_year_from,
+                          x.annual_year_to
+                        )}
+                      </td>
+                      <td>
+                        ${P.paymentMethodLabel(
+                          x.payment_method
+                        )}
+                        ${
+                          x.agency_id
+                            ? `
+                              <div class="pat-card-desc">
+                                ${P.escapeHtml(
+                                  agencies.find(
+                                    a=>a.id===x.agency_id
+                                  )?.agency_name||''
+                                )}
+                              </div>
+                            `
+                            : ''
+                        }
+                      </td>
+                      <td>
+                        ${P.fmtDate(paymentDue(x))}
+                        <div class="pat-dday ${P.ddayClass(paymentDue(x))}">
+                          ${P.dday(paymentDue(x))}
+                        </div>
+                      </td>
+                      <td class="num">
+                        ${P.fmtMoney(
+                          x.billed_amount,
+                          x.currency
+                        )}
+                      </td>
+                      <td class="num">
+                        ${P.fmtMoney(
+                          x.paid_amount,
+                          x.currency
+                        )}
+                      </td>
+                      <td>
+                        ${P.badge(
+                          x.status,
+                          P.paymentStatusLabel(
+                            x.status
+                          )
+                        )}
+                      </td>
+                      <td>
+                        ${P.fmtDate(x.paid_date)}
+                      </td>
+                      <td>
+                        ${paymentActionHtml(x)}
+                      </td>
+                    </tr>
+                  `).join('')
+                  : `
+                    <tr>
+                      <td
+                        colspan="10"
+                        class="pat-empty"
+                      >
+                        납부내역이 없습니다.
+                      </td>
+                    </tr>
+                  `
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    document
+      .querySelectorAll('[data-pay-edit]')
+      .forEach(button=>{
+        button.addEventListener(
+          'click',
+          ()=>openPaymentModal(
+            payments.find(
+              x=>x.id===button.dataset.payEdit
+            )
+          )
+        );
+      });
+
+    document
+      .querySelectorAll('[data-pay-delete]')
+      .forEach(button=>{
+        button.addEventListener(
+          'click',
+          ()=>deletePayment(
+            button.dataset.payDelete
+          )
+        );
+      });
   }
   function clearPay(){['patent_id','payment_type','annual_year_from','annual_year_to','payment_title','payment_method','agency_id','status','official_due_date','additional_due_date','invoice_received_date','invoice_due_date','payment_request_date','planned_payment_date','paid_date','official_paid_date','official_fee','agency_fee','vat_amount','other_fee','billed_amount','paid_amount','note'].forEach(k=>P.setVal('pay_'+k,''));P.setVal('pay_payment_type','ANNUAL_FEE');P.setVal('pay_payment_method','DIRECT');P.setVal('pay_status','PLANNED');P.setVal('pay_currency','KRW');}
   function openPaymentModal(x=null){if(!ctx.access.write)return;editingPayment=x?.id||null;clearPay();$('paymentModalTitle').textContent=x?'납부 수정':'납부 등록';if(x)Object.keys(x).forEach(k=>{if($('pay_'+k))P.setVal('pay_'+k,x[k]??'');});const pid=query.get('patent_id');if(!x&&pid&&patents.some(p=>p.id===pid))P.setVal('pay_patent_id',pid);toggleAgencyField();P.modalOpen('paymentModal');}
@@ -415,6 +738,126 @@
       showSection('payments');
     }catch(e){
       P.toast(e.message,'error');
+    }
+  }
+
+  async function deletePayment(paymentId){
+    if(!ctx.access.admin)return;
+
+    const payment=payments.find(
+      x=>x.id===paymentId
+    );
+
+    if(!payment){
+      P.toast(
+        '납부정보를 찾을 수 없습니다.',
+        'warn'
+      );
+      return;
+    }
+
+    if(payment.status==='PAID'){
+      P.toast(
+        '지급완료된 납부정보는 삭제할 수 없습니다.',
+        'warn'
+      );
+      return;
+    }
+
+    const title=
+      payment.payment_title||
+      P.paymentTypeLabel(
+        payment.payment_type
+      )||
+      '납부정보';
+
+    const confirmed=confirm(
+      `${patentName(payment.patent_id)}\n`+
+      `${title}\n\n`+
+      '이 납부정보를 삭제할까요?\n'+
+      '자동 생성된 기한정보도 함께 삭제됩니다.'
+    );
+
+    if(!confirmed)return;
+
+    try{
+      /*
+       * 1) 자동 생성된 기한을 먼저 제거합니다.
+       *    pat_payments를 먼저 지우면 FK의 ON DELETE SET NULL 때문에
+       *    기한이 일반 기한처럼 남을 수 있으므로 순서를 지킵니다.
+       */
+      const deadlineResult=
+        await P.state.client
+          .from('pat_deadlines')
+          .delete()
+          .eq(
+            'related_payment_id',
+            payment.id
+          )
+          .eq(
+            'company_id',
+            ctx.session.companyId
+          );
+
+      if(deadlineResult.error){
+        throw deadlineResult.error;
+      }
+
+      /*
+       * 2) 납부건에 연결된 첨부파일은 삭제하지 않고
+       *    특허 공통 첨부문서로 보존합니다.
+       *    (DB FK가 payment 삭제 시 cascade이므로 사전에 연결만 해제)
+       */
+      const fileResult=
+        await P.state.client
+          .from('pat_files')
+          .update({
+            payment_id:null
+          })
+          .eq(
+            'payment_id',
+            payment.id
+          )
+          .eq(
+            'company_id',
+            ctx.session.companyId
+          );
+
+      if(fileResult.error){
+        throw fileResult.error;
+      }
+
+      /*
+       * 3) 납부정보 삭제
+       */
+      const paymentResult=
+        await P.state.client
+          .from('pat_payments')
+          .delete()
+          .eq(
+            'id',
+            payment.id
+          )
+          .eq(
+            'company_id',
+            ctx.session.companyId
+          );
+
+      if(paymentResult.error){
+        throw paymentResult.error;
+      }
+
+      P.toast(
+        '납부정보와 자동 기한정보를 삭제했습니다.'
+      );
+
+      await loadAll();
+      showSection('payments');
+    }catch(e){
+      P.toast(
+        e.message,
+        'error'
+      );
     }
   }
 
