@@ -133,11 +133,6 @@
       this.dateInteractionGuardUntil = 0;
     },
 
-    getTodayDateValue() {
-      const now = new Date();
-      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    },
-
     get tableName() {
       return "reagent_collect_items";
     },
@@ -803,19 +798,6 @@
 
         const nextValue = String(input.value || "").trim();
         const committedValue = String(input.dataset.orderReceiptCommittedValue || "").trim();
-        const openedAt = Number(input.dataset.orderReceiptOpenedAt || 0);
-        const elapsed = openedAt ? Date.now() - openedAt : Number.MAX_SAFE_INTEGER;
-        const isMobile = window.matchMedia?.("(max-width: 760px)")?.matches === true;
-
-        // 일부 Android WebView/브라우저는 빈 date input을 탭하는 순간
-        // 오늘 날짜를 change로 확정하는 경우가 있습니다. 실제 선택보다 지나치게 빠른
-        // '빈 값 -> 오늘' 변경은 무시하고 원래 값으로 되돌립니다.
-        if (isMobile && !committedValue && nextValue === this.getTodayDateValue() && elapsed < 1200) {
-          input.value = committedValue;
-          input.dataset.orderReceiptCommittedValue = committedValue;
-          return;
-        }
-
         // 달력을 열고 닫기만 했거나 같은 날짜를 다시 선택한 경우 저장하지 않습니다.
         if (nextValue === committedValue) {
           this.endDateInteraction();
