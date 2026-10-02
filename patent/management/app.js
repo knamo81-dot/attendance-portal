@@ -8,7 +8,10 @@
 
   async function init(){
     ctx=await P.resolveContext();
-    if(!ctx.access.read){document.querySelector('.pat-app').innerHTML='<div class="pat-error">특허관리 접근 권한이 없습니다.</div>';return;}
+    if(!ctx.access.write){
+      document.querySelector('.pat-app').innerHTML='<div class="pat-error">특허 운영자 또는 관리자만 이용할 수 있습니다.</div>';
+      return;
+    }
     section=query.get('section')||'payments';
     bind(); await loadAll(); showSection(section);
   }
