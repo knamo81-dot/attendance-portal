@@ -59,3 +59,42 @@
     min-width:104px;
   }
 }
+
+/* 달력 칸 너비 고정 + 일정 텍스트 칸 안에서만 말줄임 */
+.pat-calendar{
+  grid-template-columns:repeat(7,minmax(0,1fr));
+}
+
+.pat-cal-head,
+.pat-cal-cell{
+  min-width:0;
+}
+
+.pat-cal-cell{
+  overflow:hidden;
+}
+
+.pat-cal-event-detail{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  overflow:hidden;
+}
+
+.pat-cal-event-main,
+.pat-cal-event-sub{
+  display:block;
+  width:100%;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.pat-cal-more{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
