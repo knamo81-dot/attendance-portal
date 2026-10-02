@@ -3,7 +3,7 @@
   const P=window.PatentCommon;
   let ctx=null, patents=[], payments=[], deadlines=[], agencies=[], employees=[], settings=null;
   let section='payments', editingPayment=null, editingDeadline=null, editingAgency=null, calendarDate=new Date();
-  let companySearchData=null, companySearchPage=1, companySearchPageSize=50, companySearchLoading=false, companySearchCacheLoading=false;
+  let companySearchData=null, companySearchPage=1, companySearchPageSize=50, companySearchLoading=false, companySearchCacheLoading=false, companySearchCountry='KR', companySearchNameValue='';
   const query=new URLSearchParams(location.search);
   const $=id=>document.getElementById(id);
 
@@ -1202,6 +1202,42 @@
   async function completeDeadline(id){const {error}=await P.state.client.from('pat_deadlines').update({status:'COMPLETED',completed_date:new Date().toISOString().slice(0,10),updated_by_employee_no:ctx.session.employeeNo||null}).eq('id',id).eq('company_id',ctx.session.companyId);if(error){P.toast(error.message,'error');return;}P.toast('완료 처리했습니다.');await loadAll();showSection('deadlines');}
 
 
+
+  const COMPANY_SEARCH_COUNTRIES=[
+    ['KR','한국'],
+    ['US','미국'],
+    ['EP','유럽특허청'],
+    ['JP','일본'],
+    ['CN','중국'],
+    ['WO','PCT']
+  ];
+
+  function normalizeCompanySearchCountry(value){
+    const code=String(value||'KR').trim().toUpperCase();
+    if(code==='CP')return 'CN';
+    return COMPANY_SEARCH_COUNTRIES.some(([v])=>v===code)
+      ?code
+      :'KR';
+  }
+
+  function companySearchCountryOptions(selected){
+    const current=normalizeCompanySearchCountry(selected);
+    return COMPANY_SEARCH_COUNTRIES
+      .map(([value,label])=>(
+        `<option value="${value}" ${value===current?'selected':''}>${label} (${value})</option>`
+      ))
+      .join('');
+  }
+
+  function currentCompanySearchCountry(){
+    return normalizeCompanySearchCountry(
+      $('companySearchCountry')?.value||
+      companySearchData?.country_code||
+      companySearchCountry||
+      'KR'
+    );
+  }
+
   function defaultCompanySearchName(){
     const sessionName=String(ctx?.session?.companyName||'').trim();
     return sessionName||'삼천당제약';
@@ -1211,6 +1247,7 @@
   function currentCompanySearchName(){
     return String(
       $('companySearchName')?.value||
+      companySearchNameValue||
       companySearchData?.company_name||
       defaultCompanySearchName()
     ).trim();
@@ -1224,8 +1261,26 @@
       .replace(/\s+/g,'');
   }
 
-  function numberDigits(value){
-    return String(value||'').replace(/\D/g,'');
+  function patentNumberKey(value){
+    const source=String(value||'');
+
+    try{
+      return source
+        .normalize('NFKC')
+        .replace(/[^0-9A-Za-z]/g,'')
+        .toUpperCase();
+    }catch(_){
+      return source
+        .replace(/[^0-9A-Za-z]/g,'')
+        .toUpperCase();
+    }
+  }
+
+  function portalPatentKey(country,value){
+    const number=patentNumberKey(value);
+    if(!number)return '';
+
+    return `${normalizeCompanySearchCountry(country)}::${number}`;
   }
 
   function refreshPortalRegistrationFlags(data){
@@ -1235,24 +1290,49 @@
     const byRegistration=new Map();
 
     patents.forEach(patent=>{
-      const appNo=numberDigits(patent.application_no);
-      const regNo=numberDigits(patent.registration_no);
+      const country=normalizeCompanySearchCountry(
+        patent.country_code||'KR'
+      );
 
-      if(appNo)byApplication.set(appNo,patent);
-      if(regNo)byRegistration.set(regNo,patent);
+      const appKey=portalPatentKey(
+        country,
+        patent.application_no
+      );
+
+      const regKey=portalPatentKey(
+        country,
+        patent.registration_no
+      );
+
+      if(appKey)byApplication.set(appKey,patent);
+      if(regKey)byRegistration.set(regKey,patent);
     });
 
     data.patents=data.patents.map(item=>{
-      const appNo=numberDigits(item.application_no);
-      const regNo=numberDigits(item.registration_no);
+      const country=normalizeCompanySearchCountry(
+        item.country_code||
+        data.country_code||
+        'KR'
+      );
+
+      const appKey=portalPatentKey(
+        country,
+        item.application_no
+      );
+
+      const regKey=portalPatentKey(
+        country,
+        item.registration_no
+      );
 
       const existing=
-        (appNo?byApplication.get(appNo):null)||
-        (regNo?byRegistration.get(regNo):null)||
+        (appKey?byApplication.get(appKey):null)||
+        (regKey?byRegistration.get(regKey):null)||
         null;
 
       return {
         ...item,
+        country_code:country,
         portal_registered:!!existing,
         portal_patent_id:existing?.id||null
       };
@@ -1295,6 +1375,12 @@
     };
 
     companySearchData=normalized;
+    companySearchCountry=normalizeCompanySearchCountry(
+      normalized.country_code||companySearchCountry
+    );
+    companySearchNameValue=String(
+      normalized.company_name||companySearchNameValue||''
+    ).trim();
     companySearchPage=
       Math.max(1,Number(normalized.page||companySearchPage)||1);
     companySearchPageSize=
@@ -1316,7 +1402,12 @@
 
     const targetPage=Math.max(1,Number(page)||1);
     const key=companySearchCacheKey(name);
+    const country=normalizeCompanySearchCountry(
+      options.countryCode||currentCompanySearchCountry()
+    );
 
+    companySearchCountry=country;
+    companySearchNameValue=name;
     companySearchCacheLoading=true;
 
     try{
@@ -1327,7 +1418,7 @@
         )
         .eq('company_id',ctx.session.companyId)
         .eq('search_name_key',key)
-        .eq('country_code','KR')
+        .eq('country_code',country)
         .eq('page',targetPage)
         .eq('page_size',companySearchPageSize)
         .maybeSingle();
@@ -1429,11 +1520,15 @@
   async function openCompanySearchPage(page){
     const targetPage=Math.max(1,Number(page)||1);
     const companyName=currentCompanySearchName();
+    const country=currentCompanySearchCountry();
 
     const loaded=await loadCompanySearchCachePage(
       companyName,
       targetPage,
-      {notify:false}
+      {
+        notify:false,
+        countryCode:country
+      }
     );
 
     if(loaded)return;
@@ -1475,9 +1570,9 @@
   }
 
   function countryLabel(value){
-    const code=String(value||'').toUpperCase();
-    if(code==='KR')return '한국';
-    return code||'-';
+    const code=normalizeCompanySearchCountry(value);
+    const found=COMPANY_SEARCH_COUNTRIES.find(([v])=>v===code);
+    return found?`${found[1]} (${code})`:(code||'-');
   }
 
   function normalizeSearchText(value){
@@ -1536,7 +1631,7 @@
         <div>
           <div class="pat-card-title">회사특허 조회</div>
           <div class="pat-card-desc">
-            KIPRIS 출원인 검색 결과를 현재 권리자와 포털 특허목록에 비교합니다.
+            KIPRIS 국내·해외 출원인 검색 결과를 포털 특허목록과 비교합니다.
             이미 포털에 등록된 특허는 자동 제외하고 미등록 후보만 표시합니다.
           </div>
         </div>
@@ -1552,6 +1647,17 @@
             placeholder="예: 삼천당제약"
           >
         </div>
+        <div class="company-search-country">
+          <label>조회 국가</label>
+          <select
+            id="companySearchCountry"
+            class="pat-select"
+          >
+            ${companySearchCountryOptions(
+              data?.country_code||companySearchCountry
+            )}
+          </select>
+        </div>
         <div class="company-search-actions">
           <button id="companyCacheLoadBtn" class="pat-btn secondary" type="button">
             저장자료 불러오기
@@ -1565,6 +1671,7 @@
       <div class="pat-note company-search-note">
         저장된 조회결과가 있으면 API를 다시 호출하지 않고 DB 자료를 사용합니다.
         포털 특허목록에 이미 등록된 건은 화면에서 자동 제외합니다.
+        해외특허는 국가별 데이터 제공범위에 따라 현재 권리자가 없을 수 있어 <b>확인필요</b>로 표시될 수 있습니다.
         <b>KIPRIS 새로조회</b>를 누른 경우에만 최신 KIPRIS 결과를 확인하고 다시 저장합니다.
       </div>
 
@@ -1582,9 +1689,29 @@
       loadCompanySearchCachePage(
         currentCompanySearchName(),
         1,
-        {notify:true}
+        {
+          notify:true,
+          countryCode:currentCompanySearchCountry()
+        }
       )
     ));
+
+    $('companySearchCountry')?.addEventListener('change',async()=>{
+      companySearchNameValue=currentCompanySearchName();
+      companySearchCountry=currentCompanySearchCountry();
+      companySearchPage=1;
+      companySearchData=null;
+      renderCompanySearch();
+
+      await loadCompanySearchCachePage(
+        companySearchNameValue,
+        1,
+        {
+          notify:false,
+          countryCode:companySearchCountry
+        }
+      ).catch(error=>console.warn('[company-search-country]',error));
+    });
 
     if(data){
       ['companyResultSearch','companyOwnershipFilter']
@@ -1630,7 +1757,8 @@
     return `
       <div class="company-search-summary-note">
         <span>
-          KIPRIS 전체 <b>${Number(data.total_count||0).toLocaleString('ko-KR')}건</b>
+          ${P.escapeHtml(countryLabel(data.country_code||companySearchCountry))}
+          · KIPRIS 전체 <b>${Number(data.total_count||0).toLocaleString('ko-KR')}건</b>
           · 현재 ${P.escapeHtml(pageLabel)}
           · 검토대상 <b>${rows.length.toLocaleString('ko-KR')}건</b>
           ${excludedRegisteredCount?`· 포털 등록 ${excludedRegisteredCount.toLocaleString('ko-KR')}건 제외`:''}
@@ -1744,12 +1872,16 @@
   async function findExistingPatentForCompanyItem(item){
     const appNo=String(item?.application_no||'').trim();
     const regNo=String(item?.registration_no||'').trim();
+    const country=normalizeCompanySearchCountry(
+      item?.country_code||companySearchCountry||'KR'
+    );
 
     if(appNo){
       const {data,error}=await P.state.client
         .from('pat_master')
         .select('id,invention_title,application_no,registration_no,legal_status')
         .eq('company_id',ctx.session.companyId)
+        .eq('country_code',country)
         .eq('application_no',appNo)
         .limit(1)
         .maybeSingle();
@@ -1763,6 +1895,7 @@
         .from('pat_master')
         .select('id,invention_title,application_no,registration_no,legal_status')
         .eq('company_id',ctx.session.companyId)
+        .eq('country_code',country)
         .eq('registration_no',regNo)
         .limit(1)
         .maybeSingle();
@@ -1815,9 +1948,15 @@
 
       if(lookupNumber){
         try{
+          const itemCountry=normalizeCompanySearchCountry(
+            item.country_code||companySearchCountry||'KR'
+          );
+
           const detail=await P.invokeKipris({
-            action:'lookup',
+            action:itemCountry==='KR'?'lookup':'lookup-foreign',
             number:lookupNumber,
+            literature_no:item.literature_no||null,
+            country_code:itemCountry,
             company_id:ctx.session.companyId
           });
 
@@ -2109,13 +2248,18 @@
     renderCompanySearch();
 
     try{
+      const country=currentCompanySearchCountry();
+      companySearchCountry=country;
+      companySearchNameValue=companyName;
+
       const data=await P.invokeKipris({
         action:'search-company',
         company_id:ctx.session.companyId,
         company_name:companyName,
+        country_code:country,
         page:companySearchPage,
         page_size:companySearchPageSize,
-        include_registration_detail:true
+        include_registration_detail:country==='KR'
       });
 
       applyCompanySearchData(
