@@ -44,6 +44,8 @@
   let currentPatent = null;
   let detailData = null;
   let editingId = null;
+  let duplicatePatentId = null;
+  let duplicateCheckTimer = null;
   let bulkRefreshRunning = false;
 
   function arrayFromText(value) {
@@ -151,6 +153,278 @@
     return divisions.find(
       (item) => item.division_code === divisionCode
     )?.division_name || divisionCode;
+  }
+
+
+  function normalizePatentNumber(value) {
+    return String(value || '')
+      .trim()
+      .replace(/[^0-9A-Za-z]/g, '')
+      .toUpperCase();
+  }
+
+  function hideDuplicatePatentNotice() {
+    duplicatePatentId = null;
+
+    const notice = document.getElementById(
+      'duplicatePatentNotice'
+    );
+
+    if (notice) {
+      notice.hidden = true;
+      notice.innerHTML = '';
+    }
+
+    const lookupInput = document.getElementById(
+      'lookupNo'
+    );
+
+    if (lookupInput) {
+      lookupInput.classList.remove(
+        'pat-input-duplicate'
+      );
+    }
+
+    const saveButton = document.getElementById(
+      'savePatentBtn'
+    );
+
+    if (saveButton) {
+      saveButton.disabled = false;
+    }
+  }
+
+  function showDuplicatePatentNotice(
+    patent,
+    matchedNumber = ''
+  ) {
+    if (!patent) {
+      hideDuplicatePatentNotice();
+      return;
+    }
+
+    if (
+      editingId &&
+      String(patent.id) === String(editingId)
+    ) {
+      hideDuplicatePatentNotice();
+      return;
+    }
+
+    duplicatePatentId = patent.id;
+
+    const notice = document.getElementById(
+      'duplicatePatentNotice'
+    );
+
+    if (!notice) {
+      return;
+    }
+
+    const appNo = patent.application_no || '-';
+    const regNo = patent.registration_no || '-';
+    const title = patent.invention_title || '등록된 특허';
+    const status = P.patentStatusLabel(
+      patent.legal_status
+    );
+
+    notice.innerHTML = `
+      <div class="pat-duplicate-notice-title">
+        이미 등록된 특허입니다.
+      </div>
+      <div class="pat-duplicate-notice-body">
+        <strong>${P.escapeHtml(title)}</strong>
+        <span>상태: ${P.escapeHtml(status || '-')}</span>
+        <span>출원번호: ${P.escapeHtml(appNo)}</span>
+        <span>등록번호: ${P.escapeHtml(regNo)}</span>
+      </div>
+      <div class="pat-duplicate-notice-help">
+        같은 특허를 새로 등록할 수 없습니다.
+        기존 특허를 목록에서 열어 수정해 주세요.
+      </div>
+    `;
+
+    notice.hidden = false;
+
+    const lookupInput = document.getElementById(
+      'lookupNo'
+    );
+
+    if (lookupInput) {
+      lookupInput.classList.add(
+        'pat-input-duplicate'
+      );
+    }
+
+    const saveButton = document.getElementById(
+      'savePatentBtn'
+    );
+
+    if (saveButton) {
+      saveButton.disabled = true;
+    }
+  }
+
+  function findDuplicatePatentLocal(number) {
+    const normalized = normalizePatentNumber(
+      number
+    );
+
+    if (!normalized) {
+      return null;
+    }
+
+    return patents.find((patent) => {
+      if (
+        editingId &&
+        String(patent.id) === String(editingId)
+      ) {
+        return false;
+      }
+
+      const appNo = normalizePatentNumber(
+        patent.application_no
+      );
+
+      const regNo = normalizePatentNumber(
+        patent.registration_no
+      );
+
+      return (
+        appNo === normalized ||
+        regNo === normalized
+      );
+    }) || null;
+  }
+
+  function checkDuplicatePatentInput() {
+    const lookupNo = P.val('lookupNo');
+    const applicationNo = P.val(
+      'f_application_no'
+    );
+    const registrationNo = P.val(
+      'f_registration_no'
+    );
+
+    const candidates = [
+      lookupNo,
+      applicationNo,
+      registrationNo
+    ].filter(Boolean);
+
+    let duplicate = null;
+    let matched = '';
+
+    for (const number of candidates) {
+      duplicate = findDuplicatePatentLocal(
+        number
+      );
+
+      if (duplicate) {
+        matched = number;
+        break;
+      }
+    }
+
+    if (duplicate) {
+      showDuplicatePatentNotice(
+        duplicate,
+        matched
+      );
+      return duplicate;
+    }
+
+    hideDuplicatePatentNotice();
+    return null;
+  }
+
+  function scheduleDuplicatePatentCheck() {
+    if (duplicateCheckTimer) {
+      clearTimeout(duplicateCheckTimer);
+    }
+
+    duplicateCheckTimer = setTimeout(
+      checkDuplicatePatentInput,
+      180
+    );
+  }
+
+  async function findDuplicatePatentInDb(
+    payload
+  ) {
+    const checks = [];
+
+    if (payload.application_no) {
+      checks.push([
+        'application_no',
+        payload.application_no
+      ]);
+    }
+
+    if (payload.registration_no) {
+      checks.push([
+        'registration_no',
+        payload.registration_no
+      ]);
+    }
+
+    for (const [field, value] of checks) {
+      let query = P.companyQuery(
+        'pat_master',
+        'id,invention_title,application_no,registration_no,legal_status,division_code'
+      )
+        .eq(field, value)
+        .limit(1);
+
+      if (editingId) {
+        query = query.neq(
+          'id',
+          editingId
+        );
+      }
+
+      const result = await query.maybeSingle();
+
+      if (result.error) {
+        console.warn(
+          '[Patent] 중복 특허 확인 실패:',
+          result.error
+        );
+        continue;
+      }
+
+      if (result.data) {
+        return result.data;
+      }
+    }
+
+    return null;
+  }
+
+  function isPatentDuplicateConstraint(error) {
+    const message = String(
+      error?.message || ''
+    ).toLowerCase();
+
+    const details = String(
+      error?.details || ''
+    ).toLowerCase();
+
+    const constraint = String(
+      error?.constraint || ''
+    ).toLowerCase();
+
+    return (
+      message.includes('duplicate key value') ||
+      message.includes('unique constraint') ||
+      details.includes('already exists') ||
+      constraint.includes(
+        'uq_pat_master_company_application_no'
+      ) ||
+      constraint.includes(
+        'uq_pat_master_company_registration_no'
+      )
+    );
   }
 
   function extractKiprisPatent(data) {
@@ -538,6 +812,31 @@
         'click',
         lookupKipris
       );
+
+
+    [
+      'lookupNo',
+      'f_application_no',
+      'f_registration_no'
+    ].forEach((id) => {
+      const input = document.getElementById(
+        id
+      );
+
+      if (!input) {
+        return;
+      }
+
+      input.addEventListener(
+        'input',
+        scheduleDuplicatePatentCheck
+      );
+
+      input.addEventListener(
+        'change',
+        checkDuplicatePatentInput
+      );
+    });
 
     document
       .getElementById('backBtn')
@@ -1045,6 +1344,8 @@
       'lookupNo',
       ''
     );
+
+    hideDuplicatePatentNotice();
   }
 
   function openPatentModal(patent = null) {
@@ -1052,8 +1353,9 @@
       return;
     }
 
-    editingId = patent?.id || null;
+    editingId = null;
     clearForm();
+    editingId = patent?.id || null;
 
     document.getElementById(
       'patentModalTitle'
@@ -1257,6 +1559,38 @@
       return;
     }
 
+    const localDuplicate =
+      checkDuplicatePatentInput();
+
+    if (localDuplicate) {
+      P.toast(
+        '이미 등록된 특허입니다. 입력창 상단의 안내를 확인해 주세요.',
+        'warn',
+        3600
+      );
+      return;
+    }
+
+    const dbDuplicate =
+      await findDuplicatePatentInDb(
+        payload
+      );
+
+    if (dbDuplicate) {
+      showDuplicatePatentNotice(
+        dbDuplicate,
+        payload.application_no ||
+        payload.registration_no
+      );
+
+      P.toast(
+        '이미 등록된 특허입니다. 기존 특허를 확인해 주세요.',
+        'warn',
+        3600
+      );
+      return;
+    }
+
     const button = this;
     button.disabled = true;
 
@@ -1358,10 +1692,38 @@
         await openDetail(row.id);
       }
     } catch (error) {
-      P.toast(
-        error.message,
-        'error'
-      );
+      if (
+        isPatentDuplicateConstraint(
+          error
+        )
+      ) {
+        const duplicate =
+          findDuplicatePatentLocal(
+            payload.application_no
+          ) ||
+          findDuplicatePatentLocal(
+            payload.registration_no
+          );
+
+        if (duplicate) {
+          showDuplicatePatentNotice(
+            duplicate,
+            payload.application_no ||
+            payload.registration_no
+          );
+        }
+
+        P.toast(
+          '이미 등록된 특허입니다. 출원번호 또는 등록번호를 확인해 주세요.',
+          'warn',
+          4200
+        );
+      } else {
+        P.toast(
+          error.message,
+          'error'
+        );
+      }
     } finally {
       button.disabled = false;
     }
@@ -1517,9 +1879,20 @@
 
       applyKiprisData(data);
 
-      P.toast(
-        'KIPRIS 정보를 불러왔습니다.'
-      );
+      const duplicate =
+        checkDuplicatePatentInput();
+
+      if (duplicate) {
+        P.toast(
+          'KIPRIS 조회는 완료했지만 이미 등록된 특허입니다.',
+          'warn',
+          3800
+        );
+      } else {
+        P.toast(
+          'KIPRIS 정보를 불러왔습니다.'
+        );
+      }
     } catch (error) {
       P.toast(
         error.message +
