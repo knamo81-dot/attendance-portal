@@ -513,9 +513,9 @@
       <div class="table-wrap" style="margin-top:16px;">
         <table>
           <thead>
-            <tr><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>규격</th><th>CAS</th><th>등급</th><th>기본거래처</th><th>선정사유</th><th>사용여부</th><th>수정자</th><th>작업</th></tr>
+            <tr><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>규격</th><th>CAS</th><th>등급</th><th>QR/바코드</th><th>기본거래처</th><th>선정사유</th><th>사용여부</th><th>수정자</th><th>작업</th></tr>
           </thead>
-          <tbody id="pmProductList"><tr><td class="empty" colspan="12">제품 마스터를 불러오는 중입니다.</td></tr></tbody>
+          <tbody id="pmProductList"><tr><td class="empty" colspan="13">제품 마스터를 불러오는 중입니다.</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -570,10 +570,10 @@
   - 실제 tbody 데이터 출력 순서는 collect.js / order_receipt.js 렌더링 코드도 동일 순서로 맞춰야 완전히 반영됩니다.
 -->
 <script src="../collect.js"></script>
-<script src="../product_management.js"></script>
+<script src="../product_management.js?v=20261002-identifiers1"></script>
 <script src="../order_receipt.js?v=20261002-mobile-date6"></script>
 <script src="../app.js"></script>
-<script src="./app.js?v=20261002-mobile-perf1"></script>
+<script src="./app.js?v=20261002-mobile-identifiers1"></script>
 <script>
   (function () {
     window.__ensureReagentProductManagementInit = function () {
@@ -794,3 +794,4 @@
 
 <script src="../../common/common.js"></script>
 </body></html>
+
