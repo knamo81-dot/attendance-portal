@@ -10,6 +10,17 @@ window.ReagentApp.request = {
   myRegistrationRequests: [],
   activeRequestPanel: "list",
 
+  // 모바일 제품신청 QR/바코드 스캐너 상태
+  _productScanStream: null,
+  _productScanTimer: null,
+  _productScanRunning: false,
+  _productScanBusy: false,
+  _productScanLastText: "",
+  _productScanLastAt: 0,
+  _productIdentifierRows: [],
+  _productIdentifierLoadedAt: 0,
+  _nativeBarcodeDetector: null,
+
   getCompanyId() {
     if (typeof window.ReagentApp.getCompanyId === "function") {
       return window.ReagentApp.getCompanyId() || "";
@@ -383,6 +394,355 @@ window.ReagentApp.request = {
     }
   },
 
+  /* --------------------- 모바일 QR/바코드 제품 스캔 --------------------- */
+  normalizeScannedIdentifier(value = "") {
+    return String(value ?? "")
+      .replace(/^\][A-Za-z0-9]{2}/, "")
+      .replace(/\u0000/g, "")
+      .replace(/[\r\n]+$/g, "")
+      .trim();
+  },
+
+  normalizeIdentifierCode(value = "") {
+    return this.normalizeScannedIdentifier(value)
+      .toUpperCase()
+      .replace(/[\s.,-]+/g, "");
+  },
+
+  buildProductScanCandidates(rawValue = "") {
+    const original = String(rawValue ?? "");
+    const cleaned = this.normalizeScannedIdentifier(original);
+    const withoutControls = cleaned.replace(/[\u0000-\u001C\u001E-\u001F\u007F]/g, "");
+    const visibleGs1 = cleaned.replace(/\u001D/g, "|");
+
+    const raw = new Set([original, original.trim(), cleaned, withoutControls].filter(Boolean));
+    const normalized = new Set([...raw].map((v) => this.normalizeIdentifierCode(v)).filter(Boolean));
+    const gtin = new Set();
+    const productCodes = new Set();
+
+    const gtinPatterns = [
+      /\(01\)(\d{14})/,
+      /(?:^|\|)01(\d{14})/,
+      /^01(\d{14})/
+    ];
+    for (const pattern of gtinPatterns) {
+      const match = visibleGs1.match(pattern);
+      if (match?.[1]) gtin.add(match[1]);
+    }
+
+    const p240 = visibleGs1.match(/\(240\)([^|()]+)/) || visibleGs1.match(/(?:^|\|)240([^|]+)/);
+    if (p240?.[1]) {
+      const value = String(p240[1]).trim();
+      if (value) {
+        productCodes.add(value);
+        normalized.add(this.normalizeIdentifierCode(value));
+      }
+    }
+
+    return { raw, normalized, gtin, productCodes };
+  },
+
+  async loadProductIdentifierRows(force = false) {
+    const now = Date.now();
+    const cacheMs = 1000 * 60 * 2;
+    if (!force && this._productIdentifierRows.length && now - this._productIdentifierLoadedAt < cacheMs) {
+      return this._productIdentifierRows;
+    }
+
+    const sb = window.ReagentApp.sb;
+    if (!sb) return [];
+
+    const { data, error } = await sb
+      .from("product_identifiers")
+      .select("product_id, identifier_type, identifier_value, normalized_value, code_format, is_primary, is_active")
+      .eq("is_active", true)
+      .limit(10000);
+
+    if (error) {
+      console.warn("제품 식별코드 조회 실패:", error);
+      window.ReagentApp.toast?.(`QR/바코드 정보를 조회하지 못했습니다: ${error.message || "권한을 확인하세요."}`, "warn");
+      return [];
+    }
+
+    this._productIdentifierRows = Array.isArray(data) ? data : [];
+    this._productIdentifierLoadedAt = now;
+    return this._productIdentifierRows;
+  },
+
+  findIdentifierMatches(rows = [], rawValue = "") {
+    const candidates = this.buildProductScanCandidates(rawValue);
+    const list = Array.isArray(rows) ? rows : [];
+    const codeTypes = new Set(["PRODUCT_CODE", "CAT_NO", "P_N", "REORDER"]);
+
+    // 1순위: 저장된 원본 QR/바코드 값과 직접 일치
+    const exactMatches = list.filter((row) => {
+      const raw = String(row.identifier_value || "");
+      const cleaned = this.normalizeScannedIdentifier(raw);
+      const withoutControls = cleaned.replace(/[\u0000-\u001F\u007F]/g, "");
+      return candidates.raw.has(raw) || candidates.raw.has(cleaned) || candidates.raw.has(withoutControls);
+    });
+    if (exactMatches.length) {
+      const scanTypes = new Set(["BARCODE", "QR", "QR_URL", "DATAMATRIX", "GTIN"]);
+      const scanExact = exactMatches.filter((row) => scanTypes.has(String(row.identifier_type || "").trim().toUpperCase()));
+      return scanExact.length ? scanExact : exactMatches;
+    }
+
+    // 2순위: GS1 DataMatrix 등에서 추출한 GTIN(01)
+    const gtinMatches = list.filter((row) => {
+      const type = String(row.identifier_type || "").trim().toUpperCase();
+      if (type !== "GTIN") return false;
+      const digits = this.normalizeScannedIdentifier(row.identifier_value).replace(/\D/g, "");
+      return Boolean(digits && candidates.gtin.has(digits));
+    });
+    if (gtinMatches.length) return gtinMatches;
+
+    // 3순위: GS1 AI(240) 또는 제품코드 계열 정규화값
+    return list.filter((row) => {
+      const type = String(row.identifier_type || "").trim().toUpperCase();
+      if (!codeTypes.has(type)) return false;
+      const cleaned = this.normalizeScannedIdentifier(row.identifier_value);
+      const normalized = String(row.normalized_value || this.normalizeIdentifierCode(cleaned)).trim().toUpperCase();
+      return Boolean(normalized && candidates.normalized.has(normalized));
+    });
+  },
+
+  async findProductFromScannedIdentifier(rawValue = "") {
+    const rows = await this.loadProductIdentifierRows();
+    let matches = this.findIdentifierMatches(rows, rawValue);
+
+    // 다른 화면에서 식별코드를 막 등록했을 수 있으므로 미일치 시 한 번만 최신값 재조회합니다.
+    if (!matches.length) {
+      matches = this.findIdentifierMatches(await this.loadProductIdentifierRows(true), rawValue);
+    }
+
+    const productIds = [...new Set(matches.map((row) => Number(row.product_id)).filter((id) => Number.isFinite(id) && id > 0))];
+    if (!productIds.length) return { status: "not_found", product: null };
+    if (productIds.length > 1) return { status: "ambiguous", product: null, productIds };
+
+    const productId = productIds[0];
+    let products = await this.loadProductMaster();
+    let product = products.find((row) => Number(row.id) === productId && row.is_active !== false);
+    if (!product) {
+      products = await this.loadProductMaster(true);
+      product = products.find((row) => Number(row.id) === productId && row.is_active !== false);
+    }
+
+    return product ? { status: "found", product } : { status: "inactive_or_missing", product: null };
+  },
+
+  setProductScanStatus(message = "", type = "") {
+    const status = document.getElementById("productScanStatus");
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle("success", type === "success");
+    status.classList.toggle("warn", type === "warn");
+  },
+
+  async openProductScanModal() {
+    const modal = document.getElementById("productScanModal");
+    const video = document.getElementById("productScanVideo");
+    if (!modal || !video) return;
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      window.ReagentApp.toast?.("이 브라우저에서는 카메라를 사용할 수 없습니다. 제품검색을 이용해 주세요.", "warn");
+      return;
+    }
+
+    if (!window.ZXingWASM?.readBarcodes && !("BarcodeDetector" in window)) {
+      window.ReagentApp.toast?.("QR/바코드 인식 모듈을 불러오지 못했습니다. 네트워크 확인 후 다시 시도하거나 제품검색을 이용해 주세요.", "warn");
+      return;
+    }
+
+    this.closeProductScanModal({ keepModal: true });
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("product-scan-open");
+    document.documentElement.classList.add("product-scan-open");
+    this.setProductScanStatus("카메라를 준비하는 중입니다.");
+
+    try {
+      // 식별코드 캐시를 카메라 시작과 병렬로 미리 준비합니다.
+      this.loadProductIdentifierRows().catch(() => {});
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      });
+
+      this._productScanStream = stream;
+      video.srcObject = stream;
+      video.setAttribute("playsinline", "");
+      video.muted = true;
+      await video.play();
+
+      this._productScanRunning = true;
+      this._productScanBusy = false;
+      this._productScanLastText = "";
+      this._productScanLastAt = 0;
+      this.setProductScanStatus("QR/바코드를 화면 중앙에 맞춰 주세요.");
+      this.scheduleProductScanFrame(250);
+    } catch (error) {
+      console.warn("제품 QR/바코드 카메라 실행 실패:", error);
+      this.setProductScanStatus("카메라를 열 수 없습니다. 카메라 권한을 확인해 주세요.", "warn");
+      window.ReagentApp.toast?.("카메라 권한을 확인하거나 제품검색을 이용해 주세요.", "warn");
+    }
+  },
+
+  closeProductScanModal(options = {}) {
+    this._productScanRunning = false;
+    this._productScanBusy = false;
+    if (this._productScanTimer) {
+      clearTimeout(this._productScanTimer);
+      this._productScanTimer = null;
+    }
+
+    if (this._productScanStream) {
+      try { this._productScanStream.getTracks().forEach((track) => track.stop()); } catch (_) {}
+      this._productScanStream = null;
+    }
+
+    const video = document.getElementById("productScanVideo");
+    if (video) {
+      try { video.pause(); } catch (_) {}
+      video.srcObject = null;
+    }
+
+    if (options.keepModal !== true) {
+      const modal = document.getElementById("productScanModal");
+      modal?.classList.remove("show");
+      modal?.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("product-scan-open");
+      document.documentElement.classList.remove("product-scan-open");
+    }
+  },
+
+  scheduleProductScanFrame(delay = 360) {
+    if (!this._productScanRunning) return;
+    if (this._productScanTimer) clearTimeout(this._productScanTimer);
+    this._productScanTimer = window.setTimeout(() => this.scanProductCameraFrame(), delay);
+  },
+
+  async decodeProductScanImage(imageData) {
+    if (window.ZXingWASM?.readBarcodes) {
+      const results = await window.ZXingWASM.readBarcodes(imageData, {
+        tryHarder: true,
+        maxNumberOfSymbols: 1
+      });
+      const first = Array.isArray(results) ? results.find((item) => item?.text) : null;
+      if (first?.text) return String(first.text);
+    }
+
+    if ("BarcodeDetector" in window) {
+      try {
+        if (!this._nativeBarcodeDetector) {
+          this._nativeBarcodeDetector = new window.BarcodeDetector();
+        }
+        const canvas = document.getElementById("productScanCanvas");
+        const results = await this._nativeBarcodeDetector.detect(canvas);
+        const first = Array.isArray(results) ? results.find((item) => item?.rawValue) : null;
+        if (first?.rawValue) return String(first.rawValue);
+      } catch (_) {}
+    }
+
+    return "";
+  },
+
+  async scanProductCameraFrame() {
+    if (!this._productScanRunning || this._productScanBusy) {
+      this.scheduleProductScanFrame();
+      return;
+    }
+
+    const video = document.getElementById("productScanVideo");
+    const canvas = document.getElementById("productScanCanvas");
+    if (!video || !canvas || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+      this.scheduleProductScanFrame(250);
+      return;
+    }
+
+    this._productScanBusy = true;
+    try {
+      const maxWidth = 1280;
+      const scale = Math.min(1, maxWidth / video.videoWidth);
+      canvas.width = Math.max(320, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(240, Math.round(video.videoHeight * scale));
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const text = await this.decodeProductScanImage(imageData);
+
+      if (text) {
+        const now = Date.now();
+        const normalized = this.normalizeScannedIdentifier(text);
+        if (normalized && (normalized !== this._productScanLastText || now - this._productScanLastAt > 1800)) {
+          this._productScanLastText = normalized;
+          this._productScanLastAt = now;
+          await this.handleScannedProductIdentifier(text);
+          if (!this._productScanRunning) return;
+        }
+      }
+    } catch (error) {
+      console.warn("제품 QR/바코드 프레임 인식 실패:", error);
+    } finally {
+      this._productScanBusy = false;
+    }
+
+    this.scheduleProductScanFrame();
+  },
+
+  async handleScannedProductIdentifier(rawValue = "") {
+    this.setProductScanStatus("제품 정보를 확인하는 중입니다.");
+    const result = await this.findProductFromScannedIdentifier(rawValue);
+
+    if (result.status === "found" && result.product) {
+      this.closeProductScanModal();
+      this.selectProduct(result.product, {
+        closeSearch: false,
+        message: "QR/바코드로 제품을 찾았습니다. 수량과 용도를 입력해 주세요."
+      });
+      setTimeout(() => window.ReagentApp.els?.qty?.focus?.({ preventScroll: true }), 120);
+      return;
+    }
+
+    if (result.status === "ambiguous") {
+      this.setProductScanStatus("같은 코드가 여러 제품에 연결되어 있습니다. 제품검색을 이용해 주세요.", "warn");
+      window.ReagentApp.toast?.("같은 QR/바코드가 여러 제품에 연결되어 있습니다.", "warn");
+      return;
+    }
+
+    if (result.status === "inactive_or_missing") {
+      this.setProductScanStatus("연결된 제품이 사용중지되었거나 제품마스터에서 확인되지 않습니다.", "warn");
+      return;
+    }
+
+    this.setProductScanStatus("등록된 QR/바코드를 찾지 못했습니다. 다른 코드를 비추거나 제품검색을 이용해 주세요.", "warn");
+  },
+
+  bindProductScanEvents() {
+    const open = document.getElementById("openProductScan");
+    const close = document.getElementById("closeProductScan");
+    const modal = document.getElementById("productScanModal");
+
+    if (open && open.dataset.scanBound !== "1") {
+      open.dataset.scanBound = "1";
+      open.addEventListener("click", () => this.openProductScanModal());
+    }
+    if (close && close.dataset.scanBound !== "1") {
+      close.dataset.scanBound = "1";
+      close.addEventListener("click", () => this.closeProductScanModal());
+    }
+    if (modal && modal.dataset.scanBound !== "1") {
+      modal.dataset.scanBound = "1";
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) this.closeProductScanModal();
+      });
+    }
+  },
+
   async openSearchModal() {
     const { els } = window.ReagentApp;
     if (!els.searchModal) return;
@@ -485,7 +845,7 @@ window.ReagentApp.request = {
     });
   },
 
-  selectProduct(product) {
+  selectProduct(product, options = {}) {
     const { els, setValue, toast } = window.ReagentApp;
     if (!product) return;
 
@@ -500,8 +860,10 @@ window.ReagentApp.request = {
     // 제품마스터의 기본거래처/선정사유를 신청 저장 시 함께 넘기기 위해 보관합니다.
     this.selectedProduct = this.normalizeProductRow(product);
 
-    this.closeSearchModal({ restoreRequestForm: true });
-    toast("제품이 선택되었습니다.", "success");
+    if (options.closeSearch !== false) {
+      this.closeSearchModal({ restoreRequestForm: true });
+    }
+    toast(options.message || "제품이 선택되었습니다.", "success");
   },
 
   clearForm() {
@@ -2289,3 +2651,13 @@ window.ReagentApp.request = {
     return String(value).replace(/["\\]/g, "\\$&");
   }
 };
+
+
+// 모바일 전용 스캔 버튼은 mobile/index.html에만 존재하므로 PC에는 영향이 없습니다.
+(function bindReagentProductScannerWhenReady(){
+  const bind = () => {
+    try { window.ReagentApp?.request?.bindProductScanEvents?.(); } catch (error) { console.warn("제품 스캔 이벤트 연결 실패:", error); }
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind, { once: true });
+  else bind();
+})();
