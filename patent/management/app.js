@@ -1723,6 +1723,244 @@
     `;
   }
 
+
+  function normalizePatentArray(value){
+    if(Array.isArray(value))return value.filter(Boolean);
+    if(value==null||value==='')return [];
+    return [value].filter(Boolean);
+  }
+
+  function inventorNamesFromPatent(patent){
+    return normalizePatentArray(patent?.inventors)
+      .map(item=>(
+        typeof item==='string'
+          ?item
+          :(item?.name||item?.inventor_name||'')
+      ))
+      .map(name=>String(name||'').trim())
+      .filter(Boolean);
+  }
+
+  async function findExistingPatentForCompanyItem(item){
+    const appNo=String(item?.application_no||'').trim();
+    const regNo=String(item?.registration_no||'').trim();
+
+    if(appNo){
+      const {data,error}=await P.state.client
+        .from('pat_master')
+        .select('id,invention_title,application_no,registration_no,legal_status')
+        .eq('company_id',ctx.session.companyId)
+        .eq('application_no',appNo)
+        .limit(1)
+        .maybeSingle();
+
+      if(error)throw error;
+      if(data)return data;
+    }
+
+    if(regNo){
+      const {data,error}=await P.state.client
+        .from('pat_master')
+        .select('id,invention_title,application_no,registration_no,legal_status')
+        .eq('company_id',ctx.session.companyId)
+        .eq('registration_no',regNo)
+        .limit(1)
+        .maybeSingle();
+
+      if(error)throw error;
+      if(data)return data;
+    }
+
+    return null;
+  }
+
+  function markCompanyPatentRegistered(item,row){
+    if(row&&!patents.some(p=>p.id===row.id)){
+      patents.push(row);
+    }
+
+    if(companySearchData){
+      refreshPortalRegistrationFlags(companySearchData);
+    }
+
+    renderCompanySearch();
+  }
+
+  async function registerCompanyPatent(item,button){
+    if(!ctx.access.admin)return;
+    if(!item)return;
+
+    const originalText=button?.textContent||'목록등록';
+
+    if(button){
+      button.disabled=true;
+      button.textContent='등록중...';
+    }
+
+    try{
+      const existing=await findExistingPatentForCompanyItem(item);
+
+      if(existing){
+        markCompanyPatentRegistered(item,existing);
+        P.toast('이미 특허목록에 등록된 특허입니다.','warn');
+        return;
+      }
+
+      // 회사특허 조회 캐시는 API 호출을 줄이기 위해 그대로 사용합니다.
+      // 실제 목록등록 시에만 1회 상세조회하여 특허목록의 KIPRIS 필드를 최대한 채웁니다.
+      let lookupPatent=null;
+      let lookupRaw=null;
+      const lookupNumber=
+        String(item.application_no||item.registration_no||'').trim();
+
+      if(lookupNumber){
+        try{
+          const detail=await P.invokeKipris({
+            action:'lookup',
+            number:lookupNumber,
+            company_id:ctx.session.companyId
+          });
+
+          lookupPatent=
+            detail?.patent||
+            detail?.data||
+            null;
+
+          lookupRaw=lookupPatent||detail||null;
+        }catch(error){
+          console.warn(
+            '[company-search-register] KIPRIS 상세조회 실패, 저장된 조회자료로 등록합니다.',
+            error
+          );
+        }
+      }
+
+      const source={
+        ...item,
+        ...(lookupPatent||{})
+      };
+
+      const inventionTitle=
+        String(source.invention_title||item.invention_title||'').trim();
+
+      if(!inventionTitle){
+        throw new Error('발명의 명칭이 없어 특허목록에 등록할 수 없습니다.');
+      }
+
+      const now=new Date().toISOString();
+
+      const payload=P.companyPayload({
+        internal_no:null,
+        ip_type:source.ip_type||'PATENT',
+        country_code:String(source.country_code||'KR').toUpperCase(),
+
+        invention_title:inventionTitle,
+
+        application_no:source.application_no||null,
+        application_date:source.application_date||null,
+        publication_no:source.publication_no||null,
+        publication_date:source.publication_date||null,
+
+        registration_no:source.registration_no||null,
+        registration_date:source.registration_date||null,
+
+        legal_status:source.legal_status||null,
+        legal_status_detail:source.legal_status_detail||null,
+        expiration_date:source.expiration_date||null,
+
+        applicant_names:normalizePatentArray(source.applicant_names),
+        right_holder_names:normalizePatentArray(
+          source.right_holder_names?.length
+            ?source.right_holder_names
+            :item.right_holder_names
+        ),
+        agent_names:normalizePatentArray(source.agent_names),
+
+        ipc_codes:normalizePatentArray(source.ipc_codes),
+        cpc_codes:normalizePatentArray(source.cpc_codes),
+
+        abstract_text:source.abstract_text||null,
+        public_notice_url:source.public_notice_url||null,
+        registration_notice_url:source.registration_notice_url||null,
+        representative_image_url:source.representative_image_url||null,
+
+        kipris_last_synced_at:now,
+        kipris_raw:lookupRaw||item,
+
+        division_code:null,
+        manager_employee_no:null,
+        related_project:null,
+        related_product_technology:null,
+        memo:null,
+
+        is_active:true,
+        created_by_employee_no:ctx.session.employeeNo||null,
+        updated_by_employee_no:ctx.session.employeeNo||null
+      });
+
+      const {data:row,error}=await P.state.client
+        .from('pat_master')
+        .insert(payload)
+        .select()
+        .single();
+
+      if(error)throw error;
+
+      const inventorNames=inventorNamesFromPatent(source);
+
+      if(inventorNames.length){
+        const {error:inventorError}=await P.state.client
+          .from('pat_inventors')
+          .insert(
+            inventorNames.map((name,index)=>P.companyPayload({
+              patent_id:row.id,
+              inventor_name:name,
+              display_order:index+1,
+              source:'KIPRIS'
+            }))
+          );
+
+        if(inventorError){
+          console.warn(
+            '[company-search-register] 발명자 저장 실패',
+            inventorError
+          );
+          P.toast(
+            '특허는 등록됐지만 발명자 정보 저장 중 오류가 있었습니다.',
+            'warn',
+            4800
+          );
+        }
+      }
+
+      markCompanyPatentRegistered(item,row);
+
+      P.toast(
+        '특허목록에 등록했습니다. 회사특허 조회 목록에서는 자동 제외됩니다.'
+      );
+    }catch(error){
+      const message=String(error?.message||error);
+
+      if(
+        message.includes('uq_pat_master_company_application_no')||
+        message.includes('uq_pat_master_company_registration_no')||
+        message.toLowerCase().includes('duplicate key')
+      ){
+        const existing=await findExistingPatentForCompanyItem(item).catch(()=>null);
+        if(existing)markCompanyPatentRegistered(item,existing);
+        P.toast('이미 특허목록에 등록된 특허입니다.','warn');
+        return;
+      }
+
+      P.toast(message,'error',5600);
+    }finally{
+      if(button&&document.body.contains(button)){
+        button.disabled=false;
+        button.textContent=originalText;
+      }
+    }
+  }
+
   function renderCompanySearchTable(){
     const target=$('companySearchTable');
     if(!target||!companySearchData)return;
@@ -1848,7 +2086,7 @@
             return;
           }
 
-          P.navigate('list');
+          registerCompanyPatent(item,button);
         });
       });
   }
