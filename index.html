@@ -3509,6 +3509,17 @@ body.auth-loading .top-user-bar {
       return applicantTabs.length ? applicantTabs : [{ id: 'user', label: '출장자 입력 화면' }];
     }
 
+    if (isPatentProgramSrc(currentSrc)) {
+      const patentRole = getPortalAppRoleForTabs('patent');
+      const canOperate = isPortalOperatorRole(patentRole);
+
+      if (canOperate) return normalizedTabs;
+
+      return normalizedTabs.filter(function (tab) {
+        return String(tab?.id || '') !== 'patent-management';
+      });
+    }
+
     return normalizedTabs;
   }
 
@@ -3640,6 +3651,18 @@ body.auth-loading .top-user-bar {
 
     // 특허는 현황/목록/관리를 독립 화면으로 운영하므로 포탈 상단 버튼에서 경로를 전환합니다.
     if (isPatentProgramSrc(currentSrc)) {
+      const patentRole = getPortalAppRoleForTabs('patent');
+      const canOperate = isPortalOperatorRole(patentRole);
+
+      if (tabId === 'patent-management' && !canOperate) {
+        setPortalSubtabActive('patent-dashboard', false);
+        if (currentSrc !== PATENT_DASHBOARD_SRC) {
+          try { sessionStorage.setItem(LAST_PAGE_KEY, PATENT_DASHBOARD_SRC); } catch (_) {}
+          replacePortalFrame(buildSrcWithSession(PATENT_DASHBOARD_SRC));
+        }
+        return;
+      }
+
       const targetMap = {
         'patent-dashboard': PATENT_DASHBOARD_SRC,
         'patent-list': PATENT_LIST_SRC,
@@ -4220,14 +4243,13 @@ body.auth-loading .top-user-bar {
   }
 
   function canAccessPatentApp() {
-    // 1단계 권한 적용:
-    // - 회사 관리자: 특허 전체 운영 가능
-    // - 설정 > 권한관리에서 patent/operator로 지정된 사용자: 특허 운영자
-    // - TEST01 테스트본부/팀 사용자: 검증 목적으로 특허 메뉴 접근 허용
-    // - 일반사용자 특허 조회 허용은 후속 단계에서 별도 적용
+    // 특허 조회는 로그인한 회사 소속 사용자에게 공개합니다.
+    // 실제 데이터 조회는 pat_can_read(company_id) RLS가 다시 검증합니다.
+    // 특허 원본정보 수정/납부/기한관리 등 운영기능은
+    // patent operator 또는 회사 관리자만 사용할 수 있습니다.
     if (!currentUser) return false;
     if (canUseSettingsMenu()) return true;
-    if (isTestDivisionUser()) return true;
+    if (isServiceAdminRole()) return true;
 
     const patentRole = normalizePortalRole(
       currentAppRoles?.patent?.role ||
@@ -4236,7 +4258,29 @@ body.auth-loading .top-user-bar {
       'user'
     );
 
-    return patentRole === 'admin' || patentRole === 'operator';
+    if (patentRole === 'admin' || patentRole === 'operator') {
+      return true;
+    }
+
+    const employee = normalizePortalEmployee(currentEmployee);
+    if (!employee) return false;
+
+    const rawStatus = String(
+      currentEmployee?.status ||
+      currentEmployee?.raw?.status ||
+      ''
+    ).trim();
+
+    return rawStatus !== '퇴사';
+  }
+
+  function canOperatePatentApp() {
+    if (!currentUser) return false;
+    if (canUseSettingsMenu()) return true;
+    if (isServiceAdminRole()) return true;
+
+    const patentRole = getPortalAppRoleForTabs('patent');
+    return isPortalOperatorRole(patentRole);
   }
 
   let patentVisibilitySeq = 0;
@@ -5706,6 +5750,13 @@ body.auth-loading .top-user-bar {
       try { sessionStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
       const fallbackBtn = homeBtn || findNavBySrc(HOME_SRC);
       await navigateBySrc(HOME_SRC, fallbackBtn, { skipSave: true });
+      return;
+    }
+
+    if (isPatentManagementSrc(src) && !canOperatePatentApp()) {
+      try { sessionStorage.setItem(LAST_PAGE_KEY, PATENT_DASHBOARD_SRC); } catch (_) {}
+      const patentBtn = findNavBySrc(PATENT_DASHBOARD_SRC) || els.patentNavBtn;
+      await navigateBySrc(PATENT_DASHBOARD_SRC, patentBtn, { skipSave: true });
       return;
     }
 
