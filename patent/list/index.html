@@ -44,6 +44,10 @@
           placeholder="특허명, 출원번호, 등록번호 검색"
         />
 
+        <select id="divisionFilter" class="pat-select">
+          <option value="">전체 본부</option>
+        </select>
+
         <select id="countryFilter" class="pat-select">
           <option value="">전체 국가</option>
         </select>
@@ -81,11 +85,12 @@
             <thead>
               <tr>
                 <th>No.</th>
-                <th>사내번호</th>
+                <th>상태</th>
+                <th>본부</th>
+                <th>등록번호</th>
                 <th>발명의 명칭</th>
                 <th>국가</th>
                 <th>구분</th>
-                <th>상태</th>
                 <th>출원일</th>
                 <th>등록일</th>
                 <th>만료예정일</th>
@@ -250,10 +255,16 @@
             </button>
           </div>
 
-          <div class="pat-note">
-            KIPRIS 연동은 Supabase Edge Function
-            <b>patent-kipris</b>가 설정된 경우 자동 조회됩니다.
-            미설정 상태에서도 직접 입력하여 저장할 수 있습니다.
+          <div class="lookup-division-row">
+            <div class="pat-field">
+              <label>본부</label>
+              <select
+                id="f_division_code"
+                class="pat-select"
+              >
+                <option value="">선택</option>
+              </select>
+            </div>
           </div>
         </div>
 
