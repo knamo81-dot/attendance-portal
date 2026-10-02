@@ -40,6 +40,7 @@
   let patents = [];
   let deadlines = [];
   let employees = [];
+  let divisions = [];
   let currentPatent = null;
   let detailData = null;
   let editingId = null;
@@ -140,6 +141,16 @@
     return employees.find(
       (item) => item.employee_no === employeeNo
     )?.name || employeeNo;
+  }
+
+  function divisionName(divisionCode) {
+    if (!divisionCode) {
+      return '-';
+    }
+
+    return divisions.find(
+      (item) => item.division_code === divisionCode
+    )?.division_name || divisionCode;
   }
 
   function extractKiprisPatent(data) {
@@ -456,8 +467,10 @@
 
     await Promise.all([
       loadEmployees(),
-      loadList()
+      loadDivisions()
     ]);
+
+    await loadList();
 
     bind();
 
@@ -471,6 +484,7 @@
   function bind() {
     const filterIds = [
       'searchInput',
+      'divisionFilter',
       'countryFilter',
       'typeFilter',
       'statusFilter'
@@ -600,6 +614,97 @@
     );
   }
 
+  async function loadDivisions() {
+    try {
+      const result = await P.state.client
+        .from('divisions')
+        .select('division_code,division_name,is_active')
+        .order('division_code');
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      divisions = result.data || [];
+    } catch (error) {
+      console.warn(
+        '[Patent] divisions 조회 실패:',
+        error
+      );
+
+      divisions = [];
+    }
+
+    const filter = document.getElementById(
+      'divisionFilter'
+    );
+
+    const formSelect = document.getElementById(
+      'f_division_code'
+    );
+
+    const currentFilter = filter?.value || '';
+    const currentForm = formSelect?.value || '';
+
+    const filterOptions = divisions
+      .map((division) => {
+        const code = P.escapeHtml(
+          division.division_code || ''
+        );
+
+        const name = P.escapeHtml(
+          division.division_name ||
+          division.division_code ||
+          ''
+        );
+
+        const inactive = division.is_active === false
+          ? ' (미사용)'
+          : '';
+
+        return (
+          `<option value="${code}">` +
+          `${name}${inactive}` +
+          '</option>'
+        );
+      })
+      .join('');
+
+    if (filter) {
+      filter.innerHTML = (
+        '<option value="">전체 본부</option>' +
+        filterOptions
+      );
+
+      if (
+        divisions.some(
+          (division) => (
+            division.division_code === currentFilter
+          )
+        )
+      ) {
+        filter.value = currentFilter;
+      }
+    }
+
+    if (formSelect) {
+      formSelect.innerHTML = (
+        '<option value="">선택</option>' +
+        filterOptions
+      );
+
+      if (
+        divisions.some(
+          (division) => (
+            division.division_code === currentForm
+          )
+        )
+      ) {
+        formSelect.value = currentForm;
+      }
+    }
+  }
+
   async function loadEmployees() {
     try {
       const result = await P.state.client
@@ -719,6 +824,10 @@
       document.getElementById('searchInput').value
     ).toLowerCase();
 
+    const division = document.getElementById(
+      'divisionFilter'
+    ).value;
+
     const country = document.getElementById(
       'countryFilter'
     ).value;
@@ -736,7 +845,9 @@
         patent.invention_title,
         patent.application_no,
         patent.registration_no,
-        patent.internal_no
+        patent.internal_no,
+        patent.division_code,
+        divisionName(patent.division_code)
       ]
         .join(' ')
         .toLowerCase();
@@ -747,6 +858,7 @@
 
       return (
         (!search || haystack.includes(search)) &&
+        (!division || patent.division_code === division) &&
         (!country || patent.country_code === country) &&
         (!type || patent.ip_type === type) &&
         (!status || patentStatus === status)
@@ -763,7 +875,7 @@
       ? rows.map(renderPatentRow).join('')
       : (
         '<tr>' +
-        '<td colspan="11" class="pat-empty">' +
+        '<td colspan="12" class="pat-empty">' +
         '조건에 맞는 특허가 없습니다.' +
         '</td>' +
         '</tr>'
@@ -806,25 +918,7 @@
         data-id="${patent.id}"
       >
         <td>${index + 1}</td>
-        <td>${P.escapeHtml(patent.internal_no || '-')}</td>
-        <td>
-          <b>${P.escapeHtml(patent.invention_title)}</b>
-          <div class="row-sub">
-            ${P.escapeHtml(
-              patent.application_no ||
-              patent.registration_no ||
-              ''
-            )}
-          </div>
-        </td>
-        <td>${P.escapeHtml(patent.country_code || '-')}</td>
-        <td>
-          ${P.escapeHtml(
-            labels[patent.ip_type] ||
-            patent.ip_type ||
-            '-'
-          )}
-        </td>
+
         <td>
           ${P.badge(
             patent.legal_status,
@@ -833,10 +927,66 @@
             )
           )}
         </td>
-        <td>${P.fmtDate(patent.application_date)}</td>
-        <td>${P.fmtDate(patent.registration_date)}</td>
-        <td>${P.fmtDate(patent.expiration_date)}</td>
-        <td>${nextDeadlineHtml}</td>
+
+        <td>
+          ${P.escapeHtml(
+            divisionName(
+              patent.division_code
+            )
+          )}
+        </td>
+
+        <td>
+          ${P.escapeHtml(
+            patent.registration_no || '-'
+          )}
+        </td>
+
+        <td>
+          <b>${P.escapeHtml(patent.invention_title)}</b>
+          <div class="row-sub">
+            ${P.escapeHtml(
+              patent.application_no || ''
+            )}
+          </div>
+        </td>
+
+        <td>
+          ${P.escapeHtml(
+            patent.country_code || '-'
+          )}
+        </td>
+
+        <td>
+          ${P.escapeHtml(
+            labels[patent.ip_type] ||
+            patent.ip_type ||
+            '-'
+          )}
+        </td>
+
+        <td>
+          ${P.fmtDate(
+            patent.application_date
+          )}
+        </td>
+
+        <td>
+          ${P.fmtDate(
+            patent.registration_date
+          )}
+        </td>
+
+        <td>
+          ${P.fmtDate(
+            patent.expiration_date
+          )}
+        </td>
+
+        <td>
+          ${nextDeadlineHtml}
+        </td>
+
         <td>
           ${P.escapeHtml(
             managerName(
@@ -850,6 +1000,7 @@
 
   function clearForm() {
     const fields = [
+      'division_code',
       'internal_no',
       'application_no',
       'application_date',
@@ -912,6 +1063,8 @@
 
     if (patent) {
       const formValues = {
+        division_code:
+          patent.division_code,
         internal_no:
           patent.internal_no,
         ip_type:
@@ -1000,6 +1153,9 @@
 
   function formPayload() {
     return P.companyPayload({
+      division_code:
+        P.val('f_division_code') || null,
+
       internal_no:
         P.val('f_internal_no') || null,
 
@@ -1700,6 +1856,15 @@
       <div class="detail-basic-grid">
         <div>
           <dl class="pat-info-grid">
+            <dt>본부</dt>
+            <dd>
+              ${P.escapeHtml(
+                divisionName(
+                  patent.division_code
+                )
+              )}
+            </dd>
+
             <dt>사내 관리번호</dt>
             <dd>${P.escapeHtml(patent.internal_no || '-')}</dd>
 
