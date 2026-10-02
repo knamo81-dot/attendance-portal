@@ -164,6 +164,45 @@
       .toUpperCase();
   }
 
+
+  function normalizedCountryCode(value) {
+    const code = String(value || 'KR')
+      .trim()
+      .toUpperCase();
+
+    if (code === 'CP') {
+      return 'CN';
+    }
+
+    return code || 'KR';
+  }
+
+  function lookupActionForCountry(country) {
+    return normalizedCountryCode(country) === 'KR'
+      ? 'lookup'
+      : 'lookup-foreign';
+  }
+
+  function kiprisLookupPayload(
+    country,
+    number
+  ) {
+    const countryCode =
+      normalizedCountryCode(country);
+
+    return {
+      action:
+        lookupActionForCountry(
+          countryCode
+        ),
+      number,
+      country_code:
+        countryCode,
+      company_id:
+        ctx.session.companyId
+    };
+  }
+
   function hideDuplicatePatentNotice() {
     duplicatePatentId = null;
 
@@ -266,10 +305,18 @@
     }
   }
 
-  function findDuplicatePatentLocal(number) {
+  function findDuplicatePatentLocal(
+    number,
+    countryCode = P.val('f_country_code') || 'KR'
+  ) {
     const normalized = normalizePatentNumber(
       number
     );
+
+    const country =
+      normalizedCountryCode(
+        countryCode
+      );
 
     if (!normalized) {
       return null;
@@ -279,6 +326,14 @@
       if (
         editingId &&
         String(patent.id) === String(editingId)
+      ) {
+        return false;
+      }
+
+      if (
+        normalizedCountryCode(
+          patent.country_code
+        ) !== country
       ) {
         return false;
       }
@@ -307,6 +362,11 @@
       'f_registration_no'
     );
 
+    const countryCode =
+      P.val('f_country_code') ||
+      P.val('lookupCountry') ||
+      'KR';
+
     const candidates = [
       lookupNo,
       applicationNo,
@@ -318,7 +378,8 @@
 
     for (const number of candidates) {
       duplicate = findDuplicatePatentLocal(
-        number
+        number,
+        countryCode
       );
 
       if (duplicate) {
@@ -372,8 +433,14 @@
     for (const [field, value] of checks) {
       let query = P.companyQuery(
         'pat_master',
-        'id,invention_title,application_no,registration_no,legal_status,division_code'
+        'id,country_code,invention_title,application_no,registration_no,legal_status,division_code'
       )
+        .eq(
+          'country_code',
+          normalizedCountryCode(
+            payload.country_code
+          )
+        )
         .eq(field, value)
         .limit(1);
 
@@ -818,6 +885,64 @@
         lookupKipris
       );
 
+
+    document
+      .getElementById('lookupCountry')
+      ?.addEventListener(
+        'change',
+        (event) => {
+          const country =
+            normalizedCountryCode(
+              event.target.value
+            );
+
+          P.setVal(
+            'f_country_code',
+            country
+          );
+
+          checkDuplicatePatentInput();
+        }
+      );
+
+    document
+      .getElementById('f_country_code')
+      ?.addEventListener(
+        'change',
+        (event) => {
+          const country =
+            normalizedCountryCode(
+              event.target.value
+            );
+
+          P.setVal(
+            'f_country_code',
+            country
+          );
+
+          const lookupCountry =
+            document.getElementById(
+              'lookupCountry'
+            );
+
+          if (
+            lookupCountry &&
+            [
+              'KR',
+              'US',
+              'EP',
+              'JP',
+              'CN',
+              'WO'
+            ].includes(country)
+          ) {
+            lookupCountry.value =
+              country;
+          }
+
+          checkDuplicatePatentInput();
+        }
+      );
 
     [
       'lookupNo',
@@ -1350,6 +1475,10 @@
       'KR'
     );
     P.setVal(
+      'lookupCountry',
+      'KR'
+    );
+    P.setVal(
       'f_manager_employee_no',
       ''
     );
@@ -1436,6 +1565,13 @@
           value || ''
         );
       });
+
+      P.setVal(
+        'lookupCountry',
+        normalizedCountryCode(
+          patent.country_code
+        )
+      );
 
       P.companyQuery(
         'pat_inventors',
@@ -1883,12 +2019,24 @@
     button.disabled = true;
 
     try {
-      const data = await P.invokeKipris({
-        action: 'lookup',
-        number,
-        company_id:
-          ctx.session.companyId
-      });
+      const country =
+        normalizedCountryCode(
+          P.val('lookupCountry') ||
+          P.val('f_country_code') ||
+          'KR'
+        );
+
+      P.setVal(
+        'f_country_code',
+        country
+      );
+
+      const data = await P.invokeKipris(
+        kiprisLookupPayload(
+          country,
+          number
+        )
+      );
 
       applyKiprisData(data);
 
@@ -1909,7 +2057,7 @@
     } catch (error) {
       P.toast(
         error.message +
-        ' Edge Function 설정 전에는 직접 입력해 주세요.',
+        ' 해외특허인 경우 KIPRISPlus 해외특허 Open API 활용신청/승인도 확인해 주세요.',
         'error',
         4200
       );
@@ -3384,12 +3532,13 @@
     button.disabled = true;
 
     try {
-      const data = await P.invokeKipris({
-        action: 'lookup',
-        number,
-        company_id:
-          ctx.session.companyId
-      });
+      const data = await P.invokeKipris(
+        kiprisLookupPayload(
+          currentPatent.country_code ||
+          'KR',
+          number
+        )
+      );
 
       await updatePatentFromKipris(
         currentPatent,
@@ -3642,12 +3791,13 @@
         );
 
         try {
-          const data = await P.invokeKipris({
-            action: 'lookup',
-            number,
-            company_id:
-              ctx.session.companyId
-          });
+          const data = await P.invokeKipris(
+            kiprisLookupPayload(
+              patent.country_code ||
+              'KR',
+              number
+            )
+          );
 
           const result =
             await updatePatentFromKipris(
