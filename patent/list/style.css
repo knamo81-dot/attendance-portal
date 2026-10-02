@@ -4,9 +4,9 @@
   min-width: 1120px;
 }
 
-.patent-list-table td:nth-child(3) {
-  min-width: 260px;
-  max-width: 430px;
+.patent-list-table td:nth-child(5) {
+  min-width: 280px;
+  max-width: 460px;
 }
 
 .table-footer {
@@ -328,3 +328,46 @@
     grid-template-columns: 68px minmax(0, 1fr);
   }
 }
+
+#divisionFilter {
+  min-width: 130px;
+}
+
+.lookup-division-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr);
+  max-width: 360px;
+}
+
+.lookup-division-row .pat-field {
+  margin: 0;
+}
+
+#f_division_code {
+  width: 100%;
+}
+
+.patent-list-table th:nth-child(2),
+.patent-list-table td:nth-child(2) {
+  width: 76px;
+  white-space: nowrap;
+}
+
+.patent-list-table th:nth-child(3),
+.patent-list-table td:nth-child(3) {
+  min-width: 110px;
+  white-space: nowrap;
+}
+
+.patent-list-table th:nth-child(4),
+.patent-list-table td:nth-child(4) {
+  min-width: 120px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .lookup-division-row {
+    max-width: none;
+  }
+}
+
