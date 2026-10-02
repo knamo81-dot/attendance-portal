@@ -179,6 +179,40 @@
 }
 </style>
 
+
+<style id="pm-mobile-identifier-filter-layout">
+@media (max-width:760px){
+  #page-product-management .pm-product-filters{
+    display:grid !important;
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    gap:8px !important;
+    align-items:end !important;
+  }
+  #page-product-management .pm-product-filters .pm-product-filter-search{
+    grid-column:1 / -1 !important;
+  }
+  #page-product-management .pm-product-filters .pm-product-filter-category,
+  #page-product-management .pm-product-filters .pm-product-filter-active,
+  #page-product-management .pm-product-filters .pm-product-filter-identifier{
+    grid-column:auto !important;
+    min-width:0 !important;
+  }
+  #page-product-management .pm-product-filters .pm-product-filter-reset{
+    grid-column:1 / -1 !important;
+    width:auto !important;
+    justify-self:end !important;
+  }
+  #page-product-management .pm-product-filters .pm-product-filter-reset .btn{
+    width:auto !important;
+    min-width:94px !important;
+  }
+  #page-product-management .pm-product-filters label{
+    font-size:10px !important;
+    white-space:nowrap !important;
+  }
+}
+</style>
+
 </head>
 <body class="reagent-mobile-ui">
 <input id="productKeyword" type="hidden"/>
@@ -481,11 +515,12 @@
       </div>
     </div>
     <div class="card-body">
-      <div class="collect-filters">
-        <div class="field"><label>검색</label><input id="pmProductKeyword" placeholder="품명 / 제조사 / 제품코드 / CAS / 거래처 검색"/></div>
-        <div class="field"><label>구분</label><select id="pmProductCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div>
-        <div class="field"><label>사용여부</label><select id="pmProductActive"><option value="">전체</option><option value="active">사용</option><option value="inactive">사용중지</option></select></div>
-        <div class="field"><label>&nbsp;</label><button class="btn" id="pmResetProduct">신규 입력</button></div>
+      <div class="collect-filters pm-product-filters">
+        <div class="field pm-product-filter-search"><label>검색</label><input id="pmProductKeyword" placeholder="품명 / 제조사 / 제품코드 / CAS / 거래처 검색"/></div>
+        <div class="field pm-product-filter-category"><label>구분</label><select id="pmProductCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div>
+        <div class="field pm-product-filter-active"><label>사용여부</label><select id="pmProductActive"><option value="">전체</option><option value="active">사용</option><option value="inactive">사용중지</option></select></div>
+        <div class="field pm-product-filter-identifier"><label>QR/바코드</label><select id="pmProductIdentifierStatus"><option value="">전체</option><option value="with">있음</option><option value="without">없음</option></select></div>
+        <div class="field pm-product-filter-reset"><label>&nbsp;</label><button class="btn" id="pmResetProduct">신규 입력</button></div>
       </div>
 
       <div class="form-grid" style="margin-top:16px; grid-template-columns:1fr 2fr 1.2fr 1.2fr 1fr 1fr 1fr 1.3fr 1fr;">
@@ -570,10 +605,10 @@
   - 실제 tbody 데이터 출력 순서는 collect.js / order_receipt.js 렌더링 코드도 동일 순서로 맞춰야 완전히 반영됩니다.
 -->
 <script src="../collect.js"></script>
-<script src="../product_management.js?v=20261002-identifiers1"></script>
+<script src="../product_management.js?v=20261002-identifiers2"></script>
 <script src="../order_receipt.js?v=20261002-mobile-date6"></script>
 <script src="../app.js"></script>
-<script src="./app.js?v=20261002-mobile-identifiers1"></script>
+<script src="./app.js?v=20261002-mobile-identifiers2"></script>
 <script>
   (function () {
     window.__ensureReagentProductManagementInit = function () {
@@ -794,4 +829,3 @@
 
 <script src="../../common/common.js"></script>
 </body></html>
-
