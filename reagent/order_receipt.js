@@ -724,11 +724,17 @@
       if (!recordKey || !input || input.dataset.orderReceiptBound === "1") return;
       input.dataset.orderReceiptBound = "1";
 
-      input.addEventListener("focus", () => { try { input.showPicker?.(); } catch (_) {} });
-      input.addEventListener("click", () => { try { input.showPicker?.(); } catch (_) {} });
+      // 모바일 브라우저의 <input type="date">는 탭 자체로 네이티브 달력을 엽니다.
+      // focus/click 시 showPicker()를 중복 호출하면 일부 Android 브라우저에서
+      // 달력이 즉시 닫히며 오늘 날짜가 change로 확정되는 문제가 생길 수 있습니다.
+      // 달력 열기는 브라우저 기본 동작에 맡기고, 실제 값이 바뀐 경우에만 저장합니다.
+      input.addEventListener("click", (e) => {
+        e.stopPropagation();
+      });
       input.addEventListener("change", async (e) => {
         e.stopPropagation();
-        await this.setDate(recordKey, input.dataset.field, input.value || "");
+        const nextValue = String(input.value || "").trim();
+        await this.setDate(recordKey, input.dataset.field, nextValue);
       });
     },
 
