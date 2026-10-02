@@ -411,7 +411,8 @@
     return [
       document.getElementById('pmProductKeyword')?.value || '',
       document.getElementById('pmProductCategory')?.value || '',
-      document.getElementById('pmProductActive')?.value || ''
+      document.getElementById('pmProductActive')?.value || '',
+      document.getElementById('pmProductIdentifierStatus')?.value || ''
     ].join('||');
   }
 
