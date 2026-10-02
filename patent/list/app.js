@@ -172,6 +172,74 @@
     )];
   }
 
+
+  function isPastDate(value) {
+    if (!value) {
+      return false;
+    }
+
+    const date = new Date(
+      `${String(value).slice(0, 10)}T23:59:59`
+    );
+
+    if (Number.isNaN(date.getTime())) {
+      return false;
+    }
+
+    return date.getTime() < Date.now();
+  }
+
+  function applyExpirationStatusFallback(
+    existingPatent,
+    patentData,
+    update
+  ) {
+    const expirationDate =
+      update.expiration_date ||
+      existingPatent.expiration_date;
+
+    if (
+      !existingPatent.registration_no &&
+      !update.registration_no
+    ) {
+      return;
+    }
+
+    if (!isPastDate(expirationDate)) {
+      return;
+    }
+
+    const meta =
+      patentData?.kipris_meta || {};
+
+    // ST.27에서 존속기간 이후 보호(G) 또는 만료 후
+    // 권리 활성 이벤트를 확인한 경우 날짜만으로 소멸 처리하지 않습니다.
+    if (
+      meta.st27_has_post_term_protection === true ||
+      meta.st27_active_after_expiration === true
+    ) {
+      return;
+    }
+
+    if (
+      normalizeStatus(update.legal_status) === '소멸'
+    ) {
+      return;
+    }
+
+    update.legal_status = '소멸';
+
+    if (
+      !update.legal_status_detail ||
+      normalizeStatus(
+        update.legal_status_detail
+      ) !== '소멸'
+    ) {
+      update.legal_status_detail =
+        `존속기간 만료일 경과 (${String(expirationDate).slice(0, 10)})`;
+    }
+  }
+
   function comparableValue(value) {
     if (Array.isArray(value)) {
       return JSON.stringify(
@@ -316,6 +384,13 @@
       patentData,
       kiprisResponse
     );
+
+    applyExpirationStatusFallback(
+      existingPatent,
+      patentData,
+      update
+    );
+
     const changedFields = changedOfficialFields(
       existingPatent,
       update
@@ -345,7 +420,12 @@
       await addKiprisStatusHistory(
         existingPatent,
         update.legal_status,
-        patentData
+        {
+          ...patentData,
+          legal_status_detail:
+            update.legal_status_detail ||
+            patentData.legal_status_detail
+        }
       );
     }
 
