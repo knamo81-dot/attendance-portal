@@ -240,10 +240,23 @@
       <div class="pat-modal-body">
         <div class="lookup-box">
           <div class="lookup-fields">
+            <select
+              id="lookupCountry"
+              class="pat-select lookup-country"
+              aria-label="KIPRIS 조회 국가"
+            >
+              <option value="KR">한국 (KR)</option>
+              <option value="US">미국 (US)</option>
+              <option value="EP">유럽특허청 (EP)</option>
+              <option value="JP">일본 (JP)</option>
+              <option value="CN">중국 (CN)</option>
+              <option value="WO">PCT (WO)</option>
+            </select>
+
             <input
               id="lookupNo"
               class="pat-input"
-              placeholder="출원번호 또는 등록번호"
+              placeholder="출원번호 · 공개번호 · 등록번호"
             />
 
             <button
