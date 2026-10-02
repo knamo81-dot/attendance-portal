@@ -2415,6 +2415,7 @@ body.auth-loading .top-user-bar {
             <button type="button" id="suppliesNavBtn" class="nav-btn" data-portal-src="reagent/index.html" title="시약">시약</button>
             <button type="button" id="travelExpenseNavBtn" class="nav-btn" data-portal-src="travel-expense/index.html" title="출장비정산">출장</button>
             <button type="button" id="qaNavBtn" class="nav-btn" data-portal-src="QA/usage/index.html" title="QA" hidden>QA</button>
+            <button type="button" id="patentNavBtn" class="nav-btn" data-portal-src="patent/dashboard/index.html" title="특허관리" hidden>특허</button>
             <button type="button" id="aicNavBtn" class="nav-btn" data-portal-src="aic/index.html" title="AIC">AIC</button>
             <button type="button" id="mealNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
             <button type="button" id="docsNavBtn" class="nav-btn nav-btn--soon" disabled title="준비 중">준비중</button>
@@ -2664,6 +2665,7 @@ body.auth-loading .top-user-bar {
     portalSideNav: document.getElementById('portalSideNav'),
     settingsNavBtn: document.getElementById('settingsNavBtn'),
     qaNavBtn: document.getElementById('qaNavBtn'),
+    patentNavBtn: document.getElementById('patentNavBtn'),
     researchStaffNavBtn: document.getElementById('researchStaffNavBtn'),
     serviceAdminBtn: document.getElementById('serviceAdminBtn'),
     portalSubtabsWrap: document.getElementById('portalSubtabsWrap'),
@@ -3171,6 +3173,24 @@ body.auth-loading .top-user-bar {
       desc: '출장비 신청, 제출내역 확인 및 관리팀 검토를 모바일에서 관리합니다.',
       gradient: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #38bdf8 100%)'
     },
+    'patent/dashboard/index.html': {
+      top: 'Intellectual Property Management',
+      title: '특허 관리',
+      desc: '지식재산권과 납부·기한을 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #805810 0%, #956817 48%, #b7831f 100%)'
+    },
+    'patent/list/index.html': {
+      top: 'Intellectual Property Management',
+      title: '특허 관리',
+      desc: '지식재산권과 납부·기한을 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #805810 0%, #956817 48%, #b7831f 100%)'
+    },
+    'patent/management/index.html': {
+      top: 'Intellectual Property Management',
+      title: '특허 관리',
+      desc: '지식재산권과 납부·기한을 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #805810 0%, #956817 48%, #b7831f 100%)'
+    },
     'aic/index.html': {
       top: 'Global Communication',
       title: 'AI Communication',
@@ -3329,6 +3349,21 @@ body.auth-loading .top-user-bar {
       { id: 'qa-special', label: '특별관리물질 관리' },
       { id: 'qa-health', label: '특수건강진단' },
       { id: 'qa-work-environment', label: '작업환경측정' }
+    ],
+    'patent/dashboard/index.html': [
+      { id: 'patent-dashboard', label: '특허현황' },
+      { id: 'patent-list', label: '특허목록' },
+      { id: 'patent-management', label: '특허관리' }
+    ],
+    'patent/list/index.html': [
+      { id: 'patent-dashboard', label: '특허현황' },
+      { id: 'patent-list', label: '특허목록' },
+      { id: 'patent-management', label: '특허관리' }
+    ],
+    'patent/management/index.html': [
+      { id: 'patent-dashboard', label: '특허현황' },
+      { id: 'patent-list', label: '특허목록' },
+      { id: 'patent-management', label: '특허관리' }
     ],
     'travel-expense/index.html': [],
     'travel-expense/Mobile/index.html': [],
@@ -3603,6 +3638,23 @@ body.auth-loading .top-user-bar {
       ''
     );
 
+    // 특허는 현황/목록/관리를 독립 화면으로 운영하므로 포탈 상단 버튼에서 경로를 전환합니다.
+    if (isPatentProgramSrc(currentSrc)) {
+      const targetMap = {
+        'patent-dashboard': PATENT_DASHBOARD_SRC,
+        'patent-list': PATENT_LIST_SRC,
+        'patent-management': PATENT_MANAGEMENT_SRC
+      };
+      const target = targetMap[tabId] || '';
+      if (target && currentSrc !== target) {
+        try { sessionStorage.setItem(LAST_PAGE_KEY, target); } catch (_) {}
+        replacePortalFrame(buildSrcWithSession(target));
+      } else if (target) {
+        setPortalSubtabActive(tabId, false);
+      }
+      return;
+    }
+
     // QA는 사용일지, 화학물질, 특별관리물질, 특수건강진단을 독립 프로그램으로 운영하므로
     // 포탈 상단 버튼에서 iframe 경로 자체를 전환합니다.
     if (isQaProgramSrc(currentSrc)) {
@@ -3669,6 +3721,9 @@ body.auth-loading .top-user-bar {
     const key = normalizePortalSrc(src);
     const tabs = portalDefaultTabs[key] || [];
     let activeId = tabs[0]?.id || '';
+    if (isPatentDashboardSrc(key)) activeId = 'patent-dashboard';
+    if (isPatentListSrc(key)) activeId = 'patent-list';
+    if (isPatentManagementSrc(key)) activeId = 'patent-management';
     if (isQaUsageSrc(key)) activeId = 'qa-usage';
     if (isQaStorageSrc(key)) activeId = 'qa-storage';
     if (isQaSdsSrc(key)) activeId = 'qa-sds';
@@ -3866,6 +3921,18 @@ body.auth-loading .top-user-bar {
     return key === TRAVEL_EXPENSE_DESKTOP_SRC || key === TRAVEL_EXPENSE_MOBILE_SRC;
   }
 
+  const PATENT_DASHBOARD_SRC = 'patent/dashboard/index.html';
+  const PATENT_LIST_SRC = 'patent/list/index.html';
+  const PATENT_MANAGEMENT_SRC = 'patent/management/index.html';
+
+  function isPatentDashboardSrc(src) { return normalizePortalSrc(src) === PATENT_DASHBOARD_SRC; }
+  function isPatentListSrc(src) { return normalizePortalSrc(src) === PATENT_LIST_SRC; }
+  function isPatentManagementSrc(src) { return normalizePortalSrc(src) === PATENT_MANAGEMENT_SRC; }
+  function isPatentProgramSrc(src) {
+    const key = normalizePortalSrc(src);
+    return key === PATENT_DASHBOARD_SRC || key === PATENT_LIST_SRC || key === PATENT_MANAGEMENT_SRC;
+  }
+
   const QA_USAGE_DESKTOP_SRC = 'QA/usage/index.html';
   const QA_USAGE_MOBILE_SRC = 'QA/Mobile/usage/index.html';
   const QA_SDS_DESKTOP_SRC = 'QA/index.html';
@@ -3980,7 +4047,10 @@ body.auth-loading .top-user-bar {
   }
 
   function findNavBySrc(src) {
-    return navButtons.find((btn) => btn.getAttribute('data-portal-src') === src);
+    const exact = navButtons.find((btn) => btn.getAttribute('data-portal-src') === src);
+    if (exact) return exact;
+    if (typeof isPatentProgramSrc === 'function' && isPatentProgramSrc(src)) return els.patentNavBtn || null;
+    return null;
   }
 
   function setBoxMessage(target, message) {
@@ -4131,6 +4201,33 @@ body.auth-loading .top-user-bar {
       ''
     ).trim().toUpperCase();
     return divisionCode === 'TEST01';
+  }
+
+  function canAccessPatentApp() {
+    // 특허관리 프로그램은 회사 관리자 전용입니다.
+    // Portal 설정 메뉴와 동일한 회사 관리자 판정 기준을 사용합니다.
+    // 일반사용자에게는 사이드바의 특허 버튼 자체를 노출하지 않습니다.
+    if (!currentUser) return false;
+    return canUseSettingsMenu();
+  }
+
+  let patentVisibilitySeq = 0;
+  function updatePatentButtonVisibility() {
+    if (!els.patentNavBtn) return;
+    const seq = ++patentVisibilitySeq;
+    const allowed = canAccessPatentApp();
+    if (seq !== patentVisibilitySeq) return;
+    els.patentNavBtn.hidden = !allowed;
+    els.patentNavBtn.style.display = allowed ? '' : 'none';
+    els.patentNavBtn.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+    els.patentNavBtn.tabIndex = allowed ? 0 : -1;
+  }
+
+  function schedulePatentButtonVisibilityRefresh() {
+    updatePatentButtonVisibility();
+    [100, 350, 900, 1800].forEach(function (delay) {
+      setTimeout(updatePatentButtonVisibility, delay);
+    });
   }
 
   function canAccessQaApp() {
@@ -4862,6 +4959,7 @@ body.auth-loading .top-user-bar {
     updateSettingsButtonVisibility();
     updateQaButtonVisibility();
     scheduleResearchStaffButtonVisibilityRefresh();
+    schedulePatentButtonVisibilityRefresh();
     updateQaButtonVisibility();
   }
 
@@ -4924,6 +5022,7 @@ body.auth-loading .top-user-bar {
     if (els.topUserBar) els.topUserBar.hidden = false;
     scheduleResearchStaffButtonVisibilityRefresh();
     updateQaButtonVisibility();
+    schedulePatentButtonVisibilityRefresh();
   }
 
   function applyRoleUI() {
@@ -4941,6 +5040,7 @@ body.auth-loading .top-user-bar {
     updateServiceAdminButtonVisibility();
     updateSettingsButtonVisibility();
     scheduleResearchStaffButtonVisibilityRefresh();
+    schedulePatentButtonVisibilityRefresh();
   }
 
 
@@ -5542,7 +5642,7 @@ body.auth-loading .top-user-bar {
       // 기존 시약/근태 등은 같은 HTML 안에서 postMessage로 내부 탭을 바꾸지만,
       // QA의 세 프로그램은 iframe 문서 자체를 교체해야 하므로 src를 직접 갱신합니다.
       // 이렇게 해야 iframe의 src 속성도 실제 현재 프로그램과 일치합니다.
-      if (isQaProgramSrc(normalizedTarget)) {
+      if (isQaProgramSrc(normalizedTarget) || isPatentProgramSrc(normalizedTarget)) {
         frame.src = targetUrl;
       } else if (frame.contentWindow && frame.contentWindow.location) {
         frame.contentWindow.location.replace(targetUrl);
@@ -5568,6 +5668,13 @@ body.auth-loading .top-user-bar {
     }
 
     if (isServiceAdminSrc(src) && !isServiceAdminRole()) {
+      return;
+    }
+
+    if (isPatentProgramSrc(src) && !(await canAccessPatentApp())) {
+      try { sessionStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
+      const fallbackBtn = homeBtn || findNavBySrc(HOME_SRC);
+      await navigateBySrc(HOME_SRC, fallbackBtn, { skipSave: true });
       return;
     }
 
@@ -5643,6 +5750,11 @@ body.auth-loading .top-user-bar {
     }
 
     if (lastSrc && isResearchStaffSrc(lastSrc) && !canAccessResearchStaffApp()) {
+      try { sessionStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
+      lastSrc = '';
+    }
+
+    if (lastSrc && isPatentProgramSrc(lastSrc) && !(await canAccessPatentApp())) {
       try { sessionStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
       lastSrc = '';
     }
@@ -5836,6 +5948,8 @@ body.auth-loading .top-user-bar {
 
   window.addEventListener('load', scheduleResearchStaffButtonVisibilityRefresh);
   document.addEventListener('DOMContentLoaded', scheduleResearchStaffButtonVisibilityRefresh);
+  window.addEventListener('load', schedulePatentButtonVisibilityRefresh);
+  document.addEventListener('DOMContentLoaded', schedulePatentButtonVisibilityRefresh);
 
     els.mobileDrawerBackdrop?.addEventListener('click', function () {
       closeMobileDrawer();
@@ -6032,6 +6146,28 @@ body.auth-loading .top-user-bar {
     window.addEventListener('message', function (event) {
       const payload = event?.data || {};
 
+      if (payload.type === 'patent-access-updated') {
+        schedulePatentButtonVisibilityRefresh();
+        return;
+      }
+
+      if (payload.type === 'patent-navigate') {
+        const view = String(payload.view || '').trim().toLowerCase();
+        const targetMap = { dashboard: PATENT_DASHBOARD_SRC, list: PATENT_LIST_SRC, management: PATENT_MANAGEMENT_SRC };
+        const base = targetMap[view] || '';
+        if (!base) return;
+        const params = new URLSearchParams();
+        const rawParams = payload.params && typeof payload.params === 'object' ? payload.params : {};
+        Object.keys(rawParams).forEach(function (key) {
+          const value = rawParams[key];
+          if (value !== undefined && value !== null && String(value) !== '') params.set(key, String(value));
+        });
+        const target = base + (params.toString() ? '?' + params.toString() : '');
+        try { sessionStorage.setItem(LAST_PAGE_KEY, base); } catch (_) {}
+        replacePortalFrame(buildSrcWithSession(target));
+        return;
+      }
+
       if (payload.type === 'portal-permissions-updated' || payload.type === 'PORTAL_PERMISSIONS_UPDATED') {
         // 설정 > 권한관리에서 수동 권한이 변경되면 현재 로그인 사용자의
         // user_app_roles를 즉시 다시 읽어 부모 세션과 현재 iframe에 반영합니다.
@@ -6043,6 +6179,7 @@ body.auth-loading .top-user-bar {
             updateSettingsButtonVisibility();
             updateQaButtonVisibility();
             scheduleResearchStaffButtonVisibilityRefresh();
+            schedulePatentButtonVisibilityRefresh();
             postAuthToFrame();
 
             try {
@@ -6082,7 +6219,7 @@ body.auth-loading .top-user-bar {
 
         // QA는 사용일지, SDS, 특별관리물질이 서로 독립 프로그램이므로,
         // 각 하위 앱이 보내는 자체 탭 정보로 포털의 QA 공통 메뉴를 덮어쓰지 않습니다.
-        if (isQaProgramSrc(currentSrc)) {
+        if (isQaProgramSrc(currentSrc) || isPatentProgramSrc(currentSrc)) {
           updatePortalSubtabs(currentSrc);
           return;
         }
@@ -6112,6 +6249,11 @@ body.auth-loading .top-user-bar {
           frame?.src ||
           HOME_SRC
         );
+
+        // 특허 상단 버튼은 서로 다른 프로그램 경로를 나타내므로 현재 경로 기준으로 active 상태를 고정합니다.
+        if (isPatentDashboardSrc(currentSrc)) { setPortalSubtabActive('patent-dashboard', false); return; }
+        if (isPatentListSrc(currentSrc)) { setPortalSubtabActive('patent-list', false); return; }
+        if (isPatentManagementSrc(currentSrc)) { setPortalSubtabActive('patent-management', false); return; }
 
         // QA 상단 버튼은 서로 다른 프로그램 경로를 나타냅니다.
         // 각 하위 앱이 보내는 내부 active tab id와 포털의 qa-* id가 다를 수 있으므로
