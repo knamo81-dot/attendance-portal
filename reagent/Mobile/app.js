@@ -441,8 +441,10 @@
     container.innerHTML = `
       ${visibleRows.map((p)=>{
         const cas = pm.getProductCasNumbers?.(p)?.join(', ') || p.cas || '-';
+        const identifierStatus = pm.getProductIdentifierStatus?.(p) || { hasAny:false, label:'없음' };
+        const identifierBorder = identifierStatus.hasAny ? 'border:2px solid #2563eb;' : '';
         return `
-          <article class="mobile-data-card ${p.is_active === false ? 'is-inactive' : ''}" data-product-id="${attr(p.id)}">
+          <article class="mobile-data-card ${p.is_active === false ? 'is-inactive' : ''}" data-product-id="${attr(p.id)}" style="${identifierBorder}">
             <div class="mobile-data-summary mobile-two-line-summary" role="button" tabindex="0" aria-expanded="false">
               <span class="mobile-category-badge">${esc(p.category || '-')}</span>
               <div class="mobile-two-line-info">
@@ -459,6 +461,7 @@
                 <span>규격</span><b>${esc(p.capacity || '-')}</b>
                 <span>CAS</span><b>${esc(cas)}</b>
                 <span>등급</span><b>${esc(p.grade || '-')}</b>
+                <span>QR/바코드</span><b>${esc(identifierStatus.label || '없음')}</b>
                 <span>기본거래처</span><b>${esc(p.default_vendor || '-')}</b>
                 <span>선정사유</span><b>${esc(p.default_vendor_reason || '-')}</b>
                 <span>사용여부</span><b>${p.is_active === false ? '사용중지' : '사용'}</b>
