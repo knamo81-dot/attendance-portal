@@ -4,9 +4,10 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>시약·초자 신청/취합</title>
-<link rel="stylesheet" href="style.css"/>
-<link rel="stylesheet" href="../common/mobile.css"/>
-<link rel="stylesheet" href="../common/theme.css"/>
+<link rel="stylesheet" href="../style.css?v=20260929-mobile-base1"/>
+<link rel="stylesheet" href="../../common/mobile.css"/>
+<link rel="stylesheet" href="../../common/theme.css"/>
+<link rel="stylesheet" href="./style.css?v=20261002-mobile-qascan1"/>
 <script>
   /*
     초기 권한 표시 보정
@@ -178,12 +179,46 @@
 }
 </style>
 
+
+<style id="pm-mobile-identifier-filter-layout">
+@media (max-width:760px){
+  #page-product-management .pm-product-filters{
+    display:grid !important;
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    gap:8px !important;
+    align-items:end !important;
+  }
+  #page-product-management .pm-product-filters .pm-product-filter-search{
+    grid-column:1 / -1 !important;
+  }
+  #page-product-management .pm-product-filters .pm-product-filter-category,
+  #page-product-management .pm-product-filters .pm-product-filter-active,
+  #page-product-management .pm-product-filters .pm-product-filter-identifier{
+    grid-column:auto !important;
+    min-width:0 !important;
+  }
+  #page-product-management .pm-product-filters .pm-product-filter-reset{
+    grid-column:1 / -1 !important;
+    width:auto !important;
+    justify-self:end !important;
+  }
+  #page-product-management .pm-product-filters .pm-product-filter-reset .btn{
+    width:auto !important;
+    min-width:94px !important;
+  }
+  #page-product-management .pm-product-filters label{
+    font-size:10px !important;
+    white-space:nowrap !important;
+  }
+}
+</style>
+
 </head>
-<body>
+<body class="reagent-mobile-ui">
 <input id="productKeyword" type="hidden"/>
 <div class="shell">
 <div class="tabs"><button class="tab-btn active" data-tab="request">제품 신청</button><button class="tab-btn" data-tab="collect">제품 취합</button><button class="tab-btn" data-tab="prepare">취합 정리</button><button class="tab-btn" data-tab="order-receipt">발주/입고 관리</button><button class="tab-btn" data-tab="product-management">제품 관리</button></div>
-<section class="page active" id="page-request"><div class="request-form-modal-backdrop" id="requestFormModalBackdrop"><section class="card request-form-card" id="requestFormCard"><div class="card-head request-form-modal-head"><div class="request-form-title-wrap" style="min-width:0;"><div class="request-form-title-row" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><h2 style="margin:0;">제품 신청</h2><div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:700; font-size:13px; color:#334155;">주문월</span><select id="orderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:130px;"></select><span class="small" id="orderMonthDesc" style="color:#6b7280;">선택한 주문월에 발주할 품목을 신청합니다.</span></div></div><p>제품은 검색해서 선택하고 수량/용도만 입력합니다.</p></div><div class="request-form-search-wrap" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;"><button class="btn primary" id="openSearch" style="width:auto; padding:10px 14px; white-space:nowrap;">제품검색</button><span class="badge blue">검색 → 자동입력 → 수량/용도</span></div></div>
+<section class="page active" id="page-request"><div class="request-form-modal-backdrop" id="requestFormModalBackdrop"><section class="card request-form-card" id="requestFormCard"><div class="card-head request-form-modal-head"><div class="request-form-title-wrap" style="min-width:0;"><div class="request-form-title-row" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><h2 style="margin:0;">제품 신청</h2><div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:700; font-size:13px; color:#334155;">주문월</span><select id="orderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:112px;"></select><span class="small" id="orderMonthDesc" style="color:#6b7280;">선택한 주문월에 발주할 품목을 신청합니다.</span></div></div><p>제품은 검색 또는 QR/바코드 스캔으로 선택하고 수량/용도만 입력합니다.</p></div><div class="request-form-search-wrap" style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap; justify-content:flex-end;"><button class="btn primary" id="openSearch" style="width:auto; padding:10px 12px; white-space:nowrap;">제품검색</button><button class="btn request-scan-btn" id="openProductScan" type="button" title="QR/바코드 카메라 스캔" aria-label="QR/바코드 카메라 스캔"><span class="request-scan-icon" aria-hidden="true">📷</span><span class="request-scan-label">스캔</span></button><span class="badge blue">검색/스캔 → 자동입력 → 수량/용도</span></div></div>
 <div class="card-body"><div class="form-grid">
 <div class="field"><label>분류</label><input id="category" placeholder="자동입력" readonly/></div>
 <div class="field"><label>품명</label><input id="productName" placeholder="자동입력" readonly/></div>
@@ -553,43 +588,78 @@
 <div class="modal-backdrop" id="searchModal"><div class="modal"><div class="modal-head"><div><h3>제품 검색</h3><div class="small">품명, 제품코드, 제조사, CAS 번호로 검색할 수 있습니다.</div></div><button class="btn" id="closeSearch">닫기</button></div>
 <div class="modal-search"><div class="field"><label>키워드</label><input id="searchInput" placeholder="예: ethanol, 459844, Sigma, 64-17-5"/><div class="search-hint">부분 검색 가능</div></div><div class="field"><label>분류</label><select id="searchCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div><div class="field"><label>제조사</label><select id="searchMaker"><option value="">전체</option></select></div><div class="field"><label>정렬</label><select id="sortMode"><option value="relevance">관련도순</option><option value="name">품명순</option><option value="maker">제조사순</option></select></div></div>
 <div class="modal-body" id="searchResults"></div><div class="modal-foot"><div class="small" id="resultInfo">검색 결과 0건</div><div class="small">원하는 제품이 없으면 <span class="product-link" id="inlineRequest">제품 등록 요청</span>으로 넘길 수 있습니다.</div></div></div></div>
+<div class="modal-backdrop product-scan-modal-backdrop" id="productScanModal" aria-hidden="true">
+  <section class="modal product-scan-modal" role="dialog" aria-modal="true" aria-labelledby="productScanTitle">
+    <div class="modal-head product-scan-head">
+      <div>
+        <h3 id="productScanTitle">제품 코드 스캔</h3>
+        <p>QR · DataMatrix · 바코드를 카메라에 보여주세요.</p>
+      </div>
+      <button id="closeProductScan" class="modal-close-btn product-scan-close" type="button" aria-label="닫기">×</button>
+    </div>
+    <div class="product-scan-body">
+      <section id="productScanCameraSection" class="scan-camera-section">
+        <div class="scan-video-wrap">
+          <video id="productScanVideo" playsinline muted hidden></video>
+          <canvas id="productScanCanvas" hidden></canvas>
+          <div class="scan-guide" aria-hidden="true">
+            <i></i><i></i><i></i><i></i>
+            <span></span>
+          </div>
+          <div class="scan-tools" aria-label="카메라 도구">
+            <button id="productScanTorch" class="scan-tool-btn" type="button" hidden aria-label="손전등 켜기">⌁</button>
+            <button id="productScanZoom" class="scan-tool-btn" type="button" hidden aria-label="카메라 확대">1×</button>
+          </div>
+        </div>
+        <div id="productScanStatus" class="product-scan-status scan-status" aria-live="polite">카메라를 준비하고 있습니다.</div>
+        <div class="scan-camera-actions">
+          <button id="productScanRetry" class="btn" type="button" hidden>다시 스캔</button>
+        </div>
+      </section>
+    </div>
+  </section>
+</div>
 <div class="toast-wrap" id="toastWrap"></div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.4/dist/iife/reader/index.js"></script>
 <script>
   if (!window.supabase) {
     document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
   }
 </script>
-<script src="supabase.js"></script>
-<script src="request.js"></script>
+<script src="../supabase.js"></script>
+<script src="../request.js?v=20261002-mobile-qascan1"></script>
 <!--
   COLUMN ORDER NOTE
   - HTML header/colgroup order updated:
     품명 → 제조사 → 제품코드 → CAS → 등급 → 규격
   - 실제 tbody 데이터 출력 순서는 collect.js / order_receipt.js 렌더링 코드도 동일 순서로 맞춰야 완전히 반영됩니다.
 -->
-<script src="collect.js"></script>
-<script src="product_management.js?v=20261002-identifiers2"></script>
-<script src="order_receipt.js"></script>
-<script src="app.js"></script>
+<script src="../collect.js"></script>
+<script src="../product_management.js?v=20261002-identifiers2"></script>
+<script src="../order_receipt.js?v=20261002-mobile-date6"></script>
+<script src="../app.js"></script>
+<script src="./app.js?v=20261002-mobile-identifiers2"></script>
 <script>
-  document.addEventListener("DOMContentLoaded", () => {
-    let pmInitialized = false;
-    const initProductManagement = () => {
-      if (pmInitialized) return;
-      pmInitialized = true;
-      window.ReagentApp.productManagement?.init?.();
+  (function () {
+    window.__ensureReagentProductManagementInit = function () {
+      const pm = window.ReagentApp?.productManagement;
+      if (!pm || pm.__mobilePageInitialized === true) return;
+      pm.__mobilePageInitialized = true;
+      pm.init?.();
     };
 
-    document.querySelector('.tab-btn[data-tab="product-management"]')?.addEventListener("click", () => {
-      setTimeout(initProductManagement, 0);
-    });
+    document.addEventListener("DOMContentLoaded", () => {
+      document.querySelector('.tab-btn[data-tab="product-management"]')?.addEventListener("click", () => {
+        setTimeout(window.__ensureReagentProductManagementInit, 0);
+      });
 
-    document.querySelector('.tab-btn[data-tab="order-receipt"]')?.addEventListener("click", () => {
-      setTimeout(() => window.ReagentApp.orderReceipt?.init?.(), 0);
+      document.querySelector('.tab-btn[data-tab="order-receipt"]')?.addEventListener("click", () => {
+        setTimeout(() => window.ReagentApp.orderReceipt?.init?.(), 0);
+      });
     });
-  });
+  })();
 </script>
 
 <script id="reagent-tab-emergency-fallback">
@@ -626,7 +696,7 @@
       try { window.ReagentApp?.orderReceipt?.init?.(); } catch (_) {}
     }
     if (tab === "product-management") {
-      try { window.ReagentApp?.productManagement?.init?.(); } catch (_) {}
+      try { window.__ensureReagentProductManagementInit?.(); } catch (_) {}
     }
   }
 
@@ -727,7 +797,7 @@
     }
 
     if (tabId === 'product-management') {
-      try { window.ReagentApp?.productManagement?.init?.(); } catch (_) {}
+      try { window.__ensureReagentProductManagementInit?.(); } catch (_) {}
     }
 
     notifyPortalActiveTab(tabId);
@@ -789,6 +859,5 @@
 })();
 </script>
 
-<script src="../common/common.js"></script>
+<script src="../../common/common.js"></script>
 </body></html>
-
