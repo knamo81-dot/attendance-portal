@@ -1753,6 +1753,7 @@
                 <th>만료예정일</th>
                 <th>현재권리자</th>
                 <th>소유구분</th>
+                <th>목록등록</th>
               </tr>
             </thead>
             <tbody>
@@ -1809,11 +1810,20 @@
                         ${P.escapeHtml(item.ownership_status||'확인필요')}
                       </span>
                     </td>
+                    <td class="company-register-cell">
+                      <button
+                        type="button"
+                        class="pat-btn primary company-register-btn"
+                        data-company-register-index="${index}"
+                      >
+                        목록등록
+                      </button>
+                    </td>
                   </tr>
                 `;
               }).join(''):`
                 <tr>
-                  <td colspan="11" class="pat-empty">
+                  <td colspan="12" class="pat-empty">
                     조건에 맞는 특허가 없습니다.
                   </td>
                 </tr>
@@ -1823,6 +1833,24 @@
         </div>
       </div>
     `;
+
+    target
+      .querySelectorAll('[data-company-register-index]')
+      .forEach(button=>{
+        button.addEventListener('click',()=>{
+          if(!ctx.access.admin)return;
+
+          const index=Number(button.dataset.companyRegisterIndex);
+          const item=rows[index];
+
+          if(!item){
+            P.toast('선택한 특허 정보를 찾을 수 없습니다.','warn');
+            return;
+          }
+
+          P.navigate('list');
+        });
+      });
   }
 
   async function searchCompanyPatents(page=1){
