@@ -194,6 +194,7 @@ window.ReagentApp.productManagement = {
       productKeyword: document.getElementById("pmProductKeyword"),
       productCategory: document.getElementById("pmProductCategory"),
       productActive: document.getElementById("pmProductActive"),
+      productIdentifierStatus: document.getElementById("pmProductIdentifierStatus"),
       productList: document.getElementById("pmProductList"),
       productCount: document.getElementById("pmProductCount"),
       totalCount: document.getElementById("pmTotalCount"),
@@ -293,7 +294,7 @@ window.ReagentApp.productManagement = {
       els.showRequestPanel.addEventListener("click", () => this.setProductManagementPanel("request"));
     }
 
-    [els.productKeyword, els.productCategory, els.productActive].forEach((el) => {
+    [els.productKeyword, els.productCategory, els.productActive, els.productIdentifierStatus].forEach((el) => {
       if (!el || el.dataset.pmFilterBound) return;
       el.dataset.pmFilterBound = "1";
       el.addEventListener("input", () => this.renderProducts());
@@ -819,6 +820,15 @@ window.ReagentApp.productManagement = {
     return { hasAny, hasQr, hasBarcode, label };
   },
 
+  renderProductIdentifierBadge(product = {}) {
+    const status = this.getProductIdentifierStatus(product);
+    if (!status.hasAny) {
+      return '<span style="color:#94a3b8;font-weight:700;white-space:nowrap;">없음</span>';
+    }
+
+    return `<span style="display:inline-flex;align-items:center;justify-content:center;min-height:24px;padding:3px 9px;border:1px solid #93c5fd;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:11px;font-weight:800;line-height:1.2;white-space:nowrap;">${this.html(status.label)}</span>`;
+  },
+
   async loadProductCasMap() {
     this.productCasMap = {};
     if (!this.sb) return;
@@ -874,6 +884,7 @@ window.ReagentApp.productManagement = {
     const keyword = String(els.productKeyword?.value || "").trim().toLowerCase();
     const category = els.productCategory?.value || "";
     const active = els.productActive?.value || "";
+    const identifierFilter = els.productIdentifierStatus?.value || "";
 
     return this.products.filter((p) => {
       const casSearchText = this.getProductCasNumbers(p).join(" ");
@@ -885,6 +896,10 @@ window.ReagentApp.productManagement = {
       if (category && p.category !== category) return false;
       if (active === "active" && p.is_active !== true) return false;
       if (active === "inactive" && p.is_active === true) return false;
+
+      const identifierStatus = this.getProductIdentifierStatus(p);
+      if (identifierFilter === "with" && !identifierStatus.hasAny) return false;
+      if (identifierFilter === "without" && identifierStatus.hasAny) return false;
       return true;
     });
   },
@@ -922,7 +937,6 @@ window.ReagentApp.productManagement = {
     }
 
     els.productList.innerHTML = rows.map((p) => {
-      const identifierStatus = this.getProductIdentifierStatus(p);
       return `
       <tr class="${p.is_active ? "" : "request-row-collected"}">
         <td>${this.html(p.category)}</td>
@@ -932,7 +946,7 @@ window.ReagentApp.productManagement = {
         <td>${this.html(p.capacity)}</td>
         <td>${this.renderProductCasCell(p)}</td>
         <td>${this.html(p.grade)}</td>
-        <td>${this.html(identifierStatus.label)}</td>
+        <td>${this.renderProductIdentifierBadge(p)}</td>
         <td>${this.html(p.default_vendor)}</td>
         <td>${this.html(p.default_vendor_reason || "")}</td>
         <td>${p.is_active ? "사용" : "사용중지"}</td>
