@@ -444,3 +444,15 @@
     white-space:normal;
   }
 }
+
+
+/* 회사특허 조회 → 특허목록 이동 */
+.company-register-cell{
+  text-align:center;
+  white-space:nowrap;
+}
+
+.company-register-btn{
+  min-width:72px;
+  white-space:nowrap;
+}
