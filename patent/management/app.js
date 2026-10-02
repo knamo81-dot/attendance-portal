@@ -3,7 +3,7 @@
   const P=window.PatentCommon;
   let ctx=null, patents=[], payments=[], deadlines=[], agencies=[], employees=[], settings=null;
   let section='payments', editingPayment=null, editingDeadline=null, editingAgency=null, calendarDate=new Date();
-  let companySearchData=null, companySearchPage=1, companySearchPageSize=50, companySearchLoading=false;
+  let companySearchData=null, companySearchPage=1, companySearchPageSize=50, companySearchLoading=false, companySearchCacheLoading=false;
   const query=new URLSearchParams(location.search);
   const $=id=>document.getElementById(id);
 
@@ -28,7 +28,11 @@
     document.querySelectorAll('[data-section]').forEach(b=>b.addEventListener('click',()=>showSection(b.dataset.section)));
     $('refreshBtn').addEventListener('click',()=>{
       if(section==='company-search'&&ctx.access.admin){
-        searchCompanyPatents(companySearchPage).catch(e=>P.toast(e.message,'error'));
+        loadCompanySearchCachePage(
+          currentCompanySearchName(),
+          companySearchPage,
+          {notify:true}
+        ).catch(e=>P.toast(e.message,'error'));
         return;
       }
       loadAll().catch(e=>P.toast(e.message,'error'));
@@ -199,6 +203,22 @@
 
     history.replaceState(null,'','?section='+encodeURIComponent(section));
     renderCurrent();
+
+    // 회사특허 조회 화면은 진입할 때 KIPRIS API를 자동 호출하지 않습니다.
+    // 저장된 결과가 있으면 DB 캐시에서만 불러옵니다.
+    if(
+      section==='company-search' &&
+      ctx?.access?.admin &&
+      !companySearchData &&
+      !companySearchLoading &&
+      !companySearchCacheLoading
+    ){
+      loadCompanySearchCachePage(
+        defaultCompanySearchName(),
+        companySearchPage,
+        {notify:false}
+      ).catch(e=>console.warn('[company-search-cache]',e));
+    }
   }
 
   function renderCurrent(){
@@ -1187,6 +1207,241 @@
     return sessionName||'삼천당제약';
   }
 
+
+  function currentCompanySearchName(){
+    return String(
+      $('companySearchName')?.value||
+      companySearchData?.company_name||
+      defaultCompanySearchName()
+    ).trim();
+  }
+
+  function companySearchCacheKey(value){
+    return String(value||'')
+      .normalize('NFKC')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g,'');
+  }
+
+  function numberDigits(value){
+    return String(value||'').replace(/\D/g,'');
+  }
+
+  function refreshPortalRegistrationFlags(data){
+    if(!data||!Array.isArray(data.patents))return data;
+
+    const byApplication=new Map();
+    const byRegistration=new Map();
+
+    patents.forEach(patent=>{
+      const appNo=numberDigits(patent.application_no);
+      const regNo=numberDigits(patent.registration_no);
+
+      if(appNo)byApplication.set(appNo,patent);
+      if(regNo)byRegistration.set(regNo,patent);
+    });
+
+    data.patents=data.patents.map(item=>{
+      const appNo=numberDigits(item.application_no);
+      const regNo=numberDigits(item.registration_no);
+
+      const existing=
+        (appNo?byApplication.get(appNo):null)||
+        (regNo?byRegistration.get(regNo):null)||
+        null;
+
+      return {
+        ...item,
+        portal_registered:!!existing,
+        portal_patent_id:existing?.id||null
+      };
+    });
+
+    return data;
+  }
+
+  function cloneCompanySearchResponse(data){
+    const copy=JSON.parse(JSON.stringify(data||{}));
+    delete copy._cache_meta;
+    return copy;
+  }
+
+  function isMissingCompanySearchCacheTable(error){
+    const text=String(error?.message||'').toLowerCase();
+    return (
+      error?.code==='42P01' ||
+      (
+        text.includes('pat_company_search_cache') &&
+        text.includes('does not exist')
+      )
+    );
+  }
+
+  function applyCompanySearchData(data,cacheMeta=null){
+    if(!data)return false;
+
+    const normalized=refreshPortalRegistrationFlags(
+      cloneCompanySearchResponse(data)
+    );
+
+    normalized._cache_meta={
+      cached:!!cacheMeta?.cached,
+      saved:cacheMeta?.saved!==false,
+      synced_at:
+        cacheMeta?.synced_at||
+        normalized?.source?.searched_at||
+        null
+    };
+
+    companySearchData=normalized;
+    companySearchPage=
+      Math.max(1,Number(normalized.page||companySearchPage)||1);
+    companySearchPageSize=
+      Math.max(1,Number(normalized.page_size||companySearchPageSize)||50);
+
+    return true;
+  }
+
+  async function loadCompanySearchCachePage(
+    companyName,
+    page=1,
+    options={}
+  ){
+    if(!ctx?.access?.admin)return false;
+    if(companySearchCacheLoading)return false;
+
+    const name=String(companyName||defaultCompanySearchName()).trim();
+    if(!name)return false;
+
+    const targetPage=Math.max(1,Number(page)||1);
+    const key=companySearchCacheKey(name);
+
+    companySearchCacheLoading=true;
+
+    try{
+      const {data,error}=await P.state.client
+        .from('pat_company_search_cache')
+        .select(
+          'search_name,page,page_size,total_count,returned_count,has_more,response_json,synced_at'
+        )
+        .eq('company_id',ctx.session.companyId)
+        .eq('search_name_key',key)
+        .eq('country_code','KR')
+        .eq('page',targetPage)
+        .eq('page_size',companySearchPageSize)
+        .maybeSingle();
+
+      if(error){
+        if(isMissingCompanySearchCacheTable(error)){
+          if(options.notify){
+            P.toast(
+              '회사특허 저장 테이블이 없습니다. 포함된 SQL을 먼저 실행해 주세요.',
+              'warn',
+              5200
+            );
+          }
+          return false;
+        }
+        throw error;
+      }
+
+      if(!data?.response_json){
+        if(options.notify){
+          P.toast(
+            '저장된 조회결과가 없습니다. KIPRIS 새로조회를 눌러주세요.',
+            'warn'
+          );
+        }
+        return false;
+      }
+
+      applyCompanySearchData(
+        data.response_json,
+        {
+          cached:true,
+          saved:true,
+          synced_at:data.synced_at
+        }
+      );
+
+      companySearchPage=targetPage;
+      renderCompanySearch();
+
+      if(options.notify){
+        P.toast('저장된 회사특허 조회결과를 불러왔습니다.');
+      }
+
+      return true;
+    }finally{
+      companySearchCacheLoading=false;
+    }
+  }
+
+  async function saveCompanySearchCachePage(companyName,data){
+    if(!ctx?.access?.admin||!data)return false;
+
+    const name=String(companyName||data.company_name||'').trim();
+    if(!name)return false;
+
+    const payload={
+      company_id:ctx.session.companyId,
+      search_name_key:companySearchCacheKey(name),
+      search_name:name,
+      country_code:String(data.country_code||'KR').toUpperCase(),
+      page:Math.max(1,Number(data.page||companySearchPage)||1),
+      page_size:Math.max(1,Number(data.page_size||companySearchPageSize)||50),
+      total_count:Math.max(0,Number(data.total_count||0)||0),
+      returned_count:Math.max(0,Number(data.returned_count||0)||0),
+      has_more:!!data.has_more,
+      response_json:cloneCompanySearchResponse(data),
+      synced_at:
+        data?.source?.searched_at||
+        new Date().toISOString(),
+      synced_by_employee_no:ctx.session.employeeNo||null
+    };
+
+    const {error}=await P.state.client
+      .from('pat_company_search_cache')
+      .upsert(
+        payload,
+        {
+          onConflict:
+            'company_id,search_name_key,country_code,page,page_size'
+        }
+      );
+
+    if(error){
+      if(isMissingCompanySearchCacheTable(error)){
+        P.toast(
+          'KIPRIS 조회는 완료됐지만 저장 테이블이 없어 결과를 저장하지 못했습니다. 포함된 SQL을 실행해 주세요.',
+          'warn',
+          6000
+        );
+        return false;
+      }
+      throw error;
+    }
+
+    return true;
+  }
+
+  async function openCompanySearchPage(page){
+    const targetPage=Math.max(1,Number(page)||1);
+    const companyName=currentCompanySearchName();
+
+    const loaded=await loadCompanySearchCachePage(
+      companyName,
+      targetPage,
+      {notify:false}
+    );
+
+    if(loaded)return;
+
+    // 아직 조회하지 않은 페이지는 최초 1회만 API 호출 후 자동 저장합니다.
+    await searchCompanyPatents(targetPage);
+  }
+
   function companyOwnershipClass(status){
     const map={
       '현재보유':'owned',
@@ -1230,13 +1485,13 @@
   }
 
   function companyPatentMatchesFilter(item){
+    // 이미 특허목록(pat_master)에 등록된 건은 회사특허 조회 대상에서 제외합니다.
+    if(item.portal_registered)return false;
+
     const search=normalizeSearchText($('companyResultSearch')?.value);
     const ownership=$('companyOwnershipFilter')?.value||'';
-    const portal=$('companyPortalFilter')?.value||'';
 
     if(ownership&&item.ownership_status!==ownership)return false;
-    if(portal==='registered'&&!item.portal_registered)return false;
-    if(portal==='unregistered'&&item.portal_registered)return false;
 
     if(!search)return true;
 
@@ -1266,7 +1521,7 @@
         <article class="pat-card pat-card-pad company-search-loading">
           <div class="pat-loading">KIPRIS에서 회사 특허와 현재 권리자를 확인하고 있습니다...</div>
           <div class="pat-note company-search-loading-note">
-            등록 특허는 최종/현재 권리자까지 확인하므로 일반 목록 조회보다 시간이 더 걸릴 수 있습니다.
+            조회가 끝나면 결과를 DB에 저장합니다. 이후에는 저장자료를 우선 사용해 API 호출 횟수를 줄입니다.
           </div>
         </article>
       `;
@@ -1281,8 +1536,8 @@
         <div>
           <div class="pat-card-title">회사특허 조회</div>
           <div class="pat-card-desc">
-            KIPRIS 출원인 검색 결과를 현재 권리자와 포털 등록특허에 비교합니다.
-            현재는 국내 특허(KR)를 조회합니다.
+            KIPRIS 출원인 검색 결과를 현재 권리자와 포털 특허목록에 비교합니다.
+            이미 포털에 등록된 특허는 자동 제외하고 미등록 후보만 표시합니다.
           </div>
         </div>
       </div>
@@ -1297,29 +1552,42 @@
             placeholder="예: 삼천당제약"
           >
         </div>
-        <button id="companySearchBtn" class="pat-btn primary" type="button">
-          KIPRIS 조회
-        </button>
+        <div class="company-search-actions">
+          <button id="companyCacheLoadBtn" class="pat-btn secondary" type="button">
+            저장자료 불러오기
+          </button>
+          <button id="companySearchBtn" class="pat-btn primary" type="button">
+            KIPRIS 새로조회
+          </button>
+        </div>
       </div>
 
       <div class="pat-note company-search-note">
-        출원인명으로 후보 특허를 찾은 뒤 등록 특허는 최종/현재 권리자를 비교합니다.
-        권리가 다른 회사로 이전된 건도 <b>권리이전</b>으로 남겨 확인할 수 있습니다.
+        저장된 조회결과가 있으면 API를 다시 호출하지 않고 DB 자료를 사용합니다.
+        포털 특허목록에 이미 등록된 건은 화면에서 자동 제외합니다.
+        <b>KIPRIS 새로조회</b>를 누른 경우에만 최신 KIPRIS 결과를 확인하고 다시 저장합니다.
       </div>
 
       ${data?renderCompanySearchResults(data):`
         <article class="pat-card pat-card-pad company-search-empty-card">
           <div class="pat-empty">
-            회사명을 확인한 뒤 <b>KIPRIS 조회</b>를 눌러주세요.
+            저장자료가 없으면 <b>KIPRIS 새로조회</b>를 눌러주세요.
           </div>
         </article>
       `}
     `;
 
     $('companySearchBtn')?.addEventListener('click',()=>searchCompanyPatents(1));
+    $('companyCacheLoadBtn')?.addEventListener('click',()=>(
+      loadCompanySearchCachePage(
+        currentCompanySearchName(),
+        1,
+        {notify:true}
+      )
+    ));
 
     if(data){
-      ['companyResultSearch','companyOwnershipFilter','companyPortalFilter']
+      ['companyResultSearch','companyOwnershipFilter']
         .forEach(id=>{
           const el=$(id);
           if(!el)return;
@@ -1327,11 +1595,11 @@
         });
 
       $('companyPrevPage')?.addEventListener('click',()=>{
-        if(companySearchPage>1)searchCompanyPatents(companySearchPage-1);
+        if(companySearchPage>1)openCompanySearchPage(companySearchPage-1);
       });
 
       $('companyNextPage')?.addEventListener('click',()=>{
-        if(data.has_more)searchCompanyPatents(companySearchPage+1);
+        if(data.has_more)openCompanySearchPage(companySearchPage+1);
       });
 
       renderCompanySearchTable();
@@ -1339,43 +1607,67 @@
   }
 
   function renderCompanySearchResults(data){
-    const rows=Array.isArray(data.patents)?data.patents:[];
-    const summary=data.ownership_summary||{};
-    const missingCount=rows.filter(x=>!x.portal_registered).length;
+    const rawRows=Array.isArray(data.patents)?data.patents:[];
+    const rows=rawRows.filter(x=>!x.portal_registered);
+    const excludedRegisteredCount=rawRows.length-rows.length;
+
+    const summary={
+      current_owned:rows.filter(x=>x.ownership_status==='현재보유').length,
+      jointly_owned:rows.filter(x=>x.ownership_status==='공동보유').length,
+      transferred:rows.filter(x=>x.ownership_status==='권리이전').length,
+      pending:rows.filter(x=>x.ownership_status==='출원중').length,
+      expired:rows.filter(x=>x.ownership_status==='소멸').length,
+      needs_review:rows.filter(x=>x.ownership_status==='확인필요').length
+    };
+
     const pageLabel=`${Number(data.page||companySearchPage)}페이지`;
+    const cacheMeta=data._cache_meta||{};
+    const syncAt=cacheMeta.synced_at||data?.source?.searched_at||null;
+    const syncText=syncAt
+      ?new Date(syncAt).toLocaleString('ko-KR')
+      :'-';
 
     return `
       <div class="company-search-summary-note">
-        전체 검색결과 <b>${Number(data.total_count||0).toLocaleString('ko-KR')}건</b>
-        · 현재 ${P.escapeHtml(pageLabel)}
-        · ${rows.length.toLocaleString('ko-KR')}건 표시
+        <span>
+          KIPRIS 전체 <b>${Number(data.total_count||0).toLocaleString('ko-KR')}건</b>
+          · 현재 ${P.escapeHtml(pageLabel)}
+          · 검토대상 <b>${rows.length.toLocaleString('ko-KR')}건</b>
+          ${excludedRegisteredCount?`· 포털 등록 ${excludedRegisteredCount.toLocaleString('ko-KR')}건 제외`:''}
+        </span>
+        <span class="company-cache-info">
+          <span class="company-cache-badge ${cacheMeta.cached?'cached':'fresh'}">
+            ${cacheMeta.cached?'저장자료':'API 조회'}
+          </span>
+          마지막 API 조회 ${P.escapeHtml(syncText)}
+        </span>
       </div>
 
       <div class="company-search-kpis">
         <div class="pat-kpi gold">
           <div class="pat-kpi-label">현재보유</div>
           <div class="pat-kpi-value">${Number(summary.current_owned||0)}</div>
-          <div class="pat-kpi-note">현재 페이지</div>
+          <div class="pat-kpi-note">미등록 후보</div>
         </div>
         <div class="pat-kpi blue">
           <div class="pat-kpi-label">공동보유</div>
           <div class="pat-kpi-value">${Number(summary.jointly_owned||0)}</div>
-          <div class="pat-kpi-note">현재 페이지</div>
+          <div class="pat-kpi-note">미등록 후보</div>
         </div>
         <div class="pat-kpi orange">
           <div class="pat-kpi-label">권리이전</div>
           <div class="pat-kpi-value">${Number(summary.transferred||0)}</div>
-          <div class="pat-kpi-note">현재 페이지</div>
+          <div class="pat-kpi-note">미등록 후보</div>
         </div>
         <div class="pat-kpi green">
           <div class="pat-kpi-label">출원중</div>
           <div class="pat-kpi-value">${Number(summary.pending||0)}</div>
-          <div class="pat-kpi-note">현재 페이지</div>
+          <div class="pat-kpi-note">미등록 후보</div>
         </div>
         <div class="pat-kpi red">
-          <div class="pat-kpi-label">포털 미등록</div>
-          <div class="pat-kpi-value">${missingCount}</div>
-          <div class="pat-kpi-note">현재 페이지</div>
+          <div class="pat-kpi-label">검토대상</div>
+          <div class="pat-kpi-value">${rows.length}</div>
+          <div class="pat-kpi-note">포털 등록 제외</div>
         </div>
       </div>
 
@@ -1395,11 +1687,6 @@
           <option value="거절">거절</option>
           <option value="포기">포기</option>
           <option value="확인필요">확인필요</option>
-        </select>
-        <select id="companyPortalFilter" class="pat-select">
-          <option value="">전체 포털등록</option>
-          <option value="unregistered">미등록</option>
-          <option value="registered">등록됨</option>
         </select>
       </div>
 
@@ -1444,7 +1731,9 @@
       ?companySearchData.patents
       :[];
 
-    const rows=allRows.filter(companyPatentMatchesFilter);
+    const rows=allRows
+      .filter(x=>!x.portal_registered)
+      .filter(companyPatentMatchesFilter);
     const pageOffset=(companySearchPage-1)*companySearchPageSize;
 
     target.innerHTML=`
@@ -1464,7 +1753,6 @@
                 <th>만료예정일</th>
                 <th>현재권리자</th>
                 <th>소유구분</th>
-                <th>포털등록</th>
               </tr>
             </thead>
             <tbody>
@@ -1521,18 +1809,11 @@
                         ${P.escapeHtml(item.ownership_status||'확인필요')}
                       </span>
                     </td>
-                    <td>
-                      ${
-                        item.portal_registered
-                          ?`<span class="company-portal-badge registered">등록됨</span>`
-                          :`<span class="company-portal-badge missing">미등록</span>`
-                      }
-                    </td>
                   </tr>
                 `;
               }).join(''):`
                 <tr>
-                  <td colspan="12" class="pat-empty">
+                  <td colspan="11" class="pat-empty">
                     조건에 맞는 특허가 없습니다.
                   </td>
                 </tr>
@@ -1550,11 +1831,7 @@
       return;
     }
 
-    const companyName=String(
-      $('companySearchName')?.value||
-      companySearchData?.company_name||
-      defaultCompanySearchName()
-    ).trim();
+    const companyName=currentCompanySearchName();
 
     if(!companyName){
       P.toast('회사명 또는 출원인명을 입력해 주세요.','warn');
@@ -1575,18 +1852,47 @@
         include_registration_detail:true
       });
 
-      companySearchData=data||null;
+      applyCompanySearchData(
+        data||null,
+        {
+          cached:false,
+          saved:false,
+          synced_at:data?.source?.searched_at||new Date().toISOString()
+        }
+      );
+
       companySearchPage=Number(data?.page||companySearchPage)||1;
       companySearchPageSize=Number(data?.page_size||companySearchPageSize)||50;
+
+      let saved=false;
+
+      try{
+        saved=await saveCompanySearchCachePage(
+          companyName,
+          data
+        );
+      }catch(cacheError){
+        console.error('[company-search-cache-save]',cacheError);
+        P.toast(
+          `KIPRIS 조회는 완료됐지만 저장 중 오류가 발생했습니다: ${cacheError.message}`,
+          'warn',
+          6000
+        );
+      }
+
+      if(companySearchData?._cache_meta){
+        companySearchData._cache_meta.saved=saved;
+      }
 
       const count=Number(data?.returned_count||0);
       const total=Number(data?.total_count||0);
 
       P.toast(
-        `KIPRIS 회사특허 조회 완료 · ${count}건 표시 / 전체 ${total}건`
+        saved
+          ?`KIPRIS 조회 완료 · ${count}건 표시 / 전체 ${total}건 · 조회결과 저장됨`
+          :`KIPRIS 조회 완료 · ${count}건 표시 / 전체 ${total}건`
       );
     }catch(e){
-      companySearchData=null;
       P.toast(e.message,'error',5200);
     }finally{
       companySearchLoading=false;
