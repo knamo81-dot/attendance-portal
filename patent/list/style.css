@@ -371,3 +371,52 @@
   }
 }
 
+.pat-duplicate-notice {
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fff1f2;
+  color: #991b1b;
+  padding: 10px 12px;
+}
+
+.pat-duplicate-notice[hidden] {
+  display: none !important;
+}
+
+.pat-duplicate-notice-title {
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 5px;
+}
+
+.pat-duplicate-notice-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 12px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.pat-duplicate-notice-body strong {
+  width: 100%;
+  color: #7f1d1d;
+}
+
+.pat-duplicate-notice-help {
+  margin-top: 5px;
+  color: #b91c1c;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+#lookupNo.pat-input-duplicate {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.08);
+}
+
+#savePatentBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
