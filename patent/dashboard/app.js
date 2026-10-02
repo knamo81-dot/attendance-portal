@@ -13,6 +13,12 @@
     document.getElementById('companyName').textContent=ctx.session.companyName || '현재 회사';
     if(!ctx.access.read){ document.querySelector('.pat-app').innerHTML='<div class="pat-error">특허관리 접근 권한이 없습니다.</div>'; return; }
 
+    const goManagementBtn=document.getElementById('goManagementBtn');
+    if(goManagementBtn){
+      goManagementBtn.hidden=!ctx.access.write;
+      goManagementBtn.style.display=ctx.access.write?'':'none';
+    }
+
     const [patRes,payRes,deadRes,eventRes]=await Promise.all([
       P.companyQuery('pat_master','id,invention_title,application_no,registration_no,country_code,ip_type,legal_status,application_date,registration_date,expiration_date,created_at').order('created_at',{ascending:false}),
       P.companyQuery('pat_payments','id,patent_id,payment_type,payment_title,annual_year_from,annual_year_to,official_due_date,invoice_due_date,planned_payment_date,status,paid_amount,billed_amount,currency,paid_date').neq('status','CANCELLED'),
@@ -94,6 +100,9 @@
 
   document.getElementById('refreshBtn').addEventListener('click',()=>load().catch(e=>P.toast(e.message,'error')));
   document.getElementById('goListBtn').addEventListener('click',()=>P.navigate('list'));
-  document.getElementById('goManagementBtn').addEventListener('click',openDueManagement);
+  document.getElementById('goManagementBtn')?.addEventListener('click',()=>{
+    if(!ctx?.access?.write)return;
+    openDueManagement();
+  });
   load().catch(e=>{ console.error(e); document.querySelector('.pat-app').innerHTML='<div class="pat-error">'+P.escapeHtml(e.message)+'</div>'; });
 })();
