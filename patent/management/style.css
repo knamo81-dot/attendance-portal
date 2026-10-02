@@ -111,7 +111,7 @@
 
 .company-search-query{
   display:grid;
-  grid-template-columns:minmax(280px,520px) auto;
+  grid-template-columns:minmax(280px,520px) 170px auto;
   align-items:end;
   gap:8px;
   padding:12px;
@@ -120,7 +120,8 @@
   background:#fff;
 }
 
-.company-search-name label{
+.company-search-name label,
+.company-search-country label{
   display:block;
   margin-bottom:5px;
   color:#475569;
@@ -455,4 +456,23 @@
 .company-register-btn{
   min-width:72px;
   white-space:nowrap;
+}
+
+
+.company-search-country{
+  min-width:0;
+}
+
+.company-search-country .pat-select{
+  width:100%;
+}
+
+@media(max-width:900px){
+  .company-search-query{
+    grid-template-columns:1fr 170px;
+  }
+
+  .company-search-actions{
+    grid-column:1 / -1;
+  }
 }
