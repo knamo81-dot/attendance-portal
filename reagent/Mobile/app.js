@@ -14,6 +14,7 @@
     const n = num(value);
     return n ? n.toLocaleString('ko-KR') : '0';
   };
+  const isDedicatedMobilePage = () => document.body?.classList.contains('reagent-mobile-ui') === true;
 
   function ensureAfter(anchor, id, className='mobile-data-list'){
     let el = document.getElementById(id);
@@ -122,6 +123,26 @@
       try { syncRequestMonthFilter(); } catch (error) { console.warn('모바일 제품신청 년월 필터 갱신 실패', error); }
       return result;
     };
+  }
+
+  function wrapRequestSearchPerformance(){
+    const request = APP.request;
+    if (!request || request.__mobileSearchPerformanceWrapped) return;
+    request.__mobileSearchPerformanceWrapped = true;
+
+    const originalRenderSearchResults = request.renderSearchResults?.bind(request);
+    if (originalRenderSearchResults){
+      let searchRenderTimer = null;
+      request.renderSearchResults = function(...args){
+        if (!isDedicatedMobilePage()) return originalRenderSearchResults(...args);
+        window.clearTimeout(searchRenderTimer);
+        searchRenderTimer = window.setTimeout(()=>{
+          originalRenderSearchResults(...args).catch?.((error)=>{
+            console.warn('모바일 제품검색 결과 렌더링 실패', error);
+          });
+        }, 120);
+      };
+    }
   }
 
   /* --------------------- 제품취합 카드 --------------------- */
@@ -383,6 +404,17 @@
   }
 
   /* --------------------- 제품관리 카드 --------------------- */
+  let productVisibleLimit = 120;
+  let productFilterSignature = '';
+
+  function getProductFilterSignature(){
+    return [
+      document.getElementById('pmProductKeyword')?.value || '',
+      document.getElementById('pmProductCategory')?.value || '',
+      document.getElementById('pmProductActive')?.value || ''
+    ].join('||');
+  }
+
   function renderProductMobileCards(){
     const pm = APP.productManagement;
     if (!pm) return;
@@ -392,14 +424,22 @@
     const container = ensureAfter(tableWrap,'pmProductMobileCards');
     if (!container) return;
 
+    const signature = getProductFilterSignature();
+    if (signature !== productFilterSignature){
+      productFilterSignature = signature;
+      productVisibleLimit = 120;
+    }
+
     const rows = pm.getFilteredProducts?.() || [];
     if (!rows.length){
       container.innerHTML = '<div class="mobile-empty">등록된 제품이 없습니다.</div>';
       return;
     }
 
+    const visibleRows = rows.slice(0, productVisibleLimit);
+    const moreCount = Math.max(0, rows.length - visibleRows.length);
     container.innerHTML = `
-      ${rows.map((p)=>{
+      ${visibleRows.map((p)=>{
         const cas = pm.getProductCasNumbers?.(p)?.join(', ') || p.cas || '-';
         return `
           <article class="mobile-data-card ${p.is_active === false ? 'is-inactive' : ''}" data-product-id="${attr(p.id)}">
@@ -430,13 +470,22 @@
               </div>
             </div>
           </article>`;
-      }).join('')}`;
+      }).join('')}
+      ${moreCount > 0 ? `
+        <div class="mobile-detail-actions" style="justify-content:center; padding:4px 0 8px;">
+          <button type="button" class="btn" id="mobilePmLoadMore">더 보기 (${visibleRows.length}/${rows.length})</button>
+        </div>` : ''}
+    `;
 
     bindCardToggles(container);
     container.querySelectorAll('.mobile-pm-edit').forEach((btn)=>btn.addEventListener('click',(event)=>{
       event.stopPropagation();
       pm.fillProductForm?.(Number(btn.dataset.id));
     }));
+    document.getElementById('mobilePmLoadMore')?.addEventListener('click',()=>{
+      productVisibleLimit += 120;
+      renderProductMobileCards();
+    });
   }
 
   function wrapProductRender(){
@@ -445,15 +494,23 @@
     pm.__mobileProductWrapped = true;
     const original = pm.renderProducts?.bind(pm);
     if (!original) return;
+
+    let renderTimer = null;
     pm.renderProducts = function(...args){
-      const result = original(...args);
-      try { renderProductMobileCards(); } catch (error) { console.warn('모바일 제품관리 카드 렌더링 실패', error); }
-      return result;
+      if (!isDedicatedMobilePage()) return original(...args);
+
+      // 전용 모바일에서는 화면에 보이지 않는 PC 테이블을 만들지 않습니다.
+      pm.updateManagementKpi?.();
+      window.clearTimeout(renderTimer);
+      renderTimer = window.setTimeout(()=>{
+        try { renderProductMobileCards(); } catch (error) { console.warn('모바일 제품관리 카드 렌더링 실패', error); }
+      }, 100);
     };
   }
 
   /* Shared methods are already loaded before this script. Wrap now so first render uses mobile additions. */
   wrapRequestRender();
+  wrapRequestSearchPerformance();
   wrapCollectRender();
   wrapPrepareRender();
   wrapProductRender();
@@ -464,15 +521,23 @@
 
     // In case another script replaced a renderer during startup, ensure wrappers once more.
     wrapRequestRender();
+    wrapRequestSearchPerformance();
     wrapCollectRender();
     wrapPrepareRender();
     wrapProductRender();
 
     window.setTimeout(()=>{
       try { syncRequestMonthFilter(); } catch (_) {}
-      try { renderCollectMobileCards(); } catch (_) {}
-      try { renderPrepareMobileCards(); } catch (_) {}
-      try { renderProductMobileCards(); } catch (_) {}
+
+      // 시작 시 모든 탭의 숨겨진 카드 DOM을 만들지 않고 현재 탭만 보완 렌더합니다.
+      const activePageId = document.querySelector('.page.active')?.id || '';
+      if (activePageId === 'page-collect') {
+        try { renderCollectMobileCards(); } catch (_) {}
+      } else if (activePageId === 'page-prepare') {
+        try { renderPrepareMobileCards(); } catch (_) {}
+      } else if (activePageId === 'page-product-management') {
+        try { renderProductMobileCards(); } catch (_) {}
+      }
     },350);
   });
 })();
