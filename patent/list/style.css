@@ -452,3 +452,16 @@
   color: #b91c1c;
   border: 1px solid #fecaca;
 }
+
+
+.lookup-country{
+  width:150px;
+  flex:0 0 150px;
+}
+
+@media(max-width:768px){
+  .lookup-country{
+    width:100%;
+    flex:1 1 auto;
+  }
+}
