@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>특허목록</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main class="pat-app">
+  <section id="listView">
+    <div class="pat-toolbar">
+      <div>
+        <div class="pat-title">특허목록</div>
+        <div class="pat-subtitle">등록된 특허를 검색하고 상세정보를 확인합니다.</div>
+      </div>
+      <div class="pat-toolbar-right">
+        <button id="newPatentBtn" class="pat-btn primary">＋ 신규등록</button>
+      </div>
+    </div>
+    <div class="pat-filterbar">
+      <input id="searchInput" class="pat-input" type="search" placeholder="특허명, 출원번호, 등록번호 검색" />
+      <select id="countryFilter" class="pat-select"><option value="">전체 국가</option></select>
+      <select id="typeFilter" class="pat-select"><option value="">전체 구분</option><option value="PATENT">특허</option><option value="UTILITY">실용신안</option><option value="DESIGN">디자인</option><option value="TRADEMARK">상표</option></select>
+      <select id="statusFilter" class="pat-select"><option value="">전체 상태</option><option value="registered">등록</option><option value="examining">심사중</option><option value="filed">출원중</option><option value="extinct">소멸</option></select>
+      <button id="refreshBtn" class="pat-btn">↻ 새로고침</button>
+    </div>
+    <div class="pat-card pat-card-pad">
+      <div class="pat-table-wrap">
+        <table class="pat-table patent-list-table">
+          <thead><tr><th>No.</th><th>사내번호</th><th>발명의 명칭</th><th>국가</th><th>구분</th><th>상태</th><th>출원일</th><th>등록일</th><th>만료예정일</th><th>다음기한</th><th>담당자</th></tr></thead>
+          <tbody id="patentBody"></tbody>
+        </table>
+      </div>
+      <div class="table-footer"><span id="resultCount">0건</span></div>
+    </div>
+  </section>
+
+  <section id="detailView" class="hidden">
+    <div class="pat-toolbar detail-toolbar">
+      <div class="pat-toolbar-left"><button id="backBtn" class="pat-btn">← 목록</button><span class="pat-subtitle">특허 상세정보</span></div>
+      <div class="pat-toolbar-right"><button id="kiprisRefreshBtn" class="pat-btn secondary">↻ KIPRIS 정보 갱신</button><button id="editPatentBtn" class="pat-btn">수정</button><button id="deletePatentBtn" class="pat-btn danger">삭제</button></div>
+    </div>
+    <div id="detailHero" class="pat-detail-hero"></div>
+    <div class="pat-card pat-card-pad">
+      <div class="pat-tabs detail-tabs">
+        <button class="pat-tab active" data-detail-tab="basic">기본정보</button>
+        <button class="pat-tab" data-detail-tab="events">진행이력</button>
+        <button class="pat-tab" data-detail-tab="inventors">발명자</button>
+        <button class="pat-tab" data-detail-tab="payments">납부내역</button>
+        <button class="pat-tab" data-detail-tab="files">첨부문서</button>
+        <button class="pat-tab" data-detail-tab="memo">메모</button>
+      </div>
+      <div id="detailContent" class="detail-content"></div>
+    </div>
+  </section>
+</main>
+
+<div id="patentModal" class="pat-modal-backdrop">
+  <div class="pat-modal">
+    <div class="pat-modal-head"><div><div id="patentModalTitle" class="pat-modal-title">특허 등록</div><div class="pat-modal-desc">KIPRIS 조회 후 자동입력하거나 직접 입력할 수 있습니다.</div></div><button class="pat-close" data-modal-close="patentModal">×</button></div>
+    <div class="pat-modal-body">
+      <div class="lookup-box">
+        <div class="lookup-fields"><input id="lookupNo" class="pat-input" placeholder="출원번호 또는 등록번호" /><button id="kiprisLookupBtn" class="pat-btn secondary">KIPRIS 정보 불러오기</button></div>
+        <div class="pat-note">KIPRIS 연동은 Supabase Edge Function <b>patent-kipris</b>가 설정된 경우 자동 조회됩니다. 미설정 상태에서도 직접 입력하여 저장할 수 있습니다.</div>
+      </div>
+      <div class="pat-form-grid form-top-gap">
+        <div class="pat-field"><label>사내 관리번호</label><input id="f_internal_no" class="pat-input" /></div>
+        <div class="pat-field"><label class="pat-required">구분</label><select id="f_ip_type" class="pat-select"><option value="PATENT">특허</option><option value="UTILITY">실용신안</option><option value="DESIGN">디자인</option><option value="TRADEMARK">상표</option></select></div>
+        <div class="pat-field"><label class="pat-required">국가</label><input id="f_country_code" class="pat-input" maxlength="2" value="KR" /></div>
+        <div class="pat-field span-3"><label class="pat-required">발명의 명칭</label><input id="f_invention_title" class="pat-input" /></div>
+        <div class="pat-field"><label>출원번호</label><input id="f_application_no" class="pat-input" /></div>
+        <div class="pat-field"><label>출원일</label><input id="f_application_date" class="pat-input" type="date" /></div>
+        <div class="pat-field"><label>공개번호</label><input id="f_publication_no" class="pat-input" /></div>
+        <div class="pat-field"><label>공개일</label><input id="f_publication_date" class="pat-input" type="date" /></div>
+        <div class="pat-field"><label>등록번호</label><input id="f_registration_no" class="pat-input" /></div>
+        <div class="pat-field"><label>등록일</label><input id="f_registration_date" class="pat-input" type="date" /></div>
+        <div class="pat-field"><label>현재 상태</label><input id="f_legal_status" class="pat-input" placeholder="예: 등록, 심사중" /></div>
+        <div class="pat-field"><label>존속기간 만료(예정)일</label><input id="f_expiration_date" class="pat-input" type="date" /></div>
+        <div class="pat-field"><label>담당자</label><select id="f_manager_employee_no" class="pat-select"><option value="">선택</option></select></div>
+        <div class="pat-field span-2"><label>출원인</label><input id="f_applicant_names" class="pat-input" placeholder="여러 명은 쉼표로 구분" /></div>
+        <div class="pat-field"><label>권리자</label><input id="f_right_holder_names" class="pat-input" placeholder="쉼표로 구분" /></div>
+        <div class="pat-field"><label>대리인</label><input id="f_agent_names" class="pat-input" placeholder="쉼표로 구분" /></div>
+        <div class="pat-field span-2"><label>발명자</label><input id="f_inventors" class="pat-input" placeholder="KIPRIS 이름 그대로, 쉼표로 구분" /></div>
+        <div class="pat-field"><label>IPC</label><input id="f_ipc_codes" class="pat-input" placeholder="쉼표로 구분" /></div>
+        <div class="pat-field"><label>CPC</label><input id="f_cpc_codes" class="pat-input" placeholder="쉼표로 구분" /></div>
+        <div class="pat-field span-2"><label>관련 연구과제</label><input id="f_related_project" class="pat-input" /></div>
+        <div class="pat-field span-3"><label>관련 제품/기술</label><input id="f_related_product_technology" class="pat-input" /></div>
+        <div class="pat-field span-3"><label>초록</label><textarea id="f_abstract_text" class="pat-textarea"></textarea></div>
+        <div class="pat-field span-3"><label>메모</label><textarea id="f_memo" class="pat-textarea"></textarea></div>
+      </div>
+    </div>
+    <div class="pat-modal-actions"><button class="pat-btn" data-modal-close="patentModal">취소</button><button id="savePatentBtn" class="pat-btn primary">저장</button></div>
+  </div>
+</div>
+
+<div id="fileModal" class="pat-modal-backdrop">
+  <div class="pat-modal sm">
+    <div class="pat-modal-head"><div><div class="pat-modal-title">첨부파일 업로드</div><div class="pat-modal-desc">특허 관련 문서를 현재 특허에 연결합니다.</div></div><button class="pat-close" data-modal-close="fileModal">×</button></div>
+    <div class="pat-modal-body">
+      <div class="pat-field"><label>문서 구분</label><select id="fileCategory" class="pat-select"><option value="APPLICATION">출원서</option><option value="SPECIFICATION">명세서</option><option value="PUBLICATION">공개/등록공보</option><option value="CERTIFICATE">등록증</option><option value="OFFICE_ACTION">의견제출통지</option><option value="RESPONSE">의견서/보정서</option><option value="INVOICE">청구서</option><option value="PAYMENT_PROOF">납부/지급증빙</option><option value="DRAWING">도면</option><option value="OTHER">기타</option></select></div>
+      <div class="pat-field form-top-gap"><label>파일</label><input id="fileInput" type="file" class="pat-input file-input" /></div>
+      <div class="pat-field form-top-gap"><label>설명</label><input id="fileDesc" class="pat-input" /></div>
+    </div>
+    <div class="pat-modal-actions"><button class="pat-btn" data-modal-close="fileModal">취소</button><button id="uploadFileBtn" class="pat-btn primary">업로드</button></div>
+  </div>
+</div>
+
+<script src="../shared/patent-common.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
