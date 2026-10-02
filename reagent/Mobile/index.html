@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="../style.css?v=20260929-mobile-base1"/>
 <link rel="stylesheet" href="../../common/mobile.css"/>
 <link rel="stylesheet" href="../../common/theme.css"/>
-<link rel="stylesheet" href="./style.css?v=20260929-mobile-ui1"/>
+<link rel="stylesheet" href="./style.css?v=20261002-mobile-scan1"/>
 <script>
   /*
     초기 권한 표시 보정
@@ -218,7 +218,7 @@
 <input id="productKeyword" type="hidden"/>
 <div class="shell">
 <div class="tabs"><button class="tab-btn active" data-tab="request">제품 신청</button><button class="tab-btn" data-tab="collect">제품 취합</button><button class="tab-btn" data-tab="prepare">취합 정리</button><button class="tab-btn" data-tab="order-receipt">발주/입고 관리</button><button class="tab-btn" data-tab="product-management">제품 관리</button></div>
-<section class="page active" id="page-request"><div class="request-form-modal-backdrop" id="requestFormModalBackdrop"><section class="card request-form-card" id="requestFormCard"><div class="card-head request-form-modal-head"><div class="request-form-title-wrap" style="min-width:0;"><div class="request-form-title-row" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><h2 style="margin:0;">제품 신청</h2><div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:700; font-size:13px; color:#334155;">주문월</span><select id="orderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:130px;"></select><span class="small" id="orderMonthDesc" style="color:#6b7280;">선택한 주문월에 발주할 품목을 신청합니다.</span></div></div><p>제품은 검색해서 선택하고 수량/용도만 입력합니다.</p></div><div class="request-form-search-wrap" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;"><button class="btn primary" id="openSearch" style="width:auto; padding:10px 14px; white-space:nowrap;">제품검색</button><span class="badge blue">검색 → 자동입력 → 수량/용도</span></div></div>
+<section class="page active" id="page-request"><div class="request-form-modal-backdrop" id="requestFormModalBackdrop"><section class="card request-form-card" id="requestFormCard"><div class="card-head request-form-modal-head"><div class="request-form-title-wrap" style="min-width:0;"><div class="request-form-title-row" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><h2 style="margin:0;">제품 신청</h2><div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:700; font-size:13px; color:#334155;">주문월</span><select id="orderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:112px;"></select><span class="small" id="orderMonthDesc" style="color:#6b7280;">선택한 주문월에 발주할 품목을 신청합니다.</span></div></div><p>제품은 검색 또는 QR/바코드 스캔으로 선택하고 수량/용도만 입력합니다.</p></div><div class="request-form-search-wrap" style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap; justify-content:flex-end;"><button class="btn primary" id="openSearch" style="width:auto; padding:10px 12px; white-space:nowrap;">제품검색</button><button class="btn request-scan-btn" id="openProductScan" type="button" title="QR/바코드 카메라 스캔" aria-label="QR/바코드 카메라 스캔"><span class="request-scan-icon" aria-hidden="true">📷</span><span class="request-scan-label">스캔</span></button><span class="badge blue">검색/스캔 → 자동입력 → 수량/용도</span></div></div>
 <div class="card-body"><div class="form-grid">
 <div class="field"><label>분류</label><input id="category" placeholder="자동입력" readonly/></div>
 <div class="field"><label>품명</label><input id="productName" placeholder="자동입력" readonly/></div>
@@ -588,16 +588,32 @@
 <div class="modal-backdrop" id="searchModal"><div class="modal"><div class="modal-head"><div><h3>제품 검색</h3><div class="small">품명, 제품코드, 제조사, CAS 번호로 검색할 수 있습니다.</div></div><button class="btn" id="closeSearch">닫기</button></div>
 <div class="modal-search"><div class="field"><label>키워드</label><input id="searchInput" placeholder="예: ethanol, 459844, Sigma, 64-17-5"/><div class="search-hint">부분 검색 가능</div></div><div class="field"><label>분류</label><select id="searchCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div><div class="field"><label>제조사</label><select id="searchMaker"><option value="">전체</option></select></div><div class="field"><label>정렬</label><select id="sortMode"><option value="relevance">관련도순</option><option value="name">품명순</option><option value="maker">제조사순</option></select></div></div>
 <div class="modal-body" id="searchResults"></div><div class="modal-foot"><div class="small" id="resultInfo">검색 결과 0건</div><div class="small">원하는 제품이 없으면 <span class="product-link" id="inlineRequest">제품 등록 요청</span>으로 넘길 수 있습니다.</div></div></div></div>
+<div class="modal-backdrop product-scan-modal-backdrop" id="productScanModal" aria-hidden="true">
+  <div class="modal product-scan-modal" role="dialog" aria-modal="true" aria-labelledby="productScanTitle">
+    <div class="modal-head product-scan-head">
+      <div><h3 id="productScanTitle">QR/바코드 스캔</h3><div class="small">제품의 QR·바코드를 카메라 중앙에 맞춰 주세요.</div></div>
+      <button class="btn" id="closeProductScan" type="button">닫기</button>
+    </div>
+    <div class="product-scan-camera">
+      <video id="productScanVideo" autoplay muted playsinline></video>
+      <div class="product-scan-guide" aria-hidden="true"><span></span></div>
+    </div>
+    <canvas id="productScanCanvas" hidden></canvas>
+    <div class="product-scan-status" id="productScanStatus">카메라를 준비하는 중입니다.</div>
+    <div class="product-scan-foot">등록된 QR/바코드가 인식되면 제품정보가 자동으로 입력됩니다.</div>
+  </div>
+</div>
 <div class="toast-wrap" id="toastWrap"></div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.4/dist/iife/reader/index.js"></script>
 <script>
   if (!window.supabase) {
     document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
   }
 </script>
 <script src="../supabase.js"></script>
-<script src="../request.js?v=20261002-mobile-perf1"></script>
+<script src="../request.js?v=20261002-mobile-scan1"></script>
 <!--
   COLUMN ORDER NOTE
   - HTML header/colgroup order updated:
@@ -829,3 +845,4 @@
 
 <script src="../../common/common.js"></script>
 </body></html>
+
