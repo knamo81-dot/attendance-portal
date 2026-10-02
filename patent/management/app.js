@@ -543,7 +543,150 @@
       : '<div class="pat-empty">다가오는 기한이 없습니다.</div>';
   }
 
-  function renderDeadlineTable(){const type=$('deadlineTypeFilter')?.value||'';const rows=deadlines.filter(x=>!type||x.deadline_type===type);$('deadlineTable').innerHTML=`<div class="pat-card pat-card-pad"><div class="pat-table-wrap"><table class="pat-table"><thead><tr><th>특허</th><th>구분</th><th>기한명</th><th>기한일</th><th>D-Day</th><th>상태</th><th>관리</th></tr></thead><tbody>${rows.length?rows.map(x=>`<tr><td>${P.escapeHtml(patentName(x.patent_id))}</td><td>${P.deadlineTypeLabel(x.deadline_type)}</td><td>${P.escapeHtml(x.title)}</td><td>${P.fmtDate(x.due_date)}</td><td><span class="pat-dday ${P.ddayClass(x.due_date)}">${P.dday(x.due_date)}</span></td><td>${P.badge(x.status,x.status==='OPEN'?'진행중':x.status==='COMPLETED'?'완료':x.status)}</td><td>${ctx.access.write?`<button class="pat-btn" data-dead-edit="${x.id}">수정</button> ${x.status==='OPEN'?`<button class="pat-btn success" data-dead-complete="${x.id}">완료</button>`:''}`:'-'}</td></tr>`).join(''):'<tr><td colspan="7" class="pat-empty">기한정보가 없습니다.</td></tr>'}</tbody></table></div></div>`;document.querySelectorAll('[data-dead-edit]').forEach(b=>b.addEventListener('click',()=>openDeadlineModal(deadlines.find(x=>x.id===b.dataset.deadEdit))));document.querySelectorAll('[data-dead-complete]').forEach(b=>b.addEventListener('click',()=>completeDeadline(b.dataset.deadComplete)));}
+  function deadlineActionHtml(deadline){
+    if(!ctx.access.write)return '-';
+
+    if(deadline.related_payment_id){
+      return `
+        <button
+          class="pat-btn secondary"
+          data-dead-payment="${deadline.related_payment_id}"
+        >
+          납부관리
+        </button>
+      `;
+    }
+
+    const completeButton=deadline.status==='OPEN'
+      ? `
+        <button
+          class="pat-btn success"
+          data-dead-complete="${deadline.id}"
+        >
+          완료
+        </button>
+      `
+      : '';
+
+    return `
+      <button
+        class="pat-btn"
+        data-dead-edit="${deadline.id}"
+      >
+        수정
+      </button>
+      ${completeButton}
+    `;
+  }
+
+  function renderDeadlineTable(){
+    const type=$('deadlineTypeFilter')?.value||'';
+    const rows=deadlines.filter(x=>!type||x.deadline_type===type);
+
+    $('deadlineTable').innerHTML=`
+      <div class="pat-card pat-card-pad">
+        <div class="pat-table-wrap">
+          <table class="pat-table">
+            <thead>
+              <tr>
+                <th>특허</th>
+                <th>구분</th>
+                <th>기한명</th>
+                <th>기한일</th>
+                <th>D-Day</th>
+                <th>상태</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                rows.length
+                  ? rows.map(x=>`
+                    <tr>
+                      <td>${P.escapeHtml(patentName(x.patent_id))}</td>
+                      <td>${P.deadlineTypeLabel(x.deadline_type)}</td>
+                      <td>${P.escapeHtml(x.title)}</td>
+                      <td>${P.fmtDate(x.due_date)}</td>
+                      <td>
+                        <span class="pat-dday ${P.ddayClass(x.due_date)}">
+                          ${P.dday(x.due_date)}
+                        </span>
+                      </td>
+                      <td>
+                        ${
+                          P.badge(
+                            x.status,
+                            x.status==='OPEN'
+                              ? '진행중'
+                              : x.status==='COMPLETED'
+                                ? '완료'
+                                : x.status
+                          )
+                        }
+                      </td>
+                      <td>
+                        ${deadlineActionHtml(x)}
+                      </td>
+                    </tr>
+                  `).join('')
+                  : `
+                    <tr>
+                      <td colspan="7" class="pat-empty">
+                        기한정보가 없습니다.
+                      </td>
+                    </tr>
+                  `
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    document
+      .querySelectorAll('[data-dead-edit]')
+      .forEach(button=>{
+        button.addEventListener('click',()=>{
+          openDeadlineModal(
+            deadlines.find(
+              x=>x.id===button.dataset.deadEdit
+            )
+          );
+        });
+      });
+
+    document
+      .querySelectorAll('[data-dead-complete]')
+      .forEach(button=>{
+        button.addEventListener(
+          'click',
+          ()=>completeDeadline(
+            button.dataset.deadComplete
+          )
+        );
+      });
+
+    document
+      .querySelectorAll('[data-dead-payment]')
+      .forEach(button=>{
+        button.addEventListener('click',()=>{
+          const payment=payments.find(
+            x=>x.id===button.dataset.deadPayment
+          );
+
+          if(!payment){
+            P.toast(
+              '연결된 납부정보를 찾을 수 없습니다.',
+              'warn'
+            );
+            return;
+          }
+
+          showSection('payments');
+          openPaymentModal(payment);
+        });
+      });
+  }
   function clearDead(){['patent_id','deadline_type','title','base_date','due_date','additional_due_date','status','completed_date','note'].forEach(k=>P.setVal('dead_'+k,''));P.setVal('dead_deadline_type','ANNUAL_FEE');P.setVal('dead_status','OPEN');P.setVal('dead_alert_days_before',(settings?.alert_days_before||[90,30,7]).join(','));}
   function openDeadlineModal(x=null){if(!ctx.access.write)return;editingDeadline=x?.id||null;clearDead();$('deadlineModalTitle').textContent=x?'기한 수정':'기한 등록';if(x){Object.keys(x).forEach(k=>{if($('dead_'+k))P.setVal('dead_'+k,Array.isArray(x[k])?x[k].join(','):x[k]??'');});}P.modalOpen('deadlineModal');}
   async function saveDeadline(){const pid=P.val('dead_patent_id'),title=P.val('dead_title'),due=P.val('dead_due_date');if(!pid||!title||!due){P.toast('특허, 기한명, 기한일을 입력해 주세요.','warn');return;}const alerts=P.val('dead_alert_days_before').split(',').map(x=>Number(x.trim())).filter(x=>Number.isFinite(x)&&x>=0);const payload=P.companyPayload({patent_id:pid,deadline_type:P.val('dead_deadline_type'),title,base_date:P.val('dead_base_date')||null,due_date:due,additional_due_date:P.val('dead_additional_due_date')||null,status:P.val('dead_status')||'OPEN',completed_date:P.val('dead_completed_date')||null,alert_days_before:alerts.length?alerts:[90,30,7],note:P.val('dead_note')||null,source:'MANUAL',updated_by_employee_no:ctx.session.employeeNo||null});try{let res;if(editingDeadline)res=await P.state.client.from('pat_deadlines').update(payload).eq('id',editingDeadline).eq('company_id',ctx.session.companyId);else{payload.created_by_employee_no=ctx.session.employeeNo||null;res=await P.state.client.from('pat_deadlines').insert(payload);}if(res.error)throw res.error;P.modalClose('deadlineModal');P.toast('기한정보를 저장했습니다.');editingDeadline=null;await loadAll();showSection('deadlines');}catch(e){P.toast(e.message,'error');}}
