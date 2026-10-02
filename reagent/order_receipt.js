@@ -108,8 +108,10 @@
     realtimeRefreshDelayMs: 250,
     dateInteractionActive: false,
     dateInteractionGuardUntil: 0,
+    mobileDatePickerState: null,
 
     isDateInteractionActive() {
+      if (this.mobileDatePickerState) return true;
       const active = document.activeElement;
       if (active?.classList?.contains("order-receipt-date")) return true;
       return this.dateInteractionActive === true || Date.now() < Number(this.dateInteractionGuardUntil || 0);
@@ -362,7 +364,7 @@
 
       // 날짜 선택기 외부를 다시 터치하면 날짜 선택 보호 상태를 해제합니다.
       document.addEventListener("pointerdown", (event) => {
-        if (event.target?.closest?.(".order-receipt-date")) return;
+        if (event.target?.closest?.(".order-receipt-date, #orderReceiptMobileDatePicker")) return;
         if (this.dateInteractionActive || this.dateInteractionGuardUntil) this.endDateInteraction();
       }, true);
 
@@ -630,6 +632,225 @@
       };
     },
 
+    toDateValue(date) {
+      const d = date instanceof Date ? date : new Date(date);
+      if (Number.isNaN(d.getTime())) return "";
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    },
+
+    parseDateValue(value) {
+      const raw = String(value || "").trim();
+      const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return null;
+      const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+      return Number.isNaN(d.getTime()) ? null : d;
+    },
+
+    ensureMobileDatePicker() {
+      let backdrop = document.getElementById("orderReceiptMobileDatePicker");
+      if (backdrop) return backdrop;
+
+      if (!document.getElementById("orderReceiptMobileDatePickerStyle")) {
+        const style = document.createElement("style");
+        style.id = "orderReceiptMobileDatePickerStyle";
+        style.textContent = `
+          .order-receipt-mobile-date-trigger{
+            width:100%; min-height:38px; border:1px solid var(--line,#d9e2ec); border-radius:10px;
+            background:#fff; color:var(--text,#1f2937); padding:8px 10px; font:inherit; font-weight:750;
+            text-align:left; cursor:pointer;
+          }
+          .order-receipt-mobile-date-trigger.is-empty{color:#64748b; font-weight:650;}
+          body.order-receipt-calendar-open{overflow:hidden !important;}
+          .or-mobile-calendar-backdrop[hidden]{display:none !important;}
+          .or-mobile-calendar-backdrop{
+            position:fixed; inset:0; z-index:12000; display:flex; align-items:flex-end; justify-content:center;
+            padding:12px; background:rgba(15,23,42,.48); opacity:0; pointer-events:none; transition:opacity .12s ease;
+          }
+          .or-mobile-calendar-backdrop.show{opacity:1; pointer-events:auto;}
+          .or-mobile-calendar{
+            width:min(100%,430px); max-height:calc(100vh - 24px); overflow:auto; background:#fff;
+            border-radius:20px; box-shadow:0 24px 60px rgba(15,23,42,.28); padding:14px;
+          }
+          .or-mobile-calendar-title{font-size:12px; color:#64748b; font-weight:800; margin:0 0 10px 2px;}
+          .or-mobile-calendar-head{display:grid; grid-template-columns:42px 1fr 42px; align-items:center; gap:6px;}
+          .or-mobile-calendar-head strong{text-align:center; font-size:17px; color:#0f172a;}
+          .or-mobile-calendar-nav{height:40px; border:1px solid #d9e2ec; border-radius:10px; background:#fff; font-size:24px; line-height:1;}
+          .or-mobile-calendar-weekdays,.or-mobile-calendar-days{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+          .or-mobile-calendar-weekdays{margin-top:12px; color:#64748b; font-size:11px; font-weight:800; text-align:center;}
+          .or-mobile-calendar-weekdays span{padding:5px 0;}
+          .or-mobile-calendar-days{margin-top:4px;}
+          .or-mobile-calendar-blank{aspect-ratio:1/1;}
+          .or-mobile-calendar-day{aspect-ratio:1/1; min-height:38px; border:0; border-radius:10px; background:#f8fafc; color:#1f2937; font:inherit; font-weight:750;}
+          .or-mobile-calendar-day.is-today{box-shadow:inset 0 0 0 1.5px #2563eb; color:#1d4ed8;}
+          .or-mobile-calendar-day.is-selected{background:#1d4ed8; color:#fff; box-shadow:none;}
+          .or-mobile-calendar-actions{display:grid; grid-template-columns:1fr 1fr 1.25fr; gap:7px; margin-top:14px;}
+          .or-mobile-calendar-actions .btn{min-height:42px;}
+          @media (min-width:761px){.or-mobile-calendar-backdrop{display:none !important;}}
+        `;
+        document.head.appendChild(style);
+      }
+
+      backdrop = document.createElement("div");
+      backdrop.id = "orderReceiptMobileDatePicker";
+      backdrop.className = "or-mobile-calendar-backdrop";
+      backdrop.hidden = true;
+      backdrop.innerHTML = `
+        <div class="or-mobile-calendar" role="dialog" aria-modal="true" aria-label="날짜 선택">
+          <div class="or-mobile-calendar-title" data-role="title">날짜 선택</div>
+          <div class="or-mobile-calendar-head">
+            <button type="button" class="or-mobile-calendar-nav" data-action="prev" aria-label="이전 달">‹</button>
+            <strong data-role="month"></strong>
+            <button type="button" class="or-mobile-calendar-nav" data-action="next" aria-label="다음 달">›</button>
+          </div>
+          <div class="or-mobile-calendar-weekdays"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+          <div class="or-mobile-calendar-days" data-role="days"></div>
+          <div class="or-mobile-calendar-actions">
+            <button type="button" class="btn" data-action="today">오늘</button>
+            <button type="button" class="btn" data-action="cancel">취소</button>
+            <button type="button" class="btn primary" data-action="confirm">확인</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(backdrop);
+
+      backdrop.addEventListener("click", (event) => {
+        const action = event.target?.closest?.("[data-action]")?.dataset?.action || "";
+        const dayButton = event.target?.closest?.("[data-date]");
+
+        if (dayButton) {
+          const value = String(dayButton.dataset.date || "");
+          if (this.mobileDatePickerState) this.mobileDatePickerState.selectedValue = value;
+          this.renderMobileDatePicker();
+          return;
+        }
+
+        if (action === "prev" || action === "next") {
+          const state = this.mobileDatePickerState;
+          if (!state) return;
+          const delta = action === "prev" ? -1 : 1;
+          state.viewDate = new Date(state.viewDate.getFullYear(), state.viewDate.getMonth() + delta, 1);
+          this.renderMobileDatePicker();
+          return;
+        }
+
+        if (action === "today") {
+          const state = this.mobileDatePickerState;
+          if (!state) return;
+          const now = new Date();
+          state.selectedValue = this.toDateValue(now);
+          state.viewDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          this.renderMobileDatePicker();
+          return;
+        }
+
+        if (action === "cancel" || event.target === backdrop) {
+          this.closeMobileDatePicker();
+          return;
+        }
+
+        if (action === "confirm") {
+          this.commitMobileDatePicker();
+        }
+      });
+
+      return backdrop;
+    },
+
+    openMobileDatePicker(recordKey, field, currentValue = "", label = "날짜") {
+      const isMobile = window.matchMedia?.("(max-width: 760px)")?.matches === true;
+      if (!isMobile) return;
+
+      const backdrop = this.ensureMobileDatePicker();
+      const parsed = this.parseDateValue(currentValue);
+      const base = parsed || new Date();
+      this.mobileDatePickerState = {
+        recordKey,
+        field,
+        label,
+        currentValue: String(currentValue || "").trim(),
+        selectedValue: String(currentValue || "").trim(),
+        viewDate: new Date(base.getFullYear(), base.getMonth(), 1)
+      };
+      this.beginDateInteraction(null);
+      document.body.classList.add("order-receipt-calendar-open");
+      backdrop.hidden = false;
+      this.renderMobileDatePicker();
+      requestAnimationFrame(() => backdrop.classList.add("show"));
+    },
+
+    renderMobileDatePicker() {
+      const state = this.mobileDatePickerState;
+      const backdrop = document.getElementById("orderReceiptMobileDatePicker");
+      if (!state || !backdrop) return;
+
+      const view = state.viewDate instanceof Date ? state.viewDate : new Date();
+      const year = view.getFullYear();
+      const month = view.getMonth();
+      const firstDay = new Date(year, month, 1).getDay();
+      const lastDate = new Date(year, month + 1, 0).getDate();
+      const todayValue = this.toDateValue(new Date());
+
+      const title = backdrop.querySelector('[data-role="title"]');
+      const monthLabel = backdrop.querySelector('[data-role="month"]');
+      const days = backdrop.querySelector('[data-role="days"]');
+      if (title) title.textContent = `${state.label || "날짜"} 선택`;
+      if (monthLabel) monthLabel.textContent = `${year}년 ${month + 1}월`;
+      if (!days) return;
+
+      const parts = [];
+      for (let i = 0; i < firstDay; i += 1) parts.push('<span class="or-mobile-calendar-blank" aria-hidden="true"></span>');
+      for (let day = 1; day <= lastDate; day += 1) {
+        const value = this.toDateValue(new Date(year, month, day));
+        const classes = ["or-mobile-calendar-day"];
+        if (value === todayValue) classes.push("is-today");
+        if (value === state.selectedValue) classes.push("is-selected");
+        parts.push(`<button type="button" class="${classes.join(" ")}" data-date="${attr(value)}" aria-label="${year}년 ${month + 1}월 ${day}일">${day}</button>`);
+      }
+      days.innerHTML = parts.join("");
+    },
+
+    closeMobileDatePicker(options = {}) {
+      const backdrop = document.getElementById("orderReceiptMobileDatePicker");
+      if (backdrop) {
+        backdrop.classList.remove("show");
+        window.setTimeout(() => {
+          if (!backdrop.classList.contains("show")) backdrop.hidden = true;
+        }, 130);
+      }
+      document.body.classList.remove("order-receipt-calendar-open");
+      this.mobileDatePickerState = null;
+      if (options.keepInteraction !== true) this.endDateInteraction();
+    },
+
+    async commitMobileDatePicker() {
+      const state = this.mobileDatePickerState;
+      if (!state) return;
+      const value = String(state.selectedValue || "").trim();
+      if (!value) {
+        APP.toast?.("날짜를 선택해 주세요.", "warn");
+        return;
+      }
+
+      const recordKey = state.recordKey;
+      const field = state.field;
+      const currentValue = String(state.currentValue || "").trim();
+      this.closeMobileDatePicker({ keepInteraction: true });
+
+      if (value === currentValue) {
+        this.endDateInteraction();
+        return;
+      }
+
+      try {
+        await this.setDate(recordKey, field, value);
+      } finally {
+        this.endDateInteraction();
+      }
+    },
+
     renderMobileCards(rows = [], operator = false) {
       const els = this.getEls();
       if (!els.mobileCards) return;
@@ -660,7 +881,7 @@
             <span>${escapeHtml(label)}</span>
             <b>
               <div class="order-receipt-mobile-date-box">
-                <input class="order-receipt-date order-receipt-mobile-date" data-field="${attr(field)}" type="date" value="${attr(value)}" aria-label="${attr(label)}"/>
+                <button type="button" class="order-receipt-mobile-date-trigger ${value ? "" : "is-empty"}" data-field="${attr(field)}" data-value="${attr(value)}" data-label="${attr(label)}" aria-label="${attr(label)} 선택">${escapeHtml(value || "날짜 선택")}</button>
                 ${value ? `<button type="button" class="order-date-clear order-receipt-mobile-date-clear" data-field="${attr(field)}" title="${attr(label)} 삭제" aria-label="${attr(label)} 삭제">×</button>` : ""}
               </div>
             </b>
@@ -853,7 +1074,18 @@
               await this.clearDate(key, button.dataset.field);
             });
           });
-          card.querySelectorAll(".order-receipt-mobile-date").forEach((input) => this.bindDateInput(key, input));
+          card.querySelectorAll(".order-receipt-mobile-date-trigger").forEach((button) => {
+            button.addEventListener("click", (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              this.openMobileDatePicker(
+                key,
+                button.dataset.field,
+                button.dataset.value || "",
+                button.dataset.label || "날짜"
+              );
+            });
+          });
         }
       });
     },
