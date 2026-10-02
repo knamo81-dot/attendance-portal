@@ -562,7 +562,7 @@
   }
 </script>
 <script src="../supabase.js"></script>
-<script src="../request.js"></script>
+<script src="../request.js?v=20261002-mobile-perf1"></script>
 <!--
   COLUMN ORDER NOTE
   - HTML header/colgroup order updated:
@@ -573,24 +573,26 @@
 <script src="../product_management.js"></script>
 <script src="../order_receipt.js"></script>
 <script src="../app.js"></script>
-<script src="./app.js?v=20260929-mobile-ui1"></script>
+<script src="./app.js?v=20261002-mobile-perf1"></script>
 <script>
-  document.addEventListener("DOMContentLoaded", () => {
-    let pmInitialized = false;
-    const initProductManagement = () => {
-      if (pmInitialized) return;
-      pmInitialized = true;
-      window.ReagentApp.productManagement?.init?.();
+  (function () {
+    window.__ensureReagentProductManagementInit = function () {
+      const pm = window.ReagentApp?.productManagement;
+      if (!pm || pm.__mobilePageInitialized === true) return;
+      pm.__mobilePageInitialized = true;
+      pm.init?.();
     };
 
-    document.querySelector('.tab-btn[data-tab="product-management"]')?.addEventListener("click", () => {
-      setTimeout(initProductManagement, 0);
-    });
+    document.addEventListener("DOMContentLoaded", () => {
+      document.querySelector('.tab-btn[data-tab="product-management"]')?.addEventListener("click", () => {
+        setTimeout(window.__ensureReagentProductManagementInit, 0);
+      });
 
-    document.querySelector('.tab-btn[data-tab="order-receipt"]')?.addEventListener("click", () => {
-      setTimeout(() => window.ReagentApp.orderReceipt?.init?.(), 0);
+      document.querySelector('.tab-btn[data-tab="order-receipt"]')?.addEventListener("click", () => {
+        setTimeout(() => window.ReagentApp.orderReceipt?.init?.(), 0);
+      });
     });
-  });
+  })();
 </script>
 
 <script id="reagent-tab-emergency-fallback">
@@ -627,7 +629,7 @@
       try { window.ReagentApp?.orderReceipt?.init?.(); } catch (_) {}
     }
     if (tab === "product-management") {
-      try { window.ReagentApp?.productManagement?.init?.(); } catch (_) {}
+      try { window.__ensureReagentProductManagementInit?.(); } catch (_) {}
     }
   }
 
@@ -728,7 +730,7 @@
     }
 
     if (tabId === 'product-management') {
-      try { window.ReagentApp?.productManagement?.init?.(); } catch (_) {}
+      try { window.__ensureReagentProductManagementInit?.(); } catch (_) {}
     }
 
     notifyPortalActiveTab(tabId);
