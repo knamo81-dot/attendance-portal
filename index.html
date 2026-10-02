@@ -4204,11 +4204,21 @@ body.auth-loading .top-user-bar {
   }
 
   function canAccessPatentApp() {
-    // 특허관리 프로그램은 회사 관리자 전용입니다.
-    // Portal 설정 메뉴와 동일한 회사 관리자 판정 기준을 사용합니다.
-    // 일반사용자에게는 사이드바의 특허 버튼 자체를 노출하지 않습니다.
+    // 1단계 권한 적용:
+    // - 회사 관리자: 특허 전체 운영 가능
+    // - 설정 > 권한관리에서 patent/operator로 지정된 사용자: 특허 운영자
+    // - 일반사용자 특허 조회 허용은 후속 단계에서 별도 적용
     if (!currentUser) return false;
-    return canUseSettingsMenu();
+    if (canUseSettingsMenu()) return true;
+
+    const patentRole = normalizePortalRole(
+      currentAppRoles?.patent?.role ||
+      currentAppRoles?.patent?.role_key ||
+      '',
+      'user'
+    );
+
+    return patentRole === 'admin' || patentRole === 'operator';
   }
 
   let patentVisibilitySeq = 0;
@@ -4496,8 +4506,8 @@ body.auth-loading .top-user-bar {
     }
   }
 
-  const PORTAL_APP_KEYS = ['wastewater', 'attendance', 'reagent', 'qa', 'research_staff', 'travel_expense', 'aic', 'home', 'work'];
-  const PORTAL_COMPANY_APP_KEYS = ['wastewater', 'attendance', 'reagent', 'qa', 'research_staff', 'travel_expense'];
+  const PORTAL_APP_KEYS = ['wastewater', 'attendance', 'reagent', 'qa', 'research_staff', 'travel_expense', 'patent', 'aic', 'home', 'work'];
+  const PORTAL_COMPANY_APP_KEYS = ['wastewater', 'attendance', 'reagent', 'qa', 'research_staff', 'travel_expense', 'patent'];
 
   function normalizePortalRole(role, fallback = 'user') {
     const clean = String(role || '').trim().toLowerCase();
@@ -4517,6 +4527,7 @@ body.auth-loading .top-user-bar {
     if (['qa', 'sds', 'msds', 'safety_data_sheet', 'safety-data-sheet', '안전보건자료'].includes(clean)) return 'qa';
     if (['research_staff', 'research-staff', 'staff', 'hr', '인력', '인력운영'].includes(clean)) return 'research_staff';
     if (['travel_expense', 'travel-expense', 'expense', 'expenses', 'business_trip', 'business-trip', '출장', '출장비', '출장비정산'].includes(clean)) return 'travel_expense';
+    if (['patent', 'patents', 'ip', 'intellectual_property', 'intellectual-property', '특허', '특허관리'].includes(clean)) return 'patent';
     if (['aic', 'ai_chat', 'ai-chat'].includes(clean)) return 'aic';
     if (['home', 'portal_home', 'portal-main'].includes(clean)) return 'home';
     if (['work', 'workspace', '업무'].includes(clean)) return 'work';
@@ -4537,6 +4548,7 @@ body.auth-loading .top-user-bar {
       qa: { role: 'user' },
       research_staff: { role: 'user' },
       travel_expense: { role: 'user' },
+      patent: { role: 'user' },
       aic: { role: 'user' },
       home: { role: 'user' },
       work: { role: 'user' }
@@ -4551,6 +4563,7 @@ body.auth-loading .top-user-bar {
       qa: { role: 'admin' },
       research_staff: { role: 'admin' },
       travel_expense: { role: 'admin' },
+      patent: { role: 'admin' },
       aic: { role: 'blocked' },
       home: { role: 'blocked' },
       work: { role: 'blocked' }
