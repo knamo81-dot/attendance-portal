@@ -29,9 +29,34 @@
       P.state.client.from('employees').select('employee_no,name,email').eq('company_id',ctx.session.companyId).order('name')
     ];
     jobs.push(P.companyQuery('pat_settings','*').maybeSingle());
-    const [p,pay,dead,ag,emp,set]=await Promise.all(jobs); [p,pay,dead,ag].forEach(r=>{if(r.error)throw r.error;});
-    patents=p.data||[];payments=pay.data||[];deadlines=dead.data||[];agencies=ag.data||[];employees=emp.error?[]:(emp.data||[]);settings=set.error?null:set.data;
-    fillSelects(); renderCurrent();
+
+    const [p,pay,dead,ag,emp,set]=await Promise.all(jobs);
+    [p,pay,dead,ag].forEach(r=>{if(r.error)throw r.error;});
+
+    patents=p.data||[];
+    payments=pay.data||[];
+    deadlines=dead.data||[];
+    agencies=ag.data||[];
+    employees=emp.error?[]:(emp.data||[]);
+    settings=set.error?null:set.data;
+
+    /*
+     * 기존 납부관리 데이터도 기한관리로 자동 보정합니다.
+     * - related_payment_id 기준으로 중복 생성 방지
+     * - 납부 수정 시 연결 기한도 동기화
+     * - 지급완료/취소 상태도 기한 상태에 반영
+     */
+    if(ctx.access.write){
+      const changed=await syncAllPaymentDeadlines();
+      if(changed){
+        const refreshed=await P.companyQuery('pat_deadlines','*').order('due_date',{ascending:true});
+        if(refreshed.error)throw refreshed.error;
+        deadlines=refreshed.data||[];
+      }
+    }
+
+    fillSelects();
+    renderCurrent();
   }
   function patentName(id){const p=patents.find(x=>x.id===id);return p?.invention_title||'-';}
   function employeeName(no){return employees.find(x=>x.employee_no===no)?.name||no||'-';}
@@ -43,6 +68,161 @@
   function renderCurrent(){if(section==='payments')renderPayments();if(section==='deadlines')renderDeadlines();if(section==='settings')renderSettings();}
 
   function paymentDue(x){return x.official_due_date||x.invoice_due_date||x.planned_payment_date;}
+
+  function paymentDeadlineType(paymentType){
+    const map={
+      ANNUAL_FEE:'ANNUAL_FEE',
+      REGISTRATION_FEE:'REGISTRATION_FEE',
+      EXAMINATION_FEE:'EXAMINATION_REQUEST',
+      APPLICATION_FEE:'OTHER',
+      AGENCY_INVOICE:'OTHER',
+      OTHER:'OTHER'
+    };
+    return map[paymentType]||'OTHER';
+  }
+
+  function paymentDeadlineTitle(payment){
+    if(payment.payment_title)return payment.payment_title;
+
+    if(payment.payment_type==='ANNUAL_FEE'){
+      const from=Number(payment.annual_year_from||0)||null;
+      const to=Number(payment.annual_year_to||0)||from;
+
+      if(from&&to){
+        return from===to
+          ? `${from}년차료`
+          : `${from}~${to}년차 연차료`;
+      }
+      return '연차료 납부';
+    }
+
+    if(payment.payment_type==='REGISTRATION_FEE')return '등록료 납부';
+    if(payment.payment_type==='EXAMINATION_FEE')return '심사청구료 납부';
+    if(payment.payment_type==='APPLICATION_FEE')return '출원비 납부';
+    if(payment.payment_type==='AGENCY_INVOICE')return '특허사무소 지급';
+    return P.paymentTypeLabel(payment.payment_type)||'납부 기한';
+  }
+
+  function paymentDeadlineStatus(payment){
+    if(payment.status==='PAID')return 'COMPLETED';
+    if(payment.status==='CANCELLED')return 'CANCELLED';
+    return 'OPEN';
+  }
+
+  function paymentDeadlineCompletedDate(payment){
+    if(payment.status!=='PAID')return null;
+    return payment.official_paid_date||payment.paid_date||null;
+  }
+
+  function sameValue(a,b){
+    const av=Array.isArray(a)?JSON.stringify(a):String(a??'');
+    const bv=Array.isArray(b)?JSON.stringify(b):String(b??'');
+    return av===bv;
+  }
+
+  async function syncPaymentDeadline(payment){
+    const existing=deadlines.find(x=>x.related_payment_id===payment.id)||null;
+    const dueDate=paymentDue(payment);
+
+    /*
+     * 납부기한이 지워진 경우에는 연결 기한을 삭제하지 않고 취소 처리합니다.
+     * 사용자가 나중에 다시 기한을 넣으면 같은 related_payment_id로 재활성화됩니다.
+     */
+    if(!dueDate){
+      if(existing&&existing.status!=='CANCELLED'){
+        const payload={
+          status:'CANCELLED',
+          completed_date:null,
+          updated_by_employee_no:ctx.session.employeeNo||null
+        };
+        const {data,error}=await P.state.client
+          .from('pat_deadlines')
+          .update(payload)
+          .eq('id',existing.id)
+          .eq('company_id',ctx.session.companyId)
+          .select()
+          .single();
+
+        if(error)throw error;
+        Object.assign(existing,data||payload);
+        return true;
+      }
+      return false;
+    }
+
+    const alertDays=existing?.alert_days_before?.length
+      ? existing.alert_days_before
+      : (settings?.alert_days_before||[90,30,7]);
+
+    const payload=P.companyPayload({
+      patent_id:payment.patent_id,
+      deadline_type:paymentDeadlineType(payment.payment_type),
+      title:paymentDeadlineTitle(payment),
+      base_date:payment.registration_date||null,
+      due_date:dueDate,
+      additional_due_date:payment.additional_due_date||null,
+      related_payment_id:payment.id,
+      source:'SYSTEM',
+      status:paymentDeadlineStatus(payment),
+      alert_days_before:alertDays,
+      completed_date:paymentDeadlineCompletedDate(payment),
+      note:payment.note
+        ? `납부관리 자동연동\\n${payment.note}`
+        : '납부관리 자동연동',
+      updated_by_employee_no:ctx.session.employeeNo||null
+    });
+
+    if(existing){
+      const fields=[
+        'patent_id',
+        'deadline_type',
+        'title',
+        'due_date',
+        'additional_due_date',
+        'status',
+        'completed_date',
+        'note'
+      ];
+
+      const needsUpdate=fields.some(key=>!sameValue(existing[key],payload[key]));
+      if(!needsUpdate)return false;
+
+      const {data,error}=await P.state.client
+        .from('pat_deadlines')
+        .update(payload)
+        .eq('id',existing.id)
+        .eq('company_id',ctx.session.companyId)
+        .select()
+        .single();
+
+      if(error)throw error;
+      Object.assign(existing,data||payload);
+      return true;
+    }
+
+    payload.created_by_employee_no=ctx.session.employeeNo||null;
+
+    const {data,error}=await P.state.client
+      .from('pat_deadlines')
+      .insert(payload)
+      .select()
+      .single();
+
+    if(error)throw error;
+    if(data)deadlines.push(data);
+    return true;
+  }
+
+  async function syncAllPaymentDeadlines(){
+    let changed=false;
+
+    for(const payment of payments){
+      const synced=await syncPaymentDeadline(payment);
+      if(synced)changed=true;
+    }
+
+    return changed;
+  }
   function renderPayments(){
     const open=payments.filter(x=>!['PAID','CANCELLED'].includes(x.status)), overdue=open.filter(x=>P.daysUntil(paymentDue(x))<0), due30=open.filter(x=>{const d=P.daysUntil(paymentDue(x));return d!==null&&d>=0&&d<=30;}), paid=payments.filter(x=>x.status==='PAID');
     const total=paid.reduce((a,b)=>a+Number(b.paid_amount||b.billed_amount||0),0);
@@ -58,13 +238,120 @@
   function openPaymentModal(x=null){if(!ctx.access.write)return;editingPayment=x?.id||null;clearPay();$('paymentModalTitle').textContent=x?'납부 수정':'납부 등록';if(x)Object.keys(x).forEach(k=>{if($('pay_'+k))P.setVal('pay_'+k,x[k]??'');});const pid=query.get('patent_id');if(!x&&pid&&patents.some(p=>p.id===pid))P.setVal('pay_patent_id',pid);toggleAgencyField();P.modalOpen('paymentModal');}
   function toggleAgencyField(){const direct=$('pay_payment_method').value!=='AGENCY';$('pay_agency_id').disabled=direct;if(direct)$('pay_agency_id').value='';}
   function autoPaymentTotal(){const sum=['official_fee','agency_fee','vat_amount','other_fee'].reduce((a,k)=>a+Number(P.val('pay_'+k)||0),0);if(!P.val('pay_billed_amount'))P.setVal('pay_billed_amount',sum||'');}
-  async function savePayment(){const patentId=P.val('pay_patent_id');if(!patentId){P.toast('특허를 선택해 주세요.','warn');return;}const from=Number(P.val('pay_annual_year_from')||0)||null,to=Number(P.val('pay_annual_year_to')||0)||from; if(from&&to&&to<from){P.toast('종료 연차가 시작 연차보다 작을 수 없습니다.','warn');return;}const payload=P.companyPayload({patent_id:patentId,payment_type:P.val('pay_payment_type'),payment_title:P.val('pay_payment_title')||null,annual_year_from:from,annual_year_to:to,payment_method:P.val('pay_payment_method')||null,agency_id:P.val('pay_agency_id')||null,official_due_date:P.val('pay_official_due_date')||null,additional_due_date:P.val('pay_additional_due_date')||null,invoice_received_date:P.val('pay_invoice_received_date')||null,invoice_due_date:P.val('pay_invoice_due_date')||null,payment_request_date:P.val('pay_payment_request_date')||null,planned_payment_date:P.val('pay_planned_payment_date')||null,paid_date:P.val('pay_paid_date')||null,official_paid_date:P.val('pay_official_paid_date')||null,currency:(P.val('pay_currency')||'KRW').toUpperCase(),official_fee:Number(P.val('pay_official_fee')||0),agency_fee:Number(P.val('pay_agency_fee')||0),vat_amount:Number(P.val('pay_vat_amount')||0),other_fee:Number(P.val('pay_other_fee')||0),billed_amount:Number(P.val('pay_billed_amount')||0),paid_amount:Number(P.val('pay_paid_amount')||0),status:P.val('pay_status')||'PLANNED',note:P.val('pay_note')||null,updated_by_employee_no:ctx.session.employeeNo||null});
-    try{let res;if(editingPayment)res=await P.state.client.from('pat_payments').update(payload).eq('id',editingPayment).eq('company_id',ctx.session.companyId);else{payload.created_by_employee_no=ctx.session.employeeNo||null;res=await P.state.client.from('pat_payments').insert(payload);}if(res.error)throw res.error;P.modalClose('paymentModal');P.toast('납부정보를 저장했습니다.');editingPayment=null;await loadAll();showSection('payments');}catch(e){P.toast(e.message,'error');}}
+  async function savePayment(){
+    const patentId=P.val('pay_patent_id');
+
+    if(!patentId){
+      P.toast('특허를 선택해 주세요.','warn');
+      return;
+    }
+
+    const from=Number(P.val('pay_annual_year_from')||0)||null;
+    const to=Number(P.val('pay_annual_year_to')||0)||from;
+
+    if(from&&to&&to<from){
+      P.toast('종료 연차가 시작 연차보다 작을 수 없습니다.','warn');
+      return;
+    }
+
+    const payload=P.companyPayload({
+      patent_id:patentId,
+      payment_type:P.val('pay_payment_type'),
+      payment_title:P.val('pay_payment_title')||null,
+      annual_year_from:from,
+      annual_year_to:to,
+      payment_method:P.val('pay_payment_method')||null,
+      agency_id:P.val('pay_agency_id')||null,
+      official_due_date:P.val('pay_official_due_date')||null,
+      additional_due_date:P.val('pay_additional_due_date')||null,
+      invoice_received_date:P.val('pay_invoice_received_date')||null,
+      invoice_due_date:P.val('pay_invoice_due_date')||null,
+      payment_request_date:P.val('pay_payment_request_date')||null,
+      planned_payment_date:P.val('pay_planned_payment_date')||null,
+      paid_date:P.val('pay_paid_date')||null,
+      official_paid_date:P.val('pay_official_paid_date')||null,
+      currency:(P.val('pay_currency')||'KRW').toUpperCase(),
+      official_fee:Number(P.val('pay_official_fee')||0),
+      agency_fee:Number(P.val('pay_agency_fee')||0),
+      vat_amount:Number(P.val('pay_vat_amount')||0),
+      other_fee:Number(P.val('pay_other_fee')||0),
+      billed_amount:Number(P.val('pay_billed_amount')||0),
+      paid_amount:Number(P.val('pay_paid_amount')||0),
+      status:P.val('pay_status')||'PLANNED',
+      note:P.val('pay_note')||null,
+      updated_by_employee_no:ctx.session.employeeNo||null
+    });
+
+    try{
+      let result;
+
+      if(editingPayment){
+        result=await P.state.client
+          .from('pat_payments')
+          .update(payload)
+          .eq('id',editingPayment)
+          .eq('company_id',ctx.session.companyId)
+          .select()
+          .single();
+      }else{
+        payload.created_by_employee_no=ctx.session.employeeNo||null;
+        result=await P.state.client
+          .from('pat_payments')
+          .insert(payload)
+          .select()
+          .single();
+      }
+
+      if(result.error)throw result.error;
+
+      const savedPayment=result.data;
+
+      /*
+       * 저장 즉시 기한관리에도 반영합니다.
+       * 이후 loadAll()에서도 기존 납부건을 한 번 더 점검하므로
+       * 과거 데이터까지 자동으로 보정됩니다.
+       */
+      if(savedPayment){
+        const oldPaymentIndex=payments.findIndex(x=>x.id===savedPayment.id);
+
+        if(oldPaymentIndex>=0)payments[oldPaymentIndex]=savedPayment;
+        else payments.push(savedPayment);
+
+        await syncPaymentDeadline(savedPayment);
+      }
+
+      P.modalClose('paymentModal');
+      P.toast('납부정보와 기한정보를 저장했습니다.');
+      editingPayment=null;
+
+      await loadAll();
+      showSection('payments');
+    }catch(e){
+      P.toast(e.message,'error');
+    }
+  }
 
   function renderDeadlines(){
     const open=deadlines.filter(x=>x.status==='OPEN'), due30=open.filter(x=>{const d=P.daysUntil(x.due_date);return d!==null&&d>=0&&d<=30;}), overdue=open.filter(x=>P.daysUntil(x.due_date)<0);
-    $('sectionDeadlines').innerHTML=`<div class="management-summary"><div class="pat-kpi gold"><div class="pat-kpi-label">진행중 기한</div><div class="pat-kpi-value">${open.length}</div><div class="pat-kpi-note">OPEN</div></div><div class="pat-kpi orange"><div class="pat-kpi-label">30일 이내</div><div class="pat-kpi-value">${due30.length}</div><div class="pat-kpi-note">기한임박</div></div><div class="pat-kpi red"><div class="pat-kpi-label">기한초과</div><div class="pat-kpi-value">${overdue.length}</div><div class="pat-kpi-note">즉시 확인</div></div></div><div class="pat-filterbar">${ctx.access.write?'<button id="newDeadlineBtn" class="pat-btn primary">＋ 기한 등록</button>':''}<select id="deadlineTypeFilter" class="pat-select"><option value="">전체 구분</option>${['ANNUAL_FEE','REGISTRATION_FEE','EXAMINATION_REQUEST','OFFICE_ACTION_RESPONSE','AMENDMENT','FOREIGN_FILING','PRIORITY','EXPIRATION','OTHER'].map(x=>`<option value="${x}">${P.deadlineTypeLabel(x)}</option>`).join('')}</select></div><div class="calendar-layout"><article class="pat-card pat-card-pad"><div class="calendar-head"><div class="pat-card-title">기한 캘린더</div><div class="calendar-nav"><button id="prevMonth" class="pat-btn icon">‹</button><div id="calendarMonth" class="calendar-month"></div><button id="nextMonth" class="pat-btn icon">›</button><button id="todayMonth" class="pat-btn">오늘</button></div></div><div class="pat-calendar-wrap"><div id="calendar" class="pat-calendar"></div></div></article><article class="pat-card pat-card-pad"><div class="pat-card-head"><div class="pat-card-title">다가오는 주요 기한</div></div><div id="upcomingDeadlines" class="upcoming-list"></div></article></div><div id="deadlineTable" style="margin-top:10px"></div>`;
-    $('newDeadlineBtn')?.addEventListener('click',()=>openDeadlineModal());$('deadlineTypeFilter').addEventListener('change',renderDeadlineTable);$('prevMonth').addEventListener('click',()=>{calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()-1,1);renderCalendar();});$('nextMonth').addEventListener('click',()=>{calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1);renderCalendar();});$('todayMonth').addEventListener('click',()=>{calendarDate=new Date();renderCalendar();});renderCalendar();renderDeadlineTable();renderUpcoming();
+    $('sectionDeadlines').innerHTML=`<div class="management-summary"><div class="pat-kpi gold"><div class="pat-kpi-label">진행중 기한</div><div class="pat-kpi-value">${open.length}</div><div class="pat-kpi-note">OPEN</div></div><div class="pat-kpi orange"><div class="pat-kpi-label">30일 이내</div><div class="pat-kpi-value">${due30.length}</div><div class="pat-kpi-note">기한임박</div></div><div class="pat-kpi red"><div class="pat-kpi-label">기한초과</div><div class="pat-kpi-value">${overdue.length}</div><div class="pat-kpi-note">즉시 확인</div></div></div><div class="pat-filterbar">${ctx.access.write?'<button id="newDeadlineBtn" class="pat-btn primary">＋ 기한 등록</button><button id="syncPaymentDeadlinesBtn" class="pat-btn secondary">↻ 납부기한 동기화</button>':''}<select id="deadlineTypeFilter" class="pat-select"><option value="">전체 구분</option>${['ANNUAL_FEE','REGISTRATION_FEE','EXAMINATION_REQUEST','OFFICE_ACTION_RESPONSE','AMENDMENT','FOREIGN_FILING','PRIORITY','EXPIRATION','OTHER'].map(x=>`<option value="${x}">${P.deadlineTypeLabel(x)}</option>`).join('')}</select></div><div class="calendar-layout"><article class="pat-card pat-card-pad"><div class="calendar-head"><div class="pat-card-title">기한 캘린더</div><div class="calendar-nav"><button id="prevMonth" class="pat-btn icon">‹</button><div id="calendarMonth" class="calendar-month"></div><button id="nextMonth" class="pat-btn icon">›</button><button id="todayMonth" class="pat-btn">오늘</button></div></div><div class="pat-calendar-wrap"><div id="calendar" class="pat-calendar"></div></div></article><article class="pat-card pat-card-pad"><div class="pat-card-head"><div class="pat-card-title">다가오는 주요 기한</div></div><div id="upcomingDeadlines" class="upcoming-list"></div></article></div><div id="deadlineTable" style="margin-top:10px"></div>`;
+    $('newDeadlineBtn')?.addEventListener('click',()=>openDeadlineModal());
+    $('syncPaymentDeadlinesBtn')?.addEventListener('click',async()=>{
+      const btn=$('syncPaymentDeadlinesBtn');
+      btn.disabled=true;
+      try{
+        const changed=await syncAllPaymentDeadlines();
+        const refreshed=await P.companyQuery('pat_deadlines','*').order('due_date',{ascending:true});
+        if(refreshed.error)throw refreshed.error;
+        deadlines=refreshed.data||[];
+        renderDeadlines();
+        P.toast(changed?'납부관리 기한을 동기화했습니다.':'이미 최신 상태입니다.');
+      }catch(e){
+        P.toast(e.message,'error');
+      }finally{
+        if($('syncPaymentDeadlinesBtn'))$('syncPaymentDeadlinesBtn').disabled=false;
+      }
+    });
+    $('deadlineTypeFilter').addEventListener('change',renderDeadlineTable);$('prevMonth').addEventListener('click',()=>{calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()-1,1);renderCalendar();});$('nextMonth').addEventListener('click',()=>{calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1);renderCalendar();});$('todayMonth').addEventListener('click',()=>{calendarDate=new Date();renderCalendar();});renderCalendar();renderDeadlineTable();renderUpcoming();
   }
   function renderCalendar(){const y=calendarDate.getFullYear(),m=calendarDate.getMonth();$('calendarMonth').textContent=`${y}년 ${m+1}월`;const first=new Date(y,m,1),start=new Date(y,m,1-first.getDay());const heads=['일','월','화','수','목','금','토'].map(x=>`<div class="pat-cal-head">${x}</div>`).join('');let cells='';for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;const ev=deadlines.filter(x=>x.due_date===ds&&x.status==='OPEN').slice(0,3);cells+=`<div class="pat-cal-cell ${d.getMonth()!==m?'muted':''}"><div class="pat-cal-date">${d.getDate()}</div>${ev.map(x=>`<span class="pat-cal-event ${P.daysUntil(x.due_date)<=7?'red':P.deadlineTypeLabel(x.deadline_type)==='연차료'?'gold':'blue'}" title="${P.escapeHtml(x.title)}">${P.escapeHtml(x.title)}</span>`).join('')}</div>`;}$('calendar').innerHTML=heads+cells;}
   function renderUpcoming(){const rows=deadlines.filter(x=>x.status==='OPEN').sort((a,b)=>String(a.due_date).localeCompare(String(b.due_date))).slice(0,8);$('upcomingDeadlines').innerHTML=rows.length?rows.map(x=>`<div class="upcoming-item"><div class="upcoming-top"><div class="upcoming-title">${P.escapeHtml(x.title)}</div><div class="pat-dday ${P.ddayClass(x.due_date)}">${P.dday(x.due_date)}</div></div><div class="upcoming-sub">${P.escapeHtml(patentName(x.patent_id))} · ${P.fmtDate(x.due_date)}</div></div>`).join(''):'<div class="pat-empty">다가오는 기한이 없습니다.</div>';}
