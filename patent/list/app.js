@@ -1066,8 +1066,16 @@
         )
           .eq('is_active', true)
           .order(
-            'created_at',
-            { ascending: false }
+            'application_date',
+            { ascending: false, nullsFirst: false }
+          )
+          .order(
+            'registration_date',
+            { ascending: false, nullsFirst: false }
+          )
+          .order(
+            'invention_title',
+            { ascending: true }
           ),
 
         P.companyQuery(
