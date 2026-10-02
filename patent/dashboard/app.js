@@ -16,7 +16,7 @@
     const [patRes,payRes,deadRes,eventRes]=await Promise.all([
       P.companyQuery('pat_master','id,invention_title,application_no,registration_no,country_code,ip_type,legal_status,application_date,registration_date,expiration_date,created_at').order('created_at',{ascending:false}),
       P.companyQuery('pat_payments','id,patent_id,payment_type,payment_title,annual_year_from,annual_year_to,official_due_date,invoice_due_date,planned_payment_date,status,paid_amount,billed_amount,currency,paid_date').neq('status','CANCELLED'),
-      P.companyQuery('pat_deadlines','id,patent_id,deadline_type,title,due_date,status').eq('status','OPEN'),
+      P.companyQuery('pat_deadlines','id,patent_id,deadline_type,title,due_date,status,related_payment_id').eq('status','OPEN'),
       P.companyQuery('pat_events','id,patent_id,event_date,event_type,title,description').order('event_date',{ascending:false}).limit(8)
     ]);
     [patRes,payRes,deadRes,eventRes].forEach(r=>{ if(r.error) throw r.error; });
@@ -34,7 +34,11 @@
     const counts={registered:0,examining:0,filed:0,extinct:0,other:0};
     patents.forEach(x=>counts[P.classifyPatentStatus(x.legal_status)]++);
     const duePayments=payments.filter(x=>!['PAID','CANCELLED'].includes(x.status) && P.daysUntil(patentDueDate(x))!==null && P.daysUntil(patentDueDate(x))<=30);
-    const dueDeadlines=deadlines.filter(x=>P.daysUntil(x.due_date)!==null && P.daysUntil(x.due_date)<=30);
+    const dueDeadlines=deadlines.filter(x=>
+      !x.related_payment_id &&
+      P.daysUntil(x.due_date)!==null &&
+      P.daysUntil(x.due_date)<=30
+    );
     const paidThisYear=payments.filter(x=>x.status==='PAID' && String(x.paid_date||'').startsWith(String(new Date().getFullYear()))).reduce((a,b)=>a+Number(b.paid_amount||b.billed_amount||0),0);
     const data=[
       ['전체 특허',patents.length,'총 관리 건수','gold'],['출원중',counts.filed,'현재 출원 상태','blue'],['심사중',counts.examining,'심사 진행 중','orange'],['등록',counts.registered,'권리 보유','green'],['소멸',counts.extinct,'소멸·포기·거절','red'],['납부임박',duePayments.length,'30일 이내','orange'],['기한임박',dueDeadlines.length,'30일 이내 · 올해 지급 '+P.fmtMoney(paidThisYear),'red']
@@ -61,7 +65,15 @@
   function renderDue(payments,deadlines,map){
     const items=[];
     payments.filter(x=>!['PAID','CANCELLED'].includes(x.status)).forEach(x=>{ const date=patentDueDate(x); if(!date)return; items.push({kind:'payment',date,title:x.payment_title||P.paymentTypeLabel(x.payment_type),sub:(map[x.patent_id]?.invention_title||'특허')+' · '+P.annualRangeLabel(x.annual_year_from,x.annual_year_to),patentId:x.patent_id}); });
-    deadlines.forEach(x=>items.push({kind:'deadline',date:x.due_date,title:x.title||P.deadlineTypeLabel(x.deadline_type),sub:map[x.patent_id]?.invention_title||'특허',patentId:x.patent_id}));
+    deadlines
+      .filter(x=>!x.related_payment_id)
+      .forEach(x=>items.push({
+        kind:'deadline',
+        date:x.due_date,
+        title:x.title||P.deadlineTypeLabel(x.deadline_type),
+        sub:map[x.patent_id]?.invention_title||'특허',
+        patentId:x.patent_id
+      }));
     items.sort((a,b)=>String(a.date).localeCompare(String(b.date))); const near=items.slice(0,6);
     const el=document.getElementById('dueList');
     if(!near.length){el.innerHTML='<div class="pat-empty">예정된 납부·기한 항목이 없습니다.</div>';return;}
