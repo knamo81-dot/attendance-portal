@@ -1537,14 +1537,24 @@
       (item) => item.id === id
     );
 
-    const patent = cachedPatent || (
+    const latestResult =
       await P.companyQuery(
         'pat_master',
         '*'
       )
         .eq('id', id)
-        .maybeSingle()
-    ).data;
+        .maybeSingle();
+
+    if (latestResult.error) {
+      console.warn(
+        '[Patent] 상세 최신정보 조회 실패, 목록 캐시를 사용합니다:',
+        latestResult.error
+      );
+    }
+
+    const patent =
+      latestResult.data ||
+      cachedPatent;
 
     if (!patent) {
       throw new Error(
@@ -1553,6 +1563,17 @@
     }
 
     currentPatent = patent;
+
+    const patentIndex = patents.findIndex(
+      (item) => item.id === id
+    );
+
+    if (patentIndex >= 0) {
+      patents[patentIndex] = {
+        ...patents[patentIndex],
+        ...patent
+      };
+    }
 
     const [
       inventorResult,
@@ -2525,6 +2546,19 @@
 
           currentPatent =
             result.data;
+
+          const patentIndex =
+            patents.findIndex(
+              (item) =>
+                item.id === currentPatent.id
+            );
+
+          if (patentIndex >= 0) {
+            patents[patentIndex] = {
+              ...patents[patentIndex],
+              ...currentPatent
+            };
+          }
 
           P.toast(
             '메모를 저장했습니다.'
