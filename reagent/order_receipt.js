@@ -106,6 +106,37 @@
     realtimeChannel: null,
     realtimeDebounceTimer: null,
     realtimeRefreshDelayMs: 250,
+    dateInteractionActive: false,
+    dateInteractionGuardUntil: 0,
+
+    isDateInteractionActive() {
+      const active = document.activeElement;
+      if (active?.classList?.contains("order-receipt-date")) return true;
+      return this.dateInteractionActive === true || Date.now() < Number(this.dateInteractionGuardUntil || 0);
+    },
+
+    beginDateInteraction(input) {
+      this.dateInteractionActive = true;
+      // Android/iOS 네이티브 날짜 선택기가 포커스/visibility를 바꾸는 동안
+      // 자동 새로고침이 input DOM을 교체하지 못하도록 충분한 보호 시간을 둡니다.
+      this.dateInteractionGuardUntil = Date.now() + 60000;
+      if (input) {
+        input.dataset.orderReceiptOpenedAt = String(Date.now());
+        if (input.dataset.orderReceiptCommittedValue == null) {
+          input.dataset.orderReceiptCommittedValue = String(input.value || "").trim();
+        }
+      }
+    },
+
+    endDateInteraction() {
+      this.dateInteractionActive = false;
+      this.dateInteractionGuardUntil = 0;
+    },
+
+    getTodayDateValue() {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    },
 
     get tableName() {
       return "reagent_collect_items";
@@ -334,16 +365,28 @@
       document.addEventListener("mouseup", () => { this.dragSelecting = false; });
       document.addEventListener("touchend", () => { this.dragSelecting = false; });
 
+      // 날짜 선택기 외부를 다시 터치하면 날짜 선택 보호 상태를 해제합니다.
+      document.addEventListener("pointerdown", (event) => {
+        if (event.target?.closest?.(".order-receipt-date")) return;
+        if (this.dateInteractionActive || this.dateInteractionGuardUntil) this.endDateInteraction();
+      }, true);
+
       document.addEventListener("visibilitychange", async () => {
-        if (!document.hidden && this.initialized && !this.isSaving) {
-          if (!this.realtimeChannel) this.startRealtime();
-          await this.refresh({ silent: true });
-        }
+        if (document.hidden) return;
+        if (!this.initialized || this.isSaving) return;
+
+        // 모바일 네이티브 달력/날짜 선택기가 visibility를 순간적으로 바꿀 수 있습니다.
+        // 날짜 선택 중에는 절대로 refresh/render 하지 않습니다.
+        if (this.isDateInteractionActive()) return;
+
+        if (!this.realtimeChannel) this.startRealtime();
+        await this.refresh({ silent: true });
       });
     },
 
     async refresh(options = {}) {
       if (this.isRefreshing) return;
+      if (options.allowDuringDateInteraction !== true && this.isDateInteractionActive()) return;
       this.isRefreshing = true;
 
       try {
@@ -372,11 +415,11 @@
         let channel = sb.channel(`order_receipt_${companyId || "default"}`);
 
         const onChange = () => {
-          if (this.isSaving || this.isRefreshing) return;
+          if (this.isSaving || this.isRefreshing || this.isDateInteractionActive()) return;
 
           clearTimeout(this.realtimeDebounceTimer);
           this.realtimeDebounceTimer = window.setTimeout(async () => {
-            if (this.isSaving || this.isRefreshing) return;
+            if (this.isSaving || this.isRefreshing || this.isDateInteractionActive()) return;
             if ((this.selectedKeys?.size || 0) > 0) return;
             await this.refresh({ silent: true });
           }, this.realtimeRefreshDelayMs);
@@ -420,6 +463,7 @@
       this.autoRefreshTimer = window.setInterval(async () => {
         if (document.hidden) return;
         if (this.isSaving || this.isRefreshing || this.dragSelecting) return;
+        if (this.isDateInteractionActive()) return;
 
         // 사용자가 여러 품목을 선택해서 날짜 작업 중이면 화면을 갑자기 갱신하지 않습니다.
         if ((this.selectedKeys?.size || 0) > 0) return;
@@ -742,25 +786,53 @@
       input.dataset.orderReceiptBound = "1";
       input.dataset.orderReceiptCommittedValue = String(input.value || "").trim();
 
-      // 모바일의 type=date는 사용자 탭만으로 네이티브 달력을 엽니다.
-      // showPicker()를 focus/click에서 강제 호출하지 않습니다.
-      // 기본 동작은 그대로 두고 카드/행의 상위 이벤트로만 전파되지 않게 합니다.
-      ["pointerdown", "touchstart", "click", "focus"].forEach((eventName) => {
-        input.addEventListener(eventName, (e) => e.stopPropagation(), eventName === "touchstart" ? { passive: true } : undefined);
-      });
+      // 네이티브 type=date가 직접 picker를 열도록 두고 showPicker()는 호출하지 않습니다.
+      // 날짜 선택이 시작되면 자동/Realtime/visibility 새로고침을 잠급니다.
+      const begin = (e) => {
+        e.stopPropagation();
+        this.beginDateInteraction(input);
+      };
+
+      input.addEventListener("pointerdown", begin);
+      input.addEventListener("touchstart", begin, { passive: true });
+      input.addEventListener("focus", begin);
+      input.addEventListener("click", (e) => e.stopPropagation());
 
       input.addEventListener("change", async (e) => {
         e.stopPropagation();
 
         const nextValue = String(input.value || "").trim();
         const committedValue = String(input.dataset.orderReceiptCommittedValue || "").trim();
+        const openedAt = Number(input.dataset.orderReceiptOpenedAt || 0);
+        const elapsed = openedAt ? Date.now() - openedAt : Number.MAX_SAFE_INTEGER;
+        const isMobile = window.matchMedia?.("(max-width: 760px)")?.matches === true;
 
-        // 달력을 열고 닫기만 했거나 동일 날짜를 다시 선택한 경우에는 저장/재렌더하지 않습니다.
-        if (nextValue === committedValue) return;
+        // 일부 Android WebView/브라우저는 빈 date input을 탭하는 순간
+        // 오늘 날짜를 change로 확정하는 경우가 있습니다. 실제 선택보다 지나치게 빠른
+        // '빈 값 -> 오늘' 변경은 무시하고 원래 값으로 되돌립니다.
+        if (isMobile && !committedValue && nextValue === this.getTodayDateValue() && elapsed < 1200) {
+          input.value = committedValue;
+          input.dataset.orderReceiptCommittedValue = committedValue;
+          return;
+        }
+
+        // 달력을 열고 닫기만 했거나 같은 날짜를 다시 선택한 경우 저장하지 않습니다.
+        if (nextValue === committedValue) {
+          this.endDateInteraction();
+          return;
+        }
 
         input.dataset.orderReceiptCommittedValue = nextValue;
-        await this.setDate(recordKey, input.dataset.field, nextValue);
+        try {
+          await this.setDate(recordKey, input.dataset.field, nextValue);
+        } finally {
+          this.endDateInteraction();
+        }
       });
+
+      // 취소로 change가 발생하지 않은 경우에는 다음 화면 터치에서 보호가 해제됩니다.
+      // blur만으로 즉시 해제하지 않는 이유는 일부 모바일에서 picker가 열릴 때
+      // input이 먼저 blur되어 refresh가 다시 picker를 닫는 문제가 있기 때문입니다.
     },
 
     bindMobileCardEvents() {
