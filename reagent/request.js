@@ -10,16 +10,32 @@ window.ReagentApp.request = {
   myRegistrationRequests: [],
   activeRequestPanel: "list",
 
-  // 모바일 제품신청 QR/바코드 스캐너 상태
+  // 모바일 제품신청 QR/바코드 스캐너 상태 (QA 스캐너 엔진 공통화)
   _productScanStream: null,
-  _productScanTimer: null,
+  _productScanTrack: null,
+  _productScanControls: null,
+  _productScanReader: null,
+  _productScanLoopTimer: 0,
+  _productScanNoResultTimer: 0,
+  _productScanNativeRaf: 0,
+  _productScanNativeDetector: null,
+  _productScanNativeDetecting: false,
+  _productScanDecodeInFlight: false,
   _productScanRunning: false,
   _productScanBusy: false,
   _productScanLastText: "",
   _productScanLastAt: 0,
+  _productScanFrameSeq: 0,
+  _productScanStartedAt: 0,
+  _productScanTorchOn: false,
+  _productScanZoomValue: 1,
+  _legacyZxingLoadPromise: null,
+  _productScanWasmLoadPromise: null,
+  _productScanWasmPrepared: false,
+  _productScanWasmBase: "",
   _productIdentifierRows: [],
   _productIdentifierLoadedAt: 0,
-  _nativeBarcodeDetector: null,
+  _zxingWasmVersion: "3.1.4",
 
   getCompanyId() {
     if (typeof window.ReagentApp.getCompanyId === "function") {
@@ -396,11 +412,16 @@ window.ReagentApp.request = {
 
   /* --------------------- 모바일 QR/바코드 제품 스캔 --------------------- */
   normalizeScannedIdentifier(value = "") {
-    return String(value ?? "")
-      .replace(/^\][A-Za-z0-9]{2}/, "")
+    let v = String(value ?? "")
+      .replace(/<GS>/gi, "\x1d")
+      .replace(/\u241d/g, "\x1d")
       .replace(/\u0000/g, "")
-      .replace(/[\r\n]+$/g, "")
       .trim();
+
+    // AIM symbology identifier: ]C0 / ]C1(Code128), ]d1 / ]d2(DataMatrix) 등
+    v = v.replace(/^\][A-Za-z][0-9A-Za-z]/, "");
+    v = v.replace(/^[\x00-\x1f\x7f]+|[\x00-\x1f\x7f]+$/g, "");
+    return v.trim();
   },
 
   normalizeIdentifierCode(value = "") {
@@ -409,37 +430,166 @@ window.ReagentApp.request = {
       .replace(/[\s.,-]+/g, "");
   },
 
-  buildProductScanCandidates(rawValue = "") {
-    const original = String(rawValue ?? "");
-    const cleaned = this.normalizeScannedIdentifier(original);
-    const withoutControls = cleaned.replace(/[\u0000-\u001C\u001E-\u001F\u007F]/g, "");
-    const visibleGs1 = cleaned.replace(/\u001D/g, "|");
+  barcodeFormatName(value) {
+    const numeric = {
+      0: "AZTEC", 1: "CODABAR", 2: "CODE_39", 3: "CODE_93", 4: "CODE_128",
+      5: "DATA_MATRIX", 6: "EAN_8", 7: "EAN_13", 8: "ITF", 9: "MAXICODE",
+      10: "PDF_417", 11: "QR_CODE", 12: "RSS_14", 13: "RSS_EXPANDED",
+      14: "UPC_A", 15: "UPC_E", 16: "UPC_EAN_EXTENSION"
+    };
+    if (typeof value === "number" && numeric[value]) return numeric[value];
+    const raw = String(value ?? "").trim();
+    if (!raw) return "UNKNOWN";
+    if (/^\d+$/.test(raw) && numeric[Number(raw)]) return numeric[Number(raw)];
+    const key = raw.toUpperCase().replace(/[\s_\-\/]/g, "");
+    const names = {
+      QRCODE: "QR_CODE", DATAMATRIX: "DATA_MATRIX", CODE128: "CODE_128",
+      CODE39: "CODE_39", CODE39STD: "CODE_39", CODE39EXT: "CODE_39",
+      CODE93: "CODE_93", EAN8: "EAN_8", EAN13: "EAN_13", UPCA: "UPC_A",
+      UPCE: "UPC_E", PDF417: "PDF_417", DATABAR: "RSS_14",
+      DATABAROMNI: "RSS_14", DATABAREXP: "RSS_EXPANDED",
+      DATABAREXPANDED: "RSS_EXPANDED", CODABAR: "CODABAR", ITF: "ITF",
+      AZTEC: "AZTEC", MAXICODE: "MAXICODE"
+    };
+    return names[key] || raw.toUpperCase().replace(/[\s-]+/g, "_");
+  },
 
-    const raw = new Set([original, original.trim(), cleaned, withoutControls].filter(Boolean));
-    const normalized = new Set([...raw].map((v) => this.normalizeIdentifierCode(v)).filter(Boolean));
-    const gtin = new Set();
-    const productCodes = new Set();
-
-    const gtinPatterns = [
-      /\(01\)(\d{14})/,
-      /(?:^|\|)01(\d{14})/,
-      /^01(\d{14})/
-    ];
-    for (const pattern of gtinPatterns) {
-      const match = visibleGs1.match(pattern);
-      if (match?.[1]) gtin.add(match[1]);
+  parseParenthesizedGs1(text = "") {
+    const src = String(text || "").trim();
+    if (!/\(0?1\)/.test(src)) return null;
+    const out = {};
+    const re = /\((01|10|17|21|240|422)\)(.*?)(?=\((?:01|10|17|21|240|422)\)|$)/g;
+    let m;
+    while ((m = re.exec(src))) {
+      const ai = m[1];
+      const value = String(m[2] || "").trim();
+      if (value) out[ai] = value;
     }
+    return out["01"] ? out : null;
+  },
 
-    const p240 = visibleGs1.match(/\(240\)([^|()]+)/) || visibleGs1.match(/(?:^|\|)240([^|]+)/);
-    if (p240?.[1]) {
-      const value = String(p240[1]).trim();
-      if (value) {
-        productCodes.add(value);
-        normalized.add(this.normalizeIdentifierCode(value));
+  parseRawGs1(text = "") {
+    const GS = "\x1d";
+    let src = String(text || "")
+      .replace(/<GS>/gi, GS)
+      .replace(/\u241d/g, GS)
+      .replace(/^\]d2/i, "");
+    if (!src.startsWith("01") || src.length < 16) return null;
+
+    const out = {};
+    let i = 0;
+    const readVariable = (maxLen, nextAis = []) => {
+      const start = i;
+      const hardEnd = Math.min(src.length, start + maxLen);
+      const gsPos = src.indexOf(GS, start);
+      if (gsPos >= 0 && gsPos <= hardEnd) {
+        const value = src.slice(start, gsPos);
+        i = gsPos + 1;
+        return value;
       }
-    }
+      let boundary = hardEnd;
+      for (const ai of nextAis) {
+        let pos = src.indexOf(ai, start + 1);
+        while (pos >= 0 && pos < hardEnd) {
+          if (pos > start && src.length > pos + ai.length) {
+            boundary = Math.min(boundary, pos);
+            break;
+          }
+          pos = src.indexOf(ai, pos + 1);
+        }
+      }
+      const value = src.slice(start, boundary);
+      i = boundary;
+      return value;
+    };
 
-    return { raw, normalized, gtin, productCodes };
+    while (i < src.length) {
+      if (src[i] === GS) { i += 1; continue; }
+      if (src.startsWith("01", i) && src.length >= i + 16) {
+        i += 2; out["01"] = src.slice(i, i + 14); i += 14; continue;
+      }
+      if (src.startsWith("422", i) && src.length >= i + 6) {
+        i += 3; out["422"] = src.slice(i, i + 3); i += 3; continue;
+      }
+      if (src.startsWith("17", i) && src.length >= i + 8) {
+        i += 2; out["17"] = src.slice(i, i + 6); i += 6; continue;
+      }
+      if (src.startsWith("10", i)) {
+        i += 2; out["10"] = readVariable(20, ["240", "21", "17", "422"]); continue;
+      }
+      if (src.startsWith("240", i)) {
+        i += 3; out["240"] = readVariable(30, ["21", "17", "422"]); continue;
+      }
+      if (src.startsWith("21", i)) {
+        i += 2; out["21"] = readVariable(20, ["240", "17", "422"]); continue;
+      }
+      break;
+    }
+    return out["01"] ? out : null;
+  },
+
+  buildProductScanResult(rawValue = "", format = "") {
+    const rawDisplay = String(rawValue || "").trim();
+    const raw = rawDisplay.replace(/<GS>/gi, "\x1d").replace(/\u241d/g, "\x1d");
+    const data = this.parseParenthesizedGs1(raw) || this.parseRawGs1(raw);
+    return {
+      raw,
+      rawDisplay,
+      format: this.barcodeFormatName(format),
+      gs1: data ? {
+        gtin: String(data["01"] || "").trim(),
+        lot: String(data["10"] || "").trim(),
+        expiry: String(data["17"] || "").trim(),
+        serial: String(data["21"] || "").trim(),
+        additionalId: String(data["240"] || "").trim(),
+        origin: String(data["422"] || "").trim()
+      } : null
+    };
+  },
+
+  canonicalIdentifierValue(type, value) {
+    const t = String(type || "").toUpperCase();
+    const raw = this.normalizeScannedIdentifier(value);
+    if (!raw) return "";
+    if (["PRODUCT_CODE", "CAT_NO", "P_N", "REORDER"].includes(t)) {
+      return this.normalizeIdentifierCode(raw);
+    }
+    if (t === "GTIN") return raw.replace(/[^0-9]/g, "");
+    return raw;
+  },
+
+  scanIdentifierCandidates(scan) {
+    const candidates = [];
+    const add = (kind, value) => {
+      const canonical = this.canonicalIdentifierValue(kind, value);
+      if (!canonical) return;
+      const key = `${kind}:${canonical}`;
+      if (!candidates.some((item) => item.key === key)) candidates.push({ key, kind, canonical });
+    };
+    if (scan?.raw) add("RAW", scan.raw);
+    if (scan?.gs1?.gtin) add("GTIN", scan.gs1.gtin);
+    if (scan?.gs1?.additionalId) {
+      add("PRODUCT_CODE", scan.gs1.additionalId);
+      add("RAW", scan.gs1.additionalId);
+    }
+    return candidates;
+  },
+
+  identifierRowMatchesScan(row, scan) {
+    const type = String(row?.identifier_type || "").toUpperCase();
+    const rowValue = row?.identifier_value ?? "";
+    const candidates = this.scanIdentifierCandidates(scan);
+
+    if (type === "GTIN") {
+      const rowCanonical = this.canonicalIdentifierValue("GTIN", rowValue);
+      return candidates.some((c) => c.kind === "GTIN" && c.canonical === rowCanonical);
+    }
+    if (["PRODUCT_CODE", "CAT_NO", "P_N", "REORDER"].includes(type)) {
+      const rowCanonical = String(row?.normalized_value || "").trim() || this.canonicalIdentifierValue(type, rowValue);
+      return candidates.some((c) => c.kind === "PRODUCT_CODE" && c.canonical === rowCanonical);
+    }
+    const rowCanonical = this.canonicalIdentifierValue(type, rowValue);
+    return candidates.some((c) => c.kind === "RAW" && c.canonical === rowCanonical);
   },
 
   async loadProductIdentifierRows(force = false) {
@@ -451,7 +601,6 @@ window.ReagentApp.request = {
 
     const sb = window.ReagentApp.sb;
     if (!sb) return [];
-
     const { data, error } = await sb
       .from("product_identifiers")
       .select("product_id, identifier_type, identifier_value, normalized_value, code_format, is_primary, is_active")
@@ -463,57 +612,19 @@ window.ReagentApp.request = {
       window.ReagentApp.toast?.(`QR/바코드 정보를 조회하지 못했습니다: ${error.message || "권한을 확인하세요."}`, "warn");
       return [];
     }
-
     this._productIdentifierRows = Array.isArray(data) ? data : [];
     this._productIdentifierLoadedAt = now;
     return this._productIdentifierRows;
   },
 
-  findIdentifierMatches(rows = [], rawValue = "") {
-    const candidates = this.buildProductScanCandidates(rawValue);
-    const list = Array.isArray(rows) ? rows : [];
-    const codeTypes = new Set(["PRODUCT_CODE", "CAT_NO", "P_N", "REORDER"]);
-
-    // 1순위: 저장된 원본 QR/바코드 값과 직접 일치
-    const exactMatches = list.filter((row) => {
-      const raw = String(row.identifier_value || "");
-      const cleaned = this.normalizeScannedIdentifier(raw);
-      const withoutControls = cleaned.replace(/[\u0000-\u001F\u007F]/g, "");
-      return candidates.raw.has(raw) || candidates.raw.has(cleaned) || candidates.raw.has(withoutControls);
-    });
-    if (exactMatches.length) {
-      const scanTypes = new Set(["BARCODE", "QR", "QR_URL", "DATAMATRIX", "GTIN"]);
-      const scanExact = exactMatches.filter((row) => scanTypes.has(String(row.identifier_type || "").trim().toUpperCase()));
-      return scanExact.length ? scanExact : exactMatches;
-    }
-
-    // 2순위: GS1 DataMatrix 등에서 추출한 GTIN(01)
-    const gtinMatches = list.filter((row) => {
-      const type = String(row.identifier_type || "").trim().toUpperCase();
-      if (type !== "GTIN") return false;
-      const digits = this.normalizeScannedIdentifier(row.identifier_value).replace(/\D/g, "");
-      return Boolean(digits && candidates.gtin.has(digits));
-    });
-    if (gtinMatches.length) return gtinMatches;
-
-    // 3순위: GS1 AI(240) 또는 제품코드 계열 정규화값
-    return list.filter((row) => {
-      const type = String(row.identifier_type || "").trim().toUpperCase();
-      if (!codeTypes.has(type)) return false;
-      const cleaned = this.normalizeScannedIdentifier(row.identifier_value);
-      const normalized = String(row.normalized_value || this.normalizeIdentifierCode(cleaned)).trim().toUpperCase();
-      return Boolean(normalized && candidates.normalized.has(normalized));
-    });
+  findIdentifierMatches(rows = [], scan = null) {
+    return (Array.isArray(rows) ? rows : []).filter((row) => this.identifierRowMatchesScan(row, scan));
   },
 
-  async findProductFromScannedIdentifier(rawValue = "") {
+  async findProductFromScannedIdentifier(scan) {
     const rows = await this.loadProductIdentifierRows();
-    let matches = this.findIdentifierMatches(rows, rawValue);
-
-    // 다른 화면에서 식별코드를 막 등록했을 수 있으므로 미일치 시 한 번만 최신값 재조회합니다.
-    if (!matches.length) {
-      matches = this.findIdentifierMatches(await this.loadProductIdentifierRows(true), rawValue);
-    }
+    let matches = this.findIdentifierMatches(rows, scan);
+    if (!matches.length) matches = this.findIdentifierMatches(await this.loadProductIdentifierRows(true), scan);
 
     const productIds = [...new Set(matches.map((row) => Number(row.product_id)).filter((id) => Number.isFinite(id) && id > 0))];
     if (!productIds.length) return { status: "not_found", product: null };
@@ -526,7 +637,6 @@ window.ReagentApp.request = {
       products = await this.loadProductMaster(true);
       product = products.find((row) => Number(row.id) === productId && row.is_active !== false);
     }
-
     return product ? { status: "found", product } : { status: "inactive_or_missing", product: null };
   },
 
@@ -538,193 +648,560 @@ window.ReagentApp.request = {
     status.classList.toggle("warn", type === "warn");
   },
 
+  async ensureLegacyZxingLoaded() {
+    if (window.ZXingBrowser?.BrowserMultiFormatReader) return window.ZXingBrowser;
+    if (this._legacyZxingLoadPromise) return this._legacyZxingLoadPromise;
+    const sources = [
+      "https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/umd/zxing-browser.min.js",
+      "https://unpkg.com/@zxing/browser@0.2.1/umd/zxing-browser.min.js"
+    ];
+    const loadOne = (src) => new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.crossOrigin = "anonymous";
+      script.dataset.reagentZxingBrowser = "1";
+      script.onload = () => window.ZXingBrowser?.BrowserMultiFormatReader
+        ? resolve(window.ZXingBrowser)
+        : reject(new Error("보조 스캔 엔진 초기화 실패"));
+      script.onerror = () => reject(new Error("보조 스캔 엔진 로드 실패"));
+      document.head.appendChild(script);
+    });
+    this._legacyZxingLoadPromise = (async () => {
+      let lastError = null;
+      for (const src of sources) {
+        try { return await loadOne(src); } catch (error) { lastError = error; }
+      }
+      throw lastError || new Error("보조 스캔 엔진을 불러오지 못했습니다.");
+    })().catch((error) => {
+      this._legacyZxingLoadPromise = null;
+      throw error;
+    });
+    return this._legacyZxingLoadPromise;
+  },
+
+  async prepareZXingWasm(api, base) {
+    if (this._productScanWasmPrepared || !api) return api;
+    if (typeof api.prepareZXingModule === "function") {
+      await Promise.resolve(api.prepareZXingModule({
+        overrides: {
+          locateFile(path) {
+            if (/zxing_reader\.wasm(?:$|\?)/i.test(String(path || ""))) return `${base}zxing_reader.wasm`;
+            return path;
+          }
+        }
+      }));
+    }
+    this._productScanWasmPrepared = true;
+    this._productScanWasmBase = base;
+    return api;
+  },
+
+  async ensureZXingWasmLoaded() {
+    const version = this._zxingWasmVersion;
+    if (window.ZXingWASM?.readBarcodes) {
+      const base = this._productScanWasmBase || `https://cdn.jsdelivr.net/npm/zxing-wasm@${version}/dist/reader/`;
+      return this.prepareZXingWasm(window.ZXingWASM, base);
+    }
+    if (this._productScanWasmLoadPromise) return this._productScanWasmLoadPromise;
+
+    const sources = [
+      {
+        src: `https://cdn.jsdelivr.net/npm/zxing-wasm@${version}/dist/iife/reader/index.js`,
+        base: `https://cdn.jsdelivr.net/npm/zxing-wasm@${version}/dist/reader/`
+      },
+      {
+        src: `https://unpkg.com/zxing-wasm@${version}/dist/iife/reader/index.js`,
+        base: `https://unpkg.com/zxing-wasm@${version}/dist/reader/`
+      }
+    ];
+    const loadOne = ({ src, base }) => new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.crossOrigin = "anonymous";
+      script.dataset.reagentZxingWasm = "1";
+      script.onload = async () => {
+        try {
+          if (!window.ZXingWASM?.readBarcodes) throw new Error("WASM 스캔 엔진 초기화 실패");
+          resolve(await this.prepareZXingWasm(window.ZXingWASM, base));
+        } catch (error) { reject(error); }
+      };
+      script.onerror = () => reject(new Error("WASM 스캔 엔진 로드 실패"));
+      document.head.appendChild(script);
+    });
+    this._productScanWasmLoadPromise = (async () => {
+      let lastError = null;
+      for (const source of sources) {
+        try { return await loadOne(source); } catch (error) { lastError = error; }
+      }
+      throw lastError || new Error("고성능 스캔 엔진을 불러오지 못했습니다.");
+    })().catch((error) => {
+      this._productScanWasmLoadPromise = null;
+      this._productScanWasmPrepared = false;
+      throw error;
+    });
+    return this._productScanWasmLoadPromise;
+  },
+
+  async enhanceProductScanTrack(track) {
+    if (!track) return;
+    try {
+      const caps = track.getCapabilities?.() || {};
+      const advanced = [];
+      if (Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) advanced.push({ focusMode: "continuous" });
+      if (Array.isArray(caps.exposureMode) && caps.exposureMode.includes("continuous")) advanced.push({ exposureMode: "continuous" });
+      if (Array.isArray(caps.whiteBalanceMode) && caps.whiteBalanceMode.includes("continuous")) advanced.push({ whiteBalanceMode: "continuous" });
+      if (advanced.length) await track.applyConstraints({ advanced });
+    } catch (_) {}
+  },
+
+  syncProductScanCameraTools() {
+    const torchBtn = document.getElementById("productScanTorch");
+    const zoomBtn = document.getElementById("productScanZoom");
+    const track = this._productScanTrack;
+    if (!track) return;
+    let caps = {};
+    let settings = {};
+    try { caps = track.getCapabilities?.() || {}; } catch (_) {}
+    try { settings = track.getSettings?.() || {}; } catch (_) {}
+
+    if (torchBtn) {
+      torchBtn.hidden = caps.torch !== true;
+      torchBtn.classList.toggle("active", this._productScanTorchOn);
+    }
+    if (zoomBtn) {
+      const zoom = caps.zoom;
+      const canZoom = zoom && Number.isFinite(Number(zoom.min)) && Number.isFinite(Number(zoom.max)) && Number(zoom.max) > Number(zoom.min);
+      zoomBtn.hidden = !canZoom;
+      if (canZoom) {
+        this._productScanZoomValue = Number(settings.zoom || this._productScanZoomValue || zoom.min || 1);
+        zoomBtn.textContent = `${this._productScanZoomValue.toFixed(this._productScanZoomValue % 1 ? 1 : 0)}×`;
+      }
+    }
+  },
+
+  async toggleProductScanTorch() {
+    if (!this._productScanTrack) return;
+    try {
+      const caps = this._productScanTrack.getCapabilities?.() || {};
+      if (caps.torch !== true) return;
+      this._productScanTorchOn = !this._productScanTorchOn;
+      await this._productScanTrack.applyConstraints({ advanced: [{ torch: this._productScanTorchOn }] });
+      this.syncProductScanCameraTools();
+    } catch (_) {
+      this._productScanTorchOn = false;
+      this.syncProductScanCameraTools();
+    }
+  },
+
+  async cycleProductScanZoom() {
+    if (!this._productScanTrack) return;
+    try {
+      const caps = this._productScanTrack.getCapabilities?.() || {};
+      const zoom = caps.zoom;
+      if (!zoom) return;
+      const min = Number(zoom.min || 1);
+      const max = Number(zoom.max || min);
+      if (!(max > min)) return;
+      const presets = [1, 1.3, 1.6, 2, 2.5, 3]
+        .map((value) => Math.max(min, Math.min(max, value)))
+        .filter((value, index, array) => index === 0 || Math.abs(value - array[index - 1]) > 0.05);
+      const current = Number(this._productScanZoomValue || min);
+      let next = presets.find((value) => value > current + 0.05);
+      if (next == null) next = presets[0] ?? min;
+      await this._productScanTrack.applyConstraints({ advanced: [{ zoom: next }] });
+      this._productScanZoomValue = next;
+      this.syncProductScanCameraTools();
+    } catch (_) {}
+  },
+
+  async openProductScanCamera() {
+    const video = document.getElementById("productScanVideo");
+    if (!video) throw new Error("카메라 화면을 찾을 수 없습니다.");
+    let stream = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 3840 },
+          height: { ideal: 2160 },
+          frameRate: { ideal: 30, max: 60 }
+        }
+      });
+    } catch (_) {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+      });
+    }
+
+    this._productScanStream = stream;
+    this._productScanTrack = stream.getVideoTracks?.()[0] || null;
+    video.srcObject = stream;
+    video.hidden = false;
+    video.setAttribute("playsinline", "");
+    video.muted = true;
+    await video.play();
+    await this.enhanceProductScanTrack(this._productScanTrack);
+    this.syncProductScanCameraTools();
+
+    const started = Date.now();
+    while ((!video.videoWidth || !video.videoHeight) && Date.now() - started < 2500) {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    }
+    if (!video.videoWidth || !video.videoHeight) throw new Error("카메라 영상 크기를 확인할 수 없습니다.");
+    return stream;
+  },
+
+  captureProductScanFrame(mode = "matrix") {
+    const video = document.getElementById("productScanVideo");
+    const canvas = document.getElementById("productScanCanvas");
+    if (!video || !canvas || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return null;
+
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    let sx = 0, sy = 0, sw = vw, sh = vh;
+    let maxW = 1400, maxH = 1050;
+    if (mode === "matrix") {
+      const side = Math.min(vw * 0.78, vh * 0.86);
+      sw = sh = Math.max(320, side);
+      sx = Math.max(0, (vw - sw) / 2);
+      sy = Math.max(0, (vh - sh) / 2);
+      maxW = maxH = 1200;
+    } else if (mode === "linear") {
+      sw = vw * 0.96;
+      sh = vh * 0.52;
+      sx = (vw - sw) / 2;
+      sy = (vh - sh) / 2;
+      maxW = 1600;
+      maxH = 800;
+    }
+
+    const scale = Math.min(1, maxW / sw, maxH / sh);
+    const dw = Math.max(320, Math.round(sw * scale));
+    const dh = Math.max(240, Math.round(sh * scale));
+    if (canvas.width !== dw) canvas.width = dw;
+    if (canvas.height !== dh) canvas.height = dh;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh);
+    return ctx.getImageData(0, 0, dw, dh);
+  },
+
+  scanOptionsForMode(mode, seq) {
+    const common = {
+      tryHarder: true,
+      tryRotate: true,
+      tryInvert: true,
+      maxNumberOfSymbols: 1,
+      textMode: "Escaped",
+      characterSet: "Unknown",
+      returnErrors: false
+    };
+    if (mode === "matrix") {
+      return {
+        ...common,
+        formats: ["DataMatrix", "QRCode", "Aztec", "PDF417"],
+        tryDenoise: true,
+        tryDownscale: false,
+        binarizer: seq % 4 === 0 ? "GlobalHistogram" : "LocalAverage"
+      };
+    }
+    if (mode === "linear") {
+      return {
+        ...common,
+        formats: ["AllLinear"],
+        tryDenoise: false,
+        tryDownscale: true,
+        minLineCount: 2,
+        binarizer: seq % 2 ? "GlobalHistogram" : "LocalAverage"
+      };
+    }
+    return {
+      ...common,
+      formats: ["DataMatrix", "QRCode", "Code128", "Code39", "Code93", "Codabar", "EAN13", "EAN8", "UPCA", "UPCE", "ITF", "Aztec", "PDF417"],
+      tryDenoise: true,
+      tryDownscale: true,
+      binarizer: "LocalAverage"
+    };
+  },
+
+  scheduleProductScanLoop(api, delay = 80) {
+    if (this._productScanLoopTimer) clearTimeout(this._productScanLoopTimer);
+    this._productScanLoopTimer = window.setTimeout(() => this.runProductScanLoop(api), delay);
+  },
+
+  async runProductScanLoop(api) {
+    if (!this._productScanRunning || !document.getElementById("productScanModal")?.classList.contains("show")) return;
+    if (this._productScanBusy) { this.scheduleProductScanLoop(api, 100); return; }
+    if (this._productScanDecodeInFlight) { this.scheduleProductScanLoop(api, 60); return; }
+
+    const modes = ["matrix", "linear", "matrix", "full"];
+    const mode = modes[this._productScanFrameSeq % modes.length];
+    const seq = this._productScanFrameSeq++;
+    const imageData = this.captureProductScanFrame(mode);
+    if (!imageData) { this.scheduleProductScanLoop(api, 100); return; }
+
+    this._productScanDecodeInFlight = true;
+    try {
+      const results = await api.readBarcodes(imageData, this.scanOptionsForMode(mode, seq));
+      const hit = Array.isArray(results)
+        ? results.find((item) => item && item.isValid !== false && String(item.text || "").trim())
+        : null;
+      if (hit) {
+        await this.handleScannedProductIdentifier(String(hit.text || "").trim(), hit.format || hit.symbology || "");
+      }
+    } catch (error) {
+      if (Date.now() - this._productScanStartedAt < 1500) console.debug?.("[Reagent Scan] frame decode", error);
+    } finally {
+      this._productScanDecodeInFlight = false;
+    }
+    if (this._productScanRunning) this.scheduleProductScanLoop(api, 70);
+  },
+
+  async buildNativeBarcodeDetector() {
+    if (!window.BarcodeDetector) return null;
+    try {
+      const supported = await window.BarcodeDetector.getSupportedFormats();
+      const wanted = ["qr_code", "data_matrix", "code_128", "code_39", "code_93", "codabar", "ean_8", "ean_13", "itf", "upc_a", "upc_e", "aztec", "pdf417"];
+      const formats = wanted.filter((format) => supported.includes(format));
+      if (!formats.length) return null;
+      return new window.BarcodeDetector({ formats });
+    } catch (_) { return null; }
+  },
+
+  async startNativeProductScanner() {
+    await this.openProductScanCamera();
+    this._productScanNativeDetector = await this.buildNativeBarcodeDetector();
+    if (!this._productScanNativeDetector) throw new Error("기본 바코드 인식기를 사용할 수 없습니다.");
+    const video = document.getElementById("productScanVideo");
+    this._productScanRunning = true;
+    this.setProductScanStatus("코드를 화면 중앙에 크게 맞춰주세요.");
+    const detectLoop = async () => {
+      if (!this._productScanRunning || this._productScanBusy || !this._productScanNativeDetector) {
+        if (this._productScanRunning) this._productScanNativeRaf = requestAnimationFrame(detectLoop);
+        return;
+      }
+      if (!this._productScanNativeDetecting && video?.readyState >= 2) {
+        this._productScanNativeDetecting = true;
+        try {
+          const codes = await this._productScanNativeDetector.detect(video);
+          const code = Array.isArray(codes) ? codes[0] : null;
+          if (code?.rawValue) await this.handleScannedProductIdentifier(code.rawValue, code.format || "");
+        } catch (_) {} finally { this._productScanNativeDetecting = false; }
+      }
+      if (this._productScanRunning) this._productScanNativeRaf = requestAnimationFrame(detectLoop);
+    };
+    this._productScanNativeRaf = requestAnimationFrame(detectLoop);
+  },
+
+  async startLegacyProductScanner() {
+    const ZX = await this.ensureLegacyZxingLoaded();
+    const video = document.getElementById("productScanVideo");
+    if (!video) throw new Error("카메라 화면을 찾을 수 없습니다.");
+    this._productScanReader = new ZX.BrowserMultiFormatReader(undefined, {
+      delayBetweenScanAttempts: 100,
+      delayBetweenScanSuccess: 500
+    });
+    const constraints = {
+      audio: false,
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }
+    };
+    video.hidden = false;
+    this._productScanControls = await this._productScanReader.decodeFromConstraints(constraints, video, (result) => {
+      if (!result || this._productScanBusy || !this._productScanRunning) return;
+      let format = "";
+      try { format = result.getBarcodeFormat?.(); } catch (_) {}
+      const value = result.getText?.() ?? String(result.text || "");
+      if (String(value || "").trim()) this.handleScannedProductIdentifier(value, format);
+    });
+    this._productScanStream = video.srcObject || null;
+    this._productScanTrack = this._productScanStream?.getVideoTracks?.()[0] || null;
+    await this.enhanceProductScanTrack(this._productScanTrack);
+    this.syncProductScanCameraTools();
+    this._productScanRunning = true;
+    this.setProductScanStatus("코드를 화면 중앙에 크게 맞춰주세요.");
+  },
+
+  stopProductScanner() {
+    this._productScanRunning = false;
+    if (this._productScanLoopTimer) clearTimeout(this._productScanLoopTimer);
+    if (this._productScanNoResultTimer) clearTimeout(this._productScanNoResultTimer);
+    this._productScanLoopTimer = 0;
+    this._productScanNoResultTimer = 0;
+    this._productScanDecodeInFlight = false;
+
+    try { this._productScanControls?.stop?.(); } catch (_) {}
+    this._productScanControls = null;
+    this._productScanReader = null;
+
+    if (this._productScanNativeRaf) cancelAnimationFrame(this._productScanNativeRaf);
+    this._productScanNativeRaf = 0;
+    this._productScanNativeDetector = null;
+    this._productScanNativeDetecting = false;
+
+    try { this._productScanStream?.getTracks?.().forEach((track) => track.stop()); } catch (_) {}
+    this._productScanStream = null;
+    this._productScanTrack = null;
+    this._productScanTorchOn = false;
+    this._productScanZoomValue = 1;
+
+    const video = document.getElementById("productScanVideo");
+    try { video?.srcObject?.getTracks?.().forEach((track) => track.stop()); } catch (_) {}
+    if (video) {
+      try { video.pause?.(); } catch (_) {}
+      video.srcObject = null;
+      video.hidden = true;
+    }
+    const canvas = document.getElementById("productScanCanvas");
+    if (canvas) {
+      try { canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height); } catch (_) {}
+      canvas.width = 1;
+      canvas.height = 1;
+    }
+    const torchBtn = document.getElementById("productScanTorch");
+    const zoomBtn = document.getElementById("productScanZoom");
+    if (torchBtn) { torchBtn.hidden = true; torchBtn.classList.remove("active"); }
+    if (zoomBtn) { zoomBtn.hidden = true; zoomBtn.textContent = "1×"; }
+  },
+
+  resetProductScanCameraUi() {
+    const retry = document.getElementById("productScanRetry");
+    if (retry) retry.hidden = true;
+    const video = document.getElementById("productScanVideo");
+    if (video) video.hidden = true;
+    const torchBtn = document.getElementById("productScanTorch");
+    const zoomBtn = document.getElementById("productScanZoom");
+    if (torchBtn) { torchBtn.hidden = true; torchBtn.classList.remove("active"); }
+    if (zoomBtn) { zoomBtn.hidden = true; zoomBtn.textContent = "1×"; }
+    this.setProductScanStatus("카메라와 인식 엔진을 준비하고 있습니다.");
+  },
+
   async openProductScanModal() {
     const modal = document.getElementById("productScanModal");
-    const video = document.getElementById("productScanVideo");
-    if (!modal || !video) return;
-
+    if (!modal) return;
     if (!navigator.mediaDevices?.getUserMedia) {
       window.ReagentApp.toast?.("이 브라우저에서는 카메라를 사용할 수 없습니다. 제품검색을 이용해 주세요.", "warn");
       return;
     }
 
-    if (!window.ZXingWASM?.readBarcodes && !("BarcodeDetector" in window)) {
-      window.ReagentApp.toast?.("QR/바코드 인식 모듈을 불러오지 못했습니다. 네트워크 확인 후 다시 시도하거나 제품검색을 이용해 주세요.", "warn");
-      return;
-    }
-
-    this.closeProductScanModal({ keepModal: true });
+    this.stopProductScanner();
     modal.classList.add("show");
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("product-scan-open");
     document.documentElement.classList.add("product-scan-open");
-    this.setProductScanStatus("카메라를 준비하는 중입니다.");
+    this.resetProductScanCameraUi();
+    this._productScanBusy = false;
+    this._productScanLastText = "";
+    this._productScanLastAt = 0;
+    this._productScanFrameSeq = 0;
+    this._productScanStartedAt = Date.now();
+    this.loadProductIdentifierRows().catch(() => {});
 
     try {
-      // 식별코드 캐시를 카메라 시작과 병렬로 미리 준비합니다.
-      this.loadProductIdentifierRows().catch(() => {});
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        }
-      });
-
-      this._productScanStream = stream;
-      video.srcObject = stream;
-      video.setAttribute("playsinline", "");
-      video.muted = true;
-      await video.play();
-
+      const [api] = await Promise.all([this.ensureZXingWasmLoaded(), this.openProductScanCamera()]);
       this._productScanRunning = true;
-      this._productScanBusy = false;
-      this._productScanLastText = "";
-      this._productScanLastAt = 0;
-      this.setProductScanStatus("QR/바코드를 화면 중앙에 맞춰 주세요.");
-      this.scheduleProductScanFrame(250);
-    } catch (error) {
-      console.warn("제품 QR/바코드 카메라 실행 실패:", error);
-      this.setProductScanStatus("카메라를 열 수 없습니다. 카메라 권한을 확인해 주세요.", "warn");
-      window.ReagentApp.toast?.("카메라 권한을 확인하거나 제품검색을 이용해 주세요.", "warn");
-    }
-  },
-
-  closeProductScanModal(options = {}) {
-    this._productScanRunning = false;
-    this._productScanBusy = false;
-    if (this._productScanTimer) {
-      clearTimeout(this._productScanTimer);
-      this._productScanTimer = null;
-    }
-
-    if (this._productScanStream) {
-      try { this._productScanStream.getTracks().forEach((track) => track.stop()); } catch (_) {}
-      this._productScanStream = null;
-    }
-
-    const video = document.getElementById("productScanVideo");
-    if (video) {
-      try { video.pause(); } catch (_) {}
-      video.srcObject = null;
-    }
-
-    if (options.keepModal !== true) {
-      const modal = document.getElementById("productScanModal");
-      modal?.classList.remove("show");
-      modal?.setAttribute("aria-hidden", "true");
-      document.body.classList.remove("product-scan-open");
-      document.documentElement.classList.remove("product-scan-open");
-    }
-  },
-
-  scheduleProductScanFrame(delay = 360) {
-    if (!this._productScanRunning) return;
-    if (this._productScanTimer) clearTimeout(this._productScanTimer);
-    this._productScanTimer = window.setTimeout(() => this.scanProductCameraFrame(), delay);
-  },
-
-  async decodeProductScanImage(imageData) {
-    if (window.ZXingWASM?.readBarcodes) {
-      const results = await window.ZXingWASM.readBarcodes(imageData, {
-        tryHarder: true,
-        maxNumberOfSymbols: 1
-      });
-      const first = Array.isArray(results) ? results.find((item) => item?.text) : null;
-      if (first?.text) return String(first.text);
-    }
-
-    if ("BarcodeDetector" in window) {
-      try {
-        if (!this._nativeBarcodeDetector) {
-          this._nativeBarcodeDetector = new window.BarcodeDetector();
+      this.setProductScanStatus("인식 중 · 코드를 흰 모서리 안에 크게 맞춰주세요.");
+      this._productScanNoResultTimer = window.setTimeout(() => {
+        if (this._productScanRunning && !this._productScanBusy) {
+          this.setProductScanStatus("코드가 작으면 더 가까이 가져오고, 반사가 있으면 병을 살짝 기울여 주세요.");
         }
-        const canvas = document.getElementById("productScanCanvas");
-        const results = await this._nativeBarcodeDetector.detect(canvas);
-        const first = Array.isArray(results) ? results.find((item) => item?.rawValue) : null;
-        if (first?.rawValue) return String(first.rawValue);
-      } catch (_) {}
+      }, 5500);
+      this.scheduleProductScanLoop(api, 20);
+      return;
+    } catch (error) {
+      console.warn("[Reagent Scan] ZXing-WASM start failed; legacy fallback", error);
+      this.stopProductScanner();
+      this.resetProductScanCameraUi();
     }
 
-    return "";
+    try {
+      this._productScanRunning = true;
+      await this.startLegacyProductScanner();
+      return;
+    } catch (error) {
+      console.warn("[Reagent Scan] legacy ZXing failed; native fallback", error);
+      this.stopProductScanner();
+      this.resetProductScanCameraUi();
+    }
+
+    try {
+      this._productScanRunning = true;
+      await this.startNativeProductScanner();
+    } catch (error) {
+      console.warn("[Reagent Scan] camera start failed", error);
+      this.stopProductScanner();
+      const name = String(error?.name || "");
+      const message = /NotAllowed|Permission/i.test(name)
+        ? "카메라 권한이 필요합니다. 브라우저의 카메라 권한을 허용한 뒤 다시 시도해 주세요."
+        : `카메라/인식 엔진 실행 실패: ${error?.message || "브라우저 상태를 확인해 주세요."}`;
+      this.setProductScanStatus(message, "warn");
+      const retry = document.getElementById("productScanRetry");
+      if (retry) retry.hidden = false;
+    }
   },
 
-  async scanProductCameraFrame() {
-    if (!this._productScanRunning || this._productScanBusy) {
-      this.scheduleProductScanFrame();
-      return;
-    }
+  closeProductScanModal() {
+    this.stopProductScanner();
+    this._productScanBusy = false;
+    const modal = document.getElementById("productScanModal");
+    modal?.classList.remove("show");
+    modal?.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("product-scan-open");
+    document.documentElement.classList.remove("product-scan-open");
+  },
 
-    const video = document.getElementById("productScanVideo");
-    const canvas = document.getElementById("productScanCanvas");
-    if (!video || !canvas || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
-      this.scheduleProductScanFrame(250);
-      return;
-    }
+  async handleScannedProductIdentifier(rawValue = "", format = "") {
+    if (this._productScanBusy) return;
+    const normalized = this.normalizeScannedIdentifier(rawValue);
+    if (!normalized) return;
+    const now = Date.now();
+    if (normalized === this._productScanLastText && now - this._productScanLastAt < 1800) return;
+    this._productScanLastText = normalized;
+    this._productScanLastAt = now;
 
     this._productScanBusy = true;
+    this.setProductScanStatus("제품 정보를 확인하는 중입니다.");
+    try { navigator.vibrate?.(70); } catch (_) {}
     try {
-      const maxWidth = 1280;
-      const scale = Math.min(1, maxWidth / video.videoWidth);
-      canvas.width = Math.max(320, Math.round(video.videoWidth * scale));
-      canvas.height = Math.max(240, Math.round(video.videoHeight * scale));
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const text = await this.decodeProductScanImage(imageData);
+      const scan = this.buildProductScanResult(rawValue, format);
+      const result = await this.findProductFromScannedIdentifier(scan);
 
-      if (text) {
-        const now = Date.now();
-        const normalized = this.normalizeScannedIdentifier(text);
-        if (normalized && (normalized !== this._productScanLastText || now - this._productScanLastAt > 1800)) {
-          this._productScanLastText = normalized;
-          this._productScanLastAt = now;
-          await this.handleScannedProductIdentifier(text);
-          if (!this._productScanRunning) return;
-        }
+      if (result.status === "found" && result.product) {
+        this.closeProductScanModal();
+        this.selectProduct(result.product, {
+          closeSearch: false,
+          message: "QR/바코드로 제품을 찾았습니다. 수량과 용도를 입력해 주세요."
+        });
+        try { navigator.vibrate?.([60, 40, 60]); } catch (_) {}
+        setTimeout(() => window.ReagentApp.els?.qty?.focus?.({ preventScroll: true }), 120);
+        return;
+      }
+
+      if (result.status === "ambiguous") {
+        this.setProductScanStatus("같은 코드가 여러 제품에 연결되어 있습니다. 제품검색을 이용해 주세요.", "warn");
+        window.ReagentApp.toast?.("같은 QR/바코드가 여러 제품에 연결되어 있습니다.", "warn");
+      } else if (result.status === "inactive_or_missing") {
+        this.setProductScanStatus("연결된 제품이 사용중지되었거나 제품마스터에서 확인되지 않습니다.", "warn");
+      } else {
+        this.setProductScanStatus("등록된 QR/바코드를 찾지 못했습니다. 다른 코드를 비추거나 제품검색을 이용해 주세요.", "warn");
       }
     } catch (error) {
-      console.warn("제품 QR/바코드 프레임 인식 실패:", error);
+      console.error("[Reagent Scan] lookup failed", error);
+      this.setProductScanStatus(`조회 실패: ${error?.message || "알 수 없는 오류"}`, "warn");
     } finally {
-      this._productScanBusy = false;
+      if (this._productScanRunning) this._productScanBusy = false;
     }
-
-    this.scheduleProductScanFrame();
-  },
-
-  async handleScannedProductIdentifier(rawValue = "") {
-    this.setProductScanStatus("제품 정보를 확인하는 중입니다.");
-    const result = await this.findProductFromScannedIdentifier(rawValue);
-
-    if (result.status === "found" && result.product) {
-      this.closeProductScanModal();
-      this.selectProduct(result.product, {
-        closeSearch: false,
-        message: "QR/바코드로 제품을 찾았습니다. 수량과 용도를 입력해 주세요."
-      });
-      setTimeout(() => window.ReagentApp.els?.qty?.focus?.({ preventScroll: true }), 120);
-      return;
-    }
-
-    if (result.status === "ambiguous") {
-      this.setProductScanStatus("같은 코드가 여러 제품에 연결되어 있습니다. 제품검색을 이용해 주세요.", "warn");
-      window.ReagentApp.toast?.("같은 QR/바코드가 여러 제품에 연결되어 있습니다.", "warn");
-      return;
-    }
-
-    if (result.status === "inactive_or_missing") {
-      this.setProductScanStatus("연결된 제품이 사용중지되었거나 제품마스터에서 확인되지 않습니다.", "warn");
-      return;
-    }
-
-    this.setProductScanStatus("등록된 QR/바코드를 찾지 못했습니다. 다른 코드를 비추거나 제품검색을 이용해 주세요.", "warn");
   },
 
   bindProductScanEvents() {
     const open = document.getElementById("openProductScan");
     const close = document.getElementById("closeProductScan");
+    const retry = document.getElementById("productScanRetry");
+    const torch = document.getElementById("productScanTorch");
+    const zoom = document.getElementById("productScanZoom");
     const modal = document.getElementById("productScanModal");
 
     if (open && open.dataset.scanBound !== "1") {
@@ -734,6 +1211,18 @@ window.ReagentApp.request = {
     if (close && close.dataset.scanBound !== "1") {
       close.dataset.scanBound = "1";
       close.addEventListener("click", () => this.closeProductScanModal());
+    }
+    if (retry && retry.dataset.scanBound !== "1") {
+      retry.dataset.scanBound = "1";
+      retry.addEventListener("click", () => this.openProductScanModal());
+    }
+    if (torch && torch.dataset.scanBound !== "1") {
+      torch.dataset.scanBound = "1";
+      torch.addEventListener("click", () => this.toggleProductScanTorch());
+    }
+    if (zoom && zoom.dataset.scanBound !== "1") {
+      zoom.dataset.scanBound = "1";
+      zoom.addEventListener("click", () => this.cycleProductScanZoom());
     }
     if (modal && modal.dataset.scanBound !== "1") {
       modal.dataset.scanBound = "1";
