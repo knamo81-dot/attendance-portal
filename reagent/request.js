@@ -393,13 +393,21 @@ window.ReagentApp.request = {
     document.documentElement.classList.add("search-modal-open");
     els.searchModal.classList.add("show");
 
-    // 제품관리에서 CAS가 변경된 경우 제품검색을 열 때 항상 최신 product_cas를 다시 읽습니다.
-    await this.loadProductMaster(true);
-    await this.populateMakerOptions();
-    this.renderSearchResults();
+    // DB 새로고침 완료를 기다리지 않고 검색창부터 즉시 활성화합니다.
+    // 기존 캐시가 있으면 먼저 보여주고, 최신 product_cas는 뒤에서 다시 갱신합니다.
     setTimeout(() => {
       els.searchInput?.focus?.({ preventScroll: true });
     }, 0);
+
+    if (this.productMasterRows.length) {
+      this.populateMakerOptions().catch((error) => console.warn("검색 제조사 캐시 표시 실패:", error));
+      this.renderSearchResults();
+    }
+
+    // 제품관리에서 CAS가 변경된 경우 최신 product_cas를 다시 읽습니다.
+    await this.loadProductMaster(true);
+    await this.populateMakerOptions();
+    this.renderSearchResults();
   },
 
   closeSearchModal(options = {}) {
@@ -432,13 +440,18 @@ window.ReagentApp.request = {
     const rows = await this.loadProductMaster();
     if (searchSeq !== this._searchRenderSeq) return;
 
-    const results = this.filterProductMasterRows(rows);
+    const allResults = this.filterProductMasterRows(rows);
+    const isDedicatedMobile = document.body?.classList.contains("reagent-mobile-ui") === true;
+    const mobileResultLimit = 100;
+    const results = isDedicatedMobile ? allResults.slice(0, mobileResultLimit) : allResults;
 
     if (els.resultInfo) {
-      els.resultInfo.textContent = `검색 결과 ${results.length}건`;
+      els.resultInfo.textContent = isDedicatedMobile && allResults.length > results.length
+        ? `검색 결과 ${allResults.length}건 · ${results.length}건 표시`
+        : `검색 결과 ${allResults.length}건`;
     }
 
-    if (!results.length) {
+    if (!allResults.length) {
       els.searchResults.innerHTML = `
         <div class="empty">
           검색 결과가 없습니다.<br/>
@@ -2078,7 +2091,12 @@ window.ReagentApp.request = {
       return;
     }
 
-    els.draftTableBody.innerHTML = groups.map((group) => {
+    const isDedicatedMobileList = document.body?.classList.contains("reagent-mobile-ui") === true;
+    if (isDedicatedMobileList) {
+      // 전용 모바일에서는 화면에 보이지 않는 PC 신청 테이블 DOM을 만들지 않습니다.
+      els.draftTableBody.innerHTML = "";
+    } else {
+      els.draftTableBody.innerHTML = groups.map((group) => {
       const isCompletedOnly = group.collectedQty > 0 && group.newQty === 0;
       const isAdditional = group.collectedQty > 0 && group.newQty > 0;
       const isVendorConfirmed = group.isConfirmed === true;
@@ -2192,6 +2210,7 @@ window.ReagentApp.request = {
         </tr>
       `;
     }).join("");
+    }
 
     this.renderMobileRequestCards(groups);
 
