@@ -595,6 +595,14 @@
       const els = this.getEls();
       if (!els.mobileCards) return;
 
+      // 날짜 저장/Realtime 새로고침으로 카드 DOM이 다시 만들어져도
+      // 사용자가 펼쳐 둔 모바일 카드 상태는 유지합니다.
+      const openMobileCardKeys = new Set(
+        Array.from(els.mobileCards.querySelectorAll(".order-receipt-mobile-card.open"))
+          .map((card) => String(card.dataset.recordKey || ""))
+          .filter(Boolean)
+      );
+
       if (!rows.length) {
         els.mobileCards.innerHTML = `<div class="order-receipt-mobile-empty">표시할 발주/입고 관리 품목이 없습니다.</div>`;
         return;
@@ -649,6 +657,15 @@
       }).join("");
 
       this.bindMobileCardEvents();
+
+      if (openMobileCardKeys.size) {
+        els.mobileCards.querySelectorAll(".order-receipt-mobile-card").forEach((card) => {
+          const key = String(card.dataset.recordKey || "");
+          if (!openMobileCardKeys.has(key)) return;
+          card.classList.add("open");
+          card.querySelector(".order-receipt-mobile-main")?.setAttribute("aria-expanded", "true");
+        });
+      }
     },
 
     render() {
@@ -723,17 +740,25 @@
     bindDateInput(recordKey, input) {
       if (!recordKey || !input || input.dataset.orderReceiptBound === "1") return;
       input.dataset.orderReceiptBound = "1";
+      input.dataset.orderReceiptCommittedValue = String(input.value || "").trim();
 
-      // 모바일 브라우저의 <input type="date">는 탭 자체로 네이티브 달력을 엽니다.
-      // focus/click 시 showPicker()를 중복 호출하면 일부 Android 브라우저에서
-      // 달력이 즉시 닫히며 오늘 날짜가 change로 확정되는 문제가 생길 수 있습니다.
-      // 달력 열기는 브라우저 기본 동작에 맡기고, 실제 값이 바뀐 경우에만 저장합니다.
-      input.addEventListener("click", (e) => {
-        e.stopPropagation();
+      // 모바일의 type=date는 사용자 탭만으로 네이티브 달력을 엽니다.
+      // showPicker()를 focus/click에서 강제 호출하지 않습니다.
+      // 기본 동작은 그대로 두고 카드/행의 상위 이벤트로만 전파되지 않게 합니다.
+      ["pointerdown", "touchstart", "click", "focus"].forEach((eventName) => {
+        input.addEventListener(eventName, (e) => e.stopPropagation(), eventName === "touchstart" ? { passive: true } : undefined);
       });
+
       input.addEventListener("change", async (e) => {
         e.stopPropagation();
+
         const nextValue = String(input.value || "").trim();
+        const committedValue = String(input.dataset.orderReceiptCommittedValue || "").trim();
+
+        // 달력을 열고 닫기만 했거나 동일 날짜를 다시 선택한 경우에는 저장/재렌더하지 않습니다.
+        if (nextValue === committedValue) return;
+
+        input.dataset.orderReceiptCommittedValue = nextValue;
         await this.setDate(recordKey, input.dataset.field, nextValue);
       });
     },
