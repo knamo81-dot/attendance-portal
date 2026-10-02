@@ -420,3 +420,35 @@
   cursor: not-allowed;
 }
 
+
+
+.event-add-head {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #334155;
+}
+
+.event-permission-note {
+  margin-top: 7px;
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+.event-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.pat-btn.small {
+  min-height: 28px;
+  padding: 5px 9px;
+  font-size: 10.5px;
+}
+
+.pat-btn.danger {
+  background: #fff;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
