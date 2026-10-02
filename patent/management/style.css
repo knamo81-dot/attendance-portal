@@ -98,3 +98,285 @@
   white-space:nowrap;
 }
 
+
+
+/* 회사특허 조회 - 회사 관리자 전용 */
+.company-search-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
+
+.company-search-query{
+  display:grid;
+  grid-template-columns:minmax(280px,520px) auto;
+  align-items:end;
+  gap:8px;
+  padding:12px;
+  border:1px solid #e2e8f0;
+  border-radius:14px;
+  background:#fff;
+}
+
+.company-search-name label{
+  display:block;
+  margin-bottom:5px;
+  color:#475569;
+  font-size:10.5px;
+  font-weight:900;
+}
+
+.company-search-note{
+  margin:8px 0 10px;
+}
+
+.company-search-summary-note{
+  margin:10px 0 7px;
+  color:#64748b;
+  font-size:10.5px;
+}
+
+.company-search-kpis{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:8px;
+  margin-bottom:10px;
+}
+
+.company-search-kpis .pat-kpi{
+  min-height:76px;
+}
+
+.company-search-filters{
+  display:grid;
+  grid-template-columns:minmax(260px,1fr) 150px 150px;
+  gap:7px;
+  margin-bottom:8px;
+}
+
+.company-patent-table{
+  min-width:1460px;
+}
+
+.company-patent-table th:nth-child(1){
+  width:52px;
+}
+
+.company-patent-table th:nth-child(2){
+  width:78px;
+}
+
+.company-patent-table th:nth-child(3){
+  width:118px;
+}
+
+.company-patent-table th:nth-child(4){
+  min-width:330px;
+}
+
+.company-patent-table th:nth-child(5),
+.company-patent-table th:nth-child(6){
+  width:72px;
+}
+
+.company-patent-table th:nth-child(7),
+.company-patent-table th:nth-child(8),
+.company-patent-table th:nth-child(9){
+  width:104px;
+}
+
+.company-patent-table th:nth-child(10){
+  min-width:220px;
+}
+
+.company-patent-table th:nth-child(11),
+.company-patent-table th:nth-child(12){
+  width:94px;
+}
+
+.company-title-cell{
+  min-width:0;
+}
+
+.company-title-main{
+  overflow:hidden;
+  font-weight:900;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.company-title-sub{
+  margin-top:3px;
+  color:#94a3b8;
+  font-size:9.5px;
+}
+
+.company-owner-cell{
+  line-height:1.35;
+}
+
+.company-status-badge,
+.company-ownership-badge,
+.company-portal-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:24px;
+  padding:3px 8px;
+  border:1px solid transparent;
+  border-radius:999px;
+  font-size:9.5px;
+  font-weight:900;
+  white-space:nowrap;
+}
+
+.company-status-badge.registered{
+  border-color:#bbf7d0;
+  background:#f0fdf4;
+  color:#15803d;
+}
+
+.company-status-badge.pending,
+.company-status-badge.examining{
+  border-color:#bfdbfe;
+  background:#eff6ff;
+  color:#1d4ed8;
+}
+
+.company-status-badge.expired,
+.company-status-badge.rejected,
+.company-status-badge.abandoned{
+  border-color:#e2e8f0;
+  background:#f8fafc;
+  color:#64748b;
+}
+
+.company-status-badge.neutral{
+  border-color:#e2e8f0;
+  background:#fff;
+  color:#475569;
+}
+
+.company-ownership-badge.owned{
+  border-color:#fde68a;
+  background:#fffbeb;
+  color:#92400e;
+}
+
+.company-ownership-badge.joint{
+  border-color:#bfdbfe;
+  background:#eff6ff;
+  color:#1d4ed8;
+}
+
+.company-ownership-badge.transferred{
+  border-color:#cbd5e1;
+  background:#f1f5f9;
+  color:#475569;
+}
+
+.company-ownership-badge.pending{
+  border-color:#bbf7d0;
+  background:#f0fdf4;
+  color:#15803d;
+}
+
+.company-ownership-badge.expired,
+.company-ownership-badge.rejected,
+.company-ownership-badge.abandoned{
+  border-color:#e2e8f0;
+  background:#f8fafc;
+  color:#64748b;
+}
+
+.company-ownership-badge.review{
+  border-color:#fed7aa;
+  background:#fff7ed;
+  color:#c2410c;
+}
+
+.company-portal-badge.registered{
+  border-color:#bbf7d0;
+  background:#f0fdf4;
+  color:#15803d;
+}
+
+.company-portal-badge.missing{
+  border-color:#fecaca;
+  background:#fef2f2;
+  color:#b91c1c;
+}
+
+.company-transferred-row{
+  background:#f8fafc;
+}
+
+.company-transferred-row td{
+  color:#64748b;
+}
+
+.company-search-pagination{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  margin:10px 0 2px;
+  color:#64748b;
+  font-size:10.5px;
+  font-weight:800;
+}
+
+.company-search-warnings{
+  margin-top:10px;
+  padding:8px 10px;
+  border:1px solid #fed7aa;
+  border-radius:10px;
+  background:#fff7ed;
+  color:#9a3412;
+  font-size:9.5px;
+}
+
+.company-search-warnings summary{
+  cursor:pointer;
+  font-weight:900;
+}
+
+.company-search-loading{
+  min-height:140px;
+}
+
+.company-search-loading-note{
+  margin-top:10px;
+  text-align:center;
+}
+
+.company-search-empty-card{
+  margin-top:10px;
+}
+
+@media(max-width:1100px){
+  .company-search-kpis{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+
+  .company-search-filters{
+    grid-template-columns:minmax(220px,1fr) 140px 140px;
+  }
+}
+
+@media(max-width:768px){
+  .company-search-query,
+  .company-search-filters{
+    grid-template-columns:1fr;
+  }
+
+  .company-search-kpis{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .company-search-query .pat-btn{
+    width:100%;
+  }
+}
