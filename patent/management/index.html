@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>특허관리</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main class="pat-app">
+  <div class="pat-toolbar">
+    <div><div class="pat-title">특허관리</div><div class="pat-subtitle">납부, 기한, 특허 운영 설정을 관리합니다.</div></div>
+    <div class="pat-toolbar-right"><button id="refreshBtn" class="pat-btn">↻ 새로고침</button></div>
+  </div>
+  <div class="pat-section-tabs">
+    <button class="pat-section-btn active" data-section="payments">납부관리</button>
+    <button class="pat-section-btn" data-section="deadlines">기한관리</button>
+    <button class="pat-section-btn" data-section="settings">설정</button>
+  </div>
+  <section id="sectionPayments"></section>
+  <section id="sectionDeadlines" class="hidden"></section>
+  <section id="sectionSettings" class="hidden"></section>
+</main>
+
+<div id="paymentModal" class="pat-modal-backdrop"><div class="pat-modal"><div class="pat-modal-head"><div><div id="paymentModalTitle" class="pat-modal-title">납부 등록</div><div class="pat-modal-desc">1년 납부와 다년 선납, 직접납부와 특허사무소 대행을 모두 지원합니다.</div></div><button class="pat-close" data-modal-close="paymentModal">×</button></div><div class="pat-modal-body"><div class="pat-form-grid">
+<div class="pat-field span-2"><label class="pat-required">특허</label><select id="pay_patent_id" class="pat-select"></select></div><div class="pat-field"><label class="pat-required">납부구분</label><select id="pay_payment_type" class="pat-select"><option value="ANNUAL_FEE">연차료</option><option value="REGISTRATION_FEE">등록료</option><option value="APPLICATION_FEE">출원비</option><option value="EXAMINATION_FEE">심사청구비</option><option value="AGENCY_INVOICE">특허사무소 청구</option><option value="OTHER">기타</option></select></div>
+<div class="pat-field"><label>시작 연차</label><input id="pay_annual_year_from" class="pat-input" type="number" min="1" /></div><div class="pat-field"><label>종료 연차</label><input id="pay_annual_year_to" class="pat-input" type="number" min="1" /></div><div class="pat-field"><label>표시 제목</label><input id="pay_payment_title" class="pat-input" placeholder="예: 5~7년차 연차료" /></div>
+<div class="pat-field"><label class="pat-required">납부방식</label><select id="pay_payment_method" class="pat-select"><option value="DIRECT">직접납부</option><option value="AGENCY">특허사무소 대행</option></select></div><div class="pat-field"><label>특허사무소</label><select id="pay_agency_id" class="pat-select"><option value="">선택</option></select></div><div class="pat-field"><label>상태</label><select id="pay_status" class="pat-select"><option value="PLANNED">납부예정</option><option value="INVOICE_RECEIVED">청구서 수령</option><option value="PAYMENT_REQUESTED">지급요청</option><option value="APPROVING">결재중</option><option value="PAID">지급완료</option><option value="OVERDUE">기한초과</option><option value="CANCELLED">취소</option></select></div>
+<div class="pat-field"><label>공식 납부기한</label><input id="pay_official_due_date" type="date" class="pat-input" /></div><div class="pat-field"><label>추가납부 최종기한</label><input id="pay_additional_due_date" type="date" class="pat-input" /></div><div class="pat-field"><label>청구서 수령일</label><input id="pay_invoice_received_date" type="date" class="pat-input" /></div><div class="pat-field"><label>사무소 지급기한</label><input id="pay_invoice_due_date" type="date" class="pat-input" /></div><div class="pat-field"><label>지급요청일</label><input id="pay_payment_request_date" type="date" class="pat-input" /></div><div class="pat-field"><label>지급예정일</label><input id="pay_planned_payment_date" type="date" class="pat-input" /></div><div class="pat-field"><label>실제 지급일</label><input id="pay_paid_date" type="date" class="pat-input" /></div><div class="pat-field"><label>관납 완료일</label><input id="pay_official_paid_date" type="date" class="pat-input" /></div><div class="pat-field"><label>통화</label><input id="pay_currency" class="pat-input" value="KRW" maxlength="3" /></div>
+<div class="pat-field"><label>관납료</label><input id="pay_official_fee" class="pat-input money-field" type="number" min="0" step="1" /></div><div class="pat-field"><label>대행수수료</label><input id="pay_agency_fee" class="pat-input money-field" type="number" min="0" step="1" /></div><div class="pat-field"><label>부가세</label><input id="pay_vat_amount" class="pat-input money-field" type="number" min="0" step="1" /></div><div class="pat-field"><label>기타비용</label><input id="pay_other_fee" class="pat-input money-field" type="number" min="0" step="1" /></div><div class="pat-field"><label>청구금액</label><input id="pay_billed_amount" class="pat-input" type="number" min="0" step="1" /></div><div class="pat-field"><label>실제 지급금액</label><input id="pay_paid_amount" class="pat-input" type="number" min="0" step="1" /></div>
+<div class="pat-field span-3"><label>비고</label><textarea id="pay_note" class="pat-textarea"></textarea></div>
+</div></div><div class="pat-modal-actions"><button class="pat-btn" data-modal-close="paymentModal">취소</button><button id="savePaymentBtn" class="pat-btn primary">저장</button></div></div></div>
+
+<div id="deadlineModal" class="pat-modal-backdrop"><div class="pat-modal"><div class="pat-modal-head"><div><div id="deadlineModalTitle" class="pat-modal-title">기한 등록</div><div class="pat-modal-desc">법정·업무 기한을 등록하고 D-Day로 관리합니다.</div></div><button class="pat-close" data-modal-close="deadlineModal">×</button></div><div class="pat-modal-body"><div class="pat-form-grid">
+<div class="pat-field span-2"><label class="pat-required">특허</label><select id="dead_patent_id" class="pat-select"></select></div><div class="pat-field"><label class="pat-required">구분</label><select id="dead_deadline_type" class="pat-select"><option value="ANNUAL_FEE">연차료</option><option value="REGISTRATION_FEE">등록료</option><option value="EXAMINATION_REQUEST">심사청구</option><option value="OFFICE_ACTION_RESPONSE">의견서 제출</option><option value="AMENDMENT">보정서 제출</option><option value="FOREIGN_FILING">해외출원</option><option value="PRIORITY">우선권</option><option value="EXPIRATION">존속기간 만료</option><option value="OTHER">기타</option></select></div>
+<div class="pat-field span-2"><label class="pat-required">기한명</label><input id="dead_title" class="pat-input" /></div><div class="pat-field"><label>기준일</label><input id="dead_base_date" type="date" class="pat-input" /></div><div class="pat-field"><label class="pat-required">기한일</label><input id="dead_due_date" type="date" class="pat-input" /></div><div class="pat-field"><label>추가기한</label><input id="dead_additional_due_date" type="date" class="pat-input" /></div><div class="pat-field"><label>상태</label><select id="dead_status" class="pat-select"><option value="OPEN">진행중</option><option value="COMPLETED">완료</option><option value="WAIVED">면제</option><option value="CANCELLED">취소</option></select></div><div class="pat-field"><label>완료일</label><input id="dead_completed_date" type="date" class="pat-input" /></div><div class="pat-field"><label>알림 기준(일)</label><input id="dead_alert_days_before" class="pat-input" value="90,30,7" /></div><div class="pat-field span-3"><label>비고</label><textarea id="dead_note" class="pat-textarea"></textarea></div>
+</div></div><div class="pat-modal-actions"><button class="pat-btn" data-modal-close="deadlineModal">취소</button><button id="saveDeadlineBtn" class="pat-btn primary">저장</button></div></div></div>
+
+<div id="agencyModal" class="pat-modal-backdrop"><div class="pat-modal sm"><div class="pat-modal-head"><div><div id="agencyModalTitle" class="pat-modal-title">특허사무소 등록</div></div><button class="pat-close" data-modal-close="agencyModal">×</button></div><div class="pat-modal-body"><div class="pat-form-grid"><div class="pat-field span-3"><label class="pat-required">사무소명</label><input id="agency_name" class="pat-input"></div><div class="pat-field"><label>담당자</label><input id="agency_contact_name" class="pat-input"></div><div class="pat-field"><label>전화</label><input id="agency_phone" class="pat-input"></div><div class="pat-field"><label>이메일</label><input id="agency_email" class="pat-input"></div><div class="pat-field span-3"><label>주소</label><input id="agency_address" class="pat-input"></div><div class="pat-field span-3"><label>메모</label><textarea id="agency_memo" class="pat-textarea"></textarea></div></div></div><div class="pat-modal-actions"><button class="pat-btn" data-modal-close="agencyModal">취소</button><button id="saveAgencyBtn" class="pat-btn primary">저장</button></div></div></div>
+
+<script src="../shared/patent-common.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
