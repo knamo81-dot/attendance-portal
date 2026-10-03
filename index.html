@@ -3179,16 +3179,34 @@ body.auth-loading .top-user-bar {
       desc: '지식재산권과 납부·기한을 통합 관리합니다.',
       gradient: 'linear-gradient(135deg, #805810 0%, #956817 48%, #b7831f 100%)'
     },
+    'patent/Mobile/dashboard/index.html': {
+      top: 'Intellectual Property Management',
+      title: '특허 관리',
+      desc: '특허 현황과 주요 납부·기한 정보를 모바일에서 확인합니다.',
+      gradient: 'linear-gradient(135deg, #805810 0%, #956817 48%, #b7831f 100%)'
+    },
     'patent/list/index.html': {
       top: 'Intellectual Property Management',
       title: '특허 관리',
       desc: '지식재산권과 납부·기한을 통합 관리합니다.',
       gradient: 'linear-gradient(135deg, #805810 0%, #956817 48%, #b7831f 100%)'
     },
+    'patent/Mobile/list/index.html': {
+      top: 'Intellectual Property Management',
+      title: '특허 관리',
+      desc: '등록된 특허를 모바일 카드형 목록으로 확인하고 관리합니다.',
+      gradient: 'linear-gradient(135deg, #805810 0%, #956817 48%, #b7831f 100%)'
+    },
     'patent/management/index.html': {
       top: 'Intellectual Property Management',
       title: '특허 관리',
       desc: '지식재산권과 납부·기한을 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #805810 0%, #956817 48%, #b7831f 100%)'
+    },
+    'patent/Mobile/management/index.html': {
+      top: 'Intellectual Property Management',
+      title: '특허 관리',
+      desc: '납부·기한·회사특허 조회를 모바일에서 관리합니다.',
       gradient: 'linear-gradient(135deg, #805810 0%, #956817 48%, #b7831f 100%)'
     },
     'aic/index.html': {
@@ -3355,12 +3373,27 @@ body.auth-loading .top-user-bar {
       { id: 'patent-list', label: '특허목록' },
       { id: 'patent-management', label: '특허관리' }
     ],
+    'patent/Mobile/dashboard/index.html': [
+      { id: 'patent-dashboard', label: '특허현황' },
+      { id: 'patent-list', label: '특허목록' },
+      { id: 'patent-management', label: '특허관리' }
+    ],
     'patent/list/index.html': [
       { id: 'patent-dashboard', label: '특허현황' },
       { id: 'patent-list', label: '특허목록' },
       { id: 'patent-management', label: '특허관리' }
     ],
+    'patent/Mobile/list/index.html': [
+      { id: 'patent-dashboard', label: '특허현황' },
+      { id: 'patent-list', label: '특허목록' },
+      { id: 'patent-management', label: '특허관리' }
+    ],
     'patent/management/index.html': [
+      { id: 'patent-dashboard', label: '특허현황' },
+      { id: 'patent-list', label: '특허목록' },
+      { id: 'patent-management', label: '특허관리' }
+    ],
+    'patent/Mobile/management/index.html': [
       { id: 'patent-dashboard', label: '특허현황' },
       { id: 'patent-list', label: '특허목록' },
       { id: 'patent-management', label: '특허관리' }
@@ -3656,17 +3689,18 @@ body.auth-loading .top-user-bar {
 
       if (tabId === 'patent-management' && !canOperate) {
         setPortalSubtabActive('patent-dashboard', false);
-        if (currentSrc !== PATENT_DASHBOARD_SRC) {
-          try { sessionStorage.setItem(LAST_PAGE_KEY, PATENT_DASHBOARD_SRC); } catch (_) {}
-          replacePortalFrame(buildSrcWithSession(PATENT_DASHBOARD_SRC));
+        const patentDashboardTarget = getPatentDashboardSrc();
+        if (!isPatentDashboardSrc(currentSrc)) {
+          try { sessionStorage.setItem(LAST_PAGE_KEY, PATENT_DASHBOARD_DESKTOP_SRC); } catch (_) {}
+          replacePortalFrame(buildSrcWithSession(patentDashboardTarget));
         }
         return;
       }
 
       const targetMap = {
-        'patent-dashboard': PATENT_DASHBOARD_SRC,
-        'patent-list': PATENT_LIST_SRC,
-        'patent-management': PATENT_MANAGEMENT_SRC
+        'patent-dashboard': getPatentDashboardSrc(),
+        'patent-list': getPatentListSrc(),
+        'patent-management': getPatentManagementSrc()
       };
       const target = targetMap[tabId] || '';
       if (target && currentSrc !== target) {
@@ -3944,16 +3978,46 @@ body.auth-loading .top-user-bar {
     return key === TRAVEL_EXPENSE_DESKTOP_SRC || key === TRAVEL_EXPENSE_MOBILE_SRC;
   }
 
-  const PATENT_DASHBOARD_SRC = 'patent/dashboard/index.html';
-  const PATENT_LIST_SRC = 'patent/list/index.html';
-  const PATENT_MANAGEMENT_SRC = 'patent/management/index.html';
+  const PATENT_DASHBOARD_DESKTOP_SRC = 'patent/dashboard/index.html';
+  const PATENT_DASHBOARD_MOBILE_SRC = 'patent/Mobile/dashboard/index.html';
+  const PATENT_LIST_DESKTOP_SRC = 'patent/list/index.html';
+  const PATENT_LIST_MOBILE_SRC = 'patent/Mobile/list/index.html';
+  const PATENT_MANAGEMENT_DESKTOP_SRC = 'patent/management/index.html';
+  const PATENT_MANAGEMENT_MOBILE_SRC = 'patent/Mobile/management/index.html';
 
-  function isPatentDashboardSrc(src) { return normalizePortalSrc(src) === PATENT_DASHBOARD_SRC; }
-  function isPatentListSrc(src) { return normalizePortalSrc(src) === PATENT_LIST_SRC; }
-  function isPatentManagementSrc(src) { return normalizePortalSrc(src) === PATENT_MANAGEMENT_SRC; }
-  function isPatentProgramSrc(src) {
+  const PATENT_DASHBOARD_SRC = PATENT_DASHBOARD_DESKTOP_SRC;
+  const PATENT_LIST_SRC = PATENT_LIST_DESKTOP_SRC;
+  const PATENT_MANAGEMENT_SRC = PATENT_MANAGEMENT_DESKTOP_SRC;
+
+  function getPatentDashboardSrc() {
+    return isMobilePortalView() ? PATENT_DASHBOARD_MOBILE_SRC : PATENT_DASHBOARD_DESKTOP_SRC;
+  }
+
+  function getPatentListSrc() {
+    return isMobilePortalView() ? PATENT_LIST_MOBILE_SRC : PATENT_LIST_DESKTOP_SRC;
+  }
+
+  function getPatentManagementSrc() {
+    return isMobilePortalView() ? PATENT_MANAGEMENT_MOBILE_SRC : PATENT_MANAGEMENT_DESKTOP_SRC;
+  }
+
+  function isPatentDashboardSrc(src) {
     const key = normalizePortalSrc(src);
-    return key === PATENT_DASHBOARD_SRC || key === PATENT_LIST_SRC || key === PATENT_MANAGEMENT_SRC;
+    return key === PATENT_DASHBOARD_DESKTOP_SRC || key === PATENT_DASHBOARD_MOBILE_SRC;
+  }
+
+  function isPatentListSrc(src) {
+    const key = normalizePortalSrc(src);
+    return key === PATENT_LIST_DESKTOP_SRC || key === PATENT_LIST_MOBILE_SRC;
+  }
+
+  function isPatentManagementSrc(src) {
+    const key = normalizePortalSrc(src);
+    return key === PATENT_MANAGEMENT_DESKTOP_SRC || key === PATENT_MANAGEMENT_MOBILE_SRC;
+  }
+
+  function isPatentProgramSrc(src) {
+    return isPatentDashboardSrc(src) || isPatentListSrc(src) || isPatentManagementSrc(src);
   }
 
   const QA_USAGE_DESKTOP_SRC = 'QA/usage/index.html';
@@ -4037,6 +4101,9 @@ body.auth-loading .top-user-bar {
     if (isWastewaterResponsiveSrc(raw)) return getWastewaterSrc() + suffix;
     if (isResearchStaffResponsiveSrc(raw)) return getResearchStaffSrc() + suffix;
     if (isTravelExpenseResponsiveSrc(raw)) return getTravelExpenseSrc() + suffix;
+    if (isPatentDashboardSrc(raw)) return getPatentDashboardSrc() + suffix;
+    if (isPatentListSrc(raw)) return getPatentListSrc() + suffix;
+    if (isPatentManagementSrc(raw)) return getPatentManagementSrc() + suffix;
     if (isQaUsageSrc(raw)) return getQaUsageSrc() + suffix;
     if (isQaSdsSrc(raw)) return getQaSdsSrc() + suffix;
     if (isQaStorageSrc(raw)) return getQaStorageSrc() + suffix;
@@ -5754,9 +5821,10 @@ body.auth-loading .top-user-bar {
     }
 
     if (isPatentManagementSrc(src) && !canOperatePatentApp()) {
-      try { sessionStorage.setItem(LAST_PAGE_KEY, PATENT_DASHBOARD_SRC); } catch (_) {}
-      const patentBtn = findNavBySrc(PATENT_DASHBOARD_SRC) || els.patentNavBtn;
-      await navigateBySrc(PATENT_DASHBOARD_SRC, patentBtn, { skipSave: true });
+      const patentDashboardTarget = getPatentDashboardSrc();
+      try { sessionStorage.setItem(LAST_PAGE_KEY, PATENT_DASHBOARD_DESKTOP_SRC); } catch (_) {}
+      const patentBtn = findNavBySrc(PATENT_DASHBOARD_DESKTOP_SRC) || els.patentNavBtn;
+      await navigateBySrc(patentDashboardTarget, patentBtn, { skipSave: true });
       return;
     }
 
@@ -6235,7 +6303,7 @@ body.auth-loading .top-user-bar {
 
       if (payload.type === 'patent-navigate') {
         const view = String(payload.view || '').trim().toLowerCase();
-        const targetMap = { dashboard: PATENT_DASHBOARD_SRC, list: PATENT_LIST_SRC, management: PATENT_MANAGEMENT_SRC };
+        const targetMap = { dashboard: getPatentDashboardSrc(), list: getPatentListSrc(), management: getPatentManagementSrc() };
         const base = targetMap[view] || '';
         if (!base) return;
         const params = new URLSearchParams();
