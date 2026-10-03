@@ -158,7 +158,9 @@
 }
 
 .company-patent-table{
-  min-width:1460px;
+  width:100%;
+  min-width:1220px;
+  table-layout:fixed;
 }
 
 .company-patent-table th:nth-child(1){
@@ -173,8 +175,10 @@
   width:118px;
 }
 
-.company-patent-table th:nth-child(4){
-  min-width:330px;
+.company-patent-table th:nth-child(4),
+.company-patent-table td:nth-child(4){
+  width:360px;
+  max-width:360px;
 }
 
 .company-patent-table th:nth-child(5),
@@ -188,8 +192,10 @@
   width:104px;
 }
 
-.company-patent-table th:nth-child(10){
-  min-width:220px;
+.company-patent-table th:nth-child(10),
+.company-patent-table td:nth-child(10){
+  width:205px;
+  max-width:205px;
 }
 
 .company-patent-table th:nth-child(11),
@@ -202,10 +208,14 @@
 }
 
 .company-title-main{
-  overflow:hidden;
+  display:block;
+  overflow:visible;
+  max-height:none;
   font-weight:900;
-  text-overflow:ellipsis;
-  white-space:nowrap;
+  line-height:1.4;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:break-word;
 }
 
 .company-title-sub{
@@ -706,5 +716,213 @@
 
   .company-term-add-row{
     grid-template-columns:1fr;
+  }
+}
+
+
+.company-patent-table th,
+.company-patent-table td{
+  overflow:hidden;
+}
+
+.company-owner-cell{
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+
+/* 회사특허 조회 오류: 인라인 문구 대신 모달 */
+.company-error-view-btn{
+  min-height:24px;
+  padding:3px 8px;
+  border:1px solid #efb3b3;
+  border-radius:999px;
+  background:#fff5f5;
+  color:#b42318;
+  font-size:10px;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.company-error-view-btn:hover{
+  background:#ffecec;
+}
+
+.company-error-modal-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  background:rgba(15,23,42,.45);
+}
+
+.company-error-modal-backdrop.hidden{
+  display:none;
+}
+
+.company-error-modal{
+  width:min(720px,100%);
+  max-height:min(78vh,720px);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  border:1px solid rgba(15,23,42,.12);
+  border-radius:14px;
+  background:#fff;
+  box-shadow:0 22px 60px rgba(15,23,42,.22);
+}
+
+.company-error-modal-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  padding:18px 20px 14px;
+  border-bottom:1px solid #e5e7eb;
+}
+
+.company-error-modal-title{
+  font-size:17px;
+  font-weight:900;
+  color:#111827;
+}
+
+.company-error-modal-desc{
+  margin-top:4px;
+  color:#64748b;
+  font-size:12px;
+  line-height:1.5;
+}
+
+.company-error-modal-close{
+  width:32px;
+  height:32px;
+  flex:0 0 32px;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  color:#64748b;
+  font-size:22px;
+  line-height:1;
+  cursor:pointer;
+}
+
+.company-error-modal-close:hover{
+  background:#f3f4f6;
+}
+
+.company-error-modal-body{
+  overflow:auto;
+  padding:16px 20px;
+}
+
+.company-error-modal-summary{
+  margin-bottom:10px;
+  color:#475569;
+  font-size:12px;
+}
+
+.company-error-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.company-error-item{
+  padding:12px 13px;
+  border:1px solid #fecaca;
+  border-radius:10px;
+  background:#fffafa;
+}
+
+.company-error-item-head{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+  color:#111827;
+  font-size:12px;
+}
+
+.company-error-index{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:21px;
+  height:21px;
+  border-radius:50%;
+  background:#fee2e2;
+  color:#b42318;
+  font-size:10px;
+  font-weight:900;
+}
+
+.company-error-country{
+  padding:2px 6px;
+  border-radius:999px;
+  background:#f1f5f9;
+  color:#475569;
+  font-size:10px;
+  font-weight:800;
+}
+
+.company-error-message{
+  margin-top:9px;
+  color:#b42318;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.5;
+  overflow-wrap:anywhere;
+}
+
+.company-error-status{
+  margin-top:4px;
+  color:#94a3b8;
+  font-size:10px;
+}
+
+.company-error-help{
+  margin-top:8px;
+  padding-top:8px;
+  border-top:1px dashed #fecaca;
+  color:#64748b;
+  font-size:11px;
+  line-height:1.55;
+}
+
+.company-error-modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  padding:12px 20px 16px;
+  border-top:1px solid #e5e7eb;
+}
+
+/* v7.1에서 제거된 영역은 기존 CSS가 남아도 렌더링되지 않음 */
+@media(max-width:760px){
+  .company-error-modal-backdrop{
+    padding:12px;
+  }
+
+  .company-error-modal{
+    max-height:86vh;
+  }
+
+  .company-error-modal-head,
+  .company-error-modal-body,
+  .company-error-modal-actions{
+    padding-left:14px;
+    padding-right:14px;
+  }
+
+  .company-patent-table{
+    min-width:1080px;
+  }
+
+  .company-patent-table th:nth-child(4),
+  .company-patent-table td:nth-child(4){
+    width:300px;
+    max-width:300px;
   }
 }
