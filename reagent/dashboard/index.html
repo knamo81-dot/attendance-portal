@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>시약현황</title>
+  <link rel="stylesheet" href="../../common/theme.css"/>
+  <link rel="stylesheet" href="../../common/mobile.css"/>
+  <link rel="stylesheet" href="./style.css?v=20261004-1"/>
+</head>
+<body class="reagent-dashboard reagent-dashboard-desktop" data-dashboard-mode="desktop">
+  <main class="dashboard-shell">
+    <section class="dashboard-head">
+      <div>
+        <h1>시약현황</h1>
+        <p id="dashboardSubtitle">시약·초자 주문 진행상황과 구매현황을 한눈에 확인합니다.</p>
+      </div>
+      <div class="dashboard-head-actions">
+        <label class="month-picker">
+          <span>주문월</span>
+          <select id="dashboardMonth" aria-label="주문월"></select>
+        </label>
+        <button type="button" class="refresh-btn" id="dashboardRefresh">↻ 새로고침</button>
+      </div>
+    </section>
+
+    <section class="kpi-grid" id="kpiGrid">
+      <article class="kpi-card tone-blue"><span class="kpi-label" id="kpiRequestLabel">신청품목</span><strong id="kpiRequest">-</strong><small>선택 주문월</small></article>
+      <article class="kpi-card tone-cyan"><span class="kpi-label">취합대기</span><strong id="kpiCollectPending">-</strong><small>미취합·추가신청</small></article>
+      <article class="kpi-card tone-orange"><span class="kpi-label">발주대기</span><strong id="kpiOrderPending">-</strong><small>거래처 확정 후</small></article>
+      <article class="kpi-card tone-red"><span class="kpi-label">미입고</span><strong id="kpiUnreceived">-</strong><small>발주 후 미입고</small></article>
+      <article class="kpi-card tone-green"><span class="kpi-label">입고완료</span><strong id="kpiReceived">-</strong><small>선택 주문월</small></article>
+      <article class="kpi-card tone-gold operator-only"><span class="kpi-label">구매금액</span><strong id="kpiAmount">-</strong><small>거래처 확정 기준</small></article>
+      <article class="kpi-card tone-violet viewer-only"><span class="kpi-label">제품등록요청</span><strong id="kpiMyRegistration">-</strong><small>내 요청 진행중</small></article>
+    </section>
+
+    <section class="panel progress-panel">
+      <div class="panel-head">
+        <div><h2>구매 진행현황</h2><p>선택한 주문월의 신청부터 입고까지 진행단계를 표시합니다.</p></div>
+      </div>
+      <div class="stage-flow" id="stageFlow"></div>
+    </section>
+
+    <section class="panel attention-panel operator-only">
+      <div class="panel-head compact">
+        <div><h2>확인 필요</h2><p>현재 처리해야 할 항목입니다.</p></div>
+      </div>
+      <div class="attention-grid">
+        <article><span>추가신청</span><strong id="needAdditional">-</strong></article>
+        <article><span>거래처 미확정</span><strong id="needVendor">-</strong></article>
+        <article><span>미발주</span><strong id="needOrder">-</strong></article>
+        <article><span>미입고</span><strong id="needReceipt">-</strong></article>
+        <article><span>제품등록요청</span><strong id="needRegistration">-</strong></article>
+      </div>
+    </section>
+
+    <div class="analysis-grid operator-only">
+      <section class="panel chart-panel">
+        <div class="panel-head compact">
+          <div><h2>최근 6개월 구매금액</h2><p>거래처 확정 금액 기준입니다.</p></div>
+        </div>
+        <div class="bar-chart" id="monthlyChart"></div>
+      </section>
+
+      <section class="panel vendor-panel">
+        <div class="panel-head compact">
+          <div><h2>거래처 구매현황</h2><p>구매금액·품목수·비중을 확인합니다.</p></div>
+          <select id="vendorPeriod" aria-label="거래처 집계기간">
+            <option value="month">선택 주문월</option>
+            <option value="year">선택 연도</option>
+          </select>
+        </div>
+        <div class="vendor-summary">
+          <div class="vendor-donut" id="vendorDonut"><span><b id="vendorTotal">₩0</b><small>총 구매금액</small></span></div>
+          <div class="vendor-list" id="vendorList"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="bottom-grid operator-only">
+      <section class="panel delivery-panel">
+        <div class="panel-head compact">
+          <div><h2>거래처 납기현황</h2><p>발주일→입고일 평균 납기와 미입고입니다.</p></div>
+        </div>
+        <div class="delivery-list" id="deliveryList"></div>
+      </section>
+
+      <section class="panel recent-panel">
+        <div class="panel-head compact">
+          <div><h2>최근 진행내역</h2><p>신청·거래처확정·발주·입고 기준 최신 내역입니다.</p></div>
+        </div>
+        <div class="recent-list" id="recentList"></div>
+      </section>
+    </div>
+
+    <section class="panel recent-panel viewer-only">
+      <div class="panel-head compact">
+        <div><h2>내 최근 진행내역</h2><p>내가 신청한 품목의 현재 진행상태를 확인합니다.</p></div>
+      </div>
+      <div class="recent-list" id="myRecentList"></div>
+    </section>
+
+    <div class="dashboard-loading" id="dashboardLoading" aria-live="polite">시약현황을 불러오는 중입니다.</div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    if (!window.supabase) {
+      document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
+    }
+  </script>
+  <script src="../supabase.js"></script>
+  <script src="./app.js?v=20261004-1"></script>
+</body>
+</html>
