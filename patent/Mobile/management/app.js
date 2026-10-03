@@ -978,6 +978,13 @@
       .map(x=>`<div class="pat-cal-head">${x}</div>`)
       .join('');
 
+    const today=new Date();
+    const todayKey=[
+      today.getFullYear(),
+      String(today.getMonth()+1).padStart(2,'0'),
+      String(today.getDate()).padStart(2,'0')
+    ].join('-');
+
     let cells='';
 
     for(let i=0;i<42;i++){
@@ -990,48 +997,43 @@
         String(d.getDate()).padStart(2,'0')
       ].join('-');
 
-      const dayEvents=deadlines
-        .filter(x=>x.due_date===ds&&x.status==='OPEN')
-        .sort((a,b)=>String(a.title||'').localeCompare(String(b.title||'')));
+      const dayRows=deadlines.filter(x=>
+        x.due_date===ds &&
+        !['CANCELLED','WAIVED'].includes(String(x.status||'').toUpperCase())
+      );
 
-      const visibleEvents=dayEvents.slice(0,2);
+      const completedCount=dayRows.filter(
+        x=>String(x.status||'').toUpperCase()==='COMPLETED'
+      ).length;
 
-      const eventHtml=visibleEvents.map(deadline=>{
-        const info=deadlineCalendarInfo(deadline);
-        const isPayment=!!deadline.related_payment_id;
+      const openRows=dayRows.filter(
+        x=>String(x.status||'').toUpperCase()==='OPEN'
+      );
 
-        const colorClass=P.daysUntil(deadline.due_date)<=7
-          ? 'red'
-          : isPayment
-            ? 'gold'
-            : 'blue';
+      const overdueCount=ds<todayKey
+        ?openRows.length
+        :0;
 
-        return `
-          <div
-            class="pat-cal-event pat-cal-event-detail ${colorClass}"
-            title="${P.escapeHtml(info.tooltip)}"
-          >
-            <div class="pat-cal-event-main">
-              ${P.escapeHtml(info.main)}
-            </div>
-            <div class="pat-cal-event-sub">
-              ${P.escapeHtml(info.sub)}
-            </div>
-          </div>
-        `;
-      }).join('');
+      const plannedCount=ds>=todayKey
+        ?openRows.length
+        :0;
 
-      const moreCount=dayEvents.length-visibleEvents.length;
-
-      const moreHtml=moreCount>0
-        ? `<div class="pat-cal-more">+${moreCount}건 더보기</div>`
-        : '';
+      const countHtml=[
+        plannedCount
+          ?`<span class="pat-cal-count planned" title="예정 ${plannedCount}건">예${plannedCount}</span>`
+          :'',
+        completedCount
+          ?`<span class="pat-cal-count completed" title="완료 ${completedCount}건">완${completedCount}</span>`
+          :'',
+        overdueCount
+          ?`<span class="pat-cal-count overdue" title="초과 ${overdueCount}건">초${overdueCount}</span>`
+          :''
+      ].join('');
 
       cells+=`
         <div class="pat-cal-cell ${d.getMonth()!==m?'muted':''}">
           <div class="pat-cal-date">${d.getDate()}</div>
-          ${eventHtml}
-          ${moreHtml}
+          ${countHtml?`<div class="pat-cal-counts">${countHtml}</div>`:''}
         </div>
       `;
     }
