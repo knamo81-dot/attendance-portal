@@ -1555,3 +1555,40 @@
     border-radius: 11px !important;
   }
 }
+
+
+/* =========================================================
+   Patent Mobile iOS Focus Zoom Fix v5.3
+   iPhone Safari는 입력 컨트롤의 실제 font-size가 16px 미만이면
+   포커스 시 자동 확대할 수 있으므로 모바일 입력요소를 16px로 통일.
+   ========================================================= */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea,
+  .pat-input,
+  .pat-select,
+  .event-description-textarea {
+    font-size: 16px !important;
+  }
+
+  input::placeholder,
+  textarea::placeholder,
+  .pat-input::placeholder {
+    font-size: 16px !important;
+  }
+
+  input[type="text"],
+  input[type="search"],
+  input[type="date"],
+  input[type="month"],
+  input[type="time"],
+  input[type="datetime-local"],
+  input[type="number"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="password"] {
+    font-size: 16px !important;
+  }
+}
