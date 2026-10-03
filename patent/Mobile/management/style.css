@@ -1,1 +1,1101 @@
-.
+@import url('../../shared/patent-common.css');
+.management-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:10px}.management-summary .pat-kpi{min-height:76px}
+.management-table{min-width:1120px}.payment-filters,.deadline-filters{display:flex;gap:7px;flex-wrap:wrap}.payment-filters .pat-input{min-width:220px;flex:1}.payment-filters .pat-select,.deadline-filters .pat-select{width:auto;min-width:120px}
+.calendar-layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(300px,.75fr);gap:10px}.calendar-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.calendar-nav{display:flex;gap:6px;align-items:center}.calendar-month{font-size:14px;font-weight:900;min-width:110px;text-align:center}.upcoming-list{display:grid;gap:8px}.upcoming-item{padding:10px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}.upcoming-top{display:flex;justify-content:space-between;gap:8px}.upcoming-title{font-size:10.5px;font-weight:900}.upcoming-sub{margin-top:3px;font-size:9.5px;color:#64748b}
+.settings-grid{display:grid;grid-template-columns:minmax(320px,.8fr) minmax(0,1.2fr);gap:10px}.settings-stack{display:grid;gap:10px}.setting-row{display:grid;grid-template-columns:170px 1fr;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #eef2f7}.setting-row:last-child{border-bottom:none}.setting-label{font-size:10.5px;font-weight:900;color:#475569}.setting-control{min-width:0}.switch-row{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:800}.agency-table{min-width:650px}.access-table{min-width:650px}.settings-section-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}.access-add{display:grid;grid-template-columns:1fr 140px auto;gap:7px;margin-bottom:10px}.money-field{font-variant-numeric:tabular-nums}
+@media(max-width:1100px){.management-summary{grid-template-columns:repeat(3,minmax(0,1fr))}.calendar-layout,.settings-grid{grid-template-columns:1fr}}
+@media(max-width:768px){.management-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.setting-row{grid-template-columns:1fr}.access-add{grid-template-columns:1fr}.calendar-layout{display:block}.calendar-layout>article+article{margin-top:10px}}
+.money-kpi{font-size:18px!important}
+
+/* 기한관리 달력 상세표시 */
+.pat-cal-event-detail{
+  padding:4px 5px;
+  white-space:normal;
+  line-height:1.15;
+}
+
+.pat-cal-event-main{
+  overflow:hidden;
+  font-size:8.5px;
+  font-weight:900;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.pat-cal-event-sub{
+  overflow:hidden;
+  margin-top:2px;
+  font-size:7.8px;
+  font-weight:800;
+  opacity:.82;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.pat-cal-more{
+  margin-top:4px;
+  padding:2px 4px;
+  color:#64748b;
+  font-size:8px;
+  font-weight:900;
+  text-align:right;
+}
+
+.upcoming-title{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.upcoming-sub{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+@media(max-width:768px){
+  .pat-cal-event-detail{
+    min-width:104px;
+  }
+}
+
+/* 달력 칸 너비 고정 + 일정 텍스트 칸 안에서만 말줄임 */
+.pat-calendar{
+  grid-template-columns:repeat(7,minmax(0,1fr));
+}
+
+.pat-cal-head,
+.pat-cal-cell{
+  min-width:0;
+}
+
+.pat-cal-cell{
+  overflow:hidden;
+}
+
+.pat-cal-event-detail{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  overflow:hidden;
+}
+
+.pat-cal-event-main,
+.pat-cal-event-sub{
+  display:block;
+  width:100%;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.pat-cal-more{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+
+
+/* 회사특허 조회 - 회사 관리자 전용 */
+.company-search-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
+
+.company-search-query{
+  display:grid;
+  grid-template-columns:minmax(280px,520px) 170px auto;
+  align-items:end;
+  gap:8px;
+  padding:12px;
+  border:1px solid #e2e8f0;
+  border-radius:14px;
+  background:#fff;
+}
+
+.company-search-name label,
+.company-search-country label{
+  display:block;
+  margin-bottom:5px;
+  color:#475569;
+  font-size:10.5px;
+  font-weight:900;
+}
+
+.company-search-note{
+  margin:8px 0 10px;
+}
+
+.company-search-summary-note{
+  margin:10px 0 7px;
+  color:#64748b;
+  font-size:10.5px;
+}
+
+.company-search-kpis{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:8px;
+  margin-bottom:10px;
+}
+
+.company-search-kpis .pat-kpi{
+  min-height:76px;
+}
+
+.company-search-filters{
+  display:grid;
+  grid-template-columns:minmax(260px,1fr) 150px 150px;
+  gap:7px;
+  margin-bottom:8px;
+}
+
+.company-patent-table{
+  width:100%;
+  min-width:1220px;
+  table-layout:fixed;
+}
+
+.company-patent-table th:nth-child(1){
+  width:52px;
+}
+
+.company-patent-table th:nth-child(2){
+  width:78px;
+}
+
+.company-patent-table th:nth-child(3){
+  width:118px;
+}
+
+.company-patent-table th:nth-child(4),
+.company-patent-table td:nth-child(4){
+  width:360px;
+  max-width:360px;
+}
+
+.company-patent-table th:nth-child(5),
+.company-patent-table th:nth-child(6){
+  width:72px;
+}
+
+.company-patent-table th:nth-child(7),
+.company-patent-table th:nth-child(8),
+.company-patent-table th:nth-child(9){
+  width:104px;
+}
+
+.company-patent-table th:nth-child(10),
+.company-patent-table td:nth-child(10){
+  width:205px;
+  max-width:205px;
+}
+
+.company-patent-table th:nth-child(11),
+.company-patent-table th:nth-child(12){
+  width:94px;
+}
+
+.company-title-cell{
+  min-width:0;
+}
+
+.company-title-main{
+  display:block;
+  overflow:visible;
+  max-height:none;
+  font-weight:900;
+  line-height:1.4;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+
+.company-title-sub{
+  margin-top:3px;
+  color:#94a3b8;
+  font-size:9.5px;
+}
+
+.company-owner-cell{
+  line-height:1.35;
+}
+
+.company-status-badge,
+.company-ownership-badge,
+.company-portal-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:24px;
+  padding:3px 8px;
+  border:1px solid transparent;
+  border-radius:999px;
+  font-size:9.5px;
+  font-weight:900;
+  white-space:nowrap;
+}
+
+.company-status-badge.registered{
+  border-color:#bbf7d0;
+  background:#f0fdf4;
+  color:#15803d;
+}
+
+.company-status-badge.pending,
+.company-status-badge.examining{
+  border-color:#bfdbfe;
+  background:#eff6ff;
+  color:#1d4ed8;
+}
+
+.company-status-badge.expired,
+.company-status-badge.rejected,
+.company-status-badge.abandoned{
+  border-color:#e2e8f0;
+  background:#f8fafc;
+  color:#64748b;
+}
+
+.company-status-badge.neutral{
+  border-color:#e2e8f0;
+  background:#fff;
+  color:#475569;
+}
+
+.company-ownership-badge.owned{
+  border-color:#fde68a;
+  background:#fffbeb;
+  color:#92400e;
+}
+
+.company-ownership-badge.joint{
+  border-color:#bfdbfe;
+  background:#eff6ff;
+  color:#1d4ed8;
+}
+
+.company-ownership-badge.transferred{
+  border-color:#cbd5e1;
+  background:#f1f5f9;
+  color:#475569;
+}
+
+.company-ownership-badge.pending{
+  border-color:#bbf7d0;
+  background:#f0fdf4;
+  color:#15803d;
+}
+
+.company-ownership-badge.expired,
+.company-ownership-badge.rejected,
+.company-ownership-badge.abandoned{
+  border-color:#e2e8f0;
+  background:#f8fafc;
+  color:#64748b;
+}
+
+.company-ownership-badge.review{
+  border-color:#fed7aa;
+  background:#fff7ed;
+  color:#c2410c;
+}
+
+.company-portal-badge.registered{
+  border-color:#bbf7d0;
+  background:#f0fdf4;
+  color:#15803d;
+}
+
+.company-portal-badge.missing{
+  border-color:#fecaca;
+  background:#fef2f2;
+  color:#b91c1c;
+}
+
+.company-transferred-row{
+  background:#f8fafc;
+}
+
+.company-transferred-row td{
+  color:#64748b;
+}
+
+.company-search-pagination{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  margin:10px 0 2px;
+  color:#64748b;
+  font-size:10.5px;
+  font-weight:800;
+}
+
+.company-search-warnings{
+  margin-top:10px;
+  padding:8px 10px;
+  border:1px solid #fed7aa;
+  border-radius:10px;
+  background:#fff7ed;
+  color:#9a3412;
+  font-size:9.5px;
+}
+
+.company-search-warnings summary{
+  cursor:pointer;
+  font-weight:900;
+}
+
+.company-search-loading{
+  min-height:140px;
+}
+
+.company-search-loading-note{
+  margin-top:10px;
+  text-align:center;
+}
+
+.company-search-empty-card{
+  margin-top:10px;
+}
+
+@media(max-width:1100px){
+  .company-search-kpis{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+
+  .company-search-filters{
+    grid-template-columns:minmax(220px,1fr) 140px 140px;
+  }
+}
+
+@media(max-width:768px){
+  .company-search-query,
+  .company-search-filters{
+    grid-template-columns:1fr;
+  }
+
+  .company-search-kpis{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .company-search-query .pat-btn{
+    width:100%;
+  }
+}
+
+
+/* 회사특허 조회 캐시 */
+.company-search-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:7px;
+}
+
+.company-search-summary-note{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.company-cache-info{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  color:#64748b;
+  white-space:nowrap;
+}
+
+.company-cache-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:22px;
+  padding:2px 7px;
+  border:1px solid #e2e8f0;
+  border-radius:999px;
+  font-size:9px;
+  font-weight:900;
+}
+
+.company-cache-badge.cached{
+  border-color:#bfdbfe;
+  background:#eff6ff;
+  color:#1d4ed8;
+}
+
+.company-cache-badge.fresh{
+  border-color:#fde68a;
+  background:#fffbeb;
+  color:#92400e;
+}
+
+@media(max-width:768px){
+  .company-search-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+  }
+
+  .company-search-actions .pat-btn{
+    width:100%;
+  }
+
+  .company-cache-info{
+    white-space:normal;
+  }
+}
+
+
+/* 회사특허 조회 → 특허목록 이동 */
+.company-register-cell{
+  text-align:center;
+  white-space:nowrap;
+}
+
+.company-register-btn{
+  min-width:72px;
+  white-space:nowrap;
+}
+
+
+.company-search-country{
+  min-width:0;
+}
+
+.company-search-country .pat-select{
+  width:100%;
+}
+
+@media(max-width:900px){
+  .company-search-query{
+    grid-template-columns:1fr 170px;
+  }
+
+  .company-search-actions{
+    grid-column:1 / -1;
+  }
+}
+
+
+/* ==========================================================
+   Company Patent Integrated Search v7
+   ========================================================== */
+
+.company-search-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+}
+
+.company-search-head-actions{
+  display:flex;
+  gap:8px;
+  flex:0 0 auto;
+}
+
+.company-search-query.integrated{
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:end;
+}
+
+.company-search-supported{
+  min-height:40px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  padding:9px 12px;
+  border:1px solid var(--pat-border, #d9d9d9);
+  border-radius:8px;
+  background:var(--pat-soft-bg, #fafafa);
+  font-size:13px;
+  line-height:1.45;
+}
+
+.company-search-supported-label{
+  font-weight:700;
+  white-space:nowrap;
+}
+
+.company-search-term-summary{
+  margin:14px 0 10px;
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.company-search-term-title{
+  min-width:84px;
+  padding-top:5px;
+  font-size:12px;
+  font-weight:700;
+  color:#666;
+}
+
+.company-search-term-chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  min-width:0;
+  flex:1;
+}
+
+.company-term-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  max-width:100%;
+  padding:5px 9px;
+  border:1px solid rgba(140,100,40,.24);
+  border-radius:999px;
+  background:rgba(166,122,58,.08);
+  font-size:12px;
+}
+
+.company-term-lang{
+  font-weight:700;
+  color:#8b6229;
+}
+
+.company-search-filters.integrated{
+  display:grid;
+  grid-template-columns:150px 190px 170px minmax(240px,1fr);
+  gap:8px;
+  margin:12px 0;
+}
+
+.company-search-progress{
+  margin-top:12px;
+  font-size:14px;
+  font-weight:700;
+}
+
+.company-search-error-summary,
+.company-search-sql-warning{
+  margin-top:10px;
+}
+
+.company-search-table-head{
+  display:flex;
+  justify-content:flex-end;
+  margin-bottom:8px;
+  font-size:12px;
+  color:#666;
+}
+
+.company-title-search-term{
+  margin-top:4px;
+  font-size:11px;
+  color:#8b6a3e;
+}
+
+.company-term-settings-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:14px;
+}
+
+.company-term-settings-row{
+  display:grid;
+  grid-template-columns:34px 100px minmax(180px,1fr) 72px auto;
+  gap:8px;
+  align-items:center;
+}
+
+.company-term-order{
+  text-align:center;
+  font-size:12px;
+  color:#888;
+}
+
+.company-term-active{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  white-space:nowrap;
+  font-size:12px;
+}
+
+.company-term-row-actions{
+  display:flex;
+  gap:6px;
+  justify-content:flex-end;
+}
+
+.company-term-add-row{
+  display:grid;
+  grid-template-columns:100px minmax(180px,1fr) auto;
+  gap:8px;
+  margin-top:12px;
+}
+
+.company-term-empty{
+  padding:18px 8px;
+}
+
+.pat-btn.danger{
+  border-color:#c65b5b;
+  color:#a83a3a;
+}
+
+@media(max-width:1000px){
+  .company-search-filters.integrated{
+    grid-template-columns:1fr 1fr;
+  }
+
+  .company-term-settings-row{
+    grid-template-columns:34px 90px minmax(160px,1fr) 70px;
+  }
+
+  .company-term-row-actions{
+    grid-column:2 / -1;
+    justify-content:flex-end;
+  }
+}
+
+@media(max-width:760px){
+  .company-search-head{
+    flex-direction:column;
+  }
+
+  .company-search-head-actions{
+    width:100%;
+  }
+
+  .company-search-head-actions .pat-btn{
+    width:100%;
+  }
+
+  .company-search-query.integrated{
+    grid-template-columns:1fr;
+  }
+
+  .company-search-actions{
+    grid-column:auto;
+    width:100%;
+  }
+
+  .company-search-actions .pat-btn{
+    flex:1;
+  }
+
+  .company-search-filters.integrated{
+    grid-template-columns:1fr;
+  }
+
+  .company-term-settings-row{
+    grid-template-columns:80px minmax(0,1fr);
+  }
+
+  .company-term-order{
+    display:none;
+  }
+
+  .company-term-active{
+    justify-content:flex-start;
+  }
+
+  .company-term-row-actions{
+    grid-column:1 / -1;
+  }
+
+  .company-term-add-row{
+    grid-template-columns:1fr;
+  }
+}
+
+
+.company-patent-table th,
+.company-patent-table td{
+  overflow:hidden;
+}
+
+.company-owner-cell{
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+
+/* 회사특허 조회 오류: 인라인 문구 대신 모달 */
+.company-error-view-btn{
+  min-height:24px;
+  padding:3px 8px;
+  border:1px solid #efb3b3;
+  border-radius:999px;
+  background:#fff5f5;
+  color:#b42318;
+  font-size:10px;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.company-error-view-btn:hover{
+  background:#ffecec;
+}
+
+.company-error-modal-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  background:rgba(15,23,42,.45);
+}
+
+.company-error-modal-backdrop.hidden{
+  display:none;
+}
+
+.company-error-modal{
+  width:min(720px,100%);
+  max-height:min(78vh,720px);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  border:1px solid rgba(15,23,42,.12);
+  border-radius:14px;
+  background:#fff;
+  box-shadow:0 22px 60px rgba(15,23,42,.22);
+}
+
+.company-error-modal-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  padding:18px 20px 14px;
+  border-bottom:1px solid #e5e7eb;
+}
+
+.company-error-modal-title{
+  font-size:17px;
+  font-weight:900;
+  color:#111827;
+}
+
+.company-error-modal-desc{
+  margin-top:4px;
+  color:#64748b;
+  font-size:12px;
+  line-height:1.5;
+}
+
+.company-error-modal-close{
+  width:32px;
+  height:32px;
+  flex:0 0 32px;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  color:#64748b;
+  font-size:22px;
+  line-height:1;
+  cursor:pointer;
+}
+
+.company-error-modal-close:hover{
+  background:#f3f4f6;
+}
+
+.company-error-modal-body{
+  overflow:auto;
+  padding:16px 20px;
+}
+
+.company-error-modal-summary{
+  margin-bottom:10px;
+  color:#475569;
+  font-size:12px;
+}
+
+.company-error-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.company-error-item{
+  padding:12px 13px;
+  border:1px solid #fecaca;
+  border-radius:10px;
+  background:#fffafa;
+}
+
+.company-error-item-head{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+  color:#111827;
+  font-size:12px;
+}
+
+.company-error-index{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:21px;
+  height:21px;
+  border-radius:50%;
+  background:#fee2e2;
+  color:#b42318;
+  font-size:10px;
+  font-weight:900;
+}
+
+.company-error-country{
+  padding:2px 6px;
+  border-radius:999px;
+  background:#f1f5f9;
+  color:#475569;
+  font-size:10px;
+  font-weight:800;
+}
+
+.company-error-message{
+  margin-top:9px;
+  color:#b42318;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.5;
+  overflow-wrap:anywhere;
+}
+
+.company-error-status{
+  margin-top:4px;
+  color:#94a3b8;
+  font-size:10px;
+}
+
+.company-error-help{
+  margin-top:8px;
+  padding-top:8px;
+  border-top:1px dashed #fecaca;
+  color:#64748b;
+  font-size:11px;
+  line-height:1.55;
+}
+
+.company-error-modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  padding:12px 20px 16px;
+  border-top:1px solid #e5e7eb;
+}
+
+/* v7.1에서 제거된 영역은 기존 CSS가 남아도 렌더링되지 않음 */
+@media(max-width:760px){
+  .company-error-modal-backdrop{
+    padding:12px;
+  }
+
+  .company-error-modal{
+    max-height:86vh;
+  }
+
+  .company-error-modal-head,
+  .company-error-modal-body,
+  .company-error-modal-actions{
+    padding-left:14px;
+    padding-right:14px;
+  }
+
+  .company-patent-table{
+    min-width:1080px;
+  }
+
+  .company-patent-table th:nth-child(4),
+  .company-patent-table td:nth-child(4){
+    width:300px;
+    max-width:300px;
+  }
+}
+
+/* =========================================================
+   Mobile dedicated UI
+   - This file lives under /Mobile and is managed separately.
+   ========================================================= */
+/* Patent Management Mobile UI */
+@media (max-width: 768px) {
+  html, body { max-width: 100%; overflow-x: hidden; }
+  .pat-app { padding: 8px !important; overflow-x: hidden; }
+
+  .pat-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  .pat-toolbar-left,
+  .pat-toolbar-right {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .pat-section-tabs {
+    width: 100%;
+    display: flex;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    gap: 6px !important;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .pat-section-tabs::-webkit-scrollbar { display: none; }
+  .pat-section-btn { flex: 0 0 auto; min-height: 36px; }
+
+  .pat-card { min-width: 0; }
+  .pat-card-pad { padding: 10px !important; }
+  .pat-card-head,
+  .settings-section-head,
+  .company-search-head {
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .payment-toolbar,
+  .deadline-toolbar,
+  .management-filters,
+  .company-search-filters.integrated,
+  .company-search-query.integrated {
+    grid-template-columns: 1fr !important;
+    gap: 7px !important;
+  }
+  .payment-toolbar .pat-input,
+  .payment-toolbar .pat-select,
+  .deadline-toolbar .pat-input,
+  .deadline-toolbar .pat-select,
+  .company-search-filters .pat-input,
+  .company-search-filters .pat-select { width: 100% !important; min-width: 0 !important; }
+
+  .company-search-actions,
+  .company-search-head-actions {
+    width: 100%;
+    display: flex;
+    gap: 7px;
+  }
+  .company-search-actions .pat-btn,
+  .company-search-head-actions .pat-btn { flex: 1 1 0; min-height: 40px; }
+
+  .pat-table-wrap { overflow: visible !important; }
+  .mobile-card-table,
+  .mobile-card-table tbody,
+  .mobile-card-table tr,
+  .mobile-card-table td { display: block; width: 100%; }
+  .mobile-card-table thead { display: none; }
+  .mobile-card-table tbody {
+    display: grid;
+    gap: 9px;
+  }
+  .mobile-card-table tbody tr {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-radius: 13px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(15,23,42,.045);
+  }
+  .mobile-card-table tbody td {
+    min-width: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    padding: 8px 10px !important;
+    border: 0 !important;
+    border-bottom: 1px solid #eef2f7 !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere;
+    text-overflow: clip !important;
+  }
+  .mobile-card-table tbody td:last-child { border-bottom: 0 !important; }
+  .mobile-card-table tbody td::before {
+    content: attr(data-mobile-label);
+    display: block;
+    margin-bottom: 3px;
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.25;
+  }
+  .mobile-card-table .mobile-empty-row td::before { display: none; }
+
+  .management-table .file-actions,
+  .company-patent-table .company-register-cell,
+  .agency-table td:last-child {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .management-table .file-actions .pat-btn,
+  .company-register-cell .pat-btn,
+  .agency-table td:last-child .pat-btn { min-height: 38px; }
+
+  .company-patent-table .company-title-main {
+    display: block !important;
+    max-height: none !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .company-patent-table .company-title-sub,
+  .company-patent-table .company-title-search-term { white-space: normal !important; }
+
+  .settings-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  .company-term-settings-row,
+  .company-term-add-row {
+    grid-template-columns: 1fr !important;
+    gap: 7px !important;
+  }
+  .company-term-order { display: none !important; }
+  .company-term-active { justify-content: flex-start !important; }
+  .company-term-row-actions { justify-content: flex-start !important; grid-column: auto !important; }
+
+  .pat-form-grid { grid-template-columns: 1fr !important; }
+  .span-2,
+  .span-3,
+  .span-4 { grid-column: auto !important; }
+
+  .pat-modal-backdrop { padding: 8px !important; }
+  .pat-modal,
+  .pat-modal.sm {
+    width: calc(100vw - 16px) !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 16px) !important;
+    border-radius: 16px !important;
+  }
+  .pat-modal-head,
+  .pat-modal-body,
+  .pat-modal-actions { padding-left: 14px !important; padding-right: 14px !important; }
+  .pat-modal-actions { flex-wrap: wrap; }
+  .pat-modal-actions .pat-btn { min-height: 40px; }
+
+  .calendar-grid,
+  .deadline-calendar { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+@media (max-width: 420px) {
+  .pat-title { font-size: 20px !important; }
+  .company-search-head-actions,
+  .company-search-actions { flex-direction: column; }
+}
