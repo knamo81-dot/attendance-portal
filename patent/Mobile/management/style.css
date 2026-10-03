@@ -2384,3 +2384,44 @@
     flex-shrink: 0 !important;
   }
 }
+
+
+/* =========================================================
+   Patent Mobile Date Input Width Fix v6.2
+   - iPhone Safari 날짜 입력의 고유 최소폭 때문에
+     등록 모달 가로폭을 넘는 현상 방지
+   - 특허등록 / 납부등록 / 기한등록 공통 적용
+   ========================================================= */
+@media (max-width: 768px) {
+  .pat-modal .pat-field {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .pat-modal input[type="date"],
+  .pat-modal input[type="month"],
+  .pat-modal input[type="time"],
+  .pat-modal input[type="datetime-local"] {
+    display: block !important;
+    inline-size: 100% !important;
+    width: 100% !important;
+    min-inline-size: 0 !important;
+    min-width: 0 !important;
+    max-inline-size: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    overflow: hidden !important;
+  }
+
+  .pat-modal input[type="date"]::-webkit-date-and-time-value,
+  .pat-modal input[type="month"]::-webkit-date-and-time-value,
+  .pat-modal input[type="time"]::-webkit-date-and-time-value,
+  .pat-modal input[type="datetime-local"]::-webkit-date-and-time-value {
+    min-width: 0 !important;
+    width: 100% !important;
+    text-align: left !important;
+  }
+}
