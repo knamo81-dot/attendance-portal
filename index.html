@@ -2412,7 +2412,7 @@ body.auth-loading .top-user-bar {
             <button type="button" id="wastewaterNavBtn" class="nav-btn" data-portal-src="wastewater/index.html" title="폐수">폐수</button>
             <button type="button" id="attendanceNavBtn" class="nav-btn" data-portal-src="attendance/index.html" title="근태">근태</button>
             <button type="button" id="researchStaffNavBtn" class="nav-btn" data-portal-src="research-staff/index.html" title="인력운영현황">인력</button>
-            <button type="button" id="suppliesNavBtn" class="nav-btn" data-portal-src="reagent/index.html" title="시약">시약</button>
+            <button type="button" id="suppliesNavBtn" class="nav-btn" data-portal-src="reagent/dashboard/index.html" title="시약">시약</button>
             <button type="button" id="travelExpenseNavBtn" class="nav-btn" data-portal-src="travel-expense/index.html" title="출장비정산">출장</button>
             <button type="button" id="qaNavBtn" class="nav-btn" data-portal-src="QA/usage/index.html" title="QA" hidden>QA</button>
             <button type="button" id="patentNavBtn" class="nav-btn" data-portal-src="patent/dashboard/index.html" title="특허관리" hidden>특허</button>
@@ -3083,6 +3083,18 @@ body.auth-loading .top-user-bar {
       desc: '조직과 인력 운영 현황을 모바일에서 확인합니다.',
       gradient: 'linear-gradient(135deg, #111827 0%, #1f2937 55%, #374151 100%)'
     },
+    'reagent/dashboard/index.html': {
+      top: 'Resource Management',
+      title: '시약현황',
+      desc: '시약·초자 주문 진행상황과 구매현황을 한눈에 확인합니다.',
+      gradient: 'linear-gradient(135deg, #173a7a 0%, #3157d7 55%, #4f46e5 100%)'
+    },
+    'reagent/Mobile/dashboard/index.html': {
+      top: 'Resource Management',
+      title: '시약현황',
+      desc: '시약·초자 주문 진행상황과 구매현황을 모바일에서 확인합니다.',
+      gradient: 'linear-gradient(135deg, #173a7a 0%, #3157d7 55%, #4f46e5 100%)'
+    },
     'reagent/index.html': {
       top: 'Resource Management',
       title: '시약·초자 주문 시스템',
@@ -3273,13 +3285,32 @@ body.auth-loading .top-user-bar {
       { id: 'analysis', label: '현황분석' },
       { id: 'admin', label: '운영인력 리스트' }
     ],
-    'reagent/index.html': [
+    'reagent/dashboard/index.html': [
+      { id: 'reagent-dashboard', label: '시약현황' },
       { id: 'request', label: '제품신청' },
       { id: 'collect', label: '제품취합' },
-      { id: 'summary', label: '취합정리' },
-      { id: 'products', label: '제품관리' }
+      { id: 'prepare', label: '취합정리' },
+      { id: 'order-receipt', label: '발주/입고 관리' },
+      { id: 'product-management', label: '제품관리' }
+    ],
+    'reagent/Mobile/dashboard/index.html': [
+      { id: 'reagent-dashboard', label: '시약현황' },
+      { id: 'request', label: '제품신청' },
+      { id: 'collect', label: '제품취합' },
+      { id: 'prepare', label: '취합정리' },
+      { id: 'order-receipt', label: '발주/입고 관리' },
+      { id: 'product-management', label: '제품관리' }
+    ],
+    'reagent/index.html': [
+      { id: 'reagent-dashboard', label: '시약현황' },
+      { id: 'request', label: '제품신청' },
+      { id: 'collect', label: '제품취합' },
+      { id: 'prepare', label: '취합정리' },
+      { id: 'order-receipt', label: '발주/입고 관리' },
+      { id: 'product-management', label: '제품관리' }
     ],
     'reagent/Mobile/index.html': [
+      { id: 'reagent-dashboard', label: '시약현황' },
       { id: 'request', label: '제품신청' },
       { id: 'collect', label: '제품취합' },
       { id: 'prepare', label: '취합정리' },
@@ -3430,6 +3461,7 @@ body.auth-loading .top-user-bar {
   let currentPortalTabs = [];
   let currentPortalTabId = '';
   let currentPortalFilters = [];
+  let pendingReagentTabId = '';
 
 
   function normalizePortalSrc(src) {
@@ -3499,6 +3531,12 @@ body.auth-loading .top-user-bar {
     return id === 'request' || id === 'product-request' || label === '제품신청' || label === '신청';
   }
 
+  function isReagentDashboardTab(tab) {
+    const id = String(tab?.id || '').trim().toLowerCase();
+    const label = String(tab?.label || '').replace(/\s+/g, '').trim();
+    return id === 'reagent-dashboard' || id === 'dashboard' || label === '시약현황';
+  }
+
   function isTravelExpenseApplicantTab(tab) {
     const id = String(tab?.id || '').trim().toLowerCase();
     const label = String(tab?.label || '').replace(/\s+/g, '').trim();
@@ -3533,14 +3571,22 @@ body.auth-loading .top-user-bar {
     const normalizedTabs = normalizePortalTabs(tabs);
     const currentSrc = normalizePortalSrc(frame?.dataset?.currentSrc || frame?.getAttribute('src') || frame?.src || '');
 
-    if (currentSrc === 'reagent/index.html' || currentSrc === 'reagent/Mobile/index.html') {
+    if (isReagentProgramSrc(currentSrc)) {
       const reagentRole = getPortalAppRoleForTabs('reagent');
       const canOperate = isPortalOperatorRole(reagentRole);
+      const reagentTabs = normalizedTabs.some(isReagentDashboardTab)
+        ? normalizedTabs
+        : [{ id: 'reagent-dashboard', label: '시약현황' }, ...normalizedTabs];
 
-      if (canOperate) return normalizedTabs;
+      if (canOperate) return reagentTabs;
 
-      const requestTabs = normalizedTabs.filter(isReagentRequestTab);
-      return requestTabs.length ? requestTabs : [{ id: 'request', label: '제품신청' }];
+      const allowedTabs = reagentTabs.filter(function (tab) {
+        return isReagentDashboardTab(tab) || isReagentRequestTab(tab);
+      });
+      return allowedTabs.length ? allowedTabs : [
+        { id: 'reagent-dashboard', label: '시약현황' },
+        { id: 'request', label: '제품신청' }
+      ];
     }
 
     if (currentSrc === 'travel-expense/index.html' || currentSrc === 'travel-expense/Mobile/index.html') {
@@ -3696,6 +3742,49 @@ body.auth-loading .top-user-bar {
       ''
     );
 
+    // 시약현황은 독립 dashboard 화면, 기존 업무 탭은 reagent 앱 내부 화면으로 운영합니다.
+    if (isReagentProgramSrc(currentSrc)) {
+      const reagentRole = getPortalAppRoleForTabs('reagent');
+      const canOperate = isPortalOperatorRole(reagentRole);
+      const restrictedTabs = new Set(['collect', 'prepare', 'product-management']);
+
+      if (!canOperate && restrictedTabs.has(tabId)) {
+        tabId = 'request';
+        setPortalSubtabActive('request', false);
+      }
+
+      if (tabId === 'reagent-dashboard') {
+        const target = getReagentDashboardSrc();
+        pendingReagentTabId = '';
+        if (!isReagentDashboardSrc(currentSrc)) {
+          try { sessionStorage.setItem(LAST_PAGE_KEY, REAGENT_DASHBOARD_DESKTOP_SRC); } catch (_) {}
+          replacePortalFrame(buildSrcWithSession(target));
+        } else {
+          setPortalSubtabActive('reagent-dashboard', false);
+        }
+        return;
+      }
+
+      const appTarget = getReagentAppSrc();
+      if (!isReagentAppSrc(currentSrc)) {
+        pendingReagentTabId = tabId;
+        try { sessionStorage.setItem(LAST_PAGE_KEY, REAGENT_APP_DESKTOP_SRC); } catch (_) {}
+        replacePortalFrame(buildSrcWithSession(appTarget));
+        return;
+      }
+
+      pendingReagentTabId = '';
+      const tab = currentPortalTabs.find(function (item) { return item.id === tabId; }) || null;
+      frame.contentWindow.postMessage({
+        type: 'portal-tab-change',
+        tabId: tabId,
+        tab: tabId,
+        label: tab?.label || '',
+        source: 'portal-index'
+      }, '*');
+      return;
+    }
+
     // 특허는 현황/목록/관리를 독립 화면으로 운영하므로 포탈 상단 버튼에서 경로를 전환합니다.
     if (isPatentProgramSrc(currentSrc)) {
       const patentRole = getPortalAppRoleForTabs('patent');
@@ -3792,6 +3881,7 @@ body.auth-loading .top-user-bar {
     const key = normalizePortalSrc(src);
     const tabs = portalDefaultTabs[key] || [];
     let activeId = tabs[0]?.id || '';
+    if (isReagentDashboardSrc(key)) activeId = 'reagent-dashboard';
     if (isPatentDashboardSrc(key)) activeId = 'patent-dashboard';
     if (isPatentListSrc(key)) activeId = 'patent-list';
     if (isPatentManagementSrc(key)) activeId = 'patent-management';
@@ -3944,16 +4034,31 @@ body.auth-loading .top-user-bar {
     return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
   }
 
-  const REAGENT_DESKTOP_SRC = 'reagent/index.html';
-  const REAGENT_MOBILE_SRC = 'reagent/Mobile/index.html';
+  const REAGENT_DASHBOARD_DESKTOP_SRC = 'reagent/dashboard/index.html';
+  const REAGENT_DASHBOARD_MOBILE_SRC = 'reagent/Mobile/dashboard/index.html';
+  const REAGENT_APP_DESKTOP_SRC = 'reagent/index.html';
+  const REAGENT_APP_MOBILE_SRC = 'reagent/Mobile/index.html';
 
-  function getReagentSrc() {
-    return isMobilePortalView() ? REAGENT_MOBILE_SRC : REAGENT_DESKTOP_SRC;
+  function getReagentDashboardSrc() {
+    return isMobilePortalView() ? REAGENT_DASHBOARD_MOBILE_SRC : REAGENT_DASHBOARD_DESKTOP_SRC;
   }
 
-  function isReagentResponsiveSrc(src) {
+  function getReagentAppSrc() {
+    return isMobilePortalView() ? REAGENT_APP_MOBILE_SRC : REAGENT_APP_DESKTOP_SRC;
+  }
+
+  function isReagentDashboardSrc(src) {
     const key = normalizePortalSrc(src);
-    return key === REAGENT_DESKTOP_SRC || key === REAGENT_MOBILE_SRC;
+    return key === REAGENT_DASHBOARD_DESKTOP_SRC || key === REAGENT_DASHBOARD_MOBILE_SRC;
+  }
+
+  function isReagentAppSrc(src) {
+    const key = normalizePortalSrc(src);
+    return key === REAGENT_APP_DESKTOP_SRC || key === REAGENT_APP_MOBILE_SRC;
+  }
+
+  function isReagentProgramSrc(src) {
+    return isReagentDashboardSrc(src) || isReagentAppSrc(src);
   }
 
   const WASTEWATER_DESKTOP_SRC = 'wastewater/index.html';
@@ -4111,7 +4216,8 @@ body.auth-loading .top-user-bar {
     if (!raw) return src;
     const suffixMatch = raw.match(/([?#].*)$/);
     const suffix = suffixMatch ? suffixMatch[1] : '';
-    if (isReagentResponsiveSrc(raw)) return getReagentSrc() + suffix;
+    if (isReagentDashboardSrc(raw)) return getReagentDashboardSrc() + suffix;
+    if (isReagentAppSrc(raw)) return getReagentAppSrc() + suffix;
     if (isWastewaterResponsiveSrc(raw)) return getWastewaterSrc() + suffix;
     if (isResearchStaffResponsiveSrc(raw)) return getResearchStaffSrc() + suffix;
     if (isTravelExpenseResponsiveSrc(raw)) return getTravelExpenseSrc() + suffix;
@@ -5509,8 +5615,7 @@ body.auth-loading .top-user-bar {
   }
 
   function isReagentSrc(src) {
-    const key = normalizePortalSrc(src);
-    return key === 'reagent/index.html' || key === 'reagent/Mobile/index.html';
+    return isReagentProgramSrc(src);
   }
 
   function getPersonalServiceAppInfo(src) {
@@ -5769,6 +5874,22 @@ body.auth-loading .top-user-bar {
           type: 'portal-filters-request',
           source: 'portal-index'
         }, '*');
+
+        if (isReagentAppSrc(key) && pendingReagentTabId) {
+          const targetTabId = pendingReagentTabId;
+          pendingReagentTabId = '';
+          setPortalSubtabActive(targetTabId, false);
+          setTimeout(function () {
+            try {
+              frame.contentWindow.postMessage({
+                type: 'portal-tab-change',
+                tabId: targetTabId,
+                tab: targetTabId,
+                source: 'portal-index'
+              }, '*');
+            } catch (_) {}
+          }, 50);
+        }
       } catch (_) {}
 
       /* attendance portal request retry final */
@@ -5798,7 +5919,7 @@ body.auth-loading .top-user-bar {
       // 기존 시약/근태 등은 같은 HTML 안에서 postMessage로 내부 탭을 바꾸지만,
       // QA의 세 프로그램은 iframe 문서 자체를 교체해야 하므로 src를 직접 갱신합니다.
       // 이렇게 해야 iframe의 src 속성도 실제 현재 프로그램과 일치합니다.
-      if (isQaProgramSrc(normalizedTarget) || isPatentProgramSrc(normalizedTarget)) {
+      if (isQaProgramSrc(normalizedTarget) || isPatentProgramSrc(normalizedTarget) || isReagentProgramSrc(normalizedTarget)) {
         frame.src = targetUrl;
       } else if (frame.contentWindow && frame.contentWindow.location) {
         frame.contentWindow.location.replace(targetUrl);
