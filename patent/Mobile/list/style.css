@@ -1249,3 +1249,60 @@
     min-height: 92px !important;
   }
 }
+
+
+/* =========================================================
+   Patent Event Form v5.2
+   iPhone date input intrinsic-width overlap fix
+   ========================================================= */
+@media (max-width: 768px) {
+  .events-add .event-add-row {
+    grid-template-columns:
+      minmax(0, calc(42% - 9px))
+      minmax(0, calc(58% - 9px)) !important;
+    column-gap: 18px !important;
+  }
+
+  /* iOS Safari의 type=date 최소 고유폭이 grid 칸 밖으로
+     튀어나오는 현상을 강제로 칸 내부에 가둠 */
+  .events-add .event-field:first-child {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .events-add #eventDate {
+    display: block !important;
+    inline-size: 100% !important;
+    width: 100% !important;
+    min-inline-size: 0 !important;
+    min-width: 0 !important;
+    max-inline-size: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+  }
+
+  .events-add .event-field-title {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .events-add #eventTitle {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .events-add .event-add-row {
+    grid-template-columns:
+      minmax(0, calc(40% - 8px))
+      minmax(0, calc(60% - 8px)) !important;
+    column-gap: 16px !important;
+  }
+}
