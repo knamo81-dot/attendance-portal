@@ -1,1 +1,612 @@
-.
+@import url('../../shared/patent-common.css');
+
+.patent-list-table {
+  min-width: 1120px;
+}
+
+.patent-list-table td:nth-child(5) {
+  min-width: 280px;
+  max-width: 460px;
+}
+
+.table-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 4px 0;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.detail-toolbar {
+  margin-bottom: 8px;
+}
+
+.detail-tabs {
+  margin-bottom: 12px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.detail-content {
+  min-height: 250px;
+}
+
+.detail-basic-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
+  gap: 10px;
+}
+
+.detail-side {
+  display: grid;
+  gap: 10px;
+}
+
+.rights-box {
+  padding: 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.rights-dates {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 7px;
+  color: #64748b;
+  font-size: 9.5px;
+  font-weight: 800;
+}
+
+.rights-center {
+  margin: 6px 0;
+  color: #15803d;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.lookup-box {
+  display: grid;
+  gap: 8px;
+}
+
+.lookup-fields {
+  display: flex;
+  gap: 8px;
+}
+
+.lookup-fields .pat-input {
+  flex: 1;
+}
+
+.form-top-gap {
+  margin-top: 12px;
+}
+
+.file-input {
+  min-height: 36px;
+  height: auto;
+  padding: 6px 9px;
+}
+
+.file-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.memo-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.memo-editor textarea {
+  min-height: 180px;
+}
+
+.events-add {
+  margin-bottom: 10px;
+}
+
+.event-add-row {
+  display: grid;
+  grid-template-columns: 140px 180px 1fr auto;
+  gap: 7px;
+}
+
+.inventor-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.inventor-chip {
+  padding: 7px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 10.5px;
+  font-weight: 900;
+}
+
+.summary-list {
+  display: grid;
+  gap: 8px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #eef2f7;
+  font-size: 10.5px;
+}
+
+.summary-row:last-child {
+  border-bottom: none;
+}
+
+.summary-row strong {
+  font-weight: 900;
+}
+
+/* KIPRIS 일괄갱신 */
+.bulk-refresh-modal {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.bulk-refresh-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.bulk-refresh-summary > div {
+  display: grid;
+  gap: 4px;
+  padding: 10px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.bulk-refresh-summary span {
+  color: #64748b;
+  font-size: 9.5px;
+  font-weight: 800;
+}
+
+.bulk-refresh-summary strong {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.bulk-progress-wrap {
+  margin-bottom: 10px;
+}
+
+.bulk-progress-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  color: #475569;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.bulk-progress {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.bulk-progress > span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #9a6b18;
+  transition: width 0.18s ease;
+}
+
+.bulk-current-patent {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid #eadfbf;
+  border-radius: 10px;
+  background: #fbf7ea;
+  color: #6f4d12;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.bulk-result-list {
+  display: grid;
+  gap: 6px;
+  max-height: 320px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.bulk-result-item {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 9px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.bulk-result-status {
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.bulk-result-status.success {
+  color: #15803d;
+}
+
+.bulk-result-status.unchanged {
+  color: #64748b;
+}
+
+.bulk-result-status.failed {
+  color: #b91c1c;
+}
+
+.bulk-result-main {
+  min-width: 0;
+}
+
+.bulk-result-title {
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 10.5px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bulk-result-sub {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 9.5px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.bulk-refresh-note {
+  margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .detail-basic-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .event-add-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .event-add-row input:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  .event-add-row button {
+    grid-column: 1 / -1;
+  }
+
+  .lookup-fields {
+    flex-direction: column;
+  }
+
+  .bulk-refresh-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .pat-toolbar-right {
+    flex-wrap: wrap;
+  }
+
+  .bulk-refresh-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bulk-result-item {
+    grid-template-columns: 68px minmax(0, 1fr);
+  }
+}
+
+#divisionFilter {
+  min-width: 130px;
+}
+
+.lookup-division-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr);
+  max-width: 360px;
+}
+
+.lookup-division-row .pat-field {
+  margin: 0;
+}
+
+#f_division_code {
+  width: 100%;
+}
+
+.patent-list-table th:nth-child(2),
+.patent-list-table td:nth-child(2) {
+  width: 76px;
+  white-space: nowrap;
+}
+
+.patent-list-table th:nth-child(3),
+.patent-list-table td:nth-child(3) {
+  min-width: 110px;
+  white-space: nowrap;
+}
+
+.patent-list-table th:nth-child(4),
+.patent-list-table td:nth-child(4) {
+  min-width: 120px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .lookup-division-row {
+    max-width: none;
+  }
+}
+
+.pat-duplicate-notice {
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fff1f2;
+  color: #991b1b;
+  padding: 10px 12px;
+}
+
+.pat-duplicate-notice[hidden] {
+  display: none !important;
+}
+
+.pat-duplicate-notice-title {
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 5px;
+}
+
+.pat-duplicate-notice-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 12px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.pat-duplicate-notice-body strong {
+  width: 100%;
+  color: #7f1d1d;
+}
+
+.pat-duplicate-notice-help {
+  margin-top: 5px;
+  color: #b91c1c;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+#lookupNo.pat-input-duplicate {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.08);
+}
+
+#savePatentBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+
+
+.event-add-head {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #334155;
+}
+
+.event-permission-note {
+  margin-top: 7px;
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+.event-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.pat-btn.small {
+  min-height: 28px;
+  padding: 5px 9px;
+  font-size: 10.5px;
+}
+
+.pat-btn.danger {
+  background: #fff;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+
+.lookup-country{
+  width:150px;
+  flex:0 0 150px;
+}
+
+@media(max-width:768px){
+  .lookup-country{
+    width:100%;
+    flex:1 1 auto;
+  }
+}
+
+/* =========================================================
+   Mobile dedicated UI
+   - This file lives under /Mobile and is managed separately.
+   ========================================================= */
+/* Patent List Mobile UI */
+@media (max-width: 768px) {
+  html, body { max-width: 100%; overflow-x: hidden; }
+  .pat-app { padding: 8px !important; overflow-x: hidden; }
+
+  .pat-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  .pat-toolbar-left,
+  .pat-toolbar-right {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+  .pat-toolbar-right { justify-content: stretch !important; }
+  .pat-toolbar-right .pat-btn,
+  .pat-toolbar-right .pat-input,
+  .pat-toolbar-right .pat-select { min-height: 38px; }
+
+  .list-filters,
+  .filter-row,
+  .pat-filter-row {
+    grid-template-columns: repeat(2, minmax(0,1fr)) !important;
+    gap: 7px !important;
+  }
+  .list-filters .pat-input,
+  .list-filters .pat-select,
+  .filter-row .pat-input,
+  .filter-row .pat-select { width: 100% !important; min-width: 0 !important; }
+
+  .pat-card { min-width: 0; }
+  .pat-card-pad { padding: 10px !important; }
+  .pat-table-wrap { overflow: visible !important; }
+
+  .mobile-card-table,
+  .mobile-card-table tbody,
+  .mobile-card-table tr,
+  .mobile-card-table td { display: block; width: 100%; }
+  .mobile-card-table thead { display: none; }
+  .mobile-card-table tbody {
+    display: grid;
+    gap: 9px;
+  }
+  .mobile-card-table tbody tr {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-radius: 13px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(15,23,42,.045);
+  }
+  .mobile-card-table tbody tr.clickable { cursor: pointer; }
+  .mobile-card-table tbody td {
+    min-width: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    padding: 8px 10px !important;
+    border: 0 !important;
+    border-bottom: 1px solid #eef2f7 !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere;
+    text-overflow: clip !important;
+  }
+  .mobile-card-table tbody td:last-child { border-bottom: 0 !important; }
+  .mobile-card-table tbody td::before {
+    content: attr(data-mobile-label);
+    display: block;
+    margin-bottom: 3px;
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.25;
+  }
+  .mobile-card-table .mobile-empty-row td::before { display: none; }
+
+  .patent-list-table tbody tr {
+    padding: 2px 0;
+  }
+  .patent-list-table tbody td:nth-child(5) {
+    font-weight: 800;
+    line-height: 1.45;
+  }
+
+  .table-footer { padding: 9px 2px 2px !important; }
+
+  .detail-toolbar { gap: 7px !important; }
+  .detail-toolbar .pat-toolbar-left { align-items: center; }
+  .detail-toolbar .pat-toolbar-right { gap: 6px; }
+
+  .detail-basic-grid,
+  .pat-info-grid,
+  .pat-form-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .span-2,
+  .span-3,
+  .span-4 { grid-column: auto !important; }
+
+  .detail-tabs,
+  .pat-tabs {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .detail-tabs::-webkit-scrollbar,
+  .pat-tabs::-webkit-scrollbar { display: none; }
+
+  .pat-modal-backdrop { padding: 8px !important; }
+  .pat-modal,
+  .pat-modal.sm {
+    width: calc(100vw - 16px) !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 16px) !important;
+    border-radius: 16px !important;
+  }
+  .pat-modal-head,
+  .pat-modal-body,
+  .pat-modal-actions { padding-left: 14px !important; padding-right: 14px !important; }
+  .pat-modal-actions { flex-wrap: wrap; }
+  .pat-modal-actions .pat-btn { min-height: 40px; }
+
+  .lookup-fields {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 7px !important;
+  }
+  .lookup-country { width: 100% !important; }
+}
+
+@media (max-width: 420px) {
+  .list-filters,
+  .filter-row,
+  .pat-filter-row { grid-template-columns: 1fr !important; }
+  .pat-title { font-size: 20px !important; }
+}
