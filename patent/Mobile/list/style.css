@@ -610,3 +610,332 @@
   .pat-filter-row { grid-template-columns: 1fr !important; }
   .pat-title { font-size: 20px !important; }
 }
+
+
+/* =========================================================
+   Mobile compact expandable cards v4
+   QA / 시약 모바일 밀도 기준
+   ========================================================= */
+@media (max-width: 768px) {
+  .pat-app {
+    padding: 6px !important;
+  }
+
+  .pat-card {
+    border-radius: 12px !important;
+  }
+
+  .pat-card-pad {
+    padding: 8px !important;
+  }
+
+  .pat-title {
+    font-size: 17px !important;
+    line-height: 1.25 !important;
+  }
+
+  .pat-card-title {
+    font-size: 13px !important;
+    line-height: 1.3 !important;
+  }
+
+  .pat-card-desc,
+  .row-sub,
+  .company-title-sub,
+  .company-title-search-term {
+    font-size: 9.5px !important;
+    line-height: 1.35 !important;
+  }
+
+  .pat-btn {
+    min-height: 32px !important;
+    padding: 5px 9px !important;
+    border-radius: 9px !important;
+    font-size: 10.5px !important;
+  }
+
+  .pat-input,
+  .pat-select {
+    min-height: 34px !important;
+    font-size: 11px !important;
+  }
+
+  .pat-table-wrap {
+    overflow: visible !important;
+  }
+
+  /* 기존 "모든 컬럼 세로 나열" 카드 규칙을 compact 카드로 재정의 */
+  .mobile-compact-table,
+  .mobile-compact-table tbody {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .mobile-compact-table thead {
+    display: none !important;
+  }
+
+  .mobile-compact-table tbody {
+    display: grid !important;
+    gap: 7px !important;
+  }
+
+  .mobile-compact-table tbody tr.mobile-compact-row {
+    position: relative !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 58px !important;
+    padding: 9px 10px 8px !important;
+    overflow: hidden !important;
+    border: 1px solid #dbe4ee !important;
+    border-radius: 12px !important;
+    background: #fff !important;
+    box-shadow: 0 1px 5px rgba(15,23,42,.04) !important;
+  }
+
+  .mobile-compact-table tbody tr.mobile-compact-row::after {
+    content: '⌄';
+    position: absolute;
+    right: 8px;
+    bottom: 5px;
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1;
+    pointer-events: none;
+    transition: transform .15s ease;
+  }
+
+  .mobile-compact-table tbody tr.mobile-compact-row.mobile-expanded::after {
+    content: '⌃';
+  }
+
+  .mobile-compact-table tbody tr.mobile-empty-row {
+    display: block !important;
+    min-height: 0 !important;
+    padding: 10px !important;
+  }
+
+  .mobile-compact-table tbody tr.mobile-compact-row > td {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* 제목 */
+  .mobile-compact-table td.mobile-role-title {
+    display: block !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    padding: 0 62px 3px 0 !important;
+    color: #172033 !important;
+    font-size: 12.5px !important;
+    font-weight: 800 !important;
+    line-height: 1.35 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .mobile-compact-table td.mobile-role-title::before {
+    display: none !important;
+  }
+
+  .mobile-compact-table td.mobile-role-title > b,
+  .mobile-compact-table td.mobile-role-title .company-title-main {
+    display: block !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+    font-size: 12.5px !important;
+    line-height: 1.35 !important;
+  }
+
+  /* 펼친 상태에서는 제목 전체 허용 */
+  .mobile-compact-table tr.mobile-expanded td.mobile-role-title,
+  .mobile-compact-table tr.mobile-expanded td.mobile-role-title > b,
+  .mobile-compact-table tr.mobile-expanded td.mobile-role-title .company-title-main {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  /* 상태 배지: 카드 우측 상단 */
+  .mobile-compact-table td.mobile-role-badge {
+    position: absolute !important;
+    top: 8px !important;
+    right: 8px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    width: auto !important;
+    max-width: 94px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    font-size: 9.5px !important;
+    line-height: 1 !important;
+  }
+
+  .mobile-compact-table td.mobile-role-badge::before {
+    display: none !important;
+  }
+
+  .mobile-compact-table td.mobile-role-badge + td.mobile-role-badge {
+    top: 30px !important;
+  }
+
+  .mobile-compact-table .pat-badge,
+  .mobile-compact-table .company-status-badge,
+  .mobile-compact-table .company-ownership-badge,
+  .mobile-compact-table .pat-dday {
+    font-size: 9px !important;
+    line-height: 1.2 !important;
+    padding: 3px 6px !important;
+  }
+
+  /* 축약 메타정보: 한 줄 안에서 작게 */
+  .mobile-compact-table td.mobile-role-meta {
+    display: inline-flex !important;
+    align-items: center !important;
+    flex: 0 1 auto !important;
+    width: auto !important;
+    max-width: calc(100% - 12px) !important;
+    padding: 2px 11px 0 0 !important;
+    color: #64748b !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    line-height: 1.35 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .mobile-compact-table td.mobile-role-meta::before {
+    content: attr(data-mobile-label) ' ';
+    display: inline !important;
+    flex: 0 0 auto !important;
+    margin: 0 4px 0 0 !important;
+    color: #94a3b8 !important;
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    line-height: inherit !important;
+  }
+
+  /* 추가 정보: 접힘 상태에서는 숨김 */
+  .mobile-compact-table td.mobile-role-detail,
+  .mobile-compact-table td.mobile-role-action {
+    display: none !important;
+  }
+
+  .mobile-compact-table td.mobile-role-hidden {
+    display: none !important;
+  }
+
+  /* 펼침 상태 */
+  .mobile-compact-table tr.mobile-expanded {
+    padding-bottom: 10px !important;
+    border-color: #c9a967 !important;
+    box-shadow: 0 3px 10px rgba(128,88,16,.08) !important;
+  }
+
+  .mobile-compact-table tr.mobile-expanded td.mobile-role-detail {
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    padding: 6px 0 !important;
+    border-top: 1px solid #eef2f6 !important;
+    color: #334155 !important;
+    font-size: 10.5px !important;
+    line-height: 1.4 !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .mobile-compact-table tr.mobile-expanded td.mobile-role-detail::before {
+    content: attr(data-mobile-label);
+    display: block !important;
+    flex: 0 0 74px !important;
+    width: 74px !important;
+    margin: 0 !important;
+    color: #94a3b8 !important;
+    font-size: 9.5px !important;
+    font-weight: 800 !important;
+    line-height: 1.4 !important;
+  }
+
+  .mobile-compact-table tr.mobile-expanded td.mobile-role-action {
+    display: flex !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+    padding: 7px 0 0 !important;
+    border-top: 1px solid #eef2f6 !important;
+  }
+
+  .mobile-compact-table tr.mobile-expanded td.mobile-role-action::before {
+    display: none !important;
+  }
+
+  /* 특허목록/현황의 기존 row-click 상세 이동은 별도 버튼으로 노출 */
+  .mobile-open-detail {
+    display: none;
+    margin-top: 7px;
+    min-height: 28px;
+    padding: 4px 9px;
+    border: 1px solid #d7b66b;
+    border-radius: 8px;
+    background: #fffaf0;
+    color: #805810;
+    font-size: 9.5px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .mobile-expanded .mobile-open-detail {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* 숫자/금액이 모바일에서 지나치게 커지지 않도록 */
+  .mobile-compact-table td.num,
+  .mobile-compact-table .num {
+    font-size: 10.5px !important;
+  }
+
+  /* 회사특허 title 내부 서브정보는 기존 구조 유지하되 밀도 축소 */
+  .mobile-compact-table .company-title-sub,
+  .mobile-compact-table .company-title-search-term,
+  .mobile-compact-table .row-sub {
+    margin-top: 2px !important;
+    font-size: 9px !important;
+    line-height: 1.3 !important;
+    color: #7b8797 !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .mobile-compact-table tbody tr.mobile-compact-row {
+    min-height: 56px !important;
+    padding: 8px 9px 7px !important;
+  }
+
+  .mobile-compact-table td.mobile-role-title,
+  .mobile-compact-table td.mobile-role-title > b,
+  .mobile-compact-table td.mobile-role-title .company-title-main {
+    font-size: 12px !important;
+  }
+
+  .mobile-compact-table td.mobile-role-meta {
+    font-size: 9.5px !important;
+  }
+}
