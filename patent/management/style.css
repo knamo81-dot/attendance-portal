@@ -476,3 +476,235 @@
     grid-column:1 / -1;
   }
 }
+
+
+/* ==========================================================
+   Company Patent Integrated Search v7
+   ========================================================== */
+
+.company-search-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+}
+
+.company-search-head-actions{
+  display:flex;
+  gap:8px;
+  flex:0 0 auto;
+}
+
+.company-search-query.integrated{
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:end;
+}
+
+.company-search-supported{
+  min-height:40px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  padding:9px 12px;
+  border:1px solid var(--pat-border, #d9d9d9);
+  border-radius:8px;
+  background:var(--pat-soft-bg, #fafafa);
+  font-size:13px;
+  line-height:1.45;
+}
+
+.company-search-supported-label{
+  font-weight:700;
+  white-space:nowrap;
+}
+
+.company-search-term-summary{
+  margin:14px 0 10px;
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.company-search-term-title{
+  min-width:84px;
+  padding-top:5px;
+  font-size:12px;
+  font-weight:700;
+  color:#666;
+}
+
+.company-search-term-chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  min-width:0;
+  flex:1;
+}
+
+.company-term-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  max-width:100%;
+  padding:5px 9px;
+  border:1px solid rgba(140,100,40,.24);
+  border-radius:999px;
+  background:rgba(166,122,58,.08);
+  font-size:12px;
+}
+
+.company-term-lang{
+  font-weight:700;
+  color:#8b6229;
+}
+
+.company-search-filters.integrated{
+  display:grid;
+  grid-template-columns:150px 190px 170px minmax(240px,1fr);
+  gap:8px;
+  margin:12px 0;
+}
+
+.company-search-progress{
+  margin-top:12px;
+  font-size:14px;
+  font-weight:700;
+}
+
+.company-search-error-summary,
+.company-search-sql-warning{
+  margin-top:10px;
+}
+
+.company-search-table-head{
+  display:flex;
+  justify-content:flex-end;
+  margin-bottom:8px;
+  font-size:12px;
+  color:#666;
+}
+
+.company-title-search-term{
+  margin-top:4px;
+  font-size:11px;
+  color:#8b6a3e;
+}
+
+.company-term-settings-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:14px;
+}
+
+.company-term-settings-row{
+  display:grid;
+  grid-template-columns:34px 100px minmax(180px,1fr) 72px auto;
+  gap:8px;
+  align-items:center;
+}
+
+.company-term-order{
+  text-align:center;
+  font-size:12px;
+  color:#888;
+}
+
+.company-term-active{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  white-space:nowrap;
+  font-size:12px;
+}
+
+.company-term-row-actions{
+  display:flex;
+  gap:6px;
+  justify-content:flex-end;
+}
+
+.company-term-add-row{
+  display:grid;
+  grid-template-columns:100px minmax(180px,1fr) auto;
+  gap:8px;
+  margin-top:12px;
+}
+
+.company-term-empty{
+  padding:18px 8px;
+}
+
+.pat-btn.danger{
+  border-color:#c65b5b;
+  color:#a83a3a;
+}
+
+@media(max-width:1000px){
+  .company-search-filters.integrated{
+    grid-template-columns:1fr 1fr;
+  }
+
+  .company-term-settings-row{
+    grid-template-columns:34px 90px minmax(160px,1fr) 70px;
+  }
+
+  .company-term-row-actions{
+    grid-column:2 / -1;
+    justify-content:flex-end;
+  }
+}
+
+@media(max-width:760px){
+  .company-search-head{
+    flex-direction:column;
+  }
+
+  .company-search-head-actions{
+    width:100%;
+  }
+
+  .company-search-head-actions .pat-btn{
+    width:100%;
+  }
+
+  .company-search-query.integrated{
+    grid-template-columns:1fr;
+  }
+
+  .company-search-actions{
+    grid-column:auto;
+    width:100%;
+  }
+
+  .company-search-actions .pat-btn{
+    flex:1;
+  }
+
+  .company-search-filters.integrated{
+    grid-template-columns:1fr;
+  }
+
+  .company-term-settings-row{
+    grid-template-columns:80px minmax(0,1fr);
+  }
+
+  .company-term-order{
+    display:none;
+  }
+
+  .company-term-active{
+    justify-content:flex-start;
+  }
+
+  .company-term-row-actions{
+    grid-column:1 / -1;
+  }
+
+  .company-term-add-row{
+    grid-template-columns:1fr;
+  }
+}
