@@ -1156,3 +1156,19 @@
     font-size: 9px !important;
   }
 }
+
+
+/* =========================================================
+   Patent List Mobile v4.3
+   진행이력 작성: 일자/유형 행과 제목 입력행 간격 확대
+   ========================================================= */
+@media (max-width: 768px) {
+  .event-add-row {
+    column-gap: 7px !important;
+    row-gap: 13px !important;
+  }
+
+  .event-add-row #eventTitle {
+    margin-top: 2px !important;
+  }
+}
