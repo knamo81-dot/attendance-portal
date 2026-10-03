@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>작업환경측정</title>
+  <link rel="stylesheet" href="style.css?v=20261004-mobile1" />
+</head>
+<body class="qa-workenv-mobile">
+  <main class="page">
+    <section class="card">
+      <header class="section-head">
+        <div>
+          <h1>작업환경측정</h1>
+          <p>작업환경측정 대상물질 기준과 실제 측정 대상·결과·성적서·다음 측정일을 통합 관리합니다.</p>
+        </div>
+        <nav class="inner-tabs" aria-label="작업환경측정 기능">
+          <button type="button" class="active" data-view="status">작업환경측정 현황</button>
+          <button type="button" data-view="standards">대상물질기준</button>
+        </nav>
+      </header>
+
+      <div class="view" id="statusView">
+        <div class="status-summary">
+          <div class="status-summary-card">
+            <span>관리대상</span>
+            <strong id="statusTargetCount">-</strong>
+            <small>등록된 활성 측정대상</small>
+          </div>
+          <div class="status-summary-card done">
+            <span>올해 측정완료</span>
+            <strong id="statusDoneCount">-</strong>
+            <small>선택연도 측정기록</small>
+          </div>
+          <div class="status-summary-card due">
+            <span>측정예정</span>
+            <strong id="statusDueCount">-</strong>
+            <small>다음 측정일 도래 전</small>
+          </div>
+          <div class="status-summary-card overdue">
+            <span>기한초과</span>
+            <strong id="statusOverdueCount">-</strong>
+            <small>다음 측정일 경과</small>
+          </div>
+        </div>
+
+        <div class="status-toolbar">
+          <div class="status-filter-grid">
+            <label><span>기준연도</span><select id="statusYear"></select></label>
+            <label>
+              <span>상태</span>
+              <select id="statusState">
+                <option value="">전체</option>
+                <option value="unmeasured">미측정</option>
+                <option value="done">측정완료</option>
+                <option value="due">측정예정</option>
+                <option value="overdue">기한초과</option>
+                <option value="exceeded">기준초과</option>
+              </select>
+            </label>
+            <label><span>본부</span><select id="statusDivision"><option value="">전체</option></select></label>
+            <label><span>팀</span><select id="statusTeam"><option value="">전체</option></select></label>
+            <label class="status-search"><span>검색</span><input id="statusSearch" placeholder="CAS / 대상물질 / 작업장 / 공정 / 측정기관 검색" /></label>
+          </div>
+          <button type="button" class="primary" id="newTargetBtn">+ 측정대상 등록</button>
+        </div>
+
+        <div class="mobile-card-list status-card-list" id="statusBody">
+          <div class="empty-card">작업환경측정 현황을 불러오는 중입니다.</div>
+        </div>
+        <div class="foot-note">
+          ※ 작업환경측정 현황은 실제 측정대상 장소/공정을 등록한 뒤 측정이력을 누적 관리합니다. 대상물질기준에 해당하더라도 실제 측정 대상 여부는 노출·작업조건에 따라 별도 검토가 필요합니다.
+        </div>
+      </div>
+
+      <div class="view hidden" id="standardsView">
+        <div class="stats">
+          <button type="button" class="stat-card active" data-filter="target">
+            <span>대상 유해인자</span>
+            <strong id="hazardCount">-</strong>
+            <small>KOSHA/수기 확인 대상</small>
+          </button>
+          <button type="button" class="stat-card warning" data-filter="unverified">
+            <span>KOSHA 미확인</span>
+            <strong id="unverifiedCount">-</strong>
+            <small>클릭하여 미확인 목록 확인</small>
+          </button>
+          <div class="stat-card">
+            <span>연결제품</span>
+            <strong id="productCount">-</strong>
+            <small>대상 CAS 연결 활성 시약</small>
+          </div>
+          <div class="stat-card">
+            <span>API 기준정보 최종확인일</span>
+            <strong id="apiChecked">-</strong>
+            <small>KOSHA 최종 조회</small>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <label class="search">
+            <span>검색</span>
+            <input id="searchInput" placeholder="CAS / 국문명 / 영문명 / 제품명 검색" />
+          </label>
+          <label>
+            <span>출처</span>
+            <select id="sourceFilter">
+              <option value="">전체</option>
+              <option value="KOSHA">KOSHA</option>
+              <option value="MANUAL">수기</option>
+            </select>
+          </label>
+          <label>
+            <span>적용기준</span>
+            <select id="thresholdFilter"><option value="">전체</option></select>
+          </label>
+          <label>
+            <span>제품판정</span>
+            <select id="matchFilter">
+              <option value="">전체</option>
+              <option value="applicable">적용</option>
+              <option value="review_required">검토필요</option>
+              <option value="not_applicable">기준미만</option>
+            </select>
+          </label>
+          <button type="button" class="primary toolbar-refresh" id="refreshBtn">↻ API 기준정보 갱신</button>
+        </div>
+
+        <div class="mobile-card-list standards-card-list" id="standardsBody">
+          <div class="empty-card">기준정보를 불러오는 중입니다.</div>
+        </div>
+        <div class="foot-note">※ 제품 함유량이 미입력된 경우 원본 DB는 변경하지 않고 대상 판정 시에만 100%로 간주합니다. 실제 작업환경측정 대상 작업장 여부는 노출·작업조건을 별도로 확인해야 합니다.</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 측정대상 등록/수정 -->
+  <div class="modal hidden" id="targetModal" role="dialog" aria-modal="true">
+    <div class="modal-card target-modal-card">
+      <div class="modal-head">
+        <div>
+          <h2 id="targetModalTitle">측정대상 등록</h2>
+          <p>대상물질·대상조직·작업장/공정을 한 건으로 묶어 관리합니다.</p>
+        </div>
+        <button type="button" class="icon-btn" id="targetModalClose">×</button>
+      </div>
+
+      <div class="modal-body target-form-layout">
+        <section class="target-section">
+          <div class="target-section-head">
+            <div>
+              <b>대상물질 *</b>
+              <small>대상물질기준에서 복수 선택할 수 있습니다.</small>
+            </div>
+            <div class="target-section-actions">
+              <button type="button" class="secondary small" id="targetSubstanceSelect">선택</button>
+              <button type="button" class="secondary small hidden" id="targetSubstanceEdit">수정</button>
+              <button type="button" class="danger small hidden" id="targetSubstanceClear">삭제</button>
+            </div>
+          </div>
+          <div class="selected-summary empty" id="targetSubstanceSummary">선택된 대상물질이 없습니다.</div>
+        </section>
+
+        <section class="target-section">
+          <div class="target-section-head">
+            <div>
+              <b>대상조직 *</b>
+              <small>설정 → 조직관리의 사용중 본부/팀에서 선택합니다.</small>
+            </div>
+            <button type="button" class="secondary small" id="targetOrgAdd">+ 추가</button>
+          </div>
+          <div class="repeat-list" id="targetOrgRows"></div>
+        </section>
+
+        <section class="target-section">
+          <div class="target-section-head">
+            <div>
+              <b>작업장 / 장소 · 공정 / 작업 *</b>
+              <small>같은 측정대상에 여러 장소/공정을 연결할 수 있습니다.</small>
+            </div>
+            <button type="button" class="secondary small" id="targetTaskAdd">+ 추가</button>
+          </div>
+          <div class="repeat-list" id="targetTaskRows"></div>
+        </section>
+
+        <div class="target-bottom-grid">
+          <label>
+            <span>관리 시작일</span>
+            <input id="targetFirstDate" type="date" />
+          </label>
+          <label class="wide">
+            <span>비고</span>
+            <textarea id="targetNote" rows="3" placeholder="대상 선정 근거, 노출·작업조건 등"></textarea>
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" class="secondary" id="targetModalCancel">취소</button>
+        <button type="button" class="primary" id="targetSave">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 대상물질 복수선택 -->
+  <div class="modal hidden" id="substancePickerModal" role="dialog" aria-modal="true">
+    <div class="modal-card substance-picker-card">
+      <div class="modal-head">
+        <div>
+          <h2>대상물질 선택</h2>
+          <p>작업환경측정 대상물질기준에서 체크한 항목을 한 번에 적용합니다.</p>
+        </div>
+        <button type="button" class="icon-btn" id="substancePickerClose">×</button>
+      </div>
+      <div class="picker-body">
+        <div class="picker-toolbar">
+          <input id="substancePickerSearch" placeholder="CAS / 국문명 / 영문명 검색" />
+          <span id="substancePickerCount">0종 선택</span>
+        </div>
+        <div class="picker-list" id="substancePickerList"></div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="secondary" id="substancePickerCancel">취소</button>
+        <button type="button" class="primary" id="substancePickerApply">적용</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 측정결과 입력/수정 -->
+  <div class="modal hidden" id="measurementModal" role="dialog" aria-modal="true">
+    <div class="modal-card modal-card-wide">
+      <div class="modal-head">
+        <div><h2 id="measurementModalTitle">측정결과 입력</h2><p id="measurementTargetSummary">-</p></div>
+        <button type="button" class="icon-btn" id="measurementModalClose">×</button>
+      </div>
+      <div class="modal-body measurement-form-grid">
+        <label><span>측정일 *</span><input id="measurementDate" type="date" /></label>
+        <label><span>결과 판정 *</span>
+          <select id="measurementResultStatus">
+            <option value="within_limit">기준 이하</option>
+            <option value="exceeded">기준 초과</option>
+            <option value="review">확인 필요</option>
+          </select>
+        </label>
+        <label><span>측정값</span><input id="measurementValue" type="number" step="any" placeholder="숫자 입력" /></label>
+        <label><span>단위</span><input id="measurementUnit" placeholder="예: ppm, mg/m³" /></label>
+        <label><span>노출기준 / 참고기준</span><input id="measurementLimit" placeholder="예: TWA 200 ppm" /></label>
+        <label><span>측정기관</span><input id="measurementCompany" placeholder="측정기관명" /></label>
+        <label><span>다음 측정예정일</span><input id="measurementNextDate" type="date" /></label>
+        <label><span>성적서 PDF</span><input id="measurementReport" type="file" accept="application/pdf,.pdf" /></label>
+        <div class="current-report wide hidden" id="currentReportBox">
+          <span>현재 성적서</span>
+          <button type="button" class="secondary" id="currentReportOpen">보기</button>
+          <small id="currentReportName">-</small>
+        </div>
+        <label class="wide"><span>비고</span><textarea id="measurementNote" rows="3" placeholder="측정조건, 특이사항, 후속조치 등"></textarea></label>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="secondary" id="measurementModalCancel">취소</button>
+        <button type="button" class="primary" id="measurementSave">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 측정이력 -->
+  <div class="modal hidden" id="historyModal" role="dialog" aria-modal="true">
+    <div class="modal-card history-modal-card">
+      <div class="modal-head">
+        <div><h2>측정이력</h2><p id="historyTargetSummary">-</p></div>
+        <button type="button" class="icon-btn" id="historyModalClose">×</button>
+      </div>
+      <div class="history-body">
+        <div class="mobile-history-list" id="historyBody">
+          <div class="empty-card">측정이력을 불러오는 중입니다.</div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="secondary" id="historyModalCloseBottom">닫기</button>
+        <button type="button" class="primary" id="historyAddMeasurement">+ 측정결과 입력</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KOSHA 수기확인 -->
+  <div class="modal hidden" id="manualModal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h2>KOSHA 미확인 물질 수기확인</h2>
+          <p id="manualChemical">-</p>
+        </div>
+        <button type="button" class="icon-btn" id="modalClose">×</button>
+      </div>
+      <div class="modal-body">
+        <label>
+          <span>작업환경측정 대상</span>
+          <select id="manualTarget">
+            <option value="true">대상</option>
+            <option value="false">비대상</option>
+          </select>
+        </label>
+        <label>
+          <span>판정방식</span>
+          <select id="manualRule">
+            <option value="gte">함유량 기준 이상</option>
+            <option value="manual_review">작업조건 별도 검토</option>
+          </select>
+        </label>
+        <label>
+          <span>최소 함유량 기준 (%)</span>
+          <input id="manualThreshold" type="number" min="0" max="100" step="0.0001" placeholder="예: 1" />
+        </label>
+        <label>
+          <span>화면 표시 기준</span>
+          <input id="manualThresholdText" placeholder="예: 1% 이상" />
+        </label>
+        <label class="wide">
+          <span>확인 출처/근거</span>
+          <input id="manualSource" placeholder="법령, 고시, 공단자료 등" />
+        </label>
+        <label class="wide">
+          <span>비고</span>
+          <textarea id="manualNote" rows="3" placeholder="수기 확인 내용 또는 참고사항"></textarea>
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="secondary" id="modalCancel">취소</button>
+        <button type="button" class="primary" id="manualSave">확인완료</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+  <script src="app.js?v=20261004-mobile1"></script>
+</body>
+</html>
