@@ -56,3 +56,103 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}[hidden]{display
     font-size: 16px !important;
   }
 }
+
+
+/* =========================================================
+   QA 특별관리물질 모바일 모달 안정화 v1
+   - 신규/수정 입력창 좌우 밀림 차단
+   - 시행일/제외일 간격 확보
+   - iPhone Safari 날짜 입력 intrinsic width 보정
+   ========================================================= */
+@media (max-width: 768px) {
+  html,
+  body,
+  .mobile-special-shell,
+  .mobile-special-app {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    overscroll-behavior-x: none !important;
+  }
+
+  .modal-backdrop {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    touch-action: pan-y !important;
+  }
+
+  .modal {
+    width: 100% !important;
+    max-width: 720px !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-x: none !important;
+    touch-action: pan-y !important;
+    box-sizing: border-box !important;
+  }
+
+  #editForm,
+  .form-grid,
+  .form-grid label,
+  .cas-field {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    column-gap: 12px !important;
+    row-gap: 8px !important;
+  }
+
+  /* 시행일/제외일 사이 여백을 추가 확보 */
+  .form-grid label:has(#effectiveFrom) {
+    padding-right: 3px !important;
+    overflow: hidden !important;
+  }
+
+  .form-grid label:has(#effectiveTo) {
+    padding-left: 3px !important;
+    overflow: hidden !important;
+  }
+
+  /* iOS Safari의 날짜 입력 고유 최소폭 해제 */
+  #effectiveFrom,
+  #effectiveTo,
+  .form-grid input[type="date"] {
+    display: block !important;
+    inline-size: 100% !important;
+    width: 100% !important;
+    min-inline-size: 0 !important;
+    min-width: 0 !important;
+    max-inline-size: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    overflow: hidden !important;
+  }
+
+  #effectiveFrom::-webkit-date-and-time-value,
+  #effectiveTo::-webkit-date-and-time-value,
+  .form-grid input[type="date"]::-webkit-date-and-time-value {
+    min-width: 0 !important;
+    width: 100% !important;
+    text-align: left !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .form-grid label:has(#effectiveFrom),
+  .form-grid label:has(#effectiveTo) {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
