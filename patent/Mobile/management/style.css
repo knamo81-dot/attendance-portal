@@ -2200,3 +2200,40 @@
     background: #fffaf0 !important;
   }
 }
+
+/* =========================================================
+   Patent Mobile Company Search Filters v5.9
+   - 전체 / 국가 / 소유구분 필터 3개를 한 줄에 배치
+   - 검색어 입력은 다음 줄 전체 폭 유지
+   ========================================================= */
+@media (max-width: 768px) {
+  .company-search-filters.integrated {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+
+  #companyScopeFilter,
+  #companyCountryFilter,
+  #companyOwnershipFilter {
+    grid-column: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  #companyResultSearch {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .company-search-filters.integrated {
+    gap: 5px !important;
+  }
+}
