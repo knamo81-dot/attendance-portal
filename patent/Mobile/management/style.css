@@ -1936,3 +1936,259 @@
     font-size: 7.5px !important;
   }
 }
+
+
+/* =========================================================
+   Patent Management Mobile - Deadline Day Bottom Sheet v5.7
+   ========================================================= */
+@media (max-width: 768px) {
+  #sectionDeadlines .pat-cal-cell.has-deadlines {
+    cursor: pointer !important;
+    background: #fffefb !important;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #sectionDeadlines .pat-cal-cell.has-deadlines:active {
+    background: #fff8e8 !important;
+    box-shadow: inset 0 0 0 1px #d7b66b !important;
+  }
+
+  #sectionDeadlines .pat-cal-cell.has-deadlines:focus-visible {
+    outline: 2px solid #b7831f !important;
+    outline-offset: -2px !important;
+  }
+
+  body.deadline-day-sheet-open {
+    overflow: hidden !important;
+  }
+
+  .deadline-day-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+    background: rgba(15,23,42,.42);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .18s ease, visibility .18s ease;
+    backdrop-filter: blur(2px);
+  }
+
+  .deadline-day-sheet-backdrop.show {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .deadline-day-sheet {
+    width: 100%;
+    max-width: 100%;
+    max-height: min(76dvh, 680px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-bottom: 0;
+    border-radius: 20px 20px 0 0;
+    background: #fff;
+    box-shadow: 0 -18px 50px rgba(15,23,42,.18);
+    transform: translateY(24px);
+    transition: transform .2s ease;
+  }
+
+  .deadline-day-sheet-backdrop.show .deadline-day-sheet {
+    transform: translateY(0);
+  }
+
+  .deadline-day-sheet-handle {
+    width: 38px;
+    height: 4px;
+    flex: 0 0 auto;
+    margin: 8px auto 3px;
+    border-radius: 999px;
+    background: #cbd5e1;
+  }
+
+  .deadline-day-sheet-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px 11px;
+    border-bottom: 1px solid #e8edf3;
+  }
+
+  .deadline-day-sheet-heading {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .deadline-day-sheet-title {
+    color: #172033;
+    font-size: 15px;
+    font-weight: 900;
+    line-height: 1.3;
+    letter-spacing: -.03em;
+  }
+
+  .deadline-day-sheet-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 7px;
+  }
+
+  .deadline-day-summary-chip,
+  .deadline-day-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .deadline-day-summary-chip {
+    min-height: 23px;
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+
+  .deadline-day-summary-chip.planned,
+  .deadline-day-status.planned {
+    background: #fff4cf;
+    color: #8a5a00;
+  }
+
+  .deadline-day-summary-chip.completed,
+  .deadline-day-status.completed {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  .deadline-day-summary-chip.overdue,
+  .deadline-day-status.overdue {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+
+  .deadline-day-summary-chip.other,
+  .deadline-day-status.other {
+    background: #eef2f7;
+    color: #475569;
+  }
+
+  .deadline-day-sheet-close {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .deadline-day-sheet-list {
+    min-height: 0;
+    overflow-y: auto;
+    display: grid;
+    gap: 8px;
+    padding: 10px 12px calc(14px + env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .deadline-day-item {
+    width: 100%;
+    min-width: 0;
+    display: block;
+    padding: 10px 11px;
+    border: 1px solid #dde5ed;
+    border-radius: 12px;
+    background: #fff;
+    color: #172033;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .deadline-day-item:active {
+    border-color: #d7b66b;
+    background: #fffaf0;
+  }
+
+  .deadline-day-item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .deadline-day-status {
+    min-height: 22px;
+    padding: 3px 7px;
+    font-size: 9.5px;
+  }
+
+  .deadline-day-dday {
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .deadline-day-item-title {
+    margin-top: 7px;
+    color: #172033;
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .deadline-day-item-patent {
+    margin-top: 4px;
+    color: #475569;
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .deadline-day-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin-top: 6px;
+    color: #7c8797;
+    font-size: 9.5px;
+    line-height: 1.4;
+  }
+
+  .deadline-day-item-footer {
+    margin-top: 7px;
+    padding-top: 6px;
+    border-top: 1px solid #eef2f6;
+    color: #956817;
+    font-size: 9.5px;
+    font-weight: 900;
+    text-align: right;
+  }
+
+  #sectionDeadlines tr.deadline-row-focus {
+    outline: 2px solid #d7b66b !important;
+    outline-offset: -2px !important;
+    background: #fffaf0 !important;
+  }
+}
