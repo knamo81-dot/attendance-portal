@@ -110,10 +110,16 @@
   }
   function applyPermissionUi(){
     const manage=canManageQa();
-    $('#refreshBtn').hidden=!manage;
-    $('#newTargetBtn').hidden=!manage;
-    $('#actionHead').hidden=!manage;
-    $('#statusActionHead').hidden=!manage;
+    const refreshBtn=$('#refreshBtn');
+    const newTargetBtn=$('#newTargetBtn');
+    const actionHead=$('#actionHead');
+    const statusActionHead=$('#statusActionHead');
+
+    if(refreshBtn) refreshBtn.hidden=!manage;
+    if(newTargetBtn) newTargetBtn.hidden=!manage;
+    if(actionHead) actionHead.hidden=!manage;
+    if(statusActionHead) statusActionHead.hidden=!manage;
+
     document.body.classList.toggle('qa-workenv-viewer',!manage);
   }
   async function setView(view,{reload=true}={}){
@@ -998,16 +1004,32 @@
     $('#statusBody').innerHTML='<div class="empty-card">작업환경측정 현황을 불러오는 중입니다.</div>';
     $('#standardsBody').innerHTML='<div class="empty-card">대상물질 기준정보를 불러오는 중입니다.</div>';
 
-    await waitForPortalReady();
-    applyPermissionUi();
+    try{
+      await waitForPortalReady(12000);
+      applyPermissionUi();
 
-    await Promise.all([
-      loadStandards(),
-      loadStatus(),
-      loadOrgDirectory()
-    ]);
+      const results=await Promise.allSettled([
+        loadStandards(),
+        loadStatus(),
+        loadOrgDirectory()
+      ]);
 
-    await setView('status',{reload:false});
+      results.forEach((r,i)=>{
+        if(r.status==='rejected'){
+          console.error(['대상물질기준','작업환경측정현황','조직정보'][i]+' 초기조회 실패',r.reason);
+        }
+      });
+
+      await setView('status',{reload:false});
+    }catch(e){
+      console.error('작업환경측정 모바일 초기화 실패',e);
+      $('#statusTargetCount').textContent='-';
+      $('#statusDoneCount').textContent='-';
+      $('#statusDueCount').textContent='-';
+      $('#statusOverdueCount').textContent='-';
+      $('#statusBody').innerHTML=`<div class="empty-card">작업환경측정 초기화 실패: ${esc(e.message||e)}</div>`;
+      $('#standardsBody').innerHTML=`<div class="empty-card">대상물질기준 초기화 실패: ${esc(e.message||e)}</div>`;
+    }
   }
 
   bootstrap();
