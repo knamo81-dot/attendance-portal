@@ -39,6 +39,19 @@
     const s=portalSession(), e=s.employee||{}, u=s.user||{}, c=s.company||s.activeCompany||{};
     return String(s.activeCompanyId||s.companyId||s.company_id||c.id||c.company_id||e.company_id||u.company_id||'').trim();
   }
+  const sleep = ms => new Promise(resolve=>setTimeout(resolve,ms));
+  async function waitForPortalReady(timeoutMs=8000){
+    const started=Date.now();
+    while(Date.now()-started < timeoutMs){
+      const sb=client();
+      const cid=companyId();
+      const s=portalSession();
+      const hasSession=!!(cid || s?.user || s?.employee || s?.profile || s?.activeCompanyId || s?.companyId || s?.company_id);
+      if(sb && hasSession) return true;
+      await sleep(100);
+    }
+    return !!client();
+  }
   function userName(){
     const s=portalSession(), e=s.employee||{}, u=s.user||{}, p=s.profile||{};
     return String(e.name||e.employee_name||u.name||u.user_name||p.name||p.full_name||s.name||'').trim() || null;
@@ -103,12 +116,20 @@
     $('#statusActionHead').hidden=!manage;
     document.body.classList.toggle('qa-workenv-viewer',!manage);
   }
-  function setView(view){
+  async function setView(view,{reload=true}={}){
     state.currentView=view;
     $$('.inner-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
     $('#statusView').classList.toggle('hidden',view!=='status');
     $('#standardsView').classList.toggle('hidden',view!=='standards');
-    if(view==='status') loadStatus();
+
+    if(!reload) return;
+    await waitForPortalReady();
+
+    if(view==='status'){
+      await loadStatus();
+    }else if(view==='standards'){
+      await loadStandards();
+    }
   }
   $$('.inner-tabs button').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
 
@@ -234,7 +255,14 @@
 
   async function loadStandards(){
     const sb=client();
-    if(!sb){ $('#standardsBody').innerHTML='<div class="empty-card">포털 Supabase 연결을 찾을 수 없습니다.</div>'; return; }
+    if(!sb){
+      $('#hazardCount').textContent='-';
+      $('#unverifiedCount').textContent='-';
+      $('#productCount').textContent='-';
+      $('#apiChecked').textContent='-';
+      $('#standardsBody').innerHTML='<div class="empty-card">포털 연결을 준비하는 중입니다.</div>';
+      return false;
+    }
     try{
       const cid=companyId();
       const sr=await sb.from('vw_qa_work_environment_standards').select('*').order('chemical_id');
@@ -288,6 +316,7 @@
       $('#apiChecked').textContent=fmtDate(checked);
       fillStandardFilters();
       renderStandards();
+      return true;
     }catch(e){
       console.error(e);
       $('#standardsBody').innerHTML=`<div class="empty-card">기준정보 조회 실패: ${esc(e.message||e)}</div>`;
@@ -468,7 +497,16 @@
 
 
   async function loadStatus(){
-    const sb=client(); if(!sb)return;
+    const sb=client();
+    if(!sb){
+      $('#statusTargetCount').textContent='-';
+      $('#statusDoneCount').textContent='-';
+      $('#statusDueCount').textContent='-';
+      $('#statusOverdueCount').textContent='-';
+      $('#statusYear').innerHTML='';
+      $('#statusBody').innerHTML='<div class="empty-card">포털 연결을 준비하는 중입니다.</div>';
+      return false;
+    }
     const cid=companyId();
     try{
       let q=sb.from('vw_qa_work_environment_status').select('*').eq('target_status','active');
@@ -479,6 +517,7 @@
       fillStatusYears();
       fillStatusOrgFilters();
       renderStatus();
+      return true;
     }catch(e){
       console.error(e);
       $('#statusBody').innerHTML=`<div class="empty-card">현황 DB 조회 실패: ${esc(e.message||e)}<br>database/QA_작업환경측정_복수연결_DB_3단계.sql 실행 여부를 확인해 주세요.</div>`;
@@ -950,10 +989,26 @@
     const p=event.data||{};
     if(p.type==='portal-tab-change' && (p.tabId==='qa-work-environment'||p.tab==='qa-work-environment')){
       try{window.parent?.postMessage({type:'portal-tab-active',activeTabId:'qa-work-environment',source:'qa-work-environment'},'*')}catch(_){}
+      setView(state.currentView||'status');
     }
   });
   try{window.parent?.postMessage({type:'portal-tab-active',activeTabId:'qa-work-environment',source:'qa-work-environment'},'*')}catch(_){}
 
-  applyPermissionUi();
-  Promise.all([loadStandards(),loadStatus(),loadOrgDirectory()]).finally(()=>setView('status'));
+  async function bootstrap(){
+    $('#statusBody').innerHTML='<div class="empty-card">작업환경측정 현황을 불러오는 중입니다.</div>';
+    $('#standardsBody').innerHTML='<div class="empty-card">대상물질 기준정보를 불러오는 중입니다.</div>';
+
+    await waitForPortalReady();
+    applyPermissionUi();
+
+    await Promise.all([
+      loadStandards(),
+      loadStatus(),
+      loadOrgDirectory()
+    ]);
+
+    await setView('status',{reload:false});
+  }
+
+  bootstrap();
 })();
