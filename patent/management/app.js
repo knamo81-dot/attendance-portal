@@ -1,9 +1,12 @@
 (function(){
   'use strict';
   const P=window.PatentCommon;
-  let ctx=null, patents=[], payments=[], deadlines=[], agencies=[], employees=[], settings=null;
+  let ctx=null, patents=[], payments=[], deadlines=[], agencies=[], employees=[], settings=null, companySearchTerms=[];
+  let companySearchTermsTableReady=true;
   let section='payments', editingPayment=null, editingDeadline=null, editingAgency=null, calendarDate=new Date();
-  let companySearchData=null, companySearchPage=1, companySearchPageSize=50, companySearchLoading=false, companySearchCacheLoading=false, companySearchCountry='KR', companySearchNameValue='';
+  let companySearchData=null, companySearchLoading=false, companySearchCacheLoading=false;
+  let companySearchProgress='';
+  let companySearchScopeFilter='ALL', companySearchCountryFilter='', companySearchOwnershipFilter='', companySearchTextFilter='';
   const query=new URLSearchParams(location.search);
   const $=id=>document.getElementById(id);
 
@@ -28,11 +31,8 @@
     document.querySelectorAll('[data-section]').forEach(b=>b.addEventListener('click',()=>showSection(b.dataset.section)));
     $('refreshBtn').addEventListener('click',()=>{
       if(section==='company-search'&&ctx.access.admin){
-        loadCompanySearchCachePage(
-          currentCompanySearchName(),
-          companySearchPage,
-          {notify:true}
-        ).catch(e=>P.toast(e.message,'error'));
+        loadCompanySearchCacheAll({notify:true})
+          .catch(e=>P.toast(e.message,'error'));
         return;
       }
       loadAll().catch(e=>P.toast(e.message,'error'));
@@ -44,15 +44,20 @@
 
   async function loadAll(){
     const jobs=[
-      P.companyQuery('pat_master','id,invention_title,application_no,registration_no,internal_no,legal_status').eq('is_active',true).order('invention_title'),
+      P.companyQuery('pat_master','id,country_code,invention_title,application_no,registration_no,internal_no,legal_status').eq('is_active',true).order('invention_title'),
       P.companyQuery('pat_payments','*').order('official_due_date',{ascending:true}),
       P.companyQuery('pat_deadlines','*').order('due_date',{ascending:true}),
       P.companyQuery('pat_agencies','*').eq('is_active',true).order('agency_name'),
       P.state.client.from('employees').select('employee_no,name,email').eq('company_id',ctx.session.companyId).order('name')
     ];
     jobs.push(P.companyQuery('pat_settings','*').maybeSingle());
+    jobs.push(
+      P.companyQuery('pat_company_search_terms','*')
+        .order('display_order',{ascending:true})
+        .order('created_at',{ascending:true})
+    );
 
-    const [p,pay,dead,ag,emp,set]=await Promise.all(jobs);
+    const [p,pay,dead,ag,emp,set,termRes]=await Promise.all(jobs);
     [p,pay,dead,ag].forEach(r=>{if(r.error)throw r.error;});
 
     patents=p.data||[];
@@ -61,6 +66,20 @@
     agencies=ag.data||[];
     employees=emp.error?[]:(emp.data||[]);
     settings=set.error?null:set.data;
+
+    if(termRes?.error){
+      if(isMissingCompanySearchTermsTable(termRes.error)){
+        companySearchTerms=[];
+        companySearchTermsTableReady=false;
+      }else{
+        console.warn('[company-search-terms-load]',termRes.error);
+        companySearchTerms=[];
+        companySearchTermsTableReady=false;
+      }
+    }else{
+      companySearchTerms=termRes?.data||[];
+      companySearchTermsTableReady=true;
+    }
 
     /*
      * 납부기한이 지난 미완료 납부건은 자동으로 OVERDUE(기한초과) 처리합니다.
@@ -213,11 +232,8 @@
       !companySearchLoading &&
       !companySearchCacheLoading
     ){
-      loadCompanySearchCachePage(
-        defaultCompanySearchName(),
-        companySearchPage,
-        {notify:false}
-      ).catch(e=>console.warn('[company-search-cache]',e));
+      loadCompanySearchCacheAll({notify:false})
+        .catch(e=>console.warn('[company-search-cache]',e));
     }
   }
 
@@ -1203,62 +1219,77 @@
 
 
 
+
   const COMPANY_SEARCH_COUNTRIES=[
     ['KR','한국'],
     ['US','미국'],
     ['EP','유럽특허청'],
     ['JP','일본'],
     ['CN','중국'],
-    ['WO','PCT']
+    ['WO','PCT'],
+    ['RU','러시아'],
+    ['CO','콜롬비아']
   ];
+
+  const COMPANY_SEARCH_PAGE_SIZE=100;
+  const COMPANY_SEARCH_MAX_PAGES=20;
 
   function normalizeCompanySearchCountry(value){
     const code=String(value||'KR').trim().toUpperCase();
+
     if(code==='CP')return 'CN';
+
     return COMPANY_SEARCH_COUNTRIES.some(([v])=>v===code)
       ?code
       :'KR';
   }
 
-  function companySearchCountryOptions(selected){
-    const current=normalizeCompanySearchCountry(selected);
-    return COMPANY_SEARCH_COUNTRIES
-      .map(([value,label])=>(
-        `<option value="${value}" ${value===current?'selected':''}>${label} (${value})</option>`
-      ))
-      .join('');
+  function countryLabel(value){
+    const code=normalizeCompanySearchCountry(value);
+    const found=COMPANY_SEARCH_COUNTRIES.find(([v])=>v===code);
+
+    return found
+      ?`${found[1]} (${code})`
+      :(code||'-');
   }
 
-  function currentCompanySearchCountry(){
-    return normalizeCompanySearchCountry(
-      $('companySearchCountry')?.value||
-      companySearchData?.country_code||
-      companySearchCountry||
-      'KR'
-    );
+  function activeCompanySearchTerms(){
+    return companySearchTerms
+      .filter(item=>item.is_active!==false)
+      .filter(item=>String(item.search_term||'').trim())
+      .sort((a,b)=>{
+        const order=(Number(a.display_order)||0)-(Number(b.display_order)||0);
+        if(order!==0)return order;
+        return String(a.search_term||'').localeCompare(
+          String(b.search_term||''),
+          'ko'
+        );
+      });
   }
 
-  function defaultCompanySearchName(){
-    const sessionName=String(ctx?.session?.companyName||'').trim();
-    return sessionName||'삼천당제약';
-  }
+  function companySearchTermLanguageLabel(value){
+    const code=String(value||'ETC').toUpperCase();
 
-
-  function currentCompanySearchName(){
-    return String(
-      $('companySearchName')?.value||
-      companySearchNameValue||
-      companySearchData?.company_name||
-      defaultCompanySearchName()
-    ).trim();
+    if(code==='KO')return '국문';
+    if(code==='EN')return '영문';
+    return '기타';
   }
 
   function companySearchCacheKey(value){
-    return String(value||'')
-      .normalize('NFKC')
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g,'');
+    const source=String(value||'');
+
+    try{
+      return source
+        .normalize('NFKC')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g,'');
+    }catch(_){
+      return source
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g,'');
+    }
   }
 
   function patentNumberKey(value){
@@ -1281,6 +1312,160 @@
     if(!number)return '';
 
     return `${normalizeCompanySearchCountry(country)}::${number}`;
+  }
+
+  function companyPatentDedupeKey(item,index=0){
+    const country=normalizeCompanySearchCountry(item?.country_code||'KR');
+    const app=patentNumberKey(item?.application_no);
+    const reg=patentNumberKey(item?.registration_no);
+
+    if(app)return `${country}::APP::${app}`;
+    if(reg)return `${country}::REG::${reg}`;
+
+    // 번호가 없는 자료는 잘못 합치지 않도록 별도 건으로 유지
+    return `${country}::UNKEYED::${index}::${String(item?.invention_title||'')}`;
+  }
+
+  function normalizePatentArray(value){
+    if(!value)return [];
+    if(Array.isArray(value))return value.filter(Boolean);
+
+    if(typeof value==='string'){
+      return value
+        .split(/[,\n;|]/)
+        .map(x=>x.trim())
+        .filter(Boolean);
+    }
+
+    return [];
+  }
+
+  function unionArray(...values){
+    return [
+      ...new Set(
+        values
+          .flatMap(value=>normalizePatentArray(value))
+          .map(value=>String(value||'').trim())
+          .filter(Boolean)
+      )
+    ];
+  }
+
+  function ownershipRank(value){
+    const map={
+      '현재보유':7,
+      '공동보유':6,
+      '출원중':5,
+      '확인필요':4,
+      '권리이전':3,
+      '거절':2,
+      '포기':1,
+      '소멸':0
+    };
+
+    return map[value]??4;
+  }
+
+  function richerText(a,b){
+    const aa=String(a||'').trim();
+    const bb=String(b||'').trim();
+
+    if(!aa)return b??null;
+    if(!bb)return a??null;
+
+    return bb.length>aa.length?b:a;
+  }
+
+  function mergeCompanyPatent(existing,incoming){
+    if(!existing)return {
+      ...incoming,
+      matched_search_terms:unionArray(
+        incoming.matched_search_terms
+      )
+    };
+
+    const ownership=
+      ownershipRank(incoming.ownership_status)>
+      ownershipRank(existing.ownership_status)
+        ?incoming.ownership_status
+        :existing.ownership_status;
+
+    return {
+      ...existing,
+      ...Object.fromEntries(
+        Object.entries(incoming).filter(([,value])=>{
+          if(value===null||value===undefined||value==='')return false;
+          if(Array.isArray(value)&&!value.length)return false;
+          return true;
+        })
+      ),
+
+      invention_title:richerText(
+        existing.invention_title,
+        incoming.invention_title
+      ),
+
+      abstract_text:richerText(
+        existing.abstract_text,
+        incoming.abstract_text
+      ),
+
+      applicant_names:unionArray(
+        existing.applicant_names,
+        incoming.applicant_names
+      ),
+
+      right_holder_names:unionArray(
+        existing.right_holder_names,
+        incoming.right_holder_names
+      ),
+
+      agent_names:unionArray(
+        existing.agent_names,
+        incoming.agent_names
+      ),
+
+      ipc_codes:unionArray(
+        existing.ipc_codes,
+        incoming.ipc_codes
+      ),
+
+      cpc_codes:unionArray(
+        existing.cpc_codes,
+        incoming.cpc_codes
+      ),
+
+      inventors:unionArray(
+        existing.inventors,
+        incoming.inventors
+      ),
+
+      warnings:unionArray(
+        existing.warnings,
+        incoming.warnings
+      ),
+
+      current_owner_matches:unionArray(
+        existing.current_owner_matches,
+        incoming.current_owner_matches
+      ),
+
+      matched_search_terms:unionArray(
+        existing.matched_search_terms,
+        incoming.matched_search_terms
+      ),
+
+      ownership_status:ownership,
+
+      portal_registered:
+        !!existing.portal_registered||
+        !!incoming.portal_registered,
+
+      portal_patent_id:
+        existing.portal_patent_id||
+        incoming.portal_patent_id||
+        null
+    };
   }
 
   function refreshPortalRegistrationFlags(data){
@@ -1310,9 +1495,7 @@
 
     data.patents=data.patents.map(item=>{
       const country=normalizeCompanySearchCountry(
-        item.country_code||
-        data.country_code||
-        'KR'
+        item.country_code||'KR'
       );
 
       const appKey=portalPatentKey(
@@ -1341,126 +1524,233 @@
     return data;
   }
 
+  function isMissingCompanySearchCacheTable(error){
+    const text=String(error?.message||'').toLowerCase();
+
+    return (
+      error?.code==='42P01'||
+      (
+        text.includes('pat_company_search_cache')&&
+        text.includes('does not exist')
+      )
+    );
+  }
+
+  function isMissingCompanySearchTermsTable(error){
+    const text=String(error?.message||'').toLowerCase();
+
+    return (
+      error?.code==='42P01'||
+      (
+        text.includes('pat_company_search_terms')&&
+        text.includes('does not exist')
+      )
+    );
+  }
+
   function cloneCompanySearchResponse(data){
     const copy=JSON.parse(JSON.stringify(data||{}));
     delete copy._cache_meta;
     return copy;
   }
 
-  function isMissingCompanySearchCacheTable(error){
-    const text=String(error?.message||'').toLowerCase();
-    return (
-      error?.code==='42P01' ||
-      (
-        text.includes('pat_company_search_cache') &&
-        text.includes('does not exist')
-      )
-    );
+  function buildCompanySearchAggregate(cacheRows,meta={}){
+    const map=new Map();
+    let seq=0;
+    let newestSync=null;
+    const queryRuns=[];
+
+    for(const row of cacheRows||[]){
+      const response=row?.response_json||{};
+      const searchName=String(
+        row?.search_name||
+        response?.company_name||
+        ''
+      ).trim();
+
+      const country=normalizeCompanySearchCountry(
+        row?.country_code||
+        response?.country_code||
+        'KR'
+      );
+
+      const syncAt=
+        row?.synced_at||
+        response?.source?.searched_at||
+        null;
+
+      if(syncAt&&(!newestSync||syncAt>newestSync)){
+        newestSync=syncAt;
+      }
+
+      queryRuns.push({
+        search_name:searchName,
+        country_code:country,
+        page:Number(row?.page||response?.page||1)||1,
+        total_count:Number(row?.total_count||response?.total_count||0)||0,
+        returned_count:Number(row?.returned_count||response?.returned_count||0)||0,
+        synced_at:syncAt
+      });
+
+      const patentRows=Array.isArray(response?.patents)
+        ?response.patents
+        :[];
+
+      for(const raw of patentRows){
+        const item={
+          ...raw,
+          country_code:normalizeCompanySearchCountry(
+            raw?.country_code||country
+          ),
+          matched_search_terms:unionArray(
+            raw?.matched_search_terms,
+            searchName
+          )
+        };
+
+        const key=companyPatentDedupeKey(item,seq++);
+        map.set(
+          key,
+          mergeCompanyPatent(
+            map.get(key),
+            item
+          )
+        );
+      }
+    }
+
+    const patents=[...map.values()];
+
+    patents.sort((a,b)=>{
+      const ad=String(a.application_date||'');
+      const bd=String(b.application_date||'');
+
+      if(ad!==bd)return bd.localeCompare(ad);
+
+      const ar=String(a.registration_date||'');
+      const br=String(b.registration_date||'');
+
+      if(ar!==br)return br.localeCompare(ar);
+
+      return String(a.invention_title||'')
+        .localeCompare(
+          String(b.invention_title||''),
+          'ko'
+        );
+    });
+
+    const data=refreshPortalRegistrationFlags({
+      patents,
+      query_runs:queryRuns,
+      searched_terms:activeCompanySearchTerms().map(item=>({
+        id:item.id,
+        search_term:item.search_term,
+        language_code:item.language_code,
+        is_active:item.is_active
+      })),
+      searched_countries:COMPANY_SEARCH_COUNTRIES.map(([code])=>code),
+      source:{
+        provider:'KIPRISPlus',
+        mode:'integrated-company-search',
+        searched_at:newestSync
+      },
+      _cache_meta:{
+        cached:meta.cached!==false,
+        refreshed:!!meta.refreshed,
+        synced_at:newestSync,
+        errors:meta.errors||[]
+      }
+    });
+
+    companySearchData=data;
+    return data;
   }
 
-  function applyCompanySearchData(data,cacheMeta=null){
-    if(!data)return false;
-
-    const normalized=refreshPortalRegistrationFlags(
-      cloneCompanySearchResponse(data)
-    );
-
-    normalized._cache_meta={
-      cached:!!cacheMeta?.cached,
-      saved:cacheMeta?.saved!==false,
-      synced_at:
-        cacheMeta?.synced_at||
-        normalized?.source?.searched_at||
-        null
-    };
-
-    companySearchData=normalized;
-    companySearchCountry=normalizeCompanySearchCountry(
-      normalized.country_code||companySearchCountry
-    );
-    companySearchNameValue=String(
-      normalized.company_name||companySearchNameValue||''
-    ).trim();
-    companySearchPage=
-      Math.max(1,Number(normalized.page||companySearchPage)||1);
-    companySearchPageSize=
-      Math.max(1,Number(normalized.page_size||companySearchPageSize)||50);
-
-    return true;
-  }
-
-  async function loadCompanySearchCachePage(
-    companyName,
-    page=1,
-    options={}
-  ){
+  async function loadCompanySearchCacheAll(options={}){
     if(!ctx?.access?.admin)return false;
     if(companySearchCacheLoading)return false;
 
-    const name=String(companyName||defaultCompanySearchName()).trim();
-    if(!name)return false;
+    const terms=activeCompanySearchTerms();
 
-    const targetPage=Math.max(1,Number(page)||1);
-    const key=companySearchCacheKey(name);
-    const country=normalizeCompanySearchCountry(
-      options.countryCode||currentCompanySearchCountry()
-    );
+    if(!terms.length){
+      companySearchData=null;
+      renderCompanySearch();
 
-    companySearchCountry=country;
-    companySearchNameValue=name;
+      if(options.notify){
+        P.toast(
+          '설정 > 회사특허 검색명에서 검색명을 먼저 등록해 주세요.',
+          'warn'
+        );
+      }
+
+      return false;
+    }
+
     companySearchCacheLoading=true;
 
     try{
+      const keys=new Set(
+        terms.map(item=>companySearchCacheKey(item.search_term))
+      );
+
+      const countries=COMPANY_SEARCH_COUNTRIES.map(([code])=>code);
+
       const {data,error}=await P.state.client
         .from('pat_company_search_cache')
         .select(
-          'search_name,page,page_size,total_count,returned_count,has_more,response_json,synced_at'
+          'search_name_key,search_name,country_code,page,page_size,total_count,returned_count,has_more,response_json,synced_at'
         )
         .eq('company_id',ctx.session.companyId)
-        .eq('search_name_key',key)
-        .eq('country_code',country)
-        .eq('page',targetPage)
-        .eq('page_size',companySearchPageSize)
-        .maybeSingle();
+        .in('country_code',countries)
+        .order('synced_at',{ascending:false});
 
       if(error){
         if(isMissingCompanySearchCacheTable(error)){
           if(options.notify){
             P.toast(
-              '회사특허 저장 테이블이 없습니다. 포함된 SQL을 먼저 실행해 주세요.',
+              '회사특허 조회 캐시 테이블이 없습니다. 포함된 SQL을 먼저 실행해 주세요.',
               'warn',
               5200
             );
           }
           return false;
         }
+
         throw error;
       }
 
-      if(!data?.response_json){
+      const relevant=(data||[]).filter(
+        row=>keys.has(String(row.search_name_key||''))
+      );
+
+      if(!relevant.length){
+        companySearchData=null;
+        renderCompanySearch();
+
         if(options.notify){
           P.toast(
-            '저장된 조회결과가 없습니다. KIPRIS 새로조회를 눌러주세요.',
+            '저장된 통합 조회자료가 없습니다. 전체 새로조회를 실행해 주세요.',
             'warn'
           );
         }
+
         return false;
       }
 
-      applyCompanySearchData(
-        data.response_json,
+      buildCompanySearchAggregate(
+        relevant,
         {
           cached:true,
-          saved:true,
-          synced_at:data.synced_at
+          refreshed:false
         }
       );
 
-      companySearchPage=targetPage;
       renderCompanySearch();
 
       if(options.notify){
-        P.toast('저장된 회사특허 조회결과를 불러왔습니다.');
+        P.toast(
+          `저장자료 ${companySearchData?.patents?.length||0}건을 통합해서 불러왔습니다.`
+        );
       }
 
       return true;
@@ -1472,16 +1762,26 @@
   async function saveCompanySearchCachePage(companyName,data){
     if(!ctx?.access?.admin||!data)return false;
 
-    const name=String(companyName||data.company_name||'').trim();
+    const name=String(
+      companyName||
+      data.company_name||
+      ''
+    ).trim();
+
     if(!name)return false;
 
     const payload={
       company_id:ctx.session.companyId,
       search_name_key:companySearchCacheKey(name),
       search_name:name,
-      country_code:String(data.country_code||'KR').toUpperCase(),
-      page:Math.max(1,Number(data.page||companySearchPage)||1),
-      page_size:Math.max(1,Number(data.page_size||companySearchPageSize)||50),
+      country_code:normalizeCompanySearchCountry(
+        data.country_code||'KR'
+      ),
+      page:Math.max(1,Number(data.page||1)||1),
+      page_size:Math.max(
+        1,
+        Number(data.page_size||COMPANY_SEARCH_PAGE_SIZE)||COMPANY_SEARCH_PAGE_SIZE
+      ),
       total_count:Math.max(0,Number(data.total_count||0)||0),
       returned_count:Math.max(0,Number(data.returned_count||0)||0),
       has_more:!!data.has_more,
@@ -1489,7 +1789,8 @@
       synced_at:
         data?.source?.searched_at||
         new Date().toISOString(),
-      synced_by_employee_no:ctx.session.employeeNo||null
+      synced_by_employee_no:
+        ctx.session.employeeNo||null
     };
 
     const {error}=await P.state.client
@@ -1504,37 +1805,28 @@
 
     if(error){
       if(isMissingCompanySearchCacheTable(error)){
-        P.toast(
-          'KIPRIS 조회는 완료됐지만 저장 테이블이 없어 결과를 저장하지 못했습니다. 포함된 SQL을 실행해 주세요.',
-          'warn',
-          6000
+        throw new Error(
+          '회사특허 조회 캐시 테이블이 없습니다. 포함된 SQL을 먼저 실행해 주세요.'
         );
-        return false;
       }
+
       throw error;
     }
 
     return true;
   }
 
-  async function openCompanySearchPage(page){
-    const targetPage=Math.max(1,Number(page)||1);
-    const companyName=currentCompanySearchName();
-    const country=currentCompanySearchCountry();
+  async function clearCompanySearchCacheSeries(searchName,country){
+    const {error}=await P.state.client
+      .from('pat_company_search_cache')
+      .delete()
+      .eq('company_id',ctx.session.companyId)
+      .eq('search_name_key',companySearchCacheKey(searchName))
+      .eq('country_code',normalizeCompanySearchCountry(country));
 
-    const loaded=await loadCompanySearchCachePage(
-      companyName,
-      targetPage,
-      {
-        notify:false,
-        countryCode:country
-      }
-    );
-
-    if(loaded)return;
-
-    // 아직 조회하지 않은 페이지는 최초 1회만 API 호출 후 자동 저장합니다.
-    await searchCompanyPatents(targetPage);
+    if(error&&!isMissingCompanySearchCacheTable(error)){
+      throw error;
+    }
   }
 
   function companyOwnershipClass(status){
@@ -1548,6 +1840,7 @@
       '포기':'abandoned',
       '확인필요':'review'
     };
+
     return map[status]||'review';
   }
 
@@ -1560,6 +1853,7 @@
       '포기':'abandoned',
       '소멸':'expired'
     };
+
     return map[status]||'neutral';
   }
 
@@ -1569,24 +1863,60 @@
     return value||'-';
   }
 
-  function countryLabel(value){
-    const code=normalizeCompanySearchCountry(value);
-    const found=COMPANY_SEARCH_COUNTRIES.find(([v])=>v===code);
-    return found?`${found[1]} (${code})`:(code||'-');
-  }
-
   function normalizeSearchText(value){
     return String(value??'').trim().toLowerCase();
   }
 
+  function unregisteredCompanySearchRows(){
+    const rows=Array.isArray(companySearchData?.patents)
+      ?companySearchData.patents
+      :[];
+
+    return rows.filter(item=>!item.portal_registered);
+  }
+
+  function companySearchCountryStats(){
+    const stats=new Map();
+
+    for(const item of unregisteredCompanySearchRows()){
+      const code=normalizeCompanySearchCountry(item.country_code);
+      stats.set(code,(stats.get(code)||0)+1);
+    }
+
+    return [...stats.entries()]
+      .sort((a,b)=>{
+        const ai=COMPANY_SEARCH_COUNTRIES.findIndex(([code])=>code===a[0]);
+        const bi=COMPANY_SEARCH_COUNTRIES.findIndex(([code])=>code===b[0]);
+        return ai-bi;
+      });
+  }
+
   function companyPatentMatchesFilter(item){
-    // 이미 특허목록(pat_master)에 등록된 건은 회사특허 조회 대상에서 제외합니다.
     if(item.portal_registered)return false;
 
-    const search=normalizeSearchText($('companyResultSearch')?.value);
-    const ownership=$('companyOwnershipFilter')?.value||'';
+    const country=normalizeCompanySearchCountry(item.country_code);
 
-    if(ownership&&item.ownership_status!==ownership)return false;
+    if(
+      companySearchScopeFilter==='KR'&&
+      country!=='KR'
+    )return false;
+
+    if(
+      companySearchScopeFilter==='FOREIGN'&&
+      country==='KR'
+    )return false;
+
+    if(
+      companySearchCountryFilter&&
+      country!==companySearchCountryFilter
+    )return false;
+
+    if(
+      companySearchOwnershipFilter&&
+      item.ownership_status!==companySearchOwnershipFilter
+    )return false;
+
+    const search=normalizeSearchText(companySearchTextFilter);
 
     if(!search)return true;
 
@@ -1595,7 +1925,8 @@
       item.application_no,
       item.registration_no,
       ...(Array.isArray(item.applicant_names)?item.applicant_names:[]),
-      ...(Array.isArray(item.right_holder_names)?item.right_holder_names:[])
+      ...(Array.isArray(item.right_holder_names)?item.right_holder_names:[]),
+      ...(Array.isArray(item.matched_search_terms)?item.matched_search_terms:[])
     ]
       .join(' ')
       .toLowerCase()
@@ -1607,126 +1938,181 @@
     if(!root)return;
 
     if(!ctx.access.admin){
-      root.innerHTML='<div class="pat-error">회사 관리자만 회사특허 조회를 사용할 수 있습니다.</div>';
+      root.innerHTML=
+        '<div class="pat-error">회사 관리자만 회사특허 조회를 사용할 수 있습니다.</div>';
       return;
     }
+
+    const terms=activeCompanySearchTerms();
 
     if(companySearchLoading){
       root.innerHTML=`
         <article class="pat-card pat-card-pad company-search-loading">
-          <div class="pat-loading">KIPRIS에서 회사 특허와 현재 권리자를 확인하고 있습니다...</div>
+          <div class="pat-loading">
+            KIPRIS 국내·해외 회사특허를 통합 조회하고 있습니다...
+          </div>
+          <div class="company-search-progress">
+            ${P.escapeHtml(companySearchProgress||'조회 준비 중')}
+          </div>
           <div class="pat-note company-search-loading-note">
-            조회가 끝나면 결과를 DB에 저장합니다. 이후에는 저장자료를 우선 사용해 API 호출 횟수를 줄입니다.
+            검색명 × 국가별로 순차 조회하여 API 부하를 줄이고,
+            결과는 DB 캐시에 저장합니다.
           </div>
         </article>
       `;
       return;
     }
 
-    const data=companySearchData;
-    const defaultName=data?.company_name||defaultCompanySearchName();
-
     root.innerHTML=`
       <div class="company-search-head">
         <div>
           <div class="pat-card-title">회사특허 조회</div>
           <div class="pat-card-desc">
-            KIPRIS 국내·해외 출원인 검색 결과를 포털 특허목록과 비교합니다.
-            이미 포털에 등록된 특허는 자동 제외하고 미등록 후보만 표시합니다.
+            설정에 등록한 회사 검색명으로 국내와 지원 해외국가를 한 번에 조회합니다.
+            동일 특허는 국가 + 출원번호(우선), 등록번호 기준으로 중복 제거합니다.
           </div>
+        </div>
+        <div class="company-search-head-actions">
+          <button id="goCompanySearchSettingsBtn" class="pat-btn secondary" type="button">
+            검색명 설정
+          </button>
         </div>
       </div>
 
-      <div class="company-search-query">
-        <div class="company-search-name">
-          <label>회사명 / 출원인명</label>
-          <input
-            id="companySearchName"
-            class="pat-input"
-            value="${P.escapeHtml(defaultName)}"
-            placeholder="예: 삼천당제약"
-          >
+      <div class="company-search-term-summary">
+        <div class="company-search-term-title">사용 중 검색명</div>
+        <div class="company-search-term-chips">
+          ${terms.length
+            ?terms.map(item=>`
+              <span class="company-term-chip">
+                <span class="company-term-lang">
+                  ${P.escapeHtml(companySearchTermLanguageLabel(item.language_code))}
+                </span>
+                ${P.escapeHtml(item.search_term)}
+              </span>
+            `).join('')
+            :'<span class="pat-empty-inline">등록된 검색명이 없습니다.</span>'
+          }
         </div>
-        <div class="company-search-country">
-          <label>조회 국가</label>
-          <select
-            id="companySearchCountry"
-            class="pat-select"
-          >
-            ${companySearchCountryOptions(
-              data?.country_code||companySearchCountry
-            )}
-          </select>
+      </div>
+
+      <div class="company-search-query integrated">
+        <div class="company-search-supported">
+          <span class="company-search-supported-label">조회 범위</span>
+          <span>
+            ${COMPANY_SEARCH_COUNTRIES
+              .map(([code,label])=>`${label}(${code})`)
+              .join(' · ')}
+          </span>
         </div>
+
         <div class="company-search-actions">
-          <button id="companyCacheLoadBtn" class="pat-btn secondary" type="button">
+          <button
+            id="companyCacheLoadBtn"
+            class="pat-btn secondary"
+            type="button"
+            ${terms.length?'':'disabled'}
+          >
             저장자료 불러오기
           </button>
-          <button id="companySearchBtn" class="pat-btn primary" type="button">
-            KIPRIS 새로조회
+
+          <button
+            id="companySearchBtn"
+            class="pat-btn primary"
+            type="button"
+            ${terms.length?'':'disabled'}
+          >
+            전체 새로조회
           </button>
         </div>
       </div>
 
       <div class="pat-note company-search-note">
-        저장된 조회결과가 있으면 API를 다시 호출하지 않고 DB 자료를 사용합니다.
-        포털 특허목록에 이미 등록된 건은 화면에서 자동 제외합니다.
-        해외특허는 국가별 데이터 제공범위에 따라 현재 권리자가 없을 수 있어 <b>확인필요</b>로 표시될 수 있습니다.
-        <b>KIPRIS 새로조회</b>를 누른 경우에만 최신 KIPRIS 결과를 확인하고 다시 저장합니다.
+        BULK 데이터는 이번 범위에서 제외했습니다.
+        <b>전체 새로조회</b>를 누를 때만 KIPRIS Open API를 호출하며,
+        평소에는 저장된 조회자료를 합쳐 보여줍니다.
+        이미 특허목록에 등록된 건은 자동 제외합니다.
       </div>
 
-      ${data?renderCompanySearchResults(data):`
-        <article class="pat-card pat-card-pad company-search-empty-card">
-          <div class="pat-empty">
-            저장자료가 없으면 <b>KIPRIS 새로조회</b>를 눌러주세요.
-          </div>
-        </article>
-      `}
+      ${!companySearchTermsTableReady?`
+        <div class="pat-warning company-search-sql-warning">
+          회사특허 검색명 테이블이 없습니다. 이번 패키지의 SQL을 먼저 실행해 주세요.
+        </div>
+      `:''}
+
+      ${companySearchData
+        ?renderCompanySearchResults(companySearchData)
+        :`
+          <article class="pat-card pat-card-pad company-search-empty-card">
+            <div class="pat-empty">
+              ${terms.length
+                ?'저장된 조회자료가 없으면 <b>전체 새로조회</b>를 눌러주세요.'
+                :'먼저 <b>설정 → 회사특허 검색명</b>에서 국문/영문 검색명을 등록해 주세요.'
+              }
+            </div>
+          </article>
+        `
+      }
     `;
 
-    $('companySearchBtn')?.addEventListener('click',()=>searchCompanyPatents(1));
-    $('companyCacheLoadBtn')?.addEventListener('click',()=>(
-      loadCompanySearchCachePage(
-        currentCompanySearchName(),
-        1,
-        {
-          notify:true,
-          countryCode:currentCompanySearchCountry()
-        }
-      )
-    ));
+    $('companySearchBtn')?.addEventListener(
+      'click',
+      searchCompanyPatentsAll
+    );
 
-    $('companySearchCountry')?.addEventListener('change',async()=>{
-      companySearchNameValue=currentCompanySearchName();
-      companySearchCountry=currentCompanySearchCountry();
-      companySearchPage=1;
-      companySearchData=null;
-      renderCompanySearch();
+    $('companyCacheLoadBtn')?.addEventListener(
+      'click',
+      ()=>loadCompanySearchCacheAll({notify:true})
+    );
 
-      await loadCompanySearchCachePage(
-        companySearchNameValue,
-        1,
-        {
-          notify:false,
-          countryCode:companySearchCountry
-        }
-      ).catch(error=>console.warn('[company-search-country]',error));
-    });
+    $('goCompanySearchSettingsBtn')?.addEventListener(
+      'click',
+      ()=>showSection('settings')
+    );
 
-    if(data){
-      ['companyResultSearch','companyOwnershipFilter']
-        .forEach(id=>{
-          const el=$(id);
-          if(!el)return;
-          el.addEventListener(id==='companyResultSearch'?'input':'change',renderCompanySearchTable);
-        });
+    if(companySearchData){
+      const search=$('companyResultSearch');
+      if(search)search.value=companySearchTextFilter;
 
-      $('companyPrevPage')?.addEventListener('click',()=>{
-        if(companySearchPage>1)openCompanySearchPage(companySearchPage-1);
+      const scope=$('companyScopeFilter');
+      if(scope)scope.value=companySearchScopeFilter;
+
+      const country=$('companyCountryFilter');
+      if(country)country.value=companySearchCountryFilter;
+
+      const ownership=$('companyOwnershipFilter');
+      if(ownership)ownership.value=companySearchOwnershipFilter;
+
+      search?.addEventListener('input',event=>{
+        companySearchTextFilter=event.target.value||'';
+        renderCompanySearchTable();
       });
 
-      $('companyNextPage')?.addEventListener('click',()=>{
-        if(data.has_more)openCompanySearchPage(companySearchPage+1);
+      scope?.addEventListener('change',event=>{
+        companySearchScopeFilter=event.target.value||'ALL';
+
+        if(
+          companySearchCountryFilter&&
+          (
+            (companySearchScopeFilter==='KR'&&companySearchCountryFilter!=='KR')||
+            (companySearchScopeFilter==='FOREIGN'&&companySearchCountryFilter==='KR')
+          )
+        ){
+          companySearchCountryFilter='';
+          if(country)country.value='';
+        }
+
+        renderCompanySearchTable();
+      });
+
+      country?.addEventListener('change',event=>{
+        companySearchCountryFilter=event.target.value||'';
+        renderCompanySearchTable();
+      });
+
+      ownership?.addEventListener('change',event=>{
+        companySearchOwnershipFilter=event.target.value||'';
+        renderCompanySearchTable();
       });
 
       renderCompanySearchTable();
@@ -1734,22 +2120,26 @@
   }
 
   function renderCompanySearchResults(data){
-    const rawRows=Array.isArray(data.patents)?data.patents:[];
-    const rows=rawRows.filter(x=>!x.portal_registered);
-    const excludedRegisteredCount=rawRows.length-rows.length;
+    const rows=unregisteredCompanySearchRows();
+    const countryStats=companySearchCountryStats();
+
+    const domesticCount=rows.filter(
+      item=>normalizeCompanySearchCountry(item.country_code)==='KR'
+    ).length;
+
+    const foreignCount=rows.length-domesticCount;
 
     const summary={
       current_owned:rows.filter(x=>x.ownership_status==='현재보유').length,
       jointly_owned:rows.filter(x=>x.ownership_status==='공동보유').length,
       transferred:rows.filter(x=>x.ownership_status==='권리이전').length,
       pending:rows.filter(x=>x.ownership_status==='출원중').length,
-      expired:rows.filter(x=>x.ownership_status==='소멸').length,
       needs_review:rows.filter(x=>x.ownership_status==='확인필요').length
     };
 
-    const pageLabel=`${Number(data.page||companySearchPage)}페이지`;
     const cacheMeta=data._cache_meta||{};
     const syncAt=cacheMeta.synced_at||data?.source?.searched_at||null;
+
     const syncText=syncAt
       ?new Date(syncAt).toLocaleString('ko-KR')
       :'-';
@@ -1757,105 +2147,101 @@
     return `
       <div class="company-search-summary-note">
         <span>
-          ${P.escapeHtml(countryLabel(data.country_code||companySearchCountry))}
-          · KIPRIS 전체 <b>${Number(data.total_count||0).toLocaleString('ko-KR')}건</b>
-          · 현재 ${P.escapeHtml(pageLabel)}
-          · 검토대상 <b>${rows.length.toLocaleString('ko-KR')}건</b>
-          ${excludedRegisteredCount?`· 포털 등록 ${excludedRegisteredCount.toLocaleString('ko-KR')}건 제외`:''}
+          통합 검토대상 <b>${rows.length.toLocaleString('ko-KR')}건</b>
+          · 국내 <b>${domesticCount.toLocaleString('ko-KR')}</b>
+          · 해외 <b>${foreignCount.toLocaleString('ko-KR')}</b>
+          · 검색국가 <b>${countryStats.length}</b>
         </span>
         <span class="company-cache-info">
-          <span class="company-cache-badge ${cacheMeta.cached?'cached':'fresh'}">
-            ${cacheMeta.cached?'저장자료':'API 조회'}
+          <span class="company-cache-badge ${cacheMeta.refreshed?'fresh':'cached'}">
+            ${cacheMeta.refreshed?'API 통합조회':'저장자료'}
           </span>
           마지막 API 조회 ${P.escapeHtml(syncText)}
         </span>
       </div>
 
+      ${Array.isArray(cacheMeta.errors)&&cacheMeta.errors.length?`
+        <div class="pat-warning company-search-error-summary">
+          일부 조회 실패 ${cacheMeta.errors.length}건 ·
+          ${P.escapeHtml(
+            cacheMeta.errors
+              .slice(0,4)
+              .map(item=>`${item.search_name}/${item.country_code}: ${item.message}`)
+              .join(' | ')
+          )}
+          ${cacheMeta.errors.length>4?' 외':''}
+        </div>
+      `:''}
+
       <div class="company-search-kpis">
         <div class="pat-kpi gold">
           <div class="pat-kpi-label">현재보유</div>
-          <div class="pat-kpi-value">${Number(summary.current_owned||0)}</div>
+          <div class="pat-kpi-value">${summary.current_owned}</div>
           <div class="pat-kpi-note">미등록 후보</div>
         </div>
+
         <div class="pat-kpi blue">
           <div class="pat-kpi-label">공동보유</div>
-          <div class="pat-kpi-value">${Number(summary.jointly_owned||0)}</div>
-          <div class="pat-kpi-note">미등록 후보</div>
+          <div class="pat-kpi-value">${summary.jointly_owned}</div>
+          <div class="pat-kpi-note">공동 권리</div>
         </div>
-        <div class="pat-kpi orange">
-          <div class="pat-kpi-label">권리이전</div>
-          <div class="pat-kpi-value">${Number(summary.transferred||0)}</div>
-          <div class="pat-kpi-note">미등록 후보</div>
-        </div>
-        <div class="pat-kpi green">
+
+        <div class="pat-kpi purple">
           <div class="pat-kpi-label">출원중</div>
-          <div class="pat-kpi-value">${Number(summary.pending||0)}</div>
-          <div class="pat-kpi-note">미등록 후보</div>
+          <div class="pat-kpi-value">${summary.pending}</div>
+          <div class="pat-kpi-note">등록 전</div>
         </div>
+
         <div class="pat-kpi red">
-          <div class="pat-kpi-label">검토대상</div>
-          <div class="pat-kpi-value">${rows.length}</div>
-          <div class="pat-kpi-note">포털 등록 제외</div>
+          <div class="pat-kpi-label">권리이전</div>
+          <div class="pat-kpi-value">${summary.transferred}</div>
+          <div class="pat-kpi-note">현재 권리자 불일치</div>
+        </div>
+
+        <div class="pat-kpi">
+          <div class="pat-kpi-label">확인필요</div>
+          <div class="pat-kpi-value">${summary.needs_review}</div>
+          <div class="pat-kpi-note">해외 권리자 등</div>
         </div>
       </div>
 
-      <div class="company-search-filters">
-        <input
-          id="companyResultSearch"
-          class="pat-input"
-          placeholder="발명의 명칭, 출원번호, 등록번호, 권리자 검색"
-        >
+      <div class="company-search-filters integrated">
+        <select id="companyScopeFilter" class="pat-select">
+          <option value="ALL">전체 · ${rows.length}건</option>
+          <option value="KR">국내 · ${domesticCount}건</option>
+          <option value="FOREIGN">해외 · ${foreignCount}건</option>
+        </select>
+
+        <select id="companyCountryFilter" class="pat-select">
+          <option value="">전체 국가</option>
+          ${countryStats.map(([code,count])=>`
+            <option value="${P.escapeHtml(code)}">
+              ${P.escapeHtml(countryLabel(code))} · ${count}건
+            </option>
+          `).join('')}
+        </select>
+
         <select id="companyOwnershipFilter" class="pat-select">
           <option value="">전체 소유구분</option>
           <option value="현재보유">현재보유</option>
           <option value="공동보유">공동보유</option>
-          <option value="권리이전">권리이전</option>
           <option value="출원중">출원중</option>
-          <option value="소멸">소멸</option>
+          <option value="권리이전">권리이전</option>
           <option value="거절">거절</option>
           <option value="포기">포기</option>
+          <option value="소멸">소멸</option>
           <option value="확인필요">확인필요</option>
         </select>
+
+        <input
+          id="companyResultSearch"
+          class="pat-input"
+          placeholder="발명의 명칭 · 번호 · 권리자 · 검색명"
+        >
       </div>
 
       <div id="companySearchTable"></div>
-
-      <div class="company-search-pagination">
-        <button
-          id="companyPrevPage"
-          class="pat-btn secondary"
-          type="button"
-          ${companySearchPage<=1?'disabled':''}
-        >
-          이전
-        </button>
-        <span>${Number(data.page||companySearchPage)} / ${
-          Math.max(1,Math.ceil(Number(data.total_count||0)/Number(data.page_size||companySearchPageSize)))
-        } 페이지</span>
-        <button
-          id="companyNextPage"
-          class="pat-btn secondary"
-          type="button"
-          ${data.has_more?'':'disabled'}
-        >
-          다음
-        </button>
-      </div>
-
-      ${Array.isArray(data.warnings)&&data.warnings.length?`
-        <details class="company-search-warnings">
-          <summary>API 확인사항 ${data.warnings.length}건</summary>
-          <div>${data.warnings.map(x=>`<div>${P.escapeHtml(x)}</div>`).join('')}</div>
-        </details>
-      `:''}
     `;
-  }
-
-
-  function normalizePatentArray(value){
-    if(Array.isArray(value))return value.filter(Boolean);
-    if(value==null||value==='')return [];
-    return [value].filter(Boolean);
   }
 
   function inventorNamesFromPatent(patent){
@@ -1873,13 +2259,15 @@
     const appNo=String(item?.application_no||'').trim();
     const regNo=String(item?.registration_no||'').trim();
     const country=normalizeCompanySearchCountry(
-      item?.country_code||companySearchCountry||'KR'
+      item?.country_code||'KR'
     );
 
     if(appNo){
       const {data,error}=await P.state.client
         .from('pat_master')
-        .select('id,invention_title,application_no,registration_no,legal_status')
+        .select(
+          'id,country_code,invention_title,application_no,registration_no,legal_status'
+        )
         .eq('company_id',ctx.session.companyId)
         .eq('country_code',country)
         .eq('application_no',appNo)
@@ -1893,7 +2281,9 @@
     if(regNo){
       const {data,error}=await P.state.client
         .from('pat_master')
-        .select('id,invention_title,application_no,registration_no,legal_status')
+        .select(
+          'id,country_code,invention_title,application_no,registration_no,legal_status'
+        )
         .eq('company_id',ctx.session.companyId)
         .eq('country_code',country)
         .eq('registration_no',regNo)
@@ -1920,8 +2310,7 @@
   }
 
   async function registerCompanyPatent(item,button){
-    if(!ctx.access.admin)return;
-    if(!item)return;
+    if(!ctx.access.admin||!item)return;
 
     const originalText=button?.textContent||'목록등록';
 
@@ -1931,29 +2320,40 @@
     }
 
     try{
-      const existing=await findExistingPatentForCompanyItem(item);
+      const existing=
+        await findExistingPatentForCompanyItem(item);
 
       if(existing){
         markCompanyPatentRegistered(item,existing);
-        P.toast('이미 특허목록에 등록된 특허입니다.','warn');
+        P.toast(
+          '이미 특허목록에 등록된 특허입니다.',
+          'warn'
+        );
         return;
       }
 
-      // 회사특허 조회 캐시는 API 호출을 줄이기 위해 그대로 사용합니다.
-      // 실제 목록등록 시에만 1회 상세조회하여 특허목록의 KIPRIS 필드를 최대한 채웁니다.
       let lookupPatent=null;
       let lookupRaw=null;
-      const lookupNumber=
-        String(item.application_no||item.registration_no||'').trim();
+
+      const lookupNumber=String(
+        item.application_no||
+        item.registration_no||
+        item.literature_no||
+        ''
+      ).trim();
 
       if(lookupNumber){
         try{
-          const itemCountry=normalizeCompanySearchCountry(
-            item.country_code||companySearchCountry||'KR'
-          );
+          const itemCountry=
+            normalizeCompanySearchCountry(
+              item.country_code||'KR'
+            );
 
           const detail=await P.invokeKipris({
-            action:itemCountry==='KR'?'lookup':'lookup-foreign',
+            action:
+              itemCountry==='KR'
+                ?'lookup'
+                :'lookup-foreign',
             number:lookupNumber,
             literature_no:item.literature_no||null,
             country_code:itemCountry,
@@ -1965,7 +2365,10 @@
             detail?.data||
             null;
 
-          lookupRaw=lookupPatent||detail||null;
+          lookupRaw=
+            lookupPatent||
+            detail||
+            null;
         }catch(error){
           console.warn(
             '[company-search-register] KIPRIS 상세조회 실패, 저장된 조회자료로 등록합니다.',
@@ -1979,11 +2382,16 @@
         ...(lookupPatent||{})
       };
 
-      const inventionTitle=
-        String(source.invention_title||item.invention_title||'').trim();
+      const inventionTitle=String(
+        source.invention_title||
+        item.invention_title||
+        ''
+      ).trim();
 
       if(!inventionTitle){
-        throw new Error('발명의 명칭이 없어 특허목록에 등록할 수 없습니다.');
+        throw new Error(
+          '발명의 명칭이 없어 특허목록에 등록할 수 없습니다.'
+        );
       }
 
       const now=new Date().toISOString();
@@ -1991,7 +2399,9 @@
       const payload=P.companyPayload({
         internal_no:null,
         ip_type:source.ip_type||'PATENT',
-        country_code:String(source.country_code||'KR').toUpperCase(),
+        country_code:normalizeCompanySearchCountry(
+          source.country_code||item.country_code||'KR'
+        ),
 
         invention_title:inventionTitle,
 
@@ -2007,16 +2417,27 @@
         legal_status_detail:source.legal_status_detail||null,
         expiration_date:source.expiration_date||null,
 
-        applicant_names:normalizePatentArray(source.applicant_names),
+        applicant_names:normalizePatentArray(
+          source.applicant_names
+        ),
+
         right_holder_names:normalizePatentArray(
           source.right_holder_names?.length
             ?source.right_holder_names
             :item.right_holder_names
         ),
-        agent_names:normalizePatentArray(source.agent_names),
 
-        ipc_codes:normalizePatentArray(source.ipc_codes),
-        cpc_codes:normalizePatentArray(source.cpc_codes),
+        agent_names:normalizePatentArray(
+          source.agent_names
+        ),
+
+        ipc_codes:normalizePatentArray(
+          source.ipc_codes
+        ),
+
+        cpc_codes:normalizePatentArray(
+          source.cpc_codes
+        ),
 
         abstract_text:source.abstract_text||null,
         public_notice_url:source.public_notice_url||null,
@@ -2033,8 +2454,10 @@
         memo:null,
 
         is_active:true,
-        created_by_employee_no:ctx.session.employeeNo||null,
-        updated_by_employee_no:ctx.session.employeeNo||null
+        created_by_employee_no:
+          ctx.session.employeeNo||null,
+        updated_by_employee_no:
+          ctx.session.employeeNo||null
       });
 
       const {data:row,error}=await P.state.client
@@ -2045,18 +2468,21 @@
 
       if(error)throw error;
 
-      const inventorNames=inventorNamesFromPatent(source);
+      const inventorNames=
+        inventorNamesFromPatent(source);
 
       if(inventorNames.length){
         const {error:inventorError}=await P.state.client
           .from('pat_inventors')
           .insert(
-            inventorNames.map((name,index)=>P.companyPayload({
-              patent_id:row.id,
-              inventor_name:name,
-              display_order:index+1,
-              source:'KIPRIS'
-            }))
+            inventorNames.map(
+              (name,index)=>P.companyPayload({
+                patent_id:row.id,
+                inventor_name:name,
+                display_order:index+1,
+                source:'KIPRIS'
+              })
+            )
           );
 
         if(inventorError){
@@ -2064,6 +2490,7 @@
             '[company-search-register] 발명자 저장 실패',
             inventorError
           );
+
           P.toast(
             '특허는 등록됐지만 발명자 정보 저장 중 오류가 있었습니다.',
             'warn',
@@ -2078,22 +2505,44 @@
         '특허목록에 등록했습니다. 회사특허 조회 목록에서는 자동 제외됩니다.'
       );
     }catch(error){
-      const message=String(error?.message||error);
+      const message=String(
+        error?.message||
+        error
+      );
 
       if(
         message.includes('uq_pat_master_company_application_no')||
         message.includes('uq_pat_master_company_registration_no')||
         message.toLowerCase().includes('duplicate key')
       ){
-        const existing=await findExistingPatentForCompanyItem(item).catch(()=>null);
-        if(existing)markCompanyPatentRegistered(item,existing);
-        P.toast('이미 특허목록에 등록된 특허입니다.','warn');
+        const existing=
+          await findExistingPatentForCompanyItem(item)
+            .catch(()=>null);
+
+        if(existing){
+          markCompanyPatentRegistered(
+            item,
+            existing
+          );
+        }
+
+        P.toast(
+          '이미 특허목록에 등록된 특허입니다.',
+          'warn'
+        );
         return;
       }
 
-      P.toast(message,'error',5600);
+      P.toast(
+        message,
+        'error',
+        5600
+      );
     }finally{
-      if(button&&document.body.contains(button)){
+      if(
+        button&&
+        document.body.contains(button)
+      ){
         button.disabled=false;
         button.textContent=originalText;
       }
@@ -2104,17 +2553,17 @@
     const target=$('companySearchTable');
     if(!target||!companySearchData)return;
 
-    const allRows=Array.isArray(companySearchData.patents)
-      ?companySearchData.patents
-      :[];
-
-    const rows=allRows
-      .filter(x=>!x.portal_registered)
+    const rows=unregisteredCompanySearchRows()
       .filter(companyPatentMatchesFilter);
-    const pageOffset=(companySearchPage-1)*companySearchPageSize;
 
     target.innerHTML=`
       <div class="pat-card pat-card-pad company-search-table-card">
+        <div class="company-search-table-head">
+          <span>
+            현재 필터 <b>${rows.length.toLocaleString('ko-KR')}건</b>
+          </span>
+        </div>
+
         <div class="pat-table-wrap">
           <table class="pat-table company-patent-table">
             <thead>
@@ -2134,77 +2583,109 @@
               </tr>
             </thead>
             <tbody>
-              ${rows.length?rows.map((item,index)=>{
-                const holders=Array.isArray(item.right_holder_names)
-                  ?item.right_holder_names.filter(Boolean)
-                  :[];
+              ${rows.length
+                ?rows.map((item,index)=>{
+                  const holders=Array.isArray(item.right_holder_names)
+                    ?item.right_holder_names.filter(Boolean)
+                    :[];
 
-                const applicants=Array.isArray(item.applicant_names)
-                  ?item.applicant_names.filter(Boolean)
-                  :[];
+                  const applicants=Array.isArray(item.applicant_names)
+                    ?item.applicant_names.filter(Boolean)
+                    :[];
 
-                const ownerText=holders.length
-                  ?holders
-                  :(
-                    item.registration_no
-                      ?['권리자 확인필요']
-                      :applicants.length
-                        ?applicants
-                        :['-']
+                  const ownerText=holders.length
+                    ?holders
+                    :(
+                      item.registration_no
+                        ?['권리자 확인필요']
+                        :applicants.length
+                          ?applicants
+                          :['-']
+                    );
+
+                  const warningTitle=
+                    Array.isArray(item.warnings)&&item.warnings.length
+                      ?` title="${P.escapeHtml(item.warnings.join(' | '))}"`
+                      :'';
+
+                  const matchedTerms=unionArray(
+                    item.matched_search_terms
                   );
 
-                const warningTitle=Array.isArray(item.warnings)&&item.warnings.length
-                  ?` title="${P.escapeHtml(item.warnings.join(' | '))}"`
-                  :'';
+                  return `
+                    <tr${item.ownership_status==='권리이전'?' class="company-transferred-row"':''}>
+                      <td class="num">${index+1}</td>
 
-                return `
-                  <tr${item.ownership_status==='권리이전'?' class="company-transferred-row"':''}>
-                    <td class="num">${pageOffset+index+1}</td>
-                    <td>
-                      <span class="company-status-badge ${companyLegalStatusClass(item.legal_status)}">
-                        ${P.escapeHtml(item.legal_status||'-')}
-                      </span>
-                    </td>
-                    <td>${P.escapeHtml(item.registration_no||'-')}</td>
-                    <td class="company-title-cell">
-                      <div class="company-title-main">
-                        ${P.escapeHtml(item.invention_title||'-')}
-                      </div>
-                      <div class="company-title-sub">
-                        출원 ${P.escapeHtml(item.application_no||'-')}
-                      </div>
-                    </td>
-                    <td>${P.escapeHtml(countryLabel(item.country_code))}</td>
-                    <td>${P.escapeHtml(ipTypeLabel(item.ip_type))}</td>
-                    <td>${P.fmtDate(item.application_date)}</td>
-                    <td>${P.fmtDate(item.registration_date)}</td>
-                    <td>${P.fmtDate(item.expiration_date)}</td>
-                    <td class="company-owner-cell"${warningTitle}>
-                      ${ownerText.map(x=>`<div>${P.escapeHtml(x)}</div>`).join('')}
-                    </td>
-                    <td>
-                      <span class="company-ownership-badge ${companyOwnershipClass(item.ownership_status)}">
-                        ${P.escapeHtml(item.ownership_status||'확인필요')}
-                      </span>
-                    </td>
-                    <td class="company-register-cell">
-                      <button
-                        type="button"
-                        class="pat-btn primary company-register-btn"
-                        data-company-register-index="${index}"
-                      >
-                        목록등록
-                      </button>
+                      <td>
+                        <span class="company-status-badge ${companyLegalStatusClass(item.legal_status)}">
+                          ${P.escapeHtml(item.legal_status||'-')}
+                        </span>
+                      </td>
+
+                      <td>
+                        ${P.escapeHtml(item.registration_no||'-')}
+                      </td>
+
+                      <td class="company-title-cell">
+                        <div class="company-title-main">
+                          ${P.escapeHtml(item.invention_title||'-')}
+                        </div>
+
+                        <div class="company-title-sub">
+                          출원 ${P.escapeHtml(item.application_no||'-')}
+                        </div>
+
+                        ${matchedTerms.length?`
+                          <div class="company-title-search-term">
+                            검색명 ${P.escapeHtml(matchedTerms.join(' · '))}
+                          </div>
+                        `:''}
+                      </td>
+
+                      <td>
+                        ${P.escapeHtml(countryLabel(item.country_code))}
+                      </td>
+
+                      <td>
+                        ${P.escapeHtml(ipTypeLabel(item.ip_type))}
+                      </td>
+
+                      <td>${P.fmtDate(item.application_date)}</td>
+                      <td>${P.fmtDate(item.registration_date)}</td>
+                      <td>${P.fmtDate(item.expiration_date)}</td>
+
+                      <td class="company-owner-cell"${warningTitle}>
+                        ${ownerText
+                          .map(x=>`<div>${P.escapeHtml(x)}</div>`)
+                          .join('')}
+                      </td>
+
+                      <td>
+                        <span class="company-ownership-badge ${companyOwnershipClass(item.ownership_status)}">
+                          ${P.escapeHtml(item.ownership_status||'확인필요')}
+                        </span>
+                      </td>
+
+                      <td class="company-register-cell">
+                        <button
+                          type="button"
+                          class="pat-btn primary company-register-btn"
+                          data-company-register-index="${index}"
+                        >
+                          목록등록
+                        </button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')
+                :`
+                  <tr>
+                    <td colspan="12" class="pat-empty">
+                      조건에 맞는 특허가 없습니다.
                     </td>
                   </tr>
-                `;
-              }).join(''):`
-                <tr>
-                  <td colspan="12" class="pat-empty">
-                    조건에 맞는 특허가 없습니다.
-                  </td>
-                </tr>
-              `}
+                `
+              }
             </tbody>
           </table>
         </div>
@@ -2214,116 +2695,837 @@
     target
       .querySelectorAll('[data-company-register-index]')
       .forEach(button=>{
-        button.addEventListener('click',()=>{
-          if(!ctx.access.admin)return;
+        button.addEventListener(
+          'click',
+          ()=>{
+            if(!ctx.access.admin)return;
 
-          const index=Number(button.dataset.companyRegisterIndex);
-          const item=rows[index];
+            const index=Number(
+              button.dataset.companyRegisterIndex
+            );
 
-          if(!item){
-            P.toast('선택한 특허 정보를 찾을 수 없습니다.','warn');
-            return;
+            const item=rows[index];
+
+            if(!item){
+              P.toast(
+                '선택한 특허 정보를 찾을 수 없습니다.',
+                'warn'
+              );
+              return;
+            }
+
+            registerCompanyPatent(
+              item,
+              button
+            );
           }
-
-          registerCompanyPatent(item,button);
-        });
+        );
       });
   }
 
-  async function searchCompanyPatents(page=1){
+  async function searchCompanyPatentsAll(){
     if(!ctx.access.admin){
-      P.toast('회사 관리자만 회사특허 조회를 사용할 수 있습니다.','warn');
+      P.toast(
+        '회사 관리자만 회사특허 조회를 사용할 수 있습니다.',
+        'warn'
+      );
       return;
     }
 
-    const companyName=currentCompanySearchName();
+    const terms=activeCompanySearchTerms();
 
-    if(!companyName){
-      P.toast('회사명 또는 출원인명을 입력해 주세요.','warn');
+    if(!companySearchTermsTableReady){
+      P.toast(
+        '회사특허 검색명 테이블이 없습니다. 포함된 SQL을 먼저 실행해 주세요.',
+        'warn'
+      );
       return;
     }
 
-    companySearchPage=Math.max(1,Number(page)||1);
+    if(!terms.length){
+      P.toast(
+        '설정 > 회사특허 검색명에서 검색명을 먼저 등록해 주세요.',
+        'warn'
+      );
+      return;
+    }
+
     companySearchLoading=true;
+    companySearchProgress='조회 준비 중';
     renderCompanySearch();
 
+    const countries=
+      COMPANY_SEARCH_COUNTRIES.map(([code])=>code);
+
+    const totalBaseJobs=
+      terms.length*countries.length;
+
+    let completedBaseJobs=0;
+    const freshCacheRows=[];
+    const errors=[];
+
     try{
-      const country=currentCompanySearchCountry();
-      companySearchCountry=country;
-      companySearchNameValue=companyName;
+      for(const term of terms){
+        const searchName=
+          String(term.search_term||'').trim();
 
-      const data=await P.invokeKipris({
-        action:'search-company',
-        company_id:ctx.session.companyId,
-        company_name:companyName,
-        country_code:country,
-        page:companySearchPage,
-        page_size:companySearchPageSize,
-        include_registration_detail:country==='KR'
-      });
+        for(const country of countries){
+          completedBaseJobs+=1;
 
-      applyCompanySearchData(
-        data||null,
+          let page=1;
+          let cleared=false;
+
+          while(page<=COMPANY_SEARCH_MAX_PAGES){
+            companySearchProgress=
+              `${completedBaseJobs}/${totalBaseJobs} · `+
+              `${searchName} · ${countryLabel(country)} · ${page}페이지`;
+
+            renderCompanySearch();
+
+            let data;
+
+            try{
+              data=await P.invokeKipris({
+                action:'search-company',
+                company_id:ctx.session.companyId,
+                company_name:searchName,
+                country_code:country,
+                page,
+                page_size:COMPANY_SEARCH_PAGE_SIZE,
+                include_registration_detail:country==='KR'
+              });
+            }catch(error){
+              errors.push({
+                search_name:searchName,
+                country_code:country,
+                page,
+                message:String(error?.message||error)
+              });
+              break;
+            }
+
+            if(!cleared){
+              try{
+                await clearCompanySearchCacheSeries(
+                  searchName,
+                  country
+                );
+              }catch(error){
+                errors.push({
+                  search_name:searchName,
+                  country_code:country,
+                  page,
+                  message:`캐시 정리 실패: ${String(error?.message||error)}`
+                });
+              }
+
+              cleared=true;
+            }
+
+            try{
+              await saveCompanySearchCachePage(
+                searchName,
+                data
+              );
+            }catch(error){
+              errors.push({
+                search_name:searchName,
+                country_code:country,
+                page,
+                message:`캐시 저장 실패: ${String(error?.message||error)}`
+              });
+            }
+
+            freshCacheRows.push({
+              search_name_key:companySearchCacheKey(searchName),
+              search_name:searchName,
+              country_code:country,
+              page:Number(data?.page||page)||page,
+              page_size:Number(data?.page_size||COMPANY_SEARCH_PAGE_SIZE)||COMPANY_SEARCH_PAGE_SIZE,
+              total_count:Number(data?.total_count||0)||0,
+              returned_count:Number(data?.returned_count||0)||0,
+              has_more:!!data?.has_more,
+              response_json:data,
+              synced_at:
+                data?.source?.searched_at||
+                new Date().toISOString()
+            });
+
+            if(!data?.has_more)break;
+
+            page+=1;
+          }
+
+          if(page>COMPANY_SEARCH_MAX_PAGES){
+            errors.push({
+              search_name:searchName,
+              country_code:country,
+              page,
+              message:`최대 ${COMPANY_SEARCH_MAX_PAGES}페이지까지 조회했습니다.`
+            });
+          }
+        }
+      }
+
+      buildCompanySearchAggregate(
+        freshCacheRows,
         {
           cached:false,
-          saved:false,
-          synced_at:data?.source?.searched_at||new Date().toISOString()
+          refreshed:true,
+          errors
         }
       );
 
-      companySearchPage=Number(data?.page||companySearchPage)||1;
-      companySearchPageSize=Number(data?.page_size||companySearchPageSize)||50;
+      const count=
+        unregisteredCompanySearchRows().length;
 
-      let saved=false;
-
-      try{
-        saved=await saveCompanySearchCachePage(
-          companyName,
-          data
-        );
-      }catch(cacheError){
-        console.error('[company-search-cache-save]',cacheError);
+      if(errors.length){
         P.toast(
-          `KIPRIS 조회는 완료됐지만 저장 중 오류가 발생했습니다: ${cacheError.message}`,
+          `전체조회 완료 · ${count}건 통합 · 일부 조회 ${errors.length}건 확인 필요`,
           'warn',
           6000
         );
+      }else{
+        P.toast(
+          `전체조회 완료 · ${count}건 통합`
+        );
       }
-
-      if(companySearchData?._cache_meta){
-        companySearchData._cache_meta.saved=saved;
-      }
-
-      const count=Number(data?.returned_count||0);
-      const total=Number(data?.total_count||0);
-
-      P.toast(
-        saved
-          ?`KIPRIS 조회 완료 · ${count}건 표시 / 전체 ${total}건 · 조회결과 저장됨`
-          :`KIPRIS 조회 완료 · ${count}건 표시 / 전체 ${total}건`
-      );
-    }catch(e){
-      P.toast(e.message,'error',5200);
     }finally{
       companySearchLoading=false;
+      companySearchProgress='';
       renderCompanySearch();
     }
   }
 
-  function renderSettings(){
-    const canAdmin=ctx.access.admin;const s=settings||{};
-    $('sectionSettings').innerHTML=`<div class="settings-grid"><div class="settings-stack"><article class="pat-card pat-card-pad"><div class="pat-card-title">일반 설정</div><div class="setting-row"><div class="setting-label">알림 기준 (D-Day)</div><div class="setting-control"><input id="settingAlerts" class="pat-input" value="${P.escapeHtml((s.alert_days_before||[90,30,7]).join(','))}" ${canAdmin?'':'disabled'}></div></div><div class="setting-row"><div class="setting-label">기본 국가</div><div class="setting-control"><input id="settingCountry" class="pat-input" value="${P.escapeHtml(s.default_country_code||'KR')}" ${canAdmin?'':'disabled'}></div></div><div class="setting-row"><div class="setting-label">기본 통화</div><div class="setting-control"><input id="settingCurrency" class="pat-input" value="${P.escapeHtml(s.default_currency||'KRW')}" ${canAdmin?'':'disabled'}></div></div><div class="setting-row"><div class="setting-label">KIPRIS 연동</div><div class="setting-control"><label class="switch-row"><input id="settingKipris" type="checkbox" ${s.kipris_sync_enabled!==false?'checked':''} ${canAdmin?'':'disabled'}> 사용</label></div></div><div class="setting-row"><div class="setting-label">KIPRIS 자동갱신</div><div class="setting-control"><label class="switch-row"><input id="settingAutoSync" type="checkbox" ${s.kipris_auto_sync_enabled?'checked':''} ${canAdmin?'':'disabled'}> 사용</label></div></div>${canAdmin?'<div style="margin-top:10px"><button id="saveSettingsBtn" class="pat-btn primary">설정 저장</button></div>':''}</article><article class="pat-card pat-card-pad"><div class="pat-card-title">KIPRIS API 상태</div><div class="pat-note form-top-gap">API Key는 브라우저나 DB가 아닌 Supabase Edge Function Secret에 보관합니다. 프로그램은 <b>patent-kipris</b> Edge Function을 통해 조회하도록 준비되어 있습니다.</div><div style="margin-top:10px"><button id="testKiprisBtn" class="pat-btn secondary">연동 테스트</button></div></article></div><div class="settings-stack"><article class="pat-card pat-card-pad"><div class="settings-section-head"><div><div class="pat-card-title">특허사무소 관리</div><div class="pat-card-desc">대행납부 및 청구 관리에 사용합니다.</div></div>${canAdmin?'<button id="newAgencyBtn" class="pat-btn primary">＋ 사무소 등록</button>':''}</div><div class="pat-table-wrap"><table class="pat-table agency-table"><thead><tr><th>사무소</th><th>담당자</th><th>연락처</th><th>이메일</th><th>관리</th></tr></thead><tbody>${agencies.length?agencies.map(a=>`<tr><td>${P.escapeHtml(a.agency_name)}</td><td>${P.escapeHtml(a.contact_name||'-')}</td><td>${P.escapeHtml(a.phone||'-')}</td><td>${P.escapeHtml(a.email||'-')}</td><td>${canAdmin?`<button class="pat-btn" data-ag-edit="${a.id}">수정</button>`:'-'}</td></tr>`).join(''):'<tr><td colspan="5" class="pat-empty">등록된 특허사무소가 없습니다.</td></tr>'}</tbody></table></div></article><article class="pat-card pat-card-pad"><div class="pat-card-title">접근 권한</div><div class="pat-card-desc">Portal 특허 권한 기준으로 조회와 운영 권한을 구분합니다.</div><div class="pat-note form-top-gap"><b>일반사용자</b>는 특허현황·특허목록을 조회할 수 있고, <b>특허 운영자</b>는 납부·기한 등 운영기능을 사용할 수 있습니다. <b>회사특허 조회</b>는 회사 관리자에게만 표시됩니다.</div></article></div></div>`;
-    $('saveSettingsBtn')?.addEventListener('click',saveSettings);$('testKiprisBtn')?.addEventListener('click',testKipris);$('newAgencyBtn')?.addEventListener('click',()=>openAgencyModal());document.querySelectorAll('[data-ag-edit]').forEach(b=>b.addEventListener('click',()=>openAgencyModal(agencies.find(x=>x.id===b.dataset.agEdit))));
+  async function reloadCompanySearchTerms(){
+    const {data,error}=await P.companyQuery(
+      'pat_company_search_terms',
+      '*'
+    )
+      .order('display_order',{ascending:true})
+      .order('created_at',{ascending:true});
+
+    if(error){
+      if(isMissingCompanySearchTermsTable(error)){
+        companySearchTerms=[];
+        companySearchTermsTableReady=false;
+        return;
+      }
+
+      throw error;
+    }
+
+    companySearchTerms=data||[];
+    companySearchTermsTableReady=true;
   }
+
+  async function addCompanySearchTerm(){
+    if(!ctx.access.admin)return;
+
+    const term=String(
+      P.val('newCompanySearchTerm')||''
+    ).trim();
+
+    const language=String(
+      P.val('newCompanySearchLanguage')||
+      'ETC'
+    ).toUpperCase();
+
+    if(!term){
+      P.toast(
+        '검색명을 입력해 주세요.',
+        'warn'
+      );
+      return;
+    }
+
+    const key=companySearchCacheKey(term);
+
+    if(!key){
+      P.toast(
+        '유효한 검색명을 입력해 주세요.',
+        'warn'
+      );
+      return;
+    }
+
+    const payload=P.companyPayload({
+      search_term:term,
+      search_term_key:key,
+      language_code:['KO','EN','ETC'].includes(language)
+        ?language
+        :'ETC',
+      is_active:true,
+      display_order:
+        companySearchTerms.length+1,
+      created_by_employee_no:
+        ctx.session.employeeNo||null,
+      updated_by_employee_no:
+        ctx.session.employeeNo||null,
+      updated_at:new Date().toISOString()
+    });
+
+    const {error}=await P.state.client
+      .from('pat_company_search_terms')
+      .insert(payload);
+
+    if(error){
+      if(
+        error?.code==='23505'||
+        String(error.message||'')
+          .toLowerCase()
+          .includes('duplicate')
+      ){
+        P.toast(
+          '같은 검색명이 이미 등록되어 있습니다.',
+          'warn'
+        );
+        return;
+      }
+
+      P.toast(
+        error.message,
+        'error'
+      );
+      return;
+    }
+
+    await reloadCompanySearchTerms();
+    companySearchData=null;
+    renderSettings();
+
+    P.toast(
+      '회사특허 검색명을 추가했습니다.'
+    );
+  }
+
+  async function saveCompanySearchTerm(id){
+    if(!ctx.access.admin)return;
+
+    const current=companySearchTerms.find(
+      item=>item.id===id
+    );
+
+    if(!current)return;
+
+    const safeId=String(id).replace(/[^A-Za-z0-9_-]/g,'_');
+
+    const term=String(
+      $(`companyTermText_${safeId}`)?.value||
+      ''
+    ).trim();
+
+    const language=String(
+      $(`companyTermLang_${safeId}`)?.value||
+      'ETC'
+    ).toUpperCase();
+
+    const active=
+      !!$(`companyTermActive_${safeId}`)?.checked;
+
+    if(!term){
+      P.toast(
+        '검색명을 입력해 주세요.',
+        'warn'
+      );
+      return;
+    }
+
+    const newKey=
+      companySearchCacheKey(term);
+
+    const oldKey=
+      companySearchCacheKey(
+        current.search_term
+      );
+
+    const {error}=await P.state.client
+      .from('pat_company_search_terms')
+      .update({
+        search_term:term,
+        search_term_key:newKey,
+        language_code:
+          ['KO','EN','ETC'].includes(language)
+            ?language
+            :'ETC',
+        is_active:active,
+        updated_by_employee_no:
+          ctx.session.employeeNo||null,
+        updated_at:
+          new Date().toISOString()
+      })
+      .eq('id',id)
+      .eq('company_id',ctx.session.companyId);
+
+    if(error){
+      if(
+        error?.code==='23505'||
+        String(error.message||'')
+          .toLowerCase()
+          .includes('duplicate')
+      ){
+        P.toast(
+          '같은 검색명이 이미 등록되어 있습니다.',
+          'warn'
+        );
+        return;
+      }
+
+      P.toast(
+        error.message,
+        'error'
+      );
+      return;
+    }
+
+    if(oldKey!==newKey){
+      await P.state.client
+        .from('pat_company_search_cache')
+        .delete()
+        .eq('company_id',ctx.session.companyId)
+        .eq('search_name_key',oldKey)
+        .then(()=>{})
+        .catch(()=>{});
+    }
+
+    await reloadCompanySearchTerms();
+    companySearchData=null;
+    renderSettings();
+
+    P.toast(
+      '회사특허 검색명을 저장했습니다.'
+    );
+  }
+
+  async function deleteCompanySearchTerm(id){
+    if(!ctx.access.admin)return;
+
+    const current=companySearchTerms.find(
+      item=>item.id===id
+    );
+
+    if(!current)return;
+
+    if(
+      !window.confirm(
+        `"${current.search_term}" 검색명을 삭제할까요?`
+      )
+    )return;
+
+    const key=
+      companySearchCacheKey(
+        current.search_term
+      );
+
+    const {error}=await P.state.client
+      .from('pat_company_search_terms')
+      .delete()
+      .eq('id',id)
+      .eq('company_id',ctx.session.companyId);
+
+    if(error){
+      P.toast(
+        error.message,
+        'error'
+      );
+      return;
+    }
+
+    await P.state.client
+      .from('pat_company_search_cache')
+      .delete()
+      .eq('company_id',ctx.session.companyId)
+      .eq('search_name_key',key)
+      .then(()=>{})
+      .catch(()=>{});
+
+    await reloadCompanySearchTerms();
+    companySearchData=null;
+    renderSettings();
+
+    P.toast(
+      '회사특허 검색명을 삭제했습니다.'
+    );
+  }
+
+  function renderCompanySearchTermSettings(canAdmin){
+    const rows=companySearchTerms;
+
+    if(!companySearchTermsTableReady){
+      return `
+        <article class="pat-card pat-card-pad">
+          <div class="pat-card-title">회사특허 검색명</div>
+          <div class="pat-warning form-top-gap">
+            검색명 테이블이 없습니다. 이번 패키지의 SQL을 먼저 실행해 주세요.
+          </div>
+        </article>
+      `;
+    }
+
+    return `
+      <article class="pat-card pat-card-pad">
+        <div class="settings-section-head">
+          <div>
+            <div class="pat-card-title">회사특허 검색명</div>
+            <div class="pat-card-desc">
+              회사특허 전체조회에서 사용할 국문·영문·기타 명칭입니다.
+              활성 검색명은 국내와 지원 해외국가에 모두 적용됩니다.
+            </div>
+          </div>
+        </div>
+
+        <div class="company-term-settings-list">
+          ${rows.length
+            ?rows.map((item,index)=>{
+              const safeId=String(item.id).replace(/[^A-Za-z0-9_-]/g,'_');
+
+              return `
+                <div class="company-term-settings-row">
+                  <div class="company-term-order">
+                    ${index+1}
+                  </div>
+
+                  <select
+                    id="companyTermLang_${safeId}"
+                    class="pat-select"
+                    ${canAdmin?'':'disabled'}
+                  >
+                    <option value="KO" ${item.language_code==='KO'?'selected':''}>국문</option>
+                    <option value="EN" ${item.language_code==='EN'?'selected':''}>영문</option>
+                    <option value="ETC" ${!['KO','EN'].includes(item.language_code)?'selected':''}>기타</option>
+                  </select>
+
+                  <input
+                    id="companyTermText_${safeId}"
+                    class="pat-input"
+                    value="${P.escapeHtml(item.search_term||'')}"
+                    ${canAdmin?'':'disabled'}
+                  >
+
+                  <label class="company-term-active">
+                    <input
+                      id="companyTermActive_${safeId}"
+                      type="checkbox"
+                      ${item.is_active!==false?'checked':''}
+                      ${canAdmin?'':'disabled'}
+                    >
+                    사용
+                  </label>
+
+                  ${canAdmin?`
+                    <div class="company-term-row-actions">
+                      <button
+                        class="pat-btn secondary"
+                        data-company-term-save="${P.escapeHtml(item.id)}"
+                        type="button"
+                      >
+                        저장
+                      </button>
+
+                      <button
+                        class="pat-btn danger"
+                        data-company-term-delete="${P.escapeHtml(item.id)}"
+                        type="button"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  `:''}
+                </div>
+              `;
+            }).join('')
+            :`
+              <div class="pat-empty company-term-empty">
+                등록된 검색명이 없습니다.
+              </div>
+            `
+          }
+        </div>
+
+        ${canAdmin?`
+          <div class="company-term-add-row">
+            <select id="newCompanySearchLanguage" class="pat-select">
+              <option value="KO">국문</option>
+              <option value="EN">영문</option>
+              <option value="ETC">기타</option>
+            </select>
+
+            <input
+              id="newCompanySearchTerm"
+              class="pat-input"
+              placeholder="예: 삼천당제약 / SAMCHUNDANG PHARMACEUTICAL"
+              value="${rows.length?'':P.escapeHtml(String(ctx?.session?.companyName||''))}"
+            >
+
+            <button
+              id="addCompanySearchTermBtn"
+              class="pat-btn primary"
+              type="button"
+            >
+              ＋ 검색명 추가
+            </button>
+          </div>
+        `:''}
+
+        <div class="pat-note form-top-gap">
+          같은 특허가 여러 검색명에서 조회되면
+          <b>국가 + 출원번호</b>를 우선 기준으로 1건으로 합치고,
+          출원번호가 없으면 <b>국가 + 등록번호</b>를 사용합니다.
+        </div>
+      </article>
+    `;
+  }
+
+  function renderSettings(){
+    const canAdmin=ctx.access.admin;
+    const s=settings||{};
+
+    $('sectionSettings').innerHTML=`
+      <div class="settings-grid">
+        <div class="settings-stack">
+          <article class="pat-card pat-card-pad">
+            <div class="pat-card-title">일반 설정</div>
+
+            <div class="setting-row">
+              <div class="setting-label">알림 기준 (D-Day)</div>
+              <div class="setting-control">
+                <input
+                  id="settingAlerts"
+                  class="pat-input"
+                  value="${P.escapeHtml((s.alert_days_before||[90,30,7]).join(','))}"
+                  ${canAdmin?'':'disabled'}
+                >
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-label">기본 국가</div>
+              <div class="setting-control">
+                <input
+                  id="settingCountry"
+                  class="pat-input"
+                  value="${P.escapeHtml(s.default_country_code||'KR')}"
+                  ${canAdmin?'':'disabled'}
+                >
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-label">기본 통화</div>
+              <div class="setting-control">
+                <input
+                  id="settingCurrency"
+                  class="pat-input"
+                  value="${P.escapeHtml(s.default_currency||'KRW')}"
+                  ${canAdmin?'':'disabled'}
+                >
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-label">KIPRIS 연동</div>
+              <div class="setting-control">
+                <label class="switch-row">
+                  <input
+                    id="settingKipris"
+                    type="checkbox"
+                    ${s.kipris_sync_enabled!==false?'checked':''}
+                    ${canAdmin?'':'disabled'}
+                  >
+                  사용
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-label">KIPRIS 자동갱신</div>
+              <div class="setting-control">
+                <label class="switch-row">
+                  <input
+                    id="settingAutoSync"
+                    type="checkbox"
+                    ${s.kipris_auto_sync_enabled?'checked':''}
+                    ${canAdmin?'':'disabled'}
+                  >
+                  사용
+                </label>
+              </div>
+            </div>
+
+            ${canAdmin?`
+              <div style="margin-top:10px">
+                <button id="saveSettingsBtn" class="pat-btn primary">
+                  설정 저장
+                </button>
+              </div>
+            `:''}
+          </article>
+
+          ${renderCompanySearchTermSettings(canAdmin)}
+
+          <article class="pat-card pat-card-pad">
+            <div class="pat-card-title">KIPRIS API 상태</div>
+            <div class="pat-note form-top-gap">
+              API Key는 브라우저나 DB가 아닌 Supabase Edge Function Secret에 보관합니다.
+              국내특허와 구매한 해외특허 Open API를 <b>patent-kipris</b> Edge Function으로 조회합니다.
+              BULK 상품은 이번 통합조회 범위에서 제외합니다.
+            </div>
+            <div style="margin-top:10px">
+              <button id="testKiprisBtn" class="pat-btn secondary">
+                연동 테스트
+              </button>
+            </div>
+          </article>
+        </div>
+
+        <div class="settings-stack">
+          <article class="pat-card pat-card-pad">
+            <div class="settings-section-head">
+              <div>
+                <div class="pat-card-title">특허사무소 관리</div>
+                <div class="pat-card-desc">
+                  대행납부 및 청구 관리에 사용합니다.
+                </div>
+              </div>
+
+              ${canAdmin?`
+                <button id="newAgencyBtn" class="pat-btn primary">
+                  ＋ 사무소 등록
+                </button>
+              `:''}
+            </div>
+
+            <div class="pat-table-wrap">
+              <table class="pat-table agency-table">
+                <thead>
+                  <tr>
+                    <th>사무소</th>
+                    <th>담당자</th>
+                    <th>연락처</th>
+                    <th>이메일</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${agencies.length
+                    ?agencies.map(a=>`
+                      <tr>
+                        <td>${P.escapeHtml(a.agency_name)}</td>
+                        <td>${P.escapeHtml(a.contact_name||'-')}</td>
+                        <td>${P.escapeHtml(a.phone||'-')}</td>
+                        <td>${P.escapeHtml(a.email||'-')}</td>
+                        <td>
+                          ${canAdmin
+                            ?`<button class="pat-btn" data-ag-edit="${a.id}">수정</button>`
+                            :'-'
+                          }
+                        </td>
+                      </tr>
+                    `).join('')
+                    :`
+                      <tr>
+                        <td colspan="5" class="pat-empty">
+                          등록된 특허사무소가 없습니다.
+                        </td>
+                      </tr>
+                    `
+                  }
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="pat-card pat-card-pad">
+            <div class="pat-card-title">접근 권한</div>
+            <div class="pat-card-desc">
+              Portal 특허 권한 기준으로 조회와 운영 권한을 구분합니다.
+            </div>
+            <div class="pat-note form-top-gap">
+              <b>일반사용자</b>는 특허현황·특허목록을 조회할 수 있고,
+              <b>특허 운영자</b>는 납부·기한 등 운영기능을 사용할 수 있습니다.
+              <b>회사특허 조회</b>와 검색명 수정은 회사 관리자에게만 허용합니다.
+            </div>
+          </article>
+        </div>
+      </div>
+    `;
+
+    $('saveSettingsBtn')?.addEventListener(
+      'click',
+      saveSettings
+    );
+
+    $('testKiprisBtn')?.addEventListener(
+      'click',
+      testKipris
+    );
+
+    $('newAgencyBtn')?.addEventListener(
+      'click',
+      ()=>openAgencyModal()
+    );
+
+    $('addCompanySearchTermBtn')?.addEventListener(
+      'click',
+      addCompanySearchTerm
+    );
+
+    document
+      .querySelectorAll('[data-company-term-save]')
+      .forEach(button=>{
+        button.addEventListener(
+          'click',
+          ()=>saveCompanySearchTerm(
+            button.dataset.companyTermSave
+          )
+        );
+      });
+
+    document
+      .querySelectorAll('[data-company-term-delete]')
+      .forEach(button=>{
+        button.addEventListener(
+          'click',
+          ()=>deleteCompanySearchTerm(
+            button.dataset.companyTermDelete
+          )
+        );
+      });
+
+    document
+      .querySelectorAll('[data-ag-edit]')
+      .forEach(button=>{
+        button.addEventListener(
+          'click',
+          ()=>openAgencyModal(
+            agencies.find(
+              item=>item.id===button.dataset.agEdit
+            )
+          )
+        );
+      });
+  }
+
   async function saveSettings(){const alerts=P.val('settingAlerts').split(',').map(x=>Number(x.trim())).filter(x=>Number.isFinite(x)&&x>=0);const payload=P.companyPayload({alert_days_before:alerts.length?alerts:[90,30,7],default_country_code:(P.val('settingCountry')||'KR').toUpperCase(),default_currency:(P.val('settingCurrency')||'KRW').toUpperCase(),kipris_sync_enabled:$('settingKipris').checked,kipris_auto_sync_enabled:$('settingAutoSync').checked,updated_by_employee_no:ctx.session.employeeNo||null});const {error}=await P.state.client.from('pat_settings').upsert(payload,{onConflict:'company_id'});if(error){P.toast(error.message,'error');return;}P.toast('설정을 저장했습니다.');await loadAll();showSection('settings');}
   async function testKipris(){
     const btn=this;
     btn.disabled=true;
     try{
+      const firstTerm=
+        activeCompanySearchTerms()[0]?.search_term||
+        String(ctx?.session?.companyName||'').trim();
+
+      if(!firstTerm){
+        throw new Error(
+          '회사특허 검색명을 먼저 등록해 주세요.'
+        );
+      }
+
       await P.invokeKipris({
         action:'search-company',
         company_id:ctx.session.companyId,
-        company_name:defaultCompanySearchName(),
+        company_name:firstTerm,
+        country_code:'KR',
         page:1,
         page_size:1,
         include_registration_detail:false
