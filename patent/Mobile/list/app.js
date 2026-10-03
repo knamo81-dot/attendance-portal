@@ -4023,7 +4023,8 @@
         badge: ['상태'],
         meta: ['등록번호', '국가', '다음기한'],
         hideAlways: ['No.'],
-        detailButton: true
+        detailButton: false,
+        directDetail: true
       };
     }
 
@@ -4218,6 +4219,15 @@
 
     if (profile.detailButton) {
       ensureDetailButton(row, titleCell);
+    }
+
+    // 특허목록은 카드 탭 즉시 기존 상세화면으로 이동.
+    // 모바일 펼침/접힘 이벤트를 추가하지 않습니다.
+    if (profile.directDetail) {
+      row.classList.add('mobile-direct-detail');
+      row.classList.remove('mobile-expanded');
+      row.removeAttribute('aria-expanded');
+      return;
     }
 
     if (row.dataset.mobileCompactBound === '1') return;
