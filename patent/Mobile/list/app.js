@@ -2744,11 +2744,12 @@
 
             <div class="event-field event-field-description">
               <label for="eventDescription">내용</label>
-              <input
+              <textarea
                 id="eventDescription"
-                class="pat-input"
+                class="pat-input event-description-textarea"
+                rows="4"
                 placeholder="간단한 진행내용을 입력하세요"
-              />
+              ></textarea>
             </div>
 
             <button
