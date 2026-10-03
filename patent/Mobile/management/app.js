@@ -3836,9 +3836,9 @@
           <article class="pat-card pat-card-pad">
             <div class="pat-card-title">일반 설정</div>
 
-            <div class="setting-row">
-              <div class="setting-label">알림 기준 (D-Day)</div>
-              <div class="setting-control">
+            <div class="settings-inline-grid">
+              <div class="setting-inline-item">
+                <label class="setting-label" for="settingAlerts">알림 기준 (D-Day)</label>
                 <input
                   id="settingAlerts"
                   class="pat-input"
@@ -3846,11 +3846,9 @@
                   ${canAdmin?'':'disabled'}
                 >
               </div>
-            </div>
 
-            <div class="setting-row">
-              <div class="setting-label">기본 국가</div>
-              <div class="setting-control">
+              <div class="setting-inline-item">
+                <label class="setting-label" for="settingCountry">기본 국가</label>
                 <input
                   id="settingCountry"
                   class="pat-input"
@@ -3858,11 +3856,9 @@
                   ${canAdmin?'':'disabled'}
                 >
               </div>
-            </div>
 
-            <div class="setting-row">
-              <div class="setting-label">기본 통화</div>
-              <div class="setting-control">
+              <div class="setting-inline-item">
+                <label class="setting-label" for="settingCurrency">기본 통화</label>
                 <input
                   id="settingCurrency"
                   class="pat-input"
