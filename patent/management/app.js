@@ -3608,19 +3608,6 @@
 
           ${renderCompanySearchTermSettings(canAdmin)}
 
-          <article class="pat-card pat-card-pad">
-            <div class="pat-card-title">KIPRIS API 상태</div>
-            <div class="pat-note form-top-gap">
-              API Key는 브라우저나 DB가 아닌 Supabase Edge Function Secret에 보관합니다.
-              국내특허와 구매한 해외특허 Open API를 <b>patent-kipris</b> Edge Function으로 조회합니다.
-              BULK 상품은 이번 통합조회 범위에서 제외합니다.
-            </div>
-            <div style="margin-top:10px">
-              <button id="testKiprisBtn" class="pat-btn secondary">
-                연동 테스트
-              </button>
-            </div>
-          </article>
         </div>
 
         <div class="settings-stack">
@@ -3680,17 +3667,6 @@
             </div>
           </article>
 
-          <article class="pat-card pat-card-pad">
-            <div class="pat-card-title">접근 권한</div>
-            <div class="pat-card-desc">
-              Portal 특허 권한 기준으로 조회와 운영 권한을 구분합니다.
-            </div>
-            <div class="pat-note form-top-gap">
-              <b>일반사용자</b>는 특허현황·특허목록을 조회할 수 있고,
-              <b>특허 운영자</b>는 납부·기한 등 운영기능을 사용할 수 있습니다.
-              <b>회사특허 조회</b>와 검색명 수정은 회사 관리자에게만 허용합니다.
-            </div>
-          </article>
         </div>
       </div>
     `;
@@ -3698,11 +3674,6 @@
     $('saveSettingsBtn')?.addEventListener(
       'click',
       saveSettings
-    );
-
-    $('testKiprisBtn')?.addEventListener(
-      'click',
-      testKipris
     );
 
     $('newAgencyBtn')?.addEventListener(
