@@ -2316,3 +2316,71 @@
     width: 100% !important;
   }
 }
+
+
+/* =========================================================
+   Patent Mobile Modal Header Fix v6.1
+   - 특허등록 / 납부등록 / 기한등록 상단 설명문 잘림 방지
+   - 헤더/하단 버튼 영역은 고정 높이 유지
+   - 본문만 세로 스크롤
+   ========================================================= */
+@media (max-width: 768px) {
+  .pat-modal-head {
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding-top: 14px !important;
+    padding-bottom: 12px !important;
+    align-items: flex-start !important;
+    overflow: visible !important;
+  }
+
+  .pat-modal-head > div:first-child {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: calc(100% - 46px) !important;
+    overflow: visible !important;
+  }
+
+  .pat-modal-title {
+    display: block !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    line-height: 1.25 !important;
+  }
+
+  .pat-modal-desc {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-top: 5px !important;
+    padding: 0 !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: keep-all !important;
+    overflow-wrap: anywhere !important;
+    line-height: 1.45 !important;
+  }
+
+  .pat-modal-head .pat-close {
+    flex: 0 0 34px !important;
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 34px !important;
+    margin: 0 !important;
+  }
+
+  .pat-modal-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+  }
+
+  .pat-modal-actions {
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+  }
+}
