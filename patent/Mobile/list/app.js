@@ -2640,13 +2640,13 @@
     );
 
     P.setVal(
-      'eventType',
-      event.event_type || 'MANUAL'
+      'eventTitle',
+      event.title || ''
     );
 
     P.setVal(
-      'eventTitle',
-      event.title || ''
+      'eventDescription',
+      event.description || ''
     );
 
     document
@@ -2724,24 +2724,32 @@
           </div>
 
           <div class="event-add-row">
-            <input
-              id="eventDate"
-              type="date"
-              class="pat-input"
-            />
+            <div class="event-field">
+              <label for="eventDate">일자</label>
+              <input
+                id="eventDate"
+                type="date"
+                class="pat-input"
+              />
+            </div>
 
-            <input
-              id="eventType"
-              class="pat-input"
-              placeholder="유형"
-              value="MANUAL"
-            />
+            <div class="event-field event-field-title">
+              <label for="eventTitle">진행이력</label>
+              <input
+                id="eventTitle"
+                class="pat-input"
+                placeholder="진행이력 제목"
+              />
+            </div>
 
-            <input
-              id="eventTitle"
-              class="pat-input"
-              placeholder="진행이력 제목"
-            />
+            <div class="event-field event-field-description">
+              <label for="eventDescription">내용</label>
+              <input
+                id="eventDescription"
+                class="pat-input"
+                placeholder="간단한 진행내용을 입력하세요"
+              />
+            </div>
 
             <button
               id="addEventBtn"
@@ -2818,13 +2826,22 @@
                 ${P.escapeHtml(event.title)}
               </div>
 
-              <div class="pat-timeline-desc">
-                ${P.escapeHtml(
-                  event.description ||
-                  event.event_type ||
-                  ''
-                )}
-              </div>
+              ${
+                (event.description ||
+                  (String(event.event_type || '').toUpperCase() !== 'MANUAL'
+                    ? event.event_type
+                    : ''))
+                  ? `
+                    <div class="pat-timeline-desc">
+                      ${P.escapeHtml(
+                        event.description ||
+                        event.event_type ||
+                        ''
+                      )}
+                    </div>
+                  `
+                  : ''
+              }
 
               ${actionButtons}
             </div>
@@ -2851,13 +2868,13 @@
       );
 
       P.setVal(
-        'eventType',
-        editingEvent.event_type || 'MANUAL'
+        'eventTitle',
+        editingEvent.title || ''
       );
 
       P.setVal(
-        'eventTitle',
-        editingEvent.title || ''
+        'eventDescription',
+        editingEvent.description || ''
       );
     }
 
@@ -2900,8 +2917,8 @@
 
   async function saveEvent() {
     const date = P.val('eventDate');
-    const type = P.val('eventType') || 'MANUAL';
-    const title = P.val('eventTitle');
+    const title = String(P.val('eventTitle') || '').trim();
+    const description = String(P.val('eventDescription') || '').trim();
     const employeeNo = currentEmployeeNo();
 
     if (!employeeNo) {
@@ -2914,7 +2931,7 @@
 
     if (!title) {
       P.toast(
-        '제목을 입력해 주세요.',
+        '진행이력을 입력해 주세요.',
         'warn'
       );
       return;
@@ -2941,8 +2958,9 @@
         .from('pat_events')
         .update({
           event_date: date || null,
-          event_type: type,
-          title
+          event_type: target.event_type || 'MANUAL',
+          title,
+          description: description || null
         })
         .eq('id', editingEventId)
         .eq(
@@ -2956,8 +2974,9 @@
           P.companyPayload({
             patent_id: currentPatent.id,
             event_date: date || null,
-            event_type: type,
+            event_type: 'MANUAL',
             title,
+            description: description || null,
             source: 'MANUAL',
             created_by_employee_no:
               employeeNo
