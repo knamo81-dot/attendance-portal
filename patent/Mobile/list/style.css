@@ -939,3 +939,130 @@
     font-size: 9.5px !important;
   }
 }
+
+
+/* =========================================================
+   Mobile card width fix v4.1
+   - Desktop table min-width / column min-width 완전 해제
+   - 모든 모바일 카드가 화면 안쪽 폭 100%에 맞도록 고정
+   ========================================================= */
+@media (max-width: 768px) {
+  html,
+  body,
+  .pat-app,
+  .pat-main,
+  .pat-card,
+  .pat-card-pad,
+  .pat-table-wrap,
+  .company-search-table-card,
+  #companySearchTable {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .pat-table-wrap,
+  .company-search-table-card,
+  #companySearchTable {
+    overflow-x: hidden !important;
+  }
+
+  /* PC용 고정폭을 모바일에서 완전히 무효화 */
+  table.pat-table,
+  .patent-list-table,
+  .compact-table,
+  .management-table,
+  .company-patent-table,
+  .agency-table,
+  .access-table {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    table-layout: auto !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  table.pat-table tbody,
+  .patent-list-table tbody,
+  .compact-table tbody,
+  .management-table tbody,
+  .company-patent-table tbody,
+  .agency-table tbody,
+  .access-table tbody {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* desktop nth-child 폭/최소폭 제거 */
+  .pat-table th,
+  .pat-table td,
+  .patent-list-table th,
+  .patent-list-table td,
+  .compact-table th,
+  .compact-table td,
+  .management-table th,
+  .management-table td,
+  .company-patent-table th,
+  .company-patent-table td,
+  .agency-table th,
+  .agency-table td,
+  .access-table th,
+  .access-table td {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  .mobile-compact-table tbody tr.mobile-compact-row {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+  }
+
+  .mobile-compact-table tbody tr.mobile-compact-row > td {
+    box-sizing: border-box !important;
+  }
+
+  /* 제목/권리자 등 긴 문자열이 카드 폭을 밀지 않도록 */
+  .mobile-compact-table td,
+  .mobile-compact-table td *,
+  .company-title-main,
+  .company-title-sub,
+  .company-title-search-term,
+  .company-owner-cell {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .mobile-compact-table td.mobile-role-title,
+  .mobile-compact-table td.mobile-role-meta,
+  .mobile-compact-table td.mobile-role-detail {
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+  }
+
+  /* 기본 카드 좌우 여백을 QA/시약 모바일 수준으로 정돈 */
+  .pat-table-wrap {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .mobile-compact-table tbody {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .mobile-compact-table tbody tr.mobile-compact-row {
+    border-radius: 11px !important;
+  }
+}
