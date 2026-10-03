@@ -1275,6 +1275,287 @@
     return '기타';
   }
 
+
+  async function extractCompanySearchInvokeError(error){
+    const fallback=String(
+      error?.message||
+      error||
+      '알 수 없는 오류'
+    );
+
+    const context=error?.context||null;
+
+    if(!context){
+      return {
+        message:fallback,
+        status:null,
+        detail:null
+      };
+    }
+
+    try{
+      const response=
+        typeof context.clone==='function'
+          ?context.clone()
+          :context;
+
+      const status=
+        Number(response?.status)||null;
+
+      const contentType=String(
+        response?.headers?.get?.('content-type')||
+        ''
+      ).toLowerCase();
+
+      let body=null;
+
+      if(
+        contentType.includes('application/json')&&
+        typeof response?.json==='function'
+      ){
+        body=await response.json();
+      }else if(
+        typeof response?.text==='function'
+      ){
+        const text=await response.text();
+
+        try{
+          body=JSON.parse(text);
+        }catch(_){
+          body=text;
+        }
+      }
+
+      if(body&&typeof body==='object'){
+        const detail=String(
+          body.error||
+          body.message||
+          body.detail||
+          body.details||
+          ''
+        ).trim();
+
+        if(detail){
+          return {
+            message:detail,
+            status,
+            detail:
+              body.warnings||
+              body.hint||
+              null
+          };
+        }
+      }
+
+      if(typeof body==='string'&&body.trim()){
+        return {
+          message:body.trim(),
+          status,
+          detail:null
+        };
+      }
+
+      return {
+        message:fallback,
+        status,
+        detail:null
+      };
+    }catch(_){
+      return {
+        message:fallback,
+        status:Number(context?.status)||null,
+        detail:null
+      };
+    }
+  }
+
+  function companySearchErrorHelp(item){
+    const country=
+      normalizeCompanySearchCountry(
+        item?.country_code||
+        'KR'
+      );
+
+    if(country==='CN'){
+      return (
+        '중국 특허는 KIPRISPlus에서 중국원문(CP)과 중국 영문초록(CN) 데이터가 나뉘어 제공됩니다. '+
+        '이번 실패는 해당 검색명과 중국 조회 조합에서 발생했으며, 다른 검색명·국가의 정상 조회 결과에는 영향을 주지 않습니다.'
+      );
+    }
+
+    return (
+      '해당 검색명·국가 조합만 조회에 실패했습니다. '+
+      '다른 정상 조회 결과는 그대로 반영됩니다.'
+    );
+  }
+
+  function ensureCompanySearchErrorModal(){
+    let backdrop=
+      document.getElementById(
+        'companySearchErrorModal'
+      );
+
+    if(backdrop)return backdrop;
+
+    backdrop=document.createElement('div');
+    backdrop.id='companySearchErrorModal';
+    backdrop.className=
+      'company-error-modal-backdrop hidden';
+
+    backdrop.innerHTML=`
+      <div
+        class="company-error-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="companySearchErrorModalTitle"
+      >
+        <div class="company-error-modal-head">
+          <div>
+            <div
+              id="companySearchErrorModalTitle"
+              class="company-error-modal-title"
+            >
+              일부 조회 실패
+            </div>
+            <div class="company-error-modal-desc">
+              전체조회는 계속 진행되며, 실패한 검색 조합만 아래에 표시합니다.
+            </div>
+          </div>
+
+          <button
+            type="button"
+            class="company-error-modal-close"
+            aria-label="닫기"
+          >
+            ×
+          </button>
+        </div>
+
+        <div
+          id="companySearchErrorModalBody"
+          class="company-error-modal-body"
+        ></div>
+
+        <div class="company-error-modal-actions">
+          <button
+            type="button"
+            class="pat-btn primary company-error-modal-ok"
+          >
+            확인
+          </button>
+        </div>
+      </div>
+    `;
+
+    const close=()=>{
+      backdrop.classList.add('hidden');
+    };
+
+    backdrop
+      .querySelector(
+        '.company-error-modal-close'
+      )
+      ?.addEventListener(
+        'click',
+        close
+      );
+
+    backdrop
+      .querySelector(
+        '.company-error-modal-ok'
+      )
+      ?.addEventListener(
+        'click',
+        close
+      );
+
+    backdrop.addEventListener(
+      'click',
+      event=>{
+        if(event.target===backdrop){
+          close();
+        }
+      }
+    );
+
+    document.body.appendChild(
+      backdrop
+    );
+
+    return backdrop;
+  }
+
+  function showCompanySearchErrorModal(errors){
+    if(
+      !Array.isArray(errors)||
+      !errors.length
+    )return;
+
+    const backdrop=
+      ensureCompanySearchErrorModal();
+
+    const body=
+      backdrop.querySelector(
+        '#companySearchErrorModalBody'
+      );
+
+    if(!body)return;
+
+    body.innerHTML=`
+      <div class="company-error-modal-summary">
+        실패 <b>${errors.length}건</b>
+        · 정상 조회 결과는 그대로 저장·표시됩니다.
+      </div>
+
+      <div class="company-error-list">
+        ${errors.map((item,index)=>`
+          <article class="company-error-item">
+            <div class="company-error-item-head">
+              <span class="company-error-index">
+                ${index+1}
+              </span>
+
+              <strong>
+                ${P.escapeHtml(item.search_name||'-')}
+              </strong>
+
+              <span class="company-error-country">
+                ${P.escapeHtml(
+                  countryLabel(
+                    item.country_code
+                  )
+                )}
+              </span>
+            </div>
+
+            <div class="company-error-message">
+              ${P.escapeHtml(
+                item.message||
+                '조회에 실패했습니다.'
+              )}
+            </div>
+
+            ${item.status?`
+              <div class="company-error-status">
+                HTTP ${P.escapeHtml(String(item.status))}
+              </div>
+            `:''}
+
+            <div class="company-error-help">
+              ${P.escapeHtml(
+                companySearchErrorHelp(item)
+              )}
+            </div>
+          </article>
+        `).join('')}
+      </div>
+    `;
+
+    backdrop.classList.remove(
+      'hidden'
+    );
+  }
+
   function companySearchCacheKey(value){
     const source=String(value||'');
 
@@ -1979,22 +2260,6 @@
         </div>
       </div>
 
-      <div class="company-search-term-summary">
-        <div class="company-search-term-title">사용 중 검색명</div>
-        <div class="company-search-term-chips">
-          ${terms.length
-            ?terms.map(item=>`
-              <span class="company-term-chip">
-                <span class="company-term-lang">
-                  ${P.escapeHtml(companySearchTermLanguageLabel(item.language_code))}
-                </span>
-                ${P.escapeHtml(item.search_term)}
-              </span>
-            `).join('')
-            :'<span class="pat-empty-inline">등록된 검색명이 없습니다.</span>'
-          }
-        </div>
-      </div>
 
       <div class="company-search-query integrated">
         <div class="company-search-supported">
@@ -2027,12 +2292,6 @@
         </div>
       </div>
 
-      <div class="pat-note company-search-note">
-        BULK 데이터는 이번 범위에서 제외했습니다.
-        <b>전체 새로조회</b>를 누를 때만 KIPRIS Open API를 호출하며,
-        평소에는 저장된 조회자료를 합쳐 보여줍니다.
-        이미 특허목록에 등록된 건은 자동 제외합니다.
-      </div>
 
       ${!companySearchTermsTableReady?`
         <div class="pat-warning company-search-sql-warning">
@@ -2083,6 +2342,13 @@
       const ownership=$('companyOwnershipFilter');
       if(ownership)ownership.value=companySearchOwnershipFilter;
 
+      $('companySearchErrorBtn')?.addEventListener(
+        'click',
+        ()=>showCompanySearchErrorModal(
+          companySearchData?._cache_meta?.errors||[]
+        )
+      );
+
       search?.addEventListener('input',event=>{
         companySearchTextFilter=event.target.value||'';
         renderCompanySearchTable();
@@ -2129,13 +2395,6 @@
 
     const foreignCount=rows.length-domesticCount;
 
-    const summary={
-      current_owned:rows.filter(x=>x.ownership_status==='현재보유').length,
-      jointly_owned:rows.filter(x=>x.ownership_status==='공동보유').length,
-      transferred:rows.filter(x=>x.ownership_status==='권리이전').length,
-      pending:rows.filter(x=>x.ownership_status==='출원중').length,
-      needs_review:rows.filter(x=>x.ownership_status==='확인필요').length
-    };
 
     const cacheMeta=data._cache_meta||{};
     const syncAt=cacheMeta.synced_at||data?.source?.searched_at||null;
@@ -2153,57 +2412,25 @@
           · 검색국가 <b>${countryStats.length}</b>
         </span>
         <span class="company-cache-info">
+          ${Array.isArray(cacheMeta.errors)&&cacheMeta.errors.length?`
+            <button
+              id="companySearchErrorBtn"
+              type="button"
+              class="company-error-view-btn"
+            >
+              오류 ${cacheMeta.errors.length}건 보기
+            </button>
+          `:''}
+
           <span class="company-cache-badge ${cacheMeta.refreshed?'fresh':'cached'}">
             ${cacheMeta.refreshed?'API 통합조회':'저장자료'}
           </span>
+
           마지막 API 조회 ${P.escapeHtml(syncText)}
         </span>
       </div>
 
-      ${Array.isArray(cacheMeta.errors)&&cacheMeta.errors.length?`
-        <div class="pat-warning company-search-error-summary">
-          일부 조회 실패 ${cacheMeta.errors.length}건 ·
-          ${P.escapeHtml(
-            cacheMeta.errors
-              .slice(0,4)
-              .map(item=>`${item.search_name}/${item.country_code}: ${item.message}`)
-              .join(' | ')
-          )}
-          ${cacheMeta.errors.length>4?' 외':''}
-        </div>
-      `:''}
 
-      <div class="company-search-kpis">
-        <div class="pat-kpi gold">
-          <div class="pat-kpi-label">현재보유</div>
-          <div class="pat-kpi-value">${summary.current_owned}</div>
-          <div class="pat-kpi-note">미등록 후보</div>
-        </div>
-
-        <div class="pat-kpi blue">
-          <div class="pat-kpi-label">공동보유</div>
-          <div class="pat-kpi-value">${summary.jointly_owned}</div>
-          <div class="pat-kpi-note">공동 권리</div>
-        </div>
-
-        <div class="pat-kpi purple">
-          <div class="pat-kpi-label">출원중</div>
-          <div class="pat-kpi-value">${summary.pending}</div>
-          <div class="pat-kpi-note">등록 전</div>
-        </div>
-
-        <div class="pat-kpi red">
-          <div class="pat-kpi-label">권리이전</div>
-          <div class="pat-kpi-value">${summary.transferred}</div>
-          <div class="pat-kpi-note">현재 권리자 불일치</div>
-        </div>
-
-        <div class="pat-kpi">
-          <div class="pat-kpi-label">확인필요</div>
-          <div class="pat-kpi-value">${summary.needs_review}</div>
-          <div class="pat-kpi-note">해외 권리자 등</div>
-        </div>
-      </div>
 
       <div class="company-search-filters integrated">
         <select id="companyScopeFilter" class="pat-select">
@@ -2627,7 +2854,10 @@
                       </td>
 
                       <td class="company-title-cell">
-                        <div class="company-title-main">
+                        <div
+                          class="company-title-main"
+                          title="${P.escapeHtml(item.invention_title||'-')}"
+                        >
                           ${P.escapeHtml(item.invention_title||'-')}
                         </div>
 
@@ -2795,12 +3025,20 @@
                 include_registration_detail:country==='KR'
               });
             }catch(error){
+              const failure=
+                await extractCompanySearchInvokeError(
+                  error
+                );
+
               errors.push({
                 search_name:searchName,
                 country_code:country,
                 page,
-                message:String(error?.message||error)
+                message:failure.message,
+                status:failure.status,
+                detail:failure.detail
               });
+
               break;
             }
 
@@ -2883,7 +3121,14 @@
         P.toast(
           `전체조회 완료 · ${count}건 통합 · 일부 조회 ${errors.length}건 확인 필요`,
           'warn',
-          6000
+          4200
+        );
+
+        setTimeout(
+          ()=>showCompanySearchErrorModal(
+            errors
+          ),
+          80
         );
       }else{
         P.toast(
