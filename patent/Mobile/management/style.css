@@ -1701,3 +1701,238 @@
     font-size: 8px !important;
   }
 }
+
+
+/* =========================================================
+   Patent Management Mobile - Deadline v5.6
+   1) 기한 KPI 3개 한 줄
+   2) 달력 7열을 모바일 가로폭 안에 맞춤
+   3) 달력 일정은 예/완/초 건수만 표시
+   4) 다가오는 주요 기한 폭 넘침 방지
+   ========================================================= */
+@media (max-width: 768px) {
+  /* 기한관리 KPI 3개 한 줄 */
+  #sectionDeadlines .management-summary {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  #sectionDeadlines .management-summary .pat-kpi {
+    min-width: 0 !important;
+    min-height: 76px !important;
+    padding: 8px !important;
+    border-radius: 11px !important;
+  }
+
+  #sectionDeadlines .management-summary .pat-kpi-label {
+    font-size: 9.5px !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+  }
+
+  #sectionDeadlines .management-summary .pat-kpi-value {
+    font-size: 21px !important;
+    line-height: 1 !important;
+  }
+
+  #sectionDeadlines .management-summary .pat-kpi-note {
+    font-size: 8.5px !important;
+    line-height: 1.25 !important;
+  }
+
+  /* 달력 카드/컨테이너 폭 */
+  #sectionDeadlines .calendar-layout,
+  #sectionDeadlines .calendar-layout > article,
+  #sectionDeadlines .pat-calendar-wrap,
+  #sectionDeadlines .pat-calendar {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  #sectionDeadlines .pat-calendar-wrap {
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+  }
+
+  /* 항상 7열이 화면 안쪽에 맞게 축소 */
+  #sectionDeadlines .pat-calendar {
+    display: grid !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #sectionDeadlines .pat-cal-head,
+  #sectionDeadlines .pat-cal-cell {
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+  }
+
+  #sectionDeadlines .pat-cal-head {
+    min-height: 28px !important;
+    padding: 6px 1px !important;
+    font-size: 9px !important;
+    text-align: center !important;
+  }
+
+  #sectionDeadlines .pat-cal-cell {
+    min-height: 62px !important;
+    padding: 4px 3px !important;
+    overflow: hidden !important;
+  }
+
+  #sectionDeadlines .pat-cal-date {
+    font-size: 9.5px !important;
+    line-height: 1.2 !important;
+    font-weight: 800 !important;
+  }
+
+  /* 일정명 대신 건수만 */
+  #sectionDeadlines .pat-cal-counts {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 2px !important;
+    margin-top: 5px !important;
+    min-width: 0 !important;
+  }
+
+  #sectionDeadlines .pat-cal-count {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+    padding: 2px 3px !important;
+    border-radius: 5px !important;
+    font-size: 8px !important;
+    font-weight: 900 !important;
+    line-height: 1.1 !important;
+    white-space: nowrap !important;
+  }
+
+  #sectionDeadlines .pat-cal-count.planned {
+    background: #fff4cf !important;
+    color: #8a5a00 !important;
+  }
+
+  #sectionDeadlines .pat-cal-count.completed {
+    background: #dcfce7 !important;
+    color: #15803d !important;
+  }
+
+  #sectionDeadlines .pat-cal-count.overdue {
+    background: #fee2e2 !important;
+    color: #b91c1c !important;
+  }
+
+  /* 기존 달력 일정 텍스트는 렌더링하지 않지만 혹시 남아도 숨김 */
+  #sectionDeadlines .pat-cal-event,
+  #sectionDeadlines .pat-cal-more {
+    display: none !important;
+  }
+
+  /* 달력 헤더도 폭 넘김 방지 */
+  #sectionDeadlines .calendar-head {
+    width: 100% !important;
+    min-width: 0 !important;
+    gap: 6px !important;
+  }
+
+  #sectionDeadlines .calendar-nav {
+    min-width: 0 !important;
+    gap: 4px !important;
+  }
+
+  #sectionDeadlines .calendar-month {
+    min-width: 82px !important;
+    font-size: 12px !important;
+  }
+
+  #sectionDeadlines .calendar-nav .pat-btn {
+    min-width: 32px !important;
+    width: auto !important;
+    padding-left: 7px !important;
+    padding-right: 7px !important;
+  }
+
+  /* 다가오는 주요 기한 */
+  #sectionDeadlines .upcoming-list,
+  #sectionDeadlines .upcoming-item,
+  #sectionDeadlines .upcoming-top,
+  #sectionDeadlines .upcoming-title,
+  #sectionDeadlines .upcoming-sub {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  #sectionDeadlines .upcoming-item {
+    overflow: hidden !important;
+    padding: 9px !important;
+  }
+
+  #sectionDeadlines .upcoming-top {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 7px !important;
+    align-items: start !important;
+  }
+
+  #sectionDeadlines .upcoming-title {
+    display: -webkit-box !important;
+    overflow: hidden !important;
+    white-space: normal !important;
+    text-overflow: clip !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 2 !important;
+    font-size: 10.5px !important;
+    line-height: 1.35 !important;
+  }
+
+  #sectionDeadlines .upcoming-sub {
+    overflow: hidden !important;
+    white-space: normal !important;
+    text-overflow: clip !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    font-size: 9.5px !important;
+    line-height: 1.35 !important;
+  }
+
+  #sectionDeadlines .upcoming-top .pat-dday {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+}
+
+@media (max-width: 420px) {
+  #sectionDeadlines .management-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+  }
+
+  #sectionDeadlines .management-summary .pat-kpi {
+    min-height: 72px !important;
+    padding: 7px !important;
+  }
+
+  #sectionDeadlines .pat-cal-cell {
+    min-height: 58px !important;
+    padding: 4px 2px !important;
+  }
+
+  #sectionDeadlines .pat-cal-count {
+    padding: 2px !important;
+    font-size: 7.5px !important;
+  }
+}
