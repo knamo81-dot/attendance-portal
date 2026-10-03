@@ -965,6 +965,283 @@
     });
     $('deadlineTypeFilter').addEventListener('change',renderDeadlineTable);$('prevMonth').addEventListener('click',()=>{calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()-1,1);renderCalendar();});$('nextMonth').addEventListener('click',()=>{calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1);renderCalendar();});$('todayMonth').addEventListener('click',()=>{calendarDate=new Date();renderCalendar();});renderCalendar();renderDeadlineTable();renderUpcoming();
   }
+
+  function deadlineDayStatus(deadline,dateKey){
+    const status=String(deadline?.status||'').toUpperCase();
+
+    if(status==='COMPLETED'){
+      return {
+        key:'completed',
+        short:'완',
+        label:'완료'
+      };
+    }
+
+    if(status==='OPEN'){
+      const today=new Date();
+      const todayKey=[
+        today.getFullYear(),
+        String(today.getMonth()+1).padStart(2,'0'),
+        String(today.getDate()).padStart(2,'0')
+      ].join('-');
+
+      if(String(dateKey||deadline?.due_date||'')<todayKey){
+        return {
+          key:'overdue',
+          short:'초',
+          label:'초과'
+        };
+      }
+
+      return {
+        key:'planned',
+        short:'예',
+        label:'예정'
+      };
+    }
+
+    return {
+      key:'other',
+      short:'',
+      label:status||'기타'
+    };
+  }
+
+  function deadlineRowsForDate(dateKey){
+    return deadlines
+      .filter(item=>
+        item.due_date===dateKey &&
+        !['CANCELLED','WAIVED'].includes(
+          String(item.status||'').toUpperCase()
+        )
+      )
+      .sort((a,b)=>{
+        const order={
+          overdue:0,
+          planned:1,
+          completed:2,
+          other:3
+        };
+
+        const ak=deadlineDayStatus(a,dateKey).key;
+        const bk=deadlineDayStatus(b,dateKey).key;
+
+        if(order[ak]!==order[bk]){
+          return order[ak]-order[bk];
+        }
+
+        return String(a.title||'')
+          .localeCompare(String(b.title||''),'ko');
+      });
+  }
+
+  function formatDeadlineSheetDate(dateKey){
+    const [y,m,d]=String(dateKey||'').split('-');
+    if(!y||!m||!d)return dateKey||'';
+    return `${Number(y)}년 ${Number(m)}월 ${Number(d)}일`;
+  }
+
+  function ensureDeadlineDaySheet(){
+    let backdrop=document.getElementById('deadlineDaySheetBackdrop');
+    if(backdrop)return backdrop;
+
+    backdrop=document.createElement('div');
+    backdrop.id='deadlineDaySheetBackdrop';
+    backdrop.className='deadline-day-sheet-backdrop';
+
+    backdrop.innerHTML=`
+      <section
+        class="deadline-day-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="deadlineDaySheetTitle"
+      >
+        <div class="deadline-day-sheet-handle"></div>
+
+        <div class="deadline-day-sheet-head">
+          <div class="deadline-day-sheet-heading">
+            <div
+              id="deadlineDaySheetTitle"
+              class="deadline-day-sheet-title"
+            ></div>
+            <div
+              id="deadlineDaySheetSummary"
+              class="deadline-day-sheet-summary"
+            ></div>
+          </div>
+
+          <button
+            type="button"
+            class="deadline-day-sheet-close"
+            aria-label="닫기"
+          >
+            ×
+          </button>
+        </div>
+
+        <div
+          id="deadlineDaySheetList"
+          class="deadline-day-sheet-list"
+        ></div>
+      </section>
+    `;
+
+    const close=()=>closeDeadlineDaySheet();
+
+    backdrop
+      .querySelector('.deadline-day-sheet-close')
+      ?.addEventListener('click',close);
+
+    backdrop.addEventListener('click',event=>{
+      if(event.target===backdrop){
+        close();
+      }
+    });
+
+    document.addEventListener('keydown',event=>{
+      if(
+        event.key==='Escape' &&
+        backdrop.classList.contains('show')
+      ){
+        close();
+      }
+    });
+
+    document.body.appendChild(backdrop);
+    return backdrop;
+  }
+
+  function closeDeadlineDaySheet(){
+    const backdrop=
+      document.getElementById('deadlineDaySheetBackdrop');
+
+    if(!backdrop)return;
+
+    backdrop.classList.remove('show');
+    document.body.classList.remove('deadline-day-sheet-open');
+  }
+
+  function focusDeadlineInList(deadlineId){
+    closeDeadlineDaySheet();
+
+    const row=document.querySelector(
+      `[data-deadline-row="${CSS.escape(String(deadlineId||''))}"]`
+    );
+
+    if(!row)return;
+
+    row.scrollIntoView({
+      behavior:'smooth',
+      block:'center'
+    });
+
+    row.classList.add('deadline-row-focus');
+
+    window.setTimeout(()=>{
+      row.classList.remove('deadline-row-focus');
+    },1800);
+  }
+
+  function openDeadlineDaySheet(dateKey){
+    const rows=deadlineRowsForDate(dateKey);
+    if(!rows.length)return;
+
+    const counts={
+      planned:0,
+      completed:0,
+      overdue:0
+    };
+
+    rows.forEach(item=>{
+      const key=deadlineDayStatus(item,dateKey).key;
+      if(key in counts)counts[key]+=1;
+    });
+
+    const backdrop=ensureDeadlineDaySheet();
+    const title=backdrop.querySelector('#deadlineDaySheetTitle');
+    const summary=backdrop.querySelector('#deadlineDaySheetSummary');
+    const list=backdrop.querySelector('#deadlineDaySheetList');
+
+    title.textContent=
+      `${formatDeadlineSheetDate(dateKey)} · 총 ${rows.length}건`;
+
+    summary.innerHTML=[
+      counts.planned
+        ?`<span class="deadline-day-summary-chip planned">예정 ${counts.planned}</span>`
+        :'',
+      counts.completed
+        ?`<span class="deadline-day-summary-chip completed">완료 ${counts.completed}</span>`
+        :'',
+      counts.overdue
+        ?`<span class="deadline-day-summary-chip overdue">초과 ${counts.overdue}</span>`
+        :''
+    ].join('');
+
+    list.innerHTML=rows.map(item=>{
+      const status=deadlineDayStatus(item,dateKey);
+      const info=deadlineCalendarInfo(item);
+      const payment=paymentForDeadline(item);
+      const patentTitle=patentName(item.patent_id);
+      const typeLabel=P.deadlineTypeLabel(item.deadline_type)||'-';
+      const dday=P.dday(item.due_date);
+
+      const paymentText=payment
+        ?`${P.paymentTypeLabel(payment.payment_type)||'납부'} · ${P.paymentMethodLabel(payment.payment_method)||'방식 미정'}`
+        :'';
+
+      return `
+        <button
+          type="button"
+          class="deadline-day-item"
+          data-deadline-sheet-item="${P.escapeHtml(String(item.id||''))}"
+        >
+          <div class="deadline-day-item-top">
+            <span class="deadline-day-status ${status.key}">
+              ${P.escapeHtml(status.label)}
+            </span>
+            <span class="deadline-day-dday">
+              ${P.escapeHtml(dday||P.fmtDate(item.due_date))}
+            </span>
+          </div>
+
+          <div class="deadline-day-item-title">
+            ${P.escapeHtml(item.title||info.main||typeLabel)}
+          </div>
+
+          <div class="deadline-day-item-patent">
+            ${P.escapeHtml(patentTitle)}
+          </div>
+
+          <div class="deadline-day-item-meta">
+            <span>${P.escapeHtml(typeLabel)}</span>
+            ${
+              paymentText
+                ?`<span>${P.escapeHtml(paymentText)}</span>`
+                :''
+            }
+          </div>
+
+          <div class="deadline-day-item-footer">
+            목록에서 보기
+          </div>
+        </button>
+      `;
+    }).join('');
+
+    list
+      .querySelectorAll('[data-deadline-sheet-item]')
+      .forEach(button=>{
+        button.addEventListener('click',()=>{
+          focusDeadlineInList(
+            button.dataset.deadlineSheetItem
+          );
+        });
+      });
+
+    document.body.classList.add('deadline-day-sheet-open');
+    backdrop.classList.add('show');
+  }
+
   function renderCalendar(){
     const y=calendarDate.getFullYear();
     const m=calendarDate.getMonth();
@@ -1031,7 +1308,14 @@
       ].join('');
 
       cells+=`
-        <div class="pat-cal-cell ${d.getMonth()!==m?'muted':''}">
+        <div
+          class="pat-cal-cell ${d.getMonth()!==m?'muted':''} ${dayRows.length?'has-deadlines':''}"
+          ${
+            dayRows.length
+              ?`data-deadline-date="${ds}" role="button" tabindex="0" aria-label="${d.getMonth()+1}월 ${d.getDate()}일 기한 ${dayRows.length}건 보기"`
+              :''
+          }
+        >
           <div class="pat-cal-date">${d.getDate()}</div>
           ${countHtml?`<div class="pat-cal-counts">${countHtml}</div>`:''}
         </div>
@@ -1039,6 +1323,25 @@
     }
 
     $('calendar').innerHTML=heads+cells;
+
+    $('calendar')
+      .querySelectorAll('[data-deadline-date]')
+      .forEach(cell=>{
+        const open=()=>{
+          openDeadlineDaySheet(
+            cell.dataset.deadlineDate
+          );
+        };
+
+        cell.addEventListener('click',open);
+
+        cell.addEventListener('keydown',event=>{
+          if(event.key==='Enter'||event.key===' '){
+            event.preventDefault();
+            open();
+          }
+        });
+      });
   }
 
   function renderUpcoming(){
@@ -1129,7 +1432,7 @@
               ${
                 rows.length
                   ? rows.map(x=>`
-                    <tr>
+                    <tr data-deadline-row="${P.escapeHtml(String(x.id||''))}">
                       <td>${P.escapeHtml(patentName(x.patent_id))}</td>
                       <td>${P.deadlineTypeLabel(x.deadline_type)}</td>
                       <td>${P.escapeHtml(x.title)}</td>
