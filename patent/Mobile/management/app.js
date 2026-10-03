@@ -3834,3 +3834,314 @@
     mq.addListener(syncMobileClass);
   }
 })();
+
+
+/* =========================================================
+   Mobile compact expandable cards v4
+   - QA/시약 모바일처럼 기본은 짧은 리스트 카드
+   - 카드 탭 시 추가정보 펼침/접힘
+   - 기존 버튼/상세보기 기능은 유지
+   ========================================================= */
+(() => {
+  const MOBILE_QUERY = '(max-width: 768px)';
+  const mq = window.matchMedia(MOBILE_QUERY);
+
+  function labelOf(cell) {
+    return String(cell?.getAttribute('data-mobile-label') || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function headersOf(table) {
+    return Array.from(table.querySelectorAll('thead th'))
+      .map(th => String(th.textContent || '').replace(/\s+/g, ' ').trim());
+  }
+
+  function profileFor(table) {
+    const headers = headersOf(table);
+    const has = (label) => headers.includes(label);
+
+    if (table.classList.contains('patent-list-table')) {
+      return {
+        title: ['발명의 명칭'],
+        badge: ['상태'],
+        meta: ['등록번호', '국가', '다음기한'],
+        hideAlways: ['No.'],
+        detailButton: true
+      };
+    }
+
+    if (
+      table.classList.contains('compact-table') &&
+      has('발명의 명칭') &&
+      has('등록번호')
+    ) {
+      return {
+        title: ['발명의 명칭'],
+        badge: ['상태'],
+        meta: ['등록번호', '국가'],
+        hideAlways: [],
+        detailButton: true
+      };
+    }
+
+    if (
+      table.classList.contains('management-table') &&
+      has('납부구분')
+    ) {
+      return {
+        title: ['특허'],
+        badge: ['상태'],
+        meta: ['납부구분', '납부기한'],
+        hideAlways: [],
+        detailButton: false
+      };
+    }
+
+    if (
+      has('기한명') &&
+      has('D-Day') &&
+      has('기한일')
+    ) {
+      return {
+        title: ['특허'],
+        badge: ['상태'],
+        meta: ['기한명', 'D-Day'],
+        hideAlways: [],
+        detailButton: false
+      };
+    }
+
+    if (table.classList.contains('company-patent-table')) {
+      return {
+        title: ['발명의 명칭'],
+        badge: ['상태', '소유구분'],
+        meta: ['국가', '등록번호'],
+        hideAlways: ['No.'],
+        detailButton: false
+      };
+    }
+
+    if (table.classList.contains('agency-table')) {
+      return {
+        title: ['사무소'],
+        badge: [],
+        meta: ['담당자'],
+        hideAlways: [],
+        detailButton: false
+      };
+    }
+
+    // 기타 표는 첫 번째 의미있는 컬럼을 제목으로, 상태를 배지로 사용
+    const title =
+      headers.find(label =>
+        label &&
+        !['No.', '순번', '상태', '관리'].includes(label)
+      ) || headers[0] || '';
+
+    return {
+      title: title ? [title] : [],
+      badge: has('상태') ? ['상태'] : [],
+      meta: headers
+        .filter(label =>
+          label &&
+          label !== title &&
+          !['No.', '순번', '상태', '관리'].includes(label)
+        )
+        .slice(0, 2),
+      hideAlways: ['No.', '순번'],
+      detailButton: false
+    };
+  }
+
+  function collapseOtherRows(row) {
+    const table = row.closest('table');
+    if (!table) return;
+
+    table.querySelectorAll('tbody tr.mobile-expanded').forEach(other => {
+      if (other === row) return;
+      other.classList.remove('mobile-expanded');
+      other.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  function ensureDetailButton(row, titleCell) {
+    if (!row.matches('.clickable,[data-id]')) return;
+    if (!titleCell || titleCell.querySelector('.mobile-open-detail')) return;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'mobile-open-detail';
+    button.textContent = '상세보기';
+    button.setAttribute('aria-label', '특허 상세보기');
+
+    // 별도 handler는 두지 않습니다.
+    // 버튼 클릭은 기존 row click handler로 bubble 되어 기존 상세화면을 그대로 엽니다.
+    titleCell.appendChild(button);
+  }
+
+  function configureRow(row, profile) {
+    const cells = Array.from(row.children)
+      .filter(el => el.tagName === 'TD');
+
+    if (!cells.length) return;
+
+    if (
+      cells.length === 1 &&
+      Number(cells[0].getAttribute('colspan') || 1) > 1
+    ) {
+      row.classList.add('mobile-empty-row');
+      return;
+    }
+
+    row.classList.add('mobile-compact-row');
+    row.setAttribute(
+      'aria-expanded',
+      row.classList.contains('mobile-expanded') ? 'true' : 'false'
+    );
+
+    let titleCell = null;
+
+    cells.forEach(cell => {
+      const label = labelOf(cell);
+
+      cell.classList.remove(
+        'mobile-role-title',
+        'mobile-role-badge',
+        'mobile-role-meta',
+        'mobile-role-detail',
+        'mobile-role-action',
+        'mobile-role-hidden'
+      );
+
+      if (profile.hideAlways.includes(label)) {
+        cell.classList.add('mobile-role-hidden');
+        return;
+      }
+
+      if (profile.title.includes(label)) {
+        cell.classList.add('mobile-role-title');
+        titleCell = titleCell || cell;
+        return;
+      }
+
+      if (profile.badge.includes(label)) {
+        cell.classList.add('mobile-role-badge');
+        return;
+      }
+
+      if (profile.meta.includes(label)) {
+        cell.classList.add('mobile-role-meta');
+        return;
+      }
+
+      if (
+        ['관리', '목록등록', '작업', '기능'].includes(label)
+      ) {
+        cell.classList.add('mobile-role-action');
+        return;
+      }
+
+      cell.classList.add('mobile-role-detail');
+    });
+
+    if (!titleCell) {
+      titleCell = cells.find(
+        cell =>
+          !cell.classList.contains('mobile-role-hidden') &&
+          !cell.classList.contains('mobile-role-badge')
+      ) || cells[0];
+
+      titleCell?.classList.remove(
+        'mobile-role-meta',
+        'mobile-role-detail',
+        'mobile-role-action'
+      );
+      titleCell?.classList.add('mobile-role-title');
+    }
+
+    if (profile.detailButton) {
+      ensureDetailButton(row, titleCell);
+    }
+
+    if (row.dataset.mobileCompactBound === '1') return;
+    row.dataset.mobileCompactBound = '1';
+
+    // Capture 단계에서 기존 PC row-click보다 먼저 처리
+    row.addEventListener(
+      'click',
+      event => {
+        if (!mq.matches) return;
+
+        const interactive = event.target.closest(
+          'button, a, input, select, textarea, label, [role="button"]'
+        );
+
+        // 기존 수정/등록/상세보기 버튼은 원래 동작 유지
+        if (interactive) return;
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        const expanded = row.classList.contains('mobile-expanded');
+
+        if (expanded) {
+          row.classList.remove('mobile-expanded');
+          row.setAttribute('aria-expanded', 'false');
+        } else {
+          collapseOtherRows(row);
+          row.classList.add('mobile-expanded');
+          row.setAttribute('aria-expanded', 'true');
+        }
+      },
+      true
+    );
+  }
+
+  function configureTable(table) {
+    if (!table) return;
+
+    const profile = profileFor(table);
+    table.classList.add('mobile-compact-table');
+
+    table.querySelectorAll('tbody tr').forEach(row => {
+      configureRow(row, profile);
+    });
+  }
+
+  function scan() {
+    if (!mq.matches) return;
+    document.querySelectorAll('.pat-table').forEach(configureTable);
+  }
+
+  let frame = null;
+  const observer = new MutationObserver(() => {
+    if (!mq.matches) return;
+
+    if (frame) cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(scan);
+  });
+
+  function init() {
+    if (!mq.matches) return;
+    document.body.classList.add('pat-mobile-compact');
+    scan();
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+  } else {
+    init();
+  }
+
+  if (typeof mq.addEventListener === 'function') {
+    mq.addEventListener('change', () => {
+      document.body.classList.toggle('pat-mobile-compact', mq.matches);
+      if (mq.matches) scan();
+    });
+  }
+})();
