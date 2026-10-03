@@ -1592,3 +1592,112 @@
     font-size: 16px !important;
   }
 }
+
+
+/* =========================================================
+   Patent Management Mobile - Payment v5.5
+   1) 납부 KPI: 앞 4개를 한 줄 4열
+   2) 지급완료 금액: 기존 모바일 폭(약 1/2) 유지
+   3) 검색: 검색어 1행 + 상태/방식 필터 2개 1행
+   ========================================================= */
+@media (max-width: 768px) {
+  /* 납부관리 KPI 전용 */
+  #sectionPayments .management-summary {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+
+  #sectionPayments .management-summary .pat-kpi {
+    min-width: 0 !important;
+    min-height: 76px !important;
+    padding: 8px !important;
+    border-radius: 11px !important;
+  }
+
+  /* 앞 4개 KPI는 4열에 각각 1개 */
+  #sectionPayments .management-summary .pat-kpi:nth-child(-n+4) {
+    grid-column: auto !important;
+  }
+
+  /* 지급완료 금액은 기존 2열 카드 폭과 비슷하게 4칸 중 2칸 사용 */
+  #sectionPayments .management-summary .pat-kpi:nth-child(5) {
+    grid-column: span 2 !important;
+    min-height: 76px !important;
+  }
+
+  #sectionPayments .management-summary .pat-kpi-label {
+    font-size: 9.5px !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+  }
+
+  #sectionPayments .management-summary .pat-kpi-value {
+    font-size: 21px !important;
+    line-height: 1 !important;
+  }
+
+  #sectionPayments .management-summary .pat-kpi-note {
+    font-size: 8.5px !important;
+    line-height: 1.25 !important;
+  }
+
+  /* 지급완료 금액 값은 기존 크기 유지 */
+  #sectionPayments .management-summary .money-kpi {
+    font-size: 18px !important;
+  }
+
+  /* 검색/필터 */
+  #sectionPayments .pat-filterbar {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+    width: 100% !important;
+    align-items: center !important;
+  }
+
+  #sectionPayments #paymentSearch {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  #sectionPayments #paymentStatus,
+  #sectionPayments #paymentMethod {
+    grid-column: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  #sectionPayments #newPaymentBtn {
+    grid-column: 1 / 2 !important;
+    justify-self: start !important;
+    width: auto !important;
+  }
+}
+
+@media (max-width: 420px) {
+  #sectionPayments .management-summary {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+  }
+
+  #sectionPayments .management-summary .pat-kpi {
+    min-height: 72px !important;
+    padding: 7px !important;
+  }
+
+  #sectionPayments .management-summary .pat-kpi-label {
+    font-size: 9px !important;
+  }
+
+  #sectionPayments .management-summary .pat-kpi-value {
+    font-size: 20px !important;
+  }
+
+  #sectionPayments .management-summary .pat-kpi-note {
+    font-size: 8px !important;
+  }
+}
