@@ -16,7 +16,7 @@
   };
 
   const PORTAL_TABS = [
-    { id: "reagent-dashboard", label: "구매현황" },
+    { id: "reagent-dashboard", label: "시약현황" },
     { id: "request", label: "제품신청" },
     { id: "collect", label: "제품취합" },
     { id: "prepare", label: "취합정리" },
@@ -243,8 +243,8 @@
     $$(".viewer-only").forEach(el => { el.hidden = state.operator; });
     const subtitle = $("#dashboardSubtitle");
     if (subtitle) subtitle.textContent = state.operator
-      ? "시약·초자·소모품·안전용품의 주문 및 구매 진행현황을 한눈에 확인합니다."
-      : "내가 신청한 연구용품의 취합·발주·입고 진행상황을 확인합니다.";
+      ? "시약·초자 주문 진행상황과 구매현황을 한눈에 확인합니다."
+      : "내가 신청한 시약·초자의 취합·발주·입고 진행상황을 확인합니다.";
     const label = $("#kpiRequestLabel");
     if (label) label.textContent = state.operator ? "신청품목" : "내 신청품목";
   }
@@ -463,7 +463,7 @@
     if (state.loading) return;
     state.loading = true;
     const loading = $('#dashboardLoading');
-    if (loading) { loading.hidden = false; loading.textContent = '연구용품 구매현황을 불러오는 중입니다.'; }
+    if (loading) { loading.hidden = false; loading.textContent = '시약현황을 불러오는 중입니다.'; }
     try {
       await waitForPortalReady();
       if (!APP.sb) throw new Error('Supabase 연결 정보를 확인할 수 없습니다.');
@@ -514,10 +514,10 @@
       renderAll();
       if (loading) loading.hidden = true;
     } catch (error) {
-      console.error('연구용품 구매현황 조회 실패:', error);
+      console.error('시약현황 조회 실패:', error);
       if (loading) {
         loading.hidden = false;
-        loading.textContent = `연구용품 구매현황 조회 실패: ${error?.message || error}`;
+        loading.textContent = `시약현황 조회 실패: ${error?.message || error}`;
       }
     } finally {
       state.loading = false;
