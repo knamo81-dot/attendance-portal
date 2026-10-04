@@ -18,3 +18,5 @@ body{padding:6px!important;overflow-x:hidden}.dashboard-shell{gap:7px}.dashboard
   .stage-icon svg{width:14px;height:14px}
 }
 
+
+.dashboard-year-month-picker{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,.72fr)!important;gap:2px!important;width:100%!important;min-width:0!important}.dashboard-year-month-picker select{height:30px!important;width:100%!important;min-width:0!important;padding:0 16px 0 3px!important;border:0!important;background:transparent!important;color:#0f172a!important;font-size:13px!important;font-weight:800!important;outline:0!important}.dashboard-year-month-picker .dashboard-year-select,.dashboard-year-month-picker .dashboard-month-select{min-width:0!important}
