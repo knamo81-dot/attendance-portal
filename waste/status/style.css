@@ -148,3 +148,200 @@ table{
     grid-template-columns:1fr;
   }
 }
+
+/* =========================================================
+   폐기물현황 대시보드 그래프
+========================================================= */
+.dashboard-charts{
+  display:grid;
+  grid-template-columns:minmax(0,1.65fr) minmax(330px,.85fr);
+  gap:12px;
+  margin-bottom:12px;
+}
+.chart-card{
+  margin-bottom:0;
+  min-height:300px;
+}
+.chart-head-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:10px;
+}
+.chart-head-row .hint{
+  margin-left:auto;
+}
+.chart-legend{
+  display:flex;
+  align-items:center;
+  gap:16px;
+  flex-wrap:wrap;
+  font-size:11px;
+  font-weight:800;
+  color:#53657f;
+}
+.chart-legend span{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+.legend-swatch{
+  width:10px;
+  height:10px;
+  border-radius:3px;
+  display:inline-block;
+}
+.legend-swatch.gen{background:var(--green)}
+.legend-swatch.col{background:var(--navy)}
+
+.month-chart{
+  position:relative;
+  display:grid;
+  grid-template-columns:repeat(12,minmax(34px,1fr));
+  gap:7px;
+  min-height:225px;
+  padding:14px 8px 0;
+  border-left:1px solid #e2e8f0;
+  border-bottom:1px solid #cfd9e5;
+  background:
+    linear-gradient(to bottom,
+      transparent 24%,
+      #edf1f5 25%,
+      transparent 26%,
+      transparent 49%,
+      #edf1f5 50%,
+      transparent 51%,
+      transparent 74%,
+      #edf1f5 75%,
+      transparent 76%);
+}
+.month-col{
+  display:grid;
+  grid-template-rows:1fr 24px;
+  min-width:0;
+}
+.month-bars{
+  height:180px;
+  display:flex;
+  justify-content:center;
+  align-items:flex-end;
+  gap:4px;
+}
+.month-bar{
+  width:min(14px,38%);
+  min-width:6px;
+  border-radius:5px 5px 1px 1px;
+  transition:height .25s ease, opacity .15s ease;
+}
+.month-bar:hover{
+  opacity:.78;
+}
+.month-bar.gen{background:var(--green)}
+.month-bar.col{background:var(--navy)}
+.month-label{
+  align-self:end;
+  text-align:center;
+  font-size:10px;
+  font-weight:800;
+  color:#66758b;
+  white-space:nowrap;
+}
+.month-chart.is-empty .month-col{
+  opacity:.45;
+}
+.chart-empty-note{
+  position:absolute;
+  left:50%;
+  top:44%;
+  transform:translate(-50%,-50%);
+  z-index:2;
+  padding:8px 12px;
+  border-radius:999px;
+  background:rgba(255,255,255,.92);
+  border:1px solid var(--line);
+  color:#8a98aa;
+  font-size:11px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.type-chart{
+  display:grid;
+  gap:12px;
+  padding-top:2px;
+}
+.type-bar-row{
+  display:grid;
+  grid-template-columns:minmax(110px,155px) minmax(80px,1fr) minmax(105px,auto);
+  gap:9px;
+  align-items:center;
+}
+.type-bar-name{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:11px;
+  font-weight:800;
+  color:#263a5f;
+}
+.type-track{
+  height:12px;
+  overflow:hidden;
+  border-radius:999px;
+  background:#edf2f7;
+}
+.type-fill{
+  height:100%;
+  min-width:0;
+  border-radius:999px;
+  background:linear-gradient(90deg,var(--green),#27a985);
+}
+.type-fill.negative{
+  background:#f79009;
+}
+.type-bar-value{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:5px;
+  flex-wrap:wrap;
+  font-size:11px;
+  font-weight:900;
+  font-variant-numeric:tabular-nums;
+  color:#10203c;
+}
+.mini-badge{
+  display:inline-flex;
+  align-items:center;
+  min-height:19px;
+  padding:2px 6px;
+  border-radius:999px;
+  background:#fff4e5;
+  color:#b54708;
+  font-size:9px;
+  font-weight:900;
+  white-space:nowrap;
+}
+
+@media(max-width:1200px){
+  .dashboard-charts{
+    grid-template-columns:1fr;
+  }
+  .chart-card{
+    min-height:unset;
+  }
+}
+@media(max-width:720px){
+  .month-chart{
+    overflow-x:auto;
+    grid-template-columns:repeat(12,48px);
+  }
+  .type-bar-row{
+    grid-template-columns:minmax(100px,135px) minmax(70px,1fr);
+  }
+  .type-bar-value{
+    grid-column:2;
+    justify-content:flex-start;
+  }
+}
