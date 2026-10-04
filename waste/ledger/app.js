@@ -73,6 +73,8 @@ const num=(v,d=2)=>Number(v||0).toLocaleString('ko-KR',{
   maximumFractionDigits:d
 });
 
+const round2=(v)=>Math.round((Number(v||0)+Number.EPSILON)*100)/100;
+
 function typeName(r){
   return r.display_name||
     `${r.legal_name||''}${r.physical_state==='liquid'?'(액상)':r.physical_state==='solid'?'(고상)':''}`;
@@ -86,18 +88,41 @@ function stateName(r){
   return '';
 }
 
+const CM_LIMIT=154;
+const TON_TO_CM=22;
+const MAX_TON_M3=7;
+
+function cmToM3(cm){
+  return round2((Number(cm||0)/CM_LIMIT)*MAX_TON_M3);
+}
+
+function parseAfterCm(value){
+  const raw=String(value??'').trim();
+  if(!raw) return null;
+  const normalized=raw.toLowerCase().replace(/\s+/g,'');
+  if(normalized.startsWith('over')) return CM_LIMIT;
+  const n=Number(raw);
+  return Number.isFinite(n)?n:null;
+}
+
+function guidelineText(totalCm){
+  return totalCm>CM_LIMIT ? `OVER ${CM_LIMIT}` : `${num(cmToM3(totalCm),2)} m³`;
+}
+
 const today=new Date();
 let year=String(today.getFullYear());
 let month=String(today.getMonth()+1).padStart(2,'0');
-let typeId=''; // 빈 값 = 전체 폐기물
+let typeId='';
+let viewMode='legal'; // legal | facility
 
 let types=[];
 let daily=[];
 let openings=[];
 let collections=[];
+let facilityDaily=[];
 
 async function load(){
-  const [t,d,o,c]=await Promise.all([
+  const [t,d,o,c,f]=await Promise.all([
     A.list('waste_types','*','sort_order',true),
     A.list('waste_daily_entries','*,waste_types(*)','entry_date',true),
     A.list('waste_opening_balances','*,waste_types(*)','balance_date',true),
@@ -106,6 +131,12 @@ async function load(){
       '*,waste_collection_items(*,waste_types(*),processor:waste_vendors!waste_collection_items_processor_vendor_id_fkey(*),transporter:waste_vendors!waste_collection_items_transporter_vendor_id_fkey(*),treatment_method:waste_vendor_treatment_methods!waste_collection_items_treatment_method_id_fkey(*))',
       'collection_date',
       true
+    ),
+    A.list(
+      'waste_facility_daily_logs',
+      '*,waste_types(*)',
+      'entry_date',
+      true
     )
   ]);
 
@@ -113,12 +144,9 @@ async function load(){
   daily=d.data||[];
   openings=o.data||[];
   collections=c.data||[];
+  facilityDaily=f.data||[];
 
   render();
-}
-
-function selectedTypeIds(){
-  return typeId ? [typeId] : types.map(t=>t.id);
 }
 
 function typeById(id){
@@ -131,14 +159,6 @@ function monthPrefix(){
 
 function monthStart(){
   return month==='all' ? `${year}-01-01` : `${year}-${month}-01`;
-}
-
-function nextMonthStart(){
-  if(month==='all') return `${Number(year)+1}-01-01`;
-  const y=Number(year);
-  const m=Number(month);
-  if(m===12) return `${y+1}-01-01`;
-  return `${y}-${String(m+1).padStart(2,'0')}-01`;
 }
 
 function periodLabel(){
@@ -154,6 +174,9 @@ function inSelectedType(wasteTypeId){
   return !typeId || wasteTypeId===typeId;
 }
 
+/* =========================================================
+   사업장 폐기물 관리대장
+========================================================= */
 function openingBalanceKg(){
   const start=monthStart();
 
@@ -221,19 +244,14 @@ function monthlyEvents(){
   events.sort((a,b)=>{
     const d=String(a.date).localeCompare(String(b.date));
     if(d!==0) return d;
-
-    // 같은 날에는 발생을 먼저, 처리를 뒤에 반영
     if(a.kind!==b.kind) return a.kind==='generation' ? -1 : 1;
-
-    const ta=typeName(a.waste_type);
-    const tb=typeName(b.waste_type);
-    return ta.localeCompare(tb,'ko');
+    return typeName(a.waste_type).localeCompare(typeName(b.waste_type),'ko');
   });
 
   return events;
 }
 
-function ledgerRows(){
+function legalLedgerRows(){
   const events=monthlyEvents();
   let genCum=0;
   let outsourcedCum=0;
@@ -286,13 +304,231 @@ function natureCell(ev){
   return esc(stateName(t)||'-');
 }
 
-function render(){
-  const rows=ledgerRows();
-  const titleLabel=month==='all'
-    ? `${year}년 사업장 폐기물 관리대장`
-    : `${year}년 ${Number(month)}월 사업장 폐기물 관리대장`;
+/* =========================================================
+   폐수배출시설 운영일지
+   - waste_facility_daily_logs
+   - waste_collections.is_facility_log = true
+========================================================= */
+function facilityPickupGroups(){
+  const map=new Map();
 
-  $('#app').innerHTML=`
+  collections
+    .filter(h=>h.is_facility_log===true)
+    .forEach(h=>{
+      const items=(h.waste_collection_items||[]).filter(i=>inSelectedType(i.waste_type_id));
+
+      items.forEach(i=>{
+        const key=`${h.collection_date}|${i.waste_type_id}`;
+        if(!map.has(key)){
+          map.set(key,{
+            date:h.collection_date,
+            waste_type_id:i.waste_type_id,
+            waste_type:i.waste_types||typeById(i.waste_type_id),
+            weight_kg:0,
+            processors:new Set(),
+            transporters:new Set(),
+            certificates:new Set(),
+            methods:new Set(),
+            afterValues:[],
+            notes:new Set(),
+            created_at:h.created_at||''
+          });
+        }
+
+        const g=map.get(key);
+        g.weight_kg+=Number(i.weight_kg||0);
+
+        if(i.processor?.vendor_name) g.processors.add(i.processor.vendor_name);
+        if(i.transporter?.vendor_name) g.transporters.add(i.transporter.vendor_name);
+        if(i.treatment_method?.method_name) g.methods.add(i.treatment_method.method_name);
+        if(h.certificate_no) g.certificates.add(h.certificate_no);
+        if(h.note) g.notes.add(h.note);
+        if(h.facility_after_cm!=null && String(h.facility_after_cm).trim()!==''){
+          g.afterValues.push(String(h.facility_after_cm).trim());
+        }
+        if(String(h.created_at||'')>String(g.created_at||'')) g.created_at=h.created_at||g.created_at;
+      });
+    });
+
+  return [...map.values()].map(g=>({
+    ...g,
+    processors:[...g.processors],
+    transporters:[...g.transporters],
+    certificates:[...g.certificates],
+    methods:[...g.methods],
+    notes:[...g.notes],
+    after_cm:g.afterValues.length?g.afterValues[g.afterValues.length-1]:null
+  }));
+}
+
+function buildFacilityDerived(){
+  const pickups=facilityPickupGroups();
+  const pickupMap=new Map();
+
+  pickups.forEach(p=>{
+    const key=`${p.date}|${p.waste_type_id}`;
+    pickupMap.set(key,p);
+  });
+
+  const byType=new Map();
+
+  facilityDaily
+    .filter(r=>inSelectedType(r.waste_type_id))
+    .forEach(r=>{
+      if(!byType.has(r.waste_type_id)) byType.set(r.waste_type_id,[]);
+      byType.get(r.waste_type_id).push(r);
+    });
+
+  const enriched=[];
+
+  byType.forEach((rows,wasteTypeId)=>{
+    const ordered=[...rows].sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date)));
+
+    let prevMeter=0;
+    let prevGuideline=0;
+
+    ordered.forEach((row,idx)=>{
+      const isHoliday=!!row.is_holiday;
+      const meter=isHoliday ? prevMeter : Number(row.usage||0);
+      const waterUsed=isHoliday
+        ? 0
+        : (idx===0 ? meter : round2(meter-prevMeter));
+
+      const externalCm=isHoliday
+        ? 0
+        : (row.has_external
+            ? Number(row.external_cm || (Number(row.external_ton||0)*TON_TO_CM))
+            : 0);
+
+      const totalCm=isHoliday
+        ? 0
+        : round2(Number(row.height||0)+externalCm);
+
+      const guidelineValue=isHoliday
+        ? prevGuideline
+        : (totalCm>CM_LIMIT ? null : cmToM3(totalCm));
+
+      const generated=isHoliday
+        ? 0
+        : (guidelineValue===null ? null : round2(guidelineValue-prevGuideline));
+
+      const pickup=pickupMap.get(`${row.entry_date}|${wasteTypeId}`)||null;
+
+      enriched.push({
+        ...row,
+        waste_type:row.waste_types||typeById(wasteTypeId),
+        water_prev:idx===0?0:prevMeter,
+        water_used:waterUsed,
+        external_cm_calc:externalCm,
+        total_cm:totalCm,
+        guideline_text:isHoliday?'휴일':guidelineText(totalCm),
+        generated_text:isHoliday?'휴일':(generated===null?'Unverified':`${num(generated,2)} m³`),
+        pickup
+      });
+
+      prevMeter=meter;
+
+      if(!isHoliday){
+        if(pickup?.after_cm!=null){
+          const parsed=parseAfterCm(pickup.after_cm);
+          prevGuideline=parsed==null
+            ? (guidelineValue??prevGuideline)
+            : cmToM3(parsed);
+        }else{
+          prevGuideline=guidelineValue??prevGuideline;
+        }
+      }
+    });
+  });
+
+  // 수거만 있고 일일입력이 없는 날짜도 운영일지에 표시
+  const dailyKeys=new Set(enriched.map(r=>`${r.entry_date}|${r.waste_type_id}`));
+  pickups.forEach(p=>{
+    const key=`${p.date}|${p.waste_type_id}`;
+    if(!dailyKeys.has(key)){
+      enriched.push({
+        id:null,
+        entry_date:p.date,
+        waste_type_id:p.waste_type_id,
+        waste_type:p.waste_type||typeById(p.waste_type_id),
+        usage:null,
+        height:null,
+        is_holiday:false,
+        holiday_reason:null,
+        note:'',
+        has_external:false,
+        external_ton:null,
+        external_cm:null,
+        water_prev:null,
+        water_used:null,
+        external_cm_calc:null,
+        total_cm:null,
+        guideline_text:'-',
+        generated_text:'-',
+        pickup:p,
+        pickup_only:true
+      });
+    }
+  });
+
+  enriched.sort((a,b)=>{
+    const d=String(a.entry_date).localeCompare(String(b.entry_date));
+    if(d!==0)return d;
+    return typeName(a.waste_type).localeCompare(typeName(b.waste_type),'ko');
+  });
+
+  return enriched;
+}
+
+function facilityRowsForPeriod(){
+  const prefix=monthPrefix();
+  return buildFacilityDerived()
+    .filter(r=>String(r.entry_date||'').startsWith(prefix));
+}
+
+function facilityWasteCell(row){
+  if(typeId) return '';
+  return `<br><span class="muted">${esc(typeName(row.waste_type||{}))}</span>`;
+}
+
+function facilityPickupInfo(p){
+  if(!p) return '-';
+
+  const weightT=Number(p.weight_kg||0)/1000;
+  const after=p.after_cm!=null && String(p.after_cm).trim()!==''
+    ? `<br>후높이 ${esc(p.after_cm)} cm`
+    : '';
+
+  return `수거 ${num(weightT,4)} T${after}`;
+}
+
+function facilityContractor(p){
+  if(!p || !p.processors?.length) return '-';
+  return p.processors.map(esc).join('<br>');
+}
+
+function facilityCertificates(p){
+  if(!p || !p.certificates?.length) return '-';
+  return p.certificates.map(esc).join('<br>');
+}
+
+/* =========================================================
+   렌더링
+========================================================= */
+function commonTabsHtml(){
+  return `
+    <div class="subtabs" style="margin-bottom:10px;">
+      <button id="mode-legal" class="${viewMode==='legal'?'active':''}">
+        사업장 폐기물 관리대장
+      </button>
+      <button id="mode-facility" class="${viewMode==='facility'?'active':''}">
+        폐수배출시설 운영일지
+      </button>
+    </div>`;
+}
+
+function commonFiltersHtml(){
+  return `
     <div class="toolbar">
       <select id="year" class="btn">
         ${[Number(year)-2,Number(year)-1,Number(year),Number(year)+1].map(y=>
@@ -317,7 +553,18 @@ function render(){
 
       <div class="spacer"></div>
       <button class="btn primary" id="print">인쇄</button>
-    </div>
+    </div>`;
+}
+
+function renderLegal(){
+  const rows=legalLedgerRows();
+  const titleLabel=month==='all'
+    ? `${year}년 사업장 폐기물 관리대장`
+    : `${year}년 ${Number(month)}월 사업장 폐기물 관리대장`;
+
+  $('#app').innerHTML=`
+    ${commonTabsHtml()}
+    ${commonFiltersHtml()}
 
     <div class="card">
       <div class="section-head">
@@ -419,6 +666,147 @@ function render(){
       </div>
     </div>`;
 
+  bindCommon();
+}
+
+function renderFacility(){
+  const rows=facilityRowsForPeriod();
+
+  $('#app').innerHTML=`
+    ${commonTabsHtml()}
+    ${commonFiltersHtml()}
+
+    <div class="card">
+      <div class="section-head">
+        <h2>🧾 폐수배출시설 운영일지</h2>
+        <div class="spacer"></div>
+        <span class="hint">${periodLabel()}</span>
+      </div>
+
+      <div class="hint">
+        일일입력에서 <b>폐수배출시설 운영일지</b>로 저장한 기록과,
+        수거등록에서 같은 항목을 체크한 수거건만 날짜 기준으로 합쳐 표시합니다.
+        ${typeId?` · 폐기물: <b>${esc(selectedTypeLabel())}</b>`:''}
+      </div>
+
+      <br>
+
+      <div class="table-wrap">
+        <table style="min-width:1320px">
+          <thead>
+            <tr>
+              <th>날짜</th>
+              <th>용수 금일</th>
+              <th>당일 사용량</th>
+              <th>저장고 높이</th>
+              <th>외부보관</th>
+              <th>처리업소</th>
+              <th>금일지침</th>
+              <th>총 발생량</th>
+              <th>확인서번호</th>
+              <th>수거 정보</th>
+              <th>기타</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${rows.length ? rows.map(r=>{
+              const isHoliday=!!r.is_holiday;
+              const p=r.pickup;
+
+              return `
+                <tr>
+                  <td>
+                    ${r.entry_date}
+                    ${facilityWasteCell(r)}
+                  </td>
+
+                  <td class="num">
+                    ${isHoliday?'휴일':(r.usage==null?'-':num(r.usage,2))}
+                  </td>
+
+                  <td class="num">
+                    ${isHoliday?'휴일':(r.water_used==null?'-':num(r.water_used,2))}
+                  </td>
+
+                  <td class="num">
+                    ${isHoliday?'휴일':(r.height==null?'-':`${num(r.height,1)} cm`)}
+                  </td>
+
+                  <td>
+                    ${isHoliday
+                      ? '-'
+                      : (r.has_external
+                          ? `${num(r.external_ton||0,1)} T / ${num(r.external_cm_calc||0,1)} cm`
+                          : '-')}
+                  </td>
+
+                  <td>${facilityContractor(p)}</td>
+
+                  <td>
+                    ${isHoliday
+                      ? '휴일'
+                      : (r.total_cm!=null && r.total_cm>CM_LIMIT
+                          ? `<span class="pill amber">OVER ${CM_LIMIT}</span>`
+                          : esc(r.guideline_text||'-'))}
+                  </td>
+
+                  <td>
+                    ${isHoliday
+                      ? '휴일'
+                      : (r.generated_text==='Unverified'
+                          ? '<span class="pill amber">Unverified</span>'
+                          : esc(r.generated_text||'-'))}
+                  </td>
+
+                  <td>${facilityCertificates(p)}</td>
+
+                  <td>${facilityPickupInfo(p)}</td>
+
+                  <td>
+                    ${isHoliday
+                      ? esc(r.holiday_reason||'휴일')
+                      : esc(r.note||'')}
+                    ${p?.notes?.length
+                      ? `${r.note?'<br>':''}<span class="muted">${p.notes.map(esc).join('<br>')}</span>`
+                      : ''}
+                  </td>
+                </tr>`;
+            }).join('') : `
+              <tr>
+                <td colspan="11" class="empty">
+                  ${periodLabel()} 폐수배출시설 운영일지 데이터가 없습니다.
+                </td>
+              </tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <br>
+
+      <div class="hint">
+        계산 기준은 기존 폐수 운영일지와 동일하게
+        저장고 기준 <b>${CM_LIMIT} cm = ${MAX_TON_M3} m³</b>,
+        외부보관 환산 기본값은 <b>1 T = ${TON_TO_CM} cm</b>를 사용합니다.
+        수거 후 높이가 입력된 날은 해당 값을 다음 발생량 계산의 기준으로 사용합니다.
+      </div>
+    </div>`;
+
+  bindCommon();
+}
+
+function bindCommon(){
+  $('#mode-legal').onclick=()=>{
+    viewMode='legal';
+    render();
+  };
+
+  $('#mode-facility').onclick=()=>{
+    viewMode='facility';
+    render();
+  };
+
   $('#year').onchange=e=>{
     year=e.target.value;
     render();
@@ -435,6 +823,11 @@ function render(){
   };
 
   $('#print').onclick=()=>window.print();
+}
+
+function render(){
+  if(viewMode==='facility') renderFacility();
+  else renderLegal();
 }
 
 load();
