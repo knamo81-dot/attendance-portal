@@ -12,11 +12,14 @@
     month: "",
     operator: false,
     user: {},
-    loading: false
+    loading: false,
+    reloadQueued: false
   };
 
+  let bridgedPortalSession = null;
+
   const PORTAL_TABS = [
-    { id: "reagent-dashboard", label: "시약현황" },
+    { id: "reagent-dashboard", label: "구매현황" },
     { id: "request", label: "제품신청" },
     { id: "collect", label: "제품취합" },
     { id: "prepare", label: "취합정리" },
@@ -27,13 +30,63 @@
   function portalSession() {
     try {
       if (window.parent && window.parent !== window && typeof window.parent.getPortalSession === "function") {
-        return window.parent.getPortalSession() || {};
+        const parentSession = window.parent.getPortalSession() || {};
+        if (parentSession && (parentSession.activeCompanyId || parentSession.companyId || parentSession.company_id)) {
+          return parentSession;
+        }
       }
     } catch (_) {}
     try {
-      if (window.parent && window.parent !== window && window.parent.portalSession) return window.parent.portalSession || {};
+      if (window.parent && window.parent !== window && window.parent.portalSession) {
+        const parentSession = window.parent.portalSession || {};
+        if (parentSession && (parentSession.activeCompanyId || parentSession.companyId || parentSession.company_id)) {
+          return parentSession;
+        }
+      }
     } catch (_) {}
-    return window.portalSession || window.currentPortalSession || {};
+    return bridgedPortalSession || window.portalSession || window.currentPortalSession || {};
+  }
+
+  function applyPortalAuthMessage(payload) {
+    const raw = payload || {};
+    const session = raw.session && typeof raw.session === 'object' ? { ...raw.session } : {};
+    const company = raw.company && typeof raw.company === 'object' ? raw.company : {};
+    const user = raw.user && typeof raw.user === 'object' ? raw.user : {};
+
+    const companyId = String(
+      session.activeCompanyId ||
+      session.companyId ||
+      session.company_id ||
+      company.id ||
+      company.company_id ||
+      user.company_id ||
+      user.companyId ||
+      ''
+    ).trim();
+
+    bridgedPortalSession = {
+      ...session,
+      activeCompanyId: session.activeCompanyId || companyId,
+      companyId: session.companyId || companyId,
+      company_id: session.company_id || companyId,
+      employee: raw.employee || session.employee || null,
+      profile: raw.profile || session.profile || null,
+      appRoles: raw.appRoles || raw.app_roles || session.appRoles || session.app_roles || {},
+      app_roles: raw.app_roles || raw.appRoles || session.app_roles || session.appRoles || {},
+      userRole: session.userRole || session.user_role || user.role || user.user_role || '',
+      isServiceAdmin: session.isServiceAdmin === true || session.is_service_admin === true || user.isServiceAdmin === true || user.is_service_admin === true
+    };
+
+    window.portalSession = bridgedPortalSession;
+    window.currentPortalSession = bridgedPortalSession;
+  }
+
+  function requestPortalAuth() {
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'portal-auth-request', source: 'reagent-dashboard' }, '*');
+      }
+    } catch (_) {}
   }
 
   function getCompanyId() {
@@ -243,8 +296,8 @@
     $$(".viewer-only").forEach(el => { el.hidden = state.operator; });
     const subtitle = $("#dashboardSubtitle");
     if (subtitle) subtitle.textContent = state.operator
-      ? "시약·초자 주문 진행상황과 구매현황을 한눈에 확인합니다."
-      : "내가 신청한 시약·초자의 취합·발주·입고 진행상황을 확인합니다.";
+      ? "시약·초자·소모품·안전용품의 주문 및 구매 진행현황을 한눈에 확인합니다."
+      : "내가 신청한 연구용품의 취합·발주·입고 진행상황을 확인합니다.";
     const label = $("#kpiRequestLabel");
     if (label) label.textContent = state.operator ? "신청품목" : "내 신청품목";
   }
@@ -460,10 +513,14 @@
   }
 
   async function loadData() {
-    if (state.loading) return;
+    if (state.loading) {
+      state.reloadQueued = true;
+      return;
+    }
     state.loading = true;
+    state.reloadQueued = false;
     const loading = $('#dashboardLoading');
-    if (loading) { loading.hidden = false; loading.textContent = '시약현황을 불러오는 중입니다.'; }
+    if (loading) { loading.hidden = false; loading.textContent = '연구용품 구매현황을 불러오는 중입니다.'; }
     try {
       await waitForPortalReady();
       if (!APP.sb) throw new Error('Supabase 연결 정보를 확인할 수 없습니다.');
@@ -514,13 +571,17 @@
       renderAll();
       if (loading) loading.hidden = true;
     } catch (error) {
-      console.error('시약현황 조회 실패:', error);
+      console.error('연구용품 구매현황 조회 실패:', error);
       if (loading) {
         loading.hidden = false;
-        loading.textContent = `시약현황 조회 실패: ${error?.message || error}`;
+        loading.textContent = `연구용품 구매현황 조회 실패: ${error?.message || error}`;
       }
     } finally {
       state.loading = false;
+      if (state.reloadQueued) {
+        state.reloadQueued = false;
+        setTimeout(loadData, 0);
+      }
     }
   }
 
@@ -550,7 +611,12 @@
       if (p.type === 'portal-filters-request') {
         try { window.parent?.postMessage({ type:'portal-filters-ready', enabled:false, filters:[], source:'reagent-dashboard' }, '*'); } catch (_) {}
       }
+      if (p.type === 'portal-auth') {
+        applyPortalAuthMessage(p);
+        loadData();
+      }
       if (p.type === 'portal-session' || p.type === 'portal-company-change') loadData();
+      if (p.type === 'portal-dashboard-refresh') loadData();
     });
   }
 
@@ -558,6 +624,9 @@
     state.month = getDefaultMonth();
     bindEvents();
     notifyPortalTabs();
+    requestPortalAuth();
+    setTimeout(requestPortalAuth, 150);
+    setTimeout(requestPortalAuth, 500);
     await loadData();
     setTimeout(notifyPortalTabs, 250);
     setTimeout(notifyPortalTabs, 800);
