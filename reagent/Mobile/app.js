@@ -118,7 +118,7 @@
 
   function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-  async function waitForPortalReady(timeout = 8000) {
+  async function waitForPortalReady(timeout = 2500) {
     const started = Date.now();
     while (Date.now() - started < timeout) {
       if (APP.sb && getCompanyId()) return true;
@@ -622,12 +622,20 @@
 
   async function bootstrap() {
     state.month = getDefaultMonth();
+
+    // 데이터 연결을 기다리기 전에 화면 골격과 주문월을 먼저 표시합니다.
+    // 네트워크/세션 응답이 늦어도 모바일 첫 화면이 빈 화면처럼 보이지 않게 합니다.
+    initMonthOptions();
     bindEvents();
     notifyPortalTabs();
     requestPortalAuth();
-    setTimeout(requestPortalAuth, 150);
-    setTimeout(requestPortalAuth, 500);
+
+    setTimeout(requestPortalAuth, 120);
+    setTimeout(requestPortalAuth, 400);
+    setTimeout(requestPortalAuth, 1000);
+
     await loadData();
+
     setTimeout(notifyPortalTabs, 250);
     setTimeout(notifyPortalTabs, 800);
   }
