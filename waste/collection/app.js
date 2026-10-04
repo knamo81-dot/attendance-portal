@@ -112,6 +112,8 @@ function itemRow(i=0){
         </div>
       </div>
 
+      <div class="facility-field-slot"></div>
+
       <button type="button" class="btn small danger remove-item">항목 삭제</button>
     </div>`;
 }
@@ -182,13 +184,6 @@ function render(){
             <button class="btn small" type="button" id="add-item">+ 항목 추가</button>
           </div>
 
-          <div id="facility-pickup-box" class="soft facility-pickup-box" style="display:none;">
-            <div class="field" style="margin-bottom:0;">
-              <label>수거 후 높이 (괄호값, cm)</label>
-              <input id="facility_after_cm" type="text" placeholder="예: 0.0 또는 over 154">
-            </div>
-          </div>
-
           <div id="items">${itemRow(0)}</div>
 
           <br>
@@ -245,6 +240,7 @@ function render(){
     const box=$('#items');
     box.insertAdjacentHTML('beforeend',itemRow(box.children.length));
     bindItems();
+    syncFacilityLogUI();
   };
   $('#treatment_type').onchange=syncCommonTreatment;
   $('#processor_vendor_id').onchange=syncCommonTreatment;
@@ -260,17 +256,32 @@ function methodsForVendor(vendorId){
   return methods.filter(m=>m.vendor_id===vendorId&&m.active);
 }
 
+let facilityAfterCache='';
+
 function syncFacilityLogUI(){
   const checked=$('#is_facility_log')?.checked||false;
-  const box=$('#facility-pickup-box');
-  const input=$('#facility_after_cm');
 
-  if(box) box.style.display=checked?'block':'none';
+  const existing=$('#facility_after_cm');
+  if(existing) facilityAfterCache=existing.value;
 
-  if(input){
-    input.disabled=!checked;
-    if(!checked) input.value='';
+  const slots=[...document.querySelectorAll('.facility-field-slot')];
+  slots.forEach(slot=>slot.innerHTML='');
+
+  if(!checked){
+    facilityAfterCache='';
+    return;
   }
+
+  const firstSlot=slots[0];
+  if(!firstSlot)return;
+
+  firstSlot.innerHTML=`
+    <div class="field facility-inline-field">
+      <label>수거 후 높이 (괄호값, cm)</label>
+      <input id="facility_after_cm" type="text"
+        value="${esc(facilityAfterCache)}"
+        placeholder="예: 0.0 또는 over 154">
+    </div>`;
 }
 
 function syncCommonTreatment(){
@@ -314,7 +325,10 @@ function syncCommonTreatment(){
 function bindItems(){
   document.querySelectorAll('.remove-item').forEach(b=>b.onclick=()=>{
     if(document.querySelectorAll('.item').length<=1)return notice('폐기물 항목은 최소 1개 필요합니다.','err');
+    const current=$('#facility_after_cm');
+    if(current) facilityAfterCache=current.value;
     b.closest('.item').remove();
+    syncFacilityLogUI();
   });
 }
 
