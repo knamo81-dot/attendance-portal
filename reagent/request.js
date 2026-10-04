@@ -347,20 +347,13 @@ window.ReagentApp.request = {
       else formCard.prepend(formNotice);
     }
 
-    const appPanel = document.getElementById("requestApplicationPanel");
-    let listNotice = document.getElementById("requestMonthFinalizedListNotice");
-    if (!listNotice && appPanel) {
-      listNotice = document.createElement("div");
-      listNotice.id = "requestMonthFinalizedListNotice";
-      listNotice.className = "request-month-finalized-notice request-month-finalized-list-notice";
-      appPanel.prepend(listNotice);
+    if (formNotice) {
+      formNotice.textContent = message;
+      formNotice.hidden = !finalized;
     }
 
-    [formNotice, listNotice].forEach((notice) => {
-      if (!notice) return;
-      notice.textContent = message;
-      notice.hidden = !finalized;
-    });
+    // 신청목록에는 동일한 마감 안내를 중복 표시하지 않습니다.
+    document.getElementById("requestMonthFinalizedListNotice")?.remove();
 
     ["openSearch", "openProductScan", "addItem"].forEach((id) => {
       const el = document.getElementById(id);
