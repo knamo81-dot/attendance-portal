@@ -112,40 +112,6 @@ function itemRow(i=0){
         </div>
       </div>
 
-      <div class="inline">
-        <div class="field">
-          <label>처리구분</label>
-          <select class="itreatment-type">
-            <option value="outsourced">위탁처리</option>
-            <option value="self">자가처리</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>처리업소</label>
-          <select class="iprocessor">
-            <option value="">선택 안함</option>
-            ${processorOptions()}
-          </select>
-        </div>
-      </div>
-
-      <div class="inline">
-        <div class="field">
-          <label>처리방법</label>
-          <select class="imethod">
-            <option value="">처리업소를 먼저 선택</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>운반업체</label>
-          <select class="itransporter">
-            <option value="">선택 안함</option>
-            ${transporterOptions()}
-          </select>
-        </div>
-      </div>
-
-      <div class="hint item-treatment-hint"></div>
       <button type="button" class="btn small danger remove-item">항목 삭제</button>
     </div>`;
 }
@@ -166,6 +132,41 @@ function render(){
             <label>확인서 일련번호</label>
             <input id="certificate_no">
           </div>
+
+          <div class="inline">
+            <div class="field">
+              <label>처리구분</label>
+              <select id="treatment_type">
+                <option value="outsourced">위탁처리</option>
+                <option value="self">자가처리</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>운반업체</label>
+              <select id="transporter_vendor_id">
+                <option value="">선택 안함</option>
+                ${transporterOptions()}
+              </select>
+            </div>
+          </div>
+
+          <div class="inline">
+            <div class="field">
+              <label>처리업소</label>
+              <select id="processor_vendor_id">
+                <option value="">선택 안함</option>
+                ${processorOptions()}
+              </select>
+            </div>
+            <div class="field">
+              <label>처리방법</label>
+              <select id="treatment_method_id">
+                <option value="">처리업소를 먼저 선택</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="treatment-hint" class="hint" style="margin:-4px 0 12px;"></div>
 
           <div class="section-head">
             <h2>폐기물별 수거량 및 처리정보</h2>
@@ -228,6 +229,9 @@ function render(){
     box.insertAdjacentHTML('beforeend',itemRow(box.children.length));
     bindItems();
   };
+  $('#treatment_type').onchange=syncCommonTreatment;
+  $('#processor_vendor_id').onchange=syncCommonTreatment;
+  syncCommonTreatment();
   bindItems();
   $('#form').onsubmit=save;
   document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>del(b.dataset.del));
@@ -237,12 +241,14 @@ function methodsForVendor(vendorId){
   return methods.filter(m=>m.vendor_id===vendorId&&m.active);
 }
 
-function syncItemTreatment(item){
-  const type=item.querySelector('.itreatment-type').value;
-  const processor=item.querySelector('.iprocessor');
-  const transporter=item.querySelector('.itransporter');
-  const method=item.querySelector('.imethod');
-  const hint=item.querySelector('.item-treatment-hint');
+function syncCommonTreatment(){
+  const type=$('#treatment_type')?.value||'outsourced';
+  const processor=$('#processor_vendor_id');
+  const transporter=$('#transporter_vendor_id');
+  const method=$('#treatment_method_id');
+  const hint=$('#treatment-hint');
+
+  if(!processor||!transporter||!method)return;
 
   if(type==='self'){
     processor.disabled=true;
@@ -251,30 +257,29 @@ function syncItemTreatment(item){
     transporter.value='';
     method.disabled=false;
     method.innerHTML=`<option value="">선택 안함</option>${allMethodOptions()}`;
-    hint.textContent='자가처리는 처리업소·운반업체 없이 처리방법만 선택합니다.';
+    if(hint)hint.textContent='자가처리는 처리업소·운반업체 없이 처리방법만 선택합니다.';
     return;
   }
 
   processor.disabled=false;
   transporter.disabled=false;
+
   const vendorId=processor.value;
   const list=methodsForVendor(vendorId);
+
   method.disabled=!vendorId;
   method.innerHTML=vendorId
     ? `<option value="">선택</option>${list.map(m=>`<option value="${m.id}">${esc(m.method_name)}</option>`).join('')}`
     : `<option value="">처리업소를 먼저 선택</option>`;
-  hint.textContent=vendorId&&!list.length?'선택한 처리업체에 등록된 처리방법이 없습니다. 설정 > 업체에서 처리방법을 추가해 주세요.':'';
+
+  if(hint){
+    hint.textContent=vendorId&&!list.length
+      ? '선택한 처리업체에 등록된 처리방법이 없습니다. 설정 > 업체에서 처리방법을 추가해 주세요.'
+      : '';
+  }
 }
 
 function bindItems(){
-  document.querySelectorAll('.item').forEach(item=>{
-    const typeSel=item.querySelector('.itreatment-type');
-    const processor=item.querySelector('.iprocessor');
-    typeSel.onchange=()=>syncItemTreatment(item);
-    processor.onchange=()=>syncItemTreatment(item);
-    syncItemTreatment(item);
-  });
-
   document.querySelectorAll('.remove-item').forEach(b=>b.onclick=()=>{
     if(document.querySelectorAll('.item').length<=1)return notice('폐기물 항목은 최소 1개 필요합니다.','err');
     b.closest('.item').remove();
@@ -284,6 +289,18 @@ function bindItems(){
 async function save(e){
   e.preventDefault();
 
+  const treatmentType=$('#treatment_type').value||'outsourced';
+  const processor=$('#processor_vendor_id').value||null;
+  const method=$('#treatment_method_id').value||null;
+  const transporter=$('#transporter_vendor_id').value||null;
+
+  if(treatmentType==='outsourced'&&!processor){
+    return notice('위탁처리는 처리업소를 선택하세요.','err');
+  }
+  if(!method){
+    return notice('처리방법을 선택하세요.','err');
+  }
+
   const itemEls=[...document.querySelectorAll('.item')];
   const items=[];
 
@@ -291,19 +308,8 @@ async function save(e){
     const qty=Number(el.querySelector('.iqty').value||0);
     const tonEl=el.querySelector('.iton');
     const weightKg=tonEl.value===''?null:Number(tonEl.value)*1000;
+
     if(!(qty>0||Number(weightKg)>0))continue;
-
-    const treatmentType=el.querySelector('.itreatment-type').value;
-    const processor=el.querySelector('.iprocessor').value||null;
-    const method=el.querySelector('.imethod').value||null;
-    const transporter=el.querySelector('.itransporter').value||null;
-
-    if(treatmentType==='outsourced'&&!processor){
-      return notice('위탁처리 항목은 처리업소를 선택하세요.','err');
-    }
-    if(treatmentType==='outsourced'&&!method){
-      return notice('위탁처리 항목은 처리방법을 선택하세요.','err');
-    }
 
     items.push({
       waste_type_id:el.querySelector('.itype').value,
