@@ -109,7 +109,10 @@
       select.dataset.monthSignature = signature;
       select.innerHTML = months.map((m)=>`<option value="${attr(m)}">${esc(request.formatOrderMonthLabel?.(m) || m)}</option>`).join('');
     }
+    request.ensureMonthOption?.(select, selected);
     select.value = selected;
+    request.ensureYearMonthPicker?.(select);
+    request.syncYearMonthPicker?.(select, selected);
   }
 
   function wrapRequestRender(){
