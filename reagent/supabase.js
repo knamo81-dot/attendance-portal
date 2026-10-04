@@ -16,6 +16,7 @@ const REAGENT_TENANT_TABLES = new Set([
   "product_registration_requests",
   "reagent_requests",
   "reagent_collect_items",
+  "reagent_order_month_status",
   "reagent_operators"
 ]);
 
