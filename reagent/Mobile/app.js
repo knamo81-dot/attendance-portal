@@ -170,6 +170,9 @@
     const container = ensureAfter(tableWrap, 'collectMobileCards');
     if (!collect || !request || !container) return;
 
+    const currentMonth = request.getCurrentOrderMonth?.() || '';
+    const monthFinalized = request.getCachedOrderMonthStatus?.(currentMonth) === '확정';
+
     const keys = getCollectDisplayKeys();
     if (!keys.length){
       container.innerHTML = '<div class="mobile-empty">취합할 항목이 없습니다.</div>';
@@ -190,8 +193,8 @@
       const price2 = collect.getEffectiveAmount?.(meta,2,qty) ?? num(meta.price2);
       const selectedVendor = meta.confirmed ? meta.selectedVendor : (collect.autoSelectVendor?.(meta,qty) || '');
       const checked = collect.selectedKeys?.includes(key) ? 'checked' : '';
-      const disabled = meta.confirmed ? 'disabled' : '';
-      const readonly = meta.confirmed ? 'readonly' : '';
+      const disabled = (meta.confirmed || monthFinalized) ? 'disabled' : '';
+      const readonly = (meta.confirmed || monthFinalized) ? 'readonly' : '';
       const defaultInfo = collect.getDefaultVendorInfoForGroup?.(group) || {};
       const reason = String(meta.prepareRemark || defaultInfo.reason || '').trim();
       const hasFixedReason = String(meta.vendor1 || '').trim() && reason && reason !== '최저가 구매';
@@ -203,8 +206,8 @@
           수량 ${esc(item.qty ?? '-')} · ${esc(item.usage || '용도 미입력')}
         </div>`).join('');
       const actionButton = meta.confirmed
-        ? `<button type="button" class="ghost-btn mobile-collect-cancel" data-key="${attr(key)}">확정 취소</button>`
-        : `<button type="button" class="ghost-btn mobile-collect-exclude" data-key="${attr(key)}">취합 제외</button>`;
+        ? `<button type="button" class="ghost-btn mobile-collect-cancel" data-key="${attr(key)}" ${monthFinalized ? 'disabled aria-disabled="true"' : ''}>확정 취소</button>`
+        : `<button type="button" class="ghost-btn mobile-collect-exclude" data-key="${attr(key)}" ${monthFinalized ? 'disabled aria-disabled="true"' : ''}>취합 제외</button>`;
 
       return `
         <article class="mobile-data-card mobile-collect-card" data-key="${attr(key)}">
@@ -282,7 +285,7 @@
         const key = el.dataset.key || '';
         const field = el.dataset.field || '';
         const meta = collect.getMeta(key);
-        if (!key || !field || meta.confirmed) return;
+        if (!key || !field || meta.confirmed || request.getCachedOrderMonthStatus?.(request.getCurrentOrderMonth?.() || '') === '확정') return;
         const group = groupMap.get(String(key));
         const qty = Number(group?.collectedQty || 0);
 
