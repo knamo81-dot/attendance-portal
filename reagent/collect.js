@@ -420,8 +420,81 @@ window.ReagentApp.collect = {
       });
   },
 
+  isCurrentOrderMonthFinalized() {
+    const request = window.ReagentApp.request;
+    const monthKey = request?.getCurrentOrderMonth?.() || "";
+    return request?.getCachedOrderMonthStatus?.(monthKey) === "확정";
+  },
+
+  getCurrentOrderMonthLockMessage() {
+    const request = window.ReagentApp.request;
+    const monthKey = request?.getCurrentOrderMonth?.() || "";
+    const monthLabel = request?.formatOrderMonthLabel?.(monthKey) || monthKey || "선택한 주문월";
+    return `${monthLabel} 주문건은 취합정리가 확정되어 제품취합 내용을 수정할 수 없습니다.`;
+  },
+
+  async ensureCurrentOrderMonthEditable(options = {}) {
+    const request = window.ReagentApp.request;
+    const monthKey = request?.getCurrentOrderMonth?.() || "";
+
+    if (options.refresh === true && request?.refreshOrderMonthStatus && monthKey) {
+      try {
+        await request.refreshOrderMonthStatus(monthKey, true);
+      } catch (error) {
+        console.warn("제품취합 주문월 상태 재확인 실패:", error);
+      }
+    }
+
+    const editable = !this.isCurrentOrderMonthFinalized();
+    if (!editable && options.toast !== false) {
+      window.ReagentApp.toast?.(this.getCurrentOrderMonthLockMessage(), "warn");
+    }
+    return editable;
+  },
+
+  applyCollectMonthLockUI() {
+    const finalized = this.isCurrentOrderMonthFinalized();
+    const message = this.getCurrentOrderMonthLockMessage();
+
+    ["confirmSelectedCollect", "excludeSelectedCollect"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.disabled = finalized;
+      el.setAttribute("aria-disabled", finalized ? "true" : "false");
+      el.title = finalized ? message : "";
+    });
+
+    const allToggle = document.getElementById("collectAllToggle");
+    if (allToggle) {
+      allToggle.disabled = finalized;
+      allToggle.title = finalized ? message : "현재 화면의 미확정 항목 전체 선택/해제";
+    }
+
+    document.querySelectorAll("#page-collect .collect-check").forEach((el) => {
+      if (finalized) el.checked = false;
+      el.disabled = finalized || el.closest("tr")?.classList.contains("collect-row-confirmed");
+    });
+
+    document.querySelectorAll("#page-collect .collect-input").forEach((el) => {
+      if (finalized) el.setAttribute("readonly", "readonly");
+    });
+
+    document.querySelectorAll("#page-collect .collect-cancel-btn, #page-collect .collect-exclude-btn").forEach((el) => {
+      el.disabled = finalized;
+      el.setAttribute("aria-disabled", finalized ? "true" : "false");
+      el.title = finalized ? message : el.title;
+    });
+
+    if (finalized) {
+      this.selectedKeys = [];
+      this.saveSelectedKeys?.();
+      this.resetCollectAllToggle?.();
+    }
+  },
+
   async addSelectedToCollect() {
     const request = window.ReagentApp.request;
+    if (!(await this.ensureCurrentOrderMonthEditable({ refresh: true }))) return;
     const groups = request.groupItems(request.getRowsForCurrentOrderMonth ? request.getRowsForCurrentOrderMonth() : request.requestRows);
     const selected = groups.filter((g) => request.selectedKeys.includes(g.key));
 
@@ -624,7 +697,7 @@ window.ReagentApp.collect = {
         const field = e.target.dataset.field;
         const meta = this.getMeta(key);
 
-        if (meta.confirmed) return;
+        if (meta.confirmed || this.isCurrentOrderMonthFinalized()) return;
 
         if (field === "unit1" || field === "unit2") {
           meta[field] = this.normalizeNumber(e.target.value);
@@ -703,6 +776,7 @@ window.ReagentApp.collect = {
 
   async cancelConfirmByKey(key) {
     const request = window.ReagentApp.request;
+    if (!(await this.ensureCurrentOrderMonthEditable({ refresh: true }))) return;
     const meta = this.getMeta(key);
 
     if (!meta.confirmed) {
@@ -734,6 +808,7 @@ window.ReagentApp.collect = {
 
   async excludeCollectByKey(key) {
     const request = window.ReagentApp.request;
+    if (!(await this.ensureCurrentOrderMonthEditable({ refresh: true }))) return;
     const meta = this.getMeta(key);
 
     if (meta.confirmed) {
@@ -767,6 +842,7 @@ window.ReagentApp.collect = {
 
   async confirmSelectedCollect() {
     const request = window.ReagentApp.request;
+    if (!(await this.ensureCurrentOrderMonthEditable({ refresh: true }))) return;
     const checkedKeys = this.getCheckedKeysFromDOM();
     const targetKeys = checkedKeys.length ? checkedKeys : this.selectedKeys;
 
@@ -852,6 +928,7 @@ window.ReagentApp.collect = {
   },
 
   async excludeSelectedCollect() {
+    if (!(await this.ensureCurrentOrderMonthEditable({ refresh: true }))) return;
     const checkedKeys = this.getCheckedKeysFromDOM();
     const targetKeys = checkedKeys.length ? checkedKeys : this.selectedKeys;
 
@@ -2235,6 +2312,7 @@ if (els.count) els.count.textContent = String(rows.length);
 
     const { els, escapeHtml } = window.ReagentApp;
     const request = window.ReagentApp.request;
+    const monthFinalized = this.isCurrentOrderMonthFinalized();
 
     this.migrateLocalCollectMetaToServerOnce(false)
       .catch((error) => console.warn("기존 취합 데이터 자동 이관 중 오류:", error));
@@ -2349,6 +2427,7 @@ if (els.count) els.count.textContent = String(rows.length);
       this.saveSelectedKeys();
       this.resetCollectAllToggle();
       this.syncCollectAllToggle();
+      this.applyCollectMonthLockUI();
       return;
     }
 
@@ -2368,15 +2447,15 @@ if (els.count) els.count.textContent = String(rows.length);
       const autoSelectedVendor = meta.confirmed ? meta.selectedVendor : calculatedVendor;
       const checked = this.selectedKeys.includes(group.key) ? "checked" : "";
       const confirmedBadge = meta.confirmed ? `<span style="color:#16a34a; font-weight:700;">확정</span>` : "";
-      const lockedAttr = meta.confirmed ? "disabled" : "";
-      const readonlyAttr = meta.confirmed ? "readonly" : "";
+      const lockedAttr = (meta.confirmed || monthFinalized) ? "disabled" : "";
+      const readonlyAttr = (meta.confirmed || monthFinalized) ? "readonly" : "";
       const rowId = this.simpleKey(group.key);
       const cancelButton = meta.confirmed
         ? `<button type="button" class="ghost-btn collect-cancel-btn" data-key="${escapeHtml(group.key)}" title="거래처 확정 취소">취소</button>`
         : "";
       const actionCell = meta.confirmed
-        ? `<button type="button" class="ghost-btn collect-cancel-btn" data-key="${escapeHtml(group.key)}">취소</button>`
-        : `<button type="button" class="ghost-btn collect-exclude-btn" data-key="${escapeHtml(group.key)}">제외</button>`;
+        ? `<button type="button" class="ghost-btn collect-cancel-btn" data-key="${escapeHtml(group.key)}" ${monthFinalized ? "disabled aria-disabled=\"true\"" : ""}>취소</button>`
+        : `<button type="button" class="ghost-btn collect-exclude-btn" data-key="${escapeHtml(group.key)}" ${monthFinalized ? "disabled aria-disabled=\"true\"" : ""}>제외</button>`;
 
       let remainingConfirmedQty = meta.confirmed ? Number(meta.confirmedQty || group.collectedQty || 0) : Number(group.collectedQty || 0);
 
@@ -2517,6 +2596,7 @@ if (els.count) els.count.textContent = String(rows.length);
     this.saveCollectMeta();
     this.bindCollectEvents();
     this.syncCollectAllToggle();
+    this.applyCollectMonthLockUI();
 
     if (els.collectCount) els.collectCount.textContent = String(groups.length);
     if (els.collectQty) els.collectQty.textContent = String(groups.reduce((sum, g) => sum + Number(g.collectedQty || g.totalQty || 0), 0));
