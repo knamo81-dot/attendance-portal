@@ -156,14 +156,21 @@ function itemRow(i=0){
     </div>`;
 }
 
-function vendorOptions(rows){
-  return rows.map(v=>`<option value="${v.id}">${esc(v.vendor_name)}</option>`).join('');
+function vendorOptionsByRole(roleKey, roleLabel){
+  const preferred=vendors.filter(v=>!!v[roleKey]);
+  const others=vendors.filter(v=>!v[roleKey]);
+
+  let html='';
+  if(preferred.length){
+    html+=`<optgroup label="${roleLabel}">${preferred.map(v=>`<option value="${v.id}">${esc(v.vendor_name)}</option>`).join('')}</optgroup>`;
+  }
+  if(others.length){
+    html+=`<optgroup label="기타 등록업체">${others.map(v=>`<option value="${v.id}">${esc(v.vendor_name)}${(!v.is_processor&&!v.is_transporter)?' (역할 미지정)':''}</option>`).join('')}</optgroup>`;
+  }
+  return html;
 }
 
 function render(){
-  const processors=vendors.filter(v=>v.is_processor);
-  const transporters=vendors.filter(v=>v.is_transporter);
-
   $('#app').innerHTML=`
     <div id="notice" class="notice"></div>
 
@@ -195,22 +202,18 @@ function render(){
               <label>처리업소</label>
               <select id="processor_vendor_id">
                 <option value="">선택 안함</option>
-                ${vendorOptions(processors)}
+                ${vendorOptionsByRole("is_processor","처리업체")}
               </select>
-              ${processors.length
-                ? ''
-                : '<div class="hint">설정 &gt; 업체에서 해당 업체의 ‘처리업체’를 체크하면 목록에 표시됩니다.</div>'}
+              <div class="hint">등록된 활성 업체는 모두 표시되며, 설정에서 ‘처리업체’로 지정한 업체가 위에 우선 표시됩니다.</div>
             </div>
 
             <div class="field">
               <label>운반업체</label>
               <select id="transporter_vendor_id">
                 <option value="">선택 안함</option>
-                ${vendorOptions(transporters)}
+                ${vendorOptionsByRole("is_transporter","운반업체")}
               </select>
-              ${transporters.length
-                ? ''
-                : '<div class="hint">설정 &gt; 업체에서 해당 업체의 ‘운반업체’를 체크하면 목록에 표시됩니다.</div>'}
+              <div class="hint">등록된 활성 업체는 모두 표시되며, 설정에서 ‘운반업체’로 지정한 업체가 위에 우선 표시됩니다.</div>
             </div>
           </div>
 
