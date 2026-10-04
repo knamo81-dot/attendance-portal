@@ -1156,7 +1156,156 @@ window.ReagentApp.collect = {
     window.ReagentApp.toast?.("확정된 취합자료 기준으로 취합정리에 반영했습니다.", "success");
   },
 
+  ensurePrepareMonthConfirmDialog() {
+    let backdrop = document.getElementById("prepareMonthConfirmBackdrop");
+    if (backdrop) return backdrop;
+
+    if (!document.getElementById("prepareMonthConfirmStyle")) {
+      const style = document.createElement("style");
+      style.id = "prepareMonthConfirmStyle";
+      style.textContent = `
+        #prepareMonthConfirmBackdrop{
+          position:fixed;
+          inset:0;
+          z-index:2147483000;
+          display:none;
+          align-items:center;
+          justify-content:center;
+          padding:20px;
+          background:rgba(15,23,42,.36);
+          backdrop-filter:blur(1.5px);
+        }
+        #prepareMonthConfirmBackdrop.open{display:flex;}
+        #prepareMonthConfirmBackdrop .prepare-month-confirm-dialog{
+          width:min(440px, calc(100vw - 32px));
+          max-height:calc(100vh - 40px);
+          overflow:auto;
+          background:#fff;
+          border:1px solid #dbe3ee;
+          border-radius:18px;
+          box-shadow:0 22px 60px rgba(15,23,42,.24);
+          padding:22px;
+        }
+        #prepareMonthConfirmBackdrop .prepare-month-confirm-title{
+          margin:0;
+          color:#0f172a;
+          font-size:18px;
+          font-weight:900;
+          letter-spacing:-.03em;
+        }
+        #prepareMonthConfirmBackdrop .prepare-month-confirm-message{
+          margin:12px 0 0;
+          color:#334155;
+          font-size:14px;
+          font-weight:700;
+          line-height:1.55;
+          white-space:pre-line;
+        }
+        #prepareMonthConfirmBackdrop .prepare-month-confirm-actions{
+          display:flex;
+          justify-content:flex-end;
+          gap:8px;
+          margin-top:20px;
+        }
+        #prepareMonthConfirmBackdrop .prepare-month-confirm-btn{
+          min-width:76px;
+          height:38px;
+          padding:0 16px;
+          border-radius:10px;
+          border:1px solid #d7dfeb;
+          background:#fff;
+          color:#334155;
+          font:inherit;
+          font-size:13px;
+          font-weight:800;
+          cursor:pointer;
+        }
+        #prepareMonthConfirmBackdrop .prepare-month-confirm-btn.primary{
+          border-color:#2563eb;
+          background:#2563eb;
+          color:#fff;
+        }
+        @media (max-width:760px){
+          #prepareMonthConfirmBackdrop{padding:16px;}
+          #prepareMonthConfirmBackdrop .prepare-month-confirm-dialog{
+            width:min(390px, calc(100vw - 24px));
+            padding:20px 18px;
+            border-radius:16px;
+          }
+          #prepareMonthConfirmBackdrop .prepare-month-confirm-actions{
+            display:grid;
+            grid-template-columns:1fr 1fr;
+          }
+          #prepareMonthConfirmBackdrop .prepare-month-confirm-btn{
+            width:100%;
+            min-width:0;
+            height:42px;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    backdrop = document.createElement("div");
+    backdrop.id = "prepareMonthConfirmBackdrop";
+    backdrop.setAttribute("role", "presentation");
+    backdrop.innerHTML = `
+      <section class="prepare-month-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="prepareMonthConfirmTitle" aria-describedby="prepareMonthConfirmMessage">
+        <h3 class="prepare-month-confirm-title" id="prepareMonthConfirmTitle">주문월 확정</h3>
+        <div class="prepare-month-confirm-message" id="prepareMonthConfirmMessage"></div>
+        <div class="prepare-month-confirm-actions">
+          <button type="button" class="prepare-month-confirm-btn" data-confirm-action="cancel">취소</button>
+          <button type="button" class="prepare-month-confirm-btn primary" data-confirm-action="confirm">확인</button>
+        </div>
+      </section>
+    `;
+    document.body.appendChild(backdrop);
+    return backdrop;
+  },
+
+  showPrepareMonthConfirm(message, options = {}) {
+    const backdrop = this.ensurePrepareMonthConfirmDialog();
+    const titleEl = backdrop.querySelector("#prepareMonthConfirmTitle");
+    const messageEl = backdrop.querySelector("#prepareMonthConfirmMessage");
+    const confirmBtn = backdrop.querySelector('[data-confirm-action="confirm"]');
+    const cancelBtn = backdrop.querySelector('[data-confirm-action="cancel"]');
+
+    if (titleEl) titleEl.textContent = options.title || "주문월 확정";
+    if (messageEl) messageEl.textContent = String(message || "");
+    if (confirmBtn) confirmBtn.textContent = options.confirmText || "확인";
+    if (cancelBtn) cancelBtn.textContent = options.cancelText || "취소";
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        backdrop.classList.remove("open");
+        document.removeEventListener("keydown", onKeyDown, true);
+        resolve(result);
+      };
+      const onKeyDown = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          finish(false);
+        }
+      };
+
+      if (confirmBtn) confirmBtn.onclick = () => finish(true);
+      if (cancelBtn) cancelBtn.onclick = () => finish(false);
+      backdrop.onclick = (event) => {
+        if (event.target === backdrop) finish(false);
+      };
+
+      document.addEventListener("keydown", onKeyDown, true);
+      backdrop.classList.add("open");
+      setTimeout(() => confirmBtn?.focus(), 0);
+    });
+  },
+
   async finalizePrepareMonth() {
+    if (this._prepareMonthStatusBusy === true) return;
+
     const request = window.ReagentApp.request;
     const monthKey = request?.getCurrentOrderMonth ? request.getCurrentOrderMonth() : "";
     if (!monthKey) return;
@@ -1166,19 +1315,27 @@ window.ReagentApp.collect = {
       return window.ReagentApp.toast?.("확정할 취합정리 자료가 없습니다.", "warn");
     }
 
-    const ok = confirm("해당 주문월의 취합정리 자료를 확정하시겠습니까?\n확정 후에는 이 달의 추가 제품신청이 차단됩니다.");
-    if (!ok) return;
+    this._prepareMonthStatusBusy = true;
 
     try {
+      const monthLabel = request.formatOrderMonthLabel?.(monthKey) || monthKey;
+      const ok = await this.showPrepareMonthConfirm(
+        `${monthLabel} 주문월의 취합정리 자료를 확정하시겠습니까?\n확정 후에는 이 달의 추가 제품신청이 차단됩니다.`,
+        { title: "주문월 확정", confirmText: "확정", cancelText: "취소" }
+      );
+      if (!ok) return;
+
       await this.setPrepareMonthStatus(monthKey, "확정");
 
       request.renderRequest?.();
       this.renderCollect?.();
       this.renderPrepare();
-      window.ReagentApp.toast?.(`${request.formatOrderMonthLabel?.(monthKey) || monthKey} 주문월을 확정했습니다.`, "success");
+      window.ReagentApp.toast?.(`${monthLabel} 주문월을 확정했습니다.`, "success");
     } catch (error) {
       console.error("주문월 확정 저장 실패:", error);
       window.ReagentApp.toast?.(`주문월 확정 저장 실패: ${error?.message || "원인을 확인하세요."}`, "warn");
+    } finally {
+      this._prepareMonthStatusBusy = false;
     }
   },
 
@@ -2035,11 +2192,11 @@ if (els.count) els.count.textContent = String(rows.length);
       btn.addEventListener("click", () => this.setPrepareTableView(btn.dataset.prepareTableView));
     });
 
+    // 확정 버튼은 app.js의 단일 click 바인딩을 사용합니다.
+    // 여기서 onclick을 다시 연결하면 한 번 클릭할 때 확정 로직이 두 번 실행됩니다.
     const finalizePrepareBtn = document.getElementById("finalizePrepareMonth");
     if (finalizePrepareBtn) {
-      finalizePrepareBtn.onclick = () => {
-        this.finalizePrepareMonth();
-      };
+      finalizePrepareBtn.onclick = null;
     }
 
     const cancelFinalizePrepareBtn = document.getElementById("cancelFinalizePrepareMonth");
