@@ -156,13 +156,75 @@
     <div class="dashboard-loading" id="dashboardLoading" aria-live="polite">연구용품 구매현황을 불러오는 중입니다.</div>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    if (!window.supabase) {
-      document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
-    }
+    (function () {
+      'use strict';
+
+      function loadScript(src, timeoutMs) {
+        return new Promise(function (resolve, reject) {
+          const script = document.createElement('script');
+          let done = false;
+          const timer = setTimeout(function () {
+            if (done) return;
+            done = true;
+            script.remove();
+            reject(new Error('script timeout: ' + src));
+          }, timeoutMs || 4000);
+
+          script.src = src;
+          script.async = true;
+          script.onload = function () {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            resolve();
+          };
+          script.onerror = function () {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            script.remove();
+            reject(new Error('script load failed: ' + src));
+          };
+          document.head.appendChild(script);
+        });
+      }
+
+      async function bootDashboard() {
+        // Portal은 이미 Supabase SDK를 사용하고 있으므로 같은 origin iframe에서는
+        // 부모 SDK를 우선 재사용합니다. 모바일 첫 진입 때 외부 CDN 대기로
+        // iframe 전체가 빈 화면처럼 보이는 현상을 방지합니다.
+        try {
+          if (!window.supabase && window.parent && window.parent !== window && window.parent.supabase) {
+            window.supabase = window.parent.supabase;
+          }
+        } catch (_) {}
+
+        if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+          try {
+            await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 3500);
+          } catch (_) {
+            await loadScript('https://unpkg.com/@supabase/supabase-js@2', 3500);
+          }
+        }
+
+        if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+          throw new Error('Supabase SDK를 불러오지 못했습니다.');
+        }
+
+        await loadScript('../../supabase.js?v=20261004-1.5', 4000);
+        await loadScript('./app.js?v=20261004-1.5', 4000);
+      }
+
+      bootDashboard().catch(function (error) {
+        console.error('연구용품 구매현황 초기화 실패:', error);
+        const loading = document.getElementById('dashboardLoading');
+        if (loading) {
+          loading.hidden = false;
+          loading.textContent = '구매현황을 불러오지 못했습니다. 새로고침해 주세요.';
+        }
+      });
+    })();
   </script>
-  <script src="../../supabase.js"></script>
-  <script src="./app.js?v=20261004-1.4"></script>
 </body>
 </html>
