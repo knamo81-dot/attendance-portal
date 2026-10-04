@@ -50,7 +50,7 @@ let typeFilter='';
 let settingsTab='types';
 
 const settingsConfigs={
-  types:{table:'waste_types',title:'폐기물 종류',fields:[['legal_name','폐기물명','text'],['display_name','화면 표시명','text'],['physical_state','성상','select',['liquid:액상','solid:고상','mixed:혼합','other:기타']],['legal_code','법정코드','text'],['default_quantity_unit','기본 수량단위','text'],['sort_order','순서','number']]},
+  types:{table:'waste_types',title:'폐기물 종류',fields:[['legal_name','폐기물명','text'],['physical_state','성상','select',['liquid:액상','solid:고상','mixed:혼합','other:기타']],['legal_code','법정코드','text'],['default_quantity_unit','기본 수량단위','text'],['sort_order','순서','number']]},
   vendors:{table:'waste_vendors',title:'업체',fields:[['vendor_name','업체명','text'],['business_no','사업자번호','text'],['permit_no','허가번호','text'],['contact_name','담당자','text'],['phone','연락처','text']]},
   locations:{table:'waste_storage_locations',title:'보관장소',fields:[['location_name','보관장소명','text'],['description','설명','text'],['max_weight_kg','최대보관량(kg)','number'],['sort_order','순서','number']]},
   units:{table:'waste_container_units',title:'용기·단위',fields:[['unit_name','용기명','text'],['quantity_unit','수량단위','text'],['capacity_l','용량(L)','number'],['sort_order','순서','number']]},
@@ -120,7 +120,7 @@ async function renderSettings(){
   const ordered=['types','locations','units'].includes(settingsTab);
   const res=await A.list(c.table,'*',ordered?'sort_order':'created_at',ordered);
   const rows=res.data||[];
-  $('#settings-body').innerHTML=`<div class="grid two"><div class="card"><div class="card-title">⚙ ${c.title} 설정</div><form id="settings-form"><input type="hidden" id="edit-id">${c.fields.map(settingsFieldHtml).join('')}${settingsTab==='vendors'?`<div class="field"><label>역할</label><label><input type="checkbox" id="is_transporter"> 운반업체</label><label><input type="checkbox" id="is_processor" checked> 처리업체</label></div>`:''}<div class="field"><label><input type="checkbox" id="active" checked> 사용</label></div><button class="btn primary" type="submit">저장</button> <button class="btn" type="button" id="reset-settings">신규</button></form></div><div class="card"><div class="card-title">등록 목록</div><div class="table-wrap"><table><thead><tr><th>명칭</th><th>상세</th><th>사용</th><th>관리</th></tr></thead><tbody>${rows.length?rows.map(settingsRowHtml).join(''):`<tr><td colspan="4" class="empty">등록된 데이터가 없습니다.</td></tr>`}</tbody></table></div></div></div>`;
+  $('#settings-body').innerHTML=`<div class="grid two"><div class="card"><div class="card-title">⚙ ${c.title} 설정</div><form id="settings-form"><input type="hidden" id="edit-id">${c.fields.map(settingsFieldHtml).join('')}${settingsTab==='vendors'?`<div class="field"><label>역할</label><div class="check-row"><label class="check-option"><input type="checkbox" id="is_transporter"><span>운반업체</span></label><label class="check-option"><input type="checkbox" id="is_processor" checked><span>처리업체</span></label></div></div>`:''}<div class="field"><label>사용 여부</label><label class="check-option single"><input type="checkbox" id="active" checked><span>사용</span></label></div><button class="btn primary" type="submit">저장</button> <button class="btn" type="button" id="reset-settings">신규</button></form></div><div class="card"><div class="card-title">등록 목록</div><div class="table-wrap"><table><thead><tr><th>명칭</th><th>상세</th><th>사용</th><th>관리</th></tr></thead><tbody>${rows.length?rows.map(settingsRowHtml).join(''):`<tr><td colspan="4" class="empty">등록된 데이터가 없습니다.</td></tr>`}</tbody></table></div></div></div>`;
   $('#settings-form').onsubmit=saveSetting;
   $('#reset-settings').onclick=()=>renderSettings();
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editSetting(rows.find(r=>r.id===b.dataset.edit)));
@@ -149,6 +149,7 @@ async function saveSetting(e){
   const c=settingsConfigs[settingsTab],id=$('#edit-id').value,p={};
   c.fields.forEach(([fid,,type])=>{let v=$('#'+fid).value;if(type==='number')v=v===''?null:Number(v);p[fid]=v});
   p.active=$('#active').checked;
+  if(settingsTab==='types') p.display_name=null;
   if(settingsTab==='vendors'){p.is_transporter=$('#is_transporter').checked;p.is_processor=$('#is_processor').checked;}
   const res=id?await A.update(c.table,id,p):await A.insert(c.table,p);
   if(res.error)return notice(res.error.message,'err');
