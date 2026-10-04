@@ -560,19 +560,15 @@ function commonFiltersHtml(){
 
 function renderLegal(){
   const rows=legalLedgerRows();
-  const titleLabel=month==='all'
-    ? `${year}년 사업장 폐기물 관리대장`
-    : `${year}년 ${Number(month)}월 사업장 폐기물 관리대장`;
-
   $('#app').innerHTML=`
     ${commonTabsHtml()}
     ${commonFiltersHtml()}
 
     <div class="card">
       <div class="section-head">
-        <h2>${titleLabel}</h2>
+        <h2>🧾 사업장 폐기물 관리대장</h2>
         <div class="spacer"></div>
-        <span class="hint">단위: 톤(T)</span>
+        <span class="hint">${periodLabel()} · 단위: 톤(T)</span>
       </div>
 
       <div class="hint">
