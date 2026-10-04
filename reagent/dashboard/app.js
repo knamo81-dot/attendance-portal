@@ -306,14 +306,25 @@
   function renderAttention() {
     if (!state.operator) return;
     const { groups, collect, cMap } = currentMonthData();
+
+    // 미취합: 해당 주문월의 신청품목 중 아직 한 번도 취합추가되지 않은 품목
+    const uncollected = groups.filter(g => {
+      const s = statusForGroup(g, cMap);
+      return s.collected === 0;
+    }).length;
+
+    // 추가취합 필요: 이미 일부 수량을 취합한 뒤 동일 품목의 신청수량이 추가된 경우
     const additional = groups.filter(g => {
       const s = statusForGroup(g, cMap);
       return s.collected > 0 && s.collected < g.totalQty;
     }).length;
+
     const vendorMissing = collect.filter(r => num(r.collected_qty) > 0 && !isConfirmed(r)).length;
     const orderMissing = collect.filter(r => isConfirmed(r) && !String(r.order_date || "").trim()).length;
     const receiptMissing = collect.filter(r => isConfirmed(r) && String(r.order_date || "").trim() && !String(r.receipt_date || "").trim()).length;
     const registration = state.registrationRequests.filter(r => ["요청", "확인중"].includes(String(r.status || "요청").trim())).length;
+
+    $("#needUncollected").textContent = `${uncollected}건`;
     $("#needAdditional").textContent = `${additional}건`;
     $("#needVendor").textContent = `${vendorMissing}건`;
     $("#needOrder").textContent = `${orderMissing}건`;
