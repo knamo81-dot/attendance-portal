@@ -9,6 +9,8 @@ window.ReagentApp.request = {
   productCasMap: {},
   myRegistrationRequests: [],
   activeRequestPanel: "list",
+  orderMonthStatusCache: {},
+  orderMonthStatusLoading: {},
 
   // 모바일 제품신청 QR/바코드 스캐너 상태 (QA 스캐너 엔진 공통화)
   _productScanStream: null,
@@ -142,13 +144,244 @@ window.ReagentApp.request = {
     return `${month}월 주문건은 전월 신청분과 ${month}월 추가신청분을 함께 취합할 수 있습니다.`;
   },
 
+  isValidOrderMonth(monthKey) {
+    return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(monthKey || "").trim());
+  },
+
   getCurrentOrderMonth() {
-    const saved = localStorage.getItem("reagent_order_month");
-    return saved || this.getMonthKey(new Date(), 1);
+    try {
+      const saved = localStorage.getItem("reagent_order_month");
+      if (this.isValidOrderMonth(saved)) return saved;
+    } catch (_) {}
+    return this.getMonthKey(new Date(), 0);
+  },
+
+  ensureMonthOption(select, monthKey) {
+    if (!select || !this.isValidOrderMonth(monthKey)) return;
+    const exists = Array.from(select.options || []).some((option) => option.value === monthKey);
+    if (!exists) {
+      const option = document.createElement("option");
+      option.value = monthKey;
+      option.textContent = this.formatOrderMonthLabel(monthKey);
+      select.appendChild(option);
+    }
+  },
+
+  syncYearMonthPicker(select, monthKey) {
+    if (!select || !this.isValidOrderMonth(monthKey)) return;
+    const picker = document.querySelector(`[data-reagent-month-picker="${select.id}"]`);
+    if (!picker) return;
+    const [year, month] = monthKey.split("-");
+    const yearSelect = picker.querySelector(".reagent-year-select");
+    const monthSelect = picker.querySelector(".reagent-month-select");
+    if (yearSelect && yearSelect.value !== year) yearSelect.value = year;
+    if (monthSelect && monthSelect.value !== month) monthSelect.value = month;
+  },
+
+  ensureYearMonthPicker(select) {
+    if (!select?.id) return null;
+
+    select.style.display = "none";
+    select.setAttribute("aria-hidden", "true");
+
+    let picker = document.querySelector(`[data-reagent-month-picker="${select.id}"]`);
+    if (!picker) {
+      picker = document.createElement("span");
+      picker.className = "reagent-year-month-picker";
+      picker.dataset.reagentMonthPicker = select.id;
+      picker.innerHTML = `
+        <select class="reagent-year-select" aria-label="주문년도"></select>
+        <select class="reagent-month-select" aria-label="주문월"></select>
+      `;
+      select.insertAdjacentElement("afterend", picker);
+
+      const yearSelect = picker.querySelector(".reagent-year-select");
+      const monthSelect = picker.querySelector(".reagent-month-select");
+      const currentYear = new Date().getFullYear();
+      const selectedYear = Number(String(select.value || this.getCurrentOrderMonth()).slice(0, 4)) || currentYear;
+      const minYear = Math.min(2000, selectedYear);
+      const maxYear = Math.max(2100, selectedYear);
+
+      yearSelect.innerHTML = Array.from({ length: maxYear - minYear + 1 }, (_, index) => {
+        const year = minYear + index;
+        return `<option value="${year}">${year}년</option>`;
+      }).join("");
+      monthSelect.innerHTML = Array.from({ length: 12 }, (_, index) => {
+        const month = String(index + 1).padStart(2, "0");
+        return `<option value="${month}">${index + 1}월</option>`;
+      }).join("");
+
+      const applyPickerValue = () => {
+        const year = yearSelect.value;
+        const month = monthSelect.value;
+        const monthKey = `${year}-${month}`;
+        if (!this.isValidOrderMonth(monthKey)) return;
+        this.ensureMonthOption(select, monthKey);
+        select.value = monthKey;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      };
+
+      yearSelect.addEventListener("change", applyPickerValue);
+      monthSelect.addEventListener("change", applyPickerValue);
+    }
+
+    this.syncYearMonthPicker(select, select.value || this.getCurrentOrderMonth());
+    return picker;
+  },
+
+  getCachedOrderMonthStatus(monthKey) {
+    if (!this.isValidOrderMonth(monthKey)) return "진행중";
+    return this.orderMonthStatusCache?.[monthKey]?.status || "진행중";
+  },
+
+  async refreshOrderMonthStatus(monthKey = this.getCurrentOrderMonth(), force = false) {
+    const month = this.isValidOrderMonth(monthKey) ? monthKey : this.getCurrentOrderMonth();
+    if (!force && this.orderMonthStatusCache?.[month]) {
+      this.applyOrderMonthFinalizationUI(month, this.orderMonthStatusCache[month]);
+      return this.orderMonthStatusCache[month];
+    }
+
+    if (this.orderMonthStatusLoading?.[month]) return this.orderMonthStatusLoading[month];
+
+    const sb = window.ReagentApp.sb;
+    if (!sb) {
+      const fallback = this.orderMonthStatusCache?.[month] || { order_month: month, status: "진행중" };
+      this.applyOrderMonthFinalizationUI(month, fallback);
+      return fallback;
+    }
+
+    const task = (async () => {
+      try {
+        let query = sb
+          .from("reagent_order_month_status")
+          .select("order_month,status,finalized_at,finalized_by")
+          .eq("order_month", month);
+        query = this.scopedCompanyQuery(query);
+        const { data, error } = await query.maybeSingle();
+        if (error) throw error;
+
+        const record = data || { order_month: month, status: "진행중", finalized_at: null, finalized_by: null };
+        this.orderMonthStatusCache[month] = record;
+        this.applyOrderMonthFinalizationUI(month, record);
+        window.ReagentApp.collect?.renderPrepare?.();
+        return record;
+      } catch (error) {
+        console.warn("주문월 확정 상태 조회 실패:", error);
+        const fallback = this.orderMonthStatusCache?.[month] || { order_month: month, status: "진행중" };
+        this.applyOrderMonthFinalizationUI(month, fallback);
+        return fallback;
+      } finally {
+        delete this.orderMonthStatusLoading[month];
+      }
+    })();
+
+    this.orderMonthStatusLoading[month] = task;
+    return task;
+  },
+
+  async verifyOrderMonthOpenForInsert(monthKey) {
+    const month = String(monthKey || "").trim();
+    if (!this.isValidOrderMonth(month)) throw new Error("주문월 형식이 올바르지 않습니다.");
+
+    const sb = window.ReagentApp.sb;
+    if (!sb) throw new Error("Supabase 연결 정보가 없습니다.");
+
+    let query = sb
+      .from("reagent_order_month_status")
+      .select("order_month,status,finalized_at,finalized_by")
+      .eq("order_month", month);
+    query = this.scopedCompanyQuery(query);
+    const { data, error } = await query.maybeSingle();
+    if (error) throw error;
+
+    const record = data || { order_month: month, status: "진행중", finalized_at: null, finalized_by: null };
+    this.orderMonthStatusCache[month] = record;
+    this.applyOrderMonthFinalizationUI(month, record);
+    return record.status !== "확정";
+  },
+
+  async setOrderMonthStatus(monthKey, status) {
+    const month = String(monthKey || "").trim();
+    const nextStatus = status === "확정" ? "확정" : "진행중";
+    if (!this.isValidOrderMonth(month)) throw new Error("주문월 형식이 올바르지 않습니다.");
+
+    const sb = window.ReagentApp.sb;
+    if (!sb) throw new Error("Supabase 연결 정보가 없습니다.");
+
+    const currentUser = this.getCurrentUser?.() || {};
+    const payload = this.withCompanyPayload({
+      order_month: month,
+      status: nextStatus,
+      finalized_at: nextStatus === "확정" ? new Date().toISOString() : null,
+      finalized_by: nextStatus === "확정" ? String(currentUser.employee_no || currentUser.name || "").trim() || null : null
+    });
+
+    const { data, error } = await sb
+      .from("reagent_order_month_status")
+      .upsert(payload, { onConflict: "company_id,order_month" })
+      .select("order_month,status,finalized_at,finalized_by")
+      .single();
+
+    if (error) throw error;
+
+    const record = data || payload;
+    this.orderMonthStatusCache[month] = record;
+    this.applyOrderMonthFinalizationUI(month, record);
+    return record;
+  },
+
+  applyOrderMonthFinalizationUI(monthKey, record = null) {
+    if (monthKey !== this.getCurrentOrderMonth()) return;
+    const status = record?.status || this.getCachedOrderMonthStatus(monthKey);
+    const finalized = status === "확정";
+    const message = `${this.formatOrderMonthLabel(monthKey)} 주문건은 취합정리가 확정되어 추가 신청할 수 없습니다.`;
+
+    const formCard = document.getElementById("requestFormCard");
+    let formNotice = document.getElementById("requestMonthFinalizedNotice");
+    if (!formNotice && formCard) {
+      formNotice = document.createElement("div");
+      formNotice.id = "requestMonthFinalizedNotice";
+      formNotice.className = "request-month-finalized-notice";
+      const head = formCard.querySelector(".card-head");
+      if (head) head.insertAdjacentElement("afterend", formNotice);
+      else formCard.prepend(formNotice);
+    }
+
+    const appPanel = document.getElementById("requestApplicationPanel");
+    let listNotice = document.getElementById("requestMonthFinalizedListNotice");
+    if (!listNotice && appPanel) {
+      listNotice = document.createElement("div");
+      listNotice.id = "requestMonthFinalizedListNotice";
+      listNotice.className = "request-month-finalized-notice request-month-finalized-list-notice";
+      appPanel.prepend(listNotice);
+    }
+
+    [formNotice, listNotice].forEach((notice) => {
+      if (!notice) return;
+      notice.textContent = message;
+      notice.hidden = !finalized;
+    });
+
+    ["openSearch", "openProductScan", "addItem"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.disabled = finalized;
+      el.setAttribute("aria-disabled", finalized ? "true" : "false");
+      el.classList.toggle("month-finalized-disabled", finalized);
+    });
+
+    ["qty", "usage"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.disabled = finalized;
+      el.classList.toggle("month-finalized-disabled", finalized);
+    });
+
+    document.body?.classList.toggle("reagent-order-month-finalized", finalized);
   },
 
   setCurrentOrderMonth(monthKey) {
-    if (!monthKey) return;
+    if (!this.isValidOrderMonth(monthKey)) return;
 
     try {
       localStorage.setItem("reagent_order_month", monthKey);
@@ -157,12 +390,16 @@ window.ReagentApp.request = {
     const requestSelect = document.getElementById("orderMonthSelect");
     const collectSelect = document.getElementById("collectOrderMonthSelect");
     const prepareSelect = document.getElementById("prepareOrderMonthSelect");
+    const receiptSelect = document.getElementById("orderReceiptMonth");
     const requestDesc = document.getElementById("orderMonthDesc");
     const collectDesc = document.getElementById("collectOrderMonthDesc");
     const prepareDesc = document.getElementById("prepareOrderMonthDesc");
 
-    [requestSelect, collectSelect, prepareSelect].forEach((select) => {
-      if (select && select.value !== monthKey) select.value = monthKey;
+    [requestSelect, collectSelect, prepareSelect, receiptSelect].forEach((select) => {
+      if (!select) return;
+      this.ensureMonthOption(select, monthKey);
+      if (select.value !== monthKey) select.value = monthKey;
+      this.syncYearMonthPicker(select, monthKey);
     });
 
     const desc = this.getOrderMonthDescription(monthKey);
@@ -170,9 +407,12 @@ window.ReagentApp.request = {
     if (collectDesc) collectDesc.textContent = `선택한 주문월 기준으로 취합합니다. ${desc}`;
     if (prepareDesc) prepareDesc.textContent = `선택한 주문월의 거래처 확정 자료를 기안서/비교견적서 형태로 정리합니다. ${desc}`;
 
+    this.applyOrderMonthFinalizationUI(monthKey, this.orderMonthStatusCache?.[monthKey]);
     this.renderRequest?.();
     window.ReagentApp.collect?.renderCollect?.();
     window.ReagentApp.collect?.renderPrepare?.();
+    window.ReagentApp.orderReceipt?.render?.();
+    this.refreshOrderMonthStatus(monthKey, true).catch((error) => console.warn("주문월 확정 상태 갱신 실패:", error));
   },
 
   initOrderMonthControls() {
@@ -184,18 +424,21 @@ window.ReagentApp.request = {
     if (!selects.length) return;
 
     const currentMonth = this.getMonthKey(new Date(), 0);
-    const nextMonth = this.getMonthKey(new Date(), 1);
     const selectedMonth = this.getCurrentOrderMonth();
-
-    const months = Array.from(new Set([currentMonth, nextMonth, selectedMonth]));
+    const existingMonths = Array.from(new Set((this.requestRows || []).map((row) => row.order_month).filter((month) => this.isValidOrderMonth(month))));
+    const months = Array.from(new Set([currentMonth, selectedMonth, ...existingMonths]));
 
     selects.forEach((select) => {
       select.innerHTML = months
+        .sort()
         .map((month) => `<option value="${this.attr(month)}">${this.html(this.formatOrderMonthLabel(month))}</option>`)
         .join("");
 
+      this.ensureMonthOption(select, selectedMonth);
       select.value = selectedMonth;
       select.onchange = (e) => this.setCurrentOrderMonth(e.target.value);
+      this.ensureYearMonthPicker(select);
+      this.syncYearMonthPicker(select, selectedMonth);
     });
 
     const requestDesc = document.getElementById("orderMonthDesc");
@@ -206,6 +449,17 @@ window.ReagentApp.request = {
     if (requestDesc) requestDesc.textContent = desc;
     if (collectDesc) collectDesc.textContent = `선택한 주문월 기준으로 취합합니다. ${desc}`;
     if (prepareDesc) prepareDesc.textContent = `선택한 주문월의 거래처 확정 자료를 기안서/비교견적서 형태로 정리합니다. ${desc}`;
+
+    this.applyOrderMonthFinalizationUI(selectedMonth, this.orderMonthStatusCache?.[selectedMonth]);
+    this.refreshOrderMonthStatus(selectedMonth, true).catch((error) => console.warn("주문월 확정 상태 초기 조회 실패:", error));
+
+    if (!this._orderMonthStorageBound) {
+      this._orderMonthStorageBound = true;
+      window.addEventListener("storage", (event) => {
+        if (event.key !== "reagent_order_month" || !this.isValidOrderMonth(event.newValue)) return;
+        this.setCurrentOrderMonth(event.newValue);
+      });
+    }
   },
 
   getRowsForCurrentOrderMonth() {
@@ -2205,6 +2459,19 @@ window.ReagentApp.request = {
       return;
     }
 
+    // 화면을 오래 열어둔 사이 월 마감이 변경될 수 있으므로 실제 INSERT 직전에 DB 상태를 반드시 다시 확인합니다.
+    try {
+      const isOpen = await this.verifyOrderMonthOpenForInsert(orderMonth);
+      if (!isOpen) {
+        toast(`${this.formatOrderMonthLabel(orderMonth)} 주문건은 취합정리가 확정되어 추가 신청할 수 없습니다.`, "warn");
+        return;
+      }
+    } catch (statusError) {
+      console.error("신청 직전 주문월 확정 상태 확인 실패:", statusError);
+      toast("주문월 마감 상태를 확인하지 못해 신청 저장을 중단했습니다. 잠시 후 다시 시도해 주세요.", "warn");
+      return;
+    }
+
     const { data, error } = await sb
       .from("reagent_requests")
       .insert(this.withCompanyPayload(row))
@@ -2279,7 +2546,6 @@ window.ReagentApp.request = {
     localStorage.removeItem("reagent_collected_meta");
     localStorage.removeItem("reagent_collect_meta");
     localStorage.removeItem("reagent_collect_selected_keys");
-    localStorage.removeItem("reagent_prepare_month_status");
 
     this.saveSelectedKeys();
     this.saveCollectedMeta();
@@ -2441,6 +2707,18 @@ window.ReagentApp.request = {
 
     if (!sb) {
       window.ReagentApp.toast?.("Supabase 연결 정보가 없습니다.", "warn");
+      return;
+    }
+
+    try {
+      const isOpen = await this.verifyOrderMonthOpenForInsert(orderMonth);
+      if (!isOpen) {
+        window.ReagentApp.toast?.(`${this.formatOrderMonthLabel(orderMonth)} 주문건은 취합정리가 확정되어 추가 신청할 수 없습니다.`, "warn");
+        return;
+      }
+    } catch (statusError) {
+      console.error("샘플 저장 직전 주문월 상태 확인 실패:", statusError);
+      window.ReagentApp.toast?.("주문월 마감 상태를 확인하지 못해 샘플 저장을 중단했습니다.", "warn");
       return;
     }
 
@@ -2914,6 +3192,8 @@ window.ReagentApp.request = {
   renderRequest() {
     this.bindMobileRequestForm?.();
     this.bindRegistrationStatusPanel?.();
+    const currentMonth = this.getCurrentOrderMonth();
+    this.applyOrderMonthFinalizationUI(currentMonth, this.orderMonthStatusCache?.[currentMonth]);
     const { els } = window.ReagentApp;
     if (!els.draftTableBody) return;
 
