@@ -2424,7 +2424,7 @@ body.auth-loading .top-user-bar {
           <div class="nav-group">
             <button type="button" id="workspaceNavBtn" class="nav-btn" data-portal-src="portal-home/portal-home.html" title="업무">업무</button>
             <button type="button" id="wastewaterNavBtn" class="nav-btn" data-portal-src="wastewater/index.html" title="폐수">폐수</button>
-            <button type="button" id="wasteNavBtn" class="nav-btn" data-portal-src="waste-status/index.html" title="폐기물" hidden>폐기물</button>
+            <button type="button" id="wasteNavBtn" class="nav-btn" data-portal-src="waste/status/index.html" title="폐기물" hidden>폐기물</button>
             <button type="button" id="attendanceNavBtn" class="nav-btn" data-portal-src="attendance/index.html" title="근태">근태</button>
             <button type="button" id="researchStaffNavBtn" class="nav-btn" data-portal-src="research-staff/index.html" title="인력운영현황">인력</button>
             <button type="button" id="suppliesNavBtn" class="nav-btn" data-portal-src="reagent/dashboard/index.html" title="연구용품"><span class="nav-label-two-line">연구<br/>용품</span></button>
@@ -3082,37 +3082,37 @@ body.auth-loading .top-user-bar {
       desc: '폐수/폐기물 배출시설 운영 기록과 수거 내역을 관리합니다.',
       gradient: 'linear-gradient(135deg, #047857 0%, #14b8a6 100%)'
     },
-    'waste-status/index.html': {
+    'waste/status/index.html': {
       top: 'Waste Management',
       title: '폐기물 관리',
       desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 통합 관리합니다.',
       gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
     },
-    'waste-daily/index.html': {
+    'waste/daily/index.html': {
       top: 'Waste Management',
       title: '폐기물 관리',
       desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 통합 관리합니다.',
       gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
     },
-    'waste-collection/index.html': {
+    'waste/collection/index.html': {
       top: 'Waste Management',
       title: '폐기물 관리',
       desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 통합 관리합니다.',
       gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
     },
-    'waste-ledger/index.html': {
+    'waste/ledger/index.html': {
       top: 'Waste Management',
       title: '폐기물 관리',
       desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 통합 관리합니다.',
       gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
     },
-    'waste-reference/index.html': {
+    'waste/reference/index.html': {
       top: 'Waste Management',
       title: '폐기물 관리',
       desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 통합 관리합니다.',
       gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
     },
-    'waste-documents/index.html': {
+    'waste/documents/index.html': {
       top: 'Waste Management',
       title: '폐기물 관리',
       desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 통합 관리합니다.',
@@ -3321,7 +3321,7 @@ body.auth-loading .top-user-bar {
       { id: 'reference', label: '관련자료' },
       { id: 'relatedDocs', label: '관련서류' }
     ],
-    'waste-status/index.html': [
+    'waste/status/index.html': [
       { id: 'waste-status', label: '폐기물현황' },
       { id: 'waste-daily', label: '일일입력' },
       { id: 'waste-collection', label: '수거등록' },
@@ -3329,7 +3329,7 @@ body.auth-loading .top-user-bar {
       { id: 'waste-reference', label: '관련자료' },
       { id: 'waste-documents', label: '관련서류' }
     ],
-    'waste-daily/index.html': [
+    'waste/daily/index.html': [
       { id: 'waste-status', label: '폐기물현황' },
       { id: 'waste-daily', label: '일일입력' },
       { id: 'waste-collection', label: '수거등록' },
@@ -3337,7 +3337,7 @@ body.auth-loading .top-user-bar {
       { id: 'waste-reference', label: '관련자료' },
       { id: 'waste-documents', label: '관련서류' }
     ],
-    'waste-collection/index.html': [
+    'waste/collection/index.html': [
       { id: 'waste-status', label: '폐기물현황' },
       { id: 'waste-daily', label: '일일입력' },
       { id: 'waste-collection', label: '수거등록' },
@@ -3345,7 +3345,7 @@ body.auth-loading .top-user-bar {
       { id: 'waste-reference', label: '관련자료' },
       { id: 'waste-documents', label: '관련서류' }
     ],
-    'waste-ledger/index.html': [
+    'waste/ledger/index.html': [
       { id: 'waste-status', label: '폐기물현황' },
       { id: 'waste-daily', label: '일일입력' },
       { id: 'waste-collection', label: '수거등록' },
@@ -3353,7 +3353,7 @@ body.auth-loading .top-user-bar {
       { id: 'waste-reference', label: '관련자료' },
       { id: 'waste-documents', label: '관련서류' }
     ],
-    'waste-reference/index.html': [
+    'waste/reference/index.html': [
       { id: 'waste-status', label: '폐기물현황' },
       { id: 'waste-daily', label: '일일입력' },
       { id: 'waste-collection', label: '수거등록' },
@@ -3361,7 +3361,7 @@ body.auth-loading .top-user-bar {
       { id: 'waste-reference', label: '관련자료' },
       { id: 'waste-documents', label: '관련서류' }
     ],
-    'waste-documents/index.html': [
+    'waste/documents/index.html': [
       { id: 'waste-status', label: '폐기물현황' },
       { id: 'waste-daily', label: '일일입력' },
       { id: 'waste-collection', label: '수거등록' },
@@ -4196,12 +4196,12 @@ body.auth-loading .top-user-bar {
     return key === WASTEWATER_DESKTOP_SRC || key === WASTEWATER_MOBILE_SRC;
   }
 
-  const WASTE_STATUS_SRC = 'waste-status/index.html';
-  const WASTE_DAILY_SRC = 'waste-daily/index.html';
-  const WASTE_COLLECTION_SRC = 'waste-collection/index.html';
-  const WASTE_LEDGER_SRC = 'waste-ledger/index.html';
-  const WASTE_REFERENCE_SRC = 'waste-reference/index.html';
-  const WASTE_DOCUMENTS_SRC = 'waste-documents/index.html';
+  const WASTE_STATUS_SRC = 'waste/status/index.html';
+  const WASTE_DAILY_SRC = 'waste/daily/index.html';
+  const WASTE_COLLECTION_SRC = 'waste/collection/index.html';
+  const WASTE_LEDGER_SRC = 'waste/ledger/index.html';
+  const WASTE_REFERENCE_SRC = 'waste/reference/index.html';
+  const WASTE_DOCUMENTS_SRC = 'waste/documents/index.html';
 
   function isWasteProgramSrc(src) {
     const key = normalizePortalSrc(src);
@@ -7004,4 +7004,3 @@ body.auth-loading .top-user-bar {
 
 </body>
 </html>
-
