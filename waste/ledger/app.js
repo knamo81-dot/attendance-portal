@@ -544,12 +544,14 @@ function commonFiltersHtml(){
         }).join('')}
       </select>
 
-      <select id="type" class="btn">
-        <option value="" ${typeId===''?'selected':''}>전체 폐기물</option>
-        ${types.map(x=>
-          `<option value="${x.id}" ${x.id===typeId?'selected':''}>${esc(typeName(x))}</option>`
-        ).join('')}
-      </select>
+      ${viewMode==='legal'?`
+        <select id="type" class="btn">
+          <option value="" ${typeId===''?'selected':''}>전체 폐기물</option>
+          ${types.map(x=>
+            `<option value="${x.id}" ${x.id===typeId?'selected':''}>${esc(typeName(x))}</option>`
+          ).join('')}
+        </select>
+      `:''}
 
       <div class="spacer"></div>
       <button class="btn primary" id="print">인쇄</button>
@@ -804,6 +806,7 @@ function bindCommon(){
 
   $('#mode-facility').onclick=()=>{
     viewMode='facility';
+    typeId='';
     render();
   };
 
@@ -817,10 +820,12 @@ function bindCommon(){
     render();
   };
 
-  $('#type').onchange=e=>{
-    typeId=e.target.value;
-    render();
-  };
+  if($('#type')){
+    $('#type').onchange=e=>{
+      typeId=e.target.value;
+      render();
+    };
+  }
 
   $('#print').onclick=()=>window.print();
 }
