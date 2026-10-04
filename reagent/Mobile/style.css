@@ -1464,3 +1464,47 @@ body.product-scan-open{
     border-color:transparent !important;
   }
 }
+
+/* =========================================================
+   주문년월 공통 선택 UI - 모바일
+========================================================= */
+.reagent-mobile-ui .reagent-year-month-picker{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) minmax(0,.72fr) !important;
+  gap:6px !important;
+  width:100% !important;
+  min-width:0 !important;
+}
+.reagent-mobile-ui .reagent-year-month-picker select{
+  width:100% !important;
+  min-width:0 !important;
+  max-width:none !important;
+  height:38px !important;
+  padding:0 24px 0 8px !important;
+  border:1px solid var(--line,#d9e2ec) !important;
+  border-radius:10px !important;
+  background:#fff !important;
+  font-size:16px !important;
+  font-weight:750 !important;
+}
+.reagent-mobile-ui #requestFormCard .reagent-year-month-picker{
+  display:inline-grid !important;
+  grid-template-columns:96px 72px !important;
+  width:auto !important;
+}
+.reagent-mobile-ui #requestFormCard .reagent-year-month-picker select{
+  height:42px !important;
+  font-size:15px !important;
+}
+.reagent-mobile-ui .mobile-request-month-filter .reagent-year-month-picker{
+  width:100% !important;
+}
+.reagent-mobile-ui .request-month-finalized-notice{
+  margin:0 12px 10px !important;
+  padding:9px 10px !important;
+  font-size:11px !important;
+  border-radius:10px !important;
+}
+.reagent-mobile-ui .request-month-finalized-list-notice{
+  margin:0 0 10px !important;
+}
