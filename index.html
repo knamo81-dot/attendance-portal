@@ -2633,6 +2633,7 @@ body.auth-loading .top-user-bar {
   }
 
   const frame = document.getElementById('portalFrame');
+  let portalFrameNavigationSeq = 0;
   const navButtons = Array.from(document.querySelectorAll('.nav-btn[data-portal-src]'));
   const logoutBtn = document.getElementById('logoutNavBtn');
   const homeBtn = document.getElementById('homeNavBtn');
@@ -5863,14 +5864,37 @@ body.auth-loading .top-user-bar {
   function replacePortalFrame(src) {
     if (!frame || !src) return;
     src = resolveResponsivePortalSrc(src);
+
+    // 모바일 Safari에서는 직전 iframe 탐색이 늦게 완료되면서,
+    // 새 메뉴의 header 상태 위에 이전 문서가 뒤늦게 표시되는 race가 발생할 수 있습니다.
+    // 탐색 번호와 실제 로드된 URL을 함께 확인해 stale load 이벤트를 무시합니다.
+    const navigationSeq = ++portalFrameNavigationSeq;
+    const expectedSrc = normalizePortalSrc(src);
+
     // 실제 iframe 이동은 location.replace를 사용하더라도, 현재 주소 추적용으로 별도 보관합니다.
     // 회사 전환 후 다시 같은 앱을 재로드할 때 이전 src 속성값을 참조하는 문제를 막습니다.
-    try { frame.dataset.currentSrc = src; } catch (_) {}
+    try {
+      frame.dataset.currentSrc = src;
+      frame.dataset.navigationSeq = String(navigationSeq);
+    } catch (_) {}
+
     showPortalBootOverlay();
     let restoreSafetyTimer = null;
     updatePortalHeader(src);
     updatePortalSubtabs(src);
+
     frame.onload = function () {
+      if (navigationSeq !== portalFrameNavigationSeq) return;
+
+      let loadedSrc = '';
+      try {
+        loadedSrc = normalizePortalSrc(frame.contentWindow?.location?.href || frame.getAttribute('src') || '');
+      } catch (_) {
+        loadedSrc = normalizePortalSrc(frame.getAttribute('src') || '');
+      }
+
+      if (loadedSrc && expectedSrc && loadedSrc !== expectedSrc) return;
+
       if (restoreSafetyTimer) clearTimeout(restoreSafetyTimer);
       hidePortalBootOverlay();
       postAuthToFrame();
@@ -5920,6 +5944,7 @@ body.auth-loading .top-user-bar {
       }
     };
     restoreSafetyTimer = setTimeout(function () {
+      if (navigationSeq !== portalFrameNavigationSeq) return;
       hidePortalBootOverlay();
     }, 5000);
 
