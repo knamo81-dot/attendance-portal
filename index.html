@@ -2424,6 +2424,7 @@ body.auth-loading .top-user-bar {
           <div class="nav-group">
             <button type="button" id="workspaceNavBtn" class="nav-btn" data-portal-src="portal-home/portal-home.html" title="업무">업무</button>
             <button type="button" id="wastewaterNavBtn" class="nav-btn" data-portal-src="wastewater/index.html" title="폐수">폐수</button>
+            <button type="button" id="wasteNavBtn" class="nav-btn" data-portal-src="waste-status/index.html" title="폐기물" hidden>폐기물</button>
             <button type="button" id="attendanceNavBtn" class="nav-btn" data-portal-src="attendance/index.html" title="근태">근태</button>
             <button type="button" id="researchStaffNavBtn" class="nav-btn" data-portal-src="research-staff/index.html" title="인력운영현황">인력</button>
             <button type="button" id="suppliesNavBtn" class="nav-btn" data-portal-src="reagent/dashboard/index.html" title="연구용품"><span class="nav-label-two-line">연구<br/>용품</span></button>
@@ -2679,6 +2680,7 @@ body.auth-loading .top-user-bar {
     mobileEdgeSwipeZone: document.getElementById('mobileEdgeSwipeZone'),
     portalSideNav: document.getElementById('portalSideNav'),
     settingsNavBtn: document.getElementById('settingsNavBtn'),
+    wasteNavBtn: document.getElementById('wasteNavBtn'),
     qaNavBtn: document.getElementById('qaNavBtn'),
     patentNavBtn: document.getElementById('patentNavBtn'),
     researchStaffNavBtn: document.getElementById('researchStaffNavBtn'),
@@ -3080,6 +3082,42 @@ body.auth-loading .top-user-bar {
       desc: '폐수/폐기물 배출시설 운영 기록과 수거 내역을 관리합니다.',
       gradient: 'linear-gradient(135deg, #047857 0%, #14b8a6 100%)'
     },
+    'waste-status/index.html': {
+      top: 'Waste Management',
+      title: '폐기물 관리',
+      desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
+    },
+    'waste-daily/index.html': {
+      top: 'Waste Management',
+      title: '폐기물 관리',
+      desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
+    },
+    'waste-collection/index.html': {
+      top: 'Waste Management',
+      title: '폐기물 관리',
+      desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
+    },
+    'waste-ledger/index.html': {
+      top: 'Waste Management',
+      title: '폐기물 관리',
+      desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
+    },
+    'waste-reference/index.html': {
+      top: 'Waste Management',
+      title: '폐기물 관리',
+      desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
+    },
+    'waste-documents/index.html': {
+      top: 'Waste Management',
+      title: '폐기물 관리',
+      desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
+    },
     'attendance/index.html': {
       top: 'Workforce Analytics',
       title: '근태 리스크 및 운영 분석',
@@ -3282,6 +3320,54 @@ body.auth-loading .top-user-bar {
       { id: 'ledger', label: '운영일지' },
       { id: 'reference', label: '관련자료' },
       { id: 'relatedDocs', label: '관련서류' }
+    ],
+    'waste-status/index.html': [
+      { id: 'waste-status', label: '폐기물현황' },
+      { id: 'waste-daily', label: '일일입력' },
+      { id: 'waste-collection', label: '수거등록' },
+      { id: 'waste-ledger', label: '관리대장' },
+      { id: 'waste-reference', label: '관련자료' },
+      { id: 'waste-documents', label: '관련서류' }
+    ],
+    'waste-daily/index.html': [
+      { id: 'waste-status', label: '폐기물현황' },
+      { id: 'waste-daily', label: '일일입력' },
+      { id: 'waste-collection', label: '수거등록' },
+      { id: 'waste-ledger', label: '관리대장' },
+      { id: 'waste-reference', label: '관련자료' },
+      { id: 'waste-documents', label: '관련서류' }
+    ],
+    'waste-collection/index.html': [
+      { id: 'waste-status', label: '폐기물현황' },
+      { id: 'waste-daily', label: '일일입력' },
+      { id: 'waste-collection', label: '수거등록' },
+      { id: 'waste-ledger', label: '관리대장' },
+      { id: 'waste-reference', label: '관련자료' },
+      { id: 'waste-documents', label: '관련서류' }
+    ],
+    'waste-ledger/index.html': [
+      { id: 'waste-status', label: '폐기물현황' },
+      { id: 'waste-daily', label: '일일입력' },
+      { id: 'waste-collection', label: '수거등록' },
+      { id: 'waste-ledger', label: '관리대장' },
+      { id: 'waste-reference', label: '관련자료' },
+      { id: 'waste-documents', label: '관련서류' }
+    ],
+    'waste-reference/index.html': [
+      { id: 'waste-status', label: '폐기물현황' },
+      { id: 'waste-daily', label: '일일입력' },
+      { id: 'waste-collection', label: '수거등록' },
+      { id: 'waste-ledger', label: '관리대장' },
+      { id: 'waste-reference', label: '관련자료' },
+      { id: 'waste-documents', label: '관련서류' }
+    ],
+    'waste-documents/index.html': [
+      { id: 'waste-status', label: '폐기물현황' },
+      { id: 'waste-daily', label: '일일입력' },
+      { id: 'waste-collection', label: '수거등록' },
+      { id: 'waste-ledger', label: '관리대장' },
+      { id: 'waste-reference', label: '관련자료' },
+      { id: 'waste-documents', label: '관련서류' }
     ],
     'attendance/index.html': [
       { id: 'attendance', label: '근태관리' },
@@ -3800,6 +3886,26 @@ body.auth-loading .top-user-bar {
       return;
     }
 
+    // 폐기물은 각 기능을 독립 폴더/프로그램으로 운영하므로 포탈 상단 버튼에서 경로를 전환합니다.
+    if (isWasteProgramSrc(currentSrc)) {
+      const targetMap = {
+        'waste-status': WASTE_STATUS_SRC,
+        'waste-daily': WASTE_DAILY_SRC,
+        'waste-collection': WASTE_COLLECTION_SRC,
+        'waste-ledger': WASTE_LEDGER_SRC,
+        'waste-reference': WASTE_REFERENCE_SRC,
+        'waste-documents': WASTE_DOCUMENTS_SRC
+      };
+      const target = targetMap[tabId] || '';
+      if (target && currentSrc !== target) {
+        try { sessionStorage.setItem(LAST_PAGE_KEY, target); } catch (_) {}
+        replacePortalFrame(buildSrcWithSession(target));
+      } else if (target) {
+        setPortalSubtabActive(tabId, false);
+      }
+      return;
+    }
+
     // 특허는 현황/목록/관리를 독립 화면으로 운영하므로 포탈 상단 버튼에서 경로를 전환합니다.
     if (isPatentProgramSrc(currentSrc)) {
       const patentRole = getPortalAppRoleForTabs('patent');
@@ -3896,6 +4002,7 @@ body.auth-loading .top-user-bar {
     const key = normalizePortalSrc(src);
     const tabs = portalDefaultTabs[key] || [];
     let activeId = tabs[0]?.id || '';
+    if (isWasteProgramSrc(key)) activeId = getWasteTabIdBySrc(key) || activeId;
     if (isReagentDashboardSrc(key)) activeId = 'reagent-dashboard';
     if (isReagentAppSrc(key) && pendingReagentTabId) activeId = pendingReagentTabId;
     if (isPatentDashboardSrc(key)) activeId = 'patent-dashboard';
@@ -4089,6 +4196,38 @@ body.auth-loading .top-user-bar {
     return key === WASTEWATER_DESKTOP_SRC || key === WASTEWATER_MOBILE_SRC;
   }
 
+  const WASTE_STATUS_SRC = 'waste-status/index.html';
+  const WASTE_DAILY_SRC = 'waste-daily/index.html';
+  const WASTE_COLLECTION_SRC = 'waste-collection/index.html';
+  const WASTE_LEDGER_SRC = 'waste-ledger/index.html';
+  const WASTE_REFERENCE_SRC = 'waste-reference/index.html';
+  const WASTE_DOCUMENTS_SRC = 'waste-documents/index.html';
+
+  function isWasteProgramSrc(src) {
+    const key = normalizePortalSrc(src);
+    return [
+      WASTE_STATUS_SRC,
+      WASTE_DAILY_SRC,
+      WASTE_COLLECTION_SRC,
+      WASTE_LEDGER_SRC,
+      WASTE_REFERENCE_SRC,
+      WASTE_DOCUMENTS_SRC
+    ].includes(key);
+  }
+
+  function getWasteTabIdBySrc(src) {
+    const key = normalizePortalSrc(src);
+    const map = {
+      [WASTE_STATUS_SRC]: 'waste-status',
+      [WASTE_DAILY_SRC]: 'waste-daily',
+      [WASTE_COLLECTION_SRC]: 'waste-collection',
+      [WASTE_LEDGER_SRC]: 'waste-ledger',
+      [WASTE_REFERENCE_SRC]: 'waste-reference',
+      [WASTE_DOCUMENTS_SRC]: 'waste-documents'
+    };
+    return map[key] || '';
+  }
+
   const RESEARCH_STAFF_DESKTOP_SRC = 'research-staff/index.html';
   const RESEARCH_STAFF_MOBILE_SRC = 'research-staff/Mobile/index.html';
 
@@ -4275,6 +4414,7 @@ body.auth-loading .top-user-bar {
   function findNavBySrc(src) {
     const exact = navButtons.find((btn) => btn.getAttribute('data-portal-src') === src);
     if (exact) return exact;
+    if (typeof isWasteProgramSrc === 'function' && isWasteProgramSrc(src)) return els.wasteNavBtn || null;
     if (typeof isPatentProgramSrc === 'function' && isPatentProgramSrc(src)) return els.patentNavBtn || null;
     return null;
   }
@@ -4446,44 +4586,40 @@ body.auth-loading .top-user-bar {
   }
 
   function canAccessPatentApp() {
-    // 특허 조회는 로그인한 회사 소속 사용자에게 공개합니다.
-    // 실제 데이터 조회는 pat_can_read(company_id) RLS가 다시 검증합니다.
-    // 특허 원본정보 수정/납부/기한관리 등 운영기능은
-    // patent operator 또는 회사 관리자만 사용할 수 있습니다.
-    if (!currentUser) return false;
-    if (canUseSettingsMenu()) return true;
-    if (isServiceAdminRole()) return true;
-
-    const patentRole = normalizePortalRole(
-      currentAppRoles?.patent?.role ||
-      currentAppRoles?.patent?.role_key ||
-      '',
-      'user'
-    );
-
-    if (patentRole === 'admin' || patentRole === 'operator') {
-      return true;
-    }
-
-    const employee = normalizePortalEmployee(currentEmployee);
-    if (!employee) return false;
-
-    const rawStatus = String(
-      currentEmployee?.status ||
-      currentEmployee?.raw?.status ||
-      ''
-    ).trim();
-
-    return rawStatus !== '퇴사';
+    // 특허 메뉴는 '회사 관리자'에게만 노출합니다.
+    // root service_admin은 회사 관리자 계정이 아니므로 여기서는 제외합니다.
+    return Boolean(currentUser && !isServiceAdminRole() && canUseSettingsMenu());
   }
 
   function canOperatePatentApp() {
-    if (!currentUser) return false;
-    if (canUseSettingsMenu()) return true;
-    if (isServiceAdminRole()) return true;
+    return canAccessPatentApp();
+  }
 
-    const patentRole = getPortalAppRoleForTabs('patent');
-    return isPortalOperatorRole(patentRole);
+  function canAccessWasteApp() {
+    // 폐기물 메뉴도 특허와 동일하게 '회사 관리자'에게만 노출합니다.
+    return Boolean(currentUser && !isServiceAdminRole() && canUseSettingsMenu());
+  }
+
+  let wasteVisibilitySeq = 0;
+  function updateWasteButtonVisibility() {
+    if (!els.wasteNavBtn) return;
+    const seq = ++wasteVisibilitySeq;
+    const allowed = canAccessWasteApp();
+    if (seq !== wasteVisibilitySeq) return;
+
+    // hidden + display:none을 함께 적용해 숨김 상태에서 자리를 차지하지 않도록 합니다.
+    // 따라서 다음 프로그램 버튼이 자동으로 위로 당겨집니다.
+    els.wasteNavBtn.hidden = !allowed;
+    els.wasteNavBtn.style.display = allowed ? '' : 'none';
+    els.wasteNavBtn.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+    els.wasteNavBtn.tabIndex = allowed ? 0 : -1;
+  }
+
+  function scheduleWasteButtonVisibilityRefresh() {
+    updateWasteButtonVisibility();
+    [100, 350, 900, 1800].forEach(function (delay) {
+      setTimeout(updateWasteButtonVisibility, delay);
+    });
   }
 
   let patentVisibilitySeq = 0;
@@ -4771,8 +4907,8 @@ body.auth-loading .top-user-bar {
     }
   }
 
-  const PORTAL_APP_KEYS = ['wastewater', 'attendance', 'reagent', 'qa', 'research_staff', 'travel_expense', 'patent', 'aic', 'home', 'work'];
-  const PORTAL_COMPANY_APP_KEYS = ['wastewater', 'attendance', 'reagent', 'qa', 'research_staff', 'travel_expense', 'patent'];
+  const PORTAL_APP_KEYS = ['wastewater', 'waste', 'attendance', 'reagent', 'qa', 'research_staff', 'travel_expense', 'patent', 'aic', 'home', 'work'];
+  const PORTAL_COMPANY_APP_KEYS = ['wastewater', 'waste', 'attendance', 'reagent', 'qa', 'research_staff', 'travel_expense', 'patent'];
 
   function normalizePortalRole(role, fallback = 'user') {
     const clean = String(role || '').trim().toLowerCase();
@@ -4787,6 +4923,7 @@ body.auth-loading .top-user-bar {
   function normalizePortalAppKey(appKey) {
     const clean = String(appKey || '').trim().toLowerCase();
     if (['wastewater', 'waste_water', 'waste-water', '폐수'].includes(clean)) return 'wastewater';
+    if (['waste', 'waste_management', 'waste-management', '폐기물'].includes(clean)) return 'waste';
     if (['attendance', 'attend', '근태'].includes(clean)) return 'attendance';
     if (['reagent', 'reagents', 'supplies', 'glassware', 'reagent_glassware', 'reagent-glassware', '시약', '시약초자', '연구용품'].includes(clean)) return 'reagent';
     if (['qa', 'sds', 'msds', 'safety_data_sheet', 'safety-data-sheet', '안전보건자료'].includes(clean)) return 'qa';
@@ -4808,6 +4945,7 @@ body.auth-loading .top-user-bar {
   function buildEmptyPortalAppRoles() {
     return {
       wastewater: { role: 'user', approvalRole: null },
+      waste: { role: 'user' },
       attendance: { role: 'user' },
       reagent: { role: 'user' },
       qa: { role: 'user' },
@@ -4823,6 +4961,7 @@ body.auth-loading .top-user-bar {
   function buildServiceModeAppRoles() {
     return {
       wastewater: { role: 'admin', approvalRole: null },
+      waste: { role: 'admin' },
       attendance: { role: 'admin' },
       reagent: { role: 'admin' },
       qa: { role: 'admin' },
@@ -5237,6 +5376,7 @@ body.auth-loading .top-user-bar {
     updateSettingsButtonVisibility();
     updateQaButtonVisibility();
     scheduleResearchStaffButtonVisibilityRefresh();
+    scheduleWasteButtonVisibilityRefresh();
     schedulePatentButtonVisibilityRefresh();
     updateQaButtonVisibility();
   }
@@ -5300,6 +5440,7 @@ body.auth-loading .top-user-bar {
     if (els.topUserBar) els.topUserBar.hidden = false;
     scheduleResearchStaffButtonVisibilityRefresh();
     updateQaButtonVisibility();
+    scheduleWasteButtonVisibilityRefresh();
     schedulePatentButtonVisibilityRefresh();
   }
 
@@ -5318,6 +5459,7 @@ body.auth-loading .top-user-bar {
     updateServiceAdminButtonVisibility();
     updateSettingsButtonVisibility();
     scheduleResearchStaffButtonVisibilityRefresh();
+    scheduleWasteButtonVisibilityRefresh();
     schedulePatentButtonVisibilityRefresh();
   }
 
@@ -5959,7 +6101,7 @@ body.auth-loading .top-user-bar {
       // 기존 시약/근태 등은 같은 HTML 안에서 postMessage로 내부 탭을 바꾸지만,
       // QA의 세 프로그램은 iframe 문서 자체를 교체해야 하므로 src를 직접 갱신합니다.
       // 이렇게 해야 iframe의 src 속성도 실제 현재 프로그램과 일치합니다.
-      if (isQaProgramSrc(normalizedTarget) || isPatentProgramSrc(normalizedTarget) || isReagentProgramSrc(normalizedTarget)) {
+      if (isQaProgramSrc(normalizedTarget) || isPatentProgramSrc(normalizedTarget) || isReagentProgramSrc(normalizedTarget) || isWasteProgramSrc(normalizedTarget)) {
         frame.src = targetUrl;
       } else if (frame.contentWindow && frame.contentWindow.location) {
         frame.contentWindow.location.replace(targetUrl);
@@ -5985,6 +6127,13 @@ body.auth-loading .top-user-bar {
     }
 
     if (isServiceAdminSrc(src) && !isServiceAdminRole()) {
+      return;
+    }
+
+    if (isWasteProgramSrc(src) && !canAccessWasteApp()) {
+      try { sessionStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
+      const fallbackBtn = homeBtn || findNavBySrc(HOME_SRC);
+      await navigateBySrc(HOME_SRC, fallbackBtn, { skipSave: true });
       return;
     }
 
@@ -6075,6 +6224,11 @@ body.auth-loading .top-user-bar {
     }
 
     if (lastSrc && isResearchStaffSrc(lastSrc) && !canAccessResearchStaffApp()) {
+      try { sessionStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
+      lastSrc = '';
+    }
+
+    if (lastSrc && isWasteProgramSrc(lastSrc) && !canAccessWasteApp()) {
       try { sessionStorage.removeItem(LAST_PAGE_KEY); } catch (_) {}
       lastSrc = '';
     }
@@ -6273,6 +6427,8 @@ body.auth-loading .top-user-bar {
 
   window.addEventListener('load', scheduleResearchStaffButtonVisibilityRefresh);
   document.addEventListener('DOMContentLoaded', scheduleResearchStaffButtonVisibilityRefresh);
+  window.addEventListener('load', scheduleWasteButtonVisibilityRefresh);
+  document.addEventListener('DOMContentLoaded', scheduleWasteButtonVisibilityRefresh);
   window.addEventListener('load', schedulePatentButtonVisibilityRefresh);
   document.addEventListener('DOMContentLoaded', schedulePatentButtonVisibilityRefresh);
 
@@ -6504,6 +6660,7 @@ body.auth-loading .top-user-bar {
             updateSettingsButtonVisibility();
             updateQaButtonVisibility();
             scheduleResearchStaffButtonVisibilityRefresh();
+            scheduleWasteButtonVisibilityRefresh();
             schedulePatentButtonVisibilityRefresh();
             postAuthToFrame();
 
@@ -6847,3 +7004,4 @@ body.auth-loading .top-user-bar {
 
 </body>
 </html>
+
