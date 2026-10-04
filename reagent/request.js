@@ -263,6 +263,7 @@ window.ReagentApp.request = {
         const record = data || { order_month: month, status: "진행중", finalized_at: null, finalized_by: null };
         this.orderMonthStatusCache[month] = record;
         this.applyOrderMonthFinalizationUI(month, record);
+        window.ReagentApp.collect?.renderCollect?.();
         window.ReagentApp.collect?.renderPrepare?.();
         return record;
       } catch (error) {
@@ -355,7 +356,7 @@ window.ReagentApp.request = {
     // 신청목록에는 동일한 마감 안내를 중복 표시하지 않습니다.
     document.getElementById("requestMonthFinalizedListNotice")?.remove();
 
-    ["openSearch", "openProductScan", "addItem"].forEach((id) => {
+    ["openSearch", "openProductScan", "addItem", "addToCollect"].forEach((id) => {
       const el = document.getElementById(id);
       if (!el) return;
       el.disabled = finalized;
