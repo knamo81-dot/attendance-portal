@@ -3548,7 +3548,7 @@ body.auth-loading .top-user-bar {
   function isReagentDashboardTab(tab) {
     const id = String(tab?.id || '').trim().toLowerCase();
     const label = String(tab?.label || '').replace(/\s+/g, '').trim();
-    return id === 'reagent-dashboard' || id === 'dashboard' || label === '시약현황';
+    return id === 'reagent-dashboard' || id === 'dashboard' || label === '구매현황' || label === '시약현황';
   }
 
   function isTravelExpenseApplicantTab(tab) {
@@ -3896,6 +3896,7 @@ body.auth-loading .top-user-bar {
     const tabs = portalDefaultTabs[key] || [];
     let activeId = tabs[0]?.id || '';
     if (isReagentDashboardSrc(key)) activeId = 'reagent-dashboard';
+    if (isReagentAppSrc(key) && pendingReagentTabId) activeId = pendingReagentTabId;
     if (isPatentDashboardSrc(key)) activeId = 'patent-dashboard';
     if (isPatentListSrc(key)) activeId = 'patent-list';
     if (isPatentManagementSrc(key)) activeId = 'patent-management';
@@ -6513,12 +6514,22 @@ body.auth-loading .top-user-bar {
         return;
       }
 
+      if (payload.type === 'portal-auth-request') {
+        try { postAuthToFrame(); } catch (_) {}
+        return;
+      }
+
       if (payload.type === 'portal-tabs-ready' || payload.type === 'portal-tabs-update') {
         const currentSrc = normalizePortalSrc(frame?.dataset?.currentSrc || frame?.getAttribute('src') || frame?.src || HOME_SRC);
 
-        // QA는 사용일지, SDS, 특별관리물질이 서로 독립 프로그램이므로,
-        // 각 하위 앱이 보내는 자체 탭 정보로 포털의 QA 공통 메뉴를 덮어쓰지 않습니다.
-        if (isQaProgramSrc(currentSrc) || isPatentProgramSrc(currentSrc)) {
+        // QA/특허/연구용품 구매현황처럼 경로 자체가 화면을 의미하는 경우
+        // 자식 화면이 보내는 activeTab 값보다 현재 iframe 경로를 우선합니다.
+        // 모바일에서 첫 진입 시 구매현황 탭과 iframe 내용이 한 박자 어긋나는 현상을 방지합니다.
+        if (isQaProgramSrc(currentSrc) || isPatentProgramSrc(currentSrc) || isReagentDashboardSrc(currentSrc)) {
+          if (isReagentDashboardSrc(currentSrc)) {
+            hidePortalBootOverlay();
+            try { postAuthToFrame(); } catch (_) {}
+          }
           updatePortalSubtabs(currentSrc);
           return;
         }
