@@ -74,3 +74,48 @@ table{
 @media(max-width:520px){
   body{padding:6px;}
 }
+
+/* ===== 폐수배출시설 운영일지 수거 연동 ===== */
+.facility-log-switch{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  min-height:50px;
+  margin:2px 0 12px;
+  padding:10px 12px;
+  border:1px solid #cfe0ef;
+  border-radius:12px;
+  background:#f8fbfe;
+  cursor:pointer;
+}
+.facility-log-switch:hover{
+  border-color:var(--green);
+}
+.facility-log-switch input[type="checkbox"]{
+  width:18px !important;
+  height:18px !important;
+  min-height:18px !important;
+  margin:0 !important;
+  padding:0 !important;
+  flex:0 0 18px;
+  accent-color:var(--green);
+  box-shadow:none !important;
+}
+.facility-log-switch span{
+  display:grid;
+  gap:2px;
+}
+.facility-log-switch strong{
+  font-size:12px;
+  color:#203657;
+}
+.facility-log-switch small{
+  font-size:10px;
+  color:var(--muted);
+  font-weight:600;
+}
+.facility-pickup-box{
+  margin-bottom:10px;
+  background:#f2fbf7;
+}
