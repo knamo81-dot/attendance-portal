@@ -96,6 +96,75 @@ const settingsConfigs={
   opening:{table:'waste_opening_balances',title:'기초·이월량',fields:[]}
 };
 
+
+function monthlyTrendChartHtml(months){
+  const maxKg=Math.max(
+    0,
+    ...months.map(x=>Number(x.gen||0)),
+    ...months.map(x=>Number(x.col||0))
+  );
+
+  const scale=(kg)=>{
+    if(maxKg<=0 || Number(kg||0)<=0)return 0;
+    return Math.max(3,(Number(kg||0)/maxKg)*100);
+  };
+
+  return `
+    <div class="chart-head-row">
+      <div class="chart-legend">
+        <span><i class="legend-swatch gen"></i>확정 발생량</span>
+        <span><i class="legend-swatch col"></i>처리량</span>
+      </div>
+      <span class="hint">단위: T</span>
+    </div>
+    <div class="month-chart ${maxKg<=0?'is-empty':''}">
+      ${maxKg<=0?'<div class="chart-empty-note">데이터가 입력되면 월별 추이가 표시됩니다.</div>':''}
+      ${months.map(x=>{
+        const genT=Number(x.gen||0)/1000;
+        const colT=Number(x.col||0)/1000;
+        return `
+          <div class="month-col">
+            <div class="month-bars">
+              <div class="month-bar gen"
+                style="height:${scale(x.gen)}%"
+                title="${Number(x.m)}월 확정 발생량 ${num(genT,4)} T"></div>
+              <div class="month-bar col"
+                style="height:${scale(x.col)}%"
+                title="${Number(x.m)}월 처리량 ${num(colT,4)} T"></div>
+            </div>
+            <div class="month-label">${Number(x.m)}월</div>
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function typeStorageChartHtml(typeStats){
+  if(!typeStats.length){
+    return `<div class="empty">표시할 폐기물 종류가 없습니다.</div>`;
+  }
+
+  const maxKg=Math.max(0,...typeStats.map(x=>Math.max(0,Number(x.current||0))));
+
+  return `
+    <div class="type-chart">
+      ${typeStats.map(x=>{
+        const currentKg=Number(x.current||0);
+        const pct=maxKg>0?Math.min(100,(Math.max(0,currentKg)/maxKg)*100):0;
+        return `
+          <div class="type-bar-row">
+            <div class="type-bar-name" title="${esc(x.name)}">${esc(x.name)}</div>
+            <div class="type-track">
+              <div class="type-fill ${currentKg<0?'negative':''}" style="width:${pct}%"></div>
+            </div>
+            <div class="type-bar-value ${currentKg<0?'warning':''}">
+              ${num(currentKg/1000,4)} T
+              ${x.unknown?`<span class="mini-badge">${x.unknown}건 미확정</span>`:''}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
 async function renderStatus(){
   const [types,daily,cols,opening]=await Promise.all([
     A.list('waste_types','*','sort_order',true),
@@ -103,53 +172,188 @@ async function renderStatus(){
     A.list('waste_collections','*,waste_collection_items(*,waste_types(*))','collection_date',false),
     A.list('waste_opening_balances','*,waste_types(*)','balance_date',false)
   ]);
+
   const activeTypes=(types.data||[]).filter(x=>x.active);
   const yf=r=>String(r.entry_date||r.collection_date||r.balance_date||'').startsWith(year);
-  const d=(daily.data||[]).filter(yf).filter(r=>!typeFilter||r.waste_type_id===typeFilter);
-  const c=(cols.data||[]).filter(yf).map(h=>({...h,waste_collection_items:(h.waste_collection_items||[]).filter(i=>!typeFilter||i.waste_type_id===typeFilter)})).filter(h=>h.waste_collection_items.length);
-  const o=(opening.data||[]).filter(r=>!typeFilter||r.waste_type_id===typeFilter);
-  const genConfirmed=d.filter(r=>r.weight_status==='confirmed').reduce((s,r)=>s+Number(r.weight_kg||0),0);
+
+  const allDailyYear=(daily.data||[]).filter(yf);
+  const allCollectionsYear=(cols.data||[]).filter(yf);
+  const allOpening=(opening.data||[]);
+
+  const d=allDailyYear.filter(r=>!typeFilter||r.waste_type_id===typeFilter);
+  const c=allCollectionsYear
+    .map(h=>({
+      ...h,
+      waste_collection_items:(h.waste_collection_items||[])
+        .filter(i=>!typeFilter||i.waste_type_id===typeFilter)
+    }))
+    .filter(h=>h.waste_collection_items.length);
+
+  const o=allOpening.filter(r=>!typeFilter||r.waste_type_id===typeFilter);
+
+  const genConfirmed=d
+    .filter(r=>r.weight_status==='confirmed')
+    .reduce((s,r)=>s+Number(r.weight_kg||0),0);
+
   const genUnknown=d.filter(r=>r.weight_status!=='confirmed').length;
-  const collected=c.flatMap(x=>x.waste_collection_items).reduce((s,x)=>s+Number(x.weight_kg||0),0);
+
+  const collected=c
+    .flatMap(x=>x.waste_collection_items)
+    .reduce((s,x)=>s+Number(x.weight_kg||0),0);
+
   const openingKg=o.reduce((s,x)=>s+Number(x.weight_kg||0),0);
   const current=openingKg+genConfirmed-collected;
+
   const months=Array.from({length:12},(_,i)=>{
     const m=String(i+1).padStart(2,'0');
     const md=d.filter(r=>String(r.entry_date).slice(5,7)===m);
     const mc=c.filter(r=>String(r.collection_date).slice(5,7)===m);
+
     return {
       m,
-      gen:md.filter(r=>r.weight_status==='confirmed').reduce((s,r)=>s+Number(r.weight_kg||0),0),
+      gen:md
+        .filter(r=>r.weight_status==='confirmed')
+        .reduce((s,r)=>s+Number(r.weight_kg||0),0),
       unknown:md.filter(r=>r.weight_status!=='confirmed').length,
-      col:mc.flatMap(x=>x.waste_collection_items).reduce((s,x)=>s+Number(x.weight_kg||0),0),
+      col:mc
+        .flatMap(x=>x.waste_collection_items)
+        .reduce((s,x)=>s+Number(x.weight_kg||0),0),
       count:mc.length
+    };
+  });
+
+  const visibleTypes=activeTypes.filter(t=>!typeFilter||t.id===typeFilter);
+  const typeStats=visibleTypes.map(t=>{
+    const td=allDailyYear.filter(r=>r.waste_type_id===t.id);
+    const tc=allCollectionsYear
+      .flatMap(h=>h.waste_collection_items||[])
+      .filter(i=>i.waste_type_id===t.id);
+    const to=allOpening.filter(r=>r.waste_type_id===t.id);
+
+    const gen=td
+      .filter(r=>r.weight_status==='confirmed')
+      .reduce((s,r)=>s+Number(r.weight_kg||0),0);
+    const col=tc.reduce((s,r)=>s+Number(r.weight_kg||0),0);
+    const op=to.reduce((s,r)=>s+Number(r.weight_kg||0),0);
+
+    return {
+      id:t.id,
+      name:typeName(t),
+      current:op+gen-col,
+      generated:gen,
+      collected:col,
+      unknown:td.filter(r=>r.weight_status!=='confirmed').length
     };
   });
 
   $('#app').innerHTML=`
     <div id="notice" class="notice"></div>
+
     <div class="toolbar">
-      <select id="year" class="btn">${[Number(year)-2,Number(year)-1,Number(year),Number(year)+1].map(y=>`<option ${String(y)===year?'selected':''}>${y}</option>`).join('')}</select>
-      <select id="type" class="btn"><option value="">전체 폐기물</option>${activeTypes.map(t=>`<option value="${t.id}" ${t.id===typeFilter?'selected':''}>${esc(typeName(t))}</option>`).join('')}</select>
+      <select id="year" class="btn">
+        ${[Number(year)-2,Number(year)-1,Number(year),Number(year)+1]
+          .map(y=>`<option ${String(y)===year?'selected':''}>${y}</option>`).join('')}
+      </select>
+
+      <select id="type" class="btn">
+        <option value="">전체 폐기물</option>
+        ${activeTypes.map(t=>`
+          <option value="${t.id}" ${t.id===typeFilter?'selected':''}>
+            ${esc(typeName(t))}
+          </option>`).join('')}
+      </select>
+
       <span class="spacer"></span>
       <button id="open-settings" class="btn">⚙ 설정</button>
     </div>
+
     <div class="kpis">
-      <div class="kpi"><div class="label">확정 발생량</div><div class="value">${num(genConfirmed/1000,4)} T</div></div>
-      <div class="kpi"><div class="label">처리량</div><div class="value">${num(collected/1000,4)} T</div></div>
-      <div class="kpi"><div class="label">확정 기준 현재 보관량</div><div class="value">${num(current/1000,4)} T</div></div>
-      <div class="kpi"><div class="label">중량 미확정 발생건</div><div class="value ${genUnknown?'warning':''}">${genUnknown}건</div></div>
+      <div class="kpi">
+        <div class="label">확정 발생량</div>
+        <div class="value">${num(genConfirmed/1000,4)} T</div>
+      </div>
+      <div class="kpi">
+        <div class="label">처리량</div>
+        <div class="value">${num(collected/1000,4)} T</div>
+      </div>
+      <div class="kpi">
+        <div class="label">확정 기준 현재 보관량</div>
+        <div class="value">${num(current/1000,4)} T</div>
+      </div>
+      <div class="kpi">
+        <div class="label">중량 미확정 발생건</div>
+        <div class="value ${genUnknown?'warning':''}">${genUnknown}건</div>
+      </div>
     </div>
+
+    <div class="dashboard-charts">
+      <div class="card chart-card">
+        <div class="section-head">
+          <h2>📈 월별 발생·처리 추이</h2>
+          <div class="spacer"></div>
+          <span class="hint">${year}년</span>
+        </div>
+        ${monthlyTrendChartHtml(months)}
+      </div>
+
+      <div class="card chart-card">
+        <div class="section-head">
+          <h2>📦 폐기물 종류별 현재 보관량</h2>
+          <div class="spacer"></div>
+          <span class="hint">확정 중량 기준</span>
+        </div>
+        ${typeStorageChartHtml(typeStats)}
+      </div>
+    </div>
+
     <div class="card">
-      <div class="card-title">📊 ${year}년 폐기물 현황</div>
-      <div class="hint">중량 미확정 일일입력은 무게 합계에서 제외됩니다. 따라서 현재 보관량은 확정 중량 기준입니다.</div><br>
-      <div class="table-wrap"><table><thead><tr><th>월</th><th>확정 발생량(T)</th><th>중량 미확정(건)</th><th>수거횟수</th><th>처리량(T)</th></tr></thead><tbody>
-        ${months.map(x=>`<tr><td>${Number(x.m)}월</td><td class="num">${num(x.gen/1000,4)}</td><td class="num">${x.unknown}</td><td class="num">${x.count}</td><td class="num">${num(x.col/1000,4)}</td></tr>`).join('')}
-      </tbody></table></div>
+      <div class="section-head">
+        <h2>📊 ${year}년 월별 상세 현황</h2>
+        <div class="spacer"></div>
+        <span class="hint">그래프 하단 상세 데이터</span>
+      </div>
+
+      <div class="hint">
+        중량 미확정 일일입력은 무게 합계에서 제외됩니다.
+        따라서 현재 보관량은 확정 중량 기준입니다.
+      </div>
+      <br>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>월</th>
+              <th>확정 발생량(T)</th>
+              <th>중량 미확정(건)</th>
+              <th>수거횟수</th>
+              <th>처리량(T)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${months.map(x=>`
+              <tr>
+                <td>${Number(x.m)}월</td>
+                <td class="num">${num(x.gen/1000,4)}</td>
+                <td class="num">${x.unknown}</td>
+                <td class="num">${x.count}</td>
+                <td class="num">${num(x.col/1000,4)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>`;
 
-  $('#year').onchange=e=>{year=e.target.value;renderStatus()};
-  $('#type').onchange=e=>{typeFilter=e.target.value;renderStatus()};
+  $('#year').onchange=e=>{
+    year=e.target.value;
+    renderStatus();
+  };
+
+  $('#type').onchange=e=>{
+    typeFilter=e.target.value;
+    renderStatus();
+  };
+
   $('#open-settings').onclick=()=>renderSettings();
 }
 
@@ -451,3 +655,4 @@ async function renderOpeningSettings(){
 }
 
 renderStatus();
+
