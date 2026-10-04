@@ -97,71 +97,160 @@ const settingsConfigs={
 };
 
 
-function monthlyTrendChartHtml(months){
-  const maxKg=Math.max(
-    0,
-    ...months.map(x=>Number(x.gen||0)),
-    ...months.map(x=>Number(x.col||0))
-  );
 
-  const scale=(kg)=>{
-    if(maxKg<=0 || Number(kg||0)<=0)return 0;
-    return Math.max(3,(Number(kg||0)/maxKg)*100);
+function kpiIconSvg(kind){
+  const icons={
+    generated:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 2h4v2h-1l-1.1 11.1A3 3 0 0 1 14.9 21H9.1a3 3 0 0 1-2.99-2.9L5 7H4V5h4l1-2Zm1.2 2-.5 1h4.6l-.5-1h-3.6ZM8 9h2v8H8V9Zm6 0h2v8h-2V9Zm-3 0h2v8h-2V9Z" fill="currentColor"/></svg>`,
+    collected:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11v8h2.4l2.1-3H22l-1.5 5H19a2.5 2.5 0 0 1-4.9.5H8.9A2.5 2.5 0 0 1 4 16.5 2.5 2.5 0 0 1 6.4 14H5V8H3V6Zm3.5 9.5a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2Zm10 0a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2Z" fill="currentColor"/></svg>`,
+    storage:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 6.5v11L12 22l8-4.5v-11L12 2Zm0 2.3 5.5 3.1L12 10.5 6.5 7.4 12 4.3Zm-6 4.8 5 2.8v6L6 15V9.1Zm7 8.7v-6l5-2.8V15l-5 2.8Z" fill="currentColor"/></svg>`,
+    warning:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3v8h-2V3h2Zm0 12v-2h-2v2h2Zm-1 7a10 10 0 1 1 0-20 10 10 0 0 1 0 20Zm0-2a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z" fill="currentColor"/></svg>`
   };
+  return icons[kind] || icons.generated;
+}
+
+function axisLabelsHtml(unitLabel){
+  return `<div class="chart-axis-label">${unitLabel}</div>`;
+}
+
+function monthlyTrendChartHtml(months){
+  const maxT=Math.max(0,...months.map(x=>x.genT),...months.map(x=>x.colT));
+  const scale=v=>maxT<=0?0:Math.max(v>0?6:0,(v/maxT)*100);
 
   return `
-    <div class="chart-head-row">
-      <div class="chart-legend">
-        <span><i class="legend-swatch gen"></i>확정 발생량</span>
-        <span><i class="legend-swatch col"></i>처리량</span>
+    <div class="chart-card-body">
+      <div class="chart-head-row">
+        <strong class="mini-title">월별 발생량 vs 처리량 추이 (${year}년)</strong>
+        <div class="spacer"></div>
+        <div class="chart-legend">
+          <span><i class="legend-swatch gen"></i>발생량(T)</span>
+          <span><i class="legend-swatch col"></i>처리량(T)</span>
+        </div>
       </div>
-      <span class="hint">단위: T</span>
-    </div>
-    <div class="month-chart ${maxKg<=0?'is-empty':''}">
-      ${maxKg<=0?'<div class="chart-empty-note">데이터가 입력되면 월별 추이가 표시됩니다.</div>':''}
-      ${months.map(x=>{
-        const genT=Number(x.gen||0)/1000;
-        const colT=Number(x.col||0)/1000;
-        return `
+      ${axisLabelsHtml('처리량 (T)')}
+      <div class="month-chart ${maxT<=0?'is-empty':''}">
+        ${maxT<=0?'<div class="chart-empty-note">데이터가 입력되면 월별 추이가 표시됩니다.</div>':''}
+        ${months.map(x=>`
           <div class="month-col">
             <div class="month-bars">
-              <div class="month-bar gen"
-                style="height:${scale(x.gen)}%"
-                title="${Number(x.m)}월 확정 발생량 ${num(genT,4)} T"></div>
-              <div class="month-bar col"
-                style="height:${scale(x.col)}%"
-                title="${Number(x.m)}월 처리량 ${num(colT,4)} T"></div>
+              <div class="month-bar gen" style="height:${scale(x.genT)}%" title="${x.monthLabel} 발생량 ${num(x.genT,4)} T"></div>
+              <div class="month-bar col" style="height:${scale(x.colT)}%" title="${x.monthLabel} 처리량 ${num(x.colT,4)} T"></div>
             </div>
-            <div class="month-label">${Number(x.m)}월</div>
-          </div>`;
-      }).join('')}
+            <div class="month-label">${x.monthLabel}</div>
+          </div>`).join('')}
+      </div>
     </div>`;
 }
 
 function typeStorageChartHtml(typeStats){
   if(!typeStats.length){
-    return `<div class="empty">표시할 폐기물 종류가 없습니다.</div>`;
+    return `<div class="chart-card-body"><div class="empty">표시할 폐기물 종류가 없습니다.</div></div>`;
   }
-
-  const maxKg=Math.max(0,...typeStats.map(x=>Math.max(0,Number(x.current||0))));
+  const palette=['#F29AA8','#8FC4E8','#F4BF86','#BA96E6','#7ED2AE','#D9E1E7'];
+  const maxT=Math.max(0,...typeStats.map(x=>Math.max(0,x.currentT)));
 
   return `
-    <div class="type-chart">
-      ${typeStats.map(x=>{
-        const currentKg=Number(x.current||0);
-        const pct=maxKg>0?Math.min(100,(Math.max(0,currentKg)/maxKg)*100):0;
-        return `
-          <div class="type-bar-row">
-            <div class="type-bar-name" title="${esc(x.name)}">${esc(x.name)}</div>
-            <div class="type-track">
-              <div class="type-fill ${currentKg<0?'negative':''}" style="width:${pct}%"></div>
+    <div class="chart-card-body">
+      <div class="chart-head-row">
+        <strong class="mini-title">폐기물 종류별 현재 보관량 (${year}년 기준)</strong>
+        <div class="spacer"></div>
+        <span class="hint">단위: T</span>
+      </div>
+      <div class="type-chart">
+        ${typeStats.map((x,i)=>{
+          const pct=maxT<=0?0:Math.min(100,(Math.max(0,x.currentT)/maxT)*100);
+          return `
+            <div class="type-bar-row">
+              <div class="type-bar-name" title="${esc(x.name)}">${esc(x.name)}</div>
+              <div class="type-track">
+                <div class="type-fill ${x.currentT<0?'negative':''}" style="width:${pct}%;background:${x.currentT<0?'#F79009':palette[i%palette.length]}"></div>
+              </div>
+              <div class="type-bar-value ${x.currentT<0?'warning':''}">
+                ${num(x.currentT,4)}
+                ${x.unknown?`<span class="mini-badge">${x.unknown}건 미확정</span>`:''}
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+function buildLinePath(values, width, height, padding){
+  const innerW=width-padding.left-padding.right;
+  const innerH=height-padding.top-padding.bottom;
+  const max=Math.max(0,...values);
+  const min=0;
+  const xStep=values.length>1?innerW/(values.length-1):0;
+  const yPos=(v)=>padding.top + innerH - (max===min?0:(v-min)/(max-min))*innerH;
+  return values.map((v,i)=>`${i===0?'M':'L'} ${padding.left + i*xStep} ${yPos(v)}`).join(' ');
+}
+function buildPoints(values, width, height, padding){
+  const innerW=width-padding.left-padding.right;
+  const innerH=height-padding.top-padding.bottom;
+  const max=Math.max(0,...values);
+  const min=0;
+  const xStep=values.length>1?innerW/(values.length-1):0;
+  const yPos=(v)=>padding.top + innerH - (max===min?0:(v-min)/(max-min))*innerH;
+  return values.map((v,i)=>({x:padding.left + i*xStep,y:yPos(v),v}));
+}
+function cumulativeLineChartHtml(months){
+  const w=760,h=220,p={left:38,right:12,top:18,bottom:34};
+  const gen=months.map(x=>x.cumGenT);
+  const col=months.map(x=>x.cumColT);
+  const max=Math.max(0,...gen,...col);
+  const pointsGen=buildPoints(gen,w,h,p);
+  const pointsCol=buildPoints(col,w,h,p);
+
+  return `
+    <div class="chart-card-body">
+      <div class="chart-head-row">
+        <strong class="mini-title">누적 발생량 vs 누적 처리량 (${year}년)</strong>
+        <div class="spacer"></div>
+        <div class="chart-legend">
+          <span><i class="legend-line gen"></i>발생 누계(T)</span>
+          <span><i class="legend-line col"></i>처리 누계(T)</span>
+        </div>
+      </div>
+      ${axisLabelsHtml('누적량 (T)')}
+      <div class="line-chart-wrap ${max<=0?'is-empty':''}">
+        ${max<=0?'<div class="chart-empty-note">데이터가 입력되면 누적 추이가 표시됩니다.</div>':''}
+        <svg class="line-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+          <g class="grid">
+            ${[0.25,0.5,0.75,1].map(r=>`<line x1="${p.left}" y1="${p.top+(h-p.top-p.bottom)*r}" x2="${w-p.right}" y2="${p.top+(h-p.top-p.bottom)*r}"></line>`).join('')}
+          </g>
+          <path class="line gen" d="${buildLinePath(gen,w,h,p)}"></path>
+          <path class="line col" d="${buildLinePath(col,w,h,p)}"></path>
+          ${pointsGen.map(pt=>`<circle class="point gen" cx="${pt.x}" cy="${pt.y}" r="4"></circle>`).join('')}
+          ${pointsCol.map(pt=>`<circle class="point col" cx="${pt.x}" cy="${pt.y}" r="4"></circle>`).join('')}
+        </svg>
+        <div class="line-chart-labels">
+          ${months.map(x=>`<span>${x.monthLabel}</span>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+function collectionCountChartHtml(months){
+  const max=Math.max(0,...months.map(x=>x.count));
+  const scale=v=>max<=0?0:Math.max(v>0?8:0,(v/max)*100);
+
+  return `
+    <div class="chart-card-body">
+      <div class="chart-head-row">
+        <strong class="mini-title">월별 수거 횟수 (${year}년)</strong>
+      </div>
+      ${axisLabelsHtml('수거 횟수 (건)')}
+      <div class="count-chart ${max<=0?'is-empty':''}">
+        ${max<=0?'<div class="chart-empty-note">수거등록 데이터가 입력되면 수거 횟수가 표시됩니다.</div>':''}
+        ${months.map(x=>`
+          <div class="count-col">
+            <div class="count-value">${x.count||''}</div>
+            <div class="count-bar-wrap">
+              <div class="count-bar" style="height:${scale(x.count)}%" title="${x.monthLabel} 수거 ${x.count}건"></div>
             </div>
-            <div class="type-bar-value ${currentKg<0?'warning':''}">
-              ${num(currentKg/1000,4)} T
-              ${x.unknown?`<span class="mini-badge">${x.unknown}건 미확정</span>`:''}
-            </div>
-          </div>`;
-      }).join('')}
+            <div class="month-label">${x.monthLabel}</div>
+          </div>
+        `).join('')}
+      </div>
     </div>`;
 }
 
@@ -191,60 +280,78 @@ async function renderStatus(){
 
   const o=allOpening.filter(r=>!typeFilter||r.waste_type_id===typeFilter);
 
-  const genConfirmed=d
+  const genConfirmedKg=d
     .filter(r=>r.weight_status==='confirmed')
     .reduce((s,r)=>s+Number(r.weight_kg||0),0);
 
   const genUnknown=d.filter(r=>r.weight_status!=='confirmed').length;
 
-  const collected=c
+  const collectedKg=c
     .flatMap(x=>x.waste_collection_items)
     .reduce((s,x)=>s+Number(x.weight_kg||0),0);
 
   const openingKg=o.reduce((s,x)=>s+Number(x.weight_kg||0),0);
-  const current=openingKg+genConfirmed-collected;
+  const currentKg=openingKg+genConfirmedKg-collectedKg;
 
+  let runningGenT=0;
+  let runningColT=0;
   const months=Array.from({length:12},(_,i)=>{
     const m=String(i+1).padStart(2,'0');
     const md=d.filter(r=>String(r.entry_date).slice(5,7)===m);
     const mc=c.filter(r=>String(r.collection_date).slice(5,7)===m);
 
+    const genKg=md.filter(r=>r.weight_status==='confirmed').reduce((s,r)=>s+Number(r.weight_kg||0),0);
+    const colKg=mc.flatMap(x=>x.waste_collection_items).reduce((s,x)=>s+Number(x.weight_kg||0),0);
+    const genT=genKg/1000;
+    const colT=colKg/1000;
+    runningGenT += genT;
+    runningColT += colT;
+
     return {
       m,
-      gen:md
-        .filter(r=>r.weight_status==='confirmed')
-        .reduce((s,r)=>s+Number(r.weight_kg||0),0),
+      monthLabel:`${Number(m)}월`,
+      genKg,
+      genT,
       unknown:md.filter(r=>r.weight_status!=='confirmed').length,
-      col:mc
-        .flatMap(x=>x.waste_collection_items)
-        .reduce((s,x)=>s+Number(x.weight_kg||0),0),
-      count:mc.length
+      colKg,
+      colT,
+      count:mc.length,
+      cumGenT:runningGenT,
+      cumColT:runningColT,
+      currentT:(openingKg + monthsPlaceholderBefore(i, d, c, o, typeFilter))/1000
     };
+  });
+
+  // recompute current-by-month using cumulative values
+  const openingT=openingKg/1000;
+  months.forEach((x,idx)=>{
+    x.currentT = openingT + x.cumGenT - x.cumColT;
   });
 
   const visibleTypes=activeTypes.filter(t=>!typeFilter||t.id===typeFilter);
   const typeStats=visibleTypes.map(t=>{
     const td=allDailyYear.filter(r=>r.waste_type_id===t.id);
-    const tc=allCollectionsYear
-      .flatMap(h=>h.waste_collection_items||[])
-      .filter(i=>i.waste_type_id===t.id);
+    const tc=allCollectionsYear.flatMap(h=>h.waste_collection_items||[]).filter(i=>i.waste_type_id===t.id);
     const to=allOpening.filter(r=>r.waste_type_id===t.id);
-
-    const gen=td
-      .filter(r=>r.weight_status==='confirmed')
-      .reduce((s,r)=>s+Number(r.weight_kg||0),0);
-    const col=tc.reduce((s,r)=>s+Number(r.weight_kg||0),0);
-    const op=to.reduce((s,r)=>s+Number(r.weight_kg||0),0);
-
+    const genKg=td.filter(r=>r.weight_status==='confirmed').reduce((s,r)=>s+Number(r.weight_kg||0),0);
+    const colKg=tc.reduce((s,r)=>s+Number(r.weight_kg||0),0);
+    const opKg=to.reduce((s,r)=>s+Number(r.weight_kg||0),0);
     return {
       id:t.id,
       name:typeName(t),
-      current:op+gen-col,
-      generated:gen,
-      collected:col,
+      currentT:(opKg+genKg-colKg)/1000,
+      generatedT:genKg/1000,
+      collectedT:colKg/1000,
       unknown:td.filter(r=>r.weight_status!=='confirmed').length
     };
-  });
+  }).sort((a,b)=>Math.abs(b.currentT)-Math.abs(a.currentT));
+
+  const kpis=[
+    {key:'generated', label:'확정 발생량', value:`${num(genConfirmedKg/1000,4)} T`, note:'일일입력 확정 중량 합계'},
+    {key:'collected', label:'처리량', value:`${num(collectedKg/1000,4)} T`, note:'수거등록 처리 중량 합계'},
+    {key:'storage', label:'현재 보관량', value:`${num(currentKg/1000,4)} T`, note:'기초·이월량 + 발생 - 처리'},
+    {key:'warning', label:'중량 미확정 발생건', value:`${genUnknown}건`, note:'무게 미입력/미확정 건수', warning:genUnknown>0}
+  ];
 
   $('#app').innerHTML=`
     <div id="notice" class="notice"></div>
@@ -267,77 +374,70 @@ async function renderStatus(){
       <button id="open-settings" class="btn">⚙ 설정</button>
     </div>
 
-    <div class="kpis">
-      <div class="kpi">
-        <div class="label">확정 발생량</div>
-        <div class="value">${num(genConfirmed/1000,4)} T</div>
-      </div>
-      <div class="kpi">
-        <div class="label">처리량</div>
-        <div class="value">${num(collected/1000,4)} T</div>
-      </div>
-      <div class="kpi">
-        <div class="label">확정 기준 현재 보관량</div>
-        <div class="value">${num(current/1000,4)} T</div>
-      </div>
-      <div class="kpi">
-        <div class="label">중량 미확정 발생건</div>
-        <div class="value ${genUnknown?'warning':''}">${genUnknown}건</div>
-      </div>
+    <div class="kpis kpis-rich">
+      ${kpis.map(k=>`
+        <div class="kpi rich ${k.key}">
+          <div class="kpi-main">
+            <div class="kpi-icon ${k.key}">${kpiIconSvg(k.key)}</div>
+            <div class="kpi-copy">
+              <div class="label">${k.label}</div>
+              <div class="value ${k.warning?'warning':''}">${k.value}</div>
+              <div class="meta ${k.warning?'warning':''}">${k.note}</div>
+            </div>
+          </div>
+          <div class="kpi-side-icon ${k.key}">${kpiIconSvg(k.key)}</div>
+        </div>`).join('')}
     </div>
 
-    <div class="dashboard-charts">
-      <div class="card chart-card">
-        <div class="section-head">
-          <h2>📈 월별 발생·처리 추이</h2>
-          <div class="spacer"></div>
-          <span class="hint">${year}년</span>
-        </div>
-        ${monthlyTrendChartHtml(months)}
-      </div>
+    <div class="dashboard-charts preview-grid top">
+      <div class="card chart-card large">${monthlyTrendChartHtml(months)}</div>
+      <div class="card chart-card side">${typeStorageChartHtml(typeStats)}</div>
+    </div>
 
-      <div class="card chart-card">
-        <div class="section-head">
-          <h2>📦 폐기물 종류별 현재 보관량</h2>
-          <div class="spacer"></div>
-          <span class="hint">확정 중량 기준</span>
-        </div>
-        ${typeStorageChartHtml(typeStats)}
-      </div>
+    <div class="dashboard-charts preview-grid bottom">
+      <div class="card chart-card large">${cumulativeLineChartHtml(months)}</div>
+      <div class="card chart-card side">${collectionCountChartHtml(months)}</div>
     </div>
 
     <div class="card">
-      <div class="section-head">
+      <div class="section-head detail-head">
         <h2>📊 ${year}년 월별 상세 현황</h2>
         <div class="spacer"></div>
         <span class="hint">그래프 하단 상세 데이터</span>
       </div>
-
       <div class="hint">
-        중량 미확정 일일입력은 무게 합계에서 제외됩니다.
-        따라서 현재 보관량은 확정 중량 기준입니다.
+        중량 미확정 일일입력은 무게 합계에서 제외됩니다. 따라서 현재 보관량은 확정 중량 기준입니다.
       </div>
       <br>
-
-      <div class="table-wrap">
-        <table>
+      <div class="table-wrap detail-table-wrap">
+        <table class="detail-table">
+          <colgroup>
+            <col style="width:110px">
+            <col style="width:18%">
+            <col style="width:18%">
+            <col style="width:18%">
+            <col style="width:18%">
+            <col style="width:18%">
+          </colgroup>
           <thead>
             <tr>
               <th>월</th>
-              <th>확정 발생량(T)</th>
-              <th>중량 미확정(건)</th>
-              <th>수거횟수</th>
-              <th>처리량(T)</th>
+              <th class="num">확정 발생량(T)</th>
+              <th class="num">중량 미확정(건)</th>
+              <th class="num">수거횟수</th>
+              <th class="num">처리량(T)</th>
+              <th class="num">현재 보관량(T)</th>
             </tr>
           </thead>
           <tbody>
             ${months.map(x=>`
               <tr>
-                <td>${Number(x.m)}월</td>
-                <td class="num">${num(x.gen/1000,4)}</td>
+                <td>${x.monthLabel}</td>
+                <td class="num">${num(x.genT,4)}</td>
                 <td class="num">${x.unknown}</td>
                 <td class="num">${x.count}</td>
-                <td class="num">${num(x.col/1000,4)}</td>
+                <td class="num">${num(x.colT,4)}</td>
+                <td class="num">${num(x.currentT,4)}</td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -356,6 +456,9 @@ async function renderStatus(){
 
   $('#open-settings').onclick=()=>renderSettings();
 }
+
+// helper used only for build-time compatibility; value replaced later
+function monthsPlaceholderBefore(){ return 0; }
 
 function settingsFieldHtml(f){
   const [id,label,type,opts]=f;
@@ -655,4 +758,3 @@ async function renderOpeningSettings(){
 }
 
 renderStatus();
-
