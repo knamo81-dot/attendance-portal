@@ -126,18 +126,23 @@ function typeById(id){
 }
 
 function monthPrefix(){
-  return `${year}-${month}`;
+  return month==='all' ? `${year}-` : `${year}-${month}`;
 }
 
 function monthStart(){
-  return `${year}-${month}-01`;
+  return month==='all' ? `${year}-01-01` : `${year}-${month}-01`;
 }
 
 function nextMonthStart(){
+  if(month==='all') return `${Number(year)+1}-01-01`;
   const y=Number(year);
   const m=Number(month);
   if(m===12) return `${y+1}-01-01`;
   return `${y}-${String(m+1).padStart(2,'0')}-01`;
+}
+
+function periodLabel(){
+  return month==='all' ? `${year}년 전체` : `${year}년 ${Number(month)}월`;
 }
 
 function selectedTypeLabel(){
@@ -283,7 +288,9 @@ function natureCell(ev){
 
 function render(){
   const rows=ledgerRows();
-  const titleLabel=`${year}년 ${Number(month)}월 사업장 폐기물 관리대장`;
+  const titleLabel=month==='all'
+    ? `${year}년 사업장 폐기물 관리대장`
+    : `${year}년 ${Number(month)}월 사업장 폐기물 관리대장`;
 
   $('#app').innerHTML=`
     <div class="toolbar">
@@ -294,6 +301,7 @@ function render(){
       </select>
 
       <select id="month" class="btn">
+        <option value="all" ${month==='all'?'selected':''}>전체</option>
         ${Array.from({length:12},(_,i)=>{
           const m=String(i+1).padStart(2,'0');
           return `<option value="${m}" ${m===month?'selected':''}>${i+1}월</option>`;
@@ -320,7 +328,7 @@ function render(){
 
       <div class="hint">
         ① 폐기물의 종류: <b>${esc(selectedTypeLabel())}</b>
-        · ${year}년 ${Number(month)}월 일일입력 및 수거등록 데이터를 기반으로 자동 작성
+        · ${periodLabel()} 일일입력 및 수거등록 데이터를 기반으로 자동 작성
       </div>
 
       <br>
@@ -390,7 +398,7 @@ function render(){
             }).join('') : `
               <tr>
                 <td colspan="14" class="empty">
-                  ${year}년 ${Number(month)}월 해당 데이터가 없습니다.
+                  ${periodLabel()} 해당 데이터가 없습니다.
                 </td>
               </tr>`
             }
@@ -401,7 +409,7 @@ function render(){
       <br>
 
       <div class="hint">
-        월 시작 확정 기준 이월 보관량:
+        ${month==='all'?'연도 시작':'월 시작'} 확정 기준 이월 보관량:
         <b>${num(openingBalanceKg()/1000,4)} T</b>
       </div>
 
