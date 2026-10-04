@@ -280,6 +280,17 @@
     if ($("#kpiMyRegistration")) $("#kpiMyRegistration").textContent = `${myReg}건`;
   }
 
+  function stageIcon(label) {
+    const icons = {
+      "신청": `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5"/><path d="M10 12h5M10 16h5"/></svg>`,
+      "취합": `<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v5c0 1.7 3.1 3 7 3s7-1.3 7-3V5"/><path d="M5 10v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/></svg>`,
+      "거래처확정": `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14v11H5z"/><path d="M8 8V5h8v3"/><path d="M9 13l2 2 4-4"/></svg>`,
+      "발주": `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h2l2 10h10l2-7H7"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>`,
+      "입고": `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8l8-4 8 4v9l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v9"/><path d="M8.5 15l2 2 4-4"/></svg>`
+    };
+    return icons[label] || "";
+  }
+
   function renderStages() {
     const { groups, collect, cMap } = currentMonthData();
     const total = groups.length;
@@ -297,7 +308,7 @@
     $("#stageFlow").innerHTML = stages.map(([label, value, tone], i) => {
       const pct = total ? Math.min(100, Math.round((value / total) * 100)) : 0;
       return `<div class="stage-item tone-${tone}">
-        <div class="stage-top"><span class="stage-icon">${i + 1}</span><div><b>${esc(label)}</b><strong>${value}건</strong></div></div>
+        <div class="stage-top"><span class="stage-icon">${stageIcon(label)}</span><div><b>${esc(label)}</b><strong>${value}건</strong></div></div>
         <div class="stage-bar"><i style="width:${pct}%"></i></div><small>${pct}%</small>
       </div>${i < stages.length - 1 ? '<span class="stage-arrow">›</span>' : ''}`;
     }).join("");
