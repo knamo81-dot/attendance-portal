@@ -83,6 +83,16 @@ const settingsConfigs={
     ['capacity_l','용량(L)','number'],
     ['sort_order','순서','number']
   ]},
+  referenceCategories:{table:'waste_reference_categories',title:'관련자료 종류',fields:[
+    ['category_name','관련자료 종류명','text'],
+    ['description','설명','text'],
+    ['sort_order','순서','number']
+  ]},
+  documentTypes:{table:'waste_document_types',title:'관련서류 종류',fields:[
+    ['type_name','관련서류 종류명','text'],
+    ['description','설명','text'],
+    ['sort_order','순서','number']
+  ]},
   opening:{table:'waste_opening_balances',title:'기초·이월량',fields:[]}
 };
 
@@ -148,7 +158,7 @@ function settingsFieldHtml(f){
   if(type==='select'){
     return `<div class="field"><label>${label}</label><select id="${id}">${opts.map(x=>{const [v,t]=x.split(':');return `<option value="${v}">${t}</option>`}).join('')}</select></div>`;
   }
-  return `<div class="field"><label>${label}</label><input id="${id}" type="${type}" ${['legal_name','vendor_name','location_name','unit_name'].includes(id)?'required':''}></div>`;
+  return `<div class="field"><label>${label}</label><input id="${id}" type="${type}" ${['legal_name','vendor_name','location_name','unit_name','category_name','type_name'].includes(id)?'required':''}></div>`;
 }
 
 function vendorMethodsEditorHtml(){
@@ -222,7 +232,7 @@ async function renderSettings(){
   if(settingsTab==='opening')return renderOpeningSettings();
 
   const c=settingsConfigs[settingsTab];
-  const ordered=['types','locations','units'].includes(settingsTab);
+  const ordered=['types','locations','units','referenceCategories','documentTypes'].includes(settingsTab);
 
   let rows=[];
   let allMethods=[];
@@ -298,6 +308,8 @@ function settingsRowHtml(r,allMethods=[]){
   }
   if(settingsTab==='locations'){name=r.location_name;detail=r.description||''}
   if(settingsTab==='units'){name=r.unit_name;detail=[r.capacity_l?`${r.capacity_l}L`:'',r.quantity_unit].filter(Boolean).join(' · ')}
+  if(settingsTab==='referenceCategories'){name=r.category_name;detail=r.description||''}
+  if(settingsTab==='documentTypes'){name=r.type_name;detail=r.description||''}
   return `<tr><td>${esc(name)}</td><td>${esc(detail)}</td><td>${r.active?'사용':'미사용'}</td><td><button class="btn small" data-edit="${r.id}">수정</button></td></tr>`;
 }
 
