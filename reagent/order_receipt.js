@@ -286,7 +286,10 @@
       if (!months.includes(current)) months.push(current);
       months.sort();
       els.month.innerHTML = months.map((month) => `<option value="${attr(month)}">${attr(month)}</option>`).join("");
+      APP.request?.ensureMonthOption?.(els.month, current);
       els.month.value = current;
+      APP.request?.ensureYearMonthPicker?.(els.month);
+      APP.request?.syncYearMonthPicker?.(els.month, current);
     },
 
     sortOrderReceiptRows(rows = []) {
