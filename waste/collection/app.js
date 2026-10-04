@@ -133,6 +133,14 @@ function render(){
             <input id="certificate_no">
           </div>
 
+          <label class="facility-log-switch" for="is_facility_log">
+            <input id="is_facility_log" type="checkbox">
+            <span>
+              <strong>폐수배출시설 운영일지</strong>
+              <small>체크한 수거건만 폐기물용 폐수배출시설 운영일지에 반영됩니다.</small>
+            </span>
+          </label>
+
           <div class="inline">
             <div class="field">
               <label>처리구분</label>
@@ -174,6 +182,13 @@ function render(){
             <button class="btn small" type="button" id="add-item">+ 항목 추가</button>
           </div>
 
+          <div id="facility-pickup-box" class="soft facility-pickup-box" style="display:none;">
+            <div class="field" style="margin-bottom:0;">
+              <label>수거 후 높이 (괄호값, cm)</label>
+              <input id="facility_after_cm" type="text" placeholder="예: 0.0 또는 over 154">
+            </div>
+          </div>
+
           <div id="items">${itemRow(0)}</div>
 
           <br>
@@ -190,6 +205,7 @@ function render(){
               <tr>
                 <th>수거일</th>
                 <th>확인서</th>
+                <th>운영일지</th>
                 <th>폐기물</th>
                 <th>처리구분</th>
                 <th>처리방법</th>
@@ -203,12 +219,13 @@ function render(){
               ${collections.length?collections.flatMap(r=>{
                 const its=r.waste_collection_items||[];
                 if(!its.length){
-                  return [`<tr><td>${r.collection_date}</td><td>${esc(r.certificate_no||'-')}</td><td colspan="6" class="muted">상세내역 없음</td><td><button class="btn small danger" data-del="${r.id}">삭제</button></td></tr>`];
+                  return [`<tr><td>${r.collection_date}</td><td>${esc(r.certificate_no||'-')}</td><td>${r.is_facility_log?`<span class="pill green">반영</span><br><span class="muted">${esc(r.facility_after_cm||'-')} cm</span>`:'-'}</td><td colspan="6" class="muted">상세내역 없음</td><td><button class="btn small danger" data-del="${r.id}">삭제</button></td></tr>`];
                 }
                 return its.map((x,idx)=>`
                   <tr>
                     <td>${idx===0?r.collection_date:''}</td>
                     <td>${idx===0?esc(r.certificate_no||'-'):''}</td>
+                    <td>${idx===0?(r.is_facility_log?`<span class="pill green">반영</span><br><span class="muted">${esc(r.facility_after_cm||'-')}${r.facility_after_cm?' cm':''}</span>`:'-'):''}</td>
                     <td>${esc(typeName(x.waste_types||{}))}<br><span class="muted">${num(x.quantity,0)}${esc(x.waste_container_units?.quantity_unit||'개')}</span></td>
                     <td>${x.treatment_type==='self'?'자가처리':'위탁처리'}</td>
                     <td>${esc(x.treatment_method?.method_name||'-')}</td>
@@ -217,7 +234,7 @@ function render(){
                     <td class="num">${x.weight_kg==null?'-':num(Number(x.weight_kg)/1000,4)+' T'}</td>
                     <td>${idx===0?`<button class="btn small danger" data-del="${r.id}">삭제</button>`:''}</td>
                   </tr>`);
-              }).join(''):`<tr><td colspan="9" class="empty">수거내역이 없습니다.</td></tr>`}
+              }).join(''):`<tr><td colspan="10" class="empty">수거내역이 없습니다.</td></tr>`}
             </tbody>
           </table>
         </div>
@@ -231,7 +248,9 @@ function render(){
   };
   $('#treatment_type').onchange=syncCommonTreatment;
   $('#processor_vendor_id').onchange=syncCommonTreatment;
+  $('#is_facility_log').onchange=syncFacilityLogUI;
   syncCommonTreatment();
+  syncFacilityLogUI();
   bindItems();
   $('#form').onsubmit=save;
   document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>del(b.dataset.del));
@@ -239,6 +258,19 @@ function render(){
 
 function methodsForVendor(vendorId){
   return methods.filter(m=>m.vendor_id===vendorId&&m.active);
+}
+
+function syncFacilityLogUI(){
+  const checked=$('#is_facility_log')?.checked||false;
+  const box=$('#facility-pickup-box');
+  const input=$('#facility_after_cm');
+
+  if(box) box.style.display=checked?'block':'none';
+
+  if(input){
+    input.disabled=!checked;
+    if(!checked) input.value='';
+  }
 }
 
 function syncCommonTreatment(){
@@ -325,9 +357,16 @@ async function save(e){
 
   if(!items.length)return notice('수거 폐기물을 1개 이상 입력하세요.','err');
 
+  const facilityLog=$('#is_facility_log').checked;
+  const facilityAfterCm=facilityLog
+    ? String($('#facility_after_cm').value||'').trim()
+    : '';
+
   const head={
     collection_date:$('#collection_date').value,
     certificate_no:$('#certificate_no').value,
+    is_facility_log:facilityLog,
+    facility_after_cm:facilityLog?(facilityAfterCm||null):null,
     processor_vendor_id:null,
     transporter_vendor_id:null,
     treatment_method:null,
