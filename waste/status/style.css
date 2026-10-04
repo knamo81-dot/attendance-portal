@@ -74,3 +74,40 @@ table{
 @media(max-width:520px){
   body{padding:6px;}
 }
+
+/* ===== settings checkbox alignment fix ===== */
+.check-row{
+  display:flex;
+  align-items:center;
+  gap:18px;
+  flex-wrap:wrap;
+  min-height:40px;
+}
+.check-option{
+  display:inline-flex !important;
+  align-items:center;
+  gap:8px;
+  width:auto;
+  min-height:32px;
+  cursor:pointer;
+  color:#263a5f;
+  font-weight:800;
+}
+.check-option.single{
+  min-height:36px;
+}
+.field .check-option input[type="checkbox"]{
+  width:18px !important;
+  height:18px !important;
+  min-height:18px !important;
+  margin:0 !important;
+  padding:0 !important;
+  border-radius:4px;
+  flex:0 0 18px;
+  accent-color:var(--green);
+  box-shadow:none !important;
+}
+.check-option span{
+  display:inline-block;
+  line-height:1.2;
+}
