@@ -1,864 +1,168 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>시약·초자 신청/취합</title>
-<link rel="stylesheet" href="../style.css?v=20260929-mobile-base1"/>
-<link rel="stylesheet" href="../../common/mobile.css"/>
-<link rel="stylesheet" href="../../common/theme.css"/>
-<link rel="stylesheet" href="./style.css?v=20261002-mobile-qascan1"/>
-<script>
-  /*
-    초기 권한 표시 보정
-    - 포탈 iframe에서 권한 적용 전 운영자 탭이 잠깐 보이는 현상을 방지합니다.
-    - 기존 신청/취합/정리/제품관리/운영자 지정 로직은 변경하지 않습니다.
-  */
-  (function () {
-    var root = document.documentElement;
-    var roleClass = 'reagent-role-general';
-
-    try {
-      var params = new URLSearchParams(window.location.search || '');
-      var userRole = String(params.get('user_role') || '').trim();
-      var reagentRole = String(params.get('reagent_role') || '').trim();
-      var saved = JSON.parse(localStorage.getItem('reagent_current_user') || '{}');
-
-      var isAdmin = userRole === 'admin' || saved.is_global_admin === true || String(saved.user_role || '').trim() === 'admin';
-      var isOperator = isAdmin || reagentRole !== '' || saved.is_reagent_operator === true || String(saved.reagent_role || '').trim() !== '';
-
-      if (isAdmin) {
-        roleClass = 'reagent-role-admin';
-      } else if (isOperator) {
-        roleClass = 'reagent-role-operator';
-      }
-    } catch (_) {}
-
-    root.classList.add(roleClass);
-  })();
-</script>
-<style>
-  /* 권한 JS 적용 전 초기 노출 방지: 일반 사용자는 제품신청만 표시 */
-  html.reagent-role-general .tab-btn[data-tab="collect"],
-  html.reagent-role-general .tab-btn[data-tab="prepare"],
-  html.reagent-role-general .tab-btn[data-tab="product-management"],
-  html.reagent-role-general .admin-request-actions {
-    display: none !important;
-  }
-</style>
-    
-
-<style>
-  /* portal common header mode */
-  .tabs{
-    margin-top:0 !important;
-  }
-
-  .shell{
-    padding-top:0 !important;
-  }
-</style>
-
-
-<style id="reagent-portal-bridge-style">
-  /* 포탈 공통 버튼 사용: 내부 시약 탭 버튼은 DOM 유지 후 화면에서만 숨김 */
-  .shell > .tabs{
-    display:none !important;
-    height:0 !important;
-    min-height:0 !important;
-    margin:0 !important;
-    padding:0 !important;
-    border:0 !important;
-    overflow:hidden !important;
-  }
-
-  .shell{
-    padding-top:0 !important;
-  }
-</style>
-
-
-<style id="hide-send-to-prepare-button">
-  #sendToPrepare,
-  .field:has(#sendToPrepare){
-    display:none !important;
-  }
-</style>
-
-
-<style id="order-receipt-header-inline-layout-final">
-/* ===== 발주/입고 관리 헤더 정렬 최종 =====
-   - 주문월/미입고 품목/년월 보기/새로고침을 '발주/입고 관리' 제목 오른쪽에 붙임
-   - 취합정리 화면의 제목+주문월 배치와 유사하게 정리
-*/
-#page-order-receipt .order-receipt-head{
-  align-items:flex-start !important;
-  justify-content:flex-start !important;
-}
-
-#page-order-receipt .order-receipt-head-left{
-  width:100% !important;
-  min-width:0 !important;
-}
-
-#page-order-receipt .order-receipt-title-row{
-  display:flex !important;
-  align-items:center !important;
-  justify-content:flex-start !important;
-  gap:12px !important;
-  flex-wrap:wrap !important;
-  width:100% !important;
-}
-
-#page-order-receipt .order-receipt-title-row h2{
-  margin:0 !important;
-  flex:0 0 auto !important;
-  white-space:nowrap !important;
-}
-
-#page-order-receipt .order-receipt-month-wrap{
-  display:flex !important;
-  align-items:center !important;
-  justify-content:flex-start !important;
-  gap:8px !important;
-  flex-wrap:wrap !important;
-  min-width:0 !important;
-  margin:0 !important;
-}
-
-#page-order-receipt .order-receipt-month-wrap .label{
-  font-weight:700 !important;
-  font-size:13px !important;
-  color:#334155 !important;
-  white-space:nowrap !important;
-}
-
-#page-order-receipt #orderReceiptMonth{
-  height:36px !important;
-  min-width:130px !important;
-  border:1px solid var(--line, #d9e2ec) !important;
-  border-radius:10px !important;
-  padding:0 10px !important;
-  font:inherit !important;
-  background:#fff !important;
-  color:var(--text, #1f2937) !important;
-}
-
-#page-order-receipt .order-receipt-month-wrap .btn{
-  height:36px !important;
-  padding:0 14px !important;
-  border-radius:10px !important;
-  font-weight:800 !important;
-  white-space:nowrap !important;
-}
-
-#page-order-receipt #orderReceiptDesc{
-  margin-top:8px !important;
-}
-
-@media (max-width:760px){
-  #page-order-receipt .order-receipt-title-row{
-    align-items:flex-start !important;
-    gap:8px !important;
-  }
-
-  #page-order-receipt .order-receipt-month-wrap{
-    width:100% !important;
-    gap:6px !important;
-  }
-
-  #page-order-receipt #orderReceiptMonth{
-    flex:1 1 130px !important;
-    min-width:120px !important;
-  }
-
-  #page-order-receipt .order-receipt-month-wrap .btn{
-    flex:1 1 auto !important;
-    min-width:max-content !important;
-  }
-}
-</style>
-
-
-<style id="pm-mobile-identifier-filter-layout">
-@media (max-width:760px){
-  #page-product-management .pm-product-filters{
-    display:grid !important;
-    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-    gap:8px !important;
-    align-items:end !important;
-  }
-  #page-product-management .pm-product-filters .pm-product-filter-search{
-    grid-column:1 / -1 !important;
-  }
-  #page-product-management .pm-product-filters .pm-product-filter-category,
-  #page-product-management .pm-product-filters .pm-product-filter-active,
-  #page-product-management .pm-product-filters .pm-product-filter-identifier{
-    grid-column:auto !important;
-    min-width:0 !important;
-  }
-  #page-product-management .pm-product-filters .pm-product-filter-reset{
-    grid-column:1 / -1 !important;
-    width:auto !important;
-    justify-self:end !important;
-  }
-  #page-product-management .pm-product-filters .pm-product-filter-reset .btn{
-    width:auto !important;
-    min-width:94px !important;
-  }
-  #page-product-management .pm-product-filters label{
-    font-size:10px !important;
-    white-space:nowrap !important;
-  }
-}
-</style>
-
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>연구용품 구매현황</title>
+  <link rel="stylesheet" href="../../../common/theme.css"/>
+  <link rel="stylesheet" href="../../../common/mobile.css"/>
+  <link rel="stylesheet" href="./style.css?v=20261004-1.3"/>
 </head>
-<body class="reagent-mobile-ui">
-<input id="productKeyword" type="hidden"/>
-<div class="shell">
-<div class="tabs"><button class="tab-btn active" data-tab="request">제품 신청</button><button class="tab-btn" data-tab="collect">제품 취합</button><button class="tab-btn" data-tab="prepare">취합 정리</button><button class="tab-btn" data-tab="order-receipt">발주/입고 관리</button><button class="tab-btn" data-tab="product-management">제품 관리</button></div>
-<section class="page active" id="page-request"><div class="request-form-modal-backdrop" id="requestFormModalBackdrop"><section class="card request-form-card" id="requestFormCard"><div class="card-head request-form-modal-head"><div class="request-form-title-wrap" style="min-width:0;"><div class="request-form-title-row" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><h2 style="margin:0;">제품 신청</h2><div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:700; font-size:13px; color:#334155;">주문월</span><select id="orderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:112px;"></select><span class="small" id="orderMonthDesc" style="color:#6b7280;">선택한 주문월에 발주할 품목을 신청합니다.</span></div></div><p>제품은 검색 또는 QR/바코드 스캔으로 선택하고 수량/용도만 입력합니다.</p></div><div class="request-form-search-wrap" style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap; justify-content:flex-end;"><button class="btn primary" id="openSearch" style="width:auto; padding:10px 12px; white-space:nowrap;">제품검색</button><button class="btn request-scan-btn" id="openProductScan" type="button" title="QR/바코드 카메라 스캔" aria-label="QR/바코드 카메라 스캔"><span class="request-scan-icon" aria-hidden="true">📷</span><span class="request-scan-label">스캔</span></button><span class="badge blue">검색/스캔 → 자동입력 → 수량/용도</span></div></div>
-<div class="card-body"><div class="form-grid">
-<div class="field"><label>분류</label><input id="category" placeholder="자동입력" readonly/></div>
-<div class="field"><label>품명</label><input id="productName" placeholder="자동입력" readonly/></div>
-<div class="field"><label>제조사</label><input id="maker" placeholder="자동입력" readonly/></div>
-<div class="field"><label>제품코드</label><input id="code" placeholder="자동입력" readonly/></div>
-<div class="field"><label>규격</label><input id="capacity" placeholder="자동입력" readonly/></div>
-<div class="field"><label>CAS 번호</label><input id="cas" placeholder="자동입력" readonly/></div>
-<div class="field"><label>등급</label><input id="grade" placeholder="자동입력" readonly/></div>
-<div class="field"><label>수량</label><input id="qty" max="999" min="1" placeholder="수량" step="1" type="number"/></div>
-<div class="field usage-field"><label>용도</label><input id="usage" placeholder="예: 효능평가 전처리용"/></div></div>
-</div><div class="actions request-form-actions"><button class="btn primary" id="addItem">신청 추가</button><button class="btn" id="clearForm">입력 초기화</button><button class="btn mobile-request-close" id="closeRequestFormMobile" type="button">닫기</button><button class="btn" id="requestNew" type="button" hidden aria-hidden="true" tabindex="-1">제품 등록 요청</button></div></section></div>
-<section class="card"><div class="card-head"><div><h3 id="requestListSectionTitle">신청 목록</h3><p id="requestListSectionDesc">체크한 품목만 취합 탭으로 반영됩니다.</p></div><div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;"><div class="mobile-request-action-pair"><button class="btn primary mobile-request-open mobile-request-half" id="openRequestFormMobileList" type="button" style="height:36px; padding:0 14px; border-radius:10px;">제품 신청하기</button><button class="btn mobile-request-half mobile-registration-open" id="requestNewList" type="button" style="height:36px; padding:0 14px; border-radius:10px;">제품 등록 요청</button></div><div class="request-list-toggle" style="display:inline-flex; align-items:center; gap:4px; padding:4px; border:1px solid #d9e2ec; border-radius:14px; background:#f8fafc;"><span style="font-weight:800; font-size:13px; color:#334155; padding:0 8px; white-space:nowrap;">목록 선택</span><button class="btn primary" id="showRequestListPanel" type="button" style="height:36px; padding:0 14px; border-radius:10px;">신청 목록</button><button class="btn" id="showRequestStatusPanel" type="button" style="height:36px; padding:0 14px; border-radius:10px;">제품 등록 요청 현황</button></div></div></div>
-<div class="card-body"><div id="requestApplicationPanel"><div class="summary"><div class="tile"><div class="k">통합 품목 수</div><div class="v" id="sumDraftCount">0</div></div><div class="tile"><div class="k">시약</div><div class="v" id="sumReagent">0</div></div><div class="tile"><div class="k">초자/소모품</div><div class="v" id="sumGlass">0</div></div><div class="tile"><div class="k">안전용품</div><div class="v" id="sumSafety">0</div></div></div>
-<div class="actions admin-request-actions" style="margin-top:16px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
-  <div class="admin-action-left">
-    <button class="btn primary" id="addToCollect">취합추가</button>
-  </div>
-  <div class="admin-action-right">
-    <button class="btn" id="clearDraft">전체 데이터 비우기</button>
-  </div>
-</div>
-<div class="small" style="margin-top:10px;">체크박스 선택 후 취합추가를 눌러야 제품 취합에 반영됩니다.</div>
-<div class="table-wrap request-table-wrap" style="margin-top:16px;"><table><thead><tr><th>선택</th><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>CAS</th><th>등급</th><th>규격</th><th>총수량</th><th>신청자수</th><th>용도</th><th>작업</th></tr></thead><tbody id="draftTableBody"><tr><td class="empty" colspan="12">아직 추가된 신청 항목이 없습니다.</td></tr></tbody></table></div><div class="request-mobile-list" id="draftMobileCards" aria-live="polite"></div>
-</div>
-<div id="registrationRequestStatusPanel" style="display:none;">
-  <div class="collect-filters" style="margin-top:0;">
-    <div class="field"><label>상태</label><select id="myRequestStatusFilter"><option value="">전체</option><option value="요청중">요청중</option><option value="등록">등록</option><option value="반려">반려</option></select></div>
-    <div class="field"><label>&nbsp;</label><button class="btn" id="refreshMyRegistrationRequests" type="button">새로고침</button></div>
-    <div class="field"><label>&nbsp;</label><span class="badge blue" id="myRequestStatusBadge">내 요청 0건</span></div>
-  </div>
-  <div class="small" style="margin-top:10px;">내가 요청한 미등록 제품의 처리 상태를 누계로 확인합니다. 요청/확인중은 요청중으로 표시됩니다.</div>
-  <div class="table-wrap" style="margin-top:16px;">
-    <table>
-      <thead><tr><th>요청일</th><th>상태</th><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>CAS</th><th>등급</th><th>규격</th><th>요청사유/용도</th><th>처리/반려 사유</th></tr></thead>
-      <tbody id="myRegistrationRequestList"><tr><td class="empty" colspan="11">제품 등록 요청 현황이 없습니다.</td></tr></tbody>
-    </table>
-  </div>
-</div></div></section></section>
-<section class="page" id="page-collect"><section class="card"><div class="card-head"><div style="min-width:0;"><div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;"><h2 style="margin:0;">제품 취합</h2><div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:700; font-size:13px; color:#334155;">주문월</span><select id="collectOrderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:130px;"></select><span class="small" id="collectOrderMonthDesc" style="color:#6b7280;">선택한 주문월 기준으로 취합합니다.</span></div></div><p>신청 목록에서 체크 후 취합추가한 항목만 표시됩니다.</p></div><span class="badge blue">신청 데이터 연동</span></div>
-<div class="card-body"><div class="collect-filters"><div class="field"><label>구분</label><select id="collectCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div><div class="field"><label>검색</label><input id="collectKeyword" placeholder="품명 / 제조사 / 코드 검색"/></div><div class="field"><label>&nbsp;</label><button class="btn primary" id="confirmSelectedCollect">선택 거래처 확정</button></div><div class="field"><label>&nbsp;</label><button class="btn" id="downloadCollectQuoteExcel" type="button">엑셀 다운로드</button></div></div>
-<div class="summary" style="margin-top:16px;"><div class="tile"><div class="k">통합 품목 수</div><div class="v" id="collectCount">0</div></div><div class="tile"><div class="k">취합 총수량</div><div class="v" id="collectQty">0</div></div><div class="tile"><div class="k">시약 / 초자 / 안전</div><div class="v" id="collectMix">0 / 0 / 0</div></div><div class="tile"><div class="k">견적 비교 시안</div><div class="v">2 SET</div></div></div>
-<div class="table-wrap collect-table-wrap" style="margin-top:16px;">
-  <table class="collect-fixed-table">
-    <colgroup>
-      <col style="width:78px;">   <!-- 선택/취소 -->
-      <col style="width:360px;">  <!-- 품명 -->
-      <col style="width:110px;">  <!-- 제조사 -->
-      <col style="width:95px;">   <!-- 제품코드 -->
-      <col style="width:105px;">  <!-- CAS -->
-      <col style="width:75px;">   <!-- 등급 -->
-      <col style="width:90px;">   <!-- 규격 -->
-      <col style="width:80px;">   <!-- 총수량 -->
-      <col style="width:75px;">   <!-- 상세 -->
-      <col style="width:82px;">   <!-- 단가1 -->
-      <col style="width:100px;">  <!-- 가격1 -->
-      <col style="width:118px;">  <!-- 거래처1 -->
-      <col style="width:82px;">   <!-- 단가2 -->
-      <col style="width:100px;">  <!-- 가격2 -->
-      <col style="width:118px;">  <!-- 거래처2 -->
-      <col style="width:70px;">   <!-- 작업 -->
-    </colgroup>
-    <thead>
-      <tr>
-        <th>선택</th><th>품명</th><th>제조사</th><th>제품코드</th><th>CAS</th><th>등급</th><th>규격</th><th>총수량</th><th>상세</th>
-        <th>단가</th><th>가격</th><th>거래처1</th><th>단가</th><th>가격</th><th>거래처2</th><th>작업</th>
-      </tr>
-    </thead>
-    <tbody id="collectList"><tr><td class="empty" colspan="16">취합할 항목이 없습니다.</td></tr></tbody>
-  </table>
-</div></div></section></section>
-
-<section class="page" id="page-prepare">
-  <section class="card">
-    <div class="card-head">
-      <div style="min-width:0;">
-        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-          <h2 style="margin:0;">취합 정리</h2>
-          <div class="order-month-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span style="font-weight:700; font-size:13px; color:#334155;">주문월</span>
-            <select id="prepareOrderMonthSelect" style="height:36px; border:1px solid #d9e2ec; border-radius:10px; padding:0 10px; font:inherit; background:#fff; min-width:130px;"></select>
-            <span class="small" id="prepareOrderMonthDesc" style="color:#6b7280;">확정된 취합자료 기준으로 기안서용 표와 비교견적표를 생성합니다.</span>
-          </div>
-        </div>
-        <p>제품 취합에서 거래처 확정된 자료만 정리됩니다. 해당월 확정 전까지는 다시 반영할 수 있습니다.</p>
-      </div>
-      <span class="badge blue">기안 / 비교견적</span>
-    </div>
-    <div class="card-body">
-      <div class="actions" style="margin-top:0; justify-content:space-between; align-items:center;">
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-          <div class="prepare-control-group prepare-finalize-group">
-            <span class="prepare-control-label">월 상태</span>
-            <button class="btn prepare-finalize-btn" id="finalizePrepareMonth">확정</button>
-            <button class="btn prepare-finalize-btn" id="cancelFinalizePrepareMonth">미확정</button>
-          </div>
-          <button class="btn primary" id="downloadExcel">엑셀 다운로드</button>
-        </div>
-        <div class="prepare-control-wrap">
-          <div class="prepare-control-group">
-            <span class="prepare-control-label">문서 선택</span>
-            <button class="btn prepare-view-btn primary" id="showQuoteMain" data-prepare-view="main">시약/초자</button>
-            <button class="btn prepare-view-btn" id="showQuoteSafety" data-prepare-view="safety">안전용품</button>
-          </div>
-          <div class="prepare-control-group">
-            <span class="prepare-control-label">표 선택</span>
-            <button class="btn prepare-table-view-btn primary" id="showPrepareSummary" data-prepare-table-view="summary">기안서용 요약표</button>
-            <button class="btn prepare-table-view-btn" id="showPrepareQuote" data-prepare-table-view="quote">비교견적표</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="summary" style="margin-top:16px;">
-        <div class="tile"><div class="k">확정 품목 수</div><div class="v" id="prepareCount">0</div></div>
-        <div class="tile"><div class="k">총 수량</div><div class="v" id="prepareQty">0</div></div>
-        <div class="tile"><div class="k">예상 금액</div><div class="v" id="prepareAmount">0</div></div>
-        <div class="tile"><div class="k">문서 구분</div><div class="v" id="prepareDocType" style="font-size:20px;">시약/초자</div></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="card prepare-table-panel active" id="prepareSummaryPanel" data-prepare-table-panel="summary" style="margin-top:12px;">
-    <div class="card-head">
+<body class="reagent-dashboard reagent-dashboard-mobile" data-dashboard-mode="mobile">
+  <main class="dashboard-shell">
+    <section class="dashboard-head">
       <div>
-        <h3>기안서용 요약표</h3>
-        <p>기안서 본문에 붙여 넣을 구매 예정 내역입니다.</p>
+        <h1>연구용품 구매현황</h1>
+        <p id="dashboardSubtitle">시약·초자·소모품·안전용품의 주문 및 구매 진행현황을 한눈에 확인합니다.</p>
       </div>
-      <span class="badge orange" id="prepareSummaryBadge">0건</span>
-    </div>
-    <div class="card-body">
-      <div class="table-wrap">
-        <table class="prepare-summary-table prepare-fixed-table">
-          <colgroup>
-            <col style="width:90px;">
-            <col style="width:260px;">
-            <col style="width:80px;">
-            <col style="width:420px;">
-            <col style="width:120px;">
-            <col style="width:140px;">
-            <col style="width:170px;">
-          </colgroup>
-          <thead>
-            <tr><th class="txt">구분</th><th class="txt">품명</th><th class="num">수량</th><th class="txt">용도</th><th class="num">단가</th><th class="num">금액</th><th class="txt">거래처</th></tr>
-          </thead>
-          <tbody id="prepareSummaryList"><tr><td class="empty" colspan="7">취합 정리 반영된 자료가 없습니다.</td></tr></tbody>
-          <tfoot id="prepareSummaryFoot"></tfoot>
-        </table>
+      <div class="dashboard-head-actions">
+        <label class="month-picker">
+          <span>주문월</span>
+          <select id="dashboardMonth" aria-label="주문월"></select>
+        </label>
+        <button type="button" class="refresh-btn" id="dashboardRefresh">↻ 새로고침</button>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="card prepare-table-panel" id="prepareQuotePanel" data-prepare-table-panel="quote" style="margin-top:12px;">
-    <div class="card-head">
-      <div>
-        <h3>비교견적표</h3>
-        <p>최저가 구매 근거를 확인하기 위한 비교 거래처 내역입니다.</p>
-      </div>
-      <span class="badge blue" id="prepareQuoteBadge">비교견적</span>
-    </div>
-    <div class="card-body">
-      <div class="table-wrap">
-        <table class="prepare-quote-table prepare-fixed-table">
-          <colgroup>
-            <col style="width:80px;">   <!-- 구분 -->
-            <col style="width:180px;">  <!-- 품명 -->
-            <col style="width:130px;">  <!-- 제조사 -->
-            <col style="width:120px;">  <!-- 제품코드 -->
-            <col style="width:120px;">  <!-- CAS -->
-            <col style="width:80px;">   <!-- 등급 -->
-            <col style="width:100px;">  <!-- 규격 -->
-            <col style="width:70px;">   <!-- 수량 -->
-            <col style="width:260px;">  <!-- 용도 -->
-            <col style="width:120px;">  <!-- 구매 단가 -->
-            <col style="width:130px;">  <!-- 구매 금액 -->
-            <col style="width:140px;">  <!-- 구매 거래처 -->
-            <col style="width:120px;">  <!-- 비교 단가 -->
-            <col style="width:130px;">  <!-- 비교 금액 -->
-            <col style="width:140px;">  <!-- 비교 거래처 -->
-            <col style="width:170px;">  <!-- 비고 -->
-          </colgroup>
-          <thead>
-            <tr>
-              <th class="txt">구분</th><th class="txt">품명</th><th class="txt">제조사</th><th class="txt">제품코드</th><th class="txt">CAS</th><th class="txt">등급</th><th class="txt">규격</th><th class="num">수량</th><th class="txt">용도</th>
-              <th class="num">구매 단가</th><th class="num">구매 금액</th><th class="txt">구매 거래처</th>
-              <th class="num">비교 단가</th><th class="num">비교 금액</th><th class="txt">비교 거래처</th><th class="txt">비고</th>
-            </tr>
-          </thead>
-          <tbody id="prepareQuoteList"><tr><td class="empty" colspan="16">비교견적 자료가 없습니다.</td></tr></tbody>
-          <tfoot id="prepareQuoteFoot"></tfoot>
-        </table>
-      </div>
-      <div class="small" style="margin-top:10px;">정렬 기준: 기안서용 요약표와 비교견적표 모두 구분 → 거래처 → 용도 → 품명 → 비고 순입니다.</div>
-    </div>
-  </section>
-</section>
-
-<section class="page" id="page-order-receipt">
-  <section class="card">
-    <div class="card-head order-receipt-head">
-      <div class="order-receipt-head-left">
-        <div class="order-receipt-title-row">
-          <h2>발주/입고 관리</h2>
-          <div class="order-month-wrap order-receipt-month-wrap">
-            <span class="label">주문월</span>
-            <select id="orderReceiptMonth"></select>
-            <button class="btn" id="showUnreceivedOrders" type="button">미입고 품목</button>
-            <button class="btn" id="resetOrderReceiptFilter" type="button">년월 보기</button>
-            <button class="btn primary" id="refreshOrderReceipt" type="button">새로고침</button>
-          </div>
+    <section class="kpi-grid" id="kpiGrid">
+      <article class="kpi-card tone-blue">
+        <div class="kpi-card-top">
+          <span class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5"/><path d="M10 12h5M10 16h5"/></svg></span>
+          <span class="kpi-label" id="kpiRequestLabel">신청품목</span>
         </div>
-        <p id="orderReceiptDesc">선택한 주문월의 취합정리 확정자료 기준으로 발주/입고 일자를 관리합니다.</p>
-      </div>
-    </div>
-    <div class="card-body">
-      <div class="summary">
-        <div class="tile"><div class="k">표시 품목</div><div class="v" id="orderReceiptCount">0건</div></div>
-        <div class="tile"><div class="k">미입고</div><div class="v" id="orderReceiptUnreceivedCount">0건</div></div>
-        <div class="tile"><div class="k">구매금액</div><div class="v" id="orderReceiptAmount">0</div></div>
-        <div class="tile"><div class="k">선택</div><div class="v" id="orderReceiptSelectedCount">0건</div></div>
-      </div>
-      <div id="orderReceiptReadonlyNotice" class="small" style="margin-top:10px; color:#64748b;" hidden>일반사용자는 발주/입고 현황 조회만 가능합니다.</div>
-      <div class="small" style="margin-top:10px;">관리자는 행을 드래그해 여러 품목을 선택한 뒤 발주일자 또는 입고일자를 선택하면 선택 품목 전체에 같은 날짜가 적용됩니다.</div>
-      <div class="order-receipt-bulk-actions">
-        <button class="btn" id="clearSelectedOrderDate" type="button" disabled>선택 발주일자 삭제</button>
-        <button class="btn" id="clearSelectedReceiptDate" type="button" disabled>선택 입고일자 삭제</button>
-        <span class="small">날짜칸 옆 × 버튼은 해당 품목 1건만 삭제합니다.</span>
-      </div>
-      <div class="table-wrap order-receipt-table-wrap" style="margin-top:16px;">
-        <table class="order-receipt-table">
-          <colgroup>
-            <col style="width:54px;">   <!-- 선택 -->
-            <col style="width:90px;">   <!-- 상태 -->
-            <col style="width:260px;">  <!-- 품명 -->
-            <col style="width:120px;">  <!-- 제조사 -->
-            <col style="width:120px;">  <!-- 제품코드 -->
-            <col style="width:120px;">  <!-- CAS -->
-            <col style="width:80px;">   <!-- 등급 -->
-            <col style="width:110px;">  <!-- 규격 -->
-            <col style="width:70px;">   <!-- 수량 -->
-            <col style="width:110px;">  <!-- 구매단가 -->
-            <col style="width:120px;">  <!-- 구매금액 -->
-            <col style="width:140px;">  <!-- 구매거래처 -->
-            <col style="width:160px;">  <!-- 발주일자 -->
-            <col style="width:160px;">  <!-- 입고일자 -->
-          </colgroup>
-          <thead>
-            <tr>
-              <th>선택</th><th>상태</th><th>품명</th><th>제조사</th><th>제품코드</th><th>CAS</th><th>등급</th><th>규격</th><th>수량</th><th>구매단가</th><th>구매금액</th><th>구매거래처</th><th>발주일자</th><th>입고일자</th>
-            </tr>
-          </thead>
-          <tbody id="orderReceiptList"><tr><td class="empty" colspan="14">발주/입고 관리 자료를 불러오는 중입니다.</td></tr></tbody>
-        </table>
-      </div>
-      <div class="order-receipt-mobile-list" id="orderReceiptMobileCards" aria-live="polite"></div>
-    </div>
-  </section>
-</section>
-
-<section class="page" id="page-product-management">
-  <section class="card">
-    <div class="card-head">
-      <div>
-        <h2 id="pmPageTitle">제품 관리</h2>
-        <p id="pmPageDesc">관리자·운영자 전용 제품 마스터 및 미등록 제품 요청 관리 화면입니다.</p>
-      </div>
-      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
-        <div class="request-list-toggle" style="display:inline-flex; align-items:center; gap:4px; padding:4px; border:1px solid #d9e2ec; border-radius:14px; background:#f8fafc;">
-          <span style="font-weight:800; font-size:13px; color:#334155; padding:0 8px; white-space:nowrap;">관리 선택</span>
-          <button class="btn primary" id="showPmProductPanel" type="button" style="height:36px; padding:0 14px; border-radius:10px;">제품 마스터 관리</button>
-          <button class="btn" id="showPmRequestPanel" type="button" style="height:36px; padding:0 14px; border-radius:10px;">제품 등록 요청 관리</button>
+        <strong id="kpiRequest">-</strong>
+        <small>선택 주문월</small>
+      </article>
+      <article class="kpi-card tone-cyan">
+        <div class="kpi-card-top">
+          <span class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v5c0 1.7 3.1 3 7 3s7-1.3 7-3V5"/><path d="M5 10v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/></svg></span>
+          <span class="kpi-label">취합대기</span>
         </div>
-        
-      </div>
-    </div>
-    <div class="card-body">
-      <div class="summary">
-        <div class="tile"><div class="k">전체 제품</div><div class="v" id="pmTotalCount">0건</div></div>
-        <div class="tile"><div class="k">사용 제품</div><div class="v" id="pmActiveCount">0건</div></div>
-        <div class="tile"><div class="k">사용 중지</div><div class="v" id="pmInactiveCount">0건</div></div>
-        <div class="tile"><div class="k">요청 대기</div><div class="v" id="pmPendingCount">0건</div></div>
-      </div>
-    </div>
-  </section>
+        <strong id="kpiCollectPending">-</strong>
+        <small>미취합 + 추가취합 필요</small>
+      </article>
+      <article class="kpi-card tone-orange">
+        <div class="kpi-card-top">
+          <span class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h2l2 10h10l2-7H7"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg></span>
+          <span class="kpi-label">발주대기</span>
+        </div>
+        <strong id="kpiOrderPending">-</strong>
+        <small>거래처 확정 후</small>
+      </article>
+      <article class="kpi-card tone-red">
+        <div class="kpi-card-top">
+          <span class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8l8-4 8 4v9l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v9"/><path d="M8.5 5.8l8 4"/></svg></span>
+          <span class="kpi-label">미입고</span>
+        </div>
+        <strong id="kpiUnreceived">-</strong>
+        <small>발주 후 미입고</small>
+      </article>
+      <article class="kpi-card tone-green">
+        <div class="kpi-card-top">
+          <span class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16.5 9"/></svg></span>
+          <span class="kpi-label">입고완료</span>
+        </div>
+        <strong id="kpiReceived">-</strong>
+        <small>선택 주문월</small>
+      </article>
+      <article class="kpi-card tone-gold operator-only">
+        <div class="kpi-card-top">
+          <span class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v4c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 10v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4"/><path d="M5 14v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4"/></svg></span>
+          <span class="kpi-label">구매금액</span>
+        </div>
+        <strong id="kpiAmount">-</strong>
+        <small>거래처 확정 기준</small>
+      </article>
+      <article class="kpi-card tone-violet viewer-only">
+        <div class="kpi-card-top">
+          <span class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v18H7z"/><path d="M10 8h4M10 12h4M12 16v4M10 18h4"/></svg></span>
+          <span class="kpi-label">제품등록요청</span>
+        </div>
+        <strong id="kpiMyRegistration">-</strong>
+        <small>내 요청 진행중</small>
+      </article>
+    </section>
 
-  <section class="card" id="pmProductMasterPanel" style="margin-top:12px;">
-    <div class="card-head">
-      <div>
-        <h3>제품 마스터 관리</h3>
-        <p>제품 신청 화면의 제품검색과 자동입력에 사용되는 기준 데이터입니다.</p>
-      </div>
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
-        <button class="btn" id="pmDownloadTemplate" type="button">엑셀 양식 다운로드</button>
-        <button class="btn primary" id="pmUploadExcel" type="button">엑셀 업로드</button>
-        <input id="pmUploadExcelFile" type="file" accept=".xlsx,.xls" style="display:none;"/>
-      </div>
-    </div>
-    <div class="card-body">
-      <div class="collect-filters pm-product-filters">
-        <div class="field pm-product-filter-search"><label>검색</label><input id="pmProductKeyword" placeholder="품명 / 제조사 / 제품코드 / CAS / 거래처 검색"/></div>
-        <div class="field pm-product-filter-category"><label>구분</label><select id="pmProductCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div>
-        <div class="field pm-product-filter-active"><label>사용여부</label><select id="pmProductActive"><option value="">전체</option><option value="active">사용</option><option value="inactive">사용중지</option></select></div>
-        <div class="field pm-product-filter-identifier"><label>QR/바코드</label><select id="pmProductIdentifierStatus"><option value="">전체</option><option value="with">있음</option><option value="without">없음</option></select></div>
-        <div class="field pm-product-filter-reset"><label>&nbsp;</label><button class="btn" id="pmResetProduct">신규 입력</button></div>
-      </div>
-
-      <div class="form-grid" style="margin-top:16px; grid-template-columns:1fr 2fr 1.2fr 1.2fr 1fr 1fr 1fr 1.3fr 1fr;">
-        <input id="pmProductId" type="hidden"/>
-        <div class="field"><label>구분</label><select id="pmCategory"><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div>
-        <div class="field"><label>품명</label><input id="pmName" placeholder="제품명"/></div>
-        <div class="field"><label>제조사</label><input id="pmMaker" placeholder="제조사"/></div>
-        <div class="field"><label>제품코드</label><input id="pmCode" placeholder="제품코드"/></div>
-        <div class="field"><label>규격</label><input id="pmCapacity" placeholder="규격"/></div>
-        <div class="field"><label>CAS</label><input id="pmCas" placeholder="CAS"/></div>
-        <div class="field"><label>등급</label><input id="pmGrade" placeholder="등급"/></div>
-        <div class="field"><label>기본거래처</label><input id="pmDefaultVendor" placeholder="거래처"/></div>
-        <div class="field"><label>선정사유</label><select id="pmDefaultVendorReason"><option value="">선정사유 선택</option><option value="최저가 구매">최저가 구매</option><option value="제조원 구매">제조원 구매</option><option value="취급처 구매">취급처 구매</option><option value="대리점 구매">대리점 구매</option><option value="온라인 구매">온라인 구매</option></select></div>
-      </div>
-
-      <div class="field" style="margin-top:10px;"><label>비고</label><input id="pmMemo" placeholder="비고"/></div>
-      <div class="actions" style="justify-content:space-between; align-items:center;">
-        <div><strong id="pmFormTitle">제품 등록</strong></div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn primary" id="pmSaveProduct">저장</button>
-          <button class="btn" id="pmDeactivateProduct" style="display:none;">사용중지</button>
+    <section class="panel progress-panel">
+      <div class="panel-head">
+        <div class="panel-title-wrap">
+          <span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h4l2-4 3 8 2-4h5"/><circle cx="4" cy="12" r="1.5"/><circle cx="20" cy="12" r="1.5"/></svg></span>
+          <div><h2>구매 진행현황</h2><p>선택한 주문월의 신청부터 입고까지 진행단계를 표시합니다.</p></div>
         </div>
       </div>
+      <div class="stage-flow" id="stageFlow"></div>
+    </section>
 
-      <div class="table-wrap" style="margin-top:16px;">
-        <table>
-          <thead>
-            <tr><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>규격</th><th>CAS</th><th>등급</th><th>QR/바코드</th><th>기본거래처</th><th>선정사유</th><th>사용여부</th><th>수정자</th><th>작업</th></tr>
-          </thead>
-          <tbody id="pmProductList"><tr><td class="empty" colspan="13">제품 마스터를 불러오는 중입니다.</td></tr></tbody>
-        </table>
+    <section class="panel attention-panel operator-only">
+      <div class="panel-head compact">
+        <div><h2>확인 필요</h2><p>현재 처리해야 할 항목입니다.</p></div>
       </div>
-    </div>
-  </section>
+      <div class="attention-grid">
+        <article><span>미취합</span><strong id="needUncollected">-</strong></article>
+        <article><span>추가취합 필요</span><strong id="needAdditional">-</strong></article>
+        <article><span>거래처 미확정</span><strong id="needVendor">-</strong></article>
+        <article><span>미발주</span><strong id="needOrder">-</strong></article>
+        <article><span>미입고</span><strong id="needReceipt">-</strong></article>
+        <article><span>제품등록요청</span><strong id="needRegistration">-</strong></article>
+      </div>
+    </section>
 
-  <section class="card" id="pmRegistrationRequestPanel" style="margin-top:12px; display:none;">
-    <div class="card-head">
-      <div>
-        <h3>제품 등록 요청 관리</h3>
-        <p>담당자가 제품 신청 화면에서 요청한 미등록 제품을 확인하고 승인 또는 반려합니다.</p>
-      </div>
-      <span class="badge blue">product_registration_requests</span>
-    </div>
-    <div class="card-body">
-      <div class="collect-filters">
-        <div class="field"><label>검색</label><input id="pmRequestKeyword" placeholder="품명 / 제조사 / 요청자 / 팀 / 용도 검색"/></div>
-        <div class="field"><label>상태</label><select id="pmRequestStatus"><option value="">전체</option><option value="요청">요청</option><option value="확인중">확인중</option><option value="등록완료">등록완료</option><option value="반려">반려</option></select></div>
-        <div class="field"><label>&nbsp;</label><button class="btn" id="pmRefreshRequests">요청 새로고침</button></div>
-        <div class="field"><label>&nbsp;</label><div class="small" style="padding:12px 0;">승인 시 제품 마스터에 자동 등록됩니다.</div></div>
-      </div>
-      <div class="table-wrap" style="margin-top:16px;">
-        <table>
-          <thead>
-            <tr><th>상태</th><th>구분</th><th>품명</th><th>제조사</th><th>제품코드</th><th>규격</th><th>CAS</th><th>등급</th><th>용도</th><th>요청자</th><th>처리/반려사유</th><th>작업</th></tr>
-          </thead>
-          <tbody id="pmRequestList"><tr><td class="empty" colspan="12">제품 등록 요청을 불러오는 중입니다.</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-</section>
-
-
-</div>
-<div class="modal-backdrop" id="searchModal"><div class="modal"><div class="modal-head"><div><h3>제품 검색</h3><div class="small">품명, 제품코드, 제조사, CAS 번호로 검색할 수 있습니다.</div></div><button class="btn" id="closeSearch">닫기</button></div>
-<div class="modal-search"><div class="field"><label>키워드</label><input id="searchInput" placeholder="예: ethanol, 459844, Sigma, 64-17-5"/><div class="search-hint">부분 검색 가능</div></div><div class="field"><label>분류</label><select id="searchCategory"><option value="">전체</option><option value="시약">시약</option><option value="초자">초자</option><option value="안전용품">안전용품</option></select></div><div class="field"><label>제조사</label><select id="searchMaker"><option value="">전체</option></select></div><div class="field"><label>정렬</label><select id="sortMode"><option value="relevance">관련도순</option><option value="name">품명순</option><option value="maker">제조사순</option></select></div></div>
-<div class="modal-body" id="searchResults"></div><div class="modal-foot"><div class="small" id="resultInfo">검색 결과 0건</div><div class="small">원하는 제품이 없으면 <span class="product-link" id="inlineRequest">제품 등록 요청</span>으로 넘길 수 있습니다.</div></div></div></div>
-<div class="modal-backdrop product-scan-modal-backdrop" id="productScanModal" aria-hidden="true">
-  <section class="modal product-scan-modal" role="dialog" aria-modal="true" aria-labelledby="productScanTitle">
-    <div class="modal-head product-scan-head">
-      <div>
-        <h3 id="productScanTitle">제품 코드 스캔</h3>
-        <p>QR · DataMatrix · 바코드를 카메라에 보여주세요.</p>
-      </div>
-      <button id="closeProductScan" class="modal-close-btn product-scan-close" type="button" aria-label="닫기">×</button>
-    </div>
-    <div class="product-scan-body">
-      <section id="productScanCameraSection" class="scan-camera-section">
-        <div class="scan-video-wrap">
-          <video id="productScanVideo" playsinline muted hidden></video>
-          <canvas id="productScanCanvas" hidden></canvas>
-          <div class="scan-guide" aria-hidden="true">
-            <i></i><i></i><i></i><i></i>
-            <span></span>
-          </div>
-          <div class="scan-tools" aria-label="카메라 도구">
-            <button id="productScanTorch" class="scan-tool-btn" type="button" hidden aria-label="손전등 켜기">⌁</button>
-            <button id="productScanZoom" class="scan-tool-btn" type="button" hidden aria-label="카메라 확대">1×</button>
-          </div>
+    <div class="analysis-grid operator-only">
+      <section class="panel chart-panel">
+        <div class="panel-head compact">
+          <div><h2>최근 6개월 구매금액</h2><p>거래처 확정 금액 기준입니다.</p></div>
         </div>
-        <div id="productScanStatus" class="product-scan-status scan-status" aria-live="polite">카메라를 준비하고 있습니다.</div>
-        <div class="scan-camera-actions">
-          <button id="productScanRetry" class="btn" type="button" hidden>다시 스캔</button>
+        <div class="bar-chart" id="monthlyChart"></div>
+      </section>
+
+      <section class="panel vendor-panel">
+        <div class="panel-head compact">
+          <div><h2>거래처 구매현황</h2><p>구매금액·품목수·비중을 확인합니다.</p></div>
+          <select id="vendorPeriod" aria-label="거래처 집계기간">
+            <option value="month">선택 주문월</option>
+            <option value="year">선택 연도</option>
+          </select>
+        </div>
+        <div class="vendor-summary">
+          <div class="vendor-donut" id="vendorDonut"><span><b id="vendorTotal">₩0</b><small>총 구매금액</small></span></div>
+          <div class="vendor-list" id="vendorList"></div>
         </div>
       </section>
     </div>
-  </section>
-</div>
-<div class="toast-wrap" id="toastWrap"></div>
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.4/dist/iife/reader/index.js"></script>
-<script>
-  if (!window.supabase) {
-    document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
-  }
-</script>
-<script src="../supabase.js"></script>
-<script src="../request.js?v=20261002-mobile-qascan1"></script>
-<!--
-  COLUMN ORDER NOTE
-  - HTML header/colgroup order updated:
-    품명 → 제조사 → 제품코드 → CAS → 등급 → 규격
-  - 실제 tbody 데이터 출력 순서는 collect.js / order_receipt.js 렌더링 코드도 동일 순서로 맞춰야 완전히 반영됩니다.
--->
-<script src="../collect.js"></script>
-<script src="../product_management.js?v=20261002-identifiers2"></script>
-<script src="../order_receipt.js?v=20261002-mobile-date6"></script>
-<script src="../app.js"></script>
-<script src="./app.js?v=20261002-mobile-identifiers2"></script>
-<script>
-  (function () {
-    window.__ensureReagentProductManagementInit = function () {
-      const pm = window.ReagentApp?.productManagement;
-      if (!pm || pm.__mobilePageInitialized === true) return;
-      pm.__mobilePageInitialized = true;
-      pm.init?.();
-    };
 
-    document.addEventListener("DOMContentLoaded", () => {
-      document.querySelector('.tab-btn[data-tab="product-management"]')?.addEventListener("click", () => {
-        setTimeout(window.__ensureReagentProductManagementInit, 0);
-      });
+    <div class="bottom-grid operator-only">
+      <section class="panel delivery-panel">
+        <div class="panel-head compact">
+          <div><h2>거래처 납기현황</h2><p>발주일→입고일 평균 납기와 미입고입니다.</p></div>
+        </div>
+        <div class="delivery-list" id="deliveryList"></div>
+      </section>
 
-      document.querySelector('.tab-btn[data-tab="order-receipt"]')?.addEventListener("click", () => {
-        setTimeout(() => window.ReagentApp.orderReceipt?.init?.(), 0);
-      });
-    });
-  })();
-</script>
+      <section class="panel recent-panel">
+        <div class="panel-head compact">
+          <div><h2>최근 진행내역</h2><p>신청·거래처확정·발주·입고 기준 최신 내역입니다.</p></div>
+        </div>
+        <div class="recent-list" id="recentList"></div>
+      </section>
+    </div>
 
-<script id="reagent-tab-emergency-fallback">
-(function () {
-  function activateReagentTab(tab) {
-    tab = tab || "request";
-    var tabButtons = document.querySelectorAll(".tab-btn, button[data-tab]");
-    var pages = document.querySelectorAll(".page");
-    var targetBtn = document.querySelector('.tab-btn[data-tab="' + tab + '"], button[data-tab="' + tab + '"]');
-    var targetPage = document.getElementById("page-" + tab) || document.querySelector('.page[data-tab="' + tab + '"], [data-page="' + tab + '"]');
+    <section class="panel recent-panel viewer-only">
+      <div class="panel-head compact">
+        <div><h2>내 최근 진행내역</h2><p>내가 신청한 품목의 현재 진행상태를 확인합니다.</p></div>
+      </div>
+      <div class="recent-list" id="myRecentList"></div>
+    </section>
 
-    tabButtons.forEach(function (btn) {
-      var on = btn === targetBtn;
-      btn.classList.toggle("active", on);
-      btn.disabled = false;
-      btn.style.removeProperty("pointer-events");
-      btn.style.removeProperty("visibility");
-      btn.style.removeProperty("display");
-      btn.setAttribute("aria-hidden", "false");
-    });
+    <div class="dashboard-loading" id="dashboardLoading" aria-live="polite">연구용품 구매현황을 불러오는 중입니다.</div>
+  </main>
 
-    pages.forEach(function (page) {
-      var on = page === targetPage;
-      page.classList.toggle("active", on);
-      page.hidden = false;
-      page.style.display = on ? "" : "none";
-    });
-
-    if (tab === "prepare") {
-      try { window.ReagentApp?.collect?.initPrepareMonthControl?.(); } catch (_) {}
-      try { window.ReagentApp?.collect?.renderPrepare?.(); } catch (_) {}
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    if (!window.supabase) {
+      document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
     }
-    if (tab === "order-receipt") {
-      try { window.ReagentApp?.orderReceipt?.init?.(); } catch (_) {}
-    }
-    if (tab === "product-management") {
-      try { window.__ensureReagentProductManagementInit?.(); } catch (_) {}
-    }
-  }
-
-  window.__reagentActivateTab = activateReagentTab;
-
-  document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll(".tab-btn, button[data-tab]").forEach(function (btn) {
-      btn.disabled = false;
-      btn.style.removeProperty("pointer-events");
-      btn.onclick = function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        activateReagentTab(btn.getAttribute("data-tab") || "request");
-        return false;
-      };
-    });
-  });
-})();
-</script>
-
-
-<script id="reagent-portal-bridge">
-(function () {
-  'use strict';
-
-  const REAGENT_TABS = [
-    { id: 'request', label: '제품신청' },
-    { id: 'collect', label: '제품취합' },
-    { id: 'prepare', label: '취합정리' },
-    { id: 'order-receipt', label: '발주/입고 관리' },
-    { id: 'product-management', label: '제품관리' }
-  ];
-
-  function getAllowedReagentTabs() {
-    try {
-      if (window.ReagentApp && typeof window.ReagentApp.getAllowedPortalTabs === 'function') {
-        return window.ReagentApp.getAllowedPortalTabs();
-      }
-    } catch (_) {}
-    return REAGENT_TABS;
-  }
-
-  function getActiveTabId() {
-    const active = document.querySelector('.shell > .tabs .tab-btn.active[data-tab], .tab-btn.active[data-tab]');
-    return active ? active.getAttribute('data-tab') : 'request';
-  }
-
-  function notifyPortalTabs() {
-    if (!window.parent || window.parent === window) return;
-
-    window.parent.postMessage({
-      type: 'portal-tabs-ready',
-      tabs: getAllowedReagentTabs(),
-      activeTabId: getActiveTabId(),
-      source: 'reagent'
-    }, '*');
-
-    window.parent.postMessage({
-      type: 'portal-filters-ready',
-      enabled: false,
-      filters: [],
-      source: 'reagent'
-    }, '*');
-  }
-
-  function notifyPortalActiveTab(tabId) {
-    if (!window.parent || window.parent === window || !tabId) return;
-
-    window.parent.postMessage({
-      type: 'portal-tab-active',
-      activeTabId: tabId,
-      tabId: tabId,
-      source: 'reagent'
-    }, '*');
-  }
-
-  function activateReagentPortalTab(tabId) {
-    if (!tabId) return false;
-
-    if (typeof window.__reagentActivateTab === 'function') {
-      window.__reagentActivateTab(tabId);
-      notifyPortalActiveTab(tabId);
-      return true;
-    }
-
-    const target = document.querySelector('.tab-btn[data-tab="' + tabId + '"], button[data-tab="' + tabId + '"]');
-    if (!target) return false;
-
-    target.click();
-
-    if (tabId === 'prepare') {
-      try { window.ReagentApp?.collect?.initPrepareMonthControl?.(); } catch (_) {}
-      try { window.ReagentApp?.collect?.renderPrepare?.(); } catch (_) {}
-    }
-
-    if (tabId === 'order-receipt') {
-      try { window.ReagentApp?.orderReceipt?.init?.(); } catch (_) {}
-    }
-
-    if (tabId === 'product-management') {
-      try { window.__ensureReagentProductManagementInit?.(); } catch (_) {}
-    }
-
-    notifyPortalActiveTab(tabId);
-    return true;
-  }
-
-  window.portalTabs = getAllowedReagentTabs();
-  window.portalActivateTab = activateReagentPortalTab;
-
-  window.addEventListener('message', function (event) {
-    const payload = event && event.data ? event.data : {};
-
-    if (payload.type === 'portal-tabs-request') {
-      notifyPortalTabs();
-      return;
-    }
-
-    if (payload.type === 'portal-filters-request') {
-      window.parent?.postMessage({
-        type: 'portal-filters-ready',
-        enabled: false,
-        filters: [],
-        source: 'reagent'
-      }, '*');
-      return;
-    }
-
-    if (payload.type === 'portal-tab-change') {
-      activateReagentPortalTab(payload.tabId || payload.tab || '');
-    }
-  });
-
-  document.addEventListener('click', function (event) {
-    const btn = event.target && event.target.closest
-      ? event.target.closest('.tab-btn[data-tab], button[data-tab]')
-      : null;
-
-    if (!btn) return;
-
-    setTimeout(function () {
-      notifyPortalActiveTab(btn.getAttribute('data-tab') || getActiveTabId());
-    }, 0);
-  });
-
-  function notifyAll() {
-    notifyPortalTabs();
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', notifyAll);
-  } else {
-    notifyAll();
-  }
-
-  setTimeout(notifyAll, 250);
-  setTimeout(notifyAll, 800);
-  setTimeout(notifyAll, 1600);
-  setTimeout(notifyAll, 3000);
-})();
-</script>
-
-<script src="../../common/common.js"></script>
-</body></html>
-
+  </script>
+  <script src="../../supabase.js"></script>
+  <script src="./app.js?v=20261004-1.3"></script>
+</body>
+</html>
