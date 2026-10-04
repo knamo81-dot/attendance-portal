@@ -89,7 +89,64 @@
       const saved = localStorage.getItem("reagent_order_month");
       if (/^\d{4}-\d{2}$/.test(saved || "")) return saved;
     } catch (_) {}
-    return monthKey(new Date(), 1);
+    return monthKey(new Date(), 0);
+  }
+
+  function ensureDashboardMonthOption(select, month) {
+    if (!select || !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month || ""))) return;
+    if (!Array.from(select.options || []).some((option) => option.value === month)) {
+      const option = document.createElement("option");
+      option.value = month;
+      option.textContent = monthLabel(month);
+      select.appendChild(option);
+    }
+  }
+
+  function syncDashboardYearMonthPicker(select, month) {
+    const picker = document.querySelector(`[data-dashboard-month-picker="${select?.id || ""}"]`);
+    if (!picker || !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month || ""))) return;
+    const [year, mon] = month.split("-");
+    const y = picker.querySelector(".dashboard-year-select");
+    const m = picker.querySelector(".dashboard-month-select");
+    if (y) y.value = year;
+    if (m) m.value = mon;
+  }
+
+  function ensureDashboardYearMonthPicker(select) {
+    if (!select?.id) return;
+    select.style.display = "none";
+    select.setAttribute("aria-hidden", "true");
+
+    let picker = document.querySelector(`[data-dashboard-month-picker="${select.id}"]`);
+    if (!picker) {
+      picker = document.createElement("span");
+      picker.className = "dashboard-year-month-picker";
+      picker.dataset.dashboardMonthPicker = select.id;
+      picker.innerHTML = `<select class="dashboard-year-select" aria-label="주문년도"></select><select class="dashboard-month-select" aria-label="주문월"></select>`;
+      select.insertAdjacentElement("afterend", picker);
+
+      const yearSelect = picker.querySelector(".dashboard-year-select");
+      const monthSelect = picker.querySelector(".dashboard-month-select");
+      yearSelect.innerHTML = Array.from({ length: 101 }, (_, index) => {
+        const year = 2000 + index;
+        return `<option value="${year}">${year}년</option>`;
+      }).join("");
+      monthSelect.innerHTML = Array.from({ length: 12 }, (_, index) => {
+        const month = String(index + 1).padStart(2, "0");
+        return `<option value="${month}">${index + 1}월</option>`;
+      }).join("");
+
+      const apply = () => {
+        const month = `${yearSelect.value}-${monthSelect.value}`;
+        ensureDashboardMonthOption(select, month);
+        select.value = month;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      };
+      yearSelect.addEventListener("change", apply);
+      monthSelect.addEventListener("change", apply);
+    }
+
+    syncDashboardYearMonthPicker(select, select.value || state.month);
   }
 
   function sixMonthKeys() {
@@ -257,7 +314,10 @@
     state.collect.forEach(r => { if (r.order_month) months.add(r.order_month); });
     const list = Array.from(months).filter(x => /^\d{4}-\d{2}$/.test(x)).sort().reverse();
     select.innerHTML = list.map(m => `<option value="${esc(m)}">${esc(monthLabel(m))}</option>`).join("");
+    ensureDashboardMonthOption(select, state.month);
     select.value = state.month;
+    ensureDashboardYearMonthPicker(select);
+    syncDashboardYearMonthPicker(select, state.month);
   }
 
   function renderKpis() {
@@ -539,11 +599,19 @@
   function bindEvents() {
     $('#dashboardMonth')?.addEventListener('change', (e) => {
       state.month = String(e.target.value || '').trim() || state.month;
+      syncDashboardYearMonthPicker(e.target, state.month);
       try { localStorage.setItem('reagent_order_month', state.month); } catch (_) {}
-      renderAll();
+      loadData();
     });
     $('#dashboardRefresh')?.addEventListener('click', loadData);
     $('#vendorPeriod')?.addEventListener('change', () => { renderVendors(); renderDelivery(); });
+    window.addEventListener('storage', (event) => {
+      if (event.key !== 'reagent_order_month' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(event.newValue || ''))) return;
+      if (event.newValue === state.month) return;
+      state.month = event.newValue;
+      initMonthOptions();
+      loadData();
+    });
     window.addEventListener('message', (event) => {
       const p = event.data || {};
       if (p.type === 'portal-tabs-request') notifyPortalTabs();
@@ -565,3 +633,4 @@
 
   bootstrap();
 })();
+
