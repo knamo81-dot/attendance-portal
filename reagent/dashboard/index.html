@@ -6,7 +6,7 @@
   <title>시약현황</title>
   <link rel="stylesheet" href="../../common/theme.css"/>
   <link rel="stylesheet" href="../../common/mobile.css"/>
-  <link rel="stylesheet" href="./style.css?v=20261004-1"/>
+  <link rel="stylesheet" href="./style.css?v=20261004-1.1"/>
 </head>
 <body class="reagent-dashboard reagent-dashboard-desktop" data-dashboard-mode="desktop">
   <main class="dashboard-shell">
@@ -26,7 +26,7 @@
 
     <section class="kpi-grid" id="kpiGrid">
       <article class="kpi-card tone-blue"><span class="kpi-label" id="kpiRequestLabel">신청품목</span><strong id="kpiRequest">-</strong><small>선택 주문월</small></article>
-      <article class="kpi-card tone-cyan"><span class="kpi-label">취합대기</span><strong id="kpiCollectPending">-</strong><small>미취합·추가신청</small></article>
+      <article class="kpi-card tone-cyan"><span class="kpi-label">취합대기</span><strong id="kpiCollectPending">-</strong><small>미취합 + 추가취합 필요</small></article>
       <article class="kpi-card tone-orange"><span class="kpi-label">발주대기</span><strong id="kpiOrderPending">-</strong><small>거래처 확정 후</small></article>
       <article class="kpi-card tone-red"><span class="kpi-label">미입고</span><strong id="kpiUnreceived">-</strong><small>발주 후 미입고</small></article>
       <article class="kpi-card tone-green"><span class="kpi-label">입고완료</span><strong id="kpiReceived">-</strong><small>선택 주문월</small></article>
@@ -46,7 +46,8 @@
         <div><h2>확인 필요</h2><p>현재 처리해야 할 항목입니다.</p></div>
       </div>
       <div class="attention-grid">
-        <article><span>추가신청</span><strong id="needAdditional">-</strong></article>
+        <article><span>미취합</span><strong id="needUncollected">-</strong></article>
+        <article><span>추가취합 필요</span><strong id="needAdditional">-</strong></article>
         <article><span>거래처 미확정</span><strong id="needVendor">-</strong></article>
         <article><span>미발주</span><strong id="needOrder">-</strong></article>
         <article><span>미입고</span><strong id="needReceipt">-</strong></article>
@@ -110,6 +111,6 @@
     }
   </script>
   <script src="../supabase.js"></script>
-  <script src="./app.js?v=20261004-1"></script>
+  <script src="./app.js?v=20261004-1.1"></script>
 </body>
 </html>
