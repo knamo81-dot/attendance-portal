@@ -111,3 +111,40 @@ table{
   display:inline-block;
   line-height:1.2;
 }
+
+/* ===== 업체별 처리방법 편집 UI ===== */
+.method-add-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+  align-items:center;
+}
+.method-add-row .btn{
+  white-space:nowrap;
+}
+.method-list{
+  display:grid;
+  gap:7px;
+  margin-top:8px;
+}
+.method-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:38px;
+  padding:6px 9px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#f8fafc;
+}
+.method-row .check-option{
+  flex:1;
+}
+.method-empty{
+  padding:12px;
+}
+@media(max-width:520px){
+  .method-add-row{
+    grid-template-columns:1fr;
+  }
+}
