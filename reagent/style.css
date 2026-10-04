@@ -5974,3 +5974,50 @@ td {
     grid-column:2;
   }
 }
+
+/* =========================================================
+   주문년월 공통 선택 UI (2026-10)
+   - 기존 YYYY-MM select는 JS에서 숨기고 년/월 2개 선택기로 표시
+========================================================= */
+.reagent-year-month-picker{
+  display:inline-flex !important;
+  align-items:center !important;
+  gap:6px !important;
+  min-width:0 !important;
+  vertical-align:middle;
+}
+.reagent-year-month-picker select{
+  width:auto !important;
+  height:36px !important;
+  min-width:0 !important;
+  border:1px solid var(--line,#d9e2ec) !important;
+  border-radius:10px !important;
+  padding:0 28px 0 10px !important;
+  background:#fff !important;
+  color:var(--text,#1f2937) !important;
+  font:inherit !important;
+  font-weight:700 !important;
+  line-height:1 !important;
+}
+.reagent-year-month-picker .reagent-year-select{min-width:96px !important;}
+.reagent-year-month-picker .reagent-month-select{min-width:76px !important;}
+
+.request-month-finalized-notice{
+  margin:0 20px 12px;
+  padding:10px 12px;
+  border:1px solid #f3b8b8;
+  border-radius:11px;
+  background:#fff5f5;
+  color:#b42318;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.45;
+}
+.request-month-finalized-list-notice{
+  margin:0 0 12px;
+}
+.request-month-finalized-notice[hidden]{display:none !important;}
+.month-finalized-disabled{
+  cursor:not-allowed !important;
+  opacity:.55 !important;
+}
