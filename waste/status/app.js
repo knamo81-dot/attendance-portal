@@ -1,5 +1,5 @@
 const SUPABASE_URL="https://mbqpsovlwvedwrtbbauj.supabase.co";
-const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXJhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY";
 
 (function(){
   function portalSession(){
@@ -23,16 +23,23 @@ const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
     const c=s.activeCompany||s.active_company||s.selectedCompany||s.company||{};
     const v=s.activeCompanyId||s.active_company_id||s.selectedCompanyId||s.selected_company_id||c.id||c.company_id||s.companyId||s.company_id||s.profile?.company_id||window.currentCompanyId||'';
     if(v) return String(v).trim();
-    try{ const p=new URLSearchParams(location.search); return String(p.get('company_id')||p.get('companyId')||'').trim(); }catch(e){ return ''; }
+    try{const p=new URLSearchParams(location.search);return String(p.get('company_id')||p.get('companyId')||'').trim();}catch(e){return '';}
   }
-  function userEmail(){ const s=portalSession(); return String(s.email||s.user?.email||s.profile?.email||'').trim(); }
+  function userEmail(){const s=portalSession();return String(s.email||s.user?.email||s.profile?.email||'').trim();}
   const sb=rawClient();
-  async function list(table, select='*', orderCol='created_at', ascending=false){
-    let q=sb.from(table).select(select); const cid=companyId(); if(cid) q=q.eq('company_id',cid); if(orderCol) q=q.order(orderCol,{ascending}); return q;
+  async function list(table,select='*',orderCol='created_at',ascending=false){
+    let q=sb.from(table).select(select);const cid=companyId();if(cid)q=q.eq('company_id',cid);if(orderCol)q=q.order(orderCol,{ascending});return q;
   }
-  async function insert(table,payload){ const cid=companyId(); const row={...payload, company_id:payload.company_id||cid, created_by:payload.created_by||userEmail()||null}; return sb.from(table).insert([row]).select('*').single(); }
-  async function update(table,id,payload){ let q=sb.from(table).update(payload).eq('id',id); const cid=companyId(); if(cid) q=q.eq('company_id',cid); return q.select('*').single(); }
-  async function remove(table,id){ let q=sb.from(table).delete().eq('id',id); const cid=companyId(); if(cid) q=q.eq('company_id',cid); return q; }
+  async function insert(table,payload){
+    const cid=companyId();const row={...payload,company_id:payload.company_id||cid,created_by:payload.created_by||userEmail()||null};
+    return sb.from(table).insert([row]).select('*').single();
+  }
+  async function update(table,id,payload){
+    let q=sb.from(table).update(payload).eq('id',id);const cid=companyId();if(cid)q=q.eq('company_id',cid);return q.select('*').single();
+  }
+  async function remove(table,id){
+    let q=sb.from(table).delete().eq('id',id);const cid=companyId();if(cid)q=q.eq('company_id',cid);return q;
+  }
   window.wasteApi={sb,portalSession,companyId,userEmail,list,insert,update,remove};
 })();
 
@@ -40,20 +47,42 @@ const A=window.wasteApi;
 const $=(s)=>document.querySelector(s);
 const esc=(v)=>String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));
 const num=(v,d=2)=>Number(v||0).toLocaleString('ko-KR',{minimumFractionDigits:d,maximumFractionDigits:d});
-function typeName(r){return r.display_name||`${r.legal_name}${r.physical_state==='liquid'?'(액상)':r.physical_state==='solid'?'(고상)':''}`}
+function typeName(r){return r.display_name||`${r.legal_name||''}${r.physical_state==='liquid'?'(액상)':r.physical_state==='solid'?'(고상)':''}`}
 function dateKey(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function notice(msg,type='ok'){const el=$('#notice');if(!el)return;el.textContent=msg;el.className='notice show '+type;setTimeout(()=>el.classList.remove('show'),3500)}
 
-let screenMode='status';
 let year=String(new Date().getFullYear());
 let typeFilter='';
 let settingsTab='types';
+let vendorMethodsDraft=[];
 
 const settingsConfigs={
-  types:{table:'waste_types',title:'폐기물 종류',fields:[['legal_name','폐기물명','text'],['physical_state','성상','select',['liquid:액상','solid:고상','mixed:혼합','other:기타']],['legal_code','법정코드','text'],['default_quantity_unit','기본 수량단위','text'],['sort_order','순서','number']]},
-  vendors:{table:'waste_vendors',title:'업체',fields:[['vendor_name','업체명','text'],['business_no','사업자번호','text'],['permit_no','허가번호','text'],['contact_name','담당자','text'],['phone','연락처','text']]},
-  locations:{table:'waste_storage_locations',title:'보관장소',fields:[['location_name','보관장소명','text'],['description','설명','text'],['max_weight_kg','최대보관량(kg)','number'],['sort_order','순서','number']]},
-  units:{table:'waste_container_units',title:'용기·단위',fields:[['unit_name','용기명','text'],['quantity_unit','수량단위','text'],['capacity_l','용량(L)','number'],['sort_order','순서','number']]},
+  types:{table:'waste_types',title:'폐기물 종류',fields:[
+    ['legal_name','폐기물명','text'],
+    ['physical_state','성상','select',['liquid:액상','solid:고상','mixed:혼합','other:기타']],
+    ['legal_code','법정코드','text'],
+    ['default_quantity_unit','기본 수량단위','text'],
+    ['sort_order','순서','number']
+  ]},
+  vendors:{table:'waste_vendors',title:'업체',fields:[
+    ['vendor_name','업체명','text'],
+    ['business_no','사업자번호','text'],
+    ['permit_no','허가번호','text'],
+    ['contact_name','담당자','text'],
+    ['phone','연락처','text']
+  ]},
+  locations:{table:'waste_storage_locations',title:'보관장소',fields:[
+    ['location_name','보관장소명','text'],
+    ['description','설명','text'],
+    ['max_weight_kg','최대보관량(kg)','number'],
+    ['sort_order','순서','number']
+  ]},
+  units:{table:'waste_container_units',title:'용기·단위',fields:[
+    ['unit_name','용기명','text'],
+    ['quantity_unit','수량단위','text'],
+    ['capacity_l','용량(L)','number'],
+    ['sort_order','순서','number']
+  ]},
   opening:{table:'waste_opening_balances',title:'기초·이월량',fields:[]}
 };
 
@@ -74,13 +103,26 @@ async function renderStatus(){
   const collected=c.flatMap(x=>x.waste_collection_items).reduce((s,x)=>s+Number(x.weight_kg||0),0);
   const openingKg=o.reduce((s,x)=>s+Number(x.weight_kg||0),0);
   const current=openingKg+genConfirmed-collected;
-  const months=Array.from({length:12},(_,i)=>{const m=String(i+1).padStart(2,'0');const md=d.filter(r=>String(r.entry_date).slice(5,7)===m);const mc=c.filter(r=>String(r.collection_date).slice(5,7)===m);return {m,gen:md.filter(r=>r.weight_status==='confirmed').reduce((s,r)=>s+Number(r.weight_kg||0),0),unknown:md.filter(r=>r.weight_status!=='confirmed').length,col:mc.flatMap(x=>x.waste_collection_items).reduce((s,x)=>s+Number(x.weight_kg||0),0),count:mc.length}});
+  const months=Array.from({length:12},(_,i)=>{
+    const m=String(i+1).padStart(2,'0');
+    const md=d.filter(r=>String(r.entry_date).slice(5,7)===m);
+    const mc=c.filter(r=>String(r.collection_date).slice(5,7)===m);
+    return {
+      m,
+      gen:md.filter(r=>r.weight_status==='confirmed').reduce((s,r)=>s+Number(r.weight_kg||0),0),
+      unknown:md.filter(r=>r.weight_status!=='confirmed').length,
+      col:mc.flatMap(x=>x.waste_collection_items).reduce((s,x)=>s+Number(x.weight_kg||0),0),
+      count:mc.length
+    };
+  });
+
   $('#app').innerHTML=`
     <div id="notice" class="notice"></div>
     <div class="toolbar">
       <select id="year" class="btn">${[Number(year)-2,Number(year)-1,Number(year),Number(year)+1].map(y=>`<option ${String(y)===year?'selected':''}>${y}</option>`).join('')}</select>
       <select id="type" class="btn"><option value="">전체 폐기물</option>${activeTypes.map(t=>`<option value="${t.id}" ${t.id===typeFilter?'selected':''}>${esc(typeName(t))}</option>`).join('')}</select>
-      <span class="spacer"></span><button id="open-settings" class="btn">⚙ 설정</button>
+      <span class="spacer"></span>
+      <button id="open-settings" class="btn">⚙ 설정</button>
     </div>
     <div class="kpis">
       <div class="kpi"><div class="label">확정 발생량</div><div class="value">${num(genConfirmed/1000,4)} T</div></div>
@@ -88,18 +130,248 @@ async function renderStatus(){
       <div class="kpi"><div class="label">확정 기준 현재 보관량</div><div class="value">${num(current/1000,4)} T</div></div>
       <div class="kpi"><div class="label">중량 미확정 발생건</div><div class="value ${genUnknown?'warning':''}">${genUnknown}건</div></div>
     </div>
-    <div class="card"><div class="card-title">📊 ${year}년 폐기물 현황</div><div class="hint">중량 미확정 일일입력은 무게 합계에서 제외됩니다. 따라서 현재 보관량은 확정 중량 기준입니다.</div><br>
-      <div class="table-wrap"><table><thead><tr><th>월</th><th>확정 발생량(T)</th><th>중량 미확정(건)</th><th>수거횟수</th><th>처리량(T)</th></tr></thead><tbody>${months.map(x=>`<tr><td>${Number(x.m)}월</td><td class="num">${num(x.gen/1000,4)}</td><td class="num">${x.unknown}</td><td class="num">${x.count}</td><td class="num">${num(x.col/1000,4)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="card">
+      <div class="card-title">📊 ${year}년 폐기물 현황</div>
+      <div class="hint">중량 미확정 일일입력은 무게 합계에서 제외됩니다. 따라서 현재 보관량은 확정 중량 기준입니다.</div><br>
+      <div class="table-wrap"><table><thead><tr><th>월</th><th>확정 발생량(T)</th><th>중량 미확정(건)</th><th>수거횟수</th><th>처리량(T)</th></tr></thead><tbody>
+        ${months.map(x=>`<tr><td>${Number(x.m)}월</td><td class="num">${num(x.gen/1000,4)}</td><td class="num">${x.unknown}</td><td class="num">${x.count}</td><td class="num">${num(x.col/1000,4)}</td></tr>`).join('')}
+      </tbody></table></div>
     </div>`;
+
   $('#year').onchange=e=>{year=e.target.value;renderStatus()};
   $('#type').onchange=e=>{typeFilter=e.target.value;renderStatus()};
-  $('#open-settings').onclick=()=>{screenMode='settings';renderSettings();};
+  $('#open-settings').onclick=()=>renderSettings();
 }
 
 function settingsFieldHtml(f){
   const [id,label,type,opts]=f;
-  if(type==='select') return `<div class="field"><label>${label}</label><select id="${id}">${opts.map(x=>{const [v,t]=x.split(':');return `<option value="${v}">${t}</option>`}).join('')}</select></div>`;
+  if(type==='select'){
+    return `<div class="field"><label>${label}</label><select id="${id}">${opts.map(x=>{const [v,t]=x.split(':');return `<option value="${v}">${t}</option>`}).join('')}</select></div>`;
+  }
   return `<div class="field"><label>${label}</label><input id="${id}" type="${type}" ${['legal_name','vendor_name','location_name','unit_name'].includes(id)?'required':''}></div>`;
+}
+
+function vendorMethodsEditorHtml(){
+  return `
+    <div class="field">
+      <label>처리방법</label>
+      <div class="method-add-row">
+        <input id="new-method-name" type="text" placeholder="예: 중화, 고온소각, 소각, 증발">
+        <button type="button" class="btn" id="add-method">+ 추가</button>
+      </div>
+      <div class="hint">같은 업체에 처리방법을 여러 개 등록할 수 있습니다.</div>
+      <div id="method-list" class="method-list"></div>
+    </div>`;
+}
+
+function renderMethodDraft(){
+  const box=$('#method-list');
+  if(!box)return;
+  box.innerHTML=vendorMethodsDraft.length
+    ? vendorMethodsDraft.map((m,i)=>`
+      <div class="method-row">
+        <label class="check-option">
+          <input type="checkbox" data-method-active="${i}" ${m.active!==false?'checked':''}>
+          <span>${esc(m.method_name)}</span>
+        </label>
+        <button type="button" class="btn small danger" data-method-remove="${i}">${m.id?'미사용':'삭제'}</button>
+      </div>`).join('')
+    : `<div class="empty method-empty">등록된 처리방법이 없습니다.</div>`;
+
+  document.querySelectorAll('[data-method-active]').forEach(ch=>{
+    ch.onchange=()=>{vendorMethodsDraft[Number(ch.dataset.methodActive)].active=ch.checked;};
+  });
+  document.querySelectorAll('[data-method-remove]').forEach(btn=>{
+    btn.onclick=()=>{
+      const i=Number(btn.dataset.methodRemove);
+      if(vendorMethodsDraft[i]?.id){
+        vendorMethodsDraft[i].active=false;
+      }else{
+        vendorMethodsDraft.splice(i,1);
+      }
+      renderMethodDraft();
+    };
+  });
+}
+
+function addVendorMethod(){
+  const input=$('#new-method-name');
+  const name=String(input?.value||'').trim();
+  if(!name)return;
+  const exists=vendorMethodsDraft.some(m=>String(m.method_name).trim().toLowerCase()===name.toLowerCase());
+  if(exists)return notice('이미 추가된 처리방법입니다.','err');
+  vendorMethodsDraft.push({id:null,method_name:name,active:true,sort_order:vendorMethodsDraft.length+1});
+  input.value='';
+  renderMethodDraft();
+}
+
+async function renderSettings(){
+  $('#app').innerHTML=`
+    <div id="notice" class="notice"></div>
+    <div class="toolbar"><button id="back-status" class="btn">← 폐기물현황</button><span class="spacer"></span></div>
+    <div class="subtabs">${Object.entries(settingsConfigs).map(([k,v])=>`<button data-setting-tab="${k}" class="${k===settingsTab?'active':''}">${v.title}</button>`).join('')}</div>
+    <div id="settings-body"></div>`;
+
+  $('#back-status').onclick=()=>renderStatus();
+  document.querySelectorAll('[data-setting-tab]').forEach(b=>b.onclick=()=>{
+    settingsTab=b.dataset.settingTab;
+    vendorMethodsDraft=[];
+    renderSettings();
+  });
+
+  if(settingsTab==='opening')return renderOpeningSettings();
+
+  const c=settingsConfigs[settingsTab];
+  const ordered=['types','locations','units'].includes(settingsTab);
+
+  let rows=[];
+  let allMethods=[];
+  if(settingsTab==='vendors'){
+    const [vendorsRes,methodsRes]=await Promise.all([
+      A.list(c.table,'*','vendor_name',true),
+      A.list('waste_vendor_treatment_methods','*','sort_order',true)
+    ]);
+    rows=vendorsRes.data||[];
+    allMethods=methodsRes.data||[];
+  }else{
+    const res=await A.list(c.table,'*',ordered?'sort_order':'created_at',ordered);
+    rows=res.data||[];
+  }
+
+  $('#settings-body').innerHTML=`
+    <div class="grid two">
+      <div class="card">
+        <div class="card-title">⚙ ${c.title} 설정</div>
+        <form id="settings-form">
+          <input type="hidden" id="edit-id">
+          ${c.fields.map(settingsFieldHtml).join('')}
+          ${settingsTab==='vendors'?`
+            <div class="field">
+              <label>역할</label>
+              <div class="check-row">
+                <label class="check-option"><input type="checkbox" id="is_transporter"><span>운반업체</span></label>
+                <label class="check-option"><input type="checkbox" id="is_processor" checked><span>처리업체</span></label>
+              </div>
+            </div>
+            ${vendorMethodsEditorHtml()}
+          `:''}
+          <div class="field">
+            <label>사용 여부</label>
+            <label class="check-option single"><input type="checkbox" id="active" checked><span>사용</span></label>
+          </div>
+          <button class="btn primary" type="submit">저장</button>
+          <button class="btn" type="button" id="reset-settings">신규</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-title">등록 목록</div>
+        <div class="table-wrap"><table><thead><tr><th>명칭</th><th>상세</th><th>사용</th><th>관리</th></tr></thead><tbody>
+          ${rows.length?rows.map(r=>settingsRowHtml(r,allMethods)).join(''):`<tr><td colspan="4" class="empty">등록된 데이터가 없습니다.</td></tr>`}
+        </tbody></table></div>
+      </div>
+    </div>`;
+
+  $('#settings-form').onsubmit=saveSetting;
+  $('#reset-settings').onclick=()=>{vendorMethodsDraft=[];renderSettings();};
+
+  if(settingsTab==='vendors'){
+    $('#add-method').onclick=addVendorMethod;
+    $('#new-method-name').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addVendorMethod();}};
+    renderMethodDraft();
+  }
+
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editSetting(rows.find(r=>r.id===b.dataset.edit),allMethods));
+}
+
+function settingsRowHtml(r,allMethods=[]){
+  let name='',detail='';
+  if(settingsTab==='types'){
+    name=typeName(r);
+    detail=[r.legal_code,r.default_quantity_unit].filter(Boolean).join(' · ');
+  }
+  if(settingsTab==='vendors'){
+    name=r.vendor_name;
+    const roles=[r.is_transporter?'운반':'',r.is_processor?'처리':''].filter(Boolean).join('/');
+    const methods=allMethods.filter(m=>m.vendor_id===r.id&&m.active).map(m=>m.method_name).join(', ');
+    detail=[roles,r.permit_no,methods?`처리방법: ${methods}`:''].filter(Boolean).join(' · ');
+  }
+  if(settingsTab==='locations'){name=r.location_name;detail=r.description||''}
+  if(settingsTab==='units'){name=r.unit_name;detail=[r.capacity_l?`${r.capacity_l}L`:'',r.quantity_unit].filter(Boolean).join(' · ')}
+  return `<tr><td>${esc(name)}</td><td>${esc(detail)}</td><td>${r.active?'사용':'미사용'}</td><td><button class="btn small" data-edit="${r.id}">수정</button></td></tr>`;
+}
+
+function editSetting(r,allMethods=[]){
+  if(!r)return;
+  $('#edit-id').value=r.id;
+  const c=settingsConfigs[settingsTab];
+  c.fields.forEach(([id])=>{const e=$('#'+id);if(e)e.value=r[id]??''});
+  $('#active').checked=r.active!==false;
+
+  if(settingsTab==='vendors'){
+    $('#is_transporter').checked=!!r.is_transporter;
+    $('#is_processor').checked=!!r.is_processor;
+    vendorMethodsDraft=allMethods.filter(m=>m.vendor_id===r.id).map(m=>({...m}));
+    renderMethodDraft();
+  }
+}
+
+async function syncVendorMethods(vendorId){
+  for(let i=0;i<vendorMethodsDraft.length;i++){
+    const m=vendorMethodsDraft[i];
+    if(m.id){
+      const x=await A.update('waste_vendor_treatment_methods',m.id,{
+        method_name:m.method_name,
+        active:m.active!==false,
+        sort_order:i+1,
+        vendor_id:vendorId
+      });
+      if(x.error)throw x.error;
+    }else{
+      const x=await A.insert('waste_vendor_treatment_methods',{
+        vendor_id:vendorId,
+        method_name:m.method_name,
+        active:m.active!==false,
+        sort_order:i+1
+      });
+      if(x.error)throw x.error;
+    }
+  }
+}
+
+async function saveSetting(e){
+  e.preventDefault();
+  const c=settingsConfigs[settingsTab];
+  const id=$('#edit-id').value;
+  const p={};
+
+  c.fields.forEach(([fid,,type])=>{
+    let v=$('#'+fid).value;
+    if(type==='number')v=v===''?null:Number(v);
+    p[fid]=v;
+  });
+
+  p.active=$('#active').checked;
+  if(settingsTab==='types')p.display_name=null;
+  if(settingsTab==='vendors'){
+    p.is_transporter=$('#is_transporter').checked;
+    p.is_processor=$('#is_processor').checked;
+  }
+
+  const res=id?await A.update(c.table,id,p):await A.insert(c.table,p);
+  if(res.error)return notice(res.error.message,'err');
+
+  if(settingsTab==='vendors'){
+    try{
+      await syncVendorMethods(res.data.id);
+    }catch(err){
+      return notice('업체는 저장되었지만 처리방법 저장 중 오류: '+(err.message||err),'err');
+    }
+    vendorMethodsDraft=[];
+  }
+
+  notice('저장되었습니다.');
+  renderSettings();
 }
 
 async function loadSettingsBase(){
@@ -111,59 +383,59 @@ async function loadSettingsBase(){
   return {types:types.data||[],locs:locs.data||[],units:units.data||[]};
 }
 
-async function renderSettings(){
-  $('#app').innerHTML=`<div id="notice" class="notice"></div><div class="toolbar"><button id="back-status" class="btn">← 폐기물현황</button><span class="spacer"></span></div><div class="subtabs">${Object.entries(settingsConfigs).map(([k,v])=>`<button data-setting-tab="${k}" class="${k===settingsTab?'active':''}">${v.title}</button>`).join('')}</div><div id="settings-body"></div>`;
-  $('#back-status').onclick=()=>{screenMode='status';renderStatus();};
-  document.querySelectorAll('[data-setting-tab]').forEach(b=>b.onclick=()=>{settingsTab=b.dataset.settingTab;renderSettings();});
-  if(settingsTab==='opening') return renderOpeningSettings();
-  const c=settingsConfigs[settingsTab];
-  const ordered=['types','locations','units'].includes(settingsTab);
-  const res=await A.list(c.table,'*',ordered?'sort_order':'created_at',ordered);
-  const rows=res.data||[];
-  $('#settings-body').innerHTML=`<div class="grid two"><div class="card"><div class="card-title">⚙ ${c.title} 설정</div><form id="settings-form"><input type="hidden" id="edit-id">${c.fields.map(settingsFieldHtml).join('')}${settingsTab==='vendors'?`<div class="field"><label>역할</label><div class="check-row"><label class="check-option"><input type="checkbox" id="is_transporter"><span>운반업체</span></label><label class="check-option"><input type="checkbox" id="is_processor" checked><span>처리업체</span></label></div></div>`:''}<div class="field"><label>사용 여부</label><label class="check-option single"><input type="checkbox" id="active" checked><span>사용</span></label></div><button class="btn primary" type="submit">저장</button> <button class="btn" type="button" id="reset-settings">신규</button></form></div><div class="card"><div class="card-title">등록 목록</div><div class="table-wrap"><table><thead><tr><th>명칭</th><th>상세</th><th>사용</th><th>관리</th></tr></thead><tbody>${rows.length?rows.map(settingsRowHtml).join(''):`<tr><td colspan="4" class="empty">등록된 데이터가 없습니다.</td></tr>`}</tbody></table></div></div></div>`;
-  $('#settings-form').onsubmit=saveSetting;
-  $('#reset-settings').onclick=()=>renderSettings();
-  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editSetting(rows.find(r=>r.id===b.dataset.edit)));
-}
-
-function settingsRowHtml(r){
-  let name='',detail='';
-  if(settingsTab==='types'){name=typeName(r);detail=[r.legal_code,r.default_quantity_unit].filter(Boolean).join(' · ')}
-  if(settingsTab==='vendors'){name=r.vendor_name;detail=[r.is_transporter?'운반':'',r.is_processor?'처리':'',r.permit_no].filter(Boolean).join(' · ')}
-  if(settingsTab==='locations'){name=r.location_name;detail=r.description||''}
-  if(settingsTab==='units'){name=r.unit_name;detail=[r.capacity_l?`${r.capacity_l}L`:'',r.quantity_unit].filter(Boolean).join(' · ')}
-  return `<tr><td>${esc(name)}</td><td>${esc(detail)}</td><td>${r.active?'사용':'미사용'}</td><td><button class="btn small" data-edit="${r.id}">수정</button></td></tr>`;
-}
-
-function editSetting(r){
-  if(!r)return;
-  $('#edit-id').value=r.id;
-  const c=settingsConfigs[settingsTab];
-  c.fields.forEach(([id])=>{const e=$('#'+id);if(e)e.value=r[id]??''});
-  $('#active').checked=r.active!==false;
-  if(settingsTab==='vendors'){ $('#is_transporter').checked=!!r.is_transporter; $('#is_processor').checked=!!r.is_processor; }
-}
-
-async function saveSetting(e){
-  e.preventDefault();
-  const c=settingsConfigs[settingsTab],id=$('#edit-id').value,p={};
-  c.fields.forEach(([fid,,type])=>{let v=$('#'+fid).value;if(type==='number')v=v===''?null:Number(v);p[fid]=v});
-  p.active=$('#active').checked;
-  if(settingsTab==='types') p.display_name=null;
-  if(settingsTab==='vendors'){p.is_transporter=$('#is_transporter').checked;p.is_processor=$('#is_processor').checked;}
-  const res=id?await A.update(c.table,id,p):await A.insert(c.table,p);
-  if(res.error)return notice(res.error.message,'err');
-  notice('저장되었습니다.');
-  renderSettings();
-}
-
 async function renderOpeningSettings(){
   const base=await loadSettingsBase();
   const res=await A.list('waste_opening_balances','*,waste_types(*),waste_storage_locations(*),waste_container_units(*)','balance_date',false);
   const rows=res.data||[];
-  $('#settings-body').innerHTML=`<div class="grid two"><div class="card"><div class="card-title">📦 기초·이월량</div><form id="open-form"><div class="field"><label>기준일</label><input id="balance_date" type="date" value="${dateKey()}" required></div><div class="field"><label>폐기물 종류</label><select id="waste_type_id" required>${base.types.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(typeName(x))}</option>`).join('')}</select></div><div class="field"><label>보관장소</label><select id="storage_location_id"><option value="">선택 안함</option>${base.locs.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.location_name)}</option>`).join('')}</select></div><div class="field"><label>용기·단위</label><select id="container_unit_id"><option value="">선택 안함</option>${base.units.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.unit_name)}</option>`).join('')}</select></div><div class="inline"><div class="field"><label>기초수량</label><input id="quantity" type="number" min="0" step="0.001" value="0"></div><div class="field"><label>기초중량(kg, 모르면 공란)</label><input id="weight_kg" type="number" min="0" step="0.001"></div></div><div class="field"><label>비고</label><textarea id="note"></textarea></div><button class="btn primary" type="submit">저장</button></form></div><div class="card"><div class="card-title">기초·이월량 목록</div><div class="table-wrap"><table><thead><tr><th>기준일</th><th>폐기물</th><th>수량</th><th>중량</th><th></th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${r.balance_date}</td><td>${esc(typeName(r.waste_types||{}))}</td><td>${num(r.quantity,0)}</td><td>${r.weight_kg==null?'-':num(r.weight_kg,3)+' kg'}</td><td><button class="btn small danger" data-del="${r.id}">삭제</button></td></tr>`).join(''):`<tr><td colspan="5" class="empty">데이터 없음</td></tr>`}</tbody></table></div></div></div>`;
-  $('#open-form').onsubmit=async(e)=>{e.preventDefault();const p={balance_date:$('#balance_date').value,waste_type_id:$('#waste_type_id').value,storage_location_id:$('#storage_location_id').value||null,container_unit_id:$('#container_unit_id').value||null,quantity:Number($('#quantity').value||0),weight_kg:$('#weight_kg').value===''?null:Number($('#weight_kg').value),note:$('#note').value};const x=await A.insert('waste_opening_balances',p);if(x.error)return notice(x.error.message,'err');notice('기초량을 저장했습니다.');renderOpeningSettings()};
-  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('삭제하시겠습니까?'))return;const x=await A.remove('waste_opening_balances',b.dataset.del);if(x.error)return notice(x.error.message,'err');renderOpeningSettings()});
+
+  $('#settings-body').innerHTML=`
+    <div class="grid two">
+      <div class="card">
+        <div class="card-title">📦 기초·이월량</div>
+        <form id="open-form">
+          <div class="field"><label>기준일</label><input id="balance_date" type="date" value="${dateKey()}" required></div>
+          <div class="field"><label>폐기물 종류</label><select id="waste_type_id" required>${base.types.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(typeName(x))}</option>`).join('')}</select></div>
+          <div class="field"><label>보관장소</label><select id="storage_location_id"><option value="">선택 안함</option>${base.locs.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.location_name)}</option>`).join('')}</select></div>
+          <div class="field"><label>용기·단위</label><select id="container_unit_id"><option value="">선택 안함</option>${base.units.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.unit_name)}</option>`).join('')}</select></div>
+          <div class="inline">
+            <div class="field"><label>기초수량</label><input id="quantity" type="number" min="0" step="0.001" value="0"></div>
+            <div class="field"><label>기초중량(kg, 모르면 공란)</label><input id="weight_kg" type="number" min="0" step="0.001"></div>
+          </div>
+          <div class="field"><label>비고</label><textarea id="note"></textarea></div>
+          <button class="btn primary" type="submit">저장</button>
+        </form>
+      </div>
+      <div class="card">
+        <div class="card-title">기초·이월량 목록</div>
+        <div class="table-wrap"><table><thead><tr><th>기준일</th><th>폐기물</th><th>수량</th><th>중량</th><th></th></tr></thead><tbody>
+          ${rows.length?rows.map(r=>`<tr><td>${r.balance_date}</td><td>${esc(typeName(r.waste_types||{}))}</td><td>${num(r.quantity,0)}</td><td>${r.weight_kg==null?'-':num(r.weight_kg,3)+' kg'}</td><td><button class="btn small danger" data-del="${r.id}">삭제</button></td></tr>`).join(''):`<tr><td colspan="5" class="empty">데이터 없음</td></tr>`}
+        </tbody></table></div>
+      </div>
+    </div>`;
+
+  $('#open-form').onsubmit=async(e)=>{
+    e.preventDefault();
+    const p={
+      balance_date:$('#balance_date').value,
+      waste_type_id:$('#waste_type_id').value,
+      storage_location_id:$('#storage_location_id').value||null,
+      container_unit_id:$('#container_unit_id').value||null,
+      quantity:Number($('#quantity').value||0),
+      weight_kg:$('#weight_kg').value===''?null:Number($('#weight_kg').value),
+      note:$('#note').value
+    };
+    const x=await A.insert('waste_opening_balances',p);
+    if(x.error)return notice(x.error.message,'err');
+    notice('기초량을 저장했습니다.');
+    renderOpeningSettings();
+  };
+
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('삭제하시겠습니까?'))return;
+    const x=await A.remove('waste_opening_balances',b.dataset.del);
+    if(x.error)return notice(x.error.message,'err');
+    renderOpeningSettings();
+  });
 }
 
 renderStatus();
