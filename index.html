@@ -4631,8 +4631,17 @@ body.auth-loading .top-user-bar {
   }
 
   function canAccessWasteApp() {
-    // 폐기물 메뉴도 특허와 동일하게 '회사 관리자'에게만 노출합니다.
-    return Boolean(currentUser && !isServiceAdminRole() && canUseSettingsMenu());
+    // 폐기물 메뉴:
+    // 1) 회사 관리자에게 노출
+    // 2) 테스트본부(TEST01) 및 하위 테스트팀 사용자에게도 검증 목적으로 노출
+    // 테스트팀 예외는 메뉴 노출/접근만 허용하며 운영자 권한을 자동 부여하지 않습니다.
+    return Boolean(
+      currentUser &&
+      (
+        isTestDivisionUser() ||
+        (!isServiceAdminRole() && canUseSettingsMenu())
+      )
+    );
   }
 
   let wasteVisibilitySeq = 0;
