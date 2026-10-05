@@ -93,6 +93,13 @@ const settingsConfigs={
     ['description','설명','text'],
     ['sort_order','순서','number']
   ]},
+  approvals:{table:'waste_approval_settings',title:'결재설정',fields:[
+    ['ledger_type','대장 구분','select',['legal:사업장 폐기물 관리대장','facility:폐수배출시설 운영일지']],
+    ['writer_name','담당자 이름','text'],
+    ['writer_email','담당자 이메일','text'],
+    ['approver_name','결재자 이름','text'],
+    ['approver_email','결재자 이메일','text']
+  ]},
   opening:{table:'waste_opening_balances',title:'기초·이월량',fields:[]}
 };
 
@@ -465,7 +472,7 @@ function settingsFieldHtml(f){
   if(type==='select'){
     return `<div class="field"><label>${label}</label><select id="${id}">${opts.map(x=>{const [v,t]=x.split(':');return `<option value="${v}">${t}</option>`}).join('')}</select></div>`;
   }
-  return `<div class="field"><label>${label}</label><input id="${id}" type="${type}" ${['legal_name','vendor_name','location_name','unit_name','category_name','type_name'].includes(id)?'required':''}></div>`;
+  return `<div class="field"><label>${label}</label><input id="${id}" type="${type}" ${['legal_name','vendor_name','location_name','unit_name','category_name','type_name','writer_name','writer_email','approver_name','approver_email'].includes(id)?'required':''}></div>`;
 }
 
 function vendorMethodsEditorHtml(){
@@ -551,7 +558,8 @@ async function renderSettings(){
     rows=vendorsRes.data||[];
     allMethods=methodsRes.data||[];
   }else{
-    const res=await A.list(c.table,'*',ordered?'sort_order':'created_at',ordered);
+    const orderCol=settingsTab==='approvals'?'ledger_type':(ordered?'sort_order':'created_at');
+    const res=await A.list(c.table,'*',orderCol,settingsTab==='approvals'?true:ordered);
     rows=res.data||[];
   }
 
@@ -562,6 +570,12 @@ async function renderSettings(){
         <form id="settings-form">
           <input type="hidden" id="edit-id">
           ${c.fields.map(settingsFieldHtml).join('')}
+          ${settingsTab==='approvals'?`
+            <div class="hint" style="margin:-2px 0 12px;">
+              담당자가 먼저 결재해야 결재자 결재가 가능하며, 최종결재 후 담당자 결재취소는 불가능합니다.
+              이메일은 포털 로그인 이메일과 동일하게 입력하세요.
+            </div>
+          `:''}
           ${settingsTab==='vendors'?`
             <div class="field">
               <label>역할</label>
@@ -617,6 +631,10 @@ function settingsRowHtml(r,allMethods=[]){
   if(settingsTab==='units'){name=r.unit_name;detail=[r.capacity_l?`${r.capacity_l}L`:'',r.quantity_unit].filter(Boolean).join(' · ')}
   if(settingsTab==='referenceCategories'){name=r.category_name;detail=r.description||''}
   if(settingsTab==='documentTypes'){name=r.type_name;detail=r.description||''}
+  if(settingsTab==='approvals'){
+    name=r.ledger_type==='facility'?'폐수배출시설 운영일지':'사업장 폐기물 관리대장';
+    detail=`담당자: ${r.writer_name||'-'} (${r.writer_email||'-'}) / 결재자: ${r.approver_name||'-'} (${r.approver_email||'-'})`;
+  }
   return `<tr><td>${esc(name)}</td><td>${esc(detail)}</td><td>${r.active?'사용':'미사용'}</td><td><button class="btn small" data-edit="${r.id}">수정</button></td></tr>`;
 }
 
