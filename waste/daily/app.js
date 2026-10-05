@@ -755,4 +755,3 @@ async function delFacility(id){
 }
 
 load();
-
