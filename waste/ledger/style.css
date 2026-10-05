@@ -362,3 +362,91 @@
 .legal-ledger-table tbody td:nth-child(2){
   text-align:left !important;
 }
+
+
+/* =========================================================
+   사업장 폐기물 관리대장 그룹 구분 강화
+   ② 발생내용 / ③ 자가 처리내용 / ④ 위탁 처리내용 / ⑤ 보관량
+   - 그룹 제목 배경색
+   - 그룹 경계 2px 세로선
+   - 본문에도 동일한 경계선을 이어서 표시
+========================================================= */
+
+/* 1행 그룹 제목 */
+.legal-ledger-table thead tr:first-child th:nth-child(1){
+  background:#eef5ff !important;
+  color:#29496f;
+  border-right:2px solid #9fb2c8 !important;
+}
+.legal-ledger-table thead tr:first-child th:nth-child(2){
+  background:#edf8f2 !important;
+  color:#286044;
+  border-right:2px solid #9fb2c8 !important;
+}
+.legal-ledger-table thead tr:first-child th:nth-child(3){
+  background:#fff5e9 !important;
+  color:#805523;
+  border-right:2px solid #9fb2c8 !important;
+}
+.legal-ledger-table thead tr:first-child th:nth-child(4){
+  background:#f3f5f8 !important;
+  color:#46566d;
+}
+
+/* 2행 세부 컬럼도 그룹별로 아주 옅게 구분 */
+.legal-ledger-table thead tr:nth-child(2) th:nth-child(-n+4){
+  background:#f8fbff !important;
+}
+.legal-ledger-table thead tr:nth-child(2) th:nth-child(n+5):nth-child(-n+7){
+  background:#f8fcfa !important;
+}
+.legal-ledger-table thead tr:nth-child(2) th:nth-child(n+8):nth-child(-n+13){
+  background:#fffaf4 !important;
+}
+
+/* 그룹 경계선: 발생 → 자가처리 → 위탁처리 → 보관량 */
+.legal-ledger-table thead tr:nth-child(2) th:nth-child(4),
+.legal-ledger-table tbody td:nth-child(4){
+  border-right:2px solid #9fb2c8 !important;
+}
+.legal-ledger-table thead tr:nth-child(2) th:nth-child(7),
+.legal-ledger-table tbody td:nth-child(7){
+  border-right:2px solid #9fb2c8 !important;
+}
+.legal-ledger-table thead tr:nth-child(2) th:nth-child(13),
+.legal-ledger-table tbody td:nth-child(13){
+  border-right:2px solid #9fb2c8 !important;
+}
+
+/* 보관량 영역은 마지막 결과값임을 조금 더 강조 */
+.legal-ledger-table tbody td:nth-child(14){
+  background:#fbfcfd;
+  font-weight:800;
+}
+
+/* 행 위에 마우스를 올려도 그룹 경계는 유지 */
+.legal-ledger-table tbody tr:hover td{
+  background-color:#f8fbfd;
+}
+.legal-ledger-table tbody tr:hover td:nth-child(14){
+  background-color:#f2f6f9;
+}
+
+/* 인쇄 시 색이 빠져도 그룹선으로 명확히 구분 */
+@media print{
+  .legal-ledger-table{
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+  .legal-ledger-table thead tr:first-child th:nth-child(1),
+  .legal-ledger-table thead tr:first-child th:nth-child(2),
+  .legal-ledger-table thead tr:first-child th:nth-child(3),
+  .legal-ledger-table thead tr:nth-child(2) th:nth-child(4),
+  .legal-ledger-table thead tr:nth-child(2) th:nth-child(7),
+  .legal-ledger-table thead tr:nth-child(2) th:nth-child(13),
+  .legal-ledger-table tbody td:nth-child(4),
+  .legal-ledger-table tbody td:nth-child(7),
+  .legal-ledger-table tbody td:nth-child(13){
+    border-right:2px solid #777 !important;
+  }
+}
