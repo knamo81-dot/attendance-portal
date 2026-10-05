@@ -285,7 +285,10 @@ async function renderStatus(){
 
   const allDailyYear=(daily.data||[]).filter(yf);
   const allCollectionsYear=(cols.data||[]).filter(yf);
-  const allOpening=(opening.data||[]);
+  // 기초·이월량은 일반 관리대장용과 폐수배출시설 운영일지용을 함께 보관한다.
+  // 폐기물현황/KPI는 일반 기초·이월량만 사용한다.
+  const allOpeningRows=(opening.data||[]);
+  const allOpening=allOpeningRows.filter(r=>r.is_facility_log!==true);
 
   const d=allDailyYear.filter(r=>!typeFilter||r.waste_type_id===typeFilter);
   const c=allCollectionsYear
@@ -726,8 +729,22 @@ async function loadSettingsBase(){
 
 async function renderOpeningSettings(){
   const base=await loadSettingsBase();
-  const res=await A.list('waste_opening_balances','*,waste_types(*),waste_storage_locations(*),waste_container_units(*)','balance_date',false);
+  const res=await A.list(
+    'waste_opening_balances',
+    '*,waste_types(*),waste_storage_locations(*),waste_container_units(*)',
+    'balance_date',
+    false
+  );
   const rows=res.data||[];
+
+  const facilityRowDetail=(r)=>{
+    const external=r.facility_has_external
+      ? ` / 외부 ${num(r.facility_external_ton||0,2)} T · ${num(r.facility_external_cm||0,1)} cm`
+      : '';
+    return `
+      <div><b>용수 전일 지침</b> ${num(r.facility_prev_usage||0,2)} m³</div>
+      <div><b>기초 높이</b> ${num(r.facility_height_cm||0,1)} cm${external}</div>`;
+  };
 
   $('#settings-body').innerHTML=`
     <div class="grid two">
@@ -736,38 +753,194 @@ async function renderOpeningSettings(){
         <form id="open-form">
           <div class="field"><label>기준일</label><input id="balance_date" type="date" value="${dateKey()}" required></div>
           <div class="field"><label>폐기물 종류</label><select id="waste_type_id" required>${base.types.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(typeName(x))}</option>`).join('')}</select></div>
-          <div class="field"><label>보관장소</label><select id="storage_location_id"><option value="">선택 안함</option>${base.locs.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.location_name)}</option>`).join('')}</select></div>
-          <div class="field"><label>용기·단위</label><select id="container_unit_id"><option value="">선택 안함</option>${base.units.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.unit_name)}</option>`).join('')}</select></div>
-          <div class="inline">
-            <div class="field"><label>기초수량</label><input id="quantity" type="number" min="0" step="0.001" value="0"></div>
-            <div class="field"><label>기초중량(kg, 모르면 공란)</label><input id="weight_kg" type="number" min="0" step="0.001"></div>
+
+          <label class="opening-mode-switch" for="opening_facility_mode">
+            <input id="opening_facility_mode" type="checkbox">
+            <span>
+              <strong>폐수배출시설 운영일지</strong>
+              <small>체크하면 운영일지 계산을 시작하기 위한 기초값 입력으로 전환됩니다.</small>
+            </span>
+          </label>
+
+          <div id="opening-general-fields">
+            <div class="field"><label>보관장소</label><select id="storage_location_id"><option value="">선택 안함</option>${base.locs.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.location_name)}</option>`).join('')}</select></div>
+            <div class="field"><label>용기·단위</label><select id="container_unit_id"><option value="">선택 안함</option>${base.units.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.unit_name)}</option>`).join('')}</select></div>
+            <div class="inline">
+              <div class="field"><label>기초수량</label><input id="quantity" type="number" min="0" step="0.001" value="0"></div>
+              <div class="field"><label>기초중량(kg, 모르면 공란)</label><input id="weight_kg" type="number" min="0" step="0.001"></div>
+            </div>
           </div>
+
+          <div id="opening-facility-fields" style="display:none">
+            <div class="field">
+              <label>용수 전일 지침 (누적값 m³)</label>
+              <input id="facility_prev_usage" type="number" min="0" step="0.01" value="0">
+              <div class="field-help">첫 운영일지의 당일 용수사용량 계산 기준값입니다.</div>
+            </div>
+
+            <div class="field">
+              <label>폐수 기초높이 (cm)</label>
+              <input id="facility_height_cm" type="number" min="0" step="0.1" value="0">
+              <div class="field-help">첫 운영일지의 폐수 발생량 계산에 사용할 전일 저장량 기준입니다.</div>
+            </div>
+
+            <label class="opening-sub-switch" for="facility_has_external">
+              <input id="facility_has_external" type="checkbox">
+              <span>외부보관 있음</span>
+            </label>
+
+            <div id="facility-external-fields" class="opening-expand" style="display:none">
+              <div class="inline">
+                <div class="field">
+                  <label>외부보관량 (T)</label>
+                  <input id="facility_external_ton" type="number" min="0" step="0.1" value="1">
+                </div>
+                <div class="field">
+                  <label>환산높이 (cm)</label>
+                  <input id="facility_external_cm" type="number" min="0" step="0.1" value="22">
+                </div>
+              </div>
+            </div>
+
+            <div class="opening-preview">
+              <div>
+                <span>기초 합산높이</span>
+                <strong id="opening_total_cm">0.0 cm</strong>
+              </div>
+              <div>
+                <span>기초 폐수량</span>
+                <strong id="opening_total_m3">0.00 m³</strong>
+              </div>
+            </div>
+          </div>
+
           <div class="field"><label>비고</label><textarea id="note"></textarea></div>
           <button class="btn primary" type="submit">저장</button>
         </form>
       </div>
+
       <div class="card">
         <div class="card-title">기초·이월량 목록</div>
-        <div class="table-wrap"><table><thead><tr><th>기준일</th><th>폐기물</th><th>수량</th><th>중량</th><th></th></tr></thead><tbody>
-          ${rows.length?rows.map(r=>`<tr><td>${r.balance_date}</td><td>${esc(typeName(r.waste_types||{}))}</td><td>${num(r.quantity,0)}</td><td>${r.weight_kg==null?'-':num(r.weight_kg,3)+' kg'}</td><td><button class="btn small danger" data-del="${r.id}">삭제</button></td></tr>`).join(''):`<tr><td colspan="5" class="empty">데이터 없음</td></tr>`}
-        </tbody></table></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>기준일</th>
+                <th>폐기물</th>
+                <th>구분</th>
+                <th>기초값</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.length?rows.map(r=>`
+                <tr>
+                  <td>${r.balance_date}</td>
+                  <td>${esc(typeName(r.waste_types||{}))}</td>
+                  <td>
+                    ${r.is_facility_log===true
+                      ? '<span class="pill green">폐수배출시설 운영일지</span>'
+                      : '<span class="pill">일반 기초·이월량</span>'}
+                  </td>
+                  <td class="opening-value-cell">
+                    ${r.is_facility_log===true
+                      ? facilityRowDetail(r)
+                      : `${num(r.quantity,0)}${r.weight_kg==null?'':' / '+num(r.weight_kg,3)+' kg'}`}
+                  </td>
+                  <td><button class="btn small danger" data-del="${r.id}">삭제</button></td>
+                </tr>`).join('')
+                : `<tr><td colspan="5" class="empty">데이터 없음</td></tr>`}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>`;
 
+  const mode=$('#opening_facility_mode');
+  const generalBox=$('#opening-general-fields');
+  const facilityBox=$('#opening-facility-fields');
+  const externalCheck=$('#facility_has_external');
+  const externalBox=$('#facility-external-fields');
+
+  function updateOpeningPreview(){
+    const h=Number($('#facility_height_cm')?.value||0);
+    const hasExternal=$('#facility_has_external')?.checked||false;
+    const extCm=hasExternal?Number($('#facility_external_cm')?.value||0):0;
+    const total=Math.max(0,h+extCm);
+    // 운영일지 현재 기준과 동일: 154 cm = 7 m³
+    const m3=(total/154)*7;
+    if($('#opening_total_cm'))$('#opening_total_cm').textContent=`${num(total,1)} cm`;
+    if($('#opening_total_m3'))$('#opening_total_m3').textContent=`${num(m3,2)} m³`;
+  }
+
+  function syncOpeningMode(){
+    const facility=mode.checked;
+    generalBox.style.display=facility?'none':'block';
+    facilityBox.style.display=facility?'block':'none';
+    if(facility){
+      externalBox.style.display=externalCheck.checked?'block':'none';
+      updateOpeningPreview();
+    }
+  }
+
+  mode.onchange=syncOpeningMode;
+  externalCheck.onchange=()=>{
+    externalBox.style.display=externalCheck.checked?'block':'none';
+    updateOpeningPreview();
+  };
+  ['#facility_height_cm','#facility_external_ton','#facility_external_cm'].forEach(sel=>{
+    const el=$(sel);
+    if(el)el.oninput=updateOpeningPreview;
+  });
+  syncOpeningMode();
+
   $('#open-form').onsubmit=async(e)=>{
     e.preventDefault();
-    const p={
-      balance_date:$('#balance_date').value,
-      waste_type_id:$('#waste_type_id').value,
-      storage_location_id:$('#storage_location_id').value||null,
-      container_unit_id:$('#container_unit_id').value||null,
-      quantity:Number($('#quantity').value||0),
-      weight_kg:$('#weight_kg').value===''?null:Number($('#weight_kg').value),
-      note:$('#note').value
-    };
+
+    const facility=mode.checked;
+
+    const p=facility
+      ? {
+          balance_date:$('#balance_date').value,
+          waste_type_id:$('#waste_type_id').value,
+          storage_location_id:null,
+          container_unit_id:null,
+          quantity:0,
+          weight_kg:null,
+          is_facility_log:true,
+          facility_prev_usage:Number($('#facility_prev_usage').value||0),
+          facility_height_cm:Number($('#facility_height_cm').value||0),
+          facility_has_external:externalCheck.checked,
+          facility_external_ton:externalCheck.checked
+            ? Number($('#facility_external_ton').value||0)
+            : null,
+          facility_external_cm:externalCheck.checked
+            ? Number($('#facility_external_cm').value||0)
+            : null,
+          note:$('#note').value
+        }
+      : {
+          balance_date:$('#balance_date').value,
+          waste_type_id:$('#waste_type_id').value,
+          storage_location_id:$('#storage_location_id').value||null,
+          container_unit_id:$('#container_unit_id').value||null,
+          quantity:Number($('#quantity').value||0),
+          weight_kg:$('#weight_kg').value===''?null:Number($('#weight_kg').value),
+          is_facility_log:false,
+          facility_prev_usage:null,
+          facility_height_cm:null,
+          facility_has_external:false,
+          facility_external_ton:null,
+          facility_external_cm:null,
+          note:$('#note').value
+        };
+
     const x=await A.insert('waste_opening_balances',p);
     if(x.error)return notice(x.error.message,'err');
-    notice('기초량을 저장했습니다.');
+
+    notice(facility
+      ? '폐수배출시설 운영일지 기초값을 저장했습니다.'
+      : '기초량을 저장했습니다.');
     renderOpeningSettings();
   };
 
