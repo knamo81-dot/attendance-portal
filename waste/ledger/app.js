@@ -278,42 +278,112 @@ function monthlyEvents(){
 }
 
 function legalLedgerRows(){
+  /*
+    사업장 폐기물 관리대장은 같은 날짜 + 같은 폐기물 종류를 한 행으로 묶습니다.
+
+    예)
+      2026-01-28 발생 0.1500T
+      2026-01-28 위탁 0.1500T
+      -> 발생내용과 위탁 처리내용을 동일 행에 표시
+
+    누계/보관량은 날짜 오름차순으로 먼저 계산한 뒤,
+    화면에서는 최신 날짜가 위로 오도록 내림차순으로 표시합니다.
+  */
   const events=monthlyEvents();
+  const groups=new Map();
+
+  events.forEach(ev=>{
+    const key=`${ev.date}|${ev.waste_type_id}`;
+
+    if(!groups.has(key)){
+      groups.set(key,{
+        date:ev.date,
+        waste_type_id:ev.waste_type_id,
+        waste_type:ev.waste_type||typeById(ev.waste_type_id),
+
+        hasGeneration:false,
+        generationKg:0,
+        hasUnknownGeneration:false,
+
+        hasSelf:false,
+        selfKg:0,
+        selfMethods:new Set(),
+
+        hasOut:false,
+        outsourcedKg:0,
+        outTransporters:new Set(),
+        outProcessors:new Set(),
+        outMethods:new Set()
+      });
+    }
+
+    const g=groups.get(key);
+    if(!g.waste_type && ev.waste_type) g.waste_type=ev.waste_type;
+
+    if(ev.kind==='generation'){
+      g.hasGeneration=true;
+      if(ev.confirmed){
+        g.generationKg+=Number(ev.weight_kg||0);
+      }else{
+        g.hasUnknownGeneration=true;
+      }
+      return;
+    }
+
+    if(ev.kind==='collection'){
+      const method=String(ev.method?.method_name||'').trim();
+
+      if(ev.treatment_type==='self'){
+        g.hasSelf=true;
+        g.selfKg+=Number(ev.weight_kg||0);
+        if(method) g.selfMethods.add(method);
+      }else{
+        g.hasOut=true;
+        g.outsourcedKg+=Number(ev.weight_kg||0);
+
+        const transporter=String(ev.transporter?.vendor_name||'').trim();
+        const processor=String(ev.processor?.vendor_name||'').trim();
+
+        if(transporter) g.outTransporters.add(transporter);
+        if(processor) g.outProcessors.add(processor);
+        if(method) g.outMethods.add(method);
+      }
+    }
+  });
+
+  const ordered=[...groups.values()].sort((a,b)=>{
+    const d=String(a.date).localeCompare(String(b.date));
+    if(d!==0)return d;
+    return typeName(a.waste_type).localeCompare(typeName(b.waste_type),'ko');
+  });
+
   let genCum=0;
   let outsourcedCum=0;
   let balance=openingBalanceKg();
   let hasUnknown=false;
 
-  const calculated=events.map(ev=>{
-    let generationKg=0;
-    let selfKg=0;
-    let outsourcedKg=0;
-
-    if(ev.kind==='generation'){
-      if(ev.confirmed){
-        generationKg=ev.weight_kg;
-        genCum+=generationKg;
-        balance+=generationKg;
-      }else{
-        hasUnknown=true;
-      }
+  const calculated=ordered.map(g=>{
+    if(g.hasGeneration){
+      genCum+=g.generationKg;
+      balance+=g.generationKg;
+      if(g.hasUnknownGeneration)hasUnknown=true;
     }
 
-    if(ev.kind==='collection'){
-      if(ev.treatment_type==='self'){
-        selfKg=ev.weight_kg;
-      }else{
-        outsourcedKg=ev.weight_kg;
-        outsourcedCum+=outsourcedKg;
-      }
-      balance-=ev.weight_kg;
+    if(g.hasSelf){
+      balance-=g.selfKg;
+    }
+
+    if(g.hasOut){
+      outsourcedCum+=g.outsourcedKg;
+      balance-=g.outsourcedKg;
     }
 
     return {
-      ...ev,
-      generationKg,
-      selfKg,
-      outsourcedKg,
+      ...g,
+      selfMethods:[...g.selfMethods],
+      outTransporters:[...g.outTransporters],
+      outProcessors:[...g.outProcessors],
+      outMethods:[...g.outMethods],
       genCum,
       outsourcedCum,
       balance,
@@ -324,7 +394,6 @@ function legalLedgerRows(){
   return calculated.sort((a,b)=>{
     const d=String(b.date).localeCompare(String(a.date));
     if(d!==0)return d;
-    if(a.kind!==b.kind)return a.kind==='generation'?-1:1;
     return typeName(a.waste_type).localeCompare(typeName(b.waste_type),'ko');
   });
 }
@@ -995,32 +1064,46 @@ function renderLegal(){
 
           <tbody>
             ${rows.length ? rows.map(r=>{
-              const isGeneration=r.kind==='generation';
-              const isSelf=r.kind==='collection'&&r.treatment_type==='self';
-              const isOut=r.kind==='collection'&&r.treatment_type!=='self';
+              const generationDisplay=!r.hasGeneration
+                ? '-'
+                : (r.hasUnknownGeneration
+                    ? (r.generationKg>0
+                        ? `${num(r.generationKg/1000,4)}<br><span class="pill amber">+ 미확정</span>`
+                        : '<span class="pill amber">미확정</span>')
+                    : num(r.generationKg/1000,4));
+
+              const selfMethods=(r.selfMethods||[]).length
+                ? r.selfMethods.map(x=>esc(x)).join('<br>')
+                : '-';
+
+              const outTransporters=(r.outTransporters||[]).length
+                ? r.outTransporters.map(x=>esc(x)).join('<br>')
+                : '-';
+
+              const outProcessors=(r.outProcessors||[]).length
+                ? r.outProcessors.map(x=>esc(x)).join('<br>')
+                : '-';
+
+              const outMethods=(r.outMethods||[]).length
+                ? r.outMethods.map(x=>esc(x)).join('<br>')
+                : '-';
 
               return `
                 <tr>
-                  <td>${isGeneration?r.date:'-'}</td>
+                  <td>${r.hasGeneration?r.date:'-'}</td>
                   <td>${natureCell(r)}</td>
-                  <td class="num">
-                    ${isGeneration
-                      ? (r.confirmed
-                          ? num(r.generationKg/1000,4)
-                          : '<span class="pill amber">미확정</span>')
-                      : '-'}
-                  </td>
+                  <td class="num">${generationDisplay}</td>
                   <td class="num">${num(r.genCum/1000,4)}</td>
 
-                  <td>${isSelf?r.date:'-'}</td>
-                  <td class="num">${isSelf?num(r.selfKg/1000,4):'-'}</td>
-                  <td>${isSelf?esc(r.method?.method_name||'-'):'-'}</td>
+                  <td>${r.hasSelf?r.date:'-'}</td>
+                  <td class="num">${r.hasSelf?num(r.selfKg/1000,4):'-'}</td>
+                  <td>${r.hasSelf?selfMethods:'-'}</td>
 
-                  <td>${isOut?r.date:'-'}</td>
-                  <td class="num">${isOut?num(r.outsourcedKg/1000,4):'-'}</td>
-                  <td>${isOut?esc(r.transporter?.vendor_name||'-'):'-'}</td>
-                  <td>${isOut?esc(r.processor?.vendor_name||'-'):'-'}</td>
-                  <td>${isOut?esc(r.method?.method_name||'-'):'-'}</td>
+                  <td>${r.hasOut?r.date:'-'}</td>
+                  <td class="num">${r.hasOut?num(r.outsourcedKg/1000,4):'-'}</td>
+                  <td>${r.hasOut?outTransporters:'-'}</td>
+                  <td>${r.hasOut?outProcessors:'-'}</td>
+                  <td>${r.hasOut?outMethods:'-'}</td>
                   <td class="num">${num(r.outsourcedCum/1000,4)}</td>
 
                   <td class="num">
