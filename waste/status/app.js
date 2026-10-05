@@ -51,6 +51,24 @@ function typeName(r){return r.display_name||`${r.legal_name||''}${r.physical_sta
 function dateKey(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function notice(msg,type='ok'){const el=$('#notice');if(!el)return;el.textContent=msg;el.className='notice show '+type;setTimeout(()=>el.classList.remove('show'),3500)}
 
+
+function getWasteAppRole(){
+  const s=A.portalSession()||{};
+  const roles=s.appRoles||s.app_roles||{};
+  const row=roles.waste||{};
+  const raw=typeof row==='string'
+    ? row
+    : (row.role||row.role_key||row.permission||row.permission_key||'user');
+  const role=String(raw||'user').trim().toLowerCase();
+  if(['관리자','administrator'].includes(role))return 'admin';
+  if(['운영자','manager'].includes(role))return 'operator';
+  return role||'user';
+}
+function canManageWaste(){
+  const role=getWasteAppRole();
+  return role==='admin'||role==='operator';
+}
+
 let year=String(new Date().getFullYear());
 let typeFilter='';
 let settingsTab='types';
@@ -371,7 +389,7 @@ async function renderStatus(){
       </select>
 
       <span class="spacer"></span>
-      <button id="open-settings" class="btn">⚙ 설정</button>
+      ${canManageWaste()?'<button id="open-settings" class="btn">⚙ 설정</button>':''}
     </div>
 
     <div class="kpis kpis-rich">
@@ -454,7 +472,7 @@ async function renderStatus(){
     renderStatus();
   };
 
-  $('#open-settings').onclick=()=>renderSettings();
+  if($('#open-settings'))$('#open-settings').onclick=()=>renderSettings();
 }
 
 // helper used only for build-time compatibility; value replaced later
@@ -523,6 +541,10 @@ function addVendorMethod(){
 }
 
 async function renderSettings(){
+  if(!canManageWaste()){
+    await renderStatus();
+    return;
+  }
   $('#app').innerHTML=`
     <div id="notice" class="notice"></div>
     <div class="toolbar"><button id="back-status" class="btn">← 폐기물현황</button><span class="spacer"></span></div>
