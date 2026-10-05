@@ -59,6 +59,25 @@ const $=(s)=>document.querySelector(s);
 const esc=(v)=>String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));
 const STORAGE_BUCKET='waste-editor-files';
 
+
+function getWasteAppRole(){
+  const s=A.portalSession()||{};
+  const roles=s.appRoles||s.app_roles||{};
+  const row=roles.waste||{};
+  const raw=typeof row==='string'
+    ? row
+    : (row.role||row.role_key||row.permission||row.permission_key||'user');
+  const role=String(raw||'user').trim().toLowerCase();
+  if(['관리자','administrator'].includes(role))return 'admin';
+  if(['운영자','manager'].includes(role))return 'operator';
+  return role||'user';
+}
+function canManageWaste(){
+  const role=getWasteAppRole();
+  return role==='admin'||role==='operator';
+}
+
+
 function notice(msg,type='ok'){
   const el=$('#notice');
   if(!el)return;
@@ -485,8 +504,10 @@ function listRows(){
       <td>${esc(r.created_by||'-')}</td>
       <td><div class="row-actions">
         <button class="btn small" data-view="${r.id}">보기</button>
-        <button class="btn small" data-edit="${r.id}">수정</button>
-        <button class="btn small danger" data-del="${r.id}">삭제</button>
+        ${canManageWaste()?`
+          <button class="btn small" data-edit="${r.id}">수정</button>
+          <button class="btn small danger" data-del="${r.id}">삭제</button>
+        `:''}
       </div></td>
     </tr>`;
   }).join('');
@@ -563,7 +584,7 @@ function viewContent(){
       </div>
       <div class="writer-actions">
         <button class="btn" id="view-back">목록으로</button>
-        <button class="btn primary" id="view-edit">수정</button>
+        ${canManageWaste()?'<button class="btn primary" id="view-edit">수정</button>':''}
       </div>
     </div>`;
 }
@@ -575,7 +596,7 @@ function render(){
       <div class="section-head library-head">
         <div><h2>📚 관련자료</h2><div class="hint">외부 점검 대응자료, Q&A, 운영 매뉴얼 등 참고자료를 종류별로 관리합니다.</div></div>
         <div class="spacer"></div>
-        ${mode==='list'?`<button class="btn primary" id="write" ${categories.length?'':'disabled'}>글쓰기</button>`:''}
+        ${mode==='list'&&canManageWaste()?`<button class="btn primary" id="write" ${categories.length?'':'disabled'}>글쓰기</button>`:''}
       </div>
       <div class="library-layout">
         <aside class="library-sidebar">${categoryButtons()}</aside>
@@ -601,10 +622,14 @@ function render(){
   if(mode==='view'){
     hydrateInlineImages($('#article-body'));
     $('#view-back').onclick=()=>{viewing=null;mode='list';render()};
-    $('#view-edit').onclick=()=>openEditor(viewing);
+    if($('#view-edit'))$('#view-edit').onclick=()=>openEditor(viewing);
   }
 }
 function openEditor(row){
+  if(!canManageWaste()){
+    notice('폐기물 운영자만 글쓰기/수정이 가능합니다.','err');
+    return;
+  }
   editing=row||null;
   viewing=null;
   ownerId=row?.id||uid();
@@ -685,6 +710,10 @@ async function cancelEditor(){
   editing=null; ownerId=''; mode='list'; render();
 }
 async function save(e){
+  if(!canManageWaste()){
+    e?.preventDefault?.();
+    return notice('폐기물 운영자만 저장할 수 있습니다.','err');
+  }
   e.preventDefault();
   const category=categories.find(c=>c.id===$('#category_id').value);
   if(!category)return notice('자료 종류를 선택하세요.','err');
@@ -701,6 +730,7 @@ async function save(e){
   await load(); notice('저장되었습니다.');
 }
 async function del(id){
+  if(!canManageWaste())return notice('폐기물 운영자만 삭제할 수 있습니다.','err');
   if(!confirm('이 관련자료와 첨부파일을 삭제하시겠습니까?'))return;
   const owned=rowFiles(id);
   if(owned.length){
