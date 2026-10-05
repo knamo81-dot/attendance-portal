@@ -3,74 +3,196 @@
 @media(max-width:900px){body{padding:8px}.grid.two,.grid.three,.kpis{grid-template-columns:1fr}.card{padding:13px}.inline{flex-direction:column;align-items:stretch}.toolbar{align-items:stretch}.toolbar .spacer{display:none}.btn{min-height:40px}table{min-width:680px}.kpis{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:520px){.kpis{grid-template-columns:1fr}.card-title{font-size:16px}body{padding:6px}}
 
+
+/* ===== Waste app full-width desktop layout 2026-10-04 ===== */
+.page{width:100%;max-width:none;margin:0;}
+@media(min-width:901px){
+  body{padding:10px 12px;}
+  .page{width:100%;max-width:none;margin:0;}
+  .card,.table-wrap{min-width:0;}
+  .grid.two{grid-template-columns:minmax(360px,430px) minmax(0,1fr);}
+}
+
+
 /* =========================================================
-   Waste app layout final - wastewater layout 기준 통일
-   - 전체 iframe 폭 사용
-   - 입력형 화면: 좌측 390px + 우측 가변
-   - 1100px 이하: 1단
-   - 표: 카드 가로폭 100% 사용
+   월별 결재 UI
 ========================================================= */
-html,
-body{
-  width:100%;
-  min-height:100%;
+.ledger-top-area{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 320px;
+  gap:18px;
+  align-items:stretch;
+}
+.ledger-heading-block{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+}
+.ledger-title-row{
+  margin-bottom:8px;
+}
+.approval-panel{
+  display:grid;
+  grid-template-columns:34px repeat(2,minmax(125px,1fr));
+  min-height:112px;
+  border:1px solid #93a0af;
+  background:#fff;
+  overflow:hidden;
+}
+.approval-label{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-right:1px solid #93a0af;
+  writing-mode:vertical-rl;
+  text-orientation:upright;
+  letter-spacing:3px;
+  font-size:11px;
+  font-weight:900;
+  color:#10203c;
+}
+.approval-cell{
+  display:grid;
+  grid-template-rows:30px 1fr;
+  min-width:0;
+}
+.approval-cell + .approval-cell{
+  border-left:1px solid #93a0af;
+}
+.approval-role{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-bottom:1px solid #93a0af;
+  font-size:11px;
+  font-weight:900;
+  color:#10203c;
+  background:#fbfcfd;
+}
+.approval-cell-body{
+  position:relative;
+  min-height:80px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  padding:6px 6px 5px;
+}
+.approval-stamp-wrap{
+  height:34px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.approval-stamp{
+  width:34px;
+  height:34px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:2px solid #d92d20;
+  border-radius:50%;
+  color:#d92d20;
+  transform:rotate(-8deg);
+  font-family:"Noto Serif KR","Batang",serif;
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:-1px;
+  opacity:.94;
+}
+.approval-stamp span{
+  border-top:1px solid #d92d20;
+  border-bottom:1px solid #d92d20;
+  line-height:14px;
+}
+.approval-person{
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:11px;
+  font-weight:900;
+  color:#10203c;
+}
+.approval-date{
+  min-height:15px;
+  font-size:9px;
+  color:#7a8799;
+  white-space:nowrap;
+}
+.approval-action-button{
+  min-width:52px;
+  height:31px;
+  border:1px solid #0b8a68;
+  border-radius:8px;
+  background:#0b8a68;
+  color:#fff;
+  font-size:10px;
+  font-weight:900;
+  cursor:pointer;
+}
+.approval-action-button:hover{
+  background:#08785b;
+}
+.approval-empty-mark{
+  height:31px;
+  display:flex;
+  align-items:center;
+  color:#a3adba;
+  font-size:18px;
+  font-weight:700;
+}
+.approval-cancel{
+  position:absolute;
+  right:4px;
+  bottom:3px;
+  border:0;
+  background:transparent;
+  padding:2px 3px;
+  color:#b42318;
+  font-size:8px;
+  font-weight:800;
+  cursor:pointer;
+}
+.approval-cancel:hover{
+  text-decoration:underline;
 }
 
-body{
-  padding:10px;
-}
-
-.page{
-  width:100% !important;
-  max-width:none !important;
-  min-width:0 !important;
-  min-height:100vh;
-  margin:0 !important;
-  padding:0 !important;
-}
-
-.grid,
-.grid > *,
-.card,
-.table-wrap{
-  min-width:0 !important;
-}
-
-.grid.two{
-  grid-template-columns:390px minmax(0,1fr) !important;
-  gap:12px !important;
-}
-
-table{
-  width:100% !important;
-  min-width:unset !important;
-}
-
-.table-wrap{
-  overflow-x:auto !important;
-}
-
-/* 현황/대장 단일 카드도 사용 가능한 전체 가로폭을 그대로 사용 */
-.toolbar,
-.kpis,
-.card,
-.section-head{
-  width:100%;
-}
-
-/* 폐수 프로그램과 동일하게 1100px 이하부터 세로 1단 */
-@media(max-width:1100px){
-  .grid.two,
-  .grid.three{
-    grid-template-columns:1fr !important;
+@media(max-width:900px){
+  .ledger-top-area{
+    grid-template-columns:1fr;
+  }
+  .approval-panel{
+    width:min(100%,360px);
+    justify-self:end;
   }
 }
 
-/* 모바일 밀도 */
-@media(max-width:900px){
-  body{padding:8px;}
-}
-
-@media(max-width:520px){
-  body{padding:6px;}
+@media print{
+  body{
+    padding:0!important;
+    background:#fff!important;
+  }
+  .subtabs,
+  .toolbar{
+    display:none!important;
+  }
+  .card{
+    border:0!important;
+    box-shadow:none!important;
+    padding:0!important;
+  }
+  .approval-cancel{
+    display:none!important;
+  }
+  .approval-action-button{
+    border:0!important;
+    background:transparent!important;
+    color:#66758b!important;
+  }
+  .approval-panel{
+    break-inside:avoid;
+  }
 }
