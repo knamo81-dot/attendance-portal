@@ -3703,6 +3703,18 @@ body.auth-loading .top-user-bar {
       return applicantTabs.length ? applicantTabs : [{ id: 'user', label: '출장자 입력 화면' }];
     }
 
+    if (isWasteProgramSrc(currentSrc)) {
+      const wasteRole = getPortalAppRoleForTabs('waste');
+      const canOperate = isPortalOperatorRole(wasteRole);
+
+      if (canOperate) return normalizedTabs;
+
+      return normalizedTabs.filter(function (tab) {
+        const id = String(tab?.id || '').trim().toLowerCase();
+        return id !== 'waste-daily' && id !== 'waste-collection';
+      });
+    }
+
     if (isPatentProgramSrc(currentSrc)) {
       const patentRole = getPortalAppRoleForTabs('patent');
       const canOperate = isPortalOperatorRole(patentRole);
@@ -3888,6 +3900,16 @@ body.auth-loading .top-user-bar {
 
     // 폐기물은 각 기능을 독립 폴더/프로그램으로 운영하므로 포탈 상단 버튼에서 경로를 전환합니다.
     if (isWasteProgramSrc(currentSrc)) {
+      const wasteRole = getPortalAppRoleForTabs('waste');
+      const canOperate = isPortalOperatorRole(wasteRole);
+      const restrictedTabs = new Set(['waste-daily', 'waste-collection']);
+
+      // 일반사용자는 일일입력/수거등록으로 이동할 수 없습니다.
+      if (!canOperate && restrictedTabs.has(tabId)) {
+        tabId = 'waste-status';
+        setPortalSubtabActive('waste-status', false);
+      }
+
       const targetMap = {
         'waste-status': WASTE_STATUS_SRC,
         'waste-daily': WASTE_DAILY_SRC,
@@ -4000,6 +4022,19 @@ body.auth-loading .top-user-bar {
 
   function updatePortalSubtabs(src) {
     const key = normalizePortalSrc(src);
+
+    // 일반사용자가 저장된 마지막 화면/직접 URL로 일일입력 또는 수거등록에
+    // 진입한 경우 폐기물현황으로 되돌립니다.
+    if (isWasteProgramSrc(key)) {
+      const wasteRole = getPortalAppRoleForTabs('waste');
+      const canOperate = isPortalOperatorRole(wasteRole);
+      if (!canOperate && (key === WASTE_DAILY_SRC || key === WASTE_COLLECTION_SRC)) {
+        try { sessionStorage.setItem(LAST_PAGE_KEY, WASTE_STATUS_SRC); } catch (_) {}
+        replacePortalFrame(buildSrcWithSession(WASTE_STATUS_SRC));
+        return;
+      }
+    }
+
     const tabs = portalDefaultTabs[key] || [];
     let activeId = tabs[0]?.id || '';
     if (isWasteProgramSrc(key)) activeId = getWasteTabIdBySrc(key) || activeId;
