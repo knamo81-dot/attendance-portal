@@ -116,6 +116,27 @@ function dateKey(){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+function weekendInfo(date){
+  const m=String(date||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m)return {isWeekend:false,reason:null,dow:null};
+  const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
+  const dow=d.getDay();
+  return {
+    isWeekend:dow===0||dow===6,
+    reason:dow===0?'일요일':dow===6?'토요일':null,
+    dow
+  };
+}
+
+function effectiveHoliday(date,isHoliday,reason){
+  const w=weekendInfo(date);
+  return {
+    isHoliday:w.isWeekend||!!isHoliday,
+    reason:w.reason||String(reason||'').trim()||null,
+    isWeekend:w.isWeekend
+  };
+}
+
 let editing=null;
 let types=[];
 let locs=[];
@@ -164,7 +185,7 @@ function previousFacilityUsage(date,typeId,currentId=''){
     .filter(r=>r.id!==currentId)
     .filter(r=>r.waste_type_id===typeId)
     .filter(r=>String(r.entry_date||'')<String(date||''))
-    .filter(r=>!r.is_holiday && r.usage!=null)
+    .filter(r=>!effectiveHoliday(r.entry_date,r.is_holiday,r.holiday_reason).isHoliday && r.usage!=null)
     .sort((a,b)=>String(b.entry_date).localeCompare(String(a.entry_date)));
 
   return candidates.length?Number(candidates[0].usage):null;
@@ -234,15 +255,16 @@ function facilityFormHtml(data){
       </div>
 
       <label class="toggle-row" for="facility_is_holiday">
-        <input id="facility_is_holiday" type="checkbox" ${data?.is_holiday?'checked':''}>
-        <span>휴일 입력</span>
+        <input id="facility_is_holiday" type="checkbox"
+          ${effectiveHoliday(data?.entry_date,data?.is_holiday,data?.holiday_reason).isHoliday?'checked':''}>
+        <span>휴일 입력 <small id="weekend-auto-label" class="weekend-auto-label"></small></span>
       </label>
 
       <div id="holiday-box" class="expand-box">
         <div class="field">
           <label>휴일 사유</label>
           <input id="facility_holiday_reason" type="text"
-            value="${esc(data?.holiday_reason||'')}"
+            value="${esc(effectiveHoliday(data?.entry_date,data?.is_holiday,data?.holiday_reason).reason||'')}"
             placeholder="예: 회사 단체휴무, 임시휴무, 샌드위치 휴무">
         </div>
       </div>
@@ -311,8 +333,9 @@ function combinedRowsHtml(){
     const r=x.data;
 
     if(x.mode==='facility'){
-      const detail=r.is_holiday
-        ? `<span class="pill amber">휴일</span>${r.holiday_reason?` ${esc(r.holiday_reason)}`:''}`
+      const holiday=effectiveHoliday(r.entry_date,r.is_holiday,r.holiday_reason);
+      const detail=holiday.isHoliday
+        ? `<span class="pill amber">휴일</span>${holiday.reason?` ${esc(holiday.reason)}`:''}`
         : [
             r.usage!=null?`용수 ${num(r.usage,2)} m³`:'',
             r.height!=null?`높이 ${num(r.height,1)} cm`:'',
@@ -502,9 +525,34 @@ function syncModeVisibility(){
   if(facilityBox) facilityBox.style.display=facility?'block':'none';
 
   if(facility){
+    syncWeekendHolidayFromDate();
     toggleHolidayBox();
     toggleExternalBox();
     updateFacilityPreview();
+  }
+}
+
+function syncWeekendHolidayFromDate(){
+  if(!$('#facility_mode')?.checked)return;
+
+  const date=$('#entry_date')?.value||'';
+  const info=weekendInfo(date);
+  const holiday=$('#facility_is_holiday');
+  const reason=$('#facility_holiday_reason');
+  const label=$('#weekend-auto-label');
+
+  if(!holiday||!reason)return;
+
+  if(info.isWeekend){
+    holiday.checked=true;
+    holiday.disabled=true;
+    reason.value=info.reason;
+    reason.readOnly=true;
+    if(label)label.textContent=`· ${info.reason} 자동`;
+  }else{
+    holiday.disabled=false;
+    reason.readOnly=false;
+    if(label)label.textContent='';
   }
 }
 
@@ -536,9 +584,23 @@ function bindFacilityEvents(){
   ].forEach(sel=>{
     const el=$(sel);
     if(!el)return;
+
+    if(sel==='#entry_date'){
+      const sync=()=>{
+        syncWeekendHolidayFromDate();
+        toggleHolidayBox();
+        updateFacilityPreview();
+      };
+      el.oninput=sync;
+      el.onchange=sync;
+      return;
+    }
+
     el.oninput=updateFacilityPreview;
     if(el.tagName==='SELECT')el.onchange=updateFacilityPreview;
   });
+
+  syncWeekendHolidayFromDate();
 }
 
 function toggleHolidayBox(){
@@ -558,7 +620,11 @@ function updateFacilityPreview(){
 
   const date=$('#entry_date')?.value||'';
   const typeId=$('#waste_type_id')?.value||'';
-  const isHoliday=$('#facility_is_holiday')?.checked||false;
+  const isHoliday=effectiveHoliday(
+    date,
+    $('#facility_is_holiday')?.checked||false,
+    $('#facility_holiday_reason')?.value||''
+  ).isHoliday;
   const currentId=editing?.mode==='facility'?editing.data?.id:'';
 
   const prev=previousFacilityUsage(date,typeId,currentId);
@@ -599,8 +665,13 @@ async function save(e){
   if(!wasteTypeId)return notice('폐기물 종류를 선택하세요.','err');
 
   if(facilityMode){
-    const isHoliday=$('#facility_is_holiday').checked;
-    const holidayReason=$('#facility_holiday_reason').value.trim();
+    const holidayInfo=effectiveHoliday(
+      entryDate,
+      $('#facility_is_holiday').checked,
+      $('#facility_holiday_reason').value
+    );
+    const isHoliday=holidayInfo.isHoliday;
+    const holidayReason=holidayInfo.reason||'';
     const usage=$('#facility_usage').value;
     const height=$('#facility_height').value;
     const note=$('#facility_note').value;
@@ -684,3 +755,4 @@ async function delFacility(id){
 }
 
 load();
+
