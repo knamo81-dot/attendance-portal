@@ -615,7 +615,7 @@ function roleDisplayName(kind,record){
 function approvalRecord(){
   if(month==='all')return null;
   return approvals.find(x=>
-    x.ledger_type===viewMode &&
+    x.ledger_type==='combined' &&
     Number(x.approval_year)===Number(year) &&
     Number(x.approval_month)===Number(month)
   )||null;
@@ -775,7 +775,7 @@ async function writerApprove(){
     });
   }else{
     res=await A.insert('waste_ledger_approvals',{
-      ledger_type:viewMode,
+      ledger_type:'combined',
       approval_year:Number(year),
       approval_month:Number(month),
       writer_email:assignment.email||currentUserIdentity().email||null,
@@ -904,28 +904,35 @@ function commonFiltersHtml(){
     </div>`;
 }
 
+
+function commonApprovalHeaderHtml(){
+  return `
+    <div class="ledger-control-bar">
+      <div class="ledger-control-left">
+        ${commonTabsHtml()}
+        ${commonFiltersHtml()}
+      </div>
+      <div class="ledger-control-approval">
+        ${approvalPanelHtml()}
+      </div>
+    </div>`;
+}
+
 function renderLegal(){
   const rows=legalLedgerRows();
   $('#app').innerHTML=`
-    ${commonTabsHtml()}
-    ${commonFiltersHtml()}
+    ${commonApprovalHeaderHtml()}
 
     <div class="card">
-      <div class="ledger-top-area">
-        <div class="ledger-heading-block">
-          <div class="section-head ledger-title-row">
-            <h2>🧾 사업장 폐기물 관리대장</h2>
-            <div class="spacer"></div>
-            <span class="hint">${periodLabel()} · 단위: 톤(T)</span>
-          </div>
+      <div class="section-head">
+        <h2>🧾 사업장 폐기물 관리대장</h2>
+        <div class="spacer"></div>
+        <span class="hint">${periodLabel()} · 단위: 톤(T)</span>
+      </div>
 
-          <div class="hint">
-            ① 폐기물의 종류: <b>${esc(selectedTypeLabel())}</b>
-            · ${periodLabel()} 일일입력 및 수거등록 데이터를 기반으로 자동 작성
-          </div>
-        </div>
-
-        ${approvalPanelHtml()}
+      <div class="hint">
+        ① 폐기물의 종류: <b>${esc(selectedTypeLabel())}</b>
+        · ${periodLabel()} 일일입력 및 수거등록 데이터를 기반으로 자동 작성
       </div>
 
       <br>
@@ -1023,25 +1030,18 @@ function renderFacility(){
   const rows=facilityRowsForPeriod();
 
   $('#app').innerHTML=`
-    ${commonTabsHtml()}
-    ${commonFiltersHtml()}
+    ${commonApprovalHeaderHtml()}
 
     <div class="card">
-      <div class="ledger-top-area">
-        <div class="ledger-heading-block">
-          <div class="section-head ledger-title-row">
-            <h2>🧾 폐수배출시설 운영일지</h2>
-            <div class="spacer"></div>
-            <span class="hint">${periodLabel()}</span>
-          </div>
+      <div class="section-head">
+        <h2>🧾 폐수배출시설 운영일지</h2>
+        <div class="spacer"></div>
+        <span class="hint">${periodLabel()}</span>
+      </div>
 
-          <div class="hint">
-            일일입력에서 <b>폐수배출시설 운영일지</b>로 저장한 기록과,
-            수거등록에서 같은 항목을 체크한 수거건만 날짜 기준으로 합쳐 표시합니다.
-          </div>
-        </div>
-
-        ${approvalPanelHtml()}
+      <div class="hint">
+        일일입력에서 <b>폐수배출시설 운영일지</b>로 저장한 기록과,
+        수거등록에서 같은 항목을 체크한 수거건만 날짜 기준으로 합쳐 표시합니다.
       </div>
 
       <br>
