@@ -3071,15 +3071,51 @@ body.auth-loading .top-user-bar {
       gradient: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)'
     },
     'wastewater/index.html': {
-      top: 'Operations Management',
-      title: '폐수/폐기물 운영일지',
-      desc: '폐수/폐기물 배출시설 운영 기록과 수거 내역을 관리합니다.',
+      top: 'Wastewater Management',
+      title: '폐수관리',
+      desc: '폐수 발생, 수거, 운영일지와 관련자료를 통합 관리합니다.',
       gradient: 'linear-gradient(135deg, #047857 0%, #14b8a6 100%)'
     },
     'wastewater/Mobile/index.html': {
       top: 'Operations Management',
       title: '폐수/폐기물 운영일지',
       desc: '폐수/폐기물 배출시설 운영 기록과 수거 내역을 관리합니다.',
+      gradient: 'linear-gradient(135deg, #047857 0%, #14b8a6 100%)'
+    },
+    'wastewater/status/index.html': {
+      top: 'Wastewater Management',
+      title: '폐수관리',
+      desc: '폐수 발생, 수거, 운영일지와 관련자료를 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #047857 0%, #14b8a6 100%)'
+    },
+    'wastewater/daily/index.html': {
+      top: 'Wastewater Management',
+      title: '폐수관리',
+      desc: '폐수 발생, 수거, 운영일지와 관련자료를 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #047857 0%, #14b8a6 100%)'
+    },
+    'wastewater/collection/index.html': {
+      top: 'Wastewater Management',
+      title: '폐수관리',
+      desc: '폐수 발생, 수거, 운영일지와 관련자료를 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #047857 0%, #14b8a6 100%)'
+    },
+    'wastewater/ledger/index.html': {
+      top: 'Wastewater Management',
+      title: '폐수관리',
+      desc: '폐수 발생, 수거, 운영일지와 관련자료를 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #047857 0%, #14b8a6 100%)'
+    },
+    'wastewater/reference/index.html': {
+      top: 'Wastewater Management',
+      title: '폐수관리',
+      desc: '폐수 발생, 수거, 운영일지와 관련자료를 통합 관리합니다.',
+      gradient: 'linear-gradient(135deg, #047857 0%, #14b8a6 100%)'
+    },
+    'wastewater/documents/index.html': {
+      top: 'Wastewater Management',
+      title: '폐수관리',
+      desc: '폐수 발생, 수거, 운영일지와 관련자료를 통합 관리합니다.',
       gradient: 'linear-gradient(135deg, #047857 0%, #14b8a6 100%)'
     },
     'waste/status/index.html': {
@@ -3308,11 +3344,60 @@ body.auth-loading .top-user-bar {
       { id: 'schedule', label: '일정/예약' }
     ],
     'wastewater/index.html': [
-      { id: 'daily', label: '일일입력' },
-      { id: 'pickup', label: '수거등록' },
-      { id: 'ledger', label: '운영일지' },
-      { id: 'reference', label: '관련자료' },
-      { id: 'relatedDocs', label: '관련서류' }
+      { id: 'ww-status', label: '폐수현황' },
+      { id: 'ww-daily', label: '일일입력' },
+      { id: 'ww-collection', label: '수거등록' },
+      { id: 'ww-ledger', label: '운영일지' },
+      { id: 'ww-reference', label: '관련자료' },
+      { id: 'ww-documents', label: '관련서류' }
+    ],
+    'wastewater/status/index.html': [
+      { id: 'ww-status', label: '폐수현황' },
+      { id: 'ww-daily', label: '일일입력' },
+      { id: 'ww-collection', label: '수거등록' },
+      { id: 'ww-ledger', label: '운영일지' },
+      { id: 'ww-reference', label: '관련자료' },
+      { id: 'ww-documents', label: '관련서류' }
+    ],
+    'wastewater/daily/index.html': [
+      { id: 'ww-status', label: '폐수현황' },
+      { id: 'ww-daily', label: '일일입력' },
+      { id: 'ww-collection', label: '수거등록' },
+      { id: 'ww-ledger', label: '운영일지' },
+      { id: 'ww-reference', label: '관련자료' },
+      { id: 'ww-documents', label: '관련서류' }
+    ],
+    'wastewater/collection/index.html': [
+      { id: 'ww-status', label: '폐수현황' },
+      { id: 'ww-daily', label: '일일입력' },
+      { id: 'ww-collection', label: '수거등록' },
+      { id: 'ww-ledger', label: '운영일지' },
+      { id: 'ww-reference', label: '관련자료' },
+      { id: 'ww-documents', label: '관련서류' }
+    ],
+    'wastewater/ledger/index.html': [
+      { id: 'ww-status', label: '폐수현황' },
+      { id: 'ww-daily', label: '일일입력' },
+      { id: 'ww-collection', label: '수거등록' },
+      { id: 'ww-ledger', label: '운영일지' },
+      { id: 'ww-reference', label: '관련자료' },
+      { id: 'ww-documents', label: '관련서류' }
+    ],
+    'wastewater/reference/index.html': [
+      { id: 'ww-status', label: '폐수현황' },
+      { id: 'ww-daily', label: '일일입력' },
+      { id: 'ww-collection', label: '수거등록' },
+      { id: 'ww-ledger', label: '운영일지' },
+      { id: 'ww-reference', label: '관련자료' },
+      { id: 'ww-documents', label: '관련서류' }
+    ],
+    'wastewater/documents/index.html': [
+      { id: 'ww-status', label: '폐수현황' },
+      { id: 'ww-daily', label: '일일입력' },
+      { id: 'ww-collection', label: '수거등록' },
+      { id: 'ww-ledger', label: '운영일지' },
+      { id: 'ww-reference', label: '관련자료' },
+      { id: 'ww-documents', label: '관련서류' }
     ],
     'wastewater/Mobile/index.html': [
       { id: 'daily', label: '일일입력' },
@@ -3703,6 +3788,16 @@ body.auth-loading .top-user-bar {
       return applicantTabs.length ? applicantTabs : [{ id: 'user', label: '출장자 입력 화면' }];
     }
 
+    if (isWastewaterPcProgramSrc(currentSrc)) {
+      const wastewaterRole = getPortalAppRoleForTabs('wastewater');
+      const canOperate = isPortalOperatorRole(wastewaterRole);
+      if (canOperate) return normalizedTabs;
+      return normalizedTabs.filter(function(tab){
+        const id=String(tab?.id||'').toLowerCase();
+        return id!=='ww-daily' && id!=='ww-collection';
+      });
+    }
+
     if (isWasteProgramSrc(currentSrc)) {
       const wasteRole = getPortalAppRoleForTabs('waste');
       const canOperate = isPortalOperatorRole(wasteRole);
@@ -3898,6 +3993,34 @@ body.auth-loading .top-user-bar {
       return;
     }
 
+    // 폐수 PC 신규 구조는 기능별 독립 폴더로 전환합니다.
+    // 모바일은 기존 wastewater/Mobile/index.html을 유지합니다.
+    if (isWastewaterPcProgramSrc(currentSrc)) {
+      const wastewaterRole = getPortalAppRoleForTabs('wastewater');
+      const canOperate = isPortalOperatorRole(wastewaterRole);
+      const restrictedTabs = new Set(['ww-daily','ww-collection']);
+      if (!canOperate && restrictedTabs.has(tabId)) {
+        tabId='ww-status';
+        setPortalSubtabActive('ww-status',false);
+      }
+      const targetMap={
+        'ww-status':WASTEWATER_STATUS_SRC,
+        'ww-daily':WASTEWATER_DAILY_SRC,
+        'ww-collection':WASTEWATER_COLLECTION_SRC,
+        'ww-ledger':WASTEWATER_LEDGER_SRC,
+        'ww-reference':WASTEWATER_REFERENCE_SRC,
+        'ww-documents':WASTEWATER_DOCUMENTS_SRC
+      };
+      const target=targetMap[tabId]||'';
+      if(target && currentSrc!==target){
+        try{sessionStorage.setItem(LAST_PAGE_KEY,target)}catch(_){}
+        replacePortalFrame(buildSrcWithSession(target));
+      }else if(target){
+        setPortalSubtabActive(tabId,false);
+      }
+      return;
+    }
+
     // 폐기물은 각 기능을 독립 폴더/프로그램으로 운영하므로 포탈 상단 버튼에서 경로를 전환합니다.
     if (isWasteProgramSrc(currentSrc)) {
       const wasteRole = getPortalAppRoleForTabs('waste');
@@ -4023,6 +4146,17 @@ body.auth-loading .top-user-bar {
   function updatePortalSubtabs(src) {
     const key = normalizePortalSrc(src);
 
+    // 폐수 PC: 일반사용자/결재자는 조회 화면만 사용합니다.
+    if (isWastewaterPcProgramSrc(key)) {
+      const wastewaterRole=getPortalAppRoleForTabs('wastewater');
+      const canOperate=isPortalOperatorRole(wastewaterRole);
+      if(!canOperate && (key===WASTEWATER_DAILY_SRC || key===WASTEWATER_COLLECTION_SRC)){
+        try{sessionStorage.setItem(LAST_PAGE_KEY,WASTEWATER_STATUS_SRC)}catch(_){}
+        replacePortalFrame(buildSrcWithSession(WASTEWATER_STATUS_SRC));
+        return;
+      }
+    }
+
     // 일반사용자가 저장된 마지막 화면/직접 URL로 일일입력 또는 수거등록에
     // 진입한 경우 폐기물현황으로 되돌립니다.
     if (isWasteProgramSrc(key)) {
@@ -4037,6 +4171,7 @@ body.auth-loading .top-user-bar {
 
     const tabs = portalDefaultTabs[key] || [];
     let activeId = tabs[0]?.id || '';
+    if (isWastewaterPcProgramSrc(key)) activeId = getWastewaterTabIdBySrc(key) || activeId;
     if (isWasteProgramSrc(key)) activeId = getWasteTabIdBySrc(key) || activeId;
     if (isReagentDashboardSrc(key)) activeId = 'reagent-dashboard';
     if (isReagentAppSrc(key) && pendingReagentTabId) activeId = pendingReagentTabId;
@@ -4219,16 +4354,49 @@ body.auth-loading .top-user-bar {
     return isReagentDashboardSrc(src) || isReagentAppSrc(src);
   }
 
-  const WASTEWATER_DESKTOP_SRC = 'wastewater/index.html';
+  const WASTEWATER_DESKTOP_SRC = 'wastewater/index.html'; // legacy entry/redirect source
   const WASTEWATER_MOBILE_SRC = 'wastewater/Mobile/index.html';
+  const WASTEWATER_STATUS_SRC = 'wastewater/status/index.html';
+  const WASTEWATER_DAILY_SRC = 'wastewater/daily/index.html';
+  const WASTEWATER_COLLECTION_SRC = 'wastewater/collection/index.html';
+  const WASTEWATER_LEDGER_SRC = 'wastewater/ledger/index.html';
+  const WASTEWATER_REFERENCE_SRC = 'wastewater/reference/index.html';
+  const WASTEWATER_DOCUMENTS_SRC = 'wastewater/documents/index.html';
 
   function getWastewaterSrc() {
-    return isMobilePortalView() ? WASTEWATER_MOBILE_SRC : WASTEWATER_DESKTOP_SRC;
+    return isMobilePortalView() ? WASTEWATER_MOBILE_SRC : WASTEWATER_STATUS_SRC;
   }
 
+  // 반응형 초기 진입은 기존 대표 경로/모바일 경로에만 적용합니다.
+  // 신규 PC 기능별 경로는 탭 전환 시 그대로 유지합니다.
   function isWastewaterResponsiveSrc(src) {
     const key = normalizePortalSrc(src);
     return key === WASTEWATER_DESKTOP_SRC || key === WASTEWATER_MOBILE_SRC;
+  }
+
+  function isWastewaterPcProgramSrc(src){
+    const key=normalizePortalSrc(src);
+    return [
+      WASTEWATER_STATUS_SRC,
+      WASTEWATER_DAILY_SRC,
+      WASTEWATER_COLLECTION_SRC,
+      WASTEWATER_LEDGER_SRC,
+      WASTEWATER_REFERENCE_SRC,
+      WASTEWATER_DOCUMENTS_SRC
+    ].includes(key);
+  }
+
+  function getWastewaterTabIdBySrc(src){
+    const key=normalizePortalSrc(src);
+    const map={
+      [WASTEWATER_STATUS_SRC]:'ww-status',
+      [WASTEWATER_DAILY_SRC]:'ww-daily',
+      [WASTEWATER_COLLECTION_SRC]:'ww-collection',
+      [WASTEWATER_LEDGER_SRC]:'ww-ledger',
+      [WASTEWATER_REFERENCE_SRC]:'ww-reference',
+      [WASTEWATER_DOCUMENTS_SRC]:'ww-documents'
+    };
+    return map[key]||'';
   }
 
   const WASTE_STATUS_SRC = 'waste/status/index.html';
