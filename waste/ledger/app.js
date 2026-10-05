@@ -191,6 +191,75 @@ function periodLabel(){
   return month==='all' ? `${year}년 전체` : `${year}년 ${Number(month)}월`;
 }
 
+function weekendInfo(date){
+  const m=String(date||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m)return {isWeekend:false,reason:null,dow:null};
+  const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
+  const dow=d.getDay();
+  return {
+    isWeekend:dow===0||dow===6,
+    reason:dow===0?'일요일':dow===6?'토요일':null,
+    dow
+  };
+}
+
+function effectiveFacilityHoliday(row){
+  const w=weekendInfo(row?.entry_date);
+  return {
+    isHoliday:w.isWeekend||!!row?.is_holiday,
+    reason:w.reason||String(row?.holiday_reason||'').trim()||null,
+    isWeekend:w.isWeekend
+  };
+}
+
+function selectedPeriodBounds(){
+  const y=Number(year);
+  const now=new Date();
+  const todayKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+  let start;
+  let end;
+
+  if(month==='all'){
+    start=`${year}-01-01`;
+    end=`${year}-12-31`;
+  }else{
+    const mm=String(month).padStart(2,'0');
+    start=`${year}-${mm}-01`;
+    const last=new Date(y,Number(month),0).getDate();
+    end=`${year}-${mm}-${String(last).padStart(2,'0')}`;
+  }
+
+  // 현재 또는 미래 기간은 오늘까지만 자동 행을 만든다.
+  if(end>todayKey)end=todayKey;
+
+  return {start,end};
+}
+
+function weekendDatesInSelectedPeriod(){
+  const {start,end}=selectedPeriodBounds();
+  if(!start||!end||start>end)return [];
+
+  const sm=start.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const em=end.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!sm||!em)return [];
+
+  const d=new Date(Number(sm[1]),Number(sm[2])-1,Number(sm[3]));
+  const e=new Date(Number(em[1]),Number(em[2])-1,Number(em[3]));
+  const out=[];
+
+  while(d<=e){
+    const dow=d.getDay();
+    if(dow===0||dow===6){
+      out.push(
+        `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+      );
+    }
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+
 function selectedTypeLabel(){
   if(!typeId) return '전체 폐기물';
   return typeName(typeById(typeId));
@@ -509,10 +578,42 @@ function buildFacilityDerived(){
       byType.get(r.waste_type_id).push(r);
     });
 
+  // 수거만 있는 폐기물 종류도 운영일지 대상에 포함
+  pickups.forEach(p=>{
+    if(!byType.has(p.waste_type_id))byType.set(p.waste_type_id,[]);
+  });
+
+  const autoWeekendDates=weekendDatesInSelectedPeriod();
   const enriched=[];
 
   byType.forEach((rows,wasteTypeId)=>{
-    const ordered=[...rows].sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date)));
+    const actualByDate=new Map(
+      rows.map(r=>[String(r.entry_date||''),r])
+    );
+
+    // 토·일요일에 일일입력이 없어도 운영일지에는 자동 휴일 행 생성
+    const virtualWeekends=autoWeekendDates
+      .filter(date=>!actualByDate.has(date))
+      .map(date=>({
+        id:null,
+        company_id:A.companyId(),
+        waste_type_id:wasteTypeId,
+        entry_date:date,
+        usage:null,
+        height:null,
+        is_holiday:true,
+        holiday_reason:weekendInfo(date).reason,
+        note:'',
+        has_external:false,
+        external_ton:null,
+        external_cm:null,
+        created_by:null,
+        created_at:null,
+        virtual_weekend:true
+      }));
+
+    const ordered=[...rows,...virtualWeekends]
+      .sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date)));
     const baselines=facilityOpeningRowsForType(wasteTypeId);
 
     let prevMeter=0;
@@ -533,7 +634,8 @@ function buildFacilityDerived(){
         appliedOpeningId=applicable.id;
       }
 
-      const isHoliday=!!row.is_holiday;
+      const holiday=effectiveFacilityHoliday(row);
+      const isHoliday=holiday.isHoliday;
       const meter=isHoliday ? prevMeter : Number(row.usage||0);
       const waterUsed=isHoliday
         ? 0
@@ -561,6 +663,8 @@ function buildFacilityDerived(){
 
       enriched.push({
         ...row,
+        is_holiday:isHoliday,
+        holiday_reason:isHoliday?(holiday.reason||'휴일'):null,
         waste_type:row.waste_types||typeById(wasteTypeId),
         water_prev:prevMeter,
         water_used:waterUsed,
@@ -591,6 +695,7 @@ function buildFacilityDerived(){
   pickups.forEach(p=>{
     const key=`${p.date}|${p.waste_type_id}`;
     if(!dailyKeys.has(key)){
+      const weekend=weekendInfo(p.date);
       enriched.push({
         id:null,
         entry_date:p.date,
@@ -598,8 +703,8 @@ function buildFacilityDerived(){
         waste_type:p.waste_type||typeById(p.waste_type_id),
         usage:null,
         height:null,
-        is_holiday:false,
-        holiday_reason:null,
+        is_holiday:weekend.isWeekend,
+        holiday_reason:weekend.reason,
         note:'',
         has_external:false,
         external_ton:null,
@@ -1233,7 +1338,8 @@ function renderFacility(){
 
           <tbody>
             ${rows.length ? rows.map(r=>{
-              const isHoliday=!!r.is_holiday;
+              const holiday=effectiveFacilityHoliday(r);
+              const isHoliday=holiday.isHoliday;
               const p=r.pickup;
 
               return `
@@ -1287,7 +1393,7 @@ function renderFacility(){
 
                   <td class="ledger-notes">
                     ${isHoliday
-                      ? esc(r.holiday_reason||'휴일')
+                      ? esc(holiday.reason||r.holiday_reason||'휴일')
                       : esc(r.note||'')}
                     ${p?.notes?.length
                       ? `${r.note?'<br>':''}<span class="muted">${p.notes.map(esc).join('<br>')}</span>`
