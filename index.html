@@ -4631,14 +4631,21 @@ body.auth-loading .top-user-bar {
   }
 
   function canAccessWasteApp() {
-    // 폐기물 메뉴:
-    // 1) 회사 관리자에게 노출
-    // 2) 테스트본부(TEST01) 및 하위 테스트팀 사용자에게도 검증 목적으로 노출
-    // 테스트팀 예외는 메뉴 노출/접근만 허용하며 운영자 권한을 자동 부여하지 않습니다.
+    // 폐기물 메뉴 노출 대상:
+    // 1) 회사 관리자
+    // 2) 테스트본부(TEST01) 및 하위 테스트팀
+    // 3) 권한설정에서 폐기물 운영자 또는 결재자로 지정된 사용자
+    //
+    // 결재자는 앱 접근만 허용되며 운영자 권한은 부여하지 않습니다.
+    // 따라서 일일입력/수거등록/설정/글쓰기·수정·삭제는 일반사용자와 동일하게 제한됩니다.
+    const wasteRole = getPortalAppRoleForTabs('waste');
+    const hasAssignedWasteRole = wasteRole === 'operator' || wasteRole === 'approver';
+
     return Boolean(
       currentUser &&
       (
         isTestDivisionUser() ||
+        hasAssignedWasteRole ||
         (!isServiceAdminRole() && canUseSettingsMenu())
       )
     );
@@ -7048,3 +7055,4 @@ body.auth-loading .top-user-bar {
 
 </body>
 </html>
+
