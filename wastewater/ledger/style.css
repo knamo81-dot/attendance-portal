@@ -1,33 +1,2112 @@
-:root{
-  --navy:#0f2347;
-  --green:#0b8a68;
-  --line:#dbe4ee;
-  --bg:#f4f7fb;
-  --text:#10203c;
-  --muted:#66758b;
-  --soft:#f8fafc;
-  --shadow:0 6px 18px rgba(15,35,71,.06);
+
+/* =========================================================
+   Common theme token link
+   - common/theme.css의 --common-* 값을 사용하도록 연결
+   - 폐수 고유 navy/header/status 보조 색상은 유지
+   - fallback 값을 함께 넣어 common 파일 누락 시에도 기존 화면 유지
+========================================================= */
+:root {
+  --bg:var(--common-bg, #eef3f8);
+  --card:var(--common-card, #fff);
+  --line:var(--common-line, #dce5ef);
+  --text:var(--common-text, #14213d);
+  --muted:var(--common-muted, #6b7a90);
+
+  /* 폐수 프로그램 고유 색상은 유지 */
+  --navy:#0e1a38;
+  --soft:#f7fafc;
+  --sky-soft:#eaf4ff; --sky-text:#175cd3;
+  --amber-soft:#fff4e5; --amber-text:#b54708;
+  --indigo-soft:#eef2ff; --indigo-text:#3538cd;
+  --green-soft:#ecfdf3; --green-text:#027a48;
+  --rose-soft:#fff1f3; --rose-text:#c01048;
+
+  --danger:var(--common-danger, #ff3b30);
+  --ok:var(--common-success, #0f9d58);
+  --ok-soft:#e7f8ef;
+  --warn:var(--common-warning, #f79009);
+  --warn-soft:#fff3e6;
+
+  --shadow:var(--common-shadow-panel, 0 8px 18px rgba(15,23,42,.08));
+  --radius:var(--common-card-radius, 20px);
 }
+
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;font-family:Arial,"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text)}
-body{padding:10px}
-.page{width:100%;max-width:none;margin:0}
-.shell-card{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:22px}
-.screen-kicker{font-size:11px;font-weight:900;color:var(--green);letter-spacing:.04em;margin-bottom:8px}
-.screen-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
-.screen-head h1{margin:0;font-size:24px;letter-spacing:-.04em}
-.screen-head p{margin:8px 0 0;color:var(--muted);font-size:13px;line-height:1.6}
-.stage-badge{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;border-radius:999px;background:#ecfdf3;color:#067647;border:1px solid #abefc6;font-size:11px;font-weight:900;padding:7px 11px}
-.ready-panel{display:flex;gap:12px;align-items:flex-start;margin:22px 0 14px;padding:16px;border:1px solid #b7ead8;border-radius:14px;background:#f0fdf7}
-.ready-icon{display:grid;place-items:center;flex:0 0 32px;height:32px;border-radius:50%;background:var(--green);color:#fff;font-weight:900}
-.ready-panel strong{display:block;font-size:14px}
-.ready-panel p{margin:5px 0 0;color:#53657f;font-size:12px;line-height:1.6}
-.meta-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
-.meta-box{min-width:0;padding:13px;border:1px solid var(--line);border-radius:12px;background:var(--soft)}
-.meta-box span{display:block;color:var(--muted);font-size:10px;font-weight:800;margin-bottom:5px}
-.meta-box strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
-.table-plan{margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:14px}
-.plan-title{font-size:12px;font-weight:900;margin-bottom:9px}
-.code-list{display:flex;gap:7px;flex-wrap:wrap}
-.code-list code{padding:6px 8px;border-radius:8px;background:#eef4ff;color:#3157a4;font-size:11px}
-@media(max-width:900px){.meta-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+html,body{margin:0;padding:0;height:100%}
+body{
+  margin:0;
+  font-family:var(--common-font-family, Arial,sans-serif);
+  background:var(--bg);
+  color:var(--text);
+  overflow-x:hidden;
+}
+
+button,input,textarea,select{font:inherit}
+
+.app-shell{
+  width:100%;
+  max-width:none;
+  margin:0;
+  padding:0;
+  min-height:0;
+  display:block;
+}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:20px;
+  box-shadow:var(--shadow);
+}
+
+.topbar{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
+.title-wrap h1{margin:0;font-size:32px;font-weight:800;letter-spacing:-.02em}
+.title-wrap .sub{margin-top:8px;color:var(--muted);font-size:15px}
+.top-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+
+.portal-header{
+  background:linear-gradient(135deg,#6b7280 0%,#5e6672 55%,#4b5563 100%);
+  color:#fff;
+  border-radius:28px;
+  padding:36px 40px;
+  box-shadow:0 14px 32px rgba(31,41,55,.18);
+  border:1px solid rgba(255,255,255,.18);
+  margin-bottom:18px;
+}
+.portal-eyebrow{font-size:14px;font-weight:500;line-height:1.3;color:rgba(255,255,255,.78);margin-bottom:12px}
+.portal-title{margin:0;font-size:32px;font-weight:800;letter-spacing:-.03em;line-height:1.3;color:#fff}
+
+.btn{
+  border:1px solid var(--line);
+  background:#fff;
+  color:var(--text);
+  border-radius:999px;
+  padding:11px 18px;
+  cursor:pointer;
+  font-weight:700;
+}
+.btn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn.danger{color:#b42318;border-color:#f3b4ad}
+.btn.block{width:100%;border-radius:14px}
+.btn.warn{border-color:#f7d3a1;color:#b54708}
+
+.stats{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:14px;
+  margin-bottom:18px;
+}
+.stat-box{padding:22px;min-height:108px}
+.stat-label{color:var(--muted);font-size:14px;margin-bottom:10px;font-weight:700}
+.stat-value{font-size:24px;font-weight:800;line-height:1}
+
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.tab-btn{
+  border:1px solid var(--line);
+  background:var(--soft);
+  border-radius:16px;
+  padding:14px 10px;
+  text-align:center;
+  font-weight:800;
+  color:var(--muted);
+  cursor:pointer;
+}
+.tab-btn.active{background:#fff;color:var(--navy);box-shadow:var(--shadow)}
+
+.tabs-wrap{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:18px;
+}
+.tabs-main{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:12px;
+  flex:1;
+}
+.tab-btn{
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.admin-mini-btn{padding:10px 14px;font-size:13px;border-radius:14px;white-space:nowrap;flex:0 0 auto}
+.admin-mini-btn.active{background:#fff;color:var(--navy);box-shadow:var(--shadow);font-weight:800}
+
+/* 핵심 수정 */
+.tab-panel{
+  display:none !important;
+  width:100%;
+  margin:0 !important;
+  padding:0 !important;
+  min-height:auto !important;
+}
+
+.tab-panel.active{
+  display:block !important;
+}
+
+.tab-panel.active > .card,
+.tab-panel.active > .main-grid,
+.tab-panel.active > .admin-panel-grid,
+.tab-panel.active > .ref-card,
+.tab-panel.active > .ledger-card{
+  margin-top:0 !important;
+}
+
+.main-grid{
+  display:grid;
+  grid-template-columns:390px minmax(0, 1fr);
+  gap:18px;
+  align-items:start;
+}
+
+.form-card,.preview-card,.ledger-card,.admin-card,.log-card,.ref-card{padding:24px}
+
+.ref-card{
+  margin-top:0 !important;
+  align-self:start;
+}
+
+.section-title{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:800;margin-bottom:18px}
+.field{margin-bottom:16px}
+.field label{display:block;margin-bottom:8px;font-weight:700;color:var(--navy)}
+
+.input,.textarea,.select{
+  width:100%;
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:14px;
+  padding:14px 15px;
+  color:var(--text);
+}
+.textarea{min-height:94px;resize:vertical}
+
+.checkbox-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:14px 15px;
+  background:#fff;
+  margin-bottom:14px;
+}
+.checkbox-row input{width:auto;margin:0}
+
+.preview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.mini-card{border:1px solid var(--line);border-radius:18px;padding:18px;background:#fff;min-height:92px}
+.mini-label{color:var(--muted);font-size:14px;font-weight:700;margin-bottom:10px}
+.mini-value{font-weight:800;font-size:18px}
+
+.hint-box{
+  border:1px dashed var(--line);
+  border-radius:18px;
+  padding:18px;
+  background:#fbfdff;
+  color:#41526b;
+  line-height:1.8;
+}
+
+.form-chip-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.type-chip{
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:14px;
+  padding:13px 12px;
+  text-align:center;
+  font-weight:800;
+  cursor:pointer;
+  color:var(--muted);
+}
+.type-chip.active.wastewater{background:var(--indigo-soft);color:var(--indigo-text);border-color:#c7d2fe}
+.type-chip.active.waste{background:var(--green-soft);color:var(--green-text);border-color:#b7ebc6}
+
+.type-box{border-radius:18px;padding:16px;margin-bottom:16px}
+.type-box.wastewater{border:1px solid #dbeafe;background:#f5faff}
+.type-box.waste{border:1px solid #d1fadf;background:#f3fff7}
+.type-box-title{font-size:14px;font-weight:800;margin-bottom:14px}
+
+.inline-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:800;
+  white-space:nowrap;
+}
+.inline-badge.wastewater{background:var(--sky-soft);color:var(--sky-text)}
+.inline-badge.waste{background:var(--amber-soft);color:var(--amber-text)}
+.inline-badge.locked{background:#fee4e2;color:#b42318}
+.inline-badge.partial{background:#fff4e5;color:#b54708}
+.inline-badge.ok{background:#e7f8ef;color:#0f9d58}
+
+.msg{margin-top:12px;white-space:pre-wrap;font-size:14px;font-weight:700}
+.msg.err{color:#b42318}
+.msg.ok{color:var(--ok)}
+.msg.muted{color:var(--muted);font-weight:500}
+
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:18px;background:#fff}
+table{width:100%;border-collapse:collapse;min-width:1100px;background:#fff}
+th,td{border-bottom:1px solid var(--line);padding:12px;text-align:left;vertical-align:top;font-size:14px}
+th{background:#f5f8fc;color:var(--navy);font-weight:800;position:sticky;top:0}
+.small-btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 10px;cursor:pointer;font-weight:700}
+.small-btn.danger{color:#b42318;border-color:#f5c0bb}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.three-col{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.three-col .mini-card{min-width:0}
+
+/* 관리자 기능 상단 요약 카드 4개 한 줄 고정 */
+.admin-card .preview-grid,
+.admin-card .three-col,
+.admin-summary-grid{
+  display:grid !important;
+  grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+  gap:12px !important;
+}
+.admin-card .preview-grid .mini-card,
+.admin-card .three-col .mini-card,
+.admin-summary-grid .mini-card{
+  min-width:0 !important;
+}
+
+.login-wrap{min-height:100vh;display:grid;place-items:center;padding:20px}
+.login-card{width:100%;max-width:430px;padding:28px}
+.login-card h2{margin-top:0;font-size:28px}
+
+.portal-access-wrap{min-height:100vh;display:grid;place-items:center;padding:20px}
+.portal-access-card{width:100%;max-width:520px;padding:32px}
+.portal-access-card h2{margin:0 0 12px;font-size:28px;letter-spacing:-.02em;color:var(--navy)}
+.portal-access-card p{margin:0;color:#475467;line-height:1.75}
+.portal-access-help{
+  margin-top:18px;
+  padding:14px 16px;
+  border:1px solid #dbe4ee;
+  border-radius:16px;
+  background:#f8fafc;
+  color:#475467;
+  font-size:14px;
+  line-height:1.7;
+}
+
+.role-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:5px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:800;
+  background:#edf3ff;
+  color:#2443a7;
+  text-transform:uppercase;
+}
+.role-badge.admin{background:#fff1f0;color:#b42318}
+.role-badge.operator{background:#eef7ff;color:#175cd3}
+.role-badge.user{background:#f2f4f7;color:#344054}
+.role-badge.supervisor{background:#f3e8ff;color:#6b21a8}
+
+.toolbar-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:16px;
+}
+.toolbar-right{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+.approval-box{border:1px solid var(--line);border-radius:16px;padding:14px;background:#fff}
+.signature-preview{display:block;max-width:140px;max-height:60px;border:1px solid var(--line);border-radius:8px;background:#fff;object-fit:contain;padding:4px}
+
+.ref-layout{
+  display:grid;
+  grid-template-columns:280px 1fr;
+  gap:18px;
+  align-items:start;
+}
+
+.ref-menu{display:flex;flex-direction:column;gap:10px}
+.ref-btn{
+  padding:14px;
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:14px;
+  text-align:left;
+  font-weight:800;
+  cursor:pointer;
+}
+.ref-btn.active{background:#0e1a38;color:#fff;border-color:#0e1a38}
+
+.ref-content{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  align-items:stretch;
+}
+
+.ref-paragraph{border:1px solid var(--line);border-radius:14px;padding:14px;background:#fff;line-height:1.7;white-space:pre-wrap}
+.doc-meta{font-size:12px;color:var(--muted)}
+.search-input{max-width:320px}
+
+.doc-container{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:28px;
+  line-height:1.9;
+  box-shadow:var(--shadow);
+}
+.doc-editor{padding:22px;border-radius:18px}
+.ref-editor-textarea{min-height:360px;font-family:var(--common-font-family, Arial,sans-serif);line-height:1.7}
+.doc-title{font-size:24px;font-weight:900;margin-bottom:6px;color:var(--navy);letter-spacing:-.02em}
+.doc-meta-top{font-size:13px;color:#667085}
+.doc-meta{font-size:13px;color:#667085;margin-bottom:18px;padding-bottom:10px;border-bottom:2px solid #e4e7ec}
+.doc-body{font-size:15px}
+.doc-section{font-weight:800;margin-top:24px;margin-bottom:10px;color:#0f172a}
+.doc-question{font-weight:900;margin-top:20px;margin-bottom:10px;color:#0f172a}
+.doc-answer{
+  margin-left:0 !important;
+  padding-left:0 !important;
+  text-indent:0 !important;
+  margin-bottom:8px;
+  color:#344054;
+  line-height:1.85;
+}
+
+.doc-body p,
+.doc-html p,
+.doc-answer p,
+.related-doc-body p{
+  margin-left:0 !important;
+  padding-left:0 !important;
+  text-indent:0 !important;
+}
+.doc-text{margin-bottom:8px}
+.doc-spacer{height:10px}
+.doc-empty{color:#667085;padding:8px 0}
+
+.ledger-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.ledger-approval-box{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end}
+.btn.approval-on{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+.admin-panel-grid{display:grid;grid-template-columns:1fr;gap:18px}
+.sign-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:22px}
+.sign-box{
+  border:1px solid #d0d5dd;
+  border-radius:12px;
+  padding:14px;
+  min-height:120px;
+  text-align:center;
+  background:#fff;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+.sign-title{font-weight:800;font-size:13px;color:#101828;margin-bottom:8px}
+.sign-image-wrap{height:80px;display:flex;align-items:center;justify-content:center}
+.sign-image{max-width:180px;max-height:76px;object-fit:contain}
+.sign-date{font-size:12px;color:#667085;margin-top:8px}
+.mail-help{font-size:12px;color:#667085}
+
+.rich-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.rich-toolbar .btn{padding:9px 14px;border-radius:12px}
+.rich-editor{
+  min-height:360px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:16px;
+  background:#fff;
+  line-height:1.7;
+  outline:none;
+  overflow:auto;
+}
+.rich-editor:empty:before{content:attr(data-placeholder);color:#98a2b3}
+.editor-select{width:auto;min-width:110px}
+.doc-html p{margin:0 0 10px}
+
+.rich-toolbar-group{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.rich-toolbar .btn.icon{min-width:44px;padding:9px 12px}
+
+.kpi-accent{position:relative;overflow:hidden}
+.kpi-accent::before{content:'';position:absolute;left:0;top:0;bottom:0;width:6px}
+.kpi-accent .kpi-icon{font-size:18px;line-height:1;margin-bottom:10px}
+.kpi-accent.water{background:#eef6ff;border-color:#cfe0ff}
+.kpi-accent.water::before{background:#175cd3}
+.kpi-accent.water .kpi-value{color:#175cd3}
+.kpi-accent.wastewater{background:#eefbf3;border-color:#c8ead2}
+.kpi-accent.wastewater::before{background:#0f9d58}
+.kpi-accent.wastewater .kpi-value{color:#0f9d58}
+.kpi-accent.waste{background:#fff7ed;border-color:#f7d6a8}
+.kpi-accent.waste::before{background:#b54708}
+.kpi-accent.waste .kpi-value{color:#b54708}
+.kpi-accent.over{background:#fff1f3;border-color:#f5c2cc}
+.kpi-accent.over::before{background:#c01048}
+.kpi-accent.over .kpi-value{color:#c01048}
+
+td.num{text-align:right}
+tr.over-row td{background:#fff1f3}
+.table-wrap table th{background:#f2f4f7}
+
+.approval-alert-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,.38);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  z-index:2000;
+}
+.approval-alert-modal{
+  width:min(520px,100%);
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:24px;
+  box-shadow:0 24px 50px rgba(15,23,42,.18);
+  overflow:hidden;
+}
+.approval-alert-head{padding:20px 24px;border-bottom:1px solid #e5e7eb;background:#f8fafc}
+.approval-alert-eyebrow{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px}
+.approval-alert-title{margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em;color:var(--navy)}
+.approval-alert-body{padding:22px 24px 12px}
+.approval-alert-desc{margin:0 0 16px;color:#475467;line-height:1.7}
+.approval-alert-list{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 6px;padding:0;list-style:none}
+.approval-alert-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #dbe4ee;border-radius:999px;background:#fff}
+.approval-alert-month{font-weight:800;color:var(--navy)}
+.approval-alert-foot{display:flex;justify-content:flex-end;gap:10px;padding:0 24px 22px}
+.portal-header,.stats,.tabs-wrap,.tab-panel{width:100%}
+
+@media (max-width:1100px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .main-grid,.ref-layout{grid-template-columns:1fr}
+  .preview-grid{grid-template-columns:repeat(2,1fr)}
+  .tabs-main{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .two-col,.three-col{grid-template-columns:1fr}
+}
+
+@media (max-width:720px){
+  .app-shell{padding:0}
+  .topbar{flex-direction:column}
+  .title-wrap h1{font-size:24px}
+  .stats,.tabs,.preview-grid{grid-template-columns:1fr}
+  .form-card,.preview-card,.ledger-card,.admin-card,.log-card,.ref-card{padding:18px}
+  table{min-width:860px}
+  .form-chip-row{grid-template-columns:1fr}
+  .portal-header{padding:28px 24px;border-radius:22px}
+  .portal-title{font-size:26px;line-height:1.3}
+  .approval-alert-modal{border-radius:20px}
+  .approval-alert-title{font-size:22px}
+  .approval-alert-foot{flex-direction:column}
+  .approval-alert-foot .btn{width:100%;justify-content:center}
+}
+
+/* ✅ 여기 추가 */
+table th,
+table td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.col-pickup,
+.col-note {
+  text-align: left !important;
+}
+  
+/* 관리자 기능 상단 요약 카드 4개 한 줄 최종 보정 */
+.admin-card .preview-grid,
+.admin-card .three-col,
+.admin-summary-grid{
+  display:grid !important;
+  grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+  gap:12px !important;
+}
+.admin-card .preview-grid .mini-card,
+.admin-card .three-col .mini-card,
+.admin-summary-grid .mini-card{
+  min-width:0 !important;
+}
+
+@media (max-width:1100px){
+  .admin-card .preview-grid,
+  .admin-card .three-col,
+  .admin-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
+}
+
+@media (max-width:720px){
+  .admin-card .preview-grid,
+  .admin-card .three-col,
+  .admin-summary-grid{grid-template-columns:1fr !important;}
+}
+
+
+.related-doc-toolbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:18px;
+  flex-wrap:wrap;
+}
+.related-doc-list{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.related-doc-item{
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:#fff;
+  padding:18px;
+}
+.related-doc-head{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:flex-start;
+  margin-bottom:10px;
+}
+.related-doc-title{
+  font-size:18px;
+  font-weight:800;
+  color:var(--navy);
+}
+.related-doc-meta{
+  font-size:12px;
+  color:var(--muted);
+}
+.related-doc-desc{
+  white-space:pre-wrap;
+  line-height:1.7;
+  color:#344054;
+  margin-bottom:14px;
+}
+.related-doc-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.related-doc-form{
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:#fff;
+  padding:20px;
+  margin-bottom:18px;
+}
+
+
+.related-doc-layout{
+  display:grid;
+  grid-template-columns:300px 1fr;
+  gap:18px;
+  align-items:start;
+}
+.related-doc-sidebar{
+  position:sticky;
+  top:12px;
+}
+.related-doc-board-tabs{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.related-doc-count{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:22px;
+  height:22px;
+  margin-left:6px;
+  padding:0 7px;
+  border-radius:999px;
+  background:#eef2ff;
+  color:#3538cd;
+  font-size:12px;
+  font-weight:800;
+}
+.ref-btn.active .related-doc-count{
+  background:rgba(255,255,255,.18);
+  color:#fff;
+}
+.related-doc-content{
+  min-width:0;
+}
+.related-doc-toolbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin-bottom:18px;
+  flex-wrap:wrap;
+}
+.related-doc-form{
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:#fff;
+  padding:20px;
+  margin-bottom:18px;
+}
+.related-doc-list{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.related-doc-item{
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:#fff;
+  padding:20px;
+  box-shadow:0 4px 12px rgba(15,23,42,.04);
+}
+.related-doc-head{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:flex-start;
+  margin-bottom:12px;
+}
+.related-doc-title{
+  font-size:19px;
+  font-weight:900;
+  color:var(--navy);
+  letter-spacing:-.02em;
+}
+.related-doc-meta{
+  margin-top:5px;
+  font-size:12px;
+  color:var(--muted);
+}
+.related-doc-file{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  border:1px solid #dbeafe;
+  background:#f5faff;
+  color:#175cd3;
+  border-radius:999px;
+  padding:7px 11px;
+  font-size:12px;
+  font-weight:800;
+  margin-bottom:14px;
+}
+.related-doc-body{
+  line-height:1.8;
+  color:#344054;
+  word-break:break-word;
+}
+.related-doc-body p{
+  margin:0 0 10px;
+}
+.related-doc-inline-image,
+.related-doc-body img{
+  display:block;
+  max-width:100%;
+  max-height:520px;
+  object-fit:contain;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#fff;
+  padding:6px;
+  margin:10px 0;
+}
+.related-doc-editor{
+  min-height:260px;
+}
+@media (max-width:1100px){
+  .related-doc-layout{grid-template-columns:1fr;}
+  .related-doc-sidebar{position:static;}
+  .related-doc-board-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media (max-width:720px){
+  .related-doc-board-tabs{grid-template-columns:1fr;}
+  .related-doc-head{flex-direction:column;}
+}
+
+
+/* ===== portal shell common header mode: hide inner wastewater header ===== */
+.portal-header{
+  display:none !important;
+}
+
+.app-shell{
+  padding-top:0 !important;
+}
+
+.stats{
+  margin-top:0 !important;
+}
+
+.tabs-wrap{
+  margin-top:0 !important;
+}
+
+
+/* ===== ExeloLab Common Compact UI 적용: wastewater ===== */
+/* 기능/JS 변경 없이 화면 밀도만 0.5단계 축소 */
+
+:root {
+  --ww-page-gap: 12px;
+  --ww-card-padding: 18px;
+  --ww-card-radius: var(--common-card-radius, 16px);
+  --ww-control-height: 34px;
+  --ww-control-radius: var(--common-control-radius, 11px);
+  --ww-font-base: 13px;
+  --ww-font-small: var(--common-font-size-small, 11.5px);
+  --ww-font-title: 16px;
+  --ww-shadow: var(--common-shadow-card, 0 5px 14px rgba(15,23,42,.05));
+}
+
+/* 전체 */
+body {
+  font-size: var(--ww-font-base);
+}
+
+.app-shell {
+  padding: 0 !important;
+}
+
+.card {
+  border-radius: var(--ww-card-radius);
+  box-shadow: var(--ww-shadow);
+}
+
+/* 숨겨진 내부 헤더 유지, 혹시 단독 실행 시에도 compact */
+.portal-header {
+  border-radius: 20px;
+  padding: 24px 28px;
+  margin-bottom: var(--ww-page-gap);
+}
+
+.portal-eyebrow {
+  font-size: var(--ww-font-small);
+  margin-bottom: 7px;
+}
+
+.portal-title {
+  font-size: 26px;
+}
+
+/* 상단 KPI */
+.stats {
+  gap: var(--ww-page-gap);
+  margin-bottom: var(--ww-page-gap);
+}
+
+.stat-box {
+  padding: 16px;
+  min-height: 84px;
+}
+
+.stat-label {
+  font-size: var(--ww-font-base);
+  margin-bottom: 7px;
+}
+
+.stat-value {
+  font-size: 20px;
+}
+
+/* 탭 */
+.tabs,
+.tabs-main,
+.tabs-wrap {
+  gap: 8px;
+  margin-bottom: var(--ww-page-gap);
+}
+
+.tab-btn {
+  border-radius: 12px;
+  padding: 10px 8px;
+  font-size: var(--ww-font-base);
+}
+
+.admin-mini-btn {
+  height: var(--ww-control-height);
+  padding: 0 10px;
+  font-size: var(--ww-font-small);
+  border-radius: var(--ww-control-radius);
+}
+
+/* 카드/그리드 */
+.main-grid {
+  grid-template-columns: 390px minmax(0, 1fr);
+  gap: var(--ww-page-gap);
+}
+
+.form-card,
+.preview-card,
+.ledger-card,
+.admin-card,
+.log-card,
+.ref-card,
+.related-doc-form,
+.related-doc-item {
+  padding: var(--ww-card-padding);
+}
+
+.section-title {
+  gap: 7px;
+  font-size: var(--ww-font-title);
+  margin-bottom: 12px;
+}
+
+.field {
+  margin-bottom: 11px;
+}
+
+.field label {
+  margin-bottom: 5px;
+  font-size: var(--ww-font-base);
+}
+
+/* 입력/버튼 */
+.input,
+.textarea,
+.select {
+  min-height: var(--ww-control-height);
+  border-radius: var(--ww-control-radius);
+  padding: 9px 11px;
+  font-size: var(--ww-font-base);
+}
+
+.textarea {
+  min-height: 76px;
+}
+
+.checkbox-row {
+  gap: 7px;
+  border-radius: var(--ww-control-radius);
+  padding: 10px 11px;
+  margin-bottom: 10px;
+}
+
+.btn {
+  min-height: var(--ww-control-height);
+  border-radius: 999px;
+  padding: 0 13px;
+  font-size: var(--ww-font-base);
+}
+
+.btn.block {
+  border-radius: var(--ww-control-radius);
+}
+
+.small-btn {
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: var(--ww-font-small);
+}
+
+/* 미리보기 */
+.preview-grid {
+  gap: var(--ww-page-gap);
+  margin-bottom: var(--ww-page-gap);
+}
+
+.mini-card {
+  border-radius: 14px;
+  padding: 13px;
+  min-height: 72px;
+}
+
+.mini-label {
+  font-size: var(--ww-font-small);
+  margin-bottom: 6px;
+}
+
+.mini-value {
+  font-size: 16px;
+}
+
+.hint-box,
+.type-box,
+.ref-paragraph,
+.doc-container,
+.doc-editor,
+.rich-editor {
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.type-chip {
+  border-radius: var(--ww-control-radius);
+  padding: 9px 10px;
+  font-size: var(--ww-font-base);
+}
+
+.form-chip-row {
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* 표 */
+.table-wrap {
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 9px 10px;
+  font-size: var(--ww-font-base);
+}
+
+table {
+  width: 100%;
+  min-width: unset;
+}
+
+/* 관리자/툴바 */
+.toolbar-row,
+.related-doc-toolbar,
+.ledger-top {
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.toolbar-right,
+.related-doc-actions,
+.rich-toolbar,
+.rich-toolbar-group {
+  gap: 7px;
+}
+
+.admin-card .preview-grid,
+.admin-card .three-col,
+.admin-summary-grid {
+  gap: 8px !important;
+}
+
+/* 운영 관련자료 */
+.ref-layout {
+  grid-template-columns: 240px 1fr;
+  gap: var(--ww-page-gap);
+}
+
+.ref-menu {
+  gap: 7px;
+}
+
+.ref-btn {
+  padding: 10px 12px;
+  border-radius: var(--ww-control-radius);
+  font-size: var(--ww-font-base);
+}
+
+.doc-title {
+  font-size: 20px;
+}
+
+.doc-body {
+  font-size: var(--ww-font-base);
+}
+
+.doc-meta,
+.doc-meta-top,
+.doc-meta,
+.related-doc-meta,
+.mail-help {
+  font-size: var(--ww-font-small);
+}
+
+.doc-section {
+  margin-top: 18px;
+  margin-bottom: 7px;
+}
+
+.doc-question {
+  margin-top: 15px;
+  margin-bottom: 7px;
+}
+
+.related-doc-layout {
+  grid-template-columns: 260px 1fr;
+  gap: var(--ww-page-gap);
+}
+
+.related-doc-list {
+  gap: 10px;
+}
+
+.related-doc-title {
+  font-size: var(--ww-font-title);
+}
+
+.related-doc-body {
+  line-height: 1.6;
+}
+
+/* 결재/서명 */
+.sign-row {
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.sign-box {
+  border-radius: 10px;
+  padding: 10px;
+  min-height: 104px;
+}
+
+.sign-title {
+  font-size: var(--ww-font-small);
+}
+
+.sign-image-wrap {
+  height: 66px;
+}
+
+.sign-image {
+  max-width: 150px;
+  max-height: 62px;
+}
+
+/* 로그인/접근 */
+.login-card,
+.portal-access-card {
+  padding: 22px;
+  border-radius: 18px;
+}
+
+.login-card h2,
+.portal-access-card h2 {
+  font-size: 24px;
+}
+
+.portal-access-help {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  font-size: var(--ww-font-base);
+}
+
+/* 모달 */
+.approval-alert-modal {
+  border-radius: 18px;
+}
+
+.approval-alert-head {
+  padding: 16px 18px;
+}
+
+.approval-alert-title {
+  font-size: 21px;
+}
+
+.approval-alert-body {
+  padding: 16px 18px 10px;
+}
+
+.approval-alert-foot {
+  padding: 0 18px 16px;
+}
+
+/* 반응형 기존 유지 */
+@media (max-width:1100px){
+  .main-grid,
+  .ref-layout,
+  .related-doc-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width:720px){
+  .form-card,
+  .preview-card,
+  .ledger-card,
+  .admin-card,
+  .log-card,
+  .ref-card {
+    padding: 14px;
+  }
+
+  .portal-title {
+    font-size: 23px;
+  }
+}
+
+
+
+
+/* ===== Main grid width stabilization: input form + content area ===== */
+.main-grid > *{
+  min-width:0;
+}
+
+.preview-card,
+.ledger-card,
+.admin-card,
+.log-card,
+.ref-card,
+.related-doc-content{
+  min-width:0;
+}
+
+.table-wrap{
+  min-width:0;
+  overflow-x:auto;
+}
+
+
+/* ===== Responsive layout final override: auto-slim input + fluid tables ===== */
+.main-grid{
+  grid-template-columns:390px minmax(0, 1fr) !important;
+}
+
+.main-grid > *,
+.preview-card,
+.ledger-card,
+.admin-card,
+.log-card,
+.ref-card,
+.related-doc-content{
+  min-width:0 !important;
+}
+
+.table-wrap{
+  min-width:0 !important;
+  overflow-x:auto !important;
+}
+
+table{
+  width:100% !important;
+  min-width:unset !important;
+}
+
+@media (max-width:1100px){
+  .main-grid{
+    grid-template-columns:1fr !important;
+  }
+}
+
+
+
+/* ===== Reference document overflow fix: wrap long text + fit images ===== */
+.ref-layout > *,
+.ref-content,
+.doc-container,
+.doc-body,
+.doc-html,
+.doc-text,
+.doc-answer,
+.ref-paragraph,
+.related-doc-layout > *,
+.related-doc-content,
+.related-doc-body{
+  max-width:100% !important;
+  min-width:0 !important;
+  overflow-wrap:anywhere !important;
+  word-break:keep-all !important;
+  white-space:normal !important;
+}
+
+.doc-container,
+.ref-content,
+.related-doc-content{
+  overflow-x:hidden !important;
+}
+
+.doc-body img,
+.doc-html img,
+.doc-container img,
+.related-doc-body img,
+.related-doc-inline-image{
+  max-width:100% !important;
+  height:auto !important;
+  object-fit:contain !important;
+}
+
+/* ===== Portal Common Tabs Bridge: Wastewater ===== */
+/* 포탈 공통 버튼을 사용하므로 폐수 내부 탭 버튼은 숨기되 DOM은 유지 */
+.tabs-wrap,
+.tabs,
+.tabs-main{
+  display:none !important;
+  height:0 !important;
+  min-height:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  overflow:hidden !important;
+}
+
+/* 내부 탭이 사라진 공간만큼 본문을 위로 붙임 */
+.tab-panel.active{
+  margin-top:0 !important;
+}
+
+.app-shell{
+  padding-top:0 !important;
+}
+
+.stats{
+  margin-top:0 !important;
+}
+
+
+/* =========================================================
+   Portal iframe fit patch
+   - 통합 iframe 플랫폼 내부에서 자연스럽게 보이도록 외곽 여백/높이만 정리
+   - 폐수 앱의 기존 로직과 내부 컴포넌트 스타일은 변경하지 않음
+========================================================= */
+html,
+body{
+  width:100%;
+  min-height:100%;
+}
+
+body{
+  background:transparent;
+}
+
+.app-shell{
+  width:100%;
+  max-width:none;
+  margin:0;
+  padding:10px;
+  min-height:100vh;
+}
+
+.portal-header{
+  margin-top:0;
+}
+
+@media (max-width:760px){
+  .app-shell{
+    padding:8px;
+  }
+
+  .portal-header{
+    border-radius:20px;
+    padding:24px 22px;
+  }
+
+  .portal-title{
+    font-size:24px;
+  }
+}
+
+
+
+/* =========================================================
+   Step 3-1 Common Button Shape Link: wastewater
+   - 버튼 색상은 기존 폐수 프로그램 스타일 유지
+   - 높이/반경/패딩/폰트/정렬만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+button,
+.btn,
+.tab-btn,
+.admin-mini-btn,
+.small-btn,
+.ref-btn,
+.type-chip,
+.inline-badge,
+.role-badge {
+  min-height: var(--common-control-height, var(--ww-control-height, 34px));
+  border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
+  font-size: var(--ww-font-base, 13px);
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.btn,
+.tab-btn,
+.admin-mini-btn,
+.ref-btn,
+.type-chip {
+  min-height: var(--common-control-height, var(--ww-control-height, 34px));
+  padding: 0 var(--common-control-padding-x, 13px);
+}
+
+.btn {
+  border-radius: 999px;
+}
+
+.btn.block {
+  width: 100%;
+  border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
+}
+
+.small-btn {
+  min-height: calc(var(--common-control-height, var(--ww-control-height, 34px)) - 6px);
+  padding: 0 9px;
+  font-size: var(--ww-font-small, 11.5px);
+}
+
+.inline-badge,
+.role-badge {
+  min-height: calc(var(--common-control-height, var(--ww-control-height, 34px)) - 8px);
+  padding: 0 10px;
+  font-size: var(--ww-font-small, 11.5px);
+}
+
+.rich-toolbar .btn,
+.ledger-approval-box .btn,
+.approval-alert-foot .btn,
+.related-doc-actions .btn,
+.toolbar-right .btn {
+  min-height: var(--common-control-height, var(--ww-control-height, 34px));
+  padding: 0 var(--common-control-padding-x, 13px);
+}
+
+@media (max-width: 720px) {
+  .approval-alert-foot .btn {
+    width: 100%;
+  }
+}
+
+
+
+/* =========================================================
+   Step 3-2 Common Card Surface Link: wastewater
+   - 카드 높이/레이아웃/표/문서 영역은 유지
+   - 카드 겉모양(radius, shadow, border, background)만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+.card,
+.form-card,
+.preview-card,
+.ledger-card,
+.admin-card,
+.log-card,
+.ref-card,
+.related-doc-form,
+.related-doc-item,
+.mini-card,
+.hint-box,
+.type-box,
+.ref-paragraph,
+.doc-container,
+.doc-editor,
+.rich-editor,
+.approval-box,
+.sign-box,
+.login-card,
+.portal-access-card,
+.portal-access-help,
+.table-wrap,
+.approval-alert-modal {
+  border-color: var(--common-line, var(--line));
+  border-radius: var(--common-card-radius, var(--ww-card-radius, 16px));
+  background-color: var(--common-card, #fff);
+}
+
+.card,
+.form-card,
+.preview-card,
+.ledger-card,
+.admin-card,
+.log-card,
+.ref-card,
+.related-doc-item,
+.doc-container,
+.login-card,
+.portal-access-card,
+.approval-alert-modal {
+  box-shadow: var(--common-shadow-card, var(--ww-shadow, 0 5px 14px rgba(15,23,42,.05)));
+}
+
+/* 내부 보조 박스는 컨트롤 radius 기준으로 살짝 낮게 유지 */
+.mini-card,
+.hint-box,
+.type-box,
+.ref-paragraph,
+.doc-editor,
+.rich-editor,
+.approval-box,
+.sign-box,
+.portal-access-help,
+.table-wrap,
+.related-doc-form {
+  border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
+}
+
+/* KPI/상태 강조 카드의 배경색은 기존 의미 색상을 유지 */
+.kpi-accent.water,
+.kpi-accent.wastewater,
+.kpi-accent.waste,
+.kpi-accent.over,
+.type-box.wastewater,
+.type-box.waste {
+  box-shadow: var(--common-shadow-soft, 0 3px 10px rgba(15,23,42,.04));
+}
+
+/* 문서/관련자료 이미지 박스도 외곽만 공통화 */
+.related-doc-inline-image,
+.related-doc-body img,
+.signature-preview {
+  border-color: var(--common-line, var(--line));
+  border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
+}
+
+
+
+/* =========================================================
+   Step 3-3 Common Input Shape Link: wastewater
+   - input/select/textarea의 폭/레이아웃/표 구조는 유지
+   - 높이/반경/폰트/테두리/포커스만 공통 토큰과 연결
+   - 기능/JS 변경 없음
+========================================================= */
+input,
+select,
+textarea,
+.input,
+.select,
+.textarea,
+.editor-select,
+.search-input,
+.ref-editor-textarea,
+.prepare-remark-select {
+  border-color: var(--common-line, var(--line));
+  border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
+  background-color: var(--common-card, #fff);
+  color: var(--common-text, var(--text));
+  font-size: var(--ww-font-base, 13px);
+  outline: none;
+}
+
+.input,
+.select,
+textarea,
+.textarea,
+.ref-editor-textarea {
+  min-height: var(--common-control-height, var(--ww-control-height, 34px));
+  border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
+  padding: 9px 11px;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.input:focus,
+.select:focus,
+.textarea:focus,
+.ref-editor-textarea:focus,
+.editor-select:focus,
+.search-input:focus {
+  border-color: var(--common-focus, var(--module-accent, #0ea5e9));
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.10);
+}
+
+/* 문서 편집/긴 텍스트 영역은 기존 높이 유지 */
+.textarea {
+  min-height: 76px;
+}
+
+.ref-editor-textarea {
+  min-height: 360px;
+  line-height: 1.7;
+}
+
+.rich-editor {
+  outline: none;
+}
+
+.rich-editor:focus {
+  border-color: var(--common-focus, var(--module-accent, #0ea5e9));
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.10);
+}
+
+/* 툴바/검색/선택 입력은 버튼 높이와 맞춤 */
+.editor-select,
+.search-input,
+.toolbar-right input,
+.toolbar-right select,
+.ledger-approval-box input,
+.ledger-approval-box select {
+  min-height: var(--common-control-height, var(--ww-control-height, 34px));
+  height: var(--common-control-height, var(--ww-control-height, 34px));
+  border-radius: var(--common-control-radius, var(--ww-control-radius, 11px));
+}
+
+/* 체크박스는 공통 높이 강제 제외 */
+input[type="checkbox"],
+.checkbox-row input[type="checkbox"] {
+  min-height: auto !important;
+  height: 16px !important;
+  width: 16px !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+
+/* 서명 이미지/파일류 input은 브라우저 기본 동작 유지 */
+input[type="file"] {
+  height: auto !important;
+  min-height: var(--common-control-height, var(--ww-control-height, 34px));
+  padding: 7px 10px;
+}
+
+
+
+/* =========================================================
+   Step 3-4-1/2 Common Table Surface + Density Link: wastewater
+   - table min-width/overflow/sticky/보고서 구조는 유지
+   - 테이블 선/헤더/본문색 + padding/font/row-height만 공통화
+   - 기능/JS 변경 없음
+========================================================= */
+.table-wrap {
+  border-color: var(--common-line, var(--line));
+  background-color: var(--common-card, #ffffff);
+}
+
+table {
+  color: var(--common-text, var(--text));
+  background-color: var(--common-card, #ffffff);
+}
+
+th,
+td {
+  border-color: var(--common-line, var(--line));
+  font-size: var(--ww-font-base, 13px);
+  line-height: 1.35;
+}
+
+th,
+.table-wrap table th {
+  background-color: var(--common-table-head-bg, #f2f4f7);
+  color: var(--common-table-head-text, var(--navy));
+  font-weight: 800;
+}
+
+td {
+  color: var(--common-text, var(--text));
+}
+
+/* 3-4-2: 표 밀도 통일. 구조/폭은 변경하지 않음 */
+.table-wrap th,
+.table-wrap td {
+  padding: 8px 9px;
+}
+
+/* 숫자/over/상태 의미 색상은 기존 유지 */
+td.num {
+  text-align: right;
+}
+
+tr.over-row td {
+  background: #fff1f3;
+}
+
+/* 문서/결재 표의 가독성 유지 */
+.sign-box table th,
+.sign-box table td,
+.doc-container table th,
+.doc-container table td {
+  line-height: 1.45;
+}
+
+
+
+/* =========================================================
+   Step 3-5/6 Common Modal Toast Alert Feedback Link: wastewater
+   - overlay/modal display/z-index/width/height/overflow 구조는 유지
+   - radius, shadow, border, background, font, gap만 공통화
+   - 기능/JS 변경 없음
+========================================================= */
+.approval-alert-overlay {
+  background: var(--common-overlay-bg, rgba(15,23,42,.38));
+  backdrop-filter: blur(var(--common-overlay-blur, 2px));
+}
+
+.approval-alert-modal,
+.login-card,
+.portal-access-card {
+  border: 1px solid var(--common-modal-border, var(--line));
+  border-radius: var(--common-modal-radius, 22px);
+  background: var(--common-modal-bg, #ffffff);
+  box-shadow: var(--common-modal-shadow, 0 24px 50px rgba(15,23,42,.18));
+  color: var(--common-text, var(--text));
+}
+
+.approval-alert-head {
+  border-bottom-color: var(--common-line, #e5e7eb);
+  background: var(--common-soft, #f8fafc);
+}
+
+.approval-alert-title,
+.login-card h2,
+.portal-access-card h2 {
+  font-size: var(--common-modal-title-size, 24px);
+  line-height: 1.25;
+  color: var(--common-text, var(--navy));
+}
+
+.approval-alert-desc,
+.portal-access-card p,
+.portal-access-help,
+.mail-help,
+.msg {
+  font-size: var(--common-modal-body-size, 13px);
+  line-height: 1.55;
+}
+
+.approval-alert-actions,
+.ledger-approval-box,
+.toolbar-right {
+  gap: var(--common-modal-button-gap, 8px);
+}
+
+.msg,
+.portal-access-help,
+.hint-box {
+  border-radius: var(--common-alert-radius, 14px);
+}
+
+.msg.err {
+  color: var(--common-alert-error-text, #b91c1c);
+}
+
+.msg.ok {
+  color: var(--common-alert-success-text, #047857);
+}
+
+.msg.muted {
+  color: var(--common-muted, var(--muted));
+}
+
+
+/* =========================================================
+   Mobile Top KPI Compact Cards v1
+   - 모바일에서 상단 4개 요약 카드를 2x2 압축 배치
+   - 일일 입력 폼이 바로 보이도록 카드 높이/여백 축소
+========================================================= */
+@media (max-width:720px){
+  .stats{
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:8px !important;
+    margin:0 0 12px !important;
+  }
+
+  .stat-box{
+    min-height:78px !important;
+    padding:14px 12px !important;
+    border-radius:18px !important;
+    box-shadow:0 6px 14px rgba(15,23,42,.06) !important;
+  }
+
+  .stat-label{
+    margin-bottom:7px !important;
+    font-size:12px !important;
+    line-height:1.25 !important;
+    letter-spacing:-.02em !important;
+  }
+
+  .stat-value{
+    font-size:22px !important;
+    line-height:1.15 !important;
+    letter-spacing:-.03em !important;
+    word-break:keep-all !important;
+  }
+
+  .stat-value .inline-badge{
+    padding:6px 9px !important;
+    font-size:12px !important;
+    line-height:1 !important;
+  }
+}
+
+@media (max-width:390px){
+  .stats{
+    gap:7px !important;
+  }
+
+  .stat-box{
+    min-height:74px !important;
+    padding:12px 10px !important;
+  }
+
+  .stat-label{
+    font-size:11px !important;
+  }
+
+  .stat-value{
+    font-size:20px !important;
+  }
+}
+
+
+/* =========================================================
+   Mobile Input Auto Zoom Prevent Patch v1
+   - iPhone/Safari 입력 포커스 시 화면 확대 방지
+   - 모바일 입력창 폰트 최소 16px 유지
+========================================================= */
+@media (max-width:720px){
+
+  html,
+  body{
+    -webkit-text-size-adjust:100% !important;
+    text-size-adjust:100% !important;
+  }
+
+  input,
+  select,
+  textarea,
+  .input,
+  .select,
+  .textarea{
+    font-size:16px !important;
+    line-height:1.45 !important;
+    transform:none !important;
+    zoom:1 !important;
+  }
+
+  input[type="date"],
+  input[type="number"],
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  select{
+    font-size:16px !important;
+  }
+}
+
+
+/* =========================================================
+   Mobile Date Input Hard Clamp Patch v2
+   - 날짜/수거일 date input이 모바일 화면 밖으로 나가는 문제 강제 보정
+   - iOS/Android date 기본 표시 영역까지 같이 축소
+   - 입력창 줌 방지 16px는 유지
+========================================================= */
+@media (max-width:720px){
+
+  .app-shell,
+  #app,
+  .tab-panel,
+  .tab-panel.active,
+  .main-grid,
+  .main-grid > *,
+  .form-card,
+  .field,
+  .field > *,
+  .type-box,
+  .type-box > *,
+  .form-chip-row,
+  .checkbox-row{
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
+    overflow-x:hidden !important;
+  }
+
+  .input,
+  .select,
+  .textarea,
+  input,
+  select,
+  textarea{
+    max-width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
+  }
+
+  input[type="date"],
+  input.input[type="date"],
+  .input[type="date"]{
+    display:block !important;
+    width:100% !important;
+    inline-size:100% !important;
+    max-width:100% !important;
+    max-inline-size:100% !important;
+    min-width:0 !important;
+    min-inline-size:0 !important;
+    height:40px !important;
+    min-height:40px !important;
+    padding:0 8px !important;
+    margin:0 !important;
+    box-sizing:border-box !important;
+    font-size:16px !important;
+    line-height:40px !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+    white-space:nowrap !important;
+    -webkit-appearance:none !important;
+    appearance:none !important;
+  }
+
+  input[type="date"]::-webkit-date-and-time-value{
+    min-width:0 !important;
+    max-width:100% !important;
+    width:100% !important;
+    text-align:left !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+  }
+
+  input[type="date"]::-webkit-datetime-edit{
+    min-width:0 !important;
+    max-width:100% !important;
+    width:100% !important;
+    overflow:hidden !important;
+  }
+
+  input[type="date"]::-webkit-datetime-edit-fields-wrapper{
+    min-width:0 !important;
+    max-width:100% !important;
+    overflow:hidden !important;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator{
+    flex:0 0 auto !important;
+    width:18px !important;
+    height:18px !important;
+    margin-left:2px !important;
+  }
+}
+
+
+/* =========================================================
+   Mobile Pickup/Ledger Table Readability Patch v1
+   - 수거내역/운영일지 테이블은 좌우 스크롤 전제로 가독성 우선
+   - 날짜/숫자/단위/업체명/확인서번호가 과도하게 줄바꿈되지 않도록 폭 복원
+   - 입력폼/KPI/버튼 compact 스타일은 유지
+========================================================= */
+@media (max-width:720px){
+
+  /* 수거내역 테이블 */
+  .preview-card .table-wrap,
+  .ledger-card .table-wrap{
+    width:100% !important;
+    max-width:100% !important;
+    overflow-x:auto !important;
+    overflow-y:visible !important;
+    -webkit-overflow-scrolling:touch !important;
+  }
+
+  .preview-card .table-wrap table{
+    width:max-content !important;
+    min-width:760px !important;
+    table-layout:auto !important;
+  }
+
+  .ledger-card .table-wrap table{
+    width:max-content !important;
+    min-width:1120px !important;
+    table-layout:auto !important;
+  }
+
+  .preview-card .table-wrap th,
+  .preview-card .table-wrap td,
+  .ledger-card .table-wrap th,
+  .ledger-card .table-wrap td{
+    padding:11px 14px !important;
+    font-size:14px !important;
+    line-height:1.45 !important;
+    vertical-align:middle !important;
+    white-space:nowrap !important;
+    word-break:keep-all !important;
+    overflow-wrap:normal !important;
+  }
+
+  .preview-card .table-wrap th,
+  .ledger-card .table-wrap th{
+    font-size:13px !important;
+    font-weight:900 !important;
+  }
+
+  /* 긴 설명/비고 컬럼만 적당히 줄바꿈 허용 */
+  .preview-card .table-wrap th:nth-child(3),
+  .preview-card .table-wrap td:nth-child(3){
+    min-width:180px !important;
+    white-space:normal !important;
+    word-break:keep-all !important;
+    overflow-wrap:break-word !important;
+  }
+
+  .preview-card .table-wrap th:nth-child(6),
+  .preview-card .table-wrap td:nth-child(6),
+  .ledger-card .table-wrap th.col-pickup,
+  .ledger-card .table-wrap td.col-pickup,
+  .ledger-card .table-wrap th.col-note,
+  .ledger-card .table-wrap td.col-note{
+    min-width:160px !important;
+    white-space:normal !important;
+    word-break:keep-all !important;
+    overflow-wrap:break-word !important;
+    text-align:left !important;
+  }
+
+  /* 날짜/번호/수치 컬럼 최소 폭 확보 */
+  .preview-card .table-wrap th:nth-child(1),
+  .preview-card .table-wrap td:nth-child(1){
+    min-width:104px !important;
+  }
+
+  .preview-card .table-wrap th:nth-child(4),
+  .preview-card .table-wrap td:nth-child(4){
+    min-width:150px !important;
+  }
+
+  .ledger-card .table-wrap th:nth-child(1),
+  .ledger-card .table-wrap td:nth-child(1){
+    min-width:104px !important;
+  }
+
+  .ledger-card .table-wrap th:nth-child(2),
+  .ledger-card .table-wrap td:nth-child(2),
+  .ledger-card .table-wrap th:nth-child(3),
+  .ledger-card .table-wrap td:nth-child(3),
+  .ledger-card .table-wrap th:nth-child(4),
+  .ledger-card .table-wrap td:nth-child(4),
+  .ledger-card .table-wrap th:nth-child(6),
+  .ledger-card .table-wrap td:nth-child(6),
+  .ledger-card .table-wrap th:nth-child(7),
+  .ledger-card .table-wrap td:nth-child(7){
+    min-width:96px !important;
+  }
+
+  .ledger-card .table-wrap th:nth-child(8),
+  .ledger-card .table-wrap td:nth-child(8){
+    min-width:120px !important;
+  }
+
+  .ledger-card .table-wrap th:nth-child(9),
+  .ledger-card .table-wrap td:nth-child(9){
+    min-width:150px !important;
+  }
+}
+
+
+/* =========================================================
+   Mobile Related Docs Card List v1
+   - 관련서류는 모바일에서 테이블 대신 카드형 목록으로 표시
+   - PC는 기존 테이블 유지
+========================================================= */
+.related-doc-mobile-list{
+  display:none;
+}
+
+@media (max-width:720px){
+  .related-doc-table-wrap{
+    display:none !important;
+  }
+
+  .related-doc-mobile-list{
+    display:flex !important;
+    flex-direction:column;
+    gap:12px;
+    width:100%;
+    max-width:100%;
+  }
+
+  .related-doc-mobile-empty{
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:#fff;
+    padding:20px;
+    color:var(--muted);
+    text-align:center;
+    font-weight:800;
+  }
+
+  .related-doc-mobile-card{
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:#fff;
+    padding:16px;
+    box-shadow:0 5px 14px rgba(15,23,42,.05);
+  }
+
+  .related-doc-mobile-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+  }
+
+  .related-doc-mobile-no{
+    font-size:12px;
+    font-weight:900;
+    color:var(--muted);
+  }
+
+  .related-doc-mobile-badges{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+
+  .related-doc-mobile-title{
+    width:100%;
+    border:0;
+    background:transparent;
+    padding:0;
+    margin:0 0 12px;
+    color:var(--navy);
+    font-size:16px;
+    font-weight:900;
+    line-height:1.45;
+    text-align:left;
+    white-space:normal;
+    word-break:keep-all;
+    overflow-wrap:break-word;
+    cursor:pointer;
+  }
+
+  .related-doc-mobile-meta{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:6px;
+    padding:12px;
+    border-radius:14px;
+    background:#f8fafc;
+    color:#344054;
+    font-size:13px;
+    line-height:1.45;
+  }
+
+  .related-doc-mobile-meta div{
+    display:flex;
+    gap:8px;
+    min-width:0;
+    word-break:break-all;
+  }
+
+  .related-doc-mobile-meta span{
+    flex:0 0 52px;
+    color:var(--muted);
+    font-weight:900;
+  }
+
+  .related-doc-mobile-actions{
+    display:flex;
+    gap:8px;
+    justify-content:flex-end;
+    margin-top:12px;
+  }
+
+  .related-doc-mobile-actions .small-btn{
+    min-height:34px;
+    padding:0 12px;
+  }
+}
+
+
+/* 기능별 독립 폴더용 */
+.portal-header,.tabs-wrap{display:none!important}
+.app-shell{padding:0!important;margin:0!important}
+body{padding:0!important}
+.tab-panel.active>.card,.tab-panel.active>.main-grid{margin-top:0!important}
+.ww-approval-grid{display:grid;grid-template-columns:34px 1fr 1fr;border:1px solid #ccd6e3;border-radius:10px;overflow:hidden;background:#fff;min-width:320px}
+.ww-approval-label{writing-mode:vertical-rl;transform:rotate(180deg);display:flex;align-items:center;justify-content:center;background:#f3f6f9;font-size:11px;font-weight:900;border-right:1px solid #ccd6e3}
+.ww-approval-cell{min-height:92px;text-align:center;border-right:1px solid #ccd6e3;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
+.ww-approval-cell:last-child{border-right:0}
+.ww-approval-role{width:100%;padding:5px 6px;background:#f8fafc;border-bottom:1px solid #dce4ec;font-size:10px;font-weight:900}
+.ww-approval-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px}
+.ww-stamp{width:40px;height:40px;border:2px solid #d92d20;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#d92d20;font-size:11px;font-weight:900;line-height:1}
+.ww-approval-name{font-size:10px;font-weight:800;margin-top:4px;color:#344054}
+.ww-approval-date{font-size:9px;color:#667085;margin-top:2px}
+.ww-approval-action{margin-top:4px;border:1px solid #ccd6e3;background:#fff;border-radius:7px;padding:4px 7px;font-size:9px;font-weight:800;cursor:pointer}
+.ww-approval-action.primary{background:#0e1a38;color:#fff;border-color:#0e1a38}
