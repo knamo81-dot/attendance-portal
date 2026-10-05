@@ -284,7 +284,7 @@ function legalLedgerRows(){
   let balance=openingBalanceKg();
   let hasUnknown=false;
 
-  return events.map(ev=>{
+  const calculated=events.map(ev=>{
     let generationKg=0;
     let selfKg=0;
     let outsourcedKg=0;
@@ -319,6 +319,13 @@ function legalLedgerRows(){
       balance,
       hasUnknown
     };
+  });
+
+  return calculated.sort((a,b)=>{
+    const d=String(b.date).localeCompare(String(a.date));
+    if(d!==0)return d;
+    if(a.kind!==b.kind)return a.kind==='generation'?-1:1;
+    return typeName(a.waste_type).localeCompare(typeName(b.waste_type),'ko');
   });
 }
 
@@ -509,7 +516,12 @@ function buildFacilityDerived(){
 function facilityRowsForPeriod(){
   const prefix=monthPrefix();
   return buildFacilityDerived()
-    .filter(r=>String(r.entry_date||'').startsWith(prefix));
+    .filter(r=>String(r.entry_date||'').startsWith(prefix))
+    .sort((a,b)=>{
+      const d=String(b.entry_date||'').localeCompare(String(a.entry_date||''));
+      if(d!==0)return d;
+      return typeName(a.waste_type||{}).localeCompare(typeName(b.waste_type||{}),'ko');
+    });
 }
 
 function facilityWasteCell(row){
@@ -938,7 +950,23 @@ function renderLegal(){
       <br>
 
       <div class="table-wrap">
-        <table style="min-width:1250px">
+        <table class="ledger-data-table legal-ledger-table">
+          <colgroup>
+            <col style="width:92px">
+            <col style="width:160px">
+            <col style="width:92px">
+            <col style="width:100px">
+            <col style="width:92px">
+            <col style="width:92px">
+            <col style="width:112px">
+            <col style="width:92px">
+            <col style="width:112px">
+            <col style="width:120px">
+            <col style="width:120px">
+            <col style="width:112px">
+            <col style="width:105px">
+            <col style="width:105px">
+          </colgroup>
           <thead>
             <tr>
               <th colspan="4">② 발생내용</th>
@@ -1047,7 +1075,20 @@ function renderFacility(){
       <br>
 
       <div class="table-wrap">
-        <table style="min-width:1320px">
+        <table class="ledger-data-table facility-ledger-table">
+          <colgroup>
+            <col style="width:115px">
+            <col style="width:95px">
+            <col style="width:105px">
+            <col style="width:115px">
+            <col style="width:125px">
+            <col style="width:145px">
+            <col style="width:115px">
+            <col style="width:115px">
+            <col style="width:130px">
+            <col style="width:160px">
+            <col style="width:175px">
+          </colgroup>
           <thead>
             <tr>
               <th>날짜</th>
@@ -1118,7 +1159,7 @@ function renderFacility(){
 
                   <td>${facilityPickupInfo(p)}</td>
 
-                  <td>
+                  <td class="ledger-notes">
                     ${isHoliday
                       ? esc(r.holiday_reason||'휴일')
                       : esc(r.note||'')}
