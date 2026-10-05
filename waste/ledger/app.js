@@ -1313,9 +1313,9 @@ function renderFacility(){
             <col style="width:105px">
             <col style="width:115px">
             <col style="width:125px">
+            <col style="width:115px">
+            <col style="width:115px">
             <col style="width:145px">
-            <col style="width:115px">
-            <col style="width:115px">
             <col style="width:130px">
             <col style="width:160px">
             <col style="width:175px">
@@ -1327,9 +1327,9 @@ function renderFacility(){
               <th>당일 사용량</th>
               <th>저장고 높이</th>
               <th>외부보관</th>
-              <th>처리업소</th>
               <th>금일지침</th>
               <th>총 발생량</th>
+              <th>처리업소</th>
               <th>확인서번호</th>
               <th>수거 정보</th>
               <th>기타</th>
@@ -1369,8 +1369,6 @@ function renderFacility(){
                           : '-')}
                   </td>
 
-                  <td>${facilityContractor(p)}</td>
-
                   <td>
                     ${isHoliday
                       ? '휴일'
@@ -1386,6 +1384,8 @@ function renderFacility(){
                           ? '<span class="pill amber">Unverified</span>'
                           : esc(r.generated_text||'-'))}
                   </td>
+
+                  <td>${facilityContractor(p)}</td>
 
                   <td>${facilityCertificates(p)}</td>
 
