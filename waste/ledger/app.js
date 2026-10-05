@@ -616,30 +616,51 @@ function buildFacilityDerived(){
       .sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date)));
     const baselines=facilityOpeningRowsForType(wasteTypeId);
 
-    let prevMeter=0;
-    let prevGuideline=0;
-    let appliedOpeningId='';
+    /*
+     * 폐수배출시설 운영일지 기초값 처리 원칙
+     * ----------------------------------------------------------
+     * - 기초값은 "계산 시작값"으로 최초 1회만 적용한다.
+     * - balance_date를 지났다고 중간에 prevMeter/prevGuideline을 다시
+     *   기초값으로 리셋하지 않는다.
+     * - 과거 자료를 이관한 뒤 나중에 기초값을 등록한 경우에도
+     *   (예: 2026-10-05에 567.63을 등록) 최초 실측값 계산의 seed로 쓴다.
+     * - 휴일/주말은 직전 실제 용수 지침을 그대로 유지한다.
+     */
+    const firstMeasuredRow=ordered.find(row=>{
+      const holiday=effectiveFacilityHoliday(row);
+      return !holiday.isHoliday
+        && row?.id
+        && row.usage!==null
+        && row.usage!==undefined
+        && String(row.usage).trim()!=='';
+    })||null;
+
+    const firstMeasuredDate=String(firstMeasuredRow?.entry_date||ordered[0]?.entry_date||'');
+
+    // 정상적인 경우: 최초 실측일 이전(또는 같은 날)의 가장 최근 기초값.
+    // 과거 데이터 이관 후 기초값을 늦게 등록한 경우: 가장 이른 등록 기초값을
+    // 계산 시작 seed로 소급 적용한다.
+    const baselineBeforeStart=baselines
+      .filter(x=>!firstMeasuredDate || String(x.balance_date||'')<=firstMeasuredDate)
+      .slice(-1)[0]||null;
+    const openingSeed=baselineBeforeStart || baselines[0] || null;
+    const openingState=facilityOpeningState(openingSeed);
+
+    let prevMeter=openingSeed ? openingState.prevUsage : 0;
+    let prevGuideline=openingSeed ? openingState.prevGuideline : 0;
 
     ordered.forEach((row)=>{
-      // 현재 일자까지 등록된 가장 최근 운영일지용 기초값을 적용한다.
-      // 같은 기준일이면 일일입력 계산 전에 기초값을 사용한다.
-      const applicable=baselines
-        .filter(x=>String(x.balance_date||'')<=String(row.entry_date||''))
-        .slice(-1)[0]||null;
-
-      if(applicable && applicable.id!==appliedOpeningId){
-        const state=facilityOpeningState(applicable);
-        prevMeter=state.prevUsage;
-        prevGuideline=state.prevGuideline;
-        appliedOpeningId=applicable.id;
-      }
-
       const holiday=effectiveFacilityHoliday(row);
       const isHoliday=holiday.isHoliday;
-      const meter=isHoliday ? prevMeter : Number(row.usage||0);
+      const hasMeter=!isHoliday
+        && row.usage!==null
+        && row.usage!==undefined
+        && String(row.usage).trim()!=='';
+
+      const meter=hasMeter ? Number(row.usage) : prevMeter;
       const waterUsed=isHoliday
         ? 0
-        : round2(meter-prevMeter);
+        : (hasMeter ? round2(meter-prevMeter) : null);
 
       const externalCm=isHoliday
         ? 0
@@ -653,11 +674,11 @@ function buildFacilityDerived(){
 
       const guidelineValue=isHoliday
         ? prevGuideline
-        : (totalCm>CM_LIMIT ? null : cmToM3(totalCm));
+        : (hasMeter ? (totalCm>CM_LIMIT ? null : cmToM3(totalCm)) : prevGuideline);
 
       const generated=isHoliday
         ? 0
-        : (guidelineValue===null ? null : round2(guidelineValue-prevGuideline));
+        : (!hasMeter ? null : (guidelineValue===null ? null : round2(guidelineValue-prevGuideline)));
 
       const pickup=pickupMap.get(`${row.entry_date}|${wasteTypeId}`)||null;
 
@@ -675,7 +696,7 @@ function buildFacilityDerived(){
         pickup
       });
 
-      prevMeter=meter;
+      if(hasMeter) prevMeter=meter;
 
       if(!isHoliday){
         if(pickup?.after_cm!=null){
