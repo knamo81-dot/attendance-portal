@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>폐수관리 - 수거등록</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body class="pc-page">
+  <main id="app" class="page" aria-live="polite"></main>
+  <script src="./app.js"></script>
+</body>
+</html>
