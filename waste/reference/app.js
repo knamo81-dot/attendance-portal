@@ -245,8 +245,38 @@ function toolbarHtml(){
         <button type="button" class="tool-btn" data-cmd="italic" title="기울임"><i>I</i></button>
         <button type="button" class="tool-btn" data-cmd="underline" title="밑줄"><u>U</u></button>
         <button type="button" class="tool-btn" data-cmd="strikeThrough" title="취소선"><s>S</s></button>
-        <label class="color-tool" title="글자색">A<input type="color" id="tool-color" value="#10203c"></label>
-        <label class="color-tool highlight" title="배경색">A<input type="color" id="tool-bg" value="#fff2a8"></label>
+        <div class="color-menu-wrap">
+          <button type="button" class="color-tool-button" id="text-color-button" title="글자색">
+            <span class="color-tool-letter">A</span>
+            <span class="color-tool-bar" id="text-color-bar" style="background:#10203c"></span>
+            <span class="color-tool-caret">▾</span>
+          </button>
+          <div class="color-palette-popover" id="text-color-popover">
+            <div class="palette-title">테마 색</div>
+            <div class="palette-grid theme"><button type="button" class="palette-swatch" data-color="#FFFFFF" style="background:#FFFFFF" title="#FFFFFF"></button><button type="button" class="palette-swatch" data-color="#000000" style="background:#000000" title="#000000"></button><button type="button" class="palette-swatch" data-color="#E7E6E6" style="background:#E7E6E6" title="#E7E6E6"></button><button type="button" class="palette-swatch" data-color="#0F243E" style="background:#0F243E" title="#0F243E"></button><button type="button" class="palette-swatch" data-color="#1F4E78" style="background:#1F4E78" title="#1F4E78"></button><button type="button" class="palette-swatch" data-color="#ED7D31" style="background:#ED7D31" title="#ED7D31"></button><button type="button" class="palette-swatch" data-color="#1B5E20" style="background:#1B5E20" title="#1B5E20"></button><button type="button" class="palette-swatch" data-color="#00A6D6" style="background:#00A6D6" title="#00A6D6"></button><button type="button" class="palette-swatch" data-color="#7030A0" style="background:#7030A0" title="#7030A0"></button><button type="button" class="palette-swatch" data-color="#43B02A" style="background:#43B02A" title="#43B02A"></button><button type="button" class="palette-swatch" data-color="#F2F2F2" style="background:#F2F2F2" title="#F2F2F2"></button><button type="button" class="palette-swatch" data-color="#7F7F7F" style="background:#7F7F7F" title="#7F7F7F"></button><button type="button" class="palette-swatch" data-color="#D9D9D9" style="background:#D9D9D9" title="#D9D9D9"></button><button type="button" class="palette-swatch" data-color="#DDEBF7" style="background:#DDEBF7" title="#DDEBF7"></button><button type="button" class="palette-swatch" data-color="#DDEBF7" style="background:#DDEBF7" title="#DDEBF7"></button><button type="button" class="palette-swatch" data-color="#FCE4D6" style="background:#FCE4D6" title="#FCE4D6"></button><button type="button" class="palette-swatch" data-color="#E2F0D9" style="background:#E2F0D9" title="#E2F0D9"></button><button type="button" class="palette-swatch" data-color="#DDEBF7" style="background:#DDEBF7" title="#DDEBF7"></button><button type="button" class="palette-swatch" data-color="#E4DFEC" style="background:#E4DFEC" title="#E4DFEC"></button><button type="button" class="palette-swatch" data-color="#E2F0D9" style="background:#E2F0D9" title="#E2F0D9"></button><button type="button" class="palette-swatch" data-color="#D9D9D9" style="background:#D9D9D9" title="#D9D9D9"></button><button type="button" class="palette-swatch" data-color="#595959" style="background:#595959" title="#595959"></button><button type="button" class="palette-swatch" data-color="#BFBFBF" style="background:#BFBFBF" title="#BFBFBF"></button><button type="button" class="palette-swatch" data-color="#BDD7EE" style="background:#BDD7EE" title="#BDD7EE"></button><button type="button" class="palette-swatch" data-color="#9DC3E6" style="background:#9DC3E6" title="#9DC3E6"></button><button type="button" class="palette-swatch" data-color="#F8CBAD" style="background:#F8CBAD" title="#F8CBAD"></button><button type="button" class="palette-swatch" data-color="#C6E0B4" style="background:#C6E0B4" title="#C6E0B4"></button><button type="button" class="palette-swatch" data-color="#5B9BD5" style="background:#5B9BD5" title="#5B9BD5"></button><button type="button" class="palette-swatch" data-color="#D9E1F2" style="background:#D9E1F2" title="#D9E1F2"></button><button type="button" class="palette-swatch" data-color="#A9D18E" style="background:#A9D18E" title="#A9D18E"></button><button type="button" class="palette-swatch" data-color="#BFBFBF" style="background:#BFBFBF" title="#BFBFBF"></button><button type="button" class="palette-swatch" data-color="#404040" style="background:#404040" title="#404040"></button><button type="button" class="palette-swatch" data-color="#A6A6A6" style="background:#A6A6A6" title="#A6A6A6"></button><button type="button" class="palette-swatch" data-color="#9DC3E6" style="background:#9DC3E6" title="#9DC3E6"></button><button type="button" class="palette-swatch" data-color="#5B9BD5" style="background:#5B9BD5" title="#5B9BD5"></button><button type="button" class="palette-swatch" data-color="#F4B183" style="background:#F4B183" title="#F4B183"></button><button type="button" class="palette-swatch" data-color="#A9D18E" style="background:#A9D18E" title="#A9D18E"></button><button type="button" class="palette-swatch" data-color="#2E75B6" style="background:#2E75B6" title="#2E75B6"></button><button type="button" class="palette-swatch" data-color="#B4C6E7" style="background:#B4C6E7" title="#B4C6E7"></button><button type="button" class="palette-swatch" data-color="#70AD47" style="background:#70AD47" title="#70AD47"></button><button type="button" class="palette-swatch" data-color="#A6A6A6" style="background:#A6A6A6" title="#A6A6A6"></button><button type="button" class="palette-swatch" data-color="#262626" style="background:#262626" title="#262626"></button><button type="button" class="palette-swatch" data-color="#7F7F7F" style="background:#7F7F7F" title="#7F7F7F"></button><button type="button" class="palette-swatch" data-color="#5B9BD5" style="background:#5B9BD5" title="#5B9BD5"></button><button type="button" class="palette-swatch" data-color="#2E75B6" style="background:#2E75B6" title="#2E75B6"></button><button type="button" class="palette-swatch" data-color="#C65911" style="background:#C65911" title="#C65911"></button><button type="button" class="palette-swatch" data-color="#70AD47" style="background:#70AD47" title="#70AD47"></button><button type="button" class="palette-swatch" data-color="#1F4E78" style="background:#1F4E78" title="#1F4E78"></button><button type="button" class="palette-swatch" data-color="#8EA9DB" style="background:#8EA9DB" title="#8EA9DB"></button><button type="button" class="palette-swatch" data-color="#548235" style="background:#548235" title="#548235"></button><button type="button" class="palette-swatch" data-color="#7F7F7F" style="background:#7F7F7F" title="#7F7F7F"></button><button type="button" class="palette-swatch" data-color="#0D0D0D" style="background:#0D0D0D" title="#0D0D0D"></button><button type="button" class="palette-swatch" data-color="#595959" style="background:#595959" title="#595959"></button><button type="button" class="palette-swatch" data-color="#2E75B6" style="background:#2E75B6" title="#2E75B6"></button><button type="button" class="palette-swatch" data-color="#1F4E78" style="background:#1F4E78" title="#1F4E78"></button><button type="button" class="palette-swatch" data-color="#833C0C" style="background:#833C0C" title="#833C0C"></button><button type="button" class="palette-swatch" data-color="#548235" style="background:#548235" title="#548235"></button><button type="button" class="palette-swatch" data-color="#17365D" style="background:#17365D" title="#17365D"></button><button type="button" class="palette-swatch" data-color="#305496" style="background:#305496" title="#305496"></button><button type="button" class="palette-swatch" data-color="#375623" style="background:#375623" title="#375623"></button></div>
+            <div class="palette-title standard-title">표준 색</div>
+            <div class="palette-grid standard"><button type="button" class="palette-swatch" data-color="#C00000" style="background:#C00000" title="#C00000"></button><button type="button" class="palette-swatch" data-color="#FF0000" style="background:#FF0000" title="#FF0000"></button><button type="button" class="palette-swatch" data-color="#FFC000" style="background:#FFC000" title="#FFC000"></button><button type="button" class="palette-swatch" data-color="#FFFF00" style="background:#FFFF00" title="#FFFF00"></button><button type="button" class="palette-swatch" data-color="#92D050" style="background:#92D050" title="#92D050"></button><button type="button" class="palette-swatch" data-color="#00B050" style="background:#00B050" title="#00B050"></button><button type="button" class="palette-swatch" data-color="#00B0F0" style="background:#00B0F0" title="#00B0F0"></button><button type="button" class="palette-swatch" data-color="#0070C0" style="background:#0070C0" title="#0070C0"></button><button type="button" class="palette-swatch" data-color="#002060" style="background:#002060" title="#002060"></button><button type="button" class="palette-swatch" data-color="#7030A0" style="background:#7030A0" title="#7030A0"></button></div>
+            <button type="button" class="palette-more" data-more-color="text">🎨 다른 색...</button>
+          </div>
+          <input type="color" id="tool-color" value="#10203c" hidden>
+        </div>
+
+        <div class="color-menu-wrap">
+          <button type="button" class="color-tool-button highlight" id="bg-color-button" title="배경색">
+            <span class="color-tool-letter">A</span>
+            <span class="color-tool-bar" id="bg-color-bar" style="background:#fff2a8"></span>
+            <span class="color-tool-caret">▾</span>
+          </button>
+          <div class="color-palette-popover" id="bg-color-popover">
+            <div class="palette-title">테마 색</div>
+            <div class="palette-grid theme"><button type="button" class="palette-swatch" data-color="#FFFFFF" style="background:#FFFFFF" title="#FFFFFF"></button><button type="button" class="palette-swatch" data-color="#000000" style="background:#000000" title="#000000"></button><button type="button" class="palette-swatch" data-color="#E7E6E6" style="background:#E7E6E6" title="#E7E6E6"></button><button type="button" class="palette-swatch" data-color="#0F243E" style="background:#0F243E" title="#0F243E"></button><button type="button" class="palette-swatch" data-color="#1F4E78" style="background:#1F4E78" title="#1F4E78"></button><button type="button" class="palette-swatch" data-color="#ED7D31" style="background:#ED7D31" title="#ED7D31"></button><button type="button" class="palette-swatch" data-color="#1B5E20" style="background:#1B5E20" title="#1B5E20"></button><button type="button" class="palette-swatch" data-color="#00A6D6" style="background:#00A6D6" title="#00A6D6"></button><button type="button" class="palette-swatch" data-color="#7030A0" style="background:#7030A0" title="#7030A0"></button><button type="button" class="palette-swatch" data-color="#43B02A" style="background:#43B02A" title="#43B02A"></button><button type="button" class="palette-swatch" data-color="#F2F2F2" style="background:#F2F2F2" title="#F2F2F2"></button><button type="button" class="palette-swatch" data-color="#7F7F7F" style="background:#7F7F7F" title="#7F7F7F"></button><button type="button" class="palette-swatch" data-color="#D9D9D9" style="background:#D9D9D9" title="#D9D9D9"></button><button type="button" class="palette-swatch" data-color="#DDEBF7" style="background:#DDEBF7" title="#DDEBF7"></button><button type="button" class="palette-swatch" data-color="#DDEBF7" style="background:#DDEBF7" title="#DDEBF7"></button><button type="button" class="palette-swatch" data-color="#FCE4D6" style="background:#FCE4D6" title="#FCE4D6"></button><button type="button" class="palette-swatch" data-color="#E2F0D9" style="background:#E2F0D9" title="#E2F0D9"></button><button type="button" class="palette-swatch" data-color="#DDEBF7" style="background:#DDEBF7" title="#DDEBF7"></button><button type="button" class="palette-swatch" data-color="#E4DFEC" style="background:#E4DFEC" title="#E4DFEC"></button><button type="button" class="palette-swatch" data-color="#E2F0D9" style="background:#E2F0D9" title="#E2F0D9"></button><button type="button" class="palette-swatch" data-color="#D9D9D9" style="background:#D9D9D9" title="#D9D9D9"></button><button type="button" class="palette-swatch" data-color="#595959" style="background:#595959" title="#595959"></button><button type="button" class="palette-swatch" data-color="#BFBFBF" style="background:#BFBFBF" title="#BFBFBF"></button><button type="button" class="palette-swatch" data-color="#BDD7EE" style="background:#BDD7EE" title="#BDD7EE"></button><button type="button" class="palette-swatch" data-color="#9DC3E6" style="background:#9DC3E6" title="#9DC3E6"></button><button type="button" class="palette-swatch" data-color="#F8CBAD" style="background:#F8CBAD" title="#F8CBAD"></button><button type="button" class="palette-swatch" data-color="#C6E0B4" style="background:#C6E0B4" title="#C6E0B4"></button><button type="button" class="palette-swatch" data-color="#5B9BD5" style="background:#5B9BD5" title="#5B9BD5"></button><button type="button" class="palette-swatch" data-color="#D9E1F2" style="background:#D9E1F2" title="#D9E1F2"></button><button type="button" class="palette-swatch" data-color="#A9D18E" style="background:#A9D18E" title="#A9D18E"></button><button type="button" class="palette-swatch" data-color="#BFBFBF" style="background:#BFBFBF" title="#BFBFBF"></button><button type="button" class="palette-swatch" data-color="#404040" style="background:#404040" title="#404040"></button><button type="button" class="palette-swatch" data-color="#A6A6A6" style="background:#A6A6A6" title="#A6A6A6"></button><button type="button" class="palette-swatch" data-color="#9DC3E6" style="background:#9DC3E6" title="#9DC3E6"></button><button type="button" class="palette-swatch" data-color="#5B9BD5" style="background:#5B9BD5" title="#5B9BD5"></button><button type="button" class="palette-swatch" data-color="#F4B183" style="background:#F4B183" title="#F4B183"></button><button type="button" class="palette-swatch" data-color="#A9D18E" style="background:#A9D18E" title="#A9D18E"></button><button type="button" class="palette-swatch" data-color="#2E75B6" style="background:#2E75B6" title="#2E75B6"></button><button type="button" class="palette-swatch" data-color="#B4C6E7" style="background:#B4C6E7" title="#B4C6E7"></button><button type="button" class="palette-swatch" data-color="#70AD47" style="background:#70AD47" title="#70AD47"></button><button type="button" class="palette-swatch" data-color="#A6A6A6" style="background:#A6A6A6" title="#A6A6A6"></button><button type="button" class="palette-swatch" data-color="#262626" style="background:#262626" title="#262626"></button><button type="button" class="palette-swatch" data-color="#7F7F7F" style="background:#7F7F7F" title="#7F7F7F"></button><button type="button" class="palette-swatch" data-color="#5B9BD5" style="background:#5B9BD5" title="#5B9BD5"></button><button type="button" class="palette-swatch" data-color="#2E75B6" style="background:#2E75B6" title="#2E75B6"></button><button type="button" class="palette-swatch" data-color="#C65911" style="background:#C65911" title="#C65911"></button><button type="button" class="palette-swatch" data-color="#70AD47" style="background:#70AD47" title="#70AD47"></button><button type="button" class="palette-swatch" data-color="#1F4E78" style="background:#1F4E78" title="#1F4E78"></button><button type="button" class="palette-swatch" data-color="#8EA9DB" style="background:#8EA9DB" title="#8EA9DB"></button><button type="button" class="palette-swatch" data-color="#548235" style="background:#548235" title="#548235"></button><button type="button" class="palette-swatch" data-color="#7F7F7F" style="background:#7F7F7F" title="#7F7F7F"></button><button type="button" class="palette-swatch" data-color="#0D0D0D" style="background:#0D0D0D" title="#0D0D0D"></button><button type="button" class="palette-swatch" data-color="#595959" style="background:#595959" title="#595959"></button><button type="button" class="palette-swatch" data-color="#2E75B6" style="background:#2E75B6" title="#2E75B6"></button><button type="button" class="palette-swatch" data-color="#1F4E78" style="background:#1F4E78" title="#1F4E78"></button><button type="button" class="palette-swatch" data-color="#833C0C" style="background:#833C0C" title="#833C0C"></button><button type="button" class="palette-swatch" data-color="#548235" style="background:#548235" title="#548235"></button><button type="button" class="palette-swatch" data-color="#17365D" style="background:#17365D" title="#17365D"></button><button type="button" class="palette-swatch" data-color="#305496" style="background:#305496" title="#305496"></button><button type="button" class="palette-swatch" data-color="#375623" style="background:#375623" title="#375623"></button></div>
+            <div class="palette-title standard-title">표준 색</div>
+            <div class="palette-grid standard"><button type="button" class="palette-swatch" data-color="#C00000" style="background:#C00000" title="#C00000"></button><button type="button" class="palette-swatch" data-color="#FF0000" style="background:#FF0000" title="#FF0000"></button><button type="button" class="palette-swatch" data-color="#FFC000" style="background:#FFC000" title="#FFC000"></button><button type="button" class="palette-swatch" data-color="#FFFF00" style="background:#FFFF00" title="#FFFF00"></button><button type="button" class="palette-swatch" data-color="#92D050" style="background:#92D050" title="#92D050"></button><button type="button" class="palette-swatch" data-color="#00B050" style="background:#00B050" title="#00B050"></button><button type="button" class="palette-swatch" data-color="#00B0F0" style="background:#00B0F0" title="#00B0F0"></button><button type="button" class="palette-swatch" data-color="#0070C0" style="background:#0070C0" title="#0070C0"></button><button type="button" class="palette-swatch" data-color="#002060" style="background:#002060" title="#002060"></button><button type="button" class="palette-swatch" data-color="#7030A0" style="background:#7030A0" title="#7030A0"></button></div>
+            <button type="button" class="palette-none" data-no-fill="bg">□ 채우기 없음</button>
+            <button type="button" class="palette-more" data-more-color="bg">🎨 다른 색...</button>
+          </div>
+          <input type="color" id="tool-bg" value="#fff2a8" hidden>
+        </div>
       </div>
 
       <div class="tool-group">
@@ -287,8 +317,68 @@ function bindToolbar(onImage,onFile){
   $('#tool-block').onchange=e=>execEditor('formatBlock',e.target.value);
   $('#tool-font').onchange=e=>execEditor('fontName',e.target.value);
   $('#tool-size').onchange=e=>applyFontSize(e.target.value);
-  $('#tool-color').oninput=e=>execEditor('foreColor',e.target.value);
-  $('#tool-bg').oninput=e=>execEditor('hiliteColor',e.target.value);
+
+  const closeColorMenus=()=>{
+    document.querySelectorAll('.color-palette-popover.open').forEach(x=>x.classList.remove('open'));
+  };
+  const toggleColorMenu=(id)=>{
+    const pop=$(id);
+    const willOpen=!pop.classList.contains('open');
+    closeColorMenus();
+    if(willOpen)pop.classList.add('open');
+  };
+  const applyPickedColor=(kind,color)=>{
+    if(kind==='text'){
+      execEditor('foreColor',color);
+      $('#tool-color').value=color;
+      $('#text-color-bar').style.background=color;
+    }else{
+      execEditor('hiliteColor',color);
+      $('#tool-bg').value=color;
+      $('#bg-color-bar').style.background=color;
+    }
+    closeColorMenus();
+  };
+
+  $('#text-color-button').onmousedown=e=>e.preventDefault();
+  $('#bg-color-button').onmousedown=e=>e.preventDefault();
+  $('#text-color-button').onclick=()=>toggleColorMenu('#text-color-popover');
+  $('#bg-color-button').onclick=()=>toggleColorMenu('#bg-color-popover');
+
+  document.querySelectorAll('#text-color-popover [data-color]').forEach(b=>{
+    b.onmousedown=e=>e.preventDefault();
+    b.onclick=()=>applyPickedColor('text',b.dataset.color);
+  });
+  document.querySelectorAll('#bg-color-popover [data-color]').forEach(b=>{
+    b.onmousedown=e=>e.preventDefault();
+    b.onclick=()=>applyPickedColor('bg',b.dataset.color);
+  });
+
+  document.querySelector('[data-no-fill="bg"]')?.addEventListener('mousedown',e=>e.preventDefault());
+  document.querySelector('[data-no-fill="bg"]')?.addEventListener('click',()=>{
+    execEditor('hiliteColor','transparent');
+    $('#bg-color-bar').style.background='linear-gradient(135deg,#fff 0 44%,#e5484d 45% 55%,#fff 56% 100%)';
+    closeColorMenus();
+  });
+
+  document.querySelectorAll('[data-more-color]').forEach(b=>{
+    b.onmousedown=e=>e.preventDefault();
+    b.onclick=()=>{
+      rememberRange();
+      const kind=b.dataset.moreColor;
+      closeColorMenus();
+      const input=kind==='text'?$('#tool-color'):$('#tool-bg');
+      input.click();
+    };
+  });
+
+  $('#tool-color').oninput=e=>applyPickedColor('text',e.target.value);
+  $('#tool-bg').oninput=e=>applyPickedColor('bg',e.target.value);
+
+  document.addEventListener('click',e=>{
+    if(!e.target.closest('.color-menu-wrap'))closeColorMenus();
+  });
+
   $('#tool-quote').onclick=()=>execEditor('formatBlock','blockquote');
   $('#tool-link').onclick=insertLink;
   $('#tool-table').onclick=insertTable;
