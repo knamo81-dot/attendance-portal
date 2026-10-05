@@ -34,10 +34,16 @@ const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXJhYmFzZSI
     const cid=companyId();const row={...payload,company_id:payload.company_id||cid,created_by:payload.created_by||userEmail()||null};
     return sb.from(table).insert([row]).select('*').single();
   }
+  async function update(table,id,payload){
+    let q=sb.from(table).update(payload).eq('id',id);const cid=companyId();if(cid)q=q.eq('company_id',cid);return q.select('*').single();
+  }
   async function remove(table,id){
     let q=sb.from(table).delete().eq('id',id);const cid=companyId();if(cid)q=q.eq('company_id',cid);return q;
   }
-  window.wasteApi={sb,portalSession,companyId,userEmail,list,insert,remove};
+  async function removeWhere(table,column,value){
+    let q=sb.from(table).delete().eq(column,value);const cid=companyId();if(cid)q=q.eq('company_id',cid);return q;
+  }
+  window.wasteApi={sb,portalSession,companyId,userEmail,list,insert,update,remove,removeWhere};
 })();
 
 const A=window.wasteApi;
@@ -49,6 +55,7 @@ function typeName(r){return r.display_name||`${r.legal_name||''}${r.physical_sta
 function dateKey(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 
 let types=[],units=[],vendors=[],methods=[],collections=[];
+let editingId=null;
 
 async function load(){
   const [t,u,v,m,c]=await Promise.all([
@@ -72,11 +79,11 @@ async function load(){
   render();
 }
 
-function processorOptions(){
-  return vendors.filter(v=>v.is_processor).map(v=>`<option value="${v.id}">${esc(v.vendor_name)}</option>`).join('');
+function processorOptions(selected=''){
+  return vendors.filter(v=>v.is_processor).map(v=>`<option value="${v.id}" ${v.id===selected?'selected':''}>${esc(v.vendor_name)}</option>`).join('');
 }
-function transporterOptions(){
-  return vendors.filter(v=>v.is_transporter).map(v=>`<option value="${v.id}">${esc(v.vendor_name)}</option>`).join('');
+function transporterOptions(selected=''){
+  return vendors.filter(v=>v.is_transporter).map(v=>`<option value="${v.id}" ${v.id===selected?'selected':''}>${esc(v.vendor_name)}</option>`).join('');
 }
 function allMethodOptions(){
   const seen=new Set();
@@ -87,28 +94,34 @@ function allMethodOptions(){
   }).map(m=>`<option value="${m.id}">${esc(m.method_name)}</option>`).join('');
 }
 
-function itemRow(i=0){
+function itemRow(i=0,data=null){
+  const row=data||{};
+  const selectedType=row.waste_type_id||row.waste_types?.id||types[0]?.id||'';
+  const selectedUnit=row.container_unit_id||row.waste_container_units?.id||'';
+  const qty=row.quantity==null?0:Number(row.quantity);
+  const ton=row.weight_kg==null?'':Number(row.weight_kg)/1000;
+
   return `
     <div class="soft item" data-i="${i}">
       <div class="inline">
         <div class="field">
           <label>폐기물 종류</label>
-          <select class="itype">${types.map(x=>`<option value="${x.id}">${esc(typeName(x))}</option>`).join('')}</select>
+          <select class="itype">${types.map(x=>`<option value="${x.id}" ${x.id===selectedType?'selected':''}>${esc(typeName(x))}</option>`).join('')}</select>
         </div>
         <div class="field">
           <label>용기</label>
-          <select class="iunit"><option value="">선택 안함</option>${units.map(x=>`<option value="${x.id}">${esc(x.unit_name)}</option>`).join('')}</select>
+          <select class="iunit"><option value="">선택 안함</option>${units.map(x=>`<option value="${x.id}" ${x.id===selectedUnit?'selected':''}>${esc(x.unit_name)}</option>`).join('')}</select>
         </div>
       </div>
 
       <div class="inline">
         <div class="field">
           <label>개수/수량</label>
-          <input class="iqty" type="number" min="0" step="0.001" value="0">
+          <input class="iqty" type="number" min="0" step="0.001" value="${qty}">
         </div>
         <div class="field">
           <label>실제 양 (T)</label>
-          <input class="iton" type="number" min="0" step="0.000001" placeholder="예: 0.0725">
+          <input class="iton" type="number" min="0" step="0.000001" value="${ton}" placeholder="예: 0.0725">
         </div>
       </div>
 
@@ -119,24 +132,29 @@ function itemRow(i=0){
 }
 
 function render(){
+  const editRow=editingId?collections.find(x=>x.id===editingId)||null:null;
+  const editItems=editRow?.waste_collection_items||[];
+  const firstItem=editItems[0]||{};
+  const initialItems=editItems.length?editItems:[null];
+
   $('#app').innerHTML=`
     <div id="notice" class="notice"></div>
     <div class="grid two">
       <div class="card">
-        <div class="card-title">🚚 폐기물 수거등록</div>
+        <div class="card-title">🚚 ${editRow?'폐기물 수거수정':'폐기물 수거등록'}</div>
 
         <form id="form">
           <div class="field">
             <label>수거일</label>
-            <input id="collection_date" type="date" value="${dateKey()}" required>
+            <input id="collection_date" type="date" value="${editRow?.collection_date||dateKey()}" required>
           </div>
           <div class="field">
             <label>확인서 일련번호</label>
-            <input id="certificate_no">
+            <input id="certificate_no" value="${esc(editRow?.certificate_no||'')}">
           </div>
 
           <label class="facility-log-switch" for="is_facility_log">
-            <input id="is_facility_log" type="checkbox">
+            <input id="is_facility_log" type="checkbox" ${editRow?.is_facility_log?'checked':''}>
             <span>
               <strong>폐수배출시설 운영일지</strong>
               <small>체크한 수거건만 폐기물용 폐수배출시설 운영일지에 반영됩니다.</small>
@@ -184,11 +202,14 @@ function render(){
             <button class="btn small" type="button" id="add-item">+ 항목 추가</button>
           </div>
 
-          <div id="items">${itemRow(0)}</div>
+          <div id="items">${initialItems.map((x,i)=>itemRow(i,x)).join('')}</div>
 
           <br>
-          <div class="field"><label>비고</label><textarea id="note"></textarea></div>
-          <button class="btn primary" type="submit">수거 등록 저장</button>
+          <div class="field"><label>비고</label><textarea id="note">${esc(editRow?.note||'')}</textarea></div>
+          <div class="form-actions">
+            <button class="btn primary" type="submit">${editRow?'수거 수정 저장':'수거 등록 저장'}</button>
+            ${editRow?'<button class="btn" type="button" id="cancel-edit">수정 취소</button>':''}
+          </div>
         </form>
       </div>
 
@@ -214,7 +235,7 @@ function render(){
               ${collections.length?collections.flatMap(r=>{
                 const its=r.waste_collection_items||[];
                 if(!its.length){
-                  return [`<tr><td>${r.collection_date}</td><td>${esc(r.certificate_no||'-')}</td><td>${r.is_facility_log?`<span class="pill green">반영</span><br><span class="muted">${esc(r.facility_after_cm||'-')} cm</span>`:'-'}</td><td colspan="6" class="muted">상세내역 없음</td><td><button class="btn small danger" data-del="${r.id}">삭제</button></td></tr>`];
+                  return [`<tr><td>${r.collection_date}</td><td>${esc(r.certificate_no||'-')}</td><td>${r.is_facility_log?`<span class="pill green">반영</span><br><span class="muted">${esc(r.facility_after_cm||'-')} cm</span>`:'-'}</td><td colspan="6" class="muted">상세내역 없음</td><td><div class="row-actions"><button class="btn small" data-edit="${r.id}">수정</button><button class="btn small danger" data-del="${r.id}">삭제</button></div></td></tr>`];
                 }
                 return its.map((x,idx)=>`
                   <tr>
@@ -227,7 +248,7 @@ function render(){
                     <td>${esc(x.processor?.vendor_name||'-')}</td>
                     <td>${esc(x.transporter?.vendor_name||'-')}</td>
                     <td class="num">${x.weight_kg==null?'-':num(Number(x.weight_kg)/1000,4)+' T'}</td>
-                    <td>${idx===0?`<button class="btn small danger" data-del="${r.id}">삭제</button>`:''}</td>
+                    <td>${idx===0?`<div class="row-actions"><button class="btn small" data-edit="${r.id}">수정</button><button class="btn small danger" data-del="${r.id}">삭제</button></div>`:''}</td>
                   </tr>`);
               }).join(''):`<tr><td colspan="10" class="empty">수거내역이 없습니다.</td></tr>`}
             </tbody>
@@ -245,11 +266,46 @@ function render(){
   $('#treatment_type').onchange=syncCommonTreatment;
   $('#processor_vendor_id').onchange=syncCommonTreatment;
   $('#is_facility_log').onchange=syncFacilityLogUI;
+
+  if(editRow){
+    const treatmentType=firstItem.treatment_type||'outsourced';
+    $('#treatment_type').value=treatmentType;
+    $('#processor_vendor_id').value=firstItem.processor_vendor_id||firstItem.processor?.id||'';
+    $('#transporter_vendor_id').value=firstItem.transporter_vendor_id||firstItem.transporter?.id||'';
+    facilityAfterCache=String(editRow.facility_after_cm||'');
+  }else{
+    facilityAfterCache='';
+  }
+
   syncCommonTreatment();
+
+  if(editRow){
+    $('#treatment_method_id').value=firstItem.treatment_method_id||firstItem.treatment_method?.id||'';
+  }
+
   syncFacilityLogUI();
   bindItems();
   $('#form').onsubmit=save;
+
+  if($('#cancel-edit')){
+    $('#cancel-edit').onclick=()=>{
+      editingId=null;
+      facilityAfterCache='';
+      render();
+    };
+  }
+
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>startEdit(b.dataset.edit));
   document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>del(b.dataset.del));
+}
+
+function startEdit(id){
+  const row=collections.find(x=>x.id===id);
+  if(!row)return notice('수정할 수거건을 찾을 수 없습니다.','err');
+  editingId=id;
+  facilityAfterCache=String(row.facility_after_cm||'');
+  render();
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 function methodsForVendor(vendorId){
@@ -373,7 +429,7 @@ async function save(e){
 
   const facilityLog=$('#is_facility_log').checked;
   const facilityAfterCm=facilityLog
-    ? String($('#facility_after_cm').value||'').trim()
+    ? String($('#facility_after_cm')?.value||'').trim()
     : '';
 
   const head={
@@ -386,6 +442,25 @@ async function save(e){
     treatment_method:null,
     note:$('#note').value
   };
+
+  if(editingId){
+    const h=await A.update('waste_collections',editingId,head);
+    if(h.error)return notice('수거정보 수정 오류: '+h.error.message,'err');
+
+    const rm=await A.removeWhere('waste_collection_items','collection_id',editingId);
+    if(rm.error)return notice('기존 수거 상세 정리 오류: '+rm.error.message,'err');
+
+    for(const it of items){
+      const x=await A.insert('waste_collection_items',{...it,collection_id:editingId});
+      if(x.error)return notice('수거 상세 수정 중 오류: '+x.error.message,'err');
+    }
+
+    editingId=null;
+    facilityAfterCache='';
+    await load();
+    notice('수거등록을 수정했습니다.');
+    return;
+  }
 
   const h=await A.insert('waste_collections',head);
   if(h.error)return notice(h.error.message,'err');
@@ -403,6 +478,8 @@ async function del(id){
   if(!confirm('수거건과 상세내역을 삭제하시겠습니까?'))return;
   const x=await A.remove('waste_collections',id);
   if(x.error)return notice(x.error.message,'err');
+  if(editingId===id)editingId=null;
+  facilityAfterCache='';
   await load();
   notice('삭제되었습니다.');
 }
