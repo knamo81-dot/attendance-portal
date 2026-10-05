@@ -320,3 +320,45 @@
     margin-left:auto;
   }
 }
+
+
+/* =========================================================
+   관리대장 표 정렬/컬럼 고정
+   - 헤더와 데이터 열 위치 일치
+   - 최신 날짜는 app.js에서 위쪽 정렬
+========================================================= */
+.ledger-data-table{
+  width:100% !important;
+  table-layout:fixed !important;
+  border-collapse:collapse;
+}
+.legal-ledger-table{
+  min-width:1510px !important;
+}
+.facility-ledger-table{
+  min-width:1395px !important;
+}
+.ledger-data-table th,
+.ledger-data-table td{
+  text-align:center !important;
+  vertical-align:middle !important;
+  padding:9px 8px;
+  line-height:1.45;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:keep-all;
+}
+.ledger-data-table td.num{
+  text-align:center !important;
+  font-variant-numeric:tabular-nums;
+}
+.ledger-data-table thead th{
+  white-space:nowrap;
+}
+.ledger-data-table .ledger-notes{
+  text-align:left !important;
+  word-break:break-word;
+}
+.legal-ledger-table tbody td:nth-child(2){
+  text-align:left !important;
+}
