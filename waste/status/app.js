@@ -729,13 +729,40 @@ async function loadSettingsBase(){
 
 async function renderOpeningSettings(){
   const base=await loadSettingsBase();
-  const res=await A.list(
-    'waste_opening_balances',
-    '*,waste_types(*),waste_storage_locations(*),waste_container_units(*)',
-    'balance_date',
-    false
-  );
+  const [res,facilityDailyRes]=await Promise.all([
+    A.list(
+      'waste_opening_balances',
+      '*,waste_types(*),waste_storage_locations(*),waste_container_units(*)',
+      'balance_date',
+      false
+    ),
+    A.list(
+      'waste_facility_daily_logs',
+      'waste_type_id,entry_date,usage,is_holiday',
+      'entry_date',
+      true
+    )
+  ]);
   const rows=res.data||[];
+  const facilityDailyRows=facilityDailyRes.data||[];
+
+  function previousDateKey(value){
+    const m=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(!m)return '';
+    const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
+    d.setDate(d.getDate()-1);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function firstMeasuredDateForType(wasteTypeId){
+    return facilityDailyRows
+      .filter(r=>String(r.waste_type_id||'')===String(wasteTypeId||''))
+      .filter(r=>r.is_holiday!==true)
+      .filter(r=>r.usage!==null && r.usage!==undefined && String(r.usage).trim()!=='')
+      .map(r=>String(r.entry_date||''))
+      .filter(Boolean)
+      .sort()[0]||'';
+  }
 
   const facilityRowDetail=(r)=>{
     const external=r.facility_has_external
@@ -743,7 +770,8 @@ async function renderOpeningSettings(){
       : '';
     return `
       <div><b>용수 전일 지침</b> ${num(r.facility_prev_usage||0,2)} m³</div>
-      <div><b>기초 높이</b> ${num(r.facility_height_cm||0,1)} cm${external}</div>`;
+      <div><b>기초 높이</b> ${num(r.facility_height_cm||0,1)} cm${external}</div>
+      <div class="field-help">※ 운영일지 계산 시작 시 1회만 적용</div>`;
   };
 
   $('#settings-body').innerHTML=`
@@ -751,14 +779,18 @@ async function renderOpeningSettings(){
       <div class="card">
         <div class="card-title">📦 기초·이월량</div>
         <form id="open-form">
-          <div class="field"><label>기준일</label><input id="balance_date" type="date" value="${dateKey()}" required></div>
+          <div class="field">
+            <label id="balance_date_label">기준일</label>
+            <input id="balance_date" type="date" value="${dateKey()}" required>
+            <div id="balance_date_help" class="field-help">일반 기초·이월량의 적용 기준일입니다.</div>
+          </div>
           <div class="field"><label>폐기물 종류</label><select id="waste_type_id" required>${base.types.filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(typeName(x))}</option>`).join('')}</select></div>
 
           <label class="opening-mode-switch" for="opening_facility_mode">
             <input id="opening_facility_mode" type="checkbox">
             <span>
               <strong>폐수배출시설 운영일지</strong>
-              <small>체크하면 운영일지 계산을 시작하기 위한 기초값 입력으로 전환됩니다.</small>
+              <small>체크하면 운영일지 계산을 시작하기 위한 최초 1회 기초값 입력으로 전환됩니다.</small>
             </span>
           </label>
 
@@ -775,7 +807,7 @@ async function renderOpeningSettings(){
             <div class="field">
               <label>용수 전일 지침 (누적값 m³)</label>
               <input id="facility_prev_usage" type="number" min="0" step="0.01" value="0">
-              <div class="field-help">첫 운영일지의 당일 용수사용량 계산 기준값입니다.</div>
+              <div class="field-help">첫 실제 용수 입력의 당일 사용량을 계산하는 시작값입니다. 이후 날짜에서는 다시 적용되지 않습니다.</div>
             </div>
 
             <div class="field">
@@ -873,17 +905,64 @@ async function renderOpeningSettings(){
     if($('#opening_total_m3'))$('#opening_total_m3').textContent=`${num(m3,2)} m³`;
   }
 
+  function suggestFacilityBaselineDate(force=false){
+    if(!mode.checked)return;
+    const wasteTypeId=$('#waste_type_id')?.value||'';
+    const firstMeasured=firstMeasuredDateForType(wasteTypeId);
+    const suggested=previousDateKey(firstMeasured);
+    const dateInput=$('#balance_date');
+    const help=$('#balance_date_help');
+
+    if(suggested && dateInput){
+      // 시설운영일지 모드로 전환하거나 폐기물 종류를 바꿀 때
+      // 기존 데이터의 최초 실측일 직전 날짜를 권장 기준일로 자동 제안.
+      if(force || !dateInput.dataset.facilitySuggested){
+        dateInput.value=suggested;
+        dateInput.dataset.facilitySuggested='1';
+      }
+      if(help){
+        help.textContent=`최초 실제 용수 입력일 ${firstMeasured}의 전일(${suggested})을 자동 제안했습니다. 계산에는 기초값이 최초 1회만 적용됩니다.`;
+      }
+    }else if(help){
+      help.textContent='기존 실측 데이터가 없어 기준일을 자동 계산할 수 없습니다. 계산 시작 직전 날짜를 입력하세요.';
+    }
+  }
+
   function syncOpeningMode(){
     const facility=mode.checked;
     generalBox.style.display=facility?'none':'block';
     facilityBox.style.display=facility?'block':'none';
+
+    const label=$('#balance_date_label');
+    const help=$('#balance_date_help');
+    const dateInput=$('#balance_date');
+
     if(facility){
+      if(label)label.textContent='계산 시작 기준일';
+      suggestFacilityBaselineDate(true);
       externalBox.style.display=externalCheck.checked?'block':'none';
       updateOpeningPreview();
+    }else{
+      if(label)label.textContent='기준일';
+      if(help)help.textContent='일반 기초·이월량의 적용 기준일입니다.';
+      if(dateInput){
+        delete dateInput.dataset.facilitySuggested;
+        dateInput.value=dateKey();
+      }
     }
   }
 
   mode.onchange=syncOpeningMode;
+  const wasteTypeSelect=$('#waste_type_id');
+  if(wasteTypeSelect){
+    wasteTypeSelect.onchange=()=>{
+      if(mode.checked){
+        const dateInput=$('#balance_date');
+        if(dateInput)delete dateInput.dataset.facilitySuggested;
+        suggestFacilityBaselineDate(true);
+      }
+    };
+  }
   externalCheck.onchange=()=>{
     externalBox.style.display=externalCheck.checked?'block':'none';
     updateOpeningPreview();
