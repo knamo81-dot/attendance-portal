@@ -119,3 +119,17 @@ table{
   margin-bottom:10px;
   background:#f2fbf7;
 }
+
+
+/* ===== 수거등록 수정 기능 ===== */
+.form-actions{
+  display:flex;
+  gap:7px;
+  align-items:center;
+}
+.row-actions{
+  display:flex;
+  gap:5px;
+  align-items:center;
+  justify-content:flex-start;
+}
