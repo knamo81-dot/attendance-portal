@@ -207,6 +207,7 @@ function openingBalanceKg(){
   const start=monthStart();
 
   const openingKg=openings
+    .filter(r=>r.is_facility_log!==true)
     .filter(r=>inSelectedType(r.waste_type_id))
     .filter(r=>String(r.balance_date||'')<=start)
     .reduce((s,r)=>s+Number(r.weight_kg||0),0);
@@ -463,6 +464,33 @@ function facilityPickupGroups(){
   }));
 }
 
+function facilityOpeningRowsForType(wasteTypeId){
+  return openings
+    .filter(r=>r.is_facility_log===true)
+    .filter(r=>r.waste_type_id===wasteTypeId)
+    .sort((a,b)=>{
+      const d=String(a.balance_date||'').localeCompare(String(b.balance_date||''));
+      if(d!==0)return d;
+      return String(a.created_at||'').localeCompare(String(b.created_at||''));
+    });
+}
+
+function facilityOpeningState(row){
+  if(!row)return {prevUsage:0,prevGuideline:0,totalCm:0};
+
+  const h=Number(row.facility_height_cm||0);
+  const ext=row.facility_has_external===true
+    ? Number(row.facility_external_cm || (Number(row.facility_external_ton||0)*TON_TO_CM))
+    : 0;
+  const total=Math.max(0,round2(h+ext));
+
+  return {
+    prevUsage:Number(row.facility_prev_usage||0),
+    prevGuideline:total>CM_LIMIT ? 0 : cmToM3(total),
+    totalCm:total
+  };
+}
+
 function buildFacilityDerived(){
   const pickups=facilityPickupGroups();
   const pickupMap=new Map();
@@ -485,16 +513,31 @@ function buildFacilityDerived(){
 
   byType.forEach((rows,wasteTypeId)=>{
     const ordered=[...rows].sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date)));
+    const baselines=facilityOpeningRowsForType(wasteTypeId);
 
     let prevMeter=0;
     let prevGuideline=0;
+    let appliedOpeningId='';
 
-    ordered.forEach((row,idx)=>{
+    ordered.forEach((row)=>{
+      // 현재 일자까지 등록된 가장 최근 운영일지용 기초값을 적용한다.
+      // 같은 기준일이면 일일입력 계산 전에 기초값을 사용한다.
+      const applicable=baselines
+        .filter(x=>String(x.balance_date||'')<=String(row.entry_date||''))
+        .slice(-1)[0]||null;
+
+      if(applicable && applicable.id!==appliedOpeningId){
+        const state=facilityOpeningState(applicable);
+        prevMeter=state.prevUsage;
+        prevGuideline=state.prevGuideline;
+        appliedOpeningId=applicable.id;
+      }
+
       const isHoliday=!!row.is_holiday;
       const meter=isHoliday ? prevMeter : Number(row.usage||0);
       const waterUsed=isHoliday
         ? 0
-        : (idx===0 ? meter : round2(meter-prevMeter));
+        : round2(meter-prevMeter);
 
       const externalCm=isHoliday
         ? 0
@@ -519,7 +562,7 @@ function buildFacilityDerived(){
       enriched.push({
         ...row,
         waste_type:row.waste_types||typeById(wasteTypeId),
-        water_prev:idx===0?0:prevMeter,
+        water_prev:prevMeter,
         water_used:waterUsed,
         external_cm_calc:externalCm,
         total_cm:totalCm,
