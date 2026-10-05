@@ -59,6 +59,25 @@ const $=(s)=>document.querySelector(s);
 const esc=(v)=>String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));
 const STORAGE_BUCKET='waste-editor-files';
 
+
+function getWasteAppRole(){
+  const s=A.portalSession()||{};
+  const roles=s.appRoles||s.app_roles||{};
+  const row=roles.waste||{};
+  const raw=typeof row==='string'
+    ? row
+    : (row.role||row.role_key||row.permission||row.permission_key||'user');
+  const role=String(raw||'user').trim().toLowerCase();
+  if(['관리자','administrator'].includes(role))return 'admin';
+  if(['운영자','manager'].includes(role))return 'operator';
+  return role||'user';
+}
+function canManageWaste(){
+  const role=getWasteAppRole();
+  return role==='admin'||role==='operator';
+}
+
+
 function notice(msg,type='ok'){
   const el=$('#notice');
   if(!el)return;
@@ -489,8 +508,10 @@ function listRows(){
       <td>${esc(r.created_by||'-')}</td>
       <td><div class="row-actions">
         <button class="btn small" data-view="${r.id}">보기</button>
-        <button class="btn small" data-edit="${r.id}">수정</button>
-        <button class="btn small danger" data-del="${r.id}">삭제</button>
+        ${canManageWaste()?`
+          <button class="btn small" data-edit="${r.id}">수정</button>
+          <button class="btn small danger" data-del="${r.id}">삭제</button>
+        `:''}
       </div></td>
     </tr>`;
   }).join('');
@@ -545,7 +566,7 @@ function viewContent(){
     <div id="article-body" class="article-body">${legacyOrHtml(viewing.content||'')}</div>
     ${viewing.note?`<div class="article-note"><strong>비고</strong><div>${esc(viewing.note).replace(/\n/g,'<br>')}</div></div>`:''}
     <div class="attachment-panel"><div class="attachment-title">첨부파일</div>${attachmentsHtml(viewing.id,false)}${viewing.file_path?`<div class="attachment-item"><a class="attachment-open" href="${esc(viewing.file_path)}" target="_blank" rel="noopener">📎 기존 첨부파일 열기</a></div>`:''}</div>
-    <div class="writer-actions"><button class="btn" id="view-back">목록으로</button><button class="btn primary" id="view-edit">수정</button></div>
+    <div class="writer-actions"><button class="btn" id="view-back">목록으로</button>${canManageWaste()?'<button class="btn primary" id="view-edit">수정</button>':''}</div>
   </div>`;
 }
 function render(){
@@ -555,7 +576,7 @@ function render(){
       <div class="section-head library-head">
         <div><h2>📁 관련서류</h2><div class="hint">허가증, 사업자등록증, 계약서, 교육확인서 등 증빙서류를 종류별로 관리합니다.</div></div>
         <div class="spacer"></div>
-        ${mode==='list'?`<button class="btn primary" id="write" ${types.length?'':'disabled'}>글쓰기</button>`:''}
+        ${mode==='list'&&canManageWaste()?`<button class="btn primary" id="write" ${types.length?'':'disabled'}>글쓰기</button>`:''}
       </div>
       <div class="library-layout">
         <aside class="library-sidebar">${typeButtons()}</aside>
@@ -575,10 +596,14 @@ function render(){
   if(mode==='view'){
     hydrateInlineImages($('#article-body'));
     $('#view-back').onclick=()=>{viewing=null;mode='list';render()};
-    $('#view-edit').onclick=()=>openEditor(viewing);
+    if($('#view-edit'))$('#view-edit').onclick=()=>openEditor(viewing);
   }
 }
 function openEditor(row){
+  if(!canManageWaste()){
+    notice('폐기물 운영자만 글쓰기/수정이 가능합니다.','err');
+    return;
+  }
   editing=row||null; viewing=null; ownerId=row?.id||uid(); sessionUploadedIds=new Set();
   const type=row?typeForRow(row):selectedType(); if(type)selectedTypeId=type.id;
   mode='editor'; render();
@@ -631,6 +656,10 @@ async function cancelEditor(){
   await cleanupSessionUploads();editing=null;ownerId='';mode='list';render();
 }
 async function save(e){
+  if(!canManageWaste()){
+    e?.preventDefault?.();
+    return notice('폐기물 운영자만 저장할 수 있습니다.','err');
+  }
   e.preventDefault();
   const type=types.find(t=>t.id===$('#document_type_id').value);if(!type)return notice('서류 종류를 선택하세요.','err');
   const title=$('#title').value.trim();if(!title)return notice('제목을 입력하세요.','err');
@@ -646,6 +675,7 @@ async function save(e){
   sessionUploadedIds.clear();selectedTypeId=type.id;editing=null;ownerId='';mode='list';await load();notice('저장되었습니다.');
 }
 async function del(id){
+  if(!canManageWaste())return notice('폐기물 운영자만 삭제할 수 있습니다.','err');
   if(!confirm('이 관련서류와 첨부파일을 삭제하시겠습니까?'))return;
   const owned=rowFiles(id);
   if(owned.length){await A.sb.storage.from(STORAGE_BUCKET).remove(owned.map(f=>f.storage_path));for(const f of owned)await A.remove('waste_editor_files',f.id)}
