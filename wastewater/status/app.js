@@ -49,6 +49,26 @@ function openingSeed(){
   return [...openings]
     .sort((a,b)=>String(a.balance_date||'').localeCompare(String(b.balance_date||'')))[0]||null;
 }
+function waterMeterSeed(){
+  const measured=[...daily]
+    .filter(r=>!r.is_holiday && r.usage!==null && r.usage!==undefined && String(r.usage).trim()!=='')
+    .sort((a,b)=>dateKey(a.date).localeCompare(dateKey(b.date)));
+
+  if(!measured.length)return {value:0,hasSeed:false};
+
+  const firstDate=dateKey(measured[0].date);
+  const valid=[...openings]
+    .filter(o=>o.prev_usage!==null && o.prev_usage!==undefined && String(o.prev_usage).trim()!=='')
+    .filter(o=>!o.balance_date || dateKey(o.balance_date)<=firstDate)
+    .sort((a,b)=>dateKey(a.balance_date).localeCompare(dateKey(b.balance_date)));
+
+  if(valid.length){
+    const row=valid[valid.length-1];
+    return {value:Number(row.prev_usage||0),hasSeed:true};
+  }
+
+  return {value:0,hasSeed:false};
+}
 function pickupAfterM3(p){
   if(!p)return null;
   if(p.after_pickup_volume_value!==null&&p.after_pickup_volume_value!==undefined){
@@ -72,7 +92,9 @@ function groupedPickups(){
 }
 function derive(){
   const seed=openingSeed();
-  let prevMeter=Number(seed?.prev_usage||0);
+  const meterSeed=waterMeterSeed();
+  let prevMeter=Number(meterSeed.value||0);
+  let meterInitialized=!!meterSeed.hasSeed;
   let prevStore=Number(seed?.storage_m3||0)+Number(seed?.external_m3||0);
   let displayStore=prevStore;
   let water=0,generated=0;
@@ -81,9 +103,20 @@ function derive(){
 
   for(const r of [...daily].sort((a,b)=>dateKey(a.date).localeCompare(dateKey(b.date))||String(a.created_at||'').localeCompare(String(b.created_at||'')))){
     const holiday=!!r.is_holiday;
-    const meter=holiday?prevMeter:Number(r.usage||0);
-    const used=holiday?0:Math.max(0,meter-prevMeter);
-    if(!holiday)prevMeter=meter;
+    const hasMeter=!holiday && r.usage!==null && r.usage!==undefined && String(r.usage).trim()!=='';
+    const meter=hasMeter?Number(r.usage):prevMeter;
+
+    let used=0;
+    if(!holiday && hasMeter){
+      if(!meterInitialized){
+        // 최초 누적계기값은 기준값으로만 사용하고 '당일 사용량' 합계에는 포함하지 않는다.
+        used=0;
+        meterInitialized=true;
+      }else{
+        used=Math.max(0,meter-prevMeter);
+      }
+      prevMeter=meter;
+    }
 
     const st=holiday?{total:prevStore,main:prevStore,external:0,over:false}:rowStorage(r);
 
