@@ -299,11 +299,28 @@ function scopedCompanyQuery(query){
 
 async function getMyRoles(email){
   const portalRoleResult = getWastewaterRolesFromPortalSession();
-  if(portalRoleResult.explicit){
+
+  // 포탈 세션이 단순 기본값 {role:'user'} 또는 조회역할만 내려준 경우에는
+  // 과거 폐수 전용 권한(wastewater_operators / wastewater_approvers)과
+  // 중앙 user_app_roles를 계속 조회하여 호환합니다.
+  // admin/operator/approver/blocked처럼 명확한 역할이 내려온 경우에만
+  // 포탈 세션을 최종 권한으로 사용합니다.
+  const portalRole = String(portalRoleResult.role || '').trim().toLowerCase();
+  const portalApprovalRole = String(portalRoleResult.approvalRole || '').trim().toLowerCase();
+  const hasAuthoritativePortalRole =
+    portalRoleResult.explicit && (
+      portalRole === 'admin' ||
+      portalRole === 'operator' ||
+      portalRole === 'blocked' ||
+      portalApprovalRole === 'reviewer' ||
+      portalApprovalRole === 'approver'
+    );
+
+  if(hasAuthoritativePortalRole){
     return portalRoleResult.roles || [];
   }
 
-  const roles = [];
+  const roles = [...(portalRoleResult.roles || [])];
   const targetEmail = String(email || '').trim();
   const targetEmailLower = targetEmail.toLowerCase();
   if(!targetEmail) return roles;
