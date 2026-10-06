@@ -183,6 +183,7 @@ function addCompanyIdToPayload(payload, companyId){
 const WASTEWATER_TENANT_TABLES = new Set([
   'wastewater','wastewater_pickups','monthly_approvals','approval_logs','activity_logs',
   'reference_docs','wastewater_approvers','wastewater_operators',
+  'wastewater_settings','wastewater_vendors','wastewater_storage_locations','wastewater_container_units','wastewater_opening_balances',
   'users','employees','user_app_roles',
   'divisions','teams','managed_teams',
   'attendance_records','attendance_erp_raw','attendance_secom_raw','attendance_upload_batches','attendance_upload_logs'
@@ -282,6 +283,11 @@ const LOG_TABLE='activity_logs';
 const APPROVAL_TABLE='monthly_approvals';
 const APPROVAL_LOG_TABLE='approval_logs';
 const REFERENCE_TABLE='reference_docs';
+const SETTINGS_TABLE='wastewater_settings';
+const VENDOR_TABLE='wastewater_vendors';
+const LOCATION_TABLE='wastewater_storage_locations';
+const UNIT_TABLE='wastewater_container_units';
+const OPENING_TABLE='wastewater_opening_balances';
 const RELATED_DOC_BUCKET='wastewater-docs';
 const CM_LIMIT=154;
 const TON_TO_CM=22;
@@ -442,6 +448,16 @@ function loadCoreData(){
     scopedCompanyQuery(sb.from(DAILY_VIEW).select('*')).order('date',{ascending:false}).order('created_at',{ascending:false}),
     scopedCompanyQuery(sb.from(PICKUP_TABLE).select('*')).order('pickup_date',{ascending:false}).order('created_at',{ascending:false}),
     scopedCompanyQuery(sb.from(APPROVAL_TABLE).select('*')).order('month_key',{ascending:false})
+  ]);
+}
+
+function loadFacilityConfigData(){
+  return Promise.all([
+    scopedCompanyQuery(sb.from(SETTINGS_TABLE).select('*')).maybeSingle(),
+    scopedCompanyQuery(sb.from(OPENING_TABLE).select('*')).order('balance_date',{ascending:true}),
+    scopedCompanyQuery(sb.from(VENDOR_TABLE).select('*')).order('sort_order',{ascending:true}),
+    scopedCompanyQuery(sb.from(LOCATION_TABLE).select('*')).order('sort_order',{ascending:true}),
+    scopedCompanyQuery(sb.from(UNIT_TABLE).select('*')).order('sort_order',{ascending:true})
   ]);
 }
 
@@ -727,7 +743,7 @@ window.WastewaterApi={
   getPortalRoles:getWastewaterRolesFromPortalSession,
   SUPABASE_URL,SUPABASE_KEY,
   DAILY_TABLE,DAILY_VIEW,PICKUP_TABLE,USERS_TABLE,EMPLOYEES_TABLE,WASTEWATER_ROLE_VIEW,WASTEWATER_OPERATORS_TABLE,WASTEWATER_APPROVERS_TABLE,USER_APP_ROLES_TABLE,LOG_TABLE,APPROVAL_TABLE,APPROVAL_LOG_TABLE,REFERENCE_TABLE,RELATED_DOC_BUCKET,CM_LIMIT,TON_TO_CM,MAX_TON_M3,
-  getMyRoles:apiGetMyRoles,loadCoreData,loadAdminData,loadReferenceData,loadAllData,saveReferenceDoc,deleteReferenceDocById,saveRelatedDocument,deleteRelatedDocumentById,uploadRelatedDocFile,getRelatedDocPublicUrl,deleteRelatedDocFile,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,getUserSignature,searchEmployees,loadWastewaterManagers,addWastewaterOperator,removeWastewaterOperator,addWastewaterApprover,removeWastewaterApprover,logActivity,logApprovalAction
+  getMyRoles:apiGetMyRoles,loadCoreData,loadFacilityConfigData,loadAdminData,loadReferenceData,loadAllData,saveReferenceDoc,deleteReferenceDocById,saveRelatedDocument,deleteRelatedDocumentById,uploadRelatedDocFile,getRelatedDocPublicUrl,deleteRelatedDocFile,insertDailyRow,insertPickupRow,deleteDailyRowById,deletePickupRowById,upsertWriterApproval,updateApprovalByMonth,updateUserRole,approveUserByEmail,deleteUserByEmail,updateUserSignature,getUserSignature,searchEmployees,loadWastewaterManagers,addWastewaterOperator,removeWastewaterOperator,addWastewaterApprover,removeWastewaterApprover,logActivity,logApprovalAction
 };
 
 
@@ -764,7 +780,7 @@ window.WastewaterApi={
 })();
 
 const DEFAULT_REFERENCE_DOCS={"facilities": {"title": "시설운영정보", "source": "1. 폐기물-폐수배출시설 운영일지(기본설명)(upd.26.02).xlsx", "lines": ["폐수배출시설 운영일지", "UPDATE: 2026-02-04", "① 용수 → 폐수 / 말통 흐름 요약 (내부용 도식 설명문 )", "[용수 사용 → 배출 경로 구분 설명]", "연구소에서 사용된 용수는 성상에 따라 두 가지 경로로 구분하여 관리된다.", "① 일반 세척수 및 비위험성 액상 폐수는 실험실 배관을 통해 폐수저장고로 유입되며, 폐수배출시설 운영일지 기준으로 계량·관리된다.", "폐수저장고의 총 저장 용량은 7톤이며, 계기판의 전체 높이는 154cm이다.", "", "계기판은 기본적으로 1톤 단위로 눈금 표시가 되어 있으나, 일일 점검 시 보다 정확한 현재 저장량 확인을 위해 실측 높이 기반 환산 방식을 병행하여 사용한다.", "즉, 계기판에서 확인한 현재 폐수 수위(cm)에 총 용량 7톤을 곱한 후, 계기판 총 높이 154cm로 나누는 방식을 통해 현재 저장된 폐수량(톤)을 산출할 수 있다.", "(현재 폐수량 = 측정 높이 × 7톤 ÷ 154cm)", "② 산·유기계 등 반응성 또는 위험성이 있는 액상 폐수는 폐수저장고로 유입하지 않고, 실험실 내 20L 말통에 별도로 수거하여 지정폐기물로 분류한다.", "해당 폐수는 폐기물 위탁처리 업체를 통해 외부 반출·처리되며, 모든 반출 이력은 폐기물 인계서를 통해 관리된다.", "③ 이로 인해 용수 사용량은 실험실 전체 사용량을 반영하는 반면, 폐수 발생량은 폐수저장고 유입 기준으로 계량되므로 두 수치는 구조적으로 1:1로 일치하지 않는다.", "※ 연구소에서는 폐수를 ‘폐수저장고 유입 폐수’와 ‘말통 수거 지정폐기물’로 구분 관리하고 있어, 용수사용량 대비 폐수저장고 기준 폐수량이 적게 나타나는 것은 정상이며 각 항목은 운영일지와 폐기물 인계서로 분리 관리하고 있다.", "용수사용량 (세척실위치) 폐수사용량 (말통보관-폐기물처리)", "구분 : 용수계량기\n위치 : 세척실\n확인 : 매일 구분 : 산/유기용제\n위치 : 실험실 배치 및 폐기물실 보관\n확인 : 실험실 매일 확인 및 폐기물실의 경우 수거시 배출량 확인", "폐수사용량 (저장고보관-폐수처리)", "구분 : 폐수저장고(3.5T 2개)\n위치 : 폐수실\n확인 : 매일", "② 왜 연구소는 폐수가 적게 발생하는가", "1. 적용 범위", "제약회사 연구소", "연구용 소규모 제형 개발 및 평가 공정", "2. 용수 사용 대비 폐수 회수율 개념", "용수사용량: 실험, 세척, 인원 사용, 공정 보조수 포함", "폐수발생량: 폐수저장고로 유입되어 액상 상태로 회수·계량된 수량", "👉 산·유기계 일부 폐수는 실험실 내 20L 말통에 수거 후 외부 위탁 처리", "👉 두 수치는 구조적으로 동일할 수 없음", "3. 폐수 회수율이 낮아지는 주요 원인", "① 공정 특성", "가열·교반 공정 → 수분 증발", "소량 다회 실험 → 세척수 분산", "② 제형 특성", "겔·현탁·유화 제형 → 고형/반고형 폐기", "여과·흡착 공정 → 액상 회수 불가", "③ 세척 및 건조", "IPA/EtOH 세척 후 공기 건조", "와이퍼·거즈·여과지 흡착", "④ 폐수 관리 방식", "산·유기계 폐수 → 실험실 내 말통 수거", "폐수저장고 미유입 → 위탁 폐기물로 처리", "4. 일반적인 연구소 폐수 회수율 (참고 범위)", "항목 비율", "용수 대비 폐수 (저장고 기준) :    약 40~70%", "증발·흡착·고형·별도 위탁 처리 :    약 30~60%", "※ 연구실 운영 형태에 따라 변동 가능", "③ 왜 연구소는 폐업업체 폐수 수거량 대비 사업장 폐수 감소량이 적은가", "1. 계측 기준 차이", "사업장: 폐수저장고 수위 기준 부피 환산", "폐수업체: 수거 폐수 차량 계근(무게)", "2. 폐수 성상 차이", "용존, 부유 고형물 포함 -> 물 대비 비중 증가", "부피 기준 환산량 < 계근 기준 수거량", "3. 회수 방식 차이", "폐수는 저장고 하부 흡입  방식으로 회수", "하부 슬러지 포함 수거", "④ 관리 원칙", "실제 계량값 기준 기록", "산·유기계 폐수는 위탁 처리 내역으로 관리", "수치 보정 금지", "운영일지 비고란에 사유 명시", "월별 추세 관리 중심", "⑤ 최종정리", "※ 연구소에서는 공정 특성에 따른 증발·흡착 손실과 더불어 산·유기계 일부 폐수를 말통 수거 후 위탁 처리하고 있어, 용수사용량 대비 폐수저장고 기준 폐수 발생량이 약 2배 차이 나는 것은 자연스러운 현상이며 실제 계량값을 기준으로 일관되게 기록·설명하는 것이 가장 안전한 관리 방법이다."]}, "qa": {"title": "환경점검 대응 Q&A", "source": "2. 폐기물-폐수배출시설 환경점검 대응(upd.26.02)Q&A.xlsx", "lines": ["폐기물-폐수배출시설 환경점검 대응 Q&A (실무용)", "UPDATE: 2026-02-04", "Q1. 왜 용수사용량 대비 폐수 발생량이 적습니까?", "A. 연구소는 가열·교반 공정, 반고형 제형 취급, 용기 세척 및 공기 건조 과정이 많아 증발 손실과 고형물 흡착 손실이 발생합니다.", "또한 산·유기계 등 일부 폐수는 배관을 통한 폐수저장고로 이동하지 않고 실험실에서 20L 말통에 별도 수거 후 폐기물 업체를 통해 위탁 처리하고 있어, 폐수저장고 기준의 계량량은 용수사용량 대비 낮게 나타납니다.", "Q2. 왜 폐수업체 폐수 수거량 대비 사업장 폐수 감소량이 적습니까?", "A. 사업장에서는 폐수 저장조 수위를 기준으로 부피 환산 방식으로 폐수량을 관리하고 있으며, 폐수 수거업체는 실제 수고 폐수를 차량 계근을 통해 무게 기준으로 산정하고 있습니다.", "이로 인해 폐수의 비중, 슬러지 포함 여부, 계측 기준 차이 등에 따라 내부 관리상 폐수 감소량과 수거업체 수거량 간 수치 차이가 발생할 수 있습니다.", "Q3. 왜 폐수로 안 보내고 말통에 받습니까?", "A. 산·유기계 폐수는 배관 유입 시 부식, 반응성, 혼합 위험이 있어 관련 기준에 따라 실험실 내에서 별도 용기에 수거하고 지정폐기물로 위탁 처리하고 있습니다.", "Q4. 그럼 폐수량이 실제보다 적게 기록되는 것 아닙니까?", "A. 폐수배출시설 운영일지는 폐수저장고로 유입된 액상 폐수 기준으로 작성하고 있으며, 말통 수거 폐수는 폐기물 인계서로 별도 관리하고 있어 이중 누락은 없습니다.", "Q5. 말통 폐수 양은 어떻게 확인합니까?", "A. 말통 폐수는 발생 시 수거 기록 및 폐기물 인계서를 통해 반출 이력이 관리되고 있으며, 운영일지에는 폐수저장고 유입량만 기재하고 있습니다.", "Q6. 두 자료가 서로 안 맞아도 괜찮습니까?", "A. 관리 대상과 계량 기준이 다르기 때문에 수치 일치는 필요하지 않으며, 각각의 관리 문서가 역할에 맞게 유지되고 있습니다.", "Q7. 싱크에 버린 물은 전부 폐수통으로 가지 않습니까?", "A. 일반 세척수 등은 배관을 통해 폐수저장고로 이동하나, 산·유기계 폐수 등은 관련 규정에 따라 실험실 내에서 별도 용기에 수거하여 위탁 처리하고 있습니다.", "또한 배관 체류 중 증발, 트랩 잔류, 여과지·와이퍼 흡착 등으로 폐수통에 계량되지 않는 수량이 일부 발생합니다.", "Q8. 용수 대비 폐수 비율이 약 50% 수준인데 문제 없습니까?", "A. 연구소의 경우 일반적으로 용수 대비 폐수 회수율은 약 40~70% 범위로 관리됩니다.", "여기에 더해 일부 산·유기계 폐수는 말통 수거 후 외부 위탁 처리되므로, 폐수저장고 기준 폐수량만을 비교할 경우 해당 비율은 충분히 합리적인 범위입니다.", "Q9. 수치를 보정해서 맞춰야 하지 않습니까?", "A. 아닙니다. 운영일지는 실제 계량값 기준으로 작성하는 것이 원칙이며, 산·유기계 폐수의 별도 위탁 처리 역시 실제 관리 방식에 따라 기록하고 있습니다. 임의 보정은 허위 기재로 오해될 수 있어 지양하고 있습니다.", "Q10. 폐수 발생량이 월별로 완전히 일정하지 않은 이유는?", "A. 월별 실험 종류, 제형 유형, 가열 공정 유무뿐 아니라 산·유기계 폐수 발생 빈도 및 위탁 처리량 차이에 따라 폐수저장고로 유입되는 수량이 달라질 수 있습니다."]}, "waterMismatch": {"title": "용수/폐수량 비일치의 건", "source": "3. EPA Guide 및 환경부(산업계) 인용 정리.xlsx", "lines": ["① EPA Guide 인용 논리적 근거 문단", "UPDATE: 2026-01-28", "(실험실 용수사용량 ≠ 폐수발생량 설명용)", "실험실 환경에서는 용수 사용량 전체가 폐수로 회수되지 않는 것이 구조적인 특성이다.\n미국 환경보호청(EPA)이 발간한 Water Efficiency in Laboratories 가이드에서는 연구시설의 물 사용을 평가할 때 facility water balance(물 수지) 개념을 적용하도록 권고하고 있으\n며, 구매된 용수량과 실제 사용·배출량이 반드시 일치하지 않을 수 있음을 전제로 하고 있다.\n해당 가이드는 실험실 내 물이 실험 공정, 장비 세척, 냉각, 증발 및 공정 잔류 등 다양한 경로로 사용·소모되기 때문에, 입력된 용수 전량이 폐수로 배출되지 않는 상황이 일반적임을 설명한다.\n따라서 실험실, 특히 가열·교반·세척 공정이 빈번한 제약회사 제제연구실에서는 용수사용량 대비 실제 액상 폐수 발생량이 낮게 나타나는 현상이 구조적으로 발생할 수 있다.", "② 환경부(산업계) 산업폐수 통계 활용 예시 문단", "(산업계 비교·보조 근거용)", "산업계 전반의 통계 자료에서도 용수 사용량과 폐수 발생량이 1:1로 일치하지 않는 사례가 확인된다.\n환경부 산하 한국환경정책·평가연구원(KEI) 및 관련 기관의 산업 자원효율성 분석 자료에 따르면, 업종별 공업용수 사용량 대비 폐수 방류량(폐수배출율)은 산업 특성에 따라 상이하게 나타나며, 특히 화학물질 및 화학제품 제조업에서는 공업용수 사용량 대비 폐수배출율이 상대적으로 낮은 것으로 분석된다.\n이는 공정 중 용수가 제품에 함유되거나 증발·손실되는 비율이 존재하기 때문으로 설명되고 있으며, 이러한 산업 통계는 실험실 및 연구개발 환경에서도 용수 사용량 대비 폐수 발생량 차이가 구조적으로 발생할 수 있음을 뒷받침하는 참고 자료로 활용될 수 있다."]}, "wastewaterMismatch": {"title": "폐수 배출량 비일치의 건", "source": "4. 폐수 배출량 비일치 인용의 건.xlsx", "lines": ["① 폐수의 비중과 용존고형물(TDS) 관계에 대한 설명 정리문", "UPDATE: 2026-02-04", "폐수는 용존고형물(TDS) 증가에 따라 비중이 변할 수 있으며, 비중–용존고형물 간 상관관계에 대한 경험식이 보고되어 있음", "폐수는 순수한 물이 아니라 다양한 용존고형물(TDS) 및 무기·유기 성분을 포함하고 있어, 해당 성분의 농도 증가에 따라 폐수의 비중(specific gravity) 이 변화할 수 있다.\n일반적으로 용존고형물 농도가 증가할수록 단위 부피당 질량이 증가하므로, 동일한 부피의 폐수라 하더라도 순수 물(비중 1.0) 대비 실제 무게는 더 크게 나타날 수 있다.\n이와 같은 폐수의 비중 변화는 실험실 폐수뿐 아니라 산업폐수 전반에서 관찰되는 현상으로, 용존고형물 농도(TDS)와 비중 간의 관계에 대해서는 경험식(empirical relationship)을 통해 상관관계가 보고된 바 있다.\n따라서 폐수를 부피 기준으로 환산하여 관리하는 경우, 실제 수거·계근 시 측정되는 무게 기준 폐수량과는 폐수 성상(TDS 농도)에 따라 일정 수준의 차이가 발생할 수 있다.\n※ 폐수는 용존고형물(TDS) 함유로 인해 비중이 순수 물과 달라질 수 있으며, TDS 농도 증가에 따른 비중 변화는 경험적 상관관계로 보고되어 있다.", "② Standard Methods 2540(SOLIDS) 내용을 바탕으로 한 정리문", "폐수의 총고형물·부유고형물·용존고형물 개념 및 표준시험법 근거 정리", "폐수는 순수한 물이 아니라 다양한 고형 성분을 포함한 혼합물로, 그 성상은 총고형물(Total Solids, TS), 부유고형물(Total Suspended Solids, TSS), 용존고형물(Total Dissolved Solids, TDS) 개념으로 구분하여 관리된다.\n이러한 고형물 개념은 Standard Methods for the Examination of Water and Wastewater의 Method 2540 (SOLIDS)에서 공식적으로 정의되어 있으며, 각 항목은 표준화된 시험 절차에 따라 측정하도록 규정되어 있다.\n표준시험법에 따르면,\n*총고형물(TS)은 시료를 증발·건조한 후 남는 모든 잔류물의 질량으로 정의되며,\n*부유고형물(TSS)은 여과지에 포집되는 고형물,\n*용존고형물(TDS)은 여과지를 통과한 후 잔류하는 용존 성분으로 구분된다.\n즉, 폐수는 단순한 액체 부피가 아닌, 고형물 함량과 조성에 따라 성상이 달라지는 물질로 정의·관리되며, 이러한 고형물 개념은 폐수의 처리, 규제 기준 설정 및 계측 결과 해석의\n기본 전제로 활용되고 있다.\n※ 폐수는 ‘물’이 아니라, 표준시험법에서 정의한 고형물(TS/TSS/TDS) 개념으로 관리되는 대상이다.", "③ EPA NPDES Compliance Inspection Manual의 실제 취지에 맞춘 정리문", "EPA NPDES 점검 지침의 유량·계측 정확도 관련 근거 정리", "미국 환경보호청(EPA)의 NPDES Compliance Inspection Manual은 폐수 배출시설 점검 시 유량 및 계측 데이터의 정확성을 규제 준수 여부 판단의 핵심 요소로 보고 있다.\n해당 지침에서는 점검관이 단순히 기록된 수치만을 확인하는 것이 아니라, 유량·계측 시스템이 적절하게 설치·운영·유지관리되고 있는지, 측정 방법이 시설 여건에 타당하게 적용되고 있는지, 그리고 보정(calibration) 및 기록 관리가 적정하게 이루어지고 있는지를 함께 평가하도록 하고 있다.\n특히 수위(헤드) 기반 환산 방식이나 유량계 측정 방식은 설치 조건, 관리 상태, 보정 주기 등에 따라 측정값의 정확도에 영향을 받을 수 있음을 전제로 하며, 이에 따라 점검 시 계측 방식의 적정성과 데이터 신뢰성이 중요한 확인 항목으로 다루어진다.\n따라서 폐수량을 수위 또는 유량 기반으로 계측·관리하는 경우, 계측 방식과 관리 조건에 따라 일정 수준의 오차 가능성이 존재함을 점검 대응 시 합리적으로 설명할 수 있다.\n※ EPA는 ‘계측값’보다 ‘계측이 제대로 이루어졌는지’를 본다."]}};
-const WASTEWATER_PC_BLANK_FIX_VERSION='2026-10-06-v3';
+const WASTEWATER_FACILITY_MODE_VERSION='2026-10-06-height-volume-v1';
 const api = window.WastewaterApi;
 
 let user=null,currentRole='user',currentRoles=[],currentTab='daily',ledgerMonthFilter='',pickupYearFilter='',pickupTypeFilter='전체',yearlyReportFilter='',refTab='facilities',refSearch='',relatedDocCategoryFilter='삼천당제약 사업자등록증',relatedDocWriteMode=false,relatedDocViewId=null,relatedDocEditId=null;
@@ -775,7 +791,51 @@ let wastewaterAdminState={admins:[],operators:[],approvers:[],searchResults:[]};
 
 function escapeHtml(str){return String(str??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function round2(v){return Math.round((Number(v||0)+Number.EPSILON)*100)/100;}
-function cmToM3(cm){return round2((Number(cm||0)/CM_LIMIT)*MAX_TON_M3);}
+const DEFAULT_FACILITY_SETTINGS={facility_name:'폐수배출시설',measurement_mode:'height',volume_unit:'m3',tank_height_cm:154,tank_capacity_m3:7,ton_to_cm:22};
+let facilitySettings={...DEFAULT_FACILITY_SETTINGS};
+let openingBalanceRows=[],wastewaterVendors=[],wastewaterLocations=[],wastewaterUnits=[];
+function facilityMode(){return facilitySettings?.measurement_mode==='volume'?'volume':'height';}
+function facilityVolumeUnit(){return String(facilitySettings?.volume_unit||'m3').toUpperCase()==='L'?'L':'m3';}
+function facilityHeight(){const v=Number(facilitySettings?.tank_height_cm||CM_LIMIT);return v>0?v:CM_LIMIT;}
+function facilityCapacity(){const v=Number(facilitySettings?.tank_capacity_m3||MAX_TON_M3);return v>0?v:MAX_TON_M3;}
+function cmToM3(cm){return round2((Number(cm||0)/facilityHeight())*facilityCapacity());}
+function valueToM3(value,unit){const v=Number(value||0);return String(unit||'m3').toUpperCase()==='L'?round2(v/1000):round2(v);}
+function m3ToFacilityVolume(m3){return facilityVolumeUnit()==='L'?round2(Number(m3||0)*1000):round2(m3);}
+function facilityVolumeLabel(){return facilityVolumeUnit()==='L'?'L':'m³';}
+function openingSeed(){return [...openingBalanceRows].sort((a,b)=>String(a.balance_date||'').localeCompare(String(b.balance_date||'')))[0]||null;}
+function pickupAfterStorageM3(pickup){
+  if(!pickup)return null;
+  if(pickup.after_pickup_volume_value!==null&&pickup.after_pickup_volume_value!==undefined&&pickup.after_pickup_volume_value!=='') return valueToM3(pickup.after_pickup_volume_value,pickup.after_pickup_volume_unit||facilityVolumeUnit());
+  if(pickup.after_pickup_cm!==null&&pickup.after_pickup_cm!==undefined&&pickup.after_pickup_cm!=='') return cmToM3(Number(pickup.after_pickup_cm));
+  return null;
+}
+function rowStorageInfo(row){
+  const rm=row?.measurement_mode==='volume'?'volume':(row?.measurement_mode==='height'?'height':'height');
+  if(rm==='volume' && row?.volume_value!==null && row?.volume_value!==undefined && row?.volume_value!==''){
+    const main=valueToM3(row.volume_value,row.volume_unit||facilityVolumeUnit());
+    const ext=row.has_external?valueToM3(row.external_volume_value||0,row.external_volume_unit||row.volume_unit||facilityVolumeUnit()):0;
+    const total=round2(main+ext),limit=facilityCapacity();
+    return {mode:'volume',mainM3:main,externalM3:ext,totalM3:total,over:total>limit,totalCm:null,mainDisplay:`${formatNum(row.volume_value,facilityVolumeUnit()==='L'?0:2)} ${row.volume_unit==='L'?'L':'m³'}`,externalDisplay:row.has_external?`${formatNum(row.external_volume_value||0,(row.external_volume_unit||facilityVolumeUnit())==='L'?0:2)} ${(row.external_volume_unit||facilityVolumeUnit())==='L'?'L':'m³'}`:'-'};
+  }
+  const mainCm=Number(row?.height||0),externalCm=row?.has_external?Number(row.external_cm||0):0,totalCm=round2(mainCm+externalCm),totalM3=cmToM3(totalCm);
+  return {mode:'height',mainM3:cmToM3(mainCm),externalM3:cmToM3(externalCm),totalM3,over:totalCm>facilityHeight(),totalCm,mainDisplay:`${formatNum(mainCm,1)} cm`,externalDisplay:row?.has_external?`${formatNum(externalCm,1)} cm`:'-'};
+}
+function storageLimitText(){return facilityMode()==='height'?`${formatNum(facilityHeight(),1)} cm`:`${formatNum(m3ToFacilityVolume(facilityCapacity()),facilityVolumeUnit()==='L'?0:2)} ${facilityVolumeLabel()}`;}
+function getTodayGuidelineFromStorage(info){return info.over?`OVER ${storageLimitText()}`:`${formatNum(info.totalM3,2)} m³`;}
+function renderDailyStorageInputHtml(){
+  if(facilityMode()==='height') return `<div class="field"><label>폐수높이 (cm)</label><input id="daily-height" class="input" type="number" step="0.1" oninput="updateDailyPreview()"></div>`;
+  return `<div class="field"><label>현재 폐수량 (${facilityVolumeLabel()})</label><input id="daily-volume" class="input" type="number" step="${facilityVolumeUnit()==='L'?'1':'0.01'}" oninput="updateDailyPreview()"></div>`;
+}
+function renderDailyExternalInputHtml(){
+  if(facilityMode()==='height') return `<div class="field"><label>외부보관 높이 (cm)</label><input id="daily-external-cm" class="input" type="number" step="0.1" value="0" oninput="updateDailyPreview()"></div>`;
+  return `<div class="field"><label>외부보관량 (${facilityVolumeLabel()})</label><input id="daily-external-volume" class="input" type="number" step="${facilityVolumeUnit()==='L'?'1':'0.01'}" value="0" oninput="updateDailyPreview()"></div>`;
+}
+function formatPickupAfter(p){
+  if(!p)return '-';
+  if(p.after_pickup_volume_value!==null&&p.after_pickup_volume_value!==undefined)return `${formatNum(p.after_pickup_volume_value,(p.after_pickup_volume_unit||facilityVolumeUnit())==='L'?0:2)} ${(p.after_pickup_volume_unit||facilityVolumeUnit())==='L'?'L':'m³'}`;
+  if(p.after_pickup_cm!==null&&p.after_pickup_cm!==undefined)return `${formatNum(p.after_pickup_cm,1)} cm`;
+  return '-';
+}
 function formatNum(v,d=2){if(v===null||v===undefined||v===''||Number.isNaN(Number(v)))return '-'; return Number(v).toFixed(d);}
 function roleLabel(role){
   if(role==='user') return '사용자';
@@ -805,7 +865,7 @@ function syncCurrentRole(){
 }
 function hasRole(role){return currentRoles.includes(role);}
 function approvalBadge(approved){return approved===false?`<span class="inline-badge partial">승인대기</span>`:`<span class="inline-badge ok">승인완료</span>`;}
-function getTodayGuidelineText(totalCm){return totalCm>CM_LIMIT?`OVER ${CM_LIMIT}`:`${formatNum(cmToM3(totalCm),2)} m³`;}
+function getTodayGuidelineText(totalCm){const info={totalM3:cmToM3(totalCm),over:Number(totalCm)>facilityHeight()};return getTodayGuidelineFromStorage(info);}
 function canWrite(){return hasRole('wastewater_admin')||hasRole('wastewater_operator');}
 function canDelete(){return hasRole('wastewater_admin')||hasRole('wastewater_operator');}
 function canAdmin(){return hasRole('wastewater_admin');}
@@ -855,7 +915,7 @@ function getApprovalRow(monthKey){return approvalRows.find(r=>r.month_key===mont
 function isMonthLocked(monthKey){return !!getApprovalRow(monthKey)?.is_locked;}
 function getApprovalStatus(monthKey){const row=getApprovalRow(monthKey); if(!row) return {text:'미결재', cls:'wastewater'}; if(row.reviewer_signed_at) return {text:'검토 완료 / 월잠금', cls:'locked'}; if(row.writer_signed_at) return {text:'작성자 결재 완료', cls:'partial'}; return {text:'미결재', cls:'wastewater'};}
 function getPickupTypeBadge(type){const t=type||'폐수'; return t==='폐기물'?`<span class="inline-badge waste">폐기물</span>`:`<span class="inline-badge wastewater">폐수</span>`;}
-function getPickupDetailText(row){const t=row.pickup_type||'폐수'; if(t==='폐기물') return [`폐알칼리 ${Number(row.waste_alkali_count||0)}`,`폐산 ${Number(row.waste_acid_count||0)}`,`고상 ${Number(row.waste_organic_solid_count||0)}`,`폐시약병 ${Number(row.waste_organic_bottle_count||0)}`].join(' / '); return `위탁량 ${formatNum(row.entrusted_amount,2)}m³ / 수거후높이 ${String(row.after_pickup_cm??'-')}cm`;}
+function getPickupDetailText(row){return `위탁량 ${formatNum(row.entrusted_amount,2)}m³ / 수거후 ${formatPickupAfter(row)}`;}
 function downloadFile(filename,content,mime){const blob=new Blob([content],{type:mime}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url);}
 
 function getDefaultReferenceMap(){
@@ -908,29 +968,18 @@ async function getMyRoles(email){
 }
 async function loadMyRoles(){
   currentRoles = await getMyRoles(user.email);
-
-  // 명확한 포탈 권한(admin/operator/approver/blocked)만 최종 권한으로 사용합니다.
-  // 단순 기본값 user/viewer는 기존 user_app_roles 또는 legacy 폐수 권한 조회 결과를 덮어쓰지 않습니다.
   try{
     const portalRoles = api.getPortalRoles ? api.getPortalRoles() : null;
     const portalRole = String(portalRoles?.role || '').trim().toLowerCase();
     const approvalRole = String(portalRoles?.approvalRole || '').trim().toLowerCase();
-    const authoritative =
-      portalRoles?.explicit && (
-        portalRole === 'admin' ||
-        portalRole === 'operator' ||
-        portalRole === 'blocked' ||
-        approvalRole === 'reviewer' ||
-        approvalRole === 'approver'
-      );
-
-    if(authoritative){
-      currentRoles = portalRoles.roles || [];
-    }
+    const authoritative = portalRoles?.explicit && (
+      portalRole === 'admin' || portalRole === 'operator' || portalRole === 'blocked' ||
+      approvalRole === 'reviewer' || approvalRole === 'approver'
+    );
+    if(authoritative) currentRoles = portalRoles.roles || [];
   }catch(e){
     console.warn('portal wastewater role sync skipped:', e);
   }
-
   syncCurrentRole();
 }
 
@@ -1220,10 +1269,15 @@ async function ensureAdminDataLoaded(force=false){
 
 async function loadAll(message='',cls='muted'){
   if(api.loadCoreData){
-    const [dailyRes,pickupRes,approvalsRes]=await api.loadCoreData();
+    const [[dailyRes,pickupRes,approvalsRes],[settingsRes,openingRes,vendorRes,locationRes,unitRes]]=await Promise.all([api.loadCoreData(),api.loadFacilityConfigData()]);
     dailyRows=dailyRes.data||[];
     pickupRows=pickupRes.data||[];
     approvalRows=approvalsRes.data||[];
+    facilitySettings={...DEFAULT_FACILITY_SETTINGS,...(settingsRes?.data||{})};
+    openingBalanceRows=openingRes?.data||[];
+    wastewaterVendors=vendorRes?.data||[];
+    wastewaterLocations=locationRes?.data||[];
+    wastewaterUnits=unitRes?.data||[];
 
     if(currentTab==='reference' || currentTab==='relatedDocs') await ensureReferenceDocsLoaded(false);
   }else{
@@ -1315,120 +1369,30 @@ function buildExpandedDailyRows(){
 }
 
 function getDerivedStats(){
-  const ordered = buildExpandedDailyRows();
-
-  let prevMeter = 0;
-  let prevGuideline = 0;
-  let totalWaterUse = 0;
-  let overCount = 0;
-  let latestStatus = '정상';
-  let latestStatusClass = 'ok';
-
-  const pickupMap = new Map();
-  for(const p of pickupRows){
-    if((p.pickup_type || '폐수') === '폐수'){
-      pickupMap.set(p.pickup_date, p);
-    }
-  }
-
-  const enriched = ordered.map((row, idx) => {
-    const isAutoHoliday = !!row.final_is_holiday;
-    const isManualHoliday = !!row.is_holiday;
-    const isHoliday = isAutoHoliday || isManualHoliday;
-    const isMissing = !row.id && !isHoliday;
-
-    const previousActual = idx === 0
-      ? null
-      : [...ordered].slice(0, idx).reverse().find(r => r && r.id);
-
-    const waterPrev = previousActual ? Number(previousActual.usage || 0) : 0;
-    const meter = isHoliday || isMissing ? prevMeter : Number(row.usage || 0);
-
-    const waterUsed = isHoliday
-      ? 0
-      : (isMissing ? null : (idx === 0 ? meter : round2(meter - prevMeter)));
-
-    if(waterUsed !== null){
-      totalWaterUse += Math.max(waterUsed, 0);
-    }
-
-    const externalCm = isHoliday || isMissing
-      ? 0
-      : (row.has_external
-          ? Number(row.external_cm || (Number(row.external_ton || 0) * TON_TO_CM))
-          : 0);
-
-    const totalCm = isHoliday || isMissing
-      ? 0
-      : round2(Number(row.height || 0) + externalCm);
-
-    const guidelineText = isHoliday
-      ? '휴일'
-      : (isMissing ? '미입력' : getTodayGuidelineText(totalCm));
-
-    const guidelineValue = isHoliday || isMissing
-      ? prevGuideline
-      : (totalCm > CM_LIMIT ? null : cmToM3(totalCm));
-
-    const generated = isHoliday
-      ? 0
-      : (isMissing ? null : (guidelineValue === null ? null : round2(guidelineValue - prevGuideline)));
-
-    const pickup = pickupMap.get(row.date);
-
-    if(isHoliday){
-      latestStatus = '휴일';
-      latestStatusClass = 'ok';
-    }else if(isMissing){
-      latestStatus = '미입력';
-      latestStatusClass = 'ok';
-    }else if(totalCm > CM_LIMIT){
-      overCount += 1;
-      latestStatus = `OVER ${CM_LIMIT}`;
-      latestStatusClass = 'danger';
-    }else{
-      latestStatus = '정상';
-      latestStatusClass = 'ok';
-    }
-
-    prevMeter = meter;
-    prevGuideline = isHoliday || isMissing
-      ? prevGuideline
-      : (
-          pickup?.after_pickup_cm != null
-            ? cmToM3(Number(pickup.after_pickup_cm))
-            : (guidelineValue ?? prevGuideline)
-        );
-
-    return {
-      ...row,
-      water_prev: waterPrev,
-      water_used: waterUsed,
-      external_cm: externalCm,
-      total_cm: totalCm,
-      guideline_text: guidelineText,
-      generated_text: isHoliday
-        ? '휴일'
-        : (isMissing ? '미입력' : (generated === null ? 'Unverified' : `${formatNum(generated, 2)} m³`)),
-      pickup,
-      is_display_holiday: isHoliday,
-      is_missing_day: isMissing
-    };
+  const ordered=buildExpandedDailyRows();
+  const seed=openingSeed();
+  let prevMeter=Number(seed?.prev_usage||0);
+  let prevGuideline=round2(Number(seed?.storage_m3||0)+Number(seed?.external_m3||0));
+  let totalWaterUse=0,overCount=0,latestStatus='정상',latestStatusClass='ok';
+  const pickupMap=new Map();
+  for(const p of pickupRows){if((p.pickup_type||'폐수')==='폐수')pickupMap.set(p.pickup_date,p);}
+  const enriched=ordered.map(row=>{
+    const isAutoHoliday=!!row.final_is_holiday,isManualHoliday=!!row.is_holiday,isHoliday=isAutoHoliday||isManualHoliday,isMissing=!row.id&&!isHoliday;
+    const hasMeter=!isHoliday&&!isMissing&&row.usage!==null&&row.usage!==undefined&&String(row.usage).trim()!=='';
+    const waterPrev=prevMeter,meter=hasMeter?Number(row.usage):prevMeter;
+    const waterUsed=isHoliday?0:(isMissing?null:(hasMeter?round2(meter-prevMeter):null));
+    if(waterUsed!==null)totalWaterUse+=Math.max(waterUsed,0);
+    const storage=(isHoliday||isMissing)?{mode:facilityMode(),totalM3:prevGuideline,mainM3:prevGuideline,externalM3:0,over:false,totalCm:null,mainDisplay:'-',externalDisplay:'-'}:rowStorageInfo(row);
+    const guidelineText=isHoliday?'휴일':(isMissing?'미입력':getTodayGuidelineFromStorage(storage));
+    const generated=isHoliday?0:(isMissing?null:(storage.over?null:round2(storage.totalM3-prevGuideline)));
+    const pickup=pickupMap.get(row.date);
+    if(isHoliday){latestStatus='휴일';latestStatusClass='ok'}else if(isMissing){latestStatus='미입력';latestStatusClass='ok'}else if(storage.over){overCount+=1;latestStatus=`OVER ${storageLimitText()}`;latestStatusClass='danger'}else{latestStatus='정상';latestStatusClass='ok'}
+    if(hasMeter)prevMeter=meter;
+    if(!isHoliday&&!isMissing){const after=pickupAfterStorageM3(pickup);prevGuideline=after!==null?after:(storage.over?prevGuideline:storage.totalM3);}
+    return {...row,water_prev:waterPrev,water_used:waterUsed,total_cm:storage.totalCm,total_m3:storage.totalM3,external_m3:storage.externalM3,storage_mode:storage.mode,storage_display:storage.mainDisplay,external_display:storage.externalDisplay,is_over:storage.over,guideline_text:guidelineText,generated_text:isHoliday?'휴일':(isMissing?'미입력':(generated===null?'Unverified':`${formatNum(generated,2)} m³`)),pickup,is_display_holiday:isHoliday,is_missing_day:isMissing};
   });
-
-  const totalEntrusted = pickupRows
-    .filter(p => (p.pickup_type || '폐수') === '폐수')
-    .reduce((s, p) => s + Number(p.entrusted_amount || 0), 0);
-
-  return {
-    enrichedDaily: enriched,
-    totalWaterUse,
-    totalEntrusted,
-    overCount,
-    latestStatus,
-    latestStatusClass,
-    latest: enriched.length ? enriched[enriched.length - 1] : null
-  };
+  const totalEntrusted=pickupRows.filter(p=>(p.pickup_type||'폐수')==='폐수').reduce((s,p)=>s+Number(p.entrusted_amount||0),0);
+  return {enrichedDaily:enriched,totalWaterUse,totalEntrusted,overCount,latestStatus,latestStatusClass,latest:enriched.length?enriched[enriched.length-1]:null};
 }
 
 function getClosedYearMonths(year){
@@ -1445,7 +1409,7 @@ function getClosedYearMonths(year){
   return months;
 }
 
-function getMonthlyReportData(monthKey){const stats=getDerivedStats(); const ledgerRows=[...stats.enrichedDaily].filter(r=>monthKeyFromDate(r.date)===monthKey).sort((a,b)=>String(a.date).localeCompare(String(b.date))); const pickupMonthRows=[...pickupRows].filter(r=>monthKeyFromDate(r.pickup_date)===monthKey).sort((a,b)=>String(a.pickup_date).localeCompare(String(b.pickup_date))); const wastewaterRows=pickupMonthRows.filter(r=>(r.pickup_type||'폐수')==='폐수'); const wasteRows=pickupMonthRows.filter(r=>(r.pickup_type||'폐수')==='폐기물'); const totalWaterUse=round2(ledgerRows.reduce((s,r)=>s+safeNumber(r.water_used),0)); const totalEntrusted=round2(wastewaterRows.reduce((s,r)=>s+safeNumber(r.entrusted_amount),0)); const overRows=ledgerRows.filter(r=>safeNumber(r.total_cm)>CM_LIMIT); const maxHeight=ledgerRows.length?Math.max(...ledgerRows.map(r=>safeNumber(r.total_cm))):0; const externalCount=ledgerRows.filter(r=>!!r.has_external).length; const wasteCounts=summarizeWasteCounts(wasteRows); const approval=getApprovalRow(monthKey); return {monthKey,monthLabel:formatMonthLabel(monthKey),ledgerRows,pickupMonthRows,wastewaterRows,wasteRows,totalWaterUse,totalEntrusted,overRows,overCount:overRows.length,maxHeight,externalCount,wasteCounts,wastewaterPickupCount:wastewaterRows.length,wastePickupCount:wasteRows.length,approval};}
+function getMonthlyReportData(monthKey){const stats=getDerivedStats(); const ledgerRows=[...stats.enrichedDaily].filter(r=>monthKeyFromDate(r.date)===monthKey).sort((a,b)=>String(a.date).localeCompare(String(b.date))); const pickupMonthRows=[...pickupRows].filter(r=>monthKeyFromDate(r.pickup_date)===monthKey).sort((a,b)=>String(a.pickup_date).localeCompare(String(b.pickup_date))); const wastewaterRows=pickupMonthRows.filter(r=>(r.pickup_type||'폐수')==='폐수'); const wasteRows=pickupMonthRows.filter(r=>(r.pickup_type||'폐수')==='폐기물'); const totalWaterUse=round2(ledgerRows.reduce((s,r)=>s+safeNumber(r.water_used),0)); const totalEntrusted=round2(wastewaterRows.reduce((s,r)=>s+safeNumber(r.entrusted_amount),0)); const overRows=ledgerRows.filter(r=>r.is_over); const maxHeight=facilityMode()==='height'&&ledgerRows.length?Math.max(...ledgerRows.map(r=>safeNumber(r.total_cm))):0; const externalCount=ledgerRows.filter(r=>!!r.has_external).length; const wasteCounts=summarizeWasteCounts(wasteRows); const approval=getApprovalRow(monthKey); return {monthKey,monthLabel:formatMonthLabel(monthKey),ledgerRows,pickupMonthRows,wastewaterRows,wasteRows,totalWaterUse,totalEntrusted,overRows,overCount:overRows.length,maxHeight,externalCount,wasteCounts,wastewaterPickupCount:wastewaterRows.length,wastePickupCount:wasteRows.length,approval};}
 function getYearlyReportData(year){
   const stats=getDerivedStats();
   const closedMonths=getClosedYearMonths(year);
@@ -1550,74 +1514,15 @@ function formatCertificateMultiline(text){
 }
 
 function renderLedgerRows(rows){
-  const sorted = [...rows].sort(
-    (a,b)=>
-      String(b.date||'').localeCompare(String(a.date||'')) ||
-      String(b.created_at||'').localeCompare(String(a.created_at||''))
-  );
-
-  if(!sorted.length){
-    return `<tr><td colspan="12">운영일지 데이터가 없습니다.</td></tr>`;
-  }
-
+  const sorted=[...rows].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.created_at||'').localeCompare(String(a.created_at||'')));
+  if(!sorted.length)return `<tr><td colspan="12">운영일지 데이터가 없습니다.</td></tr>`;
   return sorted.map(row=>{
-    const contractorHtml = formatContractorMultiline(row.pickup?.contractor);
-    const certificateHtml = formatCertificateMultiline(row.pickup?.certificate_no);
-
-    if(row.is_display_holiday){
-      return `<tr>
-        <td>${escapeHtml(row.date)}</td>
-        <td class="num">휴일</td>
-        <td class="num">휴일</td>
-        <td class="num">휴일</td>
-        <td>-</td>
-        <td>휴일</td>
-        <td>휴일</td>
-        <td>${contractorHtml}</td>
-        <td>${certificateHtml}</td>
-        <td class="col-pickup">-</td>
-        <td class="col-note">${escapeHtml(row.final_holiday_reason||row.holiday_reason||row.note||'휴일')}</td>
-        <td>${row.id && canDelete() ? `<button class="small-btn danger" onclick="deleteDailyRow(${row.id})">삭제</button>` : '-'}</td>
-      </tr>`;
-    }
-
-    if(row.is_missing_day){
-      return `<tr>
-        <td>${escapeHtml(row.date)}</td>
-        <td class="num">-</td>
-        <td class="num">미입력</td>
-        <td class="num">-</td>
-        <td>-</td>
-        <td>미입력</td>
-        <td>미입력</td>
-        <td>${contractorHtml}</td>
-        <td>${certificateHtml}</td>
-        <td class="col-pickup">-</td>
-        <td class="col-note">평일 미입력</td>
-        <td>-</td>
-      </tr>`;
-    }
-
-    const rowClass = safeNumber(row.total_cm) > CM_LIMIT ? 'over-row' : '';
-
-    return `<tr class="${rowClass}">
-      <td>${escapeHtml(row.date)}</td>
-      <td class="num">${formatNum(row.usage,2)}</td>
-      <td class="num">${formatNum(row.water_used,2)}</td>
-      <td class="num">${formatNum(row.height,1)} cm</td>
-      <td>${row.has_external ? `${formatNum(row.external_ton||0,1)}T / ${formatNum(row.external_cm,1)}cm` : '-'}</td>
-      <td>${escapeHtml(row.guideline_text)}</td>
-      <td>${escapeHtml(row.generated_text)}</td>
-      <td>${contractorHtml}</td>
-      <td>${certificateHtml}</td>
-      <td class="col-pickup">
-        ${row.pickup
-          ? `위탁 ${formatNum(row.pickup.entrusted_amount,2)}m³<br>후높이 ${escapeHtml(String(row.pickup.after_pickup_cm??'-'))}cm`
-          : '-'}
-      </td>
-      <td class="col-note">${escapeHtml(row.note||'')}</td>
-      <td>${canDelete() ? `<button class="small-btn danger" onclick="deleteDailyRow(${row.id})">삭제</button>` : '-'}</td>
-    </tr>`;
+    const contractorHtml=formatContractorMultiline(row.pickup?.contractor),certificateHtml=formatCertificateMultiline(row.pickup?.certificate_no);
+    if(row.is_display_holiday)return `<tr><td>${escapeHtml(row.date)}</td><td class="num">휴일</td><td class="num">휴일</td><td class="num">휴일</td><td>-</td><td>휴일</td><td>휴일</td><td>${contractorHtml}</td><td>${certificateHtml}</td><td class="col-pickup">-</td><td class="col-note">${escapeHtml(row.final_holiday_reason||row.holiday_reason||row.note||'휴일')}</td><td>${row.id&&canDelete()?`<button class="small-btn danger" onclick="deleteDailyRow(${row.id})">삭제</button>`:'-'}</td></tr>`;
+    if(row.is_missing_day)return `<tr><td>${escapeHtml(row.date)}</td><td class="num">-</td><td class="num">미입력</td><td class="num">-</td><td>-</td><td>미입력</td><td>미입력</td><td>${contractorHtml}</td><td>${certificateHtml}</td><td class="col-pickup">-</td><td class="col-note">평일 미입력</td><td>-</td></tr>`;
+    const rowClass=row.is_over?'over-row':'';
+    const storageCell=row.storage_mode==='volume'&&row.volume_value!==null&&row.volume_value!==undefined?`${formatNum(row.volume_value,(row.volume_unit||facilityVolumeUnit())==='L'?0:2)} ${(row.volume_unit||facilityVolumeUnit())==='L'?'L':'m³'}`:`${formatNum(row.height,1)} cm`;
+    return `<tr class="${rowClass}"><td>${escapeHtml(row.date)}</td><td class="num">${formatNum(row.usage,2)}</td><td class="num">${formatNum(row.water_used,2)}</td><td class="num">${storageCell}</td><td>${escapeHtml(row.external_display||'-')}</td><td>${escapeHtml(row.guideline_text)}</td><td>${escapeHtml(row.generated_text)}</td><td>${contractorHtml}</td><td>${certificateHtml}</td><td class="col-pickup">${row.pickup?`위탁 ${formatNum(row.pickup.entrusted_amount,2)}m³<br>수거후 ${escapeHtml(formatPickupAfter(row.pickup))}`:'-'}</td><td class="col-note">${escapeHtml(row.note||'')}</td><td>${canDelete()?`<button class="small-btn danger" onclick="deleteDailyRow(${row.id})">삭제</button>`:'-'}</td></tr>`;
   }).join('');
 }
 
@@ -2894,7 +2799,7 @@ document.getElementById('app').innerHTML=`<div class="app-shell">
 <div class="tab-panel ${currentTab==='daily'?'active':''}">
 <div class="main-grid">
 <div class="card form-card">
-<div class="section-title">📅 모바일 일일 입력</div>
+<div class="section-title">📅 일일입력</div><div class="msg muted">시설기준: ${facilityMode()==='height'?'높이 기준형':`볼륨 기준형 (${facilityVolumeLabel()})`}</div>
 <div class="field"><label>날짜</label><input id="daily-date" class="input" type="date" oninput="syncWastewaterWeekendInput()" onchange="syncWastewaterWeekendInput()"></div>
 <div class="field"><label>용수 금일 지침 (누적값 m³)</label><input id="daily-usage" class="input" type="number" step="0.01" oninput="updateDailyPreview()"></div>
 <div class="field"><label>폐수높이 (cm)</label><input id="daily-height" class="input" type="number" step="0.1" oninput="updateDailyPreview()"></div>
@@ -2905,8 +2810,7 @@ document.getElementById('app').innerHTML=`<div class="app-shell">
 <div class="field"><label>기타사항</label><textarea id="daily-note" class="textarea"></textarea></div>
 <div class="checkbox-row"><input id="daily-has-external" type="checkbox" onchange="toggleExternalBox(); updateDailyPreview();"><label for="daily-has-external">외부보관 있음</label></div>
 <div id="external-box" style="display:none;">
-<div class="field"><label>외부보관량 (T)</label><input id="daily-external-ton" class="input" type="number" step="0.1" value="1" oninput="updateDailyPreview()"></div>
-<div class="field"><label>환산높이 (cm)</label><input id="daily-external-cm" class="input" type="number" step="0.1" value="22" oninput="updateDailyPreview()"></div>
+${renderDailyExternalInputHtml()}
 </div>
 ${canWrite()?`<button class="btn primary block" onclick="saveDailyRow()">💾 저장 / 수정</button>`:`<div class="msg muted">일반 사용자는 조회만 가능합니다.</div>`}
 <div id="daily-msg" class="msg muted"></div></div>
@@ -2917,11 +2821,11 @@ ${canWrite()?`<button class="btn primary block" onclick="saveDailyRow()">💾 �
 <div class="mini-card"><div class="mini-label">용수 전일 지침</div><div id="pv-water-prev" class="mini-value">${formatNum(latestMeter,2)} m³</div></div>
 <div class="mini-card"><div class="mini-label">용수 금일 지침</div><div id="pv-water-today" class="mini-value">-</div></div>
 <div class="mini-card"><div class="mini-label">당일 용수사용량</div><div id="pv-water-used" class="mini-value">-</div></div>
-<div class="mini-card"><div class="mini-label">외부보관 높이</div><div id="pv-external-cm" class="mini-value">0.0 cm</div></div>
-<div class="mini-card"><div class="mini-label">계산용 총높이</div><div id="pv-total-cm" class="mini-value">-</div></div>
+<div class="mini-card"><div class="mini-label">외부보관</div><div id="pv-external-cm" class="mini-value">-</div></div>
+<div class="mini-card"><div class="mini-label">현재 총 저장량</div><div id="pv-total-cm" class="mini-value">-</div></div>
 <div class="mini-card"><div class="mini-label">금일지침 / 총 발생량</div><div id="pv-guideline" class="mini-value">-</div></div>
 </div>
-<div class="hint-box">용수 G열은 당일 사용량이 아니라 누적 계량기 값입니다. 계산용 총높이가 154 초과면 OVER 154 / Unverified로 표시됩니다.<br>휴일인 경우에는 운영일지에 휴일로 표기되며, 사유를 남길 수 있습니다.</div>
+<div class="hint-box">용수 금일지침은 누적 계량기 값입니다. 저장량 입력형식은 폐수 설정의 시설기준에 따라 자동 변경됩니다. 시설 한계를 초과하면 Unverified로 표시됩니다.<br>휴일인 경우에는 운영일지에 휴일로 표기되며, 직전 실제 계측값을 유지합니다.</div>
 </div>
 </div></div>
 
@@ -2932,8 +2836,8 @@ ${canWrite()?`<button class="btn primary block" onclick="saveDailyRow()">💾 �
 <div class="field"><label>구분</label><div class="form-chip-row"><button type="button" id="type-btn-water" class="type-chip wastewater active" onclick="setPickupType('폐수')">폐수</button><button type="button" id="type-btn-waste" class="type-chip waste" onclick="setPickupType('폐기물')">폐기물</button></div><input id="pickup-type" type="hidden" value="폐수"></div>
 <div class="field"><label>수거일</label><input id="pickup-date" class="input" type="date"></div>
 <div class="field"><label>확인서 일련번호</label><input id="pickup-cert" class="input"></div>
-<div class="field"><label>처리업소</label><input id="pickup-contractor" class="input"></div>
-<div id="pickup-wastewater-box" class="type-box wastewater"><div class="type-box-title">폐수 선택 시 입력 항목</div><div class="field"><label>위탁량 (m³)</label><input id="pickup-amount" class="input" type="number" step="0.01"></div><div class="field"><label>수거 후 높이 (괄호값, cm)</label><input id="pickup-after-cm" class="input" type="text" placeholder="예: 0.0 또는 over 154"></div></div>
+<div class="field"><label>처리업소</label><select id="pickup-contractor" class="select"><option value="">선택</option>${wastewaterVendors.filter(v=>v.active!==false).map(v=>`<option value="${escapeHtml(v.vendor_name||'')}">${escapeHtml(v.vendor_name||'')}</option>`).join('')}</select></div>
+<div id="pickup-wastewater-box" class="type-box wastewater"><div class="type-box-title">폐수 선택 시 입력 항목</div><div class="field"><label>위탁량 (m³)</label><input id="pickup-amount" class="input" type="number" step="0.01"></div>${facilityMode()==='height'?`<div class="field"><label>수거 후 높이 (cm)</label><input id="pickup-after-cm" class="input" type="number" step="0.1"></div>`:`<div class="field"><label>수거 후 폐수량 (${facilityVolumeLabel()})</label><input id="pickup-after-volume" class="input" type="number" step="${facilityVolumeUnit()==='L'?'1':'0.01'}"></div>`}</div>
 <div id="pickup-waste-box" class="type-box waste" style="display:none;"><div class="type-box-title">폐기물 선택 시 입력 항목</div><div class="field"><label>폐알칼리 (개수)</label><input id="waste-alkali-count" class="input" type="number" min="0" value="0"></div><div class="field"><label>폐산 (개수)</label><input id="waste-acid-count" class="input" type="number" min="0" value="0"></div><div class="field"><label>폐유기용제 (고상, 개수)</label><input id="waste-organic-solid-count" class="input" type="number" min="0" value="0"></div><div class="field"><label>폐유기용제 (폐시약병, 개수)</label><input id="waste-organic-bottle-count" class="input" type="number" min="0" value="0"></div></div>
 <div class="field"><label>비고</label><textarea id="pickup-note" class="textarea"></textarea></div>
 ${canWrite()?`<button class="btn primary block" onclick="savePickupRow()">💾 수거 등록 저장</button>`:`<div class="msg muted">일반 사용자는 조회만 가능합니다.</div>`}
@@ -2973,7 +2877,7 @@ ${canWrite()?`<button class="btn primary block" onclick="savePickupRow()">💾 �
         <th>날짜</th>
         <th>용수 금일</th>
         <th>당일 사용량</th>
-        <th>저장고 높이</th>
+        <th>${facilityMode()==='height'?'저장고 높이':'현재 폐수량'}</th>
         <th>외부보관</th>
         <th>금일지침</th>
         <th>총 발생량</th>
@@ -3016,14 +2920,38 @@ function setPickupType(type){const hidden=document.getElementById('pickup-type')
 function togglePickupType(){const type=document.getElementById('pickup-type')?.value||'폐수'; const waterBox=document.getElementById('pickup-wastewater-box'); const wasteBox=document.getElementById('pickup-waste-box'); const waterBtn=document.getElementById('type-btn-water'); const wasteBtn=document.getElementById('type-btn-waste'); if(waterBox) waterBox.style.display=type==='폐수'?'block':'none'; if(wasteBox) wasteBox.style.display=type==='폐기물'?'block':'none'; if(waterBtn) waterBtn.className=`type-chip wastewater ${type==='폐수'?'active':''}`; if(wasteBtn) wasteBtn.className=`type-chip waste ${type==='폐기물'?'active':''}`;}
 function toggleExternalBox(){const checked=document.getElementById('daily-has-external')?.checked; const box=document.getElementById('external-box'); if(box) box.style.display=checked?'block':'none';}
 function toggleHolidayBox(){const checked=document.getElementById('daily-is-holiday')?.checked; const box=document.getElementById('holiday-box'); if(box) box.style.display=checked?'block':'none';}
-function updateDailyPreview(){const isHoliday=!!document.getElementById('daily-is-holiday')?.checked; const hasExternal=!!document.getElementById('daily-has-external')?.checked; toggleHolidayBox(); toggleExternalBox(); const latestMeter=(()=>{const stats=getDerivedStats(); return stats.latest?Number(stats.latest.usage||0):0;})(); const meter=Number(document.getElementById('daily-usage')?.value||0); const height=Number(document.getElementById('daily-height')?.value||0); const extTon=Number(document.getElementById('daily-external-ton')?.value||0); const extCm=hasExternal?Number(document.getElementById('daily-external-cm')?.value||(extTon*TON_TO_CM)):0; const totalCm=round2(height+extCm); const waterUsed=meter?round2(meter-latestMeter):null; const latest=getDerivedStats().latest; const prevGuideline=latest?.pickup?.after_pickup_cm!=null?cmToM3(Number(latest.pickup.after_pickup_cm)):(latest?(latest.total_cm>CM_LIMIT?0:cmToM3(latest.total_cm)):0); const guideline=isHoliday?'휴일':(meter||height?getTodayGuidelineText(totalCm):'-'); const generated=isHoliday?'휴일':((meter||height)?(totalCm>CM_LIMIT?'Unverified':`${formatNum(round2(cmToM3(totalCm)-prevGuideline),2)} m³`):'-'); setText('pv-water-prev',`${formatNum(latestMeter,2)} m³`); setText('pv-water-today',isHoliday?'휴일':(meter?`${formatNum(meter,2)} m³`:'-')); setText('pv-water-used',isHoliday?'휴일':(waterUsed===null?'-':`${formatNum(waterUsed,2)} m³`)); setText('pv-external-cm',isHoliday?'휴일':`${formatNum(extCm,1)} cm`); setText('pv-total-cm',isHoliday?'휴일':(totalCm?`${formatNum(totalCm,1)} cm`:'-')); setText('pv-guideline',`${guideline} / ${generated}`);}
+function updateDailyPreview(){
+  const isHoliday=!!document.getElementById('daily-is-holiday')?.checked,hasExternal=!!document.getElementById('daily-has-external')?.checked;toggleHolidayBox();toggleExternalBox();
+  const stats=getDerivedStats(),latest=stats.latest,latestMeter=latest?Number(latest.usage||0):Number(openingSeed()?.prev_usage||0),meter=Number(document.getElementById('daily-usage')?.value||0),waterUsed=meter?round2(meter-latestMeter):null;
+  let info;
+  if(facilityMode()==='height'){
+    const height=Number(document.getElementById('daily-height')?.value||0),ext=hasExternal?Number(document.getElementById('daily-external-cm')?.value||0):0,totalCm=round2(height+ext);info={mode:'height',totalCm,totalM3:cmToM3(totalCm),externalM3:cmToM3(ext),over:totalCm>facilityHeight()};
+  }else{
+    const val=Number(document.getElementById('daily-volume')?.value||0),ext=hasExternal?Number(document.getElementById('daily-external-volume')?.value||0):0,totalM3=round2(valueToM3(val,facilityVolumeUnit())+valueToM3(ext,facilityVolumeUnit()));info={mode:'volume',totalM3,externalM3:valueToM3(ext,facilityVolumeUnit()),over:totalM3>facilityCapacity()};
+  }
+  const prevGuideline=latest?Number(latest.pickup?pickupAfterStorageM3(latest.pickup)??latest.total_m3:latest.total_m3):round2(Number(openingSeed()?.storage_m3||0)+Number(openingSeed()?.external_m3||0));
+  const guideline=isHoliday?'휴일':((meter||info.totalM3)?getTodayGuidelineFromStorage(info):'-');const generated=isHoliday?'휴일':((meter||info.totalM3)?(info.over?'Unverified':`${formatNum(round2(info.totalM3-prevGuideline),2)} m³`):'-');
+  setText('pv-water-prev',`${formatNum(latestMeter,2)} m³`);setText('pv-water-today',isHoliday?'휴일':(meter?`${formatNum(meter,2)} m³`:'-'));setText('pv-water-used',isHoliday?'휴일':(waterUsed===null?'-':`${formatNum(waterUsed,2)} m³`));
+  setText('pv-external-cm',isHoliday?'휴일':(facilityMode()==='height'?`${formatNum((hasExternal?Number(document.getElementById('daily-external-cm')?.value||0):0),1)} cm`:`${formatNum((hasExternal?Number(document.getElementById('daily-external-volume')?.value||0):0),facilityVolumeUnit()==='L'?0:2)} ${facilityVolumeLabel()}`));
+  setText('pv-total-cm',isHoliday?'휴일':(facilityMode()==='height'?`${formatNum(info.totalCm,1)} cm / ${formatNum(info.totalM3,2)} m³`:`${formatNum(m3ToFacilityVolume(info.totalM3),facilityVolumeUnit()==='L'?0:2)} ${facilityVolumeLabel()} / ${formatNum(info.totalM3,2)} m³`));setText('pv-guideline',`${guideline} / ${generated}`);
+}
 function setText(id,value){const el=document.getElementById(id); if(el) el.textContent=value;}
 function showMessage(id,message,cls){const el=document.getElementById(id); if(!el) return; el.className=`msg ${cls}`; el.textContent=message||'';}
 
-async function saveDailyRow(){if(!canWrite()) return renderApp('저장 권한이 없습니다.','err'); const date=document.getElementById('daily-date').value; const weekend=wastewaterWeekendInfo(date); const isHoliday=weekend.isWeekend||document.getElementById('daily-is-holiday').checked; const holidayReason=weekend.reason||document.getElementById('daily-holiday-reason').value.trim(); const usage=document.getElementById('daily-usage').value; const height=document.getElementById('daily-height').value; const note=document.getElementById('daily-note').value; const hasExternal=document.getElementById('daily-has-external').checked; const externalTon=document.getElementById('daily-external-ton').value||0; const externalCm=document.getElementById('daily-external-cm').value||0; if(!date) return renderApp('날짜는 필수입니다.','err'); if(isHoliday && !holidayReason) return renderApp('휴일 사유를 입력하세요.','err'); if(!isHoliday && (usage===''||height==='')) return renderApp('날짜, 용수, 높이는 필수입니다.','err'); const monthKey=monthKeyFromDate(date); if(isMonthLocked(monthKey)) return renderApp(`${monthKey}은(는) 검토 완료되어 입력할 수 없습니다.`,'err'); const payload={date,usage:isHoliday?0:parseFloat(usage),height:isHoliday?0:parseFloat(height),note,has_external:isHoliday?false:hasExternal,external_ton:isHoliday?0:parseFloat(externalTon||0),external_cm:isHoliday?0:parseFloat(externalCm||0),is_holiday:isHoliday,holiday_reason:isHoliday?holidayReason:null}; const {data,error}=await api.insertDailyRow(payload); if(error) return renderApp('일일 입력 저장 실패: '+error.message,'err'); await logActivity('save','daily',data?.id,{date,isHoliday,holidayReason}); clearDailyForm(); await loadAll('일일 입력 저장 완료','ok');}
-function clearDailyForm(){['daily-date','daily-usage','daily-height','daily-note','daily-external-ton','daily-external-cm','daily-holiday-reason'].forEach(id=>{const el=document.getElementById(id); if(!el) return; if(id==='daily-external-ton') el.value='1'; else if(id==='daily-external-cm') el.value='22'; else el.value='';}); const chk=document.getElementById('daily-has-external'); if(chk) chk.checked=false; const holidayChk=document.getElementById('daily-is-holiday'); if(holidayChk) holidayChk.checked=false; toggleHolidayBox(); toggleExternalBox(); updateDailyPreview();}
-async function savePickupRow(){if(!canWrite()) return renderApp('저장 권한이 없습니다.','err'); const pickupType=document.getElementById('pickup-type')?.value||'폐수'; const pickupDate=document.getElementById('pickup-date').value; const certificateNo=document.getElementById('pickup-cert').value; const contractor=document.getElementById('pickup-contractor').value; const note=document.getElementById('pickup-note').value; if(!pickupDate) return renderApp('수거일은 필수입니다.','err'); const monthKey=monthKeyFromDate(pickupDate); if(isMonthLocked(monthKey)) return renderApp(`${monthKey}은(는) 검토 완료되어 수거 등록할 수 없습니다.`,'err'); const payload={pickup_date:pickupDate,pickup_type:pickupType,certificate_no:certificateNo,contractor,note}; if(pickupType==='폐수'){const entrustedAmount=document.getElementById('pickup-amount').value; const afterRaw=document.getElementById('pickup-after-cm').value.trim(); if(entrustedAmount==='') return renderApp('폐수는 위탁량이 필수입니다.','err'); payload.entrusted_amount=parseFloat(entrustedAmount); if(afterRaw==='') payload.after_pickup_cm=null; else {const normalized=afterRaw.toLowerCase().replace(/\s+/g,''); if(normalized.startsWith('over')) payload.after_pickup_cm=CM_LIMIT; else {const parsed=Number(afterRaw); if(Number.isNaN(parsed)) return renderApp('수거 후 높이는 숫자 또는 over 154 형식으로 입력하세요.','err'); payload.after_pickup_cm=parsed;}} payload.waste_alkali_count=0; payload.waste_acid_count=0; payload.waste_organic_solid_count=0; payload.waste_organic_bottle_count=0;} else {payload.entrusted_amount=null; payload.after_pickup_cm=null; payload.waste_alkali_count=parseInt(document.getElementById('waste-alkali-count').value||0,10); payload.waste_acid_count=parseInt(document.getElementById('waste-acid-count').value||0,10); payload.waste_organic_solid_count=parseInt(document.getElementById('waste-organic-solid-count').value||0,10); payload.waste_organic_bottle_count=parseInt(document.getElementById('waste-organic-bottle-count').value||0,10);} const {data,error}=await api.insertPickupRow(payload); if(error) return renderApp('수거 등록 저장 실패: '+error.message,'err'); await logActivity('save','pickup',data?.id,payload); clearPickupForm(); await loadAll('수거 등록 저장 완료','ok');}
-function clearPickupForm(){['pickup-date','pickup-cert','pickup-contractor','pickup-amount','pickup-after-cm','pickup-note','waste-alkali-count','waste-acid-count','waste-organic-solid-count','waste-organic-bottle-count'].forEach(id=>{const el=document.getElementById(id); if(!el) return; if(id.startsWith('waste-')) el.value='0'; else el.value='';}); const typeEl=document.getElementById('pickup-type'); if(typeEl) typeEl.value='폐수'; togglePickupType();}
+async function saveDailyRow(){
+  if(!canWrite())return renderApp('저장 권한이 없습니다.','err');const date=document.getElementById('daily-date').value,weekend=wastewaterWeekendInfo(date),isHoliday=weekend.isWeekend||document.getElementById('daily-is-holiday').checked,holidayReason=weekend.reason||document.getElementById('daily-holiday-reason').value.trim(),usage=document.getElementById('daily-usage').value,note=document.getElementById('daily-note').value,hasExternal=document.getElementById('daily-has-external').checked;
+  if(!date)return renderApp('날짜는 필수입니다.','err');if(isHoliday&&!holidayReason)return renderApp('휴일 사유를 입력하세요.','err');const monthKey=monthKeyFromDate(date);if(isMonthLocked(monthKey))return renderApp(`${monthKey}은(는) 검토 완료되어 입력할 수 없습니다.`,'err');
+  const payload={date,usage:isHoliday?0:parseFloat(usage||0),note,has_external:isHoliday?false:hasExternal,is_holiday:isHoliday,holiday_reason:isHoliday?holidayReason:null,measurement_mode:facilityMode(),volume_unit:facilityVolumeUnit(),external_volume_unit:facilityVolumeUnit()};
+  if(!isHoliday){if(usage==='')return renderApp('용수 금일 지침은 필수입니다.','err');if(facilityMode()==='height'){const height=document.getElementById('daily-height')?.value;if(height==='')return renderApp('폐수높이는 필수입니다.','err');payload.height=parseFloat(height);payload.external_cm=hasExternal?parseFloat(document.getElementById('daily-external-cm')?.value||0):0;payload.external_ton=0;payload.volume_value=null;payload.external_volume_value=null}else{const volume=document.getElementById('daily-volume')?.value;if(volume==='')return renderApp('현재 폐수량은 필수입니다.','err');payload.volume_value=parseFloat(volume);payload.external_volume_value=hasExternal?parseFloat(document.getElementById('daily-external-volume')?.value||0):0;payload.height=0;payload.external_cm=0;payload.external_ton=0}}else{payload.height=0;payload.external_cm=0;payload.external_ton=0;payload.volume_value=0;payload.external_volume_value=0}
+  const {data,error}=await api.insertDailyRow(payload);if(error)return renderApp('일일 입력 저장 실패: '+error.message,'err');await logActivity('save','daily',data?.id,{date,isHoliday,holidayReason,measurement_mode:facilityMode()});clearDailyForm();await loadAll('일일 입력 저장 완료','ok');
+}
+function clearDailyForm(){['daily-date','daily-usage','daily-height','daily-volume','daily-note','daily-external-cm','daily-external-volume','daily-holiday-reason'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=(id==='daily-external-cm'||id==='daily-external-volume')?'0':''});const chk=document.getElementById('daily-has-external');if(chk)chk.checked=false;const holidayChk=document.getElementById('daily-is-holiday');if(holidayChk)holidayChk.checked=false;toggleHolidayBox();toggleExternalBox();updateDailyPreview();}
+async function savePickupRow(){
+  if(!canWrite())return renderApp('저장 권한이 없습니다.','err');const pickupDate=document.getElementById('pickup-date').value,certificateNo=document.getElementById('pickup-cert').value,contractor=document.getElementById('pickup-contractor').value,note=document.getElementById('pickup-note').value;if(!pickupDate)return renderApp('수거일은 필수입니다.','err');const monthKey=monthKeyFromDate(pickupDate);if(isMonthLocked(monthKey))return renderApp(`${monthKey}은(는) 검토 완료되어 수거 등록할 수 없습니다.`,'err');const amount=document.getElementById('pickup-amount').value;if(amount==='')return renderApp('위탁량은 필수입니다.','err');const payload={pickup_date:pickupDate,pickup_type:'폐수',certificate_no:certificateNo,contractor,note,entrusted_amount:parseFloat(amount),waste_alkali_count:0,waste_acid_count:0,waste_organic_solid_count:0,waste_organic_bottle_count:0};
+  if(facilityMode()==='height'){const raw=document.getElementById('pickup-after-cm')?.value||'';payload.after_pickup_cm=raw===''?null:Number(raw);payload.after_pickup_volume_value=null;payload.after_pickup_volume_unit=null}else{const raw=document.getElementById('pickup-after-volume')?.value||'';payload.after_pickup_cm=null;payload.after_pickup_volume_value=raw===''?null:Number(raw);payload.after_pickup_volume_unit=facilityVolumeUnit()}
+  const {data,error}=await api.insertPickupRow(payload);if(error)return renderApp('수거 등록 저장 실패: '+error.message,'err');await logActivity('save','pickup',data?.id,payload);clearPickupForm();await loadAll('수거 등록 저장 완료','ok');
+}
+function clearPickupForm(){['pickup-date','pickup-cert','pickup-contractor','pickup-amount','pickup-after-cm','pickup-after-volume','pickup-note','waste-alkali-count','waste-acid-count','waste-organic-solid-count','waste-organic-bottle-count'].forEach(id=>{const el=document.getElementById(id); if(!el) return; if(id.startsWith('waste-')) el.value='0'; else el.value='';}); const typeEl=document.getElementById('pickup-type'); if(typeEl) typeEl.value='폐수'; togglePickupType();}
 async function deleteDailyRow(id){if(!canDelete()) return renderApp('삭제 권한이 없습니다.','err'); const target=dailyRows.find(r=>r.id===id); if(target&&isMonthLocked(monthKeyFromDate(target.date))) return renderApp(`${monthKeyFromDate(target.date)}은(는) 검토 완료되어 삭제할 수 없습니다.`,'err'); if(!confirm('일일 입력 데이터를 삭제하시겠습니까?')) return; const {error}=await api.deleteDailyRowById(id); if(error) return renderApp('일일 입력 삭제 실패: '+error.message,'err'); await logActivity('delete','daily',id,{}); await loadAll('일일 입력 삭제 완료','ok');}
 async function deletePickupRow(id){if(!canDelete()) return renderApp('삭제 권한이 없습니다.','err'); const target=pickupRows.find(r=>r.id===id); if(target&&isMonthLocked(monthKeyFromDate(target.pickup_date))) return renderApp(`${monthKeyFromDate(target.pickup_date)}은(는) 검토 완료되어 삭제할 수 없습니다.`,'err'); if(!confirm('수거 등록 데이터를 삭제하시겠습니까?')) return; const {error}=await api.deletePickupRowById(id); if(error) return renderApp('수거 등록 삭제 실패: '+error.message,'err'); await logActivity('delete','pickup',id,{}); await loadAll('수거 등록 삭제 완료','ok');}
 
