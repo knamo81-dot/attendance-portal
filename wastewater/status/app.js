@@ -185,23 +185,27 @@ function yearMetrics(year){
   let currentStore=Number(openingSeed()?.storage_m3||0)+Number(openingSeed()?.external_m3||0);
   if(before.length)currentStore=Number(before[before.length-1].closingStore||0);
 
-  let cumGen=0,cumTreat=0;
+  let cumGen=0,cumTreat=0,cumWater=0;
   const months=Array.from({length:12},(_,i)=>{
     const mm=String(i+1).padStart(2,'0');
     const monthRows=yrRows.filter(r=>dateKey(r.date).slice(5,7)===mm);
     const monthPickups=yrPickups.filter(r=>dateKey(r.pickup_date).slice(5,7)===mm);
     const gen=monthRows.reduce((s,r)=>s+Number(r.gen||0),0);
     const treat=monthPickups.reduce((s,r)=>s+Number(r.entrusted_amount||0),0);
+    const waterUsage=monthRows.reduce((s,r)=>s+Number(r.used||0),0);
     cumGen+=gen;
     cumTreat+=treat;
+    cumWater+=waterUsage;
     return {
       month:i+1,
       label:`${i+1}월`,
       gen,
       treat,
+      waterUsage,
       count:monthPickups.length,
       cumGen,
-      cumTreat
+      cumTreat,
+      cumWater
     };
   });
 
@@ -303,26 +307,48 @@ function buildSharedLinePoints(valuesA,valuesB,width,height,padding){
 }
 function cumulativeYearChartHtml(months,year){
   const w=760,h=220,p={left:38,right:12,top:18,bottom:34};
-  const a=months.map(x=>x.cumGen),b=months.map(x=>x.cumTreat);
-  const line=buildSharedLinePoints(a,b,w,h,p);
+  const gen=months.map(x=>Number(x.cumGen||0));
+  const treat=months.map(x=>Number(x.cumTreat||0));
+  const water=months.map(x=>Number(x.cumWater||0));
+
+  const innerW=w-p.left-p.right;
+  const innerH=h-p.top-p.bottom;
+  const max=Math.max(0,...gen,...treat,...water);
+  const xStep=months.length>1?innerW/(months.length-1):0;
+  const y=v=>p.top+innerH-(max<=0?0:(Number(v||0)/max)*innerH);
+
+  const makePoints=values=>values.map((v,i)=>({
+    x:p.left+i*xStep,
+    y:y(v),
+    v:Number(v||0)
+  }));
+  const makePath=pts=>pts.map((pt,i)=>`${i?'L':'M'} ${pt.x} ${pt.y}`).join(' ');
+
+  const genPts=makePoints(gen);
+  const treatPts=makePoints(treat);
+  const waterPts=makePoints(water);
+
   return `<div class="chart-card-body">
     <div class="chart-head-row">
-      <strong class="mini-title">누적 발생량 vs 누적 처리량 (${year}년)</strong>
+      <strong class="mini-title">누적 발생량 vs 누적 처리량 vs 용수사용량 (${year}년)</strong>
       <div class="spacer"></div>
       <div class="chart-legend">
         <span><i class="legend-line gen"></i>발생 누계(m³)</span>
         <span><i class="legend-line col"></i>처리 누계(m³)</span>
+        <span><i class="legend-line water"></i>용수사용 누계(m³)</span>
       </div>
     </div>
     ${axisLabelsHtml('누적량 (m³)')}
-    <div class="line-chart-wrap ${line.max<=0?'is-empty':''}">
-      ${line.max<=0?'<div class="chart-empty-note">데이터가 입력되면 누적 추이가 표시됩니다.</div>':''}
+    <div class="line-chart-wrap ${max<=0?'is-empty':''}">
+      ${max<=0?'<div class="chart-empty-note">데이터가 입력되면 누적 추이가 표시됩니다.</div>':''}
       <svg class="line-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
         <g class="grid">${[0.25,0.5,0.75,1].map(r=>`<line x1="${p.left}" y1="${p.top+(h-p.top-p.bottom)*r}" x2="${w-p.right}" y2="${p.top+(h-p.top-p.bottom)*r}"></line>`).join('')}</g>
-        <path class="line gen" d="${line.pathA}"></path>
-        <path class="line col" d="${line.pathB}"></path>
-        ${line.pts.map(pt=>`<circle class="point gen" cx="${pt.x}" cy="${pt.y}" r="4"></circle>`).join('')}
-        ${line.ptsB.map(pt=>`<circle class="point col" cx="${pt.x}" cy="${pt.y}" r="4"></circle>`).join('')}
+        <path class="line gen" d="${makePath(genPts)}"></path>
+        <path class="line col" d="${makePath(treatPts)}"></path>
+        <path class="line water" d="${makePath(waterPts)}"></path>
+        ${genPts.map(pt=>`<circle class="point gen" cx="${pt.x}" cy="${pt.y}" r="4"><title>발생 누계 ${num(pt.v,2)} m³</title></circle>`).join('')}
+        ${treatPts.map(pt=>`<circle class="point col" cx="${pt.x}" cy="${pt.y}" r="4"><title>처리 누계 ${num(pt.v,2)} m³</title></circle>`).join('')}
+        ${waterPts.map(pt=>`<circle class="point water" cx="${pt.x}" cy="${pt.y}" r="4"><title>용수사용 누계 ${num(pt.v,2)} m³</title></circle>`).join('')}
       </svg>
       <div class="line-chart-labels">${months.map(x=>`<span>${x.label}</span>`).join('')}</div>
     </div>
