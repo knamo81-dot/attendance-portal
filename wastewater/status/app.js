@@ -74,6 +74,7 @@ function derive(){
   const seed=openingSeed();
   let prevMeter=Number(seed?.prev_usage||0);
   let prevStore=Number(seed?.storage_m3||0)+Number(seed?.external_m3||0);
+  let displayStore=prevStore;
   let water=0,generated=0;
   const pickupMap=groupedPickups();
   const rows=[];
@@ -84,7 +85,7 @@ function derive(){
     const used=holiday?0:Math.max(0,meter-prevMeter);
     if(!holiday)prevMeter=meter;
 
-    const st=holiday?{total:prevStore,over:false}:rowStorage(r);
+    const st=holiday?{total:prevStore,main:prevStore,external:0,over:false}:rowStorage(r);
 
     // 운영일지의 '총 발생량' 계산과 동일:
     // 당일 폐수량(금일지침) - 직전 기준 폐수량
@@ -98,16 +99,37 @@ function derive(){
     const after=pickupAfterM3(lastWithAfter);
     const treated=dayPickups.reduce((s,x)=>s+Number(x.entrusted_amount||0),0);
 
-    // 운영일지와 동일하게 수거 후 계측값이 있으면 다음 계산 기준으로 사용.
-    // 수거 후 계측값이 없으면 당일 금일지침(폐수량)을 다음 기준으로 사용.
+    // 운영일지 계산용 기준값은 기존 규칙 유지
     if(!holiday){
       if(after!==null)prevStore=Math.max(0,after);
       else if(!st.over)prevStore=Math.max(0,st.total);
     }
 
-    rows.push({...r,used,store:st.total,gen,storageInfo:st,treated,closingStore:prevStore});
+    // 현황의 '현재용량' 그래프는 수거 후 실제/추정 잔량을 표시
+    if(holiday){
+      // 휴일은 직전 현재용량 유지
+    }else if(after!==null){
+      displayStore=Math.max(0,after);
+    }else if(treated>0 && !st.over){
+      displayStore=Math.max(0,Number(st.total||0)-treated);
+    }else if(!st.over){
+      displayStore=Math.max(0,Number(st.total||0));
+    }
+
+    rows.push({
+      ...r,
+      used,
+      store:st.total,
+      gen,
+      storageInfo:st,
+      treated,
+      closingStore:prevStore,
+      chartStore:displayStore,
+      chartOver:!!st.over,
+      chartExternal:Number(st.external||0)
+    });
   }
-  return {rows,water,generated,currentStore:prevStore};
+  return {rows,water,generated,currentStore:displayStore};
 }
 function availableYears(){
   const ys=new Set([String(new Date().getFullYear())]);
@@ -149,38 +171,52 @@ function yearMetrics(year){
     };
   });
 
-  // 연도 필터만 유지하므로 누적발생량 그래프는 '해당월' 1개만 표시한다.
-  // 현재 연도는 현재월, 과거 연도는 운영일지 데이터가 있는 가장 최근 월을 사용한다.
+  // 연도 필터만 유지하므로 현재용량 그래프는 해당월 1개만 표시한다.
+  // 현재 연도는 현재월, 과거 연도는 운영일지 데이터가 존재하는 가장 최근 월을 사용한다.
   const now=new Date();
   const currentYear=String(now.getFullYear());
+  const today=todayKey();
   let focusMonth=year===currentYear ? now.getMonth()+1 : 0;
+
   if(year!==currentYear){
     const monthsWithData=yrRows
       .map(r=>Number(dateKey(r.date).slice(5,7)))
       .filter(m=>m>=1&&m<=12);
     focusMonth=monthsWithData.length?Math.max(...monthsWithData):12;
   }
-  const focusDays=new Date(Number(year),focusMonth,0).getDate();
-  const perDay=Array.from({length:focusDays},()=>0);
-  yrRows.filter(r=>Number(dateKey(r.date).slice(5,7))===focusMonth).forEach(r=>{
-    const day=Number(dateKey(r.date).slice(8,10));
-    if(day>=1&&day<=focusDays && r.gen!==null && r.gen!==undefined){
-      perDay[day-1]+=Number(r.gen||0);
-    }
-  });
-  let running=0;
-  const cumulative=perDay.map(v=>{
-    running=Math.round((running+Number(v||0)+Number.EPSILON)*100)/100;
-    return running;
-  });
+
+  let focusRows=yrRows
+    .filter(r=>Number(dateKey(r.date).slice(5,7))===focusMonth)
+    .sort((a,b)=>dateKey(a.date).localeCompare(dateKey(b.date)));
+
+  // 현재월에서는 오늘 이후 입력값/미래날짜를 그래프에 표시하지 않는다.
+  if(year===currentYear && focusMonth===now.getMonth()+1){
+    focusRows=focusRows.filter(r=>dateKey(r.date)<=today);
+  }
+
+  const focusPoints=focusRows.map(r=>({
+    day:Number(dateKey(r.date).slice(8,10)),
+    date:dateKey(r.date),
+    value:Number(r.chartStore||0),
+    over:!!r.chartOver,
+    external:Number(r.chartExternal||0),
+    treated:Number(r.treated||0)
+  })).filter(p=>p.day>=1);
+
+  const plotEndDay=focusPoints.length?focusPoints[focusPoints.length-1].day:0;
+  const latestPoint=focusPoints.length?focusPoints[focusPoints.length-1]:null;
   const focusMonthData={
     month:focusMonth,
     label:`${focusMonth}월`,
-    days:focusDays,
-    daily:perDay,
-    cumulative,
-    total:running
+    plotEndDay,
+    points:focusPoints,
+    current:Number(latestPoint?.value||0),
+    facilityCapacity:Number(settings?.tank_capacity_m3||0),
+    facilityHeight:Number(settings?.tank_height_cm||0)
   };
+
+  // 현재보관량 KPI도 화면에 표시되는 최신 현재용량 기준으로 통일
+  if(latestPoint) currentStore=Number(latestPoint.value||0);
 
   return {rows:yrRows,pickups:yrPickups,water,generated,treated,currentStore,months,focusMonthData};
 }
@@ -274,52 +310,73 @@ function collectionCountChartHtml(months,year){
     </div>
   </div>`;
 }
-function monthlyLedgerCumulativeChartHtml(data,year){
-  const values=data?.cumulative||[];
-  const daily=data?.daily||[];
-  const days=Number(data?.days||values.length||31);
+function monthlyCurrentStorageChartHtml(data,year){
+  const points=data?.points||[];
   const month=Number(data?.month||1);
-  const w=760,h=230,p={left:44,right:14,top:22,bottom:38};
+  const endDay=Math.max(1,Number(data?.plotEndDay||1));
+  const capacity=Math.max(0,Number(data?.facilityCapacity||0));
+  const facilityHeight=Number(data?.facilityHeight||0);
+  const current=Number(data?.current||0);
+
+  const w=760,h=230,p={left:44,right:18,top:24,bottom:38};
   const innerW=w-p.left-p.right,innerH=h-p.top-p.bottom;
+  const maxValue=Math.max(capacity,...points.map(x=>Number(x.value||0)),1);
+  const yMax=Math.max(1,maxValue*1.16);
+  const x=day=>p.left+(endDay<=1?0:((day-1)/(endDay-1))*innerW);
+  const y=v=>p.top+innerH-(Math.max(0,Number(v||0))/yMax)*innerH;
 
-  const allValues=values.length?values:[0];
-  const min=Math.min(0,...allValues);
-  const max=Math.max(0,...allValues);
-  const span=Math.max(1,max-min);
-  const x=i=>p.left+(days<=1?0:(i/(days-1))*innerW);
-  const y=v=>p.top+innerH-((Number(v||0)-min)/span)*innerH;
-
-  const points=values.map((v,i)=>({x:x(i),y:y(v),v}));
-  const path=points.map((pt,i)=>`${i?'L':'M'} ${pt.x} ${pt.y}`).join(' ');
-  const tickDays=[1,5,10,15,20,25,days].filter((v,i,a)=>v<=days&&a.indexOf(v)===i);
+  const path=points.map((pt,i)=>`${i?'L':'M'} ${x(pt.day)} ${y(pt.value)}`).join(' ');
+  const tickCandidates=[1,5,10,15,20,25,endDay];
+  const tickDays=tickCandidates.filter((v,i,a)=>v<=endDay&&a.indexOf(v)===i).sort((a,b)=>a-b);
 
   const grid=[0,.25,.5,.75,1].map(r=>{
     const yy=p.top+innerH*r;
     return `<line x1="${p.left}" y1="${yy}" x2="${w-p.right}" y2="${yy}" class="month-ledger-grid"></line>`;
   }).join('');
 
-  const ticks=tickDays.map(d=>`<text x="${x(d-1)}" y="${h-12}" text-anchor="middle" class="month-ledger-tick">${d}일</text>`).join('');
-  const pointHtml=points.map((pt,i)=>{
-    const day=i+1;
-    const title=`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')} / 당일 발생 ${num(daily[i]||0,2)} m³ / 누적 ${num(pt.v,2)} m³`;
-    return `<circle cx="${pt.x}" cy="${pt.y}" r="3.6" class="month-ledger-point"><title>${title}</title></circle>`;
+  const ticks=tickDays.map(d=>`<text x="${x(d)}" y="${h-12}" text-anchor="middle" class="month-ledger-tick">${d}일</text>`).join('');
+
+  const capacityLine=capacity>0?`
+    <line x1="${p.left}" y1="${y(capacity)}" x2="${w-p.right}" y2="${y(capacity)}" class="storage-capacity-line"></line>
+    <text x="${w-p.right-2}" y="${Math.max(12,y(capacity)-5)}" text-anchor="end" class="storage-capacity-label">저장고 ${num(capacity,2)} m³${facilityHeight?` (${num(facilityHeight,0)}cm)`:''}</text>
+  `:'';
+
+  const pointHtml=points.map(pt=>{
+    const isOver=!!pt.over;
+    const hasExternal=Number(pt.external||0)>0;
+    const classes=`month-ledger-point storage-point${isOver?' invalid':''}${hasExternal?' external':''}`;
+    const title=[
+      pt.date,
+      `현재용량 ${num(pt.value,2)} m³`,
+      pt.treated>0?`수거 ${num(pt.treated,2)} m³`:'',
+      hasExternal?`외부보관 ${num(pt.external,2)} m³ 포함`:'',
+      isOver?'저장고 본체 기준 초과 - 확인 필요':''
+    ].filter(Boolean).join(' / ');
+    return `<circle cx="${x(pt.day)}" cy="${y(pt.value)}" r="${isOver?4.8:4}" class="${classes}"><title>${title}</title></circle>`;
   }).join('');
+
+  const hasInvalid=points.some(pt=>pt.over);
 
   return `<div class="chart-card-body">
     <div class="chart-head-row">
-      <strong class="mini-title">폐수 누적발생량 (${year}년 ${month}월)</strong>
+      <strong class="mini-title">폐수 현재용량 (${year}년 ${month}월)</strong>
       <div class="spacer"></div>
-      <span class="hint">운영일지 '총 발생량' 기준</span>
+      <span class="hint">운영일지 계측값 · 수거 후 잔량 반영</span>
     </div>
     <div class="current-month-summary">
-      <span>당월 누적</span><strong>${num(data?.total||0,2)} m³</strong>
+      <span>현재용량</span><strong>${num(current,2)} m³</strong>
     </div>
-    <div class="month-ledger-line-wrap ${max===0&&min===0?'is-empty':''}">
-      ${max===0&&min===0?'<div class="chart-empty-note">해당월 운영일지 발생량이 입력되면 표시됩니다.</div>':''}
+    <div class="storage-chart-note">
+      <span class="capacity-key"></span>점선: 저장고 본체 최대용량
+      <span class="external-key"></span>외부보관 포함 총량은 점선 초과 가능
+      ${hasInvalid?'<span class="invalid-key"></span>빨간 점: 저장고 본체 자체가 시설기준 초과':''}
+    </div>
+    <div class="month-ledger-line-wrap ${points.length?'':'is-empty'}">
+      ${points.length?'':'<div class="chart-empty-note">해당월 운영일지 데이터가 입력되면 현재용량이 표시됩니다.</div>'}
       <svg class="month-ledger-line" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
         ${grid}
-        <line x1="${p.left}" y1="${y(0)}" x2="${w-p.right}" y2="${y(0)}" class="month-ledger-zero"></line>
-        <path d="${path}" class="month-ledger-path"></path>
+        ${capacityLine}
+        <path d="${path}" class="month-ledger-path storage-path"></path>
         ${pointHtml}
         ${ticks}
       </svg>
@@ -385,7 +442,7 @@ function renderStatus(){
 
     <div class="dashboard-charts preview-grid status-top">
       <div class="card chart-card large">${monthlyTrendChartHtml(metrics.months,statusYear)}</div>
-      <div class="card chart-card side">${monthlyLedgerCumulativeChartHtml(metrics.focusMonthData,statusYear)}</div>
+      <div class="card chart-card side">${monthlyCurrentStorageChartHtml(metrics.focusMonthData,statusYear)}</div>
     </div>
 
     <div class="dashboard-charts preview-grid bottom">
