@@ -102,25 +102,49 @@ function stateName(r){
   return '';
 }
 
-const CM_LIMIT=154;
-const TON_TO_CM=22;
-const MAX_TON_M3=7;
+const DEFAULT_FACILITY_HEIGHT_CM=154;
+const DEFAULT_FACILITY_CAPACITY_M3=7;
+const DEFAULT_TON_TO_CM=22;
+
+let wastewaterSettings={
+  measurement_mode:'height',
+  tank_height_cm:DEFAULT_FACILITY_HEIGHT_CM,
+  tank_capacity_m3:DEFAULT_FACILITY_CAPACITY_M3,
+  ton_to_cm:DEFAULT_TON_TO_CM
+};
+
+function facilityHeight(){
+  const v=Number(wastewaterSettings?.tank_height_cm||DEFAULT_FACILITY_HEIGHT_CM);
+  return v>0?v:DEFAULT_FACILITY_HEIGHT_CM;
+}
+
+function facilityCapacity(){
+  const v=Number(wastewaterSettings?.tank_capacity_m3||DEFAULT_FACILITY_CAPACITY_M3);
+  return v>0?v:DEFAULT_FACILITY_CAPACITY_M3;
+}
+
+function facilityTonToCm(){
+  const v=Number(wastewaterSettings?.ton_to_cm||DEFAULT_TON_TO_CM);
+  return v>0?v:DEFAULT_TON_TO_CM;
+}
 
 function cmToM3(cm){
-  return round2((Number(cm||0)/CM_LIMIT)*MAX_TON_M3);
+  return round2((Number(cm||0)/facilityHeight())*facilityCapacity());
 }
 
 function parseAfterCm(value){
   const raw=String(value??'').trim();
   if(!raw) return null;
   const normalized=raw.toLowerCase().replace(/\s+/g,'');
-  if(normalized.startsWith('over')) return CM_LIMIT;
+  if(normalized.startsWith('over')) return null;
   const n=Number(raw);
   return Number.isFinite(n)?n:null;
 }
 
-function guidelineText(totalCm){
-  return totalCm>CM_LIMIT ? `OVER ${CM_LIMIT}` : `${num(cmToM3(totalCm),2)} m³`;
+function guidelineText(totalCm,mainCm=totalCm){
+  return Number(mainCm)>facilityHeight()
+    ? `OVER ${num(facilityHeight(),0)}`
+    : `${num(cmToM3(totalCm),2)} m³`;
 }
 
 const today=new Date();
@@ -139,7 +163,7 @@ let approvals=[];
 let authUser=null;
 
 async function load(){
-  const [t,d,o,c,f,s,a]=await Promise.all([
+  const [t,d,o,c,f,s,a,ww]=await Promise.all([
     A.list('waste_types','*','sort_order',true),
     A.list('waste_daily_entries','*,waste_types(*)','entry_date',true),
     A.list('waste_opening_balances','*,waste_types(*)','balance_date',true),
@@ -156,7 +180,8 @@ async function load(){
       true
     ),
     A.list('user_app_roles','*','created_at',true),
-    A.list('waste_ledger_approvals','*','approval_year',false)
+    A.list('waste_ledger_approvals','*','approval_year',false),
+    A.list('wastewater_settings','*',null,true)
   ]);
 
   types=(t.data||[]).filter(x=>x.active);
@@ -166,6 +191,12 @@ async function load(){
   facilityDaily=f.data||[];
   approvalRoles=(s.data||[]).filter(x=>x.is_active!==false && String(x.app_key||'').toLowerCase()==='waste');
   approvals=a.data||[];
+
+  const wwRow=(ww.data||[])[0]||{};
+  wastewaterSettings={
+    ...wastewaterSettings,
+    ...wwRow
+  };
 
   try{
     const u=await A.sb.auth.getUser();
@@ -545,18 +576,21 @@ function facilityOpeningRowsForType(wasteTypeId){
 }
 
 function facilityOpeningState(row){
-  if(!row)return {prevUsage:0,prevGuideline:0,totalCm:0};
+  if(!row)return {prevUsage:0,prevGuideline:0,totalCm:0,mainCm:0,isOver:false};
 
   const h=Number(row.facility_height_cm||0);
   const ext=row.facility_has_external===true
-    ? Number(row.facility_external_cm || (Number(row.facility_external_ton||0)*TON_TO_CM))
+    ? Number(row.facility_external_cm || (Number(row.facility_external_ton||0)*facilityTonToCm()))
     : 0;
   const total=Math.max(0,round2(h+ext));
+  const isOver=h>facilityHeight();
 
   return {
     prevUsage:Number(row.facility_prev_usage||0),
-    prevGuideline:total>CM_LIMIT ? 0 : cmToM3(total),
-    totalCm:total
+    prevGuideline:isOver ? 0 : cmToM3(total),
+    totalCm:total,
+    mainCm:h,
+    isOver
   };
 }
 
@@ -662,19 +696,26 @@ function buildFacilityDerived(){
         ? 0
         : (hasMeter ? round2(meter-prevMeter) : null);
 
+      const mainCm=isHoliday ? 0 : Number(row.height||0);
+
       const externalCm=isHoliday
         ? 0
         : (row.has_external
-            ? Number(row.external_cm || (Number(row.external_ton||0)*TON_TO_CM))
+            ? Number(row.external_cm || (Number(row.external_ton||0)*facilityTonToCm()))
             : 0);
 
       const totalCm=isHoliday
         ? 0
-        : round2(Number(row.height||0)+externalCm);
+        : round2(mainCm+externalCm);
+
+      // 폐수 프로그램 운영일지와 동일한 기준:
+      // 저장고 본체 자체가 시설기준 높이를 초과할 때만 OVER.
+      // 외부보관을 포함한 총 폐수량은 저장고 최대용량을 넘어도 정상 계산.
+      const isOver=!isHoliday && mainCm>facilityHeight();
 
       const guidelineValue=isHoliday
         ? prevGuideline
-        : (hasMeter ? (totalCm>CM_LIMIT ? null : cmToM3(totalCm)) : prevGuideline);
+        : (hasMeter ? (isOver ? null : cmToM3(totalCm)) : prevGuideline);
 
       const generated=isHoliday
         ? 0
@@ -689,9 +730,12 @@ function buildFacilityDerived(){
         waste_type:row.waste_types||typeById(wasteTypeId),
         water_prev:prevMeter,
         water_used:waterUsed,
+        main_cm:mainCm,
         external_cm_calc:externalCm,
         total_cm:totalCm,
-        guideline_text:isHoliday?'휴일':guidelineText(totalCm),
+        total_m3:guidelineValue,
+        is_over:isOver,
+        guideline_text:isHoliday?'휴일':guidelineText(totalCm,mainCm),
         generated_text:isHoliday?'휴일':(generated===null?'Unverified':`${num(generated,2)} m³`),
         pickup
       });
@@ -1393,8 +1437,8 @@ function renderFacility(){
                   <td>
                     ${isHoliday
                       ? '휴일'
-                      : (r.total_cm!=null && r.total_cm>CM_LIMIT
-                          ? `<span class="pill amber">OVER ${CM_LIMIT}</span>`
+                      : (r.is_over
+                          ? `<span class="pill amber">OVER ${num(facilityHeight(),0)}</span>`
                           : esc(r.guideline_text||'-'))}
                   </td>
 
@@ -1435,9 +1479,11 @@ function renderFacility(){
       <br>
 
       <div class="hint">
-        계산 기준은 기존 폐수 운영일지와 동일하게
-        저장고 기준 <b>${CM_LIMIT} cm = ${MAX_TON_M3} m³</b>,
-        외부보관 환산 기본값은 <b>1 T = ${TON_TO_CM} cm</b>를 사용합니다.
+        계산 기준은 <b>폐수 프로그램 &gt; 설정 &gt; 시설기준</b>을 공통으로 사용합니다.
+        현재 저장고 기준은 <b>${num(facilityHeight(),0)} cm = ${num(facilityCapacity(),2)} m³</b>,
+        외부보관 환산값은 <b>1 T = ${num(facilityTonToCm(),1)} cm</b>입니다.
+        외부보관을 포함한 총 폐수량은 저장고 최대용량을 초과할 수 있으며,
+        저장고 본체 높이 자체가 ${num(facilityHeight(),0)} cm를 초과한 경우에만 산정불가로 처리합니다.
         수거 후 높이가 입력된 날은 해당 값을 다음 발생량 계산의 기준으로 사용합니다.
       </div>
     </div>`;
