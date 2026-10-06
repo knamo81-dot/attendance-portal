@@ -815,10 +815,10 @@ function rowStorageInfo(row){
     const main=valueToM3(row.volume_value,row.volume_unit||facilityVolumeUnit());
     const ext=row.has_external?valueToM3(row.external_volume_value||0,row.external_volume_unit||row.volume_unit||facilityVolumeUnit()):0;
     const total=round2(main+ext),limit=facilityCapacity();
-    return {mode:'volume',mainM3:main,externalM3:ext,totalM3:total,over:total>limit,totalCm:null,mainDisplay:`${formatNum(row.volume_value,facilityVolumeUnit()==='L'?0:2)} ${row.volume_unit==='L'?'L':'m³'}`,externalDisplay:row.has_external?`${formatNum(row.external_volume_value||0,(row.external_volume_unit||facilityVolumeUnit())==='L'?0:2)} ${(row.external_volume_unit||facilityVolumeUnit())==='L'?'L':'m³'}`:'-'};
+    return {mode:'volume',mainM3:main,externalM3:ext,totalM3:total,over:main>limit,totalCm:null,mainDisplay:`${formatNum(row.volume_value,facilityVolumeUnit()==='L'?0:2)} ${row.volume_unit==='L'?'L':'m³'}`,externalDisplay:row.has_external?`${formatNum(row.external_volume_value||0,(row.external_volume_unit||facilityVolumeUnit())==='L'?0:2)} ${(row.external_volume_unit||facilityVolumeUnit())==='L'?'L':'m³'}`:'-'};
   }
   const mainCm=Number(row?.height||0),externalCm=row?.has_external?Number(row.external_cm||0):0,totalCm=round2(mainCm+externalCm),totalM3=cmToM3(totalCm);
-  return {mode:'height',mainM3:cmToM3(mainCm),externalM3:cmToM3(externalCm),totalM3,over:totalCm>facilityHeight(),totalCm,mainDisplay:`${formatNum(mainCm,1)} cm`,externalDisplay:row?.has_external?`${formatNum(externalCm,1)} cm`:'-'};
+  return {mode:'height',mainM3:cmToM3(mainCm),externalM3:cmToM3(externalCm),totalM3,over:mainCm>facilityHeight(),totalCm,mainDisplay:`${formatNum(mainCm,1)} cm`,externalDisplay:row?.has_external?`${formatNum(externalCm,1)} cm`:'-'};
 }
 function storageLimitText(){return facilityMode()==='height'?`${formatNum(facilityHeight(),1)} cm`:`${formatNum(m3ToFacilityVolume(facilityCapacity()),facilityVolumeUnit()==='L'?0:2)} ${facilityVolumeLabel()}`;}
 function getTodayGuidelineFromStorage(info){return info.over?`OVER ${storageLimitText()}`:`${formatNum(info.totalM3,2)} m³`;}
@@ -865,7 +865,7 @@ function syncCurrentRole(){
 }
 function hasRole(role){return currentRoles.includes(role);}
 function approvalBadge(approved){return approved===false?`<span class="inline-badge partial">승인대기</span>`:`<span class="inline-badge ok">승인완료</span>`;}
-function getTodayGuidelineText(totalCm){const info={totalM3:cmToM3(totalCm),over:Number(totalCm)>facilityHeight()};return getTodayGuidelineFromStorage(info);}
+function getTodayGuidelineText(totalCm,mainCm=totalCm){const info={totalM3:cmToM3(totalCm),over:Number(mainCm)>facilityHeight()};return getTodayGuidelineFromStorage(info);}
 function canWrite(){return hasRole('wastewater_admin')||hasRole('wastewater_operator');}
 function canDelete(){return hasRole('wastewater_admin')||hasRole('wastewater_operator');}
 function canAdmin(){return hasRole('wastewater_admin');}
@@ -2825,7 +2825,7 @@ ${canWrite()?`<button class="btn primary block" onclick="saveDailyRow()">💾 �
 <div class="mini-card"><div class="mini-label">현재 총 저장량</div><div id="pv-total-cm" class="mini-value">-</div></div>
 <div class="mini-card"><div class="mini-label">금일지침 / 총 발생량</div><div id="pv-guideline" class="mini-value">-</div></div>
 </div>
-<div class="hint-box">용수 금일지침은 누적 계량기 값입니다. 저장량 입력형식은 폐수 설정의 시설기준에 따라 자동 변경됩니다. 시설 한계를 초과하면 Unverified로 표시됩니다.<br>휴일인 경우에는 운영일지에 휴일로 표기되며, 직전 실제 계측값을 유지합니다.</div>
+<div class="hint-box">용수 금일지침은 누적 계량기 값입니다. 저장량 입력형식은 폐수 설정의 시설기준에 따라 자동 변경됩니다. 저장고 자체 입력값이 시설 한계를 초과할 때만 Unverified로 표시됩니다. 외부보관량을 포함한 총량은 저장고 최대용량을 초과할 수 있습니다.<br>휴일인 경우에는 운영일지에 휴일로 표기되며, 직전 실제 계측값을 유지합니다.</div>
 </div>
 </div></div>
 
