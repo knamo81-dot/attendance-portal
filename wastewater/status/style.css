@@ -179,3 +179,16 @@
   letter-spacing:-0.15px;
   white-space:nowrap;
 }
+
+
+/* 누적 그래프 - 용수사용량 선 */
+.legend-line.water{
+  background:#18a6b8;
+}
+.line-chart .line.water{
+  stroke:#18a6b8;
+}
+.line-chart .point.water{
+  fill:#18a6b8;
+}
+
