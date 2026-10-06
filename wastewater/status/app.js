@@ -176,7 +176,8 @@ function yearMetrics(year){
   const yrRows=d.rows.filter(r=>dateKey(r.date).startsWith(year));
   const yrPickups=pickups.filter(r=>(r.pickup_type||'폐수')==='폐수'&&dateKey(r.pickup_date).startsWith(year));
   const water=yrRows.reduce((s,r)=>s+Number(r.used||0),0);
-  const generated=yrRows.reduce((s,r)=>s+Number(r.gen||0),0);
+  const generated=yrRows.reduce((s,r)=>s+(r.gen===null||r.gen===undefined?0:Number(r.gen||0)),0);
+  const unverifiedDays=yrRows.filter(r=>!r.is_holiday && (r.gen===null||r.gen===undefined)).length;
   const treated=yrPickups.reduce((s,r)=>s+Number(r.entrusted_amount||0),0);
 
   const cutoff=`${year}-12-31`;
@@ -251,7 +252,7 @@ function yearMetrics(year){
   // 현재보관량 KPI도 화면에 표시되는 최신 현재용량 기준으로 통일
   if(latestPoint) currentStore=Number(latestPoint.value||0);
 
-  return {rows:yrRows,pickups:yrPickups,water,generated,treated,currentStore,months,focusMonthData};
+  return {rows:yrRows,pickups:yrPickups,water,generated,unverifiedDays,treated,currentStore,months,focusMonthData};
 }
 
 function kpiIconSvg(kind){
@@ -450,7 +451,7 @@ function renderStatus(){
   const years=availableYears();
   const kpis=[
     {key:'water',label:'용수사용량',value:`${num(metrics.water,2)} m³`,note:`${statusYear}년 당일 사용량 합계`},
-    {key:'generated',label:'폐수발생량',value:`${num(metrics.generated,2)} m³`,note:`${statusYear}년 폐수 발생량 합계`},
+    {key:'generated',label:'폐수발생량',extra:`(산정불가일수 : ${metrics.unverifiedDays}일)`,value:`${num(metrics.generated,2)} m³`,note:`${statusYear}년 폐수 발생량 합계`},
     {key:'treated',label:'처리량',value:`${num(metrics.treated,2)} m³`,note:`${statusYear}년 수거·처리량 합계`},
     {key:'storage',label:'현재보관량',value:`${num(metrics.currentStore,2)} m³`,note:`${statusYear}년 말 기준 보관량`}
   ];
@@ -469,7 +470,7 @@ function renderStatus(){
         <div class="kpi-main">
           <div class="kpi-icon ${k.key}">${kpiIconSvg(k.key)}</div>
           <div class="kpi-copy">
-            <div class="label">${k.label}</div>
+            <div class="label">${k.label}${k.extra?` <span class="kpi-unverified">${k.extra}</span>`:''}</div>
             <div class="value">${k.value}</div>
             <div class="meta">${k.note}</div>
           </div>
