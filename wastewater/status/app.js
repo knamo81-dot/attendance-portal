@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS={facility_name:'폐수배출시설',measurement_mode:'hei
 let mode='status',settingsTab='facility';
 let settings={...DEFAULT_SETTINGS},daily=[],pickups=[],vendors=[],locations=[],units=[],openings=[],refCats=[],docTypes=[];
 let editId=null;
+let statusYear=String(new Date().getFullYear());
 
 function measurementMode(){return settings?.measurement_mode==='volume'?'volume':'height'}
 function volumeUnit(){return String(settings?.volume_unit||'m3').toUpperCase()==='L'?'L':'m3'}
@@ -44,25 +45,236 @@ function rowStorage(row){
   const totalCm=mainCm+extCm,total=cmToM3(totalCm),limit=Number(settings?.tank_height_cm||154);
   return {main:cmToM3(mainCm),external:cmToM3(extCm),total,over:totalCm>limit,totalCm,display:`${num(totalCm,1)} cm / ${num(total,2)} m³`};
 }
-function openingSeed(){return [...openings].sort((a,b)=>String(a.balance_date||'').localeCompare(String(b.balance_date||'')))[0]||null}
+function openingSeed(){
+  return [...openings]
+    .sort((a,b)=>String(a.balance_date||'').localeCompare(String(b.balance_date||'')))[0]||null;
+}
 function pickupAfterM3(p){
   if(!p)return null;
-  if(p.after_pickup_volume_value!==null&&p.after_pickup_volume_value!==undefined)return toM3(p.after_pickup_volume_value,p.after_pickup_volume_unit||settings.volume_unit);
+  if(p.after_pickup_volume_value!==null&&p.after_pickup_volume_value!==undefined){
+    return toM3(p.after_pickup_volume_value,p.after_pickup_volume_unit||settings.volume_unit);
+  }
   if(p.after_pickup_cm!==null&&p.after_pickup_cm!==undefined)return cmToM3(p.after_pickup_cm);
   return null;
 }
+function groupedPickups(){
+  const map=new Map();
+  for(const p of pickups){
+    if((p.pickup_type||'폐수')!=='폐수')continue;
+    const k=dateKey(p.pickup_date);
+    if(!map.has(k))map.set(k,[]);
+    map.get(k).push(p);
+  }
+  for(const rows of map.values()){
+    rows.sort((a,b)=>String(a.created_at||'').localeCompare(String(b.created_at||'')));
+  }
+  return map;
+}
 function derive(){
-  const seed=openingSeed();let prevMeter=Number(seed?.prev_usage||0),prevStore=Number(seed?.storage_m3||0)+Number(seed?.external_m3||0),water=0,generated=0;
-  const pp=new Map(pickups.map(x=>[dateKey(x.pickup_date),x]));const rows=[];
-  for(const r of [...daily].sort((a,b)=>dateKey(a.date).localeCompare(dateKey(b.date)))){
-    const holiday=!!r.is_holiday;const meter=holiday?prevMeter:Number(r.usage||0);const used=holiday?0:Math.max(0,meter-prevMeter);if(!holiday)prevMeter=meter;
-    const st=holiday?{total:prevStore,over:false}:rowStorage(r);const gen=holiday?0:(st.over?0:Math.max(0,st.total-prevStore));water+=used;generated+=gen;
-    const pk=pp.get(dateKey(r.date));const after=pickupAfterM3(pk);if(!holiday)prevStore=after!==null?after:(st.over?prevStore:st.total);
-    rows.push({...r,used,store:st.total,gen,storageInfo:st});
+  const seed=openingSeed();
+  let prevMeter=Number(seed?.prev_usage||0);
+  let prevStore=Number(seed?.storage_m3||0)+Number(seed?.external_m3||0);
+  let water=0,generated=0;
+  const pickupMap=groupedPickups();
+  const rows=[];
+
+  for(const r of [...daily].sort((a,b)=>dateKey(a.date).localeCompare(dateKey(b.date))||String(a.created_at||'').localeCompare(String(b.created_at||'')))){
+    const holiday=!!r.is_holiday;
+    const meter=holiday?prevMeter:Number(r.usage||0);
+    const used=holiday?0:Math.max(0,meter-prevMeter);
+    if(!holiday)prevMeter=meter;
+
+    const st=holiday?{total:prevStore,over:false}:rowStorage(r);
+    const gen=holiday?0:(st.over?0:Math.max(0,st.total-prevStore));
+    water+=used;
+    generated+=gen;
+
+    const dayPickups=pickupMap.get(dateKey(r.date))||[];
+    const lastWithAfter=[...dayPickups].reverse().find(x=>pickupAfterM3(x)!==null);
+    const after=pickupAfterM3(lastWithAfter);
+    const treated=dayPickups.reduce((s,x)=>s+Number(x.entrusted_amount||0),0);
+
+    if(!holiday){
+      if(after!==null)prevStore=Math.max(0,after);
+      else if(!st.over)prevStore=Math.max(0,st.total-treated);
+    }
+
+    rows.push({...r,used,store:st.total,gen,storageInfo:st,treated,closingStore:prevStore});
   }
   return {rows,water,generated,currentStore:prevStore};
 }
-function monthly(){const y=String(new Date().getFullYear()),d=derive();const m=Array.from({length:12},(_,i)=>({m:i+1,gen:0,pick:0}));d.rows.filter(r=>dateKey(r.date).startsWith(y)).forEach(r=>m[Number(dateKey(r.date).slice(5,7))-1].gen+=r.gen);pickups.filter(r=>dateKey(r.pickup_date).startsWith(y)).forEach(r=>m[Number(dateKey(r.pickup_date).slice(5,7))-1].pick+=Number(r.entrusted_amount||0));return m}
+function availableYears(){
+  const ys=new Set([String(new Date().getFullYear())]);
+  daily.forEach(r=>{const y=dateKey(r.date).slice(0,4);if(y)ys.add(y)});
+  pickups.forEach(r=>{const y=dateKey(r.pickup_date).slice(0,4);if(y)ys.add(y)});
+  openings.forEach(r=>{const y=dateKey(r.balance_date).slice(0,4);if(y)ys.add(y)});
+  return [...ys].filter(Boolean).sort((a,b)=>Number(b)-Number(a));
+}
+function yearMetrics(year){
+  const d=derive();
+  const yrRows=d.rows.filter(r=>dateKey(r.date).startsWith(year));
+  const yrPickups=pickups.filter(r=>(r.pickup_type||'폐수')==='폐수'&&dateKey(r.pickup_date).startsWith(year));
+  const water=yrRows.reduce((s,r)=>s+Number(r.used||0),0);
+  const generated=yrRows.reduce((s,r)=>s+Number(r.gen||0),0);
+  const treated=yrPickups.reduce((s,r)=>s+Number(r.entrusted_amount||0),0);
+
+  const cutoff=`${year}-12-31`;
+  const before=d.rows.filter(r=>dateKey(r.date)<=cutoff);
+  let currentStore=Number(openingSeed()?.storage_m3||0)+Number(openingSeed()?.external_m3||0);
+  if(before.length)currentStore=Number(before[before.length-1].closingStore||0);
+
+  let cumGen=0,cumTreat=0;
+  const months=Array.from({length:12},(_,i)=>{
+    const mm=String(i+1).padStart(2,'0');
+    const monthRows=yrRows.filter(r=>dateKey(r.date).slice(5,7)===mm);
+    const monthPickups=yrPickups.filter(r=>dateKey(r.pickup_date).slice(5,7)===mm);
+    const gen=monthRows.reduce((s,r)=>s+Number(r.gen||0),0);
+    const treat=monthPickups.reduce((s,r)=>s+Number(r.entrusted_amount||0),0);
+    cumGen+=gen;
+    cumTreat+=treat;
+    return {
+      month:i+1,
+      label:`${i+1}월`,
+      gen,
+      treat,
+      count:monthPickups.length,
+      cumGen,
+      cumTreat
+    };
+  });
+
+  const dailyByMonth=Array.from({length:12},(_,mi)=>{
+    const month=mi+1;
+    const dim=new Date(Number(year),month,0).getDate();
+    const perDay=Array.from({length:dim},()=>0);
+    yrRows.filter(r=>Number(dateKey(r.date).slice(5,7))===month).forEach(r=>{
+      const day=Number(dateKey(r.date).slice(8,10));
+      if(day>=1&&day<=dim)perDay[day-1]+=Number(r.gen||0);
+    });
+    let running=0;
+    const cumulative=perDay.map(v=>(running+=v));
+    return {month,label:`${month}월`,days:dim,cumulative,total:running};
+  });
+
+  return {rows:yrRows,pickups:yrPickups,water,generated,treated,currentStore,months,dailyByMonth};
+}
+
+function kpiIconSvg(kind){
+  const icons={
+    water:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5S5.5 9.2 5.5 14.5a6.5 6.5 0 1 0 13 0C18.5 9.2 12 2.5 12 2.5Zm0 16.3a4.3 4.3 0 0 1-4.3-4.3c0-2.8 2.8-6.6 4.3-8.4 1.5 1.8 4.3 5.6 4.3 8.4a4.3 4.3 0 0 1-4.3 4.3Z" fill="currentColor"/></svg>`,
+    generated:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16v2H4v-2Zm1-3 4-4 3 3 5-6 2 1.5-6.5 8-3.5-3.5-2.5 2.5L5 15Z" fill="currentColor"/></svg>`,
+    treated:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11v8h2.4l2.1-3H22l-1.5 5H19a2.5 2.5 0 0 1-4.9.5H8.9A2.5 2.5 0 0 1 4 16.5 2.5 2.5 0 0 1 6.4 14H5V8H3V6Zm3.5 9.5a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2Zm10 0a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2Z" fill="currentColor"/></svg>`,
+    storage:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 6.5v11L12 22l8-4.5v-11L12 2Zm0 2.3 5.5 3.1L12 10.5 6.5 7.4 12 4.3Zm-6 4.8 5 2.8v6L6 15V9.1Zm7 8.7v-6l5-2.8V15l-5 2.8Z" fill="currentColor"/></svg>`
+  };
+  return icons[kind]||icons.water;
+}
+function axisLabelsHtml(unitLabel){return `<div class="chart-axis-label">${unitLabel}</div>`}
+function monthlyTrendChartHtml(months,year){
+  const max=Math.max(0,...months.map(x=>x.gen),...months.map(x=>x.treat));
+  const scale=v=>max<=0?0:Math.max(v>0?6:0,(v/max)*100);
+  return `<div class="chart-card-body">
+    <div class="chart-head-row">
+      <strong class="mini-title">월별 발생량 vs 처리량 추이 (${year}년)</strong>
+      <div class="spacer"></div>
+      <div class="chart-legend">
+        <span><i class="legend-swatch gen"></i>폐수발생량(m³)</span>
+        <span><i class="legend-swatch col"></i>처리량(m³)</span>
+      </div>
+    </div>
+    ${axisLabelsHtml('발생·처리량 (m³)')}
+    <div class="month-chart ${max<=0?'is-empty':''}">
+      ${max<=0?'<div class="chart-empty-note">데이터가 입력되면 월별 추이가 표시됩니다.</div>':''}
+      ${months.map(x=>`<div class="month-col">
+        <div class="month-bars">
+          <div class="month-bar gen" style="height:${scale(x.gen)}%" title="${x.label} 폐수발생량 ${num(x.gen,2)} m³"></div>
+          <div class="month-bar col" style="height:${scale(x.treat)}%" title="${x.label} 처리량 ${num(x.treat,2)} m³"></div>
+        </div>
+        <div class="month-label">${x.label}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+function buildSharedLinePoints(valuesA,valuesB,width,height,padding){
+  const innerW=width-padding.left-padding.right;
+  const innerH=height-padding.top-padding.bottom;
+  const max=Math.max(0,...valuesA,...valuesB);
+  const xStep=valuesA.length>1?innerW/(valuesA.length-1):0;
+  const y=v=>padding.top+innerH-(max<=0?0:(v/max)*innerH);
+  const pts=valuesA.map((v,i)=>({x:padding.left+i*xStep,y:y(v),v}));
+  const ptsB=valuesB.map((v,i)=>({x:padding.left+i*xStep,y:y(v),v}));
+  const path=arr=>arr.map((p,i)=>`${i?'L':'M'} ${p.x} ${p.y}`).join(' ');
+  return {max,pts,ptsB,pathA:path(pts),pathB:path(ptsB)};
+}
+function cumulativeYearChartHtml(months,year){
+  const w=760,h=220,p={left:38,right:12,top:18,bottom:34};
+  const a=months.map(x=>x.cumGen),b=months.map(x=>x.cumTreat);
+  const line=buildSharedLinePoints(a,b,w,h,p);
+  return `<div class="chart-card-body">
+    <div class="chart-head-row">
+      <strong class="mini-title">누적 발생량 vs 누적 처리량 (${year}년)</strong>
+      <div class="spacer"></div>
+      <div class="chart-legend">
+        <span><i class="legend-line gen"></i>발생 누계(m³)</span>
+        <span><i class="legend-line col"></i>처리 누계(m³)</span>
+      </div>
+    </div>
+    ${axisLabelsHtml('누적량 (m³)')}
+    <div class="line-chart-wrap ${line.max<=0?'is-empty':''}">
+      ${line.max<=0?'<div class="chart-empty-note">데이터가 입력되면 누적 추이가 표시됩니다.</div>':''}
+      <svg class="line-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+        <g class="grid">${[0.25,0.5,0.75,1].map(r=>`<line x1="${p.left}" y1="${p.top+(h-p.top-p.bottom)*r}" x2="${w-p.right}" y2="${p.top+(h-p.top-p.bottom)*r}"></line>`).join('')}</g>
+        <path class="line gen" d="${line.pathA}"></path>
+        <path class="line col" d="${line.pathB}"></path>
+        ${line.pts.map(pt=>`<circle class="point gen" cx="${pt.x}" cy="${pt.y}" r="4"></circle>`).join('')}
+        ${line.ptsB.map(pt=>`<circle class="point col" cx="${pt.x}" cy="${pt.y}" r="4"></circle>`).join('')}
+      </svg>
+      <div class="line-chart-labels">${months.map(x=>`<span>${x.label}</span>`).join('')}</div>
+    </div>
+  </div>`;
+}
+function collectionCountChartHtml(months,year){
+  const max=Math.max(0,...months.map(x=>x.count));
+  const scale=v=>max<=0?0:Math.max(v>0?8:0,(v/max)*100);
+  return `<div class="chart-card-body">
+    <div class="chart-head-row"><strong class="mini-title">월별 수거횟수 (${year}년)</strong></div>
+    ${axisLabelsHtml('수거 횟수 (건)')}
+    <div class="count-chart ${max<=0?'is-empty':''}">
+      ${max<=0?'<div class="chart-empty-note">수거등록 데이터가 입력되면 수거횟수가 표시됩니다.</div>':''}
+      ${months.map(x=>`<div class="count-col">
+        <div class="count-value">${x.count||''}</div>
+        <div class="count-bar-wrap"><div class="count-bar" style="height:${scale(x.count)}%" title="${x.label} ${x.count}건"></div></div>
+        <div class="month-label">${x.label}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+function miniCumulativeSvg(values){
+  const w=220,h=76,p={left:4,right:4,top:6,bottom:8};
+  const max=Math.max(0,...values);
+  const step=values.length>1?(w-p.left-p.right)/(values.length-1):0;
+  const y=v=>p.top+(h-p.top-p.bottom)-(max<=0?0:(v/max)*(h-p.top-p.bottom));
+  const pts=values.map((v,i)=>({x:p.left+i*step,y:y(v)}));
+  const path=pts.map((pt,i)=>`${i?'L':'M'} ${pt.x} ${pt.y}`).join(' ');
+  return `<svg class="daily-mini-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+    <line class="mini-grid" x1="${p.left}" y1="${h-p.bottom}" x2="${w-p.right}" y2="${h-p.bottom}"></line>
+    <path class="mini-line" d="${path}"></path>
+  </svg>`;
+}
+function dailyCumulativeGridHtml(rows,year){
+  return `<div class="chart-card-body">
+    <div class="chart-head-row">
+      <strong class="mini-title">폐수 누적발생량 (31일/월 · ${year}년)</strong>
+      <div class="spacer"></div><span class="hint">각 월의 1일→말일 누적 발생량</span>
+    </div>
+    <div class="daily-cumulative-grid">
+      ${rows.map(x=>`<div class="daily-mini-card">
+        <div class="daily-mini-head"><strong>${x.label}</strong><span>${num(x.total,2)} m³</span></div>
+        ${miniCumulativeSvg(x.cumulative)}
+        <div class="daily-mini-days"><span>1일</span><span>${x.days}일</span></div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
 
 async function safeList(table,order='created_at',ascending=true){try{let x=q(table);if(order)x=x.order(order,{ascending});const r=await x;return r.error?[]:(r.data||[])}catch(e){return []}}
 async function load(){
@@ -80,24 +292,60 @@ async function load(){
       safeList('wastewater_document_types','sort_order',true)
     ]);
     if(s.error&&s.error.code!=='PGRST116')throw s.error;
-    settings={...DEFAULT_SETTINGS,...(s.data||{})};daily=d.data||[];pickups=p.data||[];vendors=v;locations=l;units=u;openings=o;refCats=rc;docTypes=dt;render();
+    settings={...DEFAULT_SETTINGS,...(s.data||{})};
+    daily=d.data||[];pickups=p.data||[];vendors=v;locations=l;units=u;openings=o;refCats=rc;docTypes=dt;
+    const ys=availableYears();if(!ys.includes(statusYear))statusYear=ys[0]||String(new Date().getFullYear());
+    render();
   }catch(e){errorView(e?.message||String(e))}
 }
 
 function renderStatus(){
-  const y=String(new Date().getFullYear()),d=derive();const yrRows=d.rows.filter(r=>dateKey(r.date).startsWith(y));const yrWater=yrRows.reduce((s,r)=>s+r.used,0),yrGen=yrRows.reduce((s,r)=>s+r.gen,0),yrPick=pickups.filter(r=>dateKey(r.pickup_date).startsWith(y)).reduce((s,r)=>s+Number(r.entrusted_amount||0),0);const mm=monthly(),max=Math.max(1,...mm.flatMap(x=>[x.gen,x.pick]));
+  const metrics=yearMetrics(statusYear);
+  const years=availableYears();
+  const kpis=[
+    {key:'water',label:'용수사용량',value:`${num(metrics.water,2)} m³`,note:`${statusYear}년 당일 사용량 합계`},
+    {key:'generated',label:'폐수발생량',value:`${num(metrics.generated,2)} m³`,note:`${statusYear}년 폐수 발생량 합계`},
+    {key:'treated',label:'처리량',value:`${num(metrics.treated,2)} m³`,note:`${statusYear}년 수거·처리량 합계`},
+    {key:'storage',label:'현재보관량',value:`${num(metrics.currentStore,2)} m³`,note:`${statusYear}년 말 기준 보관량`}
+  ];
+
   $('#app').innerHTML=`<div id="notice" class="notice"></div>
-  <div class="toolbar"><div><div class="page-title">폐수현황</div><div class="hint">${esc(settings.facility_name)} · ${y}년 기준 · ${measurementMode()==='height'?'높이 기준형':`볼륨 기준형 (${volumeUnit()==='L'?'L':'m³'})`}</div></div><div class="spacer"></div>${canManage()?'<button class="btn" id="open-settings">설정</button>':''}</div>
-  <div class="kpis">
-    <div class="kpi"><div class="label">현재 저장량</div><div class="value">${num(d.currentStore,2)} m³</div></div>
-    <div class="kpi"><div class="label">연간 용수사용량</div><div class="value">${num(yrWater,2)} m³</div></div>
-    <div class="kpi"><div class="label">연간 폐수발생량</div><div class="value">${num(yrGen,2)} m³</div></div>
-    <div class="kpi"><div class="label">연간 수거량</div><div class="value">${num(yrPick,2)} m³</div></div>
-  </div>
-  <div class="grid two dashboard-grid">
-    <div class="card"><div class="card-title">월별 폐수 발생량 / 수거량</div>${mm.map(x=>`<div class="bar-row"><b>${x.m}월</b><div><div class="bar-track"><div class="bar" style="width:${Math.min(100,x.gen/max*100)}%"></div></div><div class="bar-track"><div class="bar pick" style="width:${Math.min(100,x.pick/max*100)}%"></div></div></div><span>${num(x.gen,1)} / ${num(x.pick,1)}</span></div>`).join('')}</div>
-    <div class="card"><div class="card-title">최근 수거내역</div><div class="table-wrap"><table><thead><tr><th>수거일</th><th>위탁량</th><th>처리업소</th></tr></thead><tbody>${[...pickups].reverse().slice(0,10).map(x=>`<tr><td>${esc(dateKey(x.pickup_date))}</td><td class="num">${num(x.entrusted_amount,2)} m³</td><td>${esc(x.contractor||'-')}</td></tr>`).join('')||'<tr><td colspan="3" class="empty">데이터 없음</td></tr>'}</tbody></table></div></div>
-  </div>`;
+    <div class="toolbar status-toolbar">
+      <select id="status-year" class="btn year-filter">
+        ${years.map(y=>`<option value="${y}" ${y===statusYear?'selected':''}>${y}년</option>`).join('')}
+      </select>
+      <div class="spacer"></div>
+      ${canManage()?'<button class="btn" id="open-settings">⚙ 설정</button>':''}
+    </div>
+
+    <div class="kpis kpis-rich">
+      ${kpis.map(k=>`<div class="kpi rich ${k.key}">
+        <div class="kpi-main">
+          <div class="kpi-icon ${k.key}">${kpiIconSvg(k.key)}</div>
+          <div class="kpi-copy">
+            <div class="label">${k.label}</div>
+            <div class="value">${k.value}</div>
+            <div class="meta">${k.note}</div>
+          </div>
+        </div>
+        <div class="kpi-side-icon ${k.key}">${kpiIconSvg(k.key)}</div>
+      </div>`).join('')}
+    </div>
+
+    <div class="card chart-card dashboard-full">
+      ${monthlyTrendChartHtml(metrics.months,statusYear)}
+    </div>
+
+    <div class="card chart-card dashboard-full">
+      ${dailyCumulativeGridHtml(metrics.dailyByMonth,statusYear)}
+    </div>
+
+    <div class="dashboard-charts preview-grid bottom">
+      <div class="card chart-card large">${cumulativeYearChartHtml(metrics.months,statusYear)}</div>
+      <div class="card chart-card side">${collectionCountChartHtml(metrics.months,statusYear)}</div>
+    </div>`;
+
+  $('#status-year').onchange=e=>{statusYear=e.target.value;renderStatus()};
   if($('#open-settings'))$('#open-settings').onclick=()=>{mode='settings';settingsTab='facility';editId=null;render()};
 }
 
