@@ -313,7 +313,8 @@ function collectionCountChartHtml(months,year){
 function monthlyCurrentStorageChartHtml(data,year){
   const points=data?.points||[];
   const month=Number(data?.month||1);
-  const endDay=Math.max(1,Number(data?.plotEndDay||1));
+  const plotEndDay=Math.max(0,Number(data?.plotEndDay||0));
+  const monthDays=new Date(Number(year),month,0).getDate();
   const capacity=Math.max(0,Number(data?.facilityCapacity||0));
   const facilityHeight=Number(data?.facilityHeight||0);
   const current=Number(data?.current||0);
@@ -322,12 +323,16 @@ function monthlyCurrentStorageChartHtml(data,year){
   const innerW=w-p.left-p.right,innerH=h-p.top-p.bottom;
   const maxValue=Math.max(capacity,...points.map(x=>Number(x.value||0)),1);
   const yMax=Math.max(1,maxValue*1.16);
-  const x=day=>p.left+(endDay<=1?0:((day-1)/(endDay-1))*innerW);
+
+  // X축은 해당월 전체(1일~말일)를 고정으로 사용한다.
+  // 실제 path/point는 points에 존재하는 날짜까지만 생성되므로
+  // 미래 날짜 쪽은 축만 보이고 선은 이어지지 않는다.
+  const x=day=>p.left+(monthDays<=1?0:((day-1)/(monthDays-1))*innerW);
   const y=v=>p.top+innerH-(Math.max(0,Number(v||0))/yMax)*innerH;
 
   const path=points.map((pt,i)=>`${i?'L':'M'} ${x(pt.day)} ${y(pt.value)}`).join(' ');
-  const tickCandidates=[1,5,10,15,20,25,endDay];
-  const tickDays=tickCandidates.filter((v,i,a)=>v<=endDay&&a.indexOf(v)===i).sort((a,b)=>a-b);
+  const tickCandidates=[1,5,10,15,20,25,monthDays];
+  const tickDays=tickCandidates.filter((v,i,a)=>v<=monthDays&&a.indexOf(v)===i).sort((a,b)=>a-b);
 
   const grid=[0,.25,.5,.75,1].map(r=>{
     const yy=p.top+innerH*r;
