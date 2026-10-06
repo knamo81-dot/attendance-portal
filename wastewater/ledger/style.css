@@ -2099,17 +2099,163 @@ tr.over-row td {
 .app-shell{padding:0!important;margin:0!important}
 body{padding:0!important}
 .tab-panel.active>.card,.tab-panel.active>.main-grid{margin-top:0!important}
-.ww-approval-grid{display:grid;grid-template-columns:34px 1fr 1fr;border:1px solid #ccd6e3;border-radius:10px;overflow:hidden;background:#fff;min-width:320px}
-.ww-approval-label{writing-mode:vertical-rl;transform:rotate(180deg);display:flex;align-items:center;justify-content:center;background:#f3f6f9;font-size:11px;font-weight:900;border-right:1px solid #ccd6e3}
-.ww-approval-cell{min-height:92px;text-align:center;border-right:1px solid #ccd6e3;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
-.ww-approval-cell:last-child{border-right:0}
-.ww-approval-role{width:100%;padding:5px 6px;background:#f8fafc;border-bottom:1px solid #dce4ec;font-size:10px;font-weight:900}
-.ww-approval-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px}
-.ww-stamp{width:40px;height:40px;border:2px solid #d92d20;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#d92d20;font-size:11px;font-weight:900;line-height:1}
-.ww-approval-name{font-size:10px;font-weight:800;margin-top:4px;color:#344054}
-.ww-approval-date{font-size:9px;color:#667085;margin-top:2px}
-.ww-approval-action{margin-top:4px;border:1px solid #ccd6e3;background:#fff;border-radius:7px;padding:4px 7px;font-size:9px;font-weight:800;cursor:pointer}
-.ww-approval-action.primary{background:#0e1a38;color:#fff;border-color:#0e1a38}
+.ledger-top-area{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 320px;
+  gap:18px;
+  align-items:stretch;
+  margin-bottom:14px;
+}
+.ledger-heading-block{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+}
+.ww-approval-grid{
+  display:grid;
+  grid-template-columns:34px repeat(2,minmax(125px,1fr));
+  min-height:112px;
+  border:1px solid #93a0af;
+  background:#fff;
+  overflow:hidden;
+}
+.ww-approval-label{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-right:1px solid #93a0af;
+  writing-mode:vertical-rl;
+  text-orientation:upright;
+  letter-spacing:3px;
+  font-size:11px;
+  font-weight:900;
+  color:#10203c;
+  background:#fff;
+}
+.ww-approval-cell{
+  display:grid;
+  grid-template-rows:30px 1fr;
+  min-width:0;
+  min-height:112px;
+}
+.ww-approval-cell + .ww-approval-cell{
+  border-left:1px solid #93a0af;
+}
+.ww-approval-role{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-bottom:1px solid #93a0af;
+  font-size:11px;
+  font-weight:900;
+  color:#10203c;
+  background:#fbfcfd;
+}
+.ww-approval-body{
+  position:relative;
+  min-height:80px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  padding:6px 6px 5px;
+}
+.ww-approval-stamp-wrap{
+  height:34px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.ww-approval-stamp{
+  width:34px;
+  height:34px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:2px solid #d92d20;
+  border-radius:50%;
+  color:#d92d20;
+  transform:rotate(-8deg);
+  font-family:"Noto Serif KR","Batang",serif;
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:-1px;
+  opacity:.94;
+}
+.ww-approval-stamp span{
+  border-top:1px solid #d92d20;
+  border-bottom:1px solid #d92d20;
+  line-height:14px;
+}
+.ww-approval-name{
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:11px;
+  font-weight:900;
+  color:#10203c;
+}
+.ww-approval-date{
+  min-height:15px;
+  font-size:9px;
+  color:#7a8799;
+  white-space:nowrap;
+}
+.ww-approval-action{
+  min-width:52px;
+  height:31px;
+  border:1px solid #0b8a68;
+  border-radius:8px;
+  background:#0b8a68;
+  color:#fff;
+  font-size:10px;
+  font-weight:900;
+  cursor:pointer;
+  padding:0 10px;
+}
+.ww-approval-action.primary{
+  background:#0b8a68;
+  color:#fff;
+  border-color:#0b8a68;
+}
+.ww-approval-action:hover{
+  background:#08785b;
+}
+.ww-approval-empty-mark{
+  height:31px;
+  display:flex;
+  align-items:center;
+  color:#a3adba;
+  font-size:18px;
+  font-weight:700;
+}
+.ww-approval-cancel{
+  position:absolute;
+  right:4px;
+  bottom:3px;
+  border:0;
+  background:transparent;
+  padding:2px 3px;
+  color:#b42318;
+  font-size:8px;
+  font-weight:800;
+  cursor:pointer;
+}
+.ww-approval-cancel:hover{
+  text-decoration:underline;
+}
+@media(max-width:900px){
+  .ledger-top-area{
+    grid-template-columns:1fr;
+  }
+  .ww-approval-grid{
+    width:min(100%,320px);
+    justify-self:end;
+  }
+}
 
 
 /* ===== 2026-10-06 폐기물 UI 규격 통일 ===== */
