@@ -2680,6 +2680,7 @@ body.auth-loading .top-user-bar {
     mobileEdgeSwipeZone: document.getElementById('mobileEdgeSwipeZone'),
     portalSideNav: document.getElementById('portalSideNav'),
     settingsNavBtn: document.getElementById('settingsNavBtn'),
+    wastewaterNavBtn: document.getElementById('wastewaterNavBtn'),
     wasteNavBtn: document.getElementById('wasteNavBtn'),
     qaNavBtn: document.getElementById('qaNavBtn'),
     patentNavBtn: document.getElementById('patentNavBtn'),
@@ -4617,6 +4618,10 @@ body.auth-loading .top-user-bar {
   function findNavBySrc(src) {
     const exact = navButtons.find((btn) => btn.getAttribute('data-portal-src') === src);
     if (exact) return exact;
+    if (
+      (typeof isWastewaterPcProgramSrc === 'function' && isWastewaterPcProgramSrc(src)) ||
+      (typeof isWastewaterResponsiveSrc === 'function' && isWastewaterResponsiveSrc(src))
+    ) return els.wastewaterNavBtn || null;
     if (typeof isWasteProgramSrc === 'function' && isWasteProgramSrc(src)) return els.wasteNavBtn || null;
     if (typeof isPatentProgramSrc === 'function' && isPatentProgramSrc(src)) return els.patentNavBtn || null;
     return null;
@@ -5126,7 +5131,8 @@ body.auth-loading .top-user-bar {
     }
   }
 
-  const PORTAL_APP_KEYS = ['wastewater', 'waste', 'attendance', 'reagent', 'qa', 'research_staff', 'travel_expense', 'patent', 'aic', 'home', 'work'];
+  const WASTEWATER_PERMISSION_COMPAT_VERSION = '2026-10-06-v2';
+  const PORTAL_APP_KEYS =['wastewater', 'waste', 'attendance', 'reagent', 'qa', 'research_staff', 'travel_expense', 'patent', 'aic', 'home', 'work'];
   const PORTAL_COMPANY_APP_KEYS = ['wastewater', 'waste', 'attendance', 'reagent', 'qa', 'research_staff', 'travel_expense', 'patent'];
 
   function normalizePortalRole(role, fallback = 'user') {
@@ -5340,6 +5346,60 @@ body.auth-loading .top-user-bar {
     }
   }
 
+
+  async function fetchLegacyWastewaterRolesForSession(employee, email, centralRoleRows = []) {
+    const rows = [];
+    const employeeNo = String(employee?.employee_no || employee?.employeeNo || '').trim();
+    const cleanEmail = String(email || employee?.email || '').trim().toLowerCase();
+
+    // 중앙 권한관리에 이미 역할이 있으면 그대로 사용하되,
+    // 과거 전용 테이블에만 남아 있는 역할도 호환을 위해 함께 읽습니다.
+    const already = new Set(
+      (Array.isArray(centralRoleRows) ? centralRoleRows : [])
+        .filter(row => normalizePortalAppKey(row?.app_key) === 'wastewater' && row?.is_active !== false)
+        .map(row => String(row?.role_key || row?.role || '').trim().toLowerCase())
+    );
+
+    if (!employeeNo) return rows;
+
+    async function readLegacy(tableName, roleKey) {
+      try {
+        const { data, error } = await supabaseClient
+          .from(tableName)
+          .select('employee_no,is_active')
+          .eq('employee_no', employeeNo)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (error) {
+          console.warn(`[PortalSession] legacy ${tableName} lookup skipped:`, error);
+          return;
+        }
+
+        if (data && !already.has(roleKey)) {
+          rows.push({
+            company_id: '',
+            employee_no: employeeNo,
+            email: cleanEmail,
+            app_key: 'wastewater',
+            role_key: roleKey,
+            is_active: true,
+            source: 'legacy_wastewater_role'
+          });
+        }
+      } catch (error) {
+        console.warn(`[PortalSession] legacy ${tableName} lookup skipped:`, error);
+      }
+    }
+
+    await Promise.all([
+      readLegacy('wastewater_operators', 'operator'),
+      readLegacy('wastewater_approvers', 'approver')
+    ]);
+
+    return rows;
+  }
+
   async function refreshPortalIdentityContext() {
     const sessionCompany = getEffectiveCompany() || requestedCompany || currentCompany || null;
     const companyId = sessionCompany?.id || currentProfile?.company_id || '';
@@ -5355,7 +5415,9 @@ body.auth-loading .top-user-bar {
 
     currentEmployee = await fetchEmployeeForCompany(companyId, email);
     const roleRows = await fetchUserAppRolesForSession(companyId, currentEmployee, email);
-    currentAppRoles = buildWorkspaceAppRoles(roleRows, currentEmployee, currentProfile) || buildEmptyPortalAppRoles();
+    const legacyWastewaterRows = await fetchLegacyWastewaterRolesForSession(currentEmployee, email, roleRows);
+    const mergedRoleRows = [...(roleRows || []), ...(legacyWastewaterRows || [])];
+    currentAppRoles = buildWorkspaceAppRoles(mergedRoleRows, currentEmployee, currentProfile) || buildEmptyPortalAppRoles();
   }
 
   function buildPortalSession() {
@@ -6881,6 +6943,7 @@ body.auth-loading .top-user-bar {
             scheduleResearchStaffButtonVisibilityRefresh();
             scheduleWasteButtonVisibilityRefresh();
             schedulePatentButtonVisibilityRefresh();
+            updatePortalSubtabs(getCurrentFrameBaseSrc());
             postAuthToFrame();
 
             try {
