@@ -901,31 +901,91 @@ function approvalDisplayName(email,name){
 function approvalDate(v){
   if(!v)return '';
   const d=new Date(v); if(Number.isNaN(d.getTime()))return String(v).slice(0,10);
-  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-function renderWastewaterApprovalBox(monthKey){
+function wastewaterApprovalCandidates(kind){
+  const rows=kind==='writer'
+    ? (wastewaterAdminState.operators||[])
+    : (wastewaterAdminState.approvers||[]);
+  const active=rows.filter(r=>r.is_active!==false);
+  if(active.length)return active;
+
+  const allowed=kind==='writer'?canWriterApprove():canReviewerApprove();
+  if(allowed && user?.email){
+    return [{name:user?.name||user.email,email:user.email,is_active:true}];
+  }
+  return [];
+}
+function wastewaterApprovalPerson(kind,row){
+  const approvedName=kind==='writer'?row?.writer_name:row?.reviewer_name;
+  const approvedEmail=kind==='writer'?row?.writer_email:row?.reviewer_email;
+  if(approvedName||approvedEmail)return approvalDisplayName(approvedEmail,approvedName);
+
+  const rows=wastewaterApprovalCandidates(kind);
+  if(rows.length===1)return rows[0].name||rows[0].email||(kind==='writer'?'담당자':'결재자');
+  if(rows.length>1)return kind==='writer'?`운영자 ${rows.length}명`:`결재자 ${rows.length}명`;
+  return kind==='writer'?'담당자 미설정':'결재자 미설정';
+}
+function wastewaterApprovalStampHtml(){
+  return `<span class="ww-approval-stamp"><span>결재</span></span>`;
+}
+function wastewaterApprovalCellHtml(kind,monthKey){
   const row=getApprovalRow(monthKey)||{};
+  const isWriter=kind==='writer';
+  const roleLabel=isWriter?'담당자':'결재자';
+  const signedAt=isWriter?row.writer_signed_at:row.reviewer_signed_at;
+  const signed=!!signedAt;
   const writerDone=!!row.writer_signed_at;
   const reviewerDone=!!row.reviewer_signed_at;
-  const writerName=approvalDisplayName(row.writer_email,row.writer_name);
-  const reviewerName=approvalDisplayName(row.reviewer_email,row.reviewer_name);
-  return `<div class="ww-approval-grid">
+  const canAct=isWriter?canWriterApprove():canReviewerApprove();
+  const person=wastewaterApprovalPerson(kind,row);
+
+  let body='';
+  if(signed){
+    body=`
+      <div class="ww-approval-stamp-wrap">${wastewaterApprovalStampHtml()}</div>
+      <div class="ww-approval-name">${escapeHtml(person)}</div>
+      <div class="ww-approval-date">${approvalDate(signedAt)}</div>
+      ${isWriter && !reviewerDone && canAct
+        ? `<button type="button" class="ww-approval-cancel" onclick="toggleWriterApproval('${monthKey}')">결재취소</button>`
+        : ''}
+    `;
+  }else{
+    let reason='미결재';
+    if(!wastewaterApprovalCandidates(kind).length){
+      reason='최상위 설정에서 권한 지정';
+    }else if(!isWriter && !writerDone){
+      reason='담당자 결재 후 가능';
+    }
+
+    if(canAct && (isWriter || writerDone)){
+      body=`
+        <button type="button" class="ww-approval-action primary"
+          onclick="${isWriter?'toggleWriterApproval':'toggleReviewerApproval'}('${monthKey}')">결재</button>
+        <div class="ww-approval-name">${escapeHtml(person)}</div>
+        <div class="ww-approval-date">미결재</div>
+      `;
+    }else{
+      body=`
+        <div class="ww-approval-empty-mark">-</div>
+        <div class="ww-approval-name">${escapeHtml(person)}</div>
+        <div class="ww-approval-date">${escapeHtml(reason)}</div>
+      `;
+    }
+  }
+
+  return `
+    <div class="ww-approval-cell">
+      <div class="ww-approval-role">${roleLabel}</div>
+      <div class="ww-approval-body">${body}</div>
+    </div>
+  `;
+}
+function renderWastewaterApprovalBox(monthKey){
+  return `<div class="ww-approval-grid" aria-label="결재란">
     <div class="ww-approval-label">결재</div>
-    <div class="ww-approval-cell">
-      <div class="ww-approval-role">담당자</div>
-      <div class="ww-approval-body">
-        ${writerDone?`<div class="ww-stamp">결재</div><div class="ww-approval-name">${escapeHtml(writerName)}</div><div class="ww-approval-date">${approvalDate(row.writer_signed_at)}</div>`:
-          (canWriterApprove()?`<button class="ww-approval-action primary" onclick="toggleWriterApproval('${monthKey}')">결재</button>`:'<span class="msg muted">대기</span>')}
-        ${writerDone&&!reviewerDone&&canWriterApprove()?`<button class="ww-approval-action" onclick="toggleWriterApproval('${monthKey}')">결재취소</button>`:''}
-      </div>
-    </div>
-    <div class="ww-approval-cell">
-      <div class="ww-approval-role">결재자</div>
-      <div class="ww-approval-body">
-        ${reviewerDone?`<div class="ww-stamp">결재</div><div class="ww-approval-name">${escapeHtml(reviewerName)}</div><div class="ww-approval-date">${approvalDate(row.reviewer_signed_at)}</div>`:
-          (canReviewerApprove()?`<button class="ww-approval-action ${writerDone?'primary':''}" ${writerDone?'':'disabled'} onclick="toggleReviewerApproval('${monthKey}')">결재</button>`:'<span class="msg muted">대기</span>')}
-      </div>
-    </div>
+    ${wastewaterApprovalCellHtml('writer',monthKey)}
+    ${wastewaterApprovalCellHtml('reviewer',monthKey)}
   </div>`;
 }
 
@@ -1301,6 +1361,15 @@ async function loadAll(message='',cls='muted'){
     dailyRows=dailyRes.data||[]; pickupRows=pickupRes.data||[]; userRows=usersRes.data||[]; logRows=logsRes.data||[]; approvalRows=approvalsRes.data||[]; referenceDocs=referenceRes.data||[];
     lazyReferenceLoaded=true;
     lazyAdminLoaded=canAdmin();
+  }
+
+  try{
+    if(api.loadWastewaterManagers){
+      const managerRes=await api.loadWastewaterManagers();
+      wastewaterAdminState={...wastewaterAdminState,...(managerRes?.data||{})};
+    }
+  }catch(err){
+    console.warn('폐수 결재 담당자/결재자 표시정보 조회 건너뜀:',err);
   }
 
   if(!ledgerMonthFilter) ledgerMonthFilter=getDefaultLedgerMonth();
@@ -2865,17 +2934,12 @@ ${canWrite()?`<button class="btn primary block" onclick="savePickupRow()">💾 �
 
 <div class="tab-panel ${currentTab==='ledger'?'active':''}">
 <div class="card ledger-card">
-<div class="ledger-top">
-  <div>
+<div class="ledger-top-area">
+  <div class="ledger-heading-block">
     <div class="section-title">🧾 운영일지</div>
-    <div class="msg muted">담당자 결재 후 결재자가 최종 결재하면 해당월은 잠깁니다. 휴일도 별도 입력하여 기록으로 남길 수 있습니다.</div>
+    <div class="msg muted">담당자 결재 후 결재자가 최종 결재하면 해당월은 잠깁니다. 최종 결재 후에는 담당자 결재를 취소할 수 없습니다.</div>
   </div>
-  <div class="ledger-approval-box">
-    <span class="inline-badge ${approvalStatus.cls}">${approvalStatus.text}</span>
-    ${canWriterApprove()?`<button class="btn ${getApprovalRow(ledgerMonthFilter)?.writer_signed_at ? 'approval-on' : 'soft'}" onclick="toggleWriterApproval('${ledgerMonthFilter}')">${getApprovalRow(ledgerMonthFilter)?.writer_signed_at ? '담당자 결재완료' : '담당자 결재'}</button>`:''}
-    ${canReviewerApprove()?`<button class="btn ${getApprovalRow(ledgerMonthFilter)?.reviewer_signed_at ? 'approval-on' : 'soft'}" onclick="toggleReviewerApproval('${ledgerMonthFilter}')">${getApprovalRow(ledgerMonthFilter)?.reviewer_signed_at ? '결재자 결재완료' : '결재자 결재'}</button>`:''}
-    
-  </div>
+  ${renderWastewaterApprovalBox(ledgerMonthFilter)}
 </div>
 
 <div class="toolbar-row">
