@@ -166,7 +166,7 @@ function sanitizeHtml(html,forSave=false){
       const path=el.getAttribute('data-storage-path');
       const src=String(el.getAttribute('src')||'');
       if(forSave && path)el.removeAttribute('src');
-      else if(src && !/^(https?:|blob:)/i.test(src))el.removeAttribute('src');
+      else if(src && !/^(https?:|blob:|data:image\/(?:png|jpe?g|gif|webp);base64,)/i.test(src))el.removeAttribute('src');
       el.setAttribute('style',`${sanitizeStyle(el.getAttribute('style'))};max-width:100%;height:auto`.replace(/^;/,''));
     }
   });
@@ -456,6 +456,72 @@ function selectedCategory(){
 function rowFiles(id){
   return files.filter(f=>f.owner_type===OWNER_TYPE && String(f.owner_id)===String(id) && f.active!==false);
 }
+
+function legacyAttachments(row={}){
+  let list=[];
+  const raw=row?.attachments;
+  if(Array.isArray(raw)) list=raw;
+  else if(typeof raw==='string' && raw.trim()){
+    try{
+      const parsed=JSON.parse(raw);
+      if(Array.isArray(parsed)) list=parsed;
+    }catch(_){}
+  }
+
+  list=list.map((a,i)=>({
+    name:String(a?.name||a?.file_name||`기존 첨부파일 ${i+1}`),
+    url:String(a?.url||a?.public_url||'').trim(),
+    path:String(a?.path||a?.storage_path||'').trim(),
+    type:String(a?.type||a?.mime_type||''),
+    size:Number(a?.size||a?.size_bytes||0)||0
+  })).filter(a=>a.url||a.path);
+
+  if(row?.pdf_url){
+    const pdf={
+      name:String(row.pdf_name||row.file_name||'기존 PDF 첨부파일'),
+      url:String(row.pdf_url||'').trim(),
+      path:String(row.pdf_path||'').trim(),
+      type:String(row.pdf_type||'application/pdf'),
+      size:Number(row.pdf_size||0)||0
+    };
+    if(pdf.url && !list.some(a=>a.url===pdf.url)) list.push(pdf);
+  }
+
+  const seen=new Set();
+  return list.filter(a=>{
+    const key=`${a.url}|${a.path}|${a.name}`;
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+function legacyAttachmentUrl(att={}){
+  const direct=String(att.url||'').trim();
+  if(/^https?:\/\//i.test(direct)) return direct;
+
+  const path=String(att.path||'').replace(/^\/+/,'').trim();
+  if(!path) return '';
+
+  const cid=A.companyId();
+  const tenantPath=path.startsWith(`companies/${cid}/`) ? path : `companies/${cid}/${path}`;
+  try{
+    return A.sb.storage.from('wastewater-docs').getPublicUrl(tenantPath)?.data?.publicUrl||'';
+  }catch(_){
+    return '';
+  }
+}
+function legacyAttachmentsHtml(row={}){
+  const list=legacyAttachments(row);
+  if(!list.length) return '';
+  return `<div class="attachment-list legacy-attachment-list">${list.map(a=>{
+    const url=legacyAttachmentUrl(a);
+    const size=a.size?`<span>${Math.ceil(a.size/1024)} KB</span>`:'';
+    if(!url){
+      return `<div class="attachment-item"><span class="attachment-open">📎 ${esc(a.name)}</span>${size}</div>`;
+    }
+    return `<div class="attachment-item"><a class="attachment-open" href="${esc(url)}" target="_blank" rel="noopener">📎 ${esc(a.name)}</a>${size}</div>`;
+  }).join('')}</div>`;
+}
 async function load(){
   const cid=A.companyId();
   const [c,r,f]=await Promise.all([
@@ -485,7 +551,7 @@ function listRows(){
   const filtered=cat?rows.filter(r=>rowBelongs(r,cat)):[];
   if(!filtered.length)return `<tr><td colspan="5" class="empty">등록된 관련자료가 없습니다.</td></tr>`;
   return filtered.map((r,i)=>{
-    const cnt=rowFiles(r.id).length+(r.file_path?1:0);
+    const cnt=rowFiles(r.id).length+legacyAttachments(r).length+(r.file_path?1:0);
     const preview=plainTextFromHtml(r.body||r.content||'');
     return `<tr>
       <td class="num">${i+1}</td>
@@ -551,7 +617,7 @@ function editorContent(){
       </div>
       <div class="attachment-panel">
         <div class="attachment-title">첨부파일</div>
-        <div id="attachment-box">${attachmentsHtml(ownerId,true)}</div>
+        <div id="attachment-box">${attachmentsHtml(ownerId,true)}${editing?legacyAttachmentsHtml(editing):''}</div>
       </div>
       ${editing?.file_path?`<div class="legacy-file">기존 파일 경로: <a href="${esc(editing.file_path)}" target="_blank" rel="noopener">${esc(editing.file_path)}</a></div>`:''}
       <div class="writer-actions">
@@ -574,6 +640,7 @@ function viewContent(){
       <div class="attachment-panel">
         <div class="attachment-title">첨부파일</div>
         ${attachmentsHtml(viewing.id,false)}
+        ${legacyAttachmentsHtml(viewing)}
         ${viewing.file_path?`<div class="attachment-item"><a class="attachment-open" href="${esc(viewing.file_path)}" target="_blank" rel="noopener">📎 기존 첨부파일 열기</a></div>`:''}
       </div>
       <div class="writer-actions">
@@ -742,3 +809,4 @@ async function del(id){
 load();
 
 try{parent.postMessage({type:'portal-tab-active',activeTabId:'ww-reference',tabId:'ww-reference',source:'wastewater'},'*')}catch(e){}
+
