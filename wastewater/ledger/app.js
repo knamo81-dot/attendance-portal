@@ -2934,19 +2934,24 @@ ${canWrite()?`<button class="btn primary block" onclick="savePickupRow()">💾 �
 
 <div class="tab-panel ${currentTab==='ledger'?'active':''}">
 <div class="card ledger-card">
-<div class="ledger-top-area">
-  <div class="ledger-heading-block">
-    <div class="section-title">🧾 운영일지</div>
-    <div class="msg muted">담당자 결재 후 결재자가 최종 결재하면 해당월은 잠깁니다. 최종 결재 후에는 담당자 결재를 취소할 수 없습니다.</div>
-  </div>
-  ${renderWastewaterApprovalBox(ledgerMonthFilter)}
-</div>
+<div class="ledger-control-bar">
+  <div class="ledger-control-left">
+    <div class="ledger-heading-block">
+      <div class="section-title">🧾 운영일지</div>
+      <div class="msg muted">담당자 결재 후 결재자가 최종 결재하면 해당월은 잠깁니다. 최종 결재 후에는 담당자 결재를 취소할 수 없습니다.</div>
+    </div>
 
-<div class="toolbar-row">
-  <div class="toolbar-right">
-    <input id="ledger-month" class="input" type="month" value="${ledgerMonthFilter}" style="width:180px;margin:0" onchange="changeLedgerMonth(this.value)">
-    <select class="select" style="width:140px;margin:0" onchange="changeYearlyReportYear(this.value)">${availableYears.map(y=>`<option value="${y}" ${yearlyReportFilter===y?'selected':''}>${y}년</option>`).join('')}</select>
-    ${canDownload()?`<button class="btn soft" onclick="downloadMonthlyExcel()">월별 엑셀 다운로드</button><button class="btn soft" onclick="downloadMonthlyReportPdf()">월보고서 PDF</button><button class="btn soft" onclick="downloadYearlyReportPdf()">연보고서 PDF</button>`:''}
+    <div class="toolbar-row ledger-toolbar-row">
+      <div class="toolbar-right">
+        <input id="ledger-month" class="input" type="month" value="${ledgerMonthFilter}" style="width:180px;margin:0" onchange="changeLedgerMonth(this.value)">
+        <select class="select" style="width:140px;margin:0" onchange="changeYearlyReportYear(this.value)">${availableYears.map(y=>`<option value="${y}" ${yearlyReportFilter===y?'selected':''}>${y}년</option>`).join('')}</select>
+        ${canDownload()?`<button class="btn soft" onclick="downloadMonthlyExcel()">월별 엑셀 다운로드</button><button class="btn soft" onclick="downloadMonthlyReportPdf()">월보고서 PDF</button><button class="btn soft" onclick="downloadYearlyReportPdf()">연보고서 PDF</button>`:''}
+      </div>
+    </div>
+  </div>
+
+  <div class="ledger-control-approval">
+    ${renderWastewaterApprovalBox(ledgerMonthFilter)}
   </div>
 </div>
 
