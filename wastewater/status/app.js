@@ -85,18 +85,24 @@ function derive(){
     if(!holiday)prevMeter=meter;
 
     const st=holiday?{total:prevStore,over:false}:rowStorage(r);
-    const gen=holiday?0:(st.over?0:Math.max(0,st.total-prevStore));
+
+    // 운영일지의 '총 발생량' 계산과 동일:
+    // 당일 폐수량(금일지침) - 직전 기준 폐수량
+    const rawGen=holiday?0:(st.over?null:(st.total-prevStore));
+    const gen=rawGen===null?null:Math.round((Number(rawGen)+Number.EPSILON)*100)/100;
     water+=used;
-    generated+=gen;
+    if(gen!==null)generated+=gen;
 
     const dayPickups=pickupMap.get(dateKey(r.date))||[];
     const lastWithAfter=[...dayPickups].reverse().find(x=>pickupAfterM3(x)!==null);
     const after=pickupAfterM3(lastWithAfter);
     const treated=dayPickups.reduce((s,x)=>s+Number(x.entrusted_amount||0),0);
 
+    // 운영일지와 동일하게 수거 후 계측값이 있으면 다음 계산 기준으로 사용.
+    // 수거 후 계측값이 없으면 당일 금일지침(폐수량)을 다음 기준으로 사용.
     if(!holiday){
       if(after!==null)prevStore=Math.max(0,after);
-      else if(!st.over)prevStore=Math.max(0,st.total-treated);
+      else if(!st.over)prevStore=Math.max(0,st.total);
     }
 
     rows.push({...r,used,store:st.total,gen,storageInfo:st,treated,closingStore:prevStore});
@@ -143,20 +149,40 @@ function yearMetrics(year){
     };
   });
 
-  const dailyByMonth=Array.from({length:12},(_,mi)=>{
-    const month=mi+1;
-    const dim=new Date(Number(year),month,0).getDate();
-    const perDay=Array.from({length:dim},()=>0);
-    yrRows.filter(r=>Number(dateKey(r.date).slice(5,7))===month).forEach(r=>{
-      const day=Number(dateKey(r.date).slice(8,10));
-      if(day>=1&&day<=dim)perDay[day-1]+=Number(r.gen||0);
-    });
-    let running=0;
-    const cumulative=perDay.map(v=>(running+=v));
-    return {month,label:`${month}월`,days:dim,cumulative,total:running};
+  // 연도 필터만 유지하므로 누적발생량 그래프는 '해당월' 1개만 표시한다.
+  // 현재 연도는 현재월, 과거 연도는 운영일지 데이터가 있는 가장 최근 월을 사용한다.
+  const now=new Date();
+  const currentYear=String(now.getFullYear());
+  let focusMonth=year===currentYear ? now.getMonth()+1 : 0;
+  if(year!==currentYear){
+    const monthsWithData=yrRows
+      .map(r=>Number(dateKey(r.date).slice(5,7)))
+      .filter(m=>m>=1&&m<=12);
+    focusMonth=monthsWithData.length?Math.max(...monthsWithData):12;
+  }
+  const focusDays=new Date(Number(year),focusMonth,0).getDate();
+  const perDay=Array.from({length:focusDays},()=>0);
+  yrRows.filter(r=>Number(dateKey(r.date).slice(5,7))===focusMonth).forEach(r=>{
+    const day=Number(dateKey(r.date).slice(8,10));
+    if(day>=1&&day<=focusDays && r.gen!==null && r.gen!==undefined){
+      perDay[day-1]+=Number(r.gen||0);
+    }
   });
+  let running=0;
+  const cumulative=perDay.map(v=>{
+    running=Math.round((running+Number(v||0)+Number.EPSILON)*100)/100;
+    return running;
+  });
+  const focusMonthData={
+    month:focusMonth,
+    label:`${focusMonth}월`,
+    days:focusDays,
+    daily:perDay,
+    cumulative,
+    total:running
+  };
 
-  return {rows:yrRows,pickups:yrPickups,water,generated,treated,currentStore,months,dailyByMonth};
+  return {rows:yrRows,pickups:yrPickups,water,generated,treated,currentStore,months,focusMonthData};
 }
 
 function kpiIconSvg(kind){
@@ -248,30 +274,55 @@ function collectionCountChartHtml(months,year){
     </div>
   </div>`;
 }
-function miniCumulativeSvg(values){
-  const w=220,h=76,p={left:4,right:4,top:6,bottom:8};
-  const max=Math.max(0,...values);
-  const step=values.length>1?(w-p.left-p.right)/(values.length-1):0;
-  const y=v=>p.top+(h-p.top-p.bottom)-(max<=0?0:(v/max)*(h-p.top-p.bottom));
-  const pts=values.map((v,i)=>({x:p.left+i*step,y:y(v)}));
-  const path=pts.map((pt,i)=>`${i?'L':'M'} ${pt.x} ${pt.y}`).join(' ');
-  return `<svg class="daily-mini-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
-    <line class="mini-grid" x1="${p.left}" y1="${h-p.bottom}" x2="${w-p.right}" y2="${h-p.bottom}"></line>
-    <path class="mini-line" d="${path}"></path>
-  </svg>`;
-}
-function dailyCumulativeGridHtml(rows,year){
+function monthlyLedgerCumulativeChartHtml(data,year){
+  const values=data?.cumulative||[];
+  const daily=data?.daily||[];
+  const days=Number(data?.days||values.length||31);
+  const month=Number(data?.month||1);
+  const w=760,h=230,p={left:44,right:14,top:22,bottom:38};
+  const innerW=w-p.left-p.right,innerH=h-p.top-p.bottom;
+
+  const allValues=values.length?values:[0];
+  const min=Math.min(0,...allValues);
+  const max=Math.max(0,...allValues);
+  const span=Math.max(1,max-min);
+  const x=i=>p.left+(days<=1?0:(i/(days-1))*innerW);
+  const y=v=>p.top+innerH-((Number(v||0)-min)/span)*innerH;
+
+  const points=values.map((v,i)=>({x:x(i),y:y(v),v}));
+  const path=points.map((pt,i)=>`${i?'L':'M'} ${pt.x} ${pt.y}`).join(' ');
+  const tickDays=[1,5,10,15,20,25,days].filter((v,i,a)=>v<=days&&a.indexOf(v)===i);
+
+  const grid=[0,.25,.5,.75,1].map(r=>{
+    const yy=p.top+innerH*r;
+    return `<line x1="${p.left}" y1="${yy}" x2="${w-p.right}" y2="${yy}" class="month-ledger-grid"></line>`;
+  }).join('');
+
+  const ticks=tickDays.map(d=>`<text x="${x(d-1)}" y="${h-12}" text-anchor="middle" class="month-ledger-tick">${d}일</text>`).join('');
+  const pointHtml=points.map((pt,i)=>{
+    const day=i+1;
+    const title=`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')} / 당일 발생 ${num(daily[i]||0,2)} m³ / 누적 ${num(pt.v,2)} m³`;
+    return `<circle cx="${pt.x}" cy="${pt.y}" r="3.6" class="month-ledger-point"><title>${title}</title></circle>`;
+  }).join('');
+
   return `<div class="chart-card-body">
     <div class="chart-head-row">
-      <strong class="mini-title">폐수 누적발생량 (31일/월 · ${year}년)</strong>
-      <div class="spacer"></div><span class="hint">각 월의 1일→말일 누적 발생량</span>
+      <strong class="mini-title">폐수 누적발생량 (${year}년 ${month}월)</strong>
+      <div class="spacer"></div>
+      <span class="hint">운영일지 '총 발생량' 기준</span>
     </div>
-    <div class="daily-cumulative-grid">
-      ${rows.map(x=>`<div class="daily-mini-card">
-        <div class="daily-mini-head"><strong>${x.label}</strong><span>${num(x.total,2)} m³</span></div>
-        ${miniCumulativeSvg(x.cumulative)}
-        <div class="daily-mini-days"><span>1일</span><span>${x.days}일</span></div>
-      </div>`).join('')}
+    <div class="current-month-summary">
+      <span>당월 누적</span><strong>${num(data?.total||0,2)} m³</strong>
+    </div>
+    <div class="month-ledger-line-wrap ${max===0&&min===0?'is-empty':''}">
+      ${max===0&&min===0?'<div class="chart-empty-note">해당월 운영일지 발생량이 입력되면 표시됩니다.</div>':''}
+      <svg class="month-ledger-line" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+        ${grid}
+        <line x1="${p.left}" y1="${y(0)}" x2="${w-p.right}" y2="${y(0)}" class="month-ledger-zero"></line>
+        <path d="${path}" class="month-ledger-path"></path>
+        ${pointHtml}
+        ${ticks}
+      </svg>
     </div>
   </div>`;
 }
@@ -332,12 +383,9 @@ function renderStatus(){
       </div>`).join('')}
     </div>
 
-    <div class="card chart-card dashboard-full">
-      ${monthlyTrendChartHtml(metrics.months,statusYear)}
-    </div>
-
-    <div class="card chart-card dashboard-full">
-      ${dailyCumulativeGridHtml(metrics.dailyByMonth,statusYear)}
+    <div class="dashboard-charts preview-grid status-top">
+      <div class="card chart-card large">${monthlyTrendChartHtml(metrics.months,statusYear)}</div>
+      <div class="card chart-card side">${monthlyLedgerCumulativeChartHtml(metrics.focusMonthData,statusYear)}</div>
     </div>
 
     <div class="dashboard-charts preview-grid bottom">
