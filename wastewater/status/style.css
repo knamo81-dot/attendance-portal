@@ -2,3 +2,104 @@
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Arial,"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text)}body{padding:10px}.page{width:100%;max-width:none}.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:12px}.toolbar .spacer{flex:1}.page-title{font-size:18px;font-weight:900;letter-spacing:-.04em}.hint{font-size:11px;color:var(--muted);line-height:1.55}.card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin-bottom:12px}.card-title{font-size:18px;font-weight:900;letter-spacing:-.04em;display:flex;align-items:center;gap:8px;margin-bottom:14px}.grid{display:grid;gap:12px}.grid.two{grid-template-columns:390px minmax(0,1fr)}.dashboard-grid{grid-template-columns:minmax(0,1.5fr) minmax(330px,.8fr)!important}.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}.kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}.kpi .label{font-size:11px;color:var(--muted);font-weight:800}.kpi .value{font-size:24px;font-weight:900;margin-top:5px}.btn{height:38px;border:1px solid var(--line);border-radius:11px;background:#fff;color:#243a60;font-weight:800;padding:0 14px;cursor:pointer}.btn.primary{background:var(--navy);border-color:var(--navy);color:#fff}.btn.danger{color:var(--danger)}.btn.small{height:30px;padding:0 9px;font-size:11px}.field{display:grid;gap:6px;margin-bottom:12px}.field label{font-size:12px;font-weight:800;color:#263a5f}.field input,.field select,.field textarea{width:100%;min-height:40px;border:1px solid #ccd8e6;border-radius:11px;background:#fff;padding:9px 11px;font-size:13px;color:var(--text);outline:none}.field textarea{min-height:90px;resize:vertical}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(11,138,104,.09)}.subtabs{display:flex;gap:7px;overflow:auto;margin-bottom:12px}.subtab{height:34px;flex:0 0 auto;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:11px;font-weight:900;padding:0 12px;cursor:pointer}.subtab.active{background:var(--green);border-color:var(--green);color:#fff}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:13px}table{width:100%;border-collapse:collapse;background:#fff}th,td{padding:9px 10px;border-bottom:1px solid #e7edf4;font-size:12px;text-align:left;vertical-align:middle}th{background:#f8fafc;color:#53657f;font-weight:900;white-space:nowrap}td.num{text-align:right;font-variant-numeric:tabular-nums}.empty{padding:24px;text-align:center;color:#98a2b3;font-size:12px}.row-actions{display:flex;gap:5px;white-space:nowrap}.inline-actions{display:flex;gap:8px}.hint-box{background:var(--green2);border:1px solid #b7ead8;border-radius:13px;padding:12px;font-size:11px;color:#456372;line-height:1.6;margin:10px 0 12px}.notice{padding:10px 12px;border-radius:11px;font-size:12px;margin-bottom:10px;display:none}.notice.show{display:block}.notice.ok{background:#ecfdf3;color:#067647;border:1px solid #abefc6}.notice.err{background:#fef3f2;color:#b42318;border:1px solid #fecdca}.criteria-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.criteria-grid>div{border:1px solid var(--line);border-radius:12px;padding:13px;background:#f8fafc}.criteria-grid span{display:block;font-size:11px;color:var(--muted);font-weight:800;margin-bottom:6px}.criteria-grid strong{font-size:14px}.bar-row{display:grid;grid-template-columns:45px 1fr 90px;gap:8px;align-items:center;margin:9px 0;font-size:11px}.bar-track{height:13px;background:#edf2f7;border-radius:999px;overflow:hidden;margin-bottom:3px}.bar{height:100%;border-radius:999px;background:var(--green)}.bar.pick{background:var(--navy)}
 @media(max-width:1100px){.grid.two,.dashboard-grid{grid-template-columns:1fr!important}.kpis{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){body{padding:6px}.kpis{grid-template-columns:1fr}.criteria-grid{grid-template-columns:1fr}.inline-actions{flex-direction:column}.btn{min-height:40px}}
 
+
+/* =========================================================
+   폐수현황 - 폐기물현황과 동일 계열 대시보드
+========================================================= */
+.status-toolbar{margin-bottom:12px}
+.year-filter{min-width:96px;text-align:center}
+.kpis-rich{gap:12px}
+.kpi.rich{
+  position:relative;overflow:hidden;border-radius:16px;padding:16px 18px;min-height:104px
+}
+.kpi-main{display:flex;align-items:center;gap:14px}
+.kpi-copy{min-width:0}
+.kpi.rich .label{font-size:12px;font-weight:900;color:#66758b}
+.kpi.rich .value{font-size:22px;line-height:1.2;margin-top:6px;color:#10203c}
+.kpi.rich .meta{margin-top:7px;font-size:11px;font-weight:800;color:#12a36d}
+.kpi-icon,.kpi-side-icon{display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.kpi-icon{width:56px;height:56px;border-radius:50%}
+.kpi-icon svg,.kpi-side-icon svg{width:26px;height:26px}
+.kpi-side-icon{position:absolute;right:16px;top:50%;transform:translateY(-50%);opacity:.8}
+.kpi.water .kpi-icon{background:#e5f6ff;color:#1885d8}
+.kpi.generated .kpi-icon{background:#dff4e8;color:#21a366}
+.kpi.treated .kpi-icon{background:#e7f0ff;color:#2680eb}
+.kpi.storage .kpi-icon{background:#efe6ff;color:#9a54ff}
+.kpi.water .kpi-side-icon{color:#1885d8}
+.kpi.generated .kpi-side-icon{color:#21a366}
+.kpi.treated .kpi-side-icon{color:#2680eb}
+.kpi.storage .kpi-side-icon{color:#9a54ff}
+
+.dashboard-full{padding:14px 16px 16px}
+.preview-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.1fr) minmax(360px,.9fr);
+  gap:12px;margin-bottom:14px
+}
+.chart-card{padding:14px 16px 16px}
+.chart-card-body{height:100%}
+.chart-head-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.chart-head-row .spacer{flex:1}
+.mini-title{font-size:14px;color:#10203c}
+.chart-axis-label{margin:0 0 6px;color:#66758b;font-size:11px;font-weight:800}
+.chart-legend{display:flex;align-items:center;gap:18px;flex-wrap:wrap;font-size:11px;font-weight:800;color:#53657f}
+.chart-legend span{display:inline-flex;align-items:center;gap:7px}
+.legend-swatch{width:14px;height:10px;border-radius:3px;display:inline-block}
+.legend-swatch.gen{background:#35c27d}
+.legend-swatch.col{background:#6ea5ff}
+.legend-line{width:18px;height:3px;border-radius:999px;display:inline-block}
+.legend-line.gen{background:#21b36a}
+.legend-line.col{background:#2f86f6}
+
+.month-chart,.count-chart{
+  position:relative;display:grid;grid-template-columns:repeat(12,minmax(34px,1fr));gap:8px;
+  min-height:190px;padding:14px 6px 0;border-left:1px solid #e3e9f1;border-bottom:1px solid #d4dde8;
+  background:linear-gradient(to bottom,transparent 19%,#eef2f6 20%,transparent 21%,transparent 39%,#eef2f6 40%,transparent 41%,transparent 59%,#eef2f6 60%,transparent 61%,transparent 79%,#eef2f6 80%,transparent 81%)
+}
+.month-col,.count-col{display:grid;grid-template-rows:1fr 24px}
+.month-bars,.count-bar-wrap{display:flex;align-items:flex-end;justify-content:center;gap:6px;min-height:150px}
+.month-bar{width:min(16px,39%);min-width:6px;border-radius:5px 5px 2px 2px}
+.month-bar.gen{background:#35c27d}.month-bar.col{background:#6ea5ff}
+.count-col{grid-template-rows:20px 1fr 24px}
+.count-value{text-align:center;font-size:11px;font-weight:900;color:#4a5670}
+.count-bar{width:min(26px,80%);min-width:10px;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#c7abf1,#b792ed)}
+.month-label{align-self:end;text-align:center;color:#66758b;font-size:10px;font-weight:800}
+.chart-empty-note{
+  position:absolute;z-index:3;left:50%;top:46%;transform:translate(-50%,-50%);
+  padding:8px 12px;border-radius:999px;background:rgba(255,255,255,.93);border:1px solid #dce4ee;
+  color:#98a2b3;font-size:11px;font-weight:800;white-space:nowrap
+}
+.month-chart.is-empty .month-col,.count-chart.is-empty .count-col{opacity:.45}
+
+.line-chart-wrap{position:relative}
+.line-chart{width:100%;height:180px;display:block}
+.line-chart .grid line{stroke:#eef2f6;stroke-width:1}
+.line-chart .line{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.line-chart .line.gen{stroke:#21b36a}.line-chart .line.col{stroke:#2f86f6}
+.line-chart .point.gen{fill:#21b36a}.line-chart .point.col{fill:#2f86f6}
+.line-chart-labels{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));margin-top:4px}
+.line-chart-labels span{text-align:center;color:#66758b;font-size:10px;font-weight:800}
+
+/* 31일/월 누적발생량 */
+.daily-cumulative-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.daily-mini-card{border:1px solid #e1e8f0;border-radius:12px;background:#fbfcfe;padding:10px 11px}
+.daily-mini-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.daily-mini-head strong{font-size:12px;color:#263a5f}
+.daily-mini-head span{font-size:11px;font-weight:900;color:#0b8a68;font-variant-numeric:tabular-nums}
+.daily-mini-svg{width:100%;height:72px;display:block;margin-top:6px}
+.daily-mini-svg .mini-grid{stroke:#e8edf3;stroke-width:1}
+.daily-mini-svg .mini-line{fill:none;stroke:#25ad73;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.daily-mini-days{display:flex;justify-content:space-between;color:#98a2b3;font-size:9px;font-weight:800}
+
+@media(max-width:1200px){
+  .preview-grid{grid-template-columns:1fr}
+  .daily-cumulative-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:900px){
+  .kpi-side-icon{display:none}
+  .daily-cumulative-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:720px){
+  .month-chart,.count-chart{overflow-x:auto;grid-template-columns:repeat(12,48px)}
+  .daily-cumulative-grid{grid-template-columns:1fr}
+}
