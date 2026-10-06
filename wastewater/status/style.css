@@ -168,3 +168,14 @@
 .storage-point.invalid{
   fill:#d92d20;stroke:#fff;stroke-width:1.8
 }
+
+
+/* 폐수발생량 KPI - 산정불가일수 보조표기 */
+.kpi-unverified{
+  margin-left:5px;
+  font-size:9px;
+  font-weight:800;
+  color:#98a2b3;
+  letter-spacing:-0.15px;
+  white-space:nowrap;
+}
