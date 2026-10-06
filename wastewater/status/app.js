@@ -38,12 +38,12 @@ function rowStorage(row){
     const main=toM3(row.volume_value,row.volume_unit||settings.volume_unit);
     const ext=row.has_external?toM3(row.external_volume_value||0,row.external_volume_unit||row.volume_unit||settings.volume_unit):0;
     const total=main+ext,cap=Number(settings?.tank_capacity_m3||0);
-    return {main,external:ext,total,over:cap>0&&total>cap,display:`${num(total,2)} m³`};
+    return {main,external:ext,total,over:cap>0&&main>cap,display:`${num(total,2)} m³`};
   }
   const mainCm=Number(row.height||0);
   const extCm=row.has_external?Number(row.external_cm||0):0;
   const totalCm=mainCm+extCm,total=cmToM3(totalCm),limit=Number(settings?.tank_height_cm||154);
-  return {main:cmToM3(mainCm),external:cmToM3(extCm),total,over:totalCm>limit,totalCm,display:`${num(totalCm,1)} cm / ${num(total,2)} m³`};
+  return {main:cmToM3(mainCm),external:cmToM3(extCm),total,over:mainCm>limit,totalCm,display:`${num(totalCm,1)} cm / ${num(total,2)} m³`};
 }
 function openingSeed(){
   return [...openings]
