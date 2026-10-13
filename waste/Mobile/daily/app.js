@@ -326,7 +326,7 @@ function combinedRowsHtml(){
   });
 
   if(!combined.length){
-    return `<tr><td colspan="7" class="empty">등록된 일일입력 기록이 없습니다.</td></tr>`;
+    return `<div class="mobile-empty-card">등록된 일일입력 기록이 없습니다.</div>`;
   }
 
   return combined.map(x=>{
@@ -334,29 +334,32 @@ function combinedRowsHtml(){
 
     if(x.mode==='facility'){
       const holiday=effectiveHoliday(r.entry_date,r.is_holiday,r.holiday_reason);
-      const detail=holiday.isHoliday
-        ? `<span class="pill amber">휴일</span>${holiday.reason?` ${esc(holiday.reason)}`:''}`
-        : [
-            r.usage!=null?`용수 ${num(r.usage,2)} m³`:'',
-            r.height!=null?`높이 ${num(r.height,1)} cm`:'',
-            r.has_external?`외부 ${num(r.external_ton,2)} T / ${num(r.external_cm,1)} cm`:''
-          ].filter(Boolean).join('<br>');
-
+      const summaryValue=holiday.isHoliday
+        ? '휴일'
+        : (r.height!=null?`${num(r.height,1)} cm`:'높이 -');
       return `
-        <tr>
-          <td>${r.entry_date}</td>
-          <td>${esc(typeName(r.waste_types||{}))}</td>
-          <td><span class="pill green">폐수배출시설 운영일지</span></td>
-          <td>${detail||'-'}</td>
-          <td>${r.has_external?'<span class="pill amber">외부보관</span>':'-'}</td>
-          <td>${esc(r.note||'')}</td>
-          <td>
-            <div class="row-actions">
+        <details class="mobile-record-card daily-record facility-record ${holiday.isHoliday?'holiday-record':''}">
+          <summary class="mobile-record-summary daily-summary">
+            <span class="mobile-record-date">${r.entry_date}</span>
+            <span class="mobile-record-type"><span class="pill green">폐수 운영일지</span></span>
+            <span class="mobile-record-value">${summaryValue}</span>
+            <span class="mobile-record-chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div class="mobile-record-detail">
+            <div class="mobile-detail-row"><span>폐기물 종류</span><b>${esc(typeName(r.waste_types||{}))}</b></div>
+            ${holiday.isHoliday
+              ? `<div class="mobile-detail-row"><span>휴일 사유</span><b>${esc(holiday.reason||'휴일')}</b></div>`
+              : `
+                <div class="mobile-detail-row"><span>용수 금일</span><b>${r.usage==null?'-':`${num(r.usage,2)} m³`}</b></div>
+                <div class="mobile-detail-row"><span>저장고 높이</span><b>${r.height==null?'-':`${num(r.height,1)} cm`}</b></div>
+                <div class="mobile-detail-row"><span>외부보관</span><b>${r.has_external?`${num(r.external_ton,2)} T / ${num(r.external_cm,1)} cm`:'-'}</b></div>`}
+            <div class="mobile-detail-row"><span>비고</span><b>${esc(r.note||'-')}</b></div>
+            <div class="mobile-detail-actions">
               <button class="btn small" data-edit-facility="${r.id}">수정</button>
               <button class="btn small danger" data-del-facility="${r.id}">삭제</button>
             </div>
-          </td>
-        </tr>`;
+          </div>
+        </details>`;
     }
 
     const quantityText=r.waste_container_units?.unit_name
@@ -368,23 +371,27 @@ function combinedRowsHtml(){
       : `${num(r.weight_kg,3)} kg <span class="pill ${r.weight_status==='confirmed'?'green':'amber'}">${r.weight_status==='confirmed'?'확정':'추정'}</span>`;
 
     return `
-      <tr>
-        <td>${r.entry_date}</td>
-        <td>${esc(typeName(r.waste_types||{}))}</td>
-        <td><span class="pill">일반 발생기록</span></td>
-        <td>${quantityText}<br>${weightText}</td>
-        <td>${esc(r.waste_storage_locations?.location_name||'-')}</td>
-        <td>${esc(r.note||'')}</td>
-        <td>
-          <div class="row-actions">
+      <details class="mobile-record-card daily-record">
+        <summary class="mobile-record-summary daily-summary">
+          <span class="mobile-record-date">${r.entry_date}</span>
+          <span class="mobile-record-type">${esc(typeName(r.waste_types||{}))}</span>
+          <span class="mobile-record-value">${r.weight_kg==null?'미확정':`${num(r.weight_kg,3)} kg`}</span>
+          <span class="mobile-record-chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div class="mobile-record-detail">
+          <div class="mobile-detail-row"><span>구분</span><b><span class="pill">일반 발생기록</span></b></div>
+          <div class="mobile-detail-row"><span>수량</span><b>${quantityText}</b></div>
+          <div class="mobile-detail-row"><span>중량</span><b>${weightText}</b></div>
+          <div class="mobile-detail-row"><span>보관장소</span><b>${esc(r.waste_storage_locations?.location_name||'-')}</b></div>
+          <div class="mobile-detail-row"><span>비고</span><b>${esc(r.note||'-')}</b></div>
+          <div class="mobile-detail-actions">
             <button class="btn small" data-edit-general="${r.id}">수정</button>
             <button class="btn small danger" data-del-general="${r.id}">삭제</button>
           </div>
-        </td>
-      </tr>`;
+        </div>
+      </details>`;
   }).join('');
 }
-
 function render(){
   const data=currentEditingData();
   const facilityMode=isFacilityEditing();
@@ -444,22 +451,8 @@ function render(){
           <span class="hint">최근 순</span>
         </div>
 
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>발생일</th>
-                <th>폐기물</th>
-                <th>구분</th>
-                <th>입력내용</th>
-                <th>보관/상태</th>
-                <th>비고</th>
-                <th>관리</th>
-              </tr>
-            </thead>
-            <tbody>${combinedRowsHtml()}</tbody>
-          </table>
-        </div>
+        <div class="mobile-list-caption daily-list-caption"><span>날짜</span><span>폐기물/구분</span><span>주요값</span><span></span></div>
+        <div class="mobile-card-list">${combinedRowsHtml()}</div>
       </div>
     </div>`;
 
