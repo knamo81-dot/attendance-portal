@@ -3155,6 +3155,42 @@ body.auth-loading .top-user-bar {
       desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 통합 관리합니다.',
       gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
     },
+    'waste/Mobile/status/index.html': {
+      top: 'Waste Management',
+      title: '폐기물 관리',
+      desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 모바일에서 관리합니다.',
+      gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
+    },
+    'waste/Mobile/daily/index.html': {
+      top: 'Waste Management',
+      title: '폐기물 관리',
+      desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 모바일에서 관리합니다.',
+      gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
+    },
+    'waste/Mobile/collection/index.html': {
+      top: 'Waste Management',
+      title: '폐기물 관리',
+      desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 모바일에서 관리합니다.',
+      gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
+    },
+    'waste/Mobile/ledger/index.html': {
+      top: 'Waste Management',
+      title: '폐기물 관리',
+      desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 모바일에서 관리합니다.',
+      gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
+    },
+    'waste/Mobile/reference/index.html': {
+      top: 'Waste Management',
+      title: '폐기물 관리',
+      desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 모바일에서 관리합니다.',
+      gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
+    },
+    'waste/Mobile/documents/index.html': {
+      top: 'Waste Management',
+      title: '폐기물 관리',
+      desc: '폐기물 발생·보관·수거·관리대장 및 관련 자료를 모바일에서 관리합니다.',
+      gradient: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)'
+    },
     'attendance/index.html': {
       top: 'Workforce Analytics',
       title: '근태 리스크 및 운영 분석',
@@ -3448,6 +3484,54 @@ body.auth-loading .top-user-bar {
       { id: 'waste-documents', label: '관련서류' }
     ],
     'waste/documents/index.html': [
+      { id: 'waste-status', label: '폐기물현황' },
+      { id: 'waste-daily', label: '일일입력' },
+      { id: 'waste-collection', label: '수거등록' },
+      { id: 'waste-ledger', label: '관리대장' },
+      { id: 'waste-reference', label: '관련자료' },
+      { id: 'waste-documents', label: '관련서류' }
+    ],
+    'waste/Mobile/status/index.html': [
+      { id: 'waste-status', label: '폐기물현황' },
+      { id: 'waste-daily', label: '일일입력' },
+      { id: 'waste-collection', label: '수거등록' },
+      { id: 'waste-ledger', label: '관리대장' },
+      { id: 'waste-reference', label: '관련자료' },
+      { id: 'waste-documents', label: '관련서류' }
+    ],
+    'waste/Mobile/daily/index.html': [
+      { id: 'waste-status', label: '폐기물현황' },
+      { id: 'waste-daily', label: '일일입력' },
+      { id: 'waste-collection', label: '수거등록' },
+      { id: 'waste-ledger', label: '관리대장' },
+      { id: 'waste-reference', label: '관련자료' },
+      { id: 'waste-documents', label: '관련서류' }
+    ],
+    'waste/Mobile/collection/index.html': [
+      { id: 'waste-status', label: '폐기물현황' },
+      { id: 'waste-daily', label: '일일입력' },
+      { id: 'waste-collection', label: '수거등록' },
+      { id: 'waste-ledger', label: '관리대장' },
+      { id: 'waste-reference', label: '관련자료' },
+      { id: 'waste-documents', label: '관련서류' }
+    ],
+    'waste/Mobile/ledger/index.html': [
+      { id: 'waste-status', label: '폐기물현황' },
+      { id: 'waste-daily', label: '일일입력' },
+      { id: 'waste-collection', label: '수거등록' },
+      { id: 'waste-ledger', label: '관리대장' },
+      { id: 'waste-reference', label: '관련자료' },
+      { id: 'waste-documents', label: '관련서류' }
+    ],
+    'waste/Mobile/reference/index.html': [
+      { id: 'waste-status', label: '폐기물현황' },
+      { id: 'waste-daily', label: '일일입력' },
+      { id: 'waste-collection', label: '수거등록' },
+      { id: 'waste-ledger', label: '관리대장' },
+      { id: 'waste-reference', label: '관련자료' },
+      { id: 'waste-documents', label: '관련서류' }
+    ],
+    'waste/Mobile/documents/index.html': [
       { id: 'waste-status', label: '폐기물현황' },
       { id: 'waste-daily', label: '일일입력' },
       { id: 'waste-collection', label: '수거등록' },
@@ -4034,15 +4118,7 @@ body.auth-loading .top-user-bar {
         setPortalSubtabActive('waste-status', false);
       }
 
-      const targetMap = {
-        'waste-status': WASTE_STATUS_SRC,
-        'waste-daily': WASTE_DAILY_SRC,
-        'waste-collection': WASTE_COLLECTION_SRC,
-        'waste-ledger': WASTE_LEDGER_SRC,
-        'waste-reference': WASTE_REFERENCE_SRC,
-        'waste-documents': WASTE_DOCUMENTS_SRC
-      };
-      const target = targetMap[tabId] || '';
+      const target = getWasteFeatureSrc(tabId);
       if (target && currentSrc !== target) {
         try { sessionStorage.setItem(LAST_PAGE_KEY, target); } catch (_) {}
         replacePortalFrame(buildSrcWithSession(target));
@@ -4163,9 +4239,16 @@ body.auth-loading .top-user-bar {
     if (isWasteProgramSrc(key)) {
       const wasteRole = getPortalAppRoleForTabs('waste');
       const canOperate = isPortalOperatorRole(wasteRole);
-      if (!canOperate && (key === WASTE_DAILY_SRC || key === WASTE_COLLECTION_SRC)) {
-        try { sessionStorage.setItem(LAST_PAGE_KEY, WASTE_STATUS_SRC); } catch (_) {}
-        replacePortalFrame(buildSrcWithSession(WASTE_STATUS_SRC));
+      const restrictedWasteSrc = new Set([
+        WASTE_DAILY_SRC,
+        WASTE_COLLECTION_SRC,
+        WASTE_DAILY_MOBILE_SRC,
+        WASTE_COLLECTION_MOBILE_SRC
+      ]);
+      if (!canOperate && restrictedWasteSrc.has(key)) {
+        const statusTarget = getWasteFeatureSrc('waste-status');
+        try { sessionStorage.setItem(LAST_PAGE_KEY, statusTarget); } catch (_) {}
+        replacePortalFrame(buildSrcWithSession(statusTarget));
         return;
       }
     }
@@ -4407,6 +4490,33 @@ body.auth-loading .top-user-bar {
   const WASTE_REFERENCE_SRC = 'waste/reference/index.html';
   const WASTE_DOCUMENTS_SRC = 'waste/documents/index.html';
 
+  const WASTE_STATUS_MOBILE_SRC = 'waste/Mobile/status/index.html';
+  const WASTE_DAILY_MOBILE_SRC = 'waste/Mobile/daily/index.html';
+  const WASTE_COLLECTION_MOBILE_SRC = 'waste/Mobile/collection/index.html';
+  const WASTE_LEDGER_MOBILE_SRC = 'waste/Mobile/ledger/index.html';
+  const WASTE_REFERENCE_MOBILE_SRC = 'waste/Mobile/reference/index.html';
+  const WASTE_DOCUMENTS_MOBILE_SRC = 'waste/Mobile/documents/index.html';
+
+  function getWasteFeatureSrc(tabId) {
+    const mobile = isMobilePortalView();
+    const map = mobile ? {
+      'waste-status': WASTE_STATUS_MOBILE_SRC,
+      'waste-daily': WASTE_DAILY_MOBILE_SRC,
+      'waste-collection': WASTE_COLLECTION_MOBILE_SRC,
+      'waste-ledger': WASTE_LEDGER_MOBILE_SRC,
+      'waste-reference': WASTE_REFERENCE_MOBILE_SRC,
+      'waste-documents': WASTE_DOCUMENTS_MOBILE_SRC
+    } : {
+      'waste-status': WASTE_STATUS_SRC,
+      'waste-daily': WASTE_DAILY_SRC,
+      'waste-collection': WASTE_COLLECTION_SRC,
+      'waste-ledger': WASTE_LEDGER_SRC,
+      'waste-reference': WASTE_REFERENCE_SRC,
+      'waste-documents': WASTE_DOCUMENTS_SRC
+    };
+    return map[tabId] || (mobile ? WASTE_STATUS_MOBILE_SRC : WASTE_STATUS_SRC);
+  }
+
   function isWasteProgramSrc(src) {
     const key = normalizePortalSrc(src);
     return [
@@ -4415,7 +4525,13 @@ body.auth-loading .top-user-bar {
       WASTE_COLLECTION_SRC,
       WASTE_LEDGER_SRC,
       WASTE_REFERENCE_SRC,
-      WASTE_DOCUMENTS_SRC
+      WASTE_DOCUMENTS_SRC,
+      WASTE_STATUS_MOBILE_SRC,
+      WASTE_DAILY_MOBILE_SRC,
+      WASTE_COLLECTION_MOBILE_SRC,
+      WASTE_LEDGER_MOBILE_SRC,
+      WASTE_REFERENCE_MOBILE_SRC,
+      WASTE_DOCUMENTS_MOBILE_SRC
     ].includes(key);
   }
 
@@ -4427,7 +4543,13 @@ body.auth-loading .top-user-bar {
       [WASTE_COLLECTION_SRC]: 'waste-collection',
       [WASTE_LEDGER_SRC]: 'waste-ledger',
       [WASTE_REFERENCE_SRC]: 'waste-reference',
-      [WASTE_DOCUMENTS_SRC]: 'waste-documents'
+      [WASTE_DOCUMENTS_SRC]: 'waste-documents',
+      [WASTE_STATUS_MOBILE_SRC]: 'waste-status',
+      [WASTE_DAILY_MOBILE_SRC]: 'waste-daily',
+      [WASTE_COLLECTION_MOBILE_SRC]: 'waste-collection',
+      [WASTE_LEDGER_MOBILE_SRC]: 'waste-ledger',
+      [WASTE_REFERENCE_MOBILE_SRC]: 'waste-reference',
+      [WASTE_DOCUMENTS_MOBILE_SRC]: 'waste-documents'
     };
     return map[key] || '';
   }
@@ -4578,6 +4700,10 @@ body.auth-loading .top-user-bar {
     if (isReagentDashboardSrc(raw)) return getReagentDashboardSrc() + suffix;
     if (isReagentAppSrc(raw)) return getReagentAppSrc() + suffix;
     if (isWastewaterResponsiveSrc(raw)) return getWastewaterSrc() + suffix;
+    if (isWasteProgramSrc(raw)) {
+      const wasteTabId = getWasteTabIdBySrc(raw) || 'waste-status';
+      return getWasteFeatureSrc(wasteTabId) + suffix;
+    }
     if (isResearchStaffResponsiveSrc(raw)) return getResearchStaffSrc() + suffix;
     if (isTravelExpenseResponsiveSrc(raw)) return getTravelExpenseSrc() + suffix;
     if (isPatentDashboardSrc(raw)) return getPatentDashboardSrc() + suffix;
