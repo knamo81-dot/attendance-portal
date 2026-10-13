@@ -1,4 +1,379 @@
+const SUPABASE_URL="https://mbqpsovlwvedwrtbbauj.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1icXBzb3Zsd3ZlZHdydGJiYXVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MTI2NTksImV4cCI6MjA5MTM4ODY1OX0.B3VWnRUn-A9hABLrx5ysFDQeAJvP_rTktzGiuz5LeTY";
 
+(function(){
+  function portalSession(){
+    try{ if(window.parent && window.parent!==window && typeof window.parent.getPortalSession==='function') return window.parent.getPortalSession()||{}; }catch(e){}
+    try{ if(window.parent && window.parent!==window && window.parent.portalSession) return window.parent.portalSession||{}; }catch(e){}
+    return window.portalSession||window.currentPortalSession||{};
+  }
+  function rawClient(){
+    const s=portalSession();
+    if(s && s.supabase) return s.supabase;
+    try{ if(window.parent && window.parent!==window && window.parent.portalSupabase) return window.parent.portalSupabase; }catch(e){}
+    if(window.portalSupabase) return window.portalSupabase;
+    if(window.supabase && typeof window.supabase.createClient==='function'){
+      window.portalSupabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+      return window.portalSupabase;
+    }
+    throw new Error('Supabase client 초기화 실패');
+  }
+  function companyId(){
+    const s=portalSession();
+    const c=s.activeCompany||s.active_company||s.selectedCompany||s.company||{};
+    const v=s.activeCompanyId||s.active_company_id||s.selectedCompanyId||s.selected_company_id||c.id||c.company_id||s.companyId||s.company_id||s.profile?.company_id||window.currentCompanyId||'';
+    if(v) return String(v).trim();
+    try{ const p=new URLSearchParams(location.search); return String(p.get('company_id')||p.get('companyId')||'').trim(); }catch(e){ return ''; }
+  }
+  function userEmail(){ const s=portalSession(); return String(s.email||s.user?.email||s.profile?.email||'').trim(); }
+  const sb=rawClient();
+  async function list(table,select='*',orderCol='created_at',ascending=false){
+    let q=sb.from(table).select(select);
+    const cid=companyId();
+    if(cid) q=q.eq('company_id',cid);
+    if(orderCol) q=q.order(orderCol,{ascending});
+    return q;
+  }
+  async function insert(table,payload){
+    const cid=companyId();
+    const row={...payload,company_id:payload.company_id||cid,created_by:payload.created_by||userEmail()||null};
+    return sb.from(table).insert([row]).select('*').single();
+  }
+  async function update(table,id,payload){
+    let q=sb.from(table).update(payload).eq('id',id);
+    const cid=companyId();
+    if(cid) q=q.eq('company_id',cid);
+    return q.select('*').single();
+  }
+  async function remove(table,id){
+    let q=sb.from(table).delete().eq('id',id);
+    const cid=companyId();
+    if(cid) q=q.eq('company_id',cid);
+    return q;
+  }
+  window.wasteApi={sb,portalSession,companyId,userEmail,list,insert,update,remove};
+})();
+
+const A=window.wasteApi;
+const $=(s)=>document.querySelector(s);
+const esc=(v)=>String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));
+const STORAGE_BUCKET='waste-editor-files';
+
+
+function getWasteAppRole(){
+  const s=A.portalSession()||{};
+  const roles=s.appRoles||s.app_roles||{};
+  const row=roles.waste||{};
+  const raw=typeof row==='string'
+    ? row
+    : (row.role||row.role_key||row.permission||row.permission_key||'user');
+  const role=String(raw||'user').trim().toLowerCase();
+  if(['관리자','administrator'].includes(role))return 'admin';
+  if(['운영자','manager'].includes(role))return 'operator';
+  return role||'user';
+}
+function canManageWaste(){
+  const role=getWasteAppRole();
+  return role==='admin'||role==='operator';
+}
+
+
+function notice(msg,type='ok'){
+  const el=$('#notice');
+  if(!el)return;
+  el.textContent=msg;
+  el.className='notice show '+type;
+  setTimeout(()=>el.classList.remove('show'),3500);
+}
+function formatDate(v){
+  if(!v)return '-';
+  const s=String(v).slice(0,10);
+  const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m?`${m[1]}. ${Number(m[2])}. ${Number(m[3])}.`:s;
+}
+function uid(){
+  if(window.crypto?.randomUUID)return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
+    const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);
+  });
+}
+function safeFileName(name){
+  return String(name||'file').normalize('NFKC').replace(/[^\w가-힣.\-() ]+/g,'_').replace(/\s+/g,'_').slice(0,120);
+}
+function plainTextFromHtml(html){
+  const d=document.createElement('div');
+  d.innerHTML=String(html||'');
+  return (d.textContent||'').replace(/\s+/g,' ').trim();
+}
+function looksLikeHtml(v){
+  return /<\/?[a-z][\s\S]*>/i.test(String(v||''));
+}
+function legacyOrHtml(v){
+  if(!v)return '<p></p>';
+  if(looksLikeHtml(v))return sanitizeHtml(v,true);
+  return `<p>${esc(v).replace(/\n/g,'<br>')}</p>`;
+}
+function sanitizeStyle(styleText){
+  const allow=new Set(['text-align','font-family','font-size','color','background-color','font-weight','font-style','text-decoration','width','height','max-width']);
+  const out=[];
+  String(styleText||'').split(';').forEach(part=>{
+    const i=part.indexOf(':');
+    if(i<0)return;
+    const prop=part.slice(0,i).trim().toLowerCase();
+    let val=part.slice(i+1).trim();
+    if(!allow.has(prop))return;
+    if(/url\s*\(|expression\s*\(|javascript:/i.test(val))return;
+    if(prop==='font-size'&&!/^\d{1,2}px$/.test(val))return;
+    if((prop==='width'||prop==='height'||prop==='max-width')&&!/^(\d{1,4}px|\d{1,3}%|auto)$/.test(val))return;
+    out.push(`${prop}:${val}`);
+  });
+  return out.join(';');
+}
+function sanitizeHtml(html,forSave=false){
+  const parser=new DOMParser();
+  const doc=parser.parseFromString(`<div id="root">${String(html||'')}</div>`,'text/html');
+  const root=doc.querySelector('#root');
+  const allowed=new Set(['P','DIV','BR','SPAN','STRONG','B','EM','I','U','S','STRIKE','UL','OL','LI','BLOCKQUOTE','A','IMG','TABLE','THEAD','TBODY','TFOOT','TR','TD','TH','HR','H1','H2','H3','FONT']);
+  const nodes=[...root.querySelectorAll('*')];
+
+  nodes.forEach(el=>{
+    if(!allowed.has(el.tagName)){
+      el.replaceWith(...el.childNodes);
+      return;
+    }
+
+    [...el.attributes].forEach(a=>{
+      const n=a.name.toLowerCase();
+      if(n.startsWith('on'))return el.removeAttribute(a.name);
+
+      const common=n==='style';
+      const ok=
+        common ||
+        (el.tagName==='A' && ['href','target','rel'].includes(n)) ||
+        (el.tagName==='IMG' && ['src','alt','data-storage-path','width','height'].includes(n)) ||
+        (el.tagName==='FONT' && ['face','size','color'].includes(n)) ||
+        (['TD','TH'].includes(el.tagName) && ['colspan','rowspan'].includes(n));
+
+      if(!ok)el.removeAttribute(a.name);
+    });
+
+    if(el.hasAttribute('style')){
+      const clean=sanitizeStyle(el.getAttribute('style'));
+      clean?el.setAttribute('style',clean):el.removeAttribute('style');
+    }
+
+    if(el.tagName==='A'){
+      const href=String(el.getAttribute('href')||'').trim();
+      if(href && !/^(https?:|mailto:)/i.test(href))el.removeAttribute('href');
+      el.setAttribute('target','_blank');
+      el.setAttribute('rel','noopener noreferrer');
+    }
+
+    if(el.tagName==='IMG'){
+      const path=el.getAttribute('data-storage-path');
+      const src=String(el.getAttribute('src')||'');
+      if(forSave && path)el.removeAttribute('src');
+      else if(src && !/^(https?:|blob:)/i.test(src))el.removeAttribute('src');
+      el.setAttribute('style',`${sanitizeStyle(el.getAttribute('style'))};max-width:100%;height:auto`.replace(/^;/,''));
+    }
+  });
+
+  return root.innerHTML;
+}
+
+let savedRange=null;
+function editorEl(){return $('#rich-editor')}
+function rememberRange(){
+  const ed=editorEl();
+  const sel=window.getSelection();
+  if(!ed||!sel||!sel.rangeCount)return;
+  const r=sel.getRangeAt(0);
+  if(ed.contains(r.commonAncestorContainer))savedRange=r.cloneRange();
+}
+function restoreRange(){
+  if(!savedRange)return;
+  const sel=window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(savedRange);
+}
+function execEditor(cmd,value=null){
+  const ed=editorEl();
+  if(!ed)return;
+  ed.focus();
+  restoreRange();
+  document.execCommand('styleWithCSS',false,true);
+  document.execCommand(cmd,false,value);
+  rememberRange();
+}
+function applyFontSize(px){
+  const map={'12':'2','14':'3','16':'3','18':'4','20':'4','24':'5','28':'6','32':'6'};
+  execEditor('fontSize',map[String(px)]||'3');
+  document.querySelectorAll('#rich-editor font[size]').forEach(el=>{
+    el.removeAttribute('size');
+    el.style.fontSize=`${px}px`;
+  });
+}
+function normalizeUrl(v){
+  let url=String(v||'').trim();
+  if(!url)return '';
+  if(!/^[a-z]+:/i.test(url))url='https://'+url;
+  return url;
+}
+function insertLink(){
+  rememberRange();
+  const url=normalizeUrl(prompt('링크 주소를 입력하세요.'));
+  if(url)execEditor('createLink',url);
+}
+function insertTable(){
+  rememberRange();
+  const rows=Math.min(10,Math.max(1,Number(prompt('행 수를 입력하세요.','3')||0)));
+  const cols=Math.min(10,Math.max(1,Number(prompt('열 수를 입력하세요.','3')||0)));
+  if(!rows||!cols)return;
+  let html='<table><tbody>';
+  for(let r=0;r<rows;r++){
+    html+='<tr>';
+    for(let c=0;c<cols;c++)html+='<td><br></td>';
+    html+='</tr>';
+  }
+  html+='</tbody></table><p><br></p>';
+  execEditor('insertHTML',html);
+}
+function toolbarHtml(){
+  return `
+    <div class="editor-toolbar" id="editor-toolbar">
+      <div class="tool-group">
+        <select id="tool-block" title="문단 형식">
+          <option value="p">본문</option>
+          <option value="h1">제목 1</option>
+          <option value="h2">제목 2</option>
+          <option value="h3">제목 3</option>
+        </select>
+        <select id="tool-font" title="글꼴">
+          <option value="'Noto Sans KR',sans-serif">Noto Sans KR</option>
+          <option value="'Nanum Gothic',sans-serif">나눔고딕</option>
+          <option value="'Nanum Myeongjo',serif">나눔명조</option>
+          <option value="Arial,sans-serif">Arial</option>
+        </select>
+        <select id="tool-size" title="글자 크기">
+          ${[12,14,16,18,20,24,28,32].map(n=>`<option value="${n}" ${n===16?'selected':''}>${n}</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="tool-group">
+        <button type="button" class="tool-btn" data-cmd="bold" title="굵게"><b>B</b></button>
+        <button type="button" class="tool-btn" data-cmd="italic" title="기울임"><i>I</i></button>
+        <button type="button" class="tool-btn" data-cmd="underline" title="밑줄"><u>U</u></button>
+        <button type="button" class="tool-btn" data-cmd="strikeThrough" title="취소선"><s>S</s></button>
+        <div class="color-menu-wrap">
+          <button type="button" class="color-tool-button" id="text-color-button" title="글자색">
+            <span class="color-tool-letter">A</span>
+            <span class="color-tool-bar" id="text-color-bar" style="background:#10203c"></span>
+            <span class="color-tool-caret">▾</span>
+          </button>
+          <div class="color-palette-popover" id="text-color-popover">
+            <div class="palette-title">테마 색</div>
+            <div class="palette-grid theme"><button type="button" class="palette-swatch" data-color="#FFFFFF" style="background:#FFFFFF" title="#FFFFFF"></button><button type="button" class="palette-swatch" data-color="#000000" style="background:#000000" title="#000000"></button><button type="button" class="palette-swatch" data-color="#E7E6E6" style="background:#E7E6E6" title="#E7E6E6"></button><button type="button" class="palette-swatch" data-color="#0F243E" style="background:#0F243E" title="#0F243E"></button><button type="button" class="palette-swatch" data-color="#1F4E78" style="background:#1F4E78" title="#1F4E78"></button><button type="button" class="palette-swatch" data-color="#ED7D31" style="background:#ED7D31" title="#ED7D31"></button><button type="button" class="palette-swatch" data-color="#1B5E20" style="background:#1B5E20" title="#1B5E20"></button><button type="button" class="palette-swatch" data-color="#00A6D6" style="background:#00A6D6" title="#00A6D6"></button><button type="button" class="palette-swatch" data-color="#7030A0" style="background:#7030A0" title="#7030A0"></button><button type="button" class="palette-swatch" data-color="#43B02A" style="background:#43B02A" title="#43B02A"></button><button type="button" class="palette-swatch" data-color="#F2F2F2" style="background:#F2F2F2" title="#F2F2F2"></button><button type="button" class="palette-swatch" data-color="#7F7F7F" style="background:#7F7F7F" title="#7F7F7F"></button><button type="button" class="palette-swatch" data-color="#D9D9D9" style="background:#D9D9D9" title="#D9D9D9"></button><button type="button" class="palette-swatch" data-color="#DDEBF7" style="background:#DDEBF7" title="#DDEBF7"></button><button type="button" class="palette-swatch" data-color="#DDEBF7" style="background:#DDEBF7" title="#DDEBF7"></button><button type="button" class="palette-swatch" data-color="#FCE4D6" style="background:#FCE4D6" title="#FCE4D6"></button><button type="button" class="palette-swatch" data-color="#E2F0D9" style="background:#E2F0D9" title="#E2F0D9"></button><button type="button" class="palette-swatch" data-color="#DDEBF7" style="background:#DDEBF7" title="#DDEBF7"></button><button type="button" class="palette-swatch" data-color="#E4DFEC" style="background:#E4DFEC" title="#E4DFEC"></button><button type="button" class="palette-swatch" data-color="#E2F0D9" style="background:#E2F0D9" title="#E2F0D9"></button><button type="button" class="palette-swatch" data-color="#D9D9D9" style="background:#D9D9D9" title="#D9D9D9"></button><button type="button" class="palette-swatch" data-color="#595959" style="background:#595959" title="#595959"></button><button type="button" class="palette-swatch" data-color="#BFBFBF" style="background:#BFBFBF" title="#BFBFBF"></button><button type="button" class="palette-swatch" data-color="#BDD7EE" style="background:#BDD7EE" title="#BDD7EE"></button><button type="button" class="palette-swatch" data-color="#9DC3E6" style="background:#9DC3E6" title="#9DC3E6"></button><button type="button" class="palette-swatch" data-color="#F8CBAD" style="background:#F8CBAD" title="#F8CBAD"></button><button type="button" class="palette-swatch" data-color="#C6E0B4" style="background:#C6E0B4" title="#C6E0B4"></button><button type="button" class="palette-swatch" data-color="#5B9BD5" style="background:#5B9BD5" title="#5B9BD5"></button><button type="button" class="palette-swatch" data-color="#D9E1F2" style="background:#D9E1F2" title="#D9E1F2"></button><button type="button" class="palette-swatch" data-color="#A9D18E" style="background:#A9D18E" title="#A9D18E"></button><button type="button" class="palette-swatch" data-color="#BFBFBF" style="background:#BFBFBF" title="#BFBFBF"></button><button type="button" class="palette-swatch" data-color="#404040" style="background:#404040" title="#404040"></button><button type="button" class="palette-swatch" data-color="#A6A6A6" style="background:#A6A6A6" title="#A6A6A6"></button><button type="button" class="palette-swatch" data-color="#9DC3E6" style="background:#9DC3E6" title="#9DC3E6"></button><button type="button" class="palette-swatch" data-color="#5B9BD5" style="background:#5B9BD5" title="#5B9BD5"></button><button type="button" class="palette-swatch" data-color="#F4B183" style="background:#F4B183" title="#F4B183"></button><button type="button" class="palette-swatch" data-color="#A9D18E" style="background:#A9D18E" title="#A9D18E"></button><button type="button" class="palette-swatch" data-color="#2E75B6" style="background:#2E75B6" title="#2E75B6"></button><button type="button" class="palette-swatch" data-color="#B4C6E7" style="background:#B4C6E7" title="#B4C6E7"></button><button type="button" class="palette-swatch" data-color="#70AD47" style="background:#70AD47" title="#70AD47"></button><button type="button" class="palette-swatch" data-color="#A6A6A6" style="background:#A6A6A6" title="#A6A6A6"></button><button type="button" class="palette-swatch" data-color="#262626" style="background:#262626" title="#262626"></button><button type="button" class="palette-swatch" data-color="#7F7F7F" style="background:#7F7F7F" title="#7F7F7F"></button><button type="button" class="palette-swatch" data-color="#5B9BD5" style="background:#5B9BD5" title="#5B9BD5"></button><button type="button" class="palette-swatch" data-color="#2E75B6" style="background:#2E75B6" title="#2E75B6"></button><button type="button" class="palette-swatch" data-color="#C65911" style="background:#C65911" title="#C65911"></button><button type="button" class="palette-swatch" data-color="#70AD47" style="background:#70AD47" title="#70AD47"></button><button type="button" class="palette-swatch" data-color="#1F4E78" style="background:#1F4E78" title="#1F4E78"></button><button type="button" class="palette-swatch" data-color="#8EA9DB" style="background:#8EA9DB" title="#8EA9DB"></button><button type="button" class="palette-swatch" data-color="#548235" style="background:#548235" title="#548235"></button><button type="button" class="palette-swatch" data-color="#7F7F7F" style="background:#7F7F7F" title="#7F7F7F"></button><button type="button" class="palette-swatch" data-color="#0D0D0D" style="background:#0D0D0D" title="#0D0D0D"></button><button type="button" class="palette-swatch" data-color="#595959" style="background:#595959" title="#595959"></button><button type="button" class="palette-swatch" data-color="#2E75B6" style="background:#2E75B6" title="#2E75B6"></button><button type="button" class="palette-swatch" data-color="#1F4E78" style="background:#1F4E78" title="#1F4E78"></button><button type="button" class="palette-swatch" data-color="#833C0C" style="background:#833C0C" title="#833C0C"></button><button type="button" class="palette-swatch" data-color="#548235" style="background:#548235" title="#548235"></button><button type="button" class="palette-swatch" data-color="#17365D" style="background:#17365D" title="#17365D"></button><button type="button" class="palette-swatch" data-color="#305496" style="background:#305496" title="#305496"></button><button type="button" class="palette-swatch" data-color="#375623" style="background:#375623" title="#375623"></button></div>
+            <div class="palette-title standard-title">표준 색</div>
+            <div class="palette-grid standard"><button type="button" class="palette-swatch" data-color="#C00000" style="background:#C00000" title="#C00000"></button><button type="button" class="palette-swatch" data-color="#FF0000" style="background:#FF0000" title="#FF0000"></button><button type="button" class="palette-swatch" data-color="#FFC000" style="background:#FFC000" title="#FFC000"></button><button type="button" class="palette-swatch" data-color="#FFFF00" style="background:#FFFF00" title="#FFFF00"></button><button type="button" class="palette-swatch" data-color="#92D050" style="background:#92D050" title="#92D050"></button><button type="button" class="palette-swatch" data-color="#00B050" style="background:#00B050" title="#00B050"></button><button type="button" class="palette-swatch" data-color="#00B0F0" style="background:#00B0F0" title="#00B0F0"></button><button type="button" class="palette-swatch" data-color="#0070C0" style="background:#0070C0" title="#0070C0"></button><button type="button" class="palette-swatch" data-color="#002060" style="background:#002060" title="#002060"></button><button type="button" class="palette-swatch" data-color="#7030A0" style="background:#7030A0" title="#7030A0"></button></div>
+            <button type="button" class="palette-more" data-more-color="text">🎨 다른 색...</button>
+          </div>
+          <input type="color" id="tool-color" value="#10203c" hidden>
+        </div>
+
+        <div class="color-menu-wrap">
+          <button type="button" class="color-tool-button highlight" id="bg-color-button" title="배경색">
+            <span class="color-tool-letter">A</span>
+            <span class="color-tool-bar" id="bg-color-bar" style="background:#fff2a8"></span>
+            <span class="color-tool-caret">▾</span>
+          </button>
+          <div class="color-palette-popover" id="bg-color-popover">
+            <div class="palette-title">테마 색</div>
+            <div class="palette-grid theme"><button type="button" class="palette-swatch" data-color="#FFFFFF" style="background:#FFFFFF" title="#FFFFFF"></button><button type="button" class="palette-swatch" data-color="#000000" style="background:#000000" title="#000000"></button><button type="button" class="palette-swatch" data-color="#E7E6E6" style="background:#E7E6E6" title="#E7E6E6"></button><button type="button" class="palette-swatch" data-color="#0F243E" style="background:#0F243E" title="#0F243E"></button><button type="button" class="palette-swatch" data-color="#1F4E78" style="background:#1F4E78" title="#1F4E78"></button><button type="button" class="palette-swatch" data-color="#ED7D31" style="background:#ED7D31" title="#ED7D31"></button><button type="button" class="palette-swatch" data-color="#1B5E20" style="background:#1B5E20" title="#1B5E20"></button><button type="button" class="palette-swatch" data-color="#00A6D6" style="background:#00A6D6" title="#00A6D6"></button><button type="button" class="palette-swatch" data-color="#7030A0" style="background:#7030A0" title="#7030A0"></button><button type="button" class="palette-swatch" data-color="#43B02A" style="background:#43B02A" title="#43B02A"></button><button type="button" class="palette-swatch" data-color="#F2F2F2" style="background:#F2F2F2" title="#F2F2F2"></button><button type="button" class="palette-swatch" data-color="#7F7F7F" style="background:#7F7F7F" title="#7F7F7F"></button><button type="button" class="palette-swatch" data-color="#D9D9D9" style="background:#D9D9D9" title="#D9D9D9"></button><button type="button" class="palette-swatch" data-color="#DDEBF7" style="background:#DDEBF7" title="#DDEBF7"></button><button type="button" class="palette-swatch" data-color="#DDEBF7" style="background:#DDEBF7" title="#DDEBF7"></button><button type="button" class="palette-swatch" data-color="#FCE4D6" style="background:#FCE4D6" title="#FCE4D6"></button><button type="button" class="palette-swatch" data-color="#E2F0D9" style="background:#E2F0D9" title="#E2F0D9"></button><button type="button" class="palette-swatch" data-color="#DDEBF7" style="background:#DDEBF7" title="#DDEBF7"></button><button type="button" class="palette-swatch" data-color="#E4DFEC" style="background:#E4DFEC" title="#E4DFEC"></button><button type="button" class="palette-swatch" data-color="#E2F0D9" style="background:#E2F0D9" title="#E2F0D9"></button><button type="button" class="palette-swatch" data-color="#D9D9D9" style="background:#D9D9D9" title="#D9D9D9"></button><button type="button" class="palette-swatch" data-color="#595959" style="background:#595959" title="#595959"></button><button type="button" class="palette-swatch" data-color="#BFBFBF" style="background:#BFBFBF" title="#BFBFBF"></button><button type="button" class="palette-swatch" data-color="#BDD7EE" style="background:#BDD7EE" title="#BDD7EE"></button><button type="button" class="palette-swatch" data-color="#9DC3E6" style="background:#9DC3E6" title="#9DC3E6"></button><button type="button" class="palette-swatch" data-color="#F8CBAD" style="background:#F8CBAD" title="#F8CBAD"></button><button type="button" class="palette-swatch" data-color="#C6E0B4" style="background:#C6E0B4" title="#C6E0B4"></button><button type="button" class="palette-swatch" data-color="#5B9BD5" style="background:#5B9BD5" title="#5B9BD5"></button><button type="button" class="palette-swatch" data-color="#D9E1F2" style="background:#D9E1F2" title="#D9E1F2"></button><button type="button" class="palette-swatch" data-color="#A9D18E" style="background:#A9D18E" title="#A9D18E"></button><button type="button" class="palette-swatch" data-color="#BFBFBF" style="background:#BFBFBF" title="#BFBFBF"></button><button type="button" class="palette-swatch" data-color="#404040" style="background:#404040" title="#404040"></button><button type="button" class="palette-swatch" data-color="#A6A6A6" style="background:#A6A6A6" title="#A6A6A6"></button><button type="button" class="palette-swatch" data-color="#9DC3E6" style="background:#9DC3E6" title="#9DC3E6"></button><button type="button" class="palette-swatch" data-color="#5B9BD5" style="background:#5B9BD5" title="#5B9BD5"></button><button type="button" class="palette-swatch" data-color="#F4B183" style="background:#F4B183" title="#F4B183"></button><button type="button" class="palette-swatch" data-color="#A9D18E" style="background:#A9D18E" title="#A9D18E"></button><button type="button" class="palette-swatch" data-color="#2E75B6" style="background:#2E75B6" title="#2E75B6"></button><button type="button" class="palette-swatch" data-color="#B4C6E7" style="background:#B4C6E7" title="#B4C6E7"></button><button type="button" class="palette-swatch" data-color="#70AD47" style="background:#70AD47" title="#70AD47"></button><button type="button" class="palette-swatch" data-color="#A6A6A6" style="background:#A6A6A6" title="#A6A6A6"></button><button type="button" class="palette-swatch" data-color="#262626" style="background:#262626" title="#262626"></button><button type="button" class="palette-swatch" data-color="#7F7F7F" style="background:#7F7F7F" title="#7F7F7F"></button><button type="button" class="palette-swatch" data-color="#5B9BD5" style="background:#5B9BD5" title="#5B9BD5"></button><button type="button" class="palette-swatch" data-color="#2E75B6" style="background:#2E75B6" title="#2E75B6"></button><button type="button" class="palette-swatch" data-color="#C65911" style="background:#C65911" title="#C65911"></button><button type="button" class="palette-swatch" data-color="#70AD47" style="background:#70AD47" title="#70AD47"></button><button type="button" class="palette-swatch" data-color="#1F4E78" style="background:#1F4E78" title="#1F4E78"></button><button type="button" class="palette-swatch" data-color="#8EA9DB" style="background:#8EA9DB" title="#8EA9DB"></button><button type="button" class="palette-swatch" data-color="#548235" style="background:#548235" title="#548235"></button><button type="button" class="palette-swatch" data-color="#7F7F7F" style="background:#7F7F7F" title="#7F7F7F"></button><button type="button" class="palette-swatch" data-color="#0D0D0D" style="background:#0D0D0D" title="#0D0D0D"></button><button type="button" class="palette-swatch" data-color="#595959" style="background:#595959" title="#595959"></button><button type="button" class="palette-swatch" data-color="#2E75B6" style="background:#2E75B6" title="#2E75B6"></button><button type="button" class="palette-swatch" data-color="#1F4E78" style="background:#1F4E78" title="#1F4E78"></button><button type="button" class="palette-swatch" data-color="#833C0C" style="background:#833C0C" title="#833C0C"></button><button type="button" class="palette-swatch" data-color="#548235" style="background:#548235" title="#548235"></button><button type="button" class="palette-swatch" data-color="#17365D" style="background:#17365D" title="#17365D"></button><button type="button" class="palette-swatch" data-color="#305496" style="background:#305496" title="#305496"></button><button type="button" class="palette-swatch" data-color="#375623" style="background:#375623" title="#375623"></button></div>
+            <div class="palette-title standard-title">표준 색</div>
+            <div class="palette-grid standard"><button type="button" class="palette-swatch" data-color="#C00000" style="background:#C00000" title="#C00000"></button><button type="button" class="palette-swatch" data-color="#FF0000" style="background:#FF0000" title="#FF0000"></button><button type="button" class="palette-swatch" data-color="#FFC000" style="background:#FFC000" title="#FFC000"></button><button type="button" class="palette-swatch" data-color="#FFFF00" style="background:#FFFF00" title="#FFFF00"></button><button type="button" class="palette-swatch" data-color="#92D050" style="background:#92D050" title="#92D050"></button><button type="button" class="palette-swatch" data-color="#00B050" style="background:#00B050" title="#00B050"></button><button type="button" class="palette-swatch" data-color="#00B0F0" style="background:#00B0F0" title="#00B0F0"></button><button type="button" class="palette-swatch" data-color="#0070C0" style="background:#0070C0" title="#0070C0"></button><button type="button" class="palette-swatch" data-color="#002060" style="background:#002060" title="#002060"></button><button type="button" class="palette-swatch" data-color="#7030A0" style="background:#7030A0" title="#7030A0"></button></div>
+            <button type="button" class="palette-none" data-no-fill="bg">□ 채우기 없음</button>
+            <button type="button" class="palette-more" data-more-color="bg">🎨 다른 색...</button>
+          </div>
+          <input type="color" id="tool-bg" value="#fff2a8" hidden>
+        </div>
+      </div>
+
+      <div class="tool-group">
+        <button type="button" class="tool-btn" data-cmd="justifyLeft" title="왼쪽 정렬">≡</button>
+        <button type="button" class="tool-btn" data-cmd="justifyCenter" title="가운데 정렬">≣</button>
+        <button type="button" class="tool-btn" data-cmd="justifyRight" title="오른쪽 정렬">≡</button>
+        <button type="button" class="tool-btn" data-cmd="justifyFull" title="양쪽 정렬">☷</button>
+        <button type="button" class="tool-btn" data-cmd="insertUnorderedList" title="글머리표">• 목록</button>
+        <button type="button" class="tool-btn" data-cmd="insertOrderedList" title="번호목록">1. 목록</button>
+      </div>
+
+      <div class="tool-group">
+        <button type="button" class="tool-btn" id="tool-quote" title="인용구">❝</button>
+        <button type="button" class="tool-btn" data-cmd="outdent" title="내어쓰기">←</button>
+        <button type="button" class="tool-btn" data-cmd="indent" title="들여쓰기">→</button>
+        <button type="button" class="tool-btn" data-cmd="insertHorizontalRule" title="구분선">―</button>
+        <button type="button" class="tool-btn" id="tool-link" title="링크">🔗</button>
+        <button type="button" class="tool-btn" id="tool-table" title="표">▦</button>
+      </div>
+
+      <div class="tool-group">
+        <button type="button" class="tool-btn text" id="tool-image" title="본문 이미지">🖼 사진</button>
+        <button type="button" class="tool-btn text" id="tool-file" title="첨부파일">📎 파일</button>
+        <button type="button" class="tool-btn" data-cmd="undo" title="실행취소">↶</button>
+        <button type="button" class="tool-btn" data-cmd="redo" title="다시실행">↷</button>
+        <button type="button" class="tool-btn text" data-cmd="removeFormat" title="서식 지우기">서식삭제</button>
+      </div>
+    </div>
+    <input id="image-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+    <input id="file-input" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,image/jpeg,image/png,image/webp,image/gif" hidden>
+  `;
+}
+function bindToolbar(onImage,onFile){
+  document.querySelectorAll('[data-cmd]').forEach(b=>{
+    b.onmousedown=e=>e.preventDefault();
+    b.onclick=()=>execEditor(b.dataset.cmd);
+  });
+  $('#tool-block').onchange=e=>execEditor('formatBlock',e.target.value);
+  $('#tool-font').onchange=e=>execEditor('fontName',e.target.value);
+  $('#tool-size').onchange=e=>applyFontSize(e.target.value);
+
+  const closeColorMenus=()=>{
+    document.querySelectorAll('.color-palette-popover.open').forEach(x=>x.classList.remove('open'));
+  };
+  const toggleColorMenu=(id)=>{
+    const pop=$(id);
+    const willOpen=!pop.classList.contains('open');
+    closeColorMenus();
+    if(willOpen)pop.classList.add('open');
+  };
+  const applyPickedColor=(kind,color)=>{
+    if(kind==='text'){
+      execEditor('foreColor',color);
+      $('#tool-color').value=color;
+      $('#text-color-bar').style.background=color;
+    }else{
+      execEditor('hiliteColor',color);
+      $('#tool-bg').value=color;
+      $('#bg-color-bar').style.background=color;
+    }
+    closeColorMenus();
+  };
+
+  $('#text-color-button').onmousedown=e=>e.preventDefault();
+  $('#bg-color-button').onmousedown=e=>e.preventDefault();
+  $('#text-color-button').onclick=()=>toggleColorMenu('#text-color-popover');
+  $('#bg-color-button').onclick=()=>toggleColorMenu('#bg-color-popover');
+
+  document.querySelectorAll('#text-color-popover [data-color]').forEach(b=>{
+    b.onmousedown=e=>e.preventDefault();
+    b.onclick=()=>applyPickedColor('text',b.dataset.color);
+  });
+  document.querySelectorAll('#bg-color-popover [data-color]').forEach(b=>{
+    b.onmousedown=e=>e.preventDefault();
+    b.onclick=()=>applyPickedColor('bg',b.dataset.color);
+  });
+
+  document.querySelector('[data-no-fill="bg"]')?.addEventListener('mousedown',e=>e.preventDefault());
   document.querySelector('[data-no-fill="bg"]')?.addEventListener('click',()=>{
     execEditor('hiliteColor','transparent');
     $('#bg-color-bar').style.background='linear-gradient(135deg,#fff 0 44%,#e5484d 45% 55%,#fff 56% 100%)';
@@ -111,30 +486,32 @@ function categoryButtons(){
     return `<button class="library-category ${c.id===selectedCategoryId?'active':''}" data-category="${c.id}"><span>${esc(c.category_name)}</span><b>${count}</b></button>`;
   }).join('');
 }
-function listRows(){
+function listCards(){
   const cat=selectedCategory();
   const filtered=cat?rows.filter(r=>rowBelongs(r,cat)):[];
-  if(!filtered.length)return `<tr><td colspan="5" class="empty">등록된 관련자료가 없습니다.</td></tr>`;
+  if(!filtered.length)return `<div class="mobile-empty-card">등록된 관련자료가 없습니다.</div>`;
   return filtered.map((r,i)=>{
     const cnt=rowFiles(r.id).length+(r.file_path?1:0);
     const preview=plainTextFromHtml(r.content||'');
-    return `<tr>
-      <td class="num">${i+1}</td>
-      <td>${formatDate(r.created_at)}</td>
-      <td>
-        <button class="title-link" data-view="${r.id}">${esc(r.title)}</button>
-        ${cnt?`<span class="pill amber">첨부 ${cnt}</span>`:''}
-        ${preview?`<div class="row-preview">${esc(preview.slice(0,120))}${preview.length>120?'…':''}</div>`:''}
-      </td>
-      <td>${esc(r.created_by||'-')}</td>
-      <td><div class="row-actions">
-        <button class="btn small" data-view="${r.id}">보기</button>
-        ${canManageWaste()?`
-          <button class="btn small" data-edit="${r.id}">수정</button>
-          <button class="btn small danger" data-del="${r.id}">삭제</button>
-        `:''}
-      </div></td>
-    </tr>`;
+    return `
+      <article class="mobile-library-card">
+        <div class="mobile-library-top">
+          <span class="mobile-library-no">#${i+1}</span>
+          <span class="mobile-library-date">${formatDate(r.created_at)}</span>
+        </div>
+        <button class="mobile-library-title" data-view="${r.id}">${esc(r.title)}</button>
+        ${preview?`<div class="mobile-library-preview">${esc(preview.slice(0,120))}${preview.length>120?'…':''}</div>`:''}
+        <div class="mobile-library-meta">
+          <span>작성자</span><b>${esc(r.created_by||'-')}</b>
+          <span>첨부</span><b>${cnt?`${cnt}개`:'없음'}</b>
+        </div>
+        <div class="mobile-library-actions">
+          <button class="btn small" data-view="${r.id}">보기</button>
+          ${canManageWaste()?`
+            <button class="btn small" data-edit="${r.id}">수정</button>
+            <button class="btn small danger" data-del="${r.id}">삭제</button>`:''}
+        </div>
+      </article>`;
   }).join('');
 }
 function attachmentsHtml(id,editable=false){
@@ -154,9 +531,7 @@ function listContent(){
       <strong>${cat?esc(cat.category_name):'관련자료'}</strong>
       <span class="hint">${cat?rows.filter(r=>rowBelongs(r,cat)).length:0}건</span>
     </div>
-    <div class="table-wrap"><table class="library-table"><thead><tr>
-      <th style="width:70px">순번</th><th style="width:130px">작성일</th><th>제목</th><th style="width:200px">작성자</th><th style="width:190px">작업</th>
-    </tr></thead><tbody>${listRows()}</tbody></table></div>`;
+    <div class="mobile-library-list">${listCards()}</div>`;
 }
 function editorContent(){
   const cat=editing?categoryForRow(editing):selectedCategory();
