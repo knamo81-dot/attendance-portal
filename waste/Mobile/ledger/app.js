@@ -1212,6 +1212,97 @@ function commonApprovalHeaderHtml(){
     </div>`;
 }
 
+function legalCardsHtml(rows){
+  if(!rows.length){
+    return `<div class="mobile-empty-card">${periodLabel()} 해당 데이터가 없습니다.</div>`;
+  }
+  return rows.map(r=>{
+    const generationDisplay=!r.hasGeneration
+      ? '-'
+      : (r.hasUnknownGeneration
+          ? (r.generationKg>0?`${num(r.generationKg/1000,4)} T · 미확정 포함`:'미확정')
+          : `${num(r.generationKg/1000,4)} T`);
+    const selfMethods=(r.selfMethods||[]).length?r.selfMethods.map(esc).join(', '):'-';
+    const outTransporters=(r.outTransporters||[]).length?r.outTransporters.map(esc).join(', '):'-';
+    const outProcessors=(r.outProcessors||[]).length?r.outProcessors.map(esc).join(', '):'-';
+    const outMethods=(r.outMethods||[]).length?r.outMethods.map(esc).join(', '):'-';
+    const wasteName=esc(typeName(r.waste_type||{}));
+    return `
+      <details class="mobile-record-card ledger-record ${r.hasUnknown?'warning-record':''}">
+        <summary class="mobile-record-summary legal-summary">
+          <span class="mobile-record-date">${r.date}</span>
+          <span class="mobile-record-type">${wasteName}</span>
+          <span class="mobile-record-value">보관 ${num(r.balance/1000,4)} T${r.hasUnknown?' *':''}</span>
+          <span class="mobile-record-chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div class="mobile-record-detail">
+          <div class="mobile-detail-section-title">발생내용</div>
+          <div class="mobile-detail-row"><span>성질·상태</span><b>${natureCell(r)}</b></div>
+          <div class="mobile-detail-row"><span>발생량</span><b>${generationDisplay}</b></div>
+          <div class="mobile-detail-row"><span>발생량 누계</span><b>${num(r.genCum/1000,4)} T</b></div>
+          ${r.hasSelf?`
+            <div class="mobile-detail-section-title">자가 처리내용</div>
+            <div class="mobile-detail-row"><span>처리량</span><b>${num(r.selfKg/1000,4)} T</b></div>
+            <div class="mobile-detail-row"><span>처리방법</span><b>${selfMethods}</b></div>`:''}
+          ${r.hasOut?`
+            <div class="mobile-detail-section-title">위탁 처리내용</div>
+            <div class="mobile-detail-row"><span>처리량</span><b>${num(r.outsourcedKg/1000,4)} T</b></div>
+            <div class="mobile-detail-row"><span>운반자</span><b>${outTransporters}</b></div>
+            <div class="mobile-detail-row"><span>처리자</span><b>${outProcessors}</b></div>
+            <div class="mobile-detail-row"><span>처리방법</span><b>${outMethods}</b></div>
+            <div class="mobile-detail-row"><span>위탁 누계</span><b>${num(r.outsourcedCum/1000,4)} T</b></div>`:''}
+          <div class="mobile-detail-row emphasis"><span>보관량</span><b>${num(r.balance/1000,4)} T${r.hasUnknown?' *':''}</b></div>
+        </div>
+      </details>`;
+  }).join('');
+}
+
+function facilityCardsHtml(rows){
+  if(!rows.length){
+    return `<div class="mobile-empty-card">${periodLabel()} 폐수배출시설 운영일지 데이터가 없습니다.</div>`;
+  }
+  return rows.map(r=>{
+    const holiday=effectiveFacilityHoliday(r);
+    const isHoliday=holiday.isHoliday;
+    const p=r.pickup;
+    if(isHoliday){
+      return `
+        <details class="mobile-record-card ledger-record holiday-record">
+          <summary class="mobile-record-summary facility-summary">
+            <span class="mobile-record-date">${r.entry_date}</span>
+            <span class="mobile-record-type">휴일</span>
+            <span class="mobile-record-value">${esc(holiday.reason||r.holiday_reason||'휴일')}</span>
+            <span class="mobile-record-chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div class="mobile-record-detail">
+            <div class="mobile-detail-row"><span>휴일 사유</span><b>${esc(holiday.reason||r.holiday_reason||r.note||'휴일')}</b></div>
+          </div>
+        </details>`;
+    }
+    return `
+      <details class="mobile-record-card ledger-record ${r.is_over?'over-record':''}">
+        <summary class="mobile-record-summary facility-summary">
+          <span class="mobile-record-date">${r.entry_date}</span>
+          <span class="mobile-record-type">${esc(typeName(r.waste_type||{}))}</span>
+          <span class="mobile-record-value">${r.is_over?`OVER ${num(facilityHeight(),0)}`:esc(r.guideline_text||'-')}</span>
+          <span class="mobile-record-chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div class="mobile-record-detail">
+          <div class="mobile-detail-row"><span>용수 금일</span><b>${r.usage==null?'-':num(r.usage,2)}</b></div>
+          <div class="mobile-detail-row"><span>당일 사용량</span><b>${r.water_used==null?'-':`${num(r.water_used,2)} m³`}</b></div>
+          <div class="mobile-detail-row"><span>저장고 높이</span><b>${r.height==null?'-':`${num(r.height,1)} cm`}</b></div>
+          <div class="mobile-detail-row"><span>외부보관</span><b>${r.has_external?`${num(r.external_ton||0,1)} T / ${num(r.external_cm_calc||0,1)} cm`:'-'}</b></div>
+          <div class="mobile-detail-row"><span>금일지침</span><b>${r.is_over?`<span class="pill amber">OVER ${num(facilityHeight(),0)}</span>`:esc(r.guideline_text||'-')}</b></div>
+          <div class="mobile-detail-row"><span>총 발생량</span><b>${r.generated_text==='Unverified'?'<span class="pill amber">Unverified</span>':esc(r.generated_text||'-')}</b></div>
+          <div class="mobile-detail-row"><span>처리업소</span><b>${facilityContractor(p)}</b></div>
+          <div class="mobile-detail-row"><span>확인서번호</span><b>${facilityCertificates(p)}</b></div>
+          <div class="mobile-detail-row"><span>수거정보</span><b>${facilityPickupInfo(p)}</b></div>
+          <div class="mobile-detail-row"><span>기타</span><b>${esc(r.note||'-')}${p?.notes?.length?`<br><span class="muted">${p.notes.map(esc).join('<br>')}</span>`:''}</b></div>
+        </div>
+      </details>`;
+  }).join('');
+}
+
 function renderLegal(){
   const rows=legalLedgerRows();
   $('#app').innerHTML=`
@@ -1231,108 +1322,8 @@ function renderLegal(){
 
       <br>
 
-      <div class="table-wrap">
-        <table class="ledger-data-table legal-ledger-table">
-          <colgroup>
-            <col style="width:92px">
-            <col style="width:160px">
-            <col style="width:92px">
-            <col style="width:100px">
-            <col style="width:92px">
-            <col style="width:92px">
-            <col style="width:112px">
-            <col style="width:92px">
-            <col style="width:112px">
-            <col style="width:120px">
-            <col style="width:120px">
-            <col style="width:112px">
-            <col style="width:105px">
-            <col style="width:105px">
-          </colgroup>
-          <thead>
-            <tr>
-              <th colspan="4">② 발생내용</th>
-              <th colspan="3">③ 자가 처리내용</th>
-              <th colspan="6">④ 위탁 처리내용</th>
-              <th rowspan="2">⑤ 보관량(T)</th>
-            </tr>
-            <tr>
-              <th>연월일</th>
-              <th>성질·상태</th>
-              <th>발생량(T)</th>
-              <th>발생량 누계(T)</th>
-
-              <th>연월일</th>
-              <th>처리량(T)</th>
-              <th>처리방법</th>
-
-              <th>연월일</th>
-              <th>위탁 처리량(T)</th>
-              <th>운반자</th>
-              <th>처리자</th>
-              <th>처리방법</th>
-              <th>위탁 누계(T)</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            ${rows.length ? rows.map(r=>{
-              const generationDisplay=!r.hasGeneration
-                ? '-'
-                : (r.hasUnknownGeneration
-                    ? (r.generationKg>0
-                        ? `${num(r.generationKg/1000,4)}<br><span class="pill amber">+ 미확정</span>`
-                        : '<span class="pill amber">미확정</span>')
-                    : num(r.generationKg/1000,4));
-
-              const selfMethods=(r.selfMethods||[]).length
-                ? r.selfMethods.map(x=>esc(x)).join('<br>')
-                : '-';
-
-              const outTransporters=(r.outTransporters||[]).length
-                ? r.outTransporters.map(x=>esc(x)).join('<br>')
-                : '-';
-
-              const outProcessors=(r.outProcessors||[]).length
-                ? r.outProcessors.map(x=>esc(x)).join('<br>')
-                : '-';
-
-              const outMethods=(r.outMethods||[]).length
-                ? r.outMethods.map(x=>esc(x)).join('<br>')
-                : '-';
-
-              return `
-                <tr>
-                  <td>${r.hasGeneration?r.date:'-'}</td>
-                  <td>${natureCell(r)}</td>
-                  <td class="num">${generationDisplay}</td>
-                  <td class="num">${num(r.genCum/1000,4)}</td>
-
-                  <td>${r.hasSelf?r.date:'-'}</td>
-                  <td class="num">${r.hasSelf?num(r.selfKg/1000,4):'-'}</td>
-                  <td>${r.hasSelf?selfMethods:'-'}</td>
-
-                  <td>${r.hasOut?r.date:'-'}</td>
-                  <td class="num">${r.hasOut?num(r.outsourcedKg/1000,4):'-'}</td>
-                  <td>${r.hasOut?outTransporters:'-'}</td>
-                  <td>${r.hasOut?outProcessors:'-'}</td>
-                  <td>${r.hasOut?outMethods:'-'}</td>
-                  <td class="num">${num(r.outsourcedCum/1000,4)}</td>
-
-                  <td class="num">
-                    ${num(r.balance/1000,4)}${r.hasUnknown?' *':''}
-                  </td>
-                </tr>`;
-            }).join('') : `
-              <tr>
-                <td colspan="14" class="empty">
-                  ${periodLabel()} 해당 데이터가 없습니다.
-                </td>
-              </tr>`
-            }
-          </tbody>
-        </table>
-      </div>
+      <div class="mobile-list-caption legal-list-caption"><span>날짜</span><span>폐기물</span><span>보관량</span><span></span></div>
+      <div class="mobile-card-list">${legalCardsHtml(rows)}</div>
 
       <br>
 
@@ -1370,111 +1361,8 @@ function renderFacility(){
 
       <br>
 
-      <div class="table-wrap">
-        <table class="ledger-data-table facility-ledger-table">
-          <colgroup>
-            <col style="width:115px">
-            <col style="width:95px">
-            <col style="width:105px">
-            <col style="width:115px">
-            <col style="width:125px">
-            <col style="width:115px">
-            <col style="width:115px">
-            <col style="width:145px">
-            <col style="width:130px">
-            <col style="width:160px">
-            <col style="width:175px">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>날짜</th>
-              <th>용수 금일</th>
-              <th>당일 사용량</th>
-              <th>저장고 높이</th>
-              <th>외부보관</th>
-              <th>금일지침</th>
-              <th>총 발생량</th>
-              <th>처리업소</th>
-              <th>확인서번호</th>
-              <th>수거 정보</th>
-              <th>기타</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            ${rows.length ? rows.map(r=>{
-              const holiday=effectiveFacilityHoliday(r);
-              const isHoliday=holiday.isHoliday;
-              const p=r.pickup;
-
-              return `
-                <tr>
-                  <td>
-                    ${r.entry_date}
-                    ${facilityWasteCell(r)}
-                  </td>
-
-                  <td class="num">
-                    ${isHoliday?'휴일':(r.usage==null?'-':num(r.usage,2))}
-                  </td>
-
-                  <td class="num">
-                    ${isHoliday?'휴일':(r.water_used==null?'-':num(r.water_used,2))}
-                  </td>
-
-                  <td class="num">
-                    ${isHoliday?'휴일':(r.height==null?'-':`${num(r.height,1)} cm`)}
-                  </td>
-
-                  <td>
-                    ${isHoliday
-                      ? '-'
-                      : (r.has_external
-                          ? `${num(r.external_ton||0,1)} T / ${num(r.external_cm_calc||0,1)} cm`
-                          : '-')}
-                  </td>
-
-                  <td>
-                    ${isHoliday
-                      ? '휴일'
-                      : (r.is_over
-                          ? `<span class="pill amber">OVER ${num(facilityHeight(),0)}</span>`
-                          : esc(r.guideline_text||'-'))}
-                  </td>
-
-                  <td>
-                    ${isHoliday
-                      ? '휴일'
-                      : (r.generated_text==='Unverified'
-                          ? '<span class="pill amber">Unverified</span>'
-                          : esc(r.generated_text||'-'))}
-                  </td>
-
-                  <td>${facilityContractor(p)}</td>
-
-                  <td>${facilityCertificates(p)}</td>
-
-                  <td>${facilityPickupInfo(p)}</td>
-
-                  <td class="ledger-notes">
-                    ${isHoliday
-                      ? esc(holiday.reason||r.holiday_reason||'휴일')
-                      : esc(r.note||'')}
-                    ${p?.notes?.length
-                      ? `${r.note?'<br>':''}<span class="muted">${p.notes.map(esc).join('<br>')}</span>`
-                      : ''}
-                  </td>
-                </tr>`;
-            }).join('') : `
-              <tr>
-                <td colspan="11" class="empty">
-                  ${periodLabel()} 폐수배출시설 운영일지 데이터가 없습니다.
-                </td>
-              </tr>`
-            }
-          </tbody>
-        </table>
-      </div>
+      <div class="mobile-list-caption facility-list-caption"><span>날짜</span><span>폐기물</span><span>금일지침</span><span></span></div>
+      <div class="mobile-card-list">${facilityCardsHtml(rows)}</div>
 
       <br>
 
