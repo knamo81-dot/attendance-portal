@@ -430,38 +430,23 @@ async function renderStatus(){
         중량 미확정 일일입력은 무게 합계에서 제외됩니다. 따라서 현재 보관량은 확정 중량 기준입니다.
       </div>
       <br>
-      <div class="table-wrap detail-table-wrap">
-        <table class="detail-table">
-          <colgroup>
-            <col style="width:110px">
-            <col style="width:18%">
-            <col style="width:18%">
-            <col style="width:18%">
-            <col style="width:18%">
-            <col style="width:18%">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>월</th>
-              <th class="num">확정 발생량(T)</th>
-              <th class="num">중량 미확정(건)</th>
-              <th class="num">수거횟수</th>
-              <th class="num">처리량(T)</th>
-              <th class="num">현재 보관량(T)</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${months.map(x=>`
-              <tr>
-                <td>${x.monthLabel}</td>
-                <td class="num">${num(x.genT,4)}</td>
-                <td class="num">${x.unknown}</td>
-                <td class="num">${x.count}</td>
-                <td class="num">${num(x.colT,4)}</td>
-                <td class="num">${num(x.currentT,4)}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
+      <div class="mobile-card-list status-detail-list">
+        ${months.map(x=>`
+          <details class="mobile-record-card status-detail-card">
+            <summary class="mobile-record-summary status-detail-summary">
+              <span class="mobile-record-date">${x.monthLabel}</span>
+              <span class="mobile-record-value">발생 ${num(x.genT,4)} T</span>
+              <span class="mobile-record-value">보관 ${num(x.currentT,4)} T</span>
+              <span class="mobile-record-chevron" aria-hidden="true">⌄</span>
+            </summary>
+            <div class="mobile-record-detail">
+              <div class="mobile-detail-row"><span>확정 발생량</span><b>${num(x.genT,4)} T</b></div>
+              <div class="mobile-detail-row"><span>중량 미확정</span><b class="${x.unknown?'warning':''}">${x.unknown}건</b></div>
+              <div class="mobile-detail-row"><span>수거횟수</span><b>${x.count}건</b></div>
+              <div class="mobile-detail-row"><span>처리량</span><b>${num(x.colT,4)} T</b></div>
+              <div class="mobile-detail-row"><span>현재 보관량</span><b>${num(x.currentT,4)} T</b></div>
+            </div>
+          </details>`).join('')}
       </div>
     </div>`;
 
