@@ -487,33 +487,35 @@ function typeButtons(){
     return `<button class="library-category ${t.id===selectedTypeId?'active':''}" data-type="${t.id}"><span>${esc(t.type_name)}</span><b>${count}</b></button>`;
   }).join('');
 }
-function listRows(){
+function listCards(){
   const type=selectedType();
   const filtered=type?rows.filter(r=>rowBelongs(r,type)):[];
-  if(!filtered.length)return `<tr><td colspan="7" class="empty">등록된 관련서류가 없습니다.</td></tr>`;
+  if(!filtered.length)return `<div class="mobile-empty-card">등록된 관련서류가 없습니다.</div>`;
   return filtered.map((r,i)=>{
     const expired=r.expiry_date&&String(r.expiry_date)<new Date().toISOString().slice(0,10);
     const cnt=rowFiles(r.id).length+(r.file_path?1:0);
     const preview=plainTextFromHtml(r.content||r.note||'');
-    return `<tr>
-      <td class="num">${i+1}</td>
-      <td>${formatDate(r.issue_date||r.created_at)}</td>
-      <td>
-        <button class="title-link" data-view="${r.id}">${esc(r.title)}</button>
-        ${cnt?`<span class="pill amber">첨부 ${cnt}</span>`:''}
-        ${preview?`<div class="row-preview">${esc(preview.slice(0,100))}${preview.length>100?'…':''}</div>`:''}
-      </td>
-      <td>${esc(r.waste_vendors?.vendor_name||'-')}</td>
-      <td class="${expired?'warning':''}">${r.expiry_date?formatDate(r.expiry_date):'-'}</td>
-      <td>${esc(r.created_by||'-')}</td>
-      <td><div class="row-actions">
-        <button class="btn small" data-view="${r.id}">보기</button>
-        ${canManageWaste()?`
-          <button class="btn small" data-edit="${r.id}">수정</button>
-          <button class="btn small danger" data-del="${r.id}">삭제</button>
-        `:''}
-      </div></td>
-    </tr>`;
+    return `
+      <article class="mobile-library-card ${expired?'expired-card':''}">
+        <div class="mobile-library-top">
+          <span class="mobile-library-no">#${i+1}</span>
+          <span class="mobile-library-date">발급 ${formatDate(r.issue_date||r.created_at)}</span>
+        </div>
+        <button class="mobile-library-title" data-view="${r.id}">${esc(r.title)}</button>
+        ${preview?`<div class="mobile-library-preview">${esc(preview.slice(0,100))}${preview.length>100?'…':''}</div>`:''}
+        <div class="mobile-library-meta">
+          <span>관련 업체</span><b>${esc(r.waste_vendors?.vendor_name||'-')}</b>
+          <span>유효기간</span><b class="${expired?'warning':''}">${r.expiry_date?formatDate(r.expiry_date):'-'}</b>
+          <span>작성자</span><b>${esc(r.created_by||'-')}</b>
+          <span>첨부</span><b>${cnt?`${cnt}개`:'없음'}</b>
+        </div>
+        <div class="mobile-library-actions">
+          <button class="btn small" data-view="${r.id}">보기</button>
+          ${canManageWaste()?`
+            <button class="btn small" data-edit="${r.id}">수정</button>
+            <button class="btn small danger" data-del="${r.id}">삭제</button>`:''}
+        </div>
+      </article>`;
   }).join('');
 }
 function attachmentsHtml(id,editable=false){
@@ -529,9 +531,7 @@ function attachmentsHtml(id,editable=false){
 function listContent(){
   const type=selectedType();
   return `<div class="library-list-head"><strong>${type?esc(type.type_name):'관련서류'}</strong><span class="hint">${type?rows.filter(r=>rowBelongs(r,type)).length:0}건</span></div>
-  <div class="table-wrap"><table class="library-table"><thead><tr>
-    <th style="width:70px">순번</th><th style="width:130px">발급일</th><th>제목</th><th style="width:190px">관련 업체</th><th style="width:130px">유효기간</th><th style="width:190px">작성자</th><th style="width:190px">작업</th>
-  </tr></thead><tbody>${listRows()}</tbody></table></div>`;
+  <div class="mobile-library-list">${listCards()}</div>`;
 }
 function editorContent(){
   const type=editing?typeForRow(editing):selectedType();
