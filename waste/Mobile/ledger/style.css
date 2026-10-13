@@ -1,0 +1,541 @@
+:root{--navy:#0f2347;--green:#0b8a68;--green2:#eaf9f3;--line:#dbe4ee;--bg:#f4f7fb;--text:#10203c;--muted:#66758b;--danger:#b42318;--amber:#b54708;--radius:16px;--shadow:0 6px 18px rgba(15,35,71,.06)}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Arial,"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text)}body{padding:12px}.page{width:100%;max-width:none;margin:0}.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.toolbar .spacer{flex:1}.card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin-bottom:12px}.card-title{font-size:18px;font-weight:900;letter-spacing:-.04em;display:flex;align-items:center;gap:8px;margin-bottom:14px}.grid{display:grid;gap:12px}.grid.two{grid-template-columns:minmax(320px,430px) minmax(0,1fr)}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.field{display:grid;gap:6px;margin-bottom:12px}.field label{font-size:12px;font-weight:800;color:#263a5f}.field input,.field select,.field textarea{width:100%;min-height:40px;border:1px solid #ccd8e6;border-radius:11px;background:#fff;padding:9px 11px;font-size:13px;color:var(--text);outline:none}.field textarea{min-height:90px;resize:vertical}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(11,138,104,.09)}.inline{display:flex;gap:8px;align-items:end}.inline>*{flex:1}.btn{height:38px;border:1px solid var(--line);border-radius:11px;background:#fff;color:#243a60;font-weight:800;padding:0 14px;cursor:pointer}.btn.primary{background:var(--navy);border-color:var(--navy);color:#fff}.btn.green{background:var(--green);border-color:var(--green);color:#fff}.btn.danger{color:var(--danger)}.btn.small{height:30px;padding:0 9px;font-size:11px}.btn:disabled{opacity:.5;cursor:not-allowed}.hint{font-size:11px;line-height:1.55;color:var(--muted)}.notice{padding:10px 12px;border-radius:11px;font-size:12px;margin-bottom:10px;display:none}.notice.show{display:block}.notice.ok{background:#ecfdf3;color:#067647;border:1px solid #abefc6}.notice.err{background:#fef3f2;color:#b42318;border:1px solid #fecdca}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:13px}table{width:100%;border-collapse:collapse;background:#fff;min-width:760px}th,td{padding:9px 10px;border-bottom:1px solid #e7edf4;font-size:12px;text-align:left;vertical-align:middle}th{background:#f8fafc;color:#53657f;font-weight:900;white-space:nowrap}td.num{text-align:right;font-variant-numeric:tabular-nums}.pill{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:900;background:#eef4ff;color:#3157a4}.pill.green{background:#ecfdf3;color:#067647}.pill.amber{background:#fff4e5;color:#b54708}.pill.gray{background:#f2f4f7;color:#667085}.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}.kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}.kpi .label{font-size:11px;color:var(--muted);font-weight:800}.kpi .value{font-size:24px;font-weight:900;margin-top:5px}.section-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}.section-head h2{font-size:16px;margin:0}.section-head .spacer{flex:1}.soft{background:var(--green2);border:1px solid #b7ead8;border-radius:13px;padding:13px}.seg{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.seg button{height:40px;border:1px solid #cbd8e8;border-radius:11px;background:#fff;font-weight:900;color:#65748a}.seg button.active{background:#ecfdf3;border-color:#7bd7b7;color:#067647}.empty{padding:24px;text-align:center;color:#98a2b3;font-size:12px}.warning{color:var(--amber);font-weight:800}.muted{color:var(--muted)}.row-actions{display:flex;gap:5px;white-space:nowrap}.subtabs{display:flex;gap:7px;overflow:auto;margin-bottom:12px}.subtabs button{height:34px;flex:0 0 auto;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:11px;font-weight:900;padding:0 12px}.subtabs button.active{background:var(--green);border-color:var(--green);color:#fff}
+@media(max-width:900px){body{padding:8px}.grid.two,.grid.three,.kpis{grid-template-columns:1fr}.card{padding:13px}.inline{flex-direction:column;align-items:stretch}.toolbar{align-items:stretch}.toolbar .spacer{display:none}.btn{min-height:40px}table{min-width:680px}.kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.kpis{grid-template-columns:1fr}.card-title{font-size:16px}body{padding:6px}}
+
+
+/* ===== Waste app full-width desktop layout 2026-10-04 ===== */
+.page{width:100%;max-width:none;margin:0;}
+@media(min-width:901px){
+  body{padding:10px 12px;}
+  .page{width:100%;max-width:none;margin:0;}
+  .card,.table-wrap{min-width:0;}
+  .grid.two{grid-template-columns:minmax(360px,430px) minmax(0,1fr);}
+}
+
+
+/* =========================================================
+   월별 결재 UI
+========================================================= */
+.ledger-top-area{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 320px;
+  gap:18px;
+  align-items:stretch;
+}
+.ledger-heading-block{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+}
+.ledger-title-row{
+  margin-bottom:8px;
+}
+.approval-panel{
+  display:grid;
+  grid-template-columns:34px repeat(2,minmax(125px,1fr));
+  min-height:112px;
+  border:1px solid #93a0af;
+  background:#fff;
+  overflow:hidden;
+}
+.approval-label{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-right:1px solid #93a0af;
+  writing-mode:vertical-rl;
+  text-orientation:upright;
+  letter-spacing:3px;
+  font-size:11px;
+  font-weight:900;
+  color:#10203c;
+}
+.approval-cell{
+  display:grid;
+  grid-template-rows:30px 1fr;
+  min-width:0;
+}
+.approval-cell + .approval-cell{
+  border-left:1px solid #93a0af;
+}
+.approval-role{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-bottom:1px solid #93a0af;
+  font-size:11px;
+  font-weight:900;
+  color:#10203c;
+  background:#fbfcfd;
+}
+.approval-cell-body{
+  position:relative;
+  min-height:80px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  padding:6px 6px 5px;
+}
+.approval-stamp-wrap{
+  height:34px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.approval-stamp{
+  width:34px;
+  height:34px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:2px solid #d92d20;
+  border-radius:50%;
+  color:#d92d20;
+  transform:rotate(-8deg);
+  font-family:"Noto Serif KR","Batang",serif;
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:-1px;
+  opacity:.94;
+}
+.approval-stamp span{
+  border-top:1px solid #d92d20;
+  border-bottom:1px solid #d92d20;
+  line-height:14px;
+}
+.approval-person{
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:11px;
+  font-weight:900;
+  color:#10203c;
+}
+.approval-date{
+  min-height:15px;
+  font-size:9px;
+  color:#7a8799;
+  white-space:nowrap;
+}
+.approval-action-button{
+  min-width:52px;
+  height:31px;
+  border:1px solid #0b8a68;
+  border-radius:8px;
+  background:#0b8a68;
+  color:#fff;
+  font-size:10px;
+  font-weight:900;
+  cursor:pointer;
+}
+.approval-action-button:hover{
+  background:#08785b;
+}
+.approval-empty-mark{
+  height:31px;
+  display:flex;
+  align-items:center;
+  color:#a3adba;
+  font-size:18px;
+  font-weight:700;
+}
+.approval-cancel{
+  position:absolute;
+  right:4px;
+  bottom:3px;
+  border:0;
+  background:transparent;
+  padding:2px 3px;
+  color:#b42318;
+  font-size:8px;
+  font-weight:800;
+  cursor:pointer;
+}
+.approval-cancel:hover{
+  text-decoration:underline;
+}
+
+@media(max-width:900px){
+  .ledger-top-area{
+    grid-template-columns:1fr;
+  }
+  .approval-panel{
+    width:min(100%,360px);
+    justify-self:end;
+  }
+}
+
+@media print{
+  body{
+    padding:0!important;
+    background:#fff!important;
+  }
+  .subtabs,
+  .toolbar{
+    display:none!important;
+  }
+  .card{
+    border:0!important;
+    box-shadow:none!important;
+    padding:0!important;
+  }
+  .approval-cancel{
+    display:none!important;
+  }
+  .approval-action-button{
+    border:0!important;
+    background:transparent!important;
+    color:#66758b!important;
+  }
+  .approval-panel{
+    break-inside:avoid;
+  }
+}
+
+
+/* =========================================================
+   결재란 위치 변경
+   - 좌측: 1행 대장 전환 탭 / 2행 연도·월·폐기물·인쇄
+   - 우측: 두 행 높이를 모두 사용하는 공통 결재란
+   - 사업장 폐기물 관리대장 / 폐수배출시설 운영일지 공통 결재
+========================================================= */
+.ledger-control-bar{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 300px;
+  gap:14px;
+  align-items:stretch;
+  margin-bottom:10px;
+}
+.ledger-control-left{
+  min-width:0;
+  display:grid;
+  grid-template-rows:auto auto;
+  gap:7px;
+  align-content:start;
+}
+.ledger-control-left .subtabs{
+  margin-bottom:0!important;
+}
+.ledger-control-left .toolbar{
+  margin-bottom:0!important;
+}
+.ledger-control-approval{
+  display:flex;
+  align-items:stretch;
+  justify-content:flex-end;
+  min-height:79px;
+}
+.ledger-control-approval .approval-panel{
+  width:100%;
+  min-height:79px;
+  height:100%;
+  grid-template-columns:29px repeat(2,minmax(120px,1fr));
+}
+.ledger-control-approval .approval-label{
+  font-size:10px;
+  letter-spacing:2px;
+}
+.ledger-control-approval .approval-cell{
+  grid-template-rows:24px 1fr;
+}
+.ledger-control-approval .approval-role{
+  font-size:10px;
+}
+.ledger-control-approval .approval-cell-body{
+  min-height:53px;
+  padding:3px 5px;
+  gap:1px;
+}
+.ledger-control-approval .approval-stamp-wrap{
+  height:27px;
+}
+.ledger-control-approval .approval-stamp{
+  width:28px;
+  height:28px;
+  font-size:9px;
+  border-width:1.5px;
+}
+.ledger-control-approval .approval-stamp span{
+  line-height:11px;
+}
+.ledger-control-approval .approval-person{
+  font-size:10px;
+}
+.ledger-control-approval .approval-date{
+  min-height:12px;
+  font-size:8px;
+}
+.ledger-control-approval .approval-action-button{
+  height:27px;
+  min-width:48px;
+  font-size:9px;
+}
+.ledger-control-approval .approval-empty-mark{
+  height:24px;
+  font-size:15px;
+}
+.ledger-control-approval .approval-cancel{
+  right:2px;
+  bottom:1px;
+  font-size:7px;
+}
+
+/* 카드 내부에 남아 있던 결재 배치용 구조는 더 이상 사용하지 않음 */
+.ledger-top-area{
+  display:block;
+}
+.ledger-heading-block{
+  display:block;
+}
+
+@media(max-width:900px){
+  .ledger-control-bar{
+    grid-template-columns:1fr;
+  }
+  .ledger-control-approval{
+    justify-content:flex-start;
+  }
+  .ledger-control-approval .approval-panel{
+    width:min(100%,320px);
+  }
+}
+
+@media print{
+  .ledger-control-left{
+    display:none!important;
+  }
+  .ledger-control-bar{
+    display:flex!important;
+    justify-content:flex-end;
+    margin-bottom:8px!important;
+  }
+  .ledger-control-approval{
+    display:flex!important;
+    width:300px;
+    margin-left:auto;
+  }
+}
+
+
+/* =========================================================
+   관리대장 표 정렬/컬럼 고정
+   - 헤더와 데이터 열 위치 일치
+   - 최신 날짜는 app.js에서 위쪽 정렬
+========================================================= */
+.ledger-data-table{
+  width:100% !important;
+  table-layout:fixed !important;
+  border-collapse:collapse;
+}
+.legal-ledger-table{
+  min-width:1510px !important;
+}
+.facility-ledger-table{
+  min-width:1395px !important;
+}
+.ledger-data-table th,
+.ledger-data-table td{
+  text-align:center !important;
+  vertical-align:middle !important;
+  padding:9px 8px;
+  line-height:1.45;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:keep-all;
+}
+.ledger-data-table td.num{
+  text-align:center !important;
+  font-variant-numeric:tabular-nums;
+}
+.ledger-data-table thead th{
+  white-space:nowrap;
+}
+.ledger-data-table .ledger-notes{
+  text-align:left !important;
+  word-break:break-word;
+}
+.legal-ledger-table tbody td:nth-child(2){
+  text-align:left !important;
+}
+
+
+/* =========================================================
+   사업장 폐기물 관리대장 그룹 구분 강화
+   ② 발생내용 / ③ 자가 처리내용 / ④ 위탁 처리내용 / ⑤ 보관량
+   - 그룹 제목 배경색
+   - 그룹 경계 2px 세로선
+   - 본문에도 동일한 경계선을 이어서 표시
+========================================================= */
+
+/* 1행 그룹 제목 */
+.legal-ledger-table thead tr:first-child th:nth-child(1){
+  background:#eef5ff !important;
+  color:#29496f;
+  border-right:2px solid #9fb2c8 !important;
+}
+.legal-ledger-table thead tr:first-child th:nth-child(2){
+  background:#edf8f2 !important;
+  color:#286044;
+  border-right:2px solid #9fb2c8 !important;
+}
+.legal-ledger-table thead tr:first-child th:nth-child(3){
+  background:#fff5e9 !important;
+  color:#805523;
+  border-right:2px solid #9fb2c8 !important;
+}
+.legal-ledger-table thead tr:first-child th:nth-child(4){
+  background:#f3f5f8 !important;
+  color:#46566d;
+}
+
+/* 2행 세부 컬럼도 그룹별로 아주 옅게 구분 */
+.legal-ledger-table thead tr:nth-child(2) th:nth-child(-n+4){
+  background:#f8fbff !important;
+}
+.legal-ledger-table thead tr:nth-child(2) th:nth-child(n+5):nth-child(-n+7){
+  background:#f8fcfa !important;
+}
+.legal-ledger-table thead tr:nth-child(2) th:nth-child(n+8):nth-child(-n+13){
+  background:#fffaf4 !important;
+}
+
+/* 그룹 경계선: 발생 → 자가처리 → 위탁처리 → 보관량 */
+.legal-ledger-table thead tr:nth-child(2) th:nth-child(4),
+.legal-ledger-table tbody td:nth-child(4){
+  border-right:2px solid #9fb2c8 !important;
+}
+.legal-ledger-table thead tr:nth-child(2) th:nth-child(7),
+.legal-ledger-table tbody td:nth-child(7){
+  border-right:2px solid #9fb2c8 !important;
+}
+.legal-ledger-table thead tr:nth-child(2) th:nth-child(13),
+.legal-ledger-table tbody td:nth-child(13){
+  border-right:2px solid #9fb2c8 !important;
+}
+
+/* 보관량 영역은 마지막 결과값임을 조금 더 강조 */
+.legal-ledger-table tbody td:nth-child(14){
+  background:#fbfcfd;
+  font-weight:800;
+}
+
+/* 행 위에 마우스를 올려도 그룹 경계는 유지 */
+.legal-ledger-table tbody tr:hover td{
+  background-color:#f8fbfd;
+}
+.legal-ledger-table tbody tr:hover td:nth-child(14){
+  background-color:#f2f6f9;
+}
+
+/* 인쇄 시 색이 빠져도 그룹선으로 명확히 구분 */
+@media print{
+  .legal-ledger-table{
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+  .legal-ledger-table thead tr:first-child th:nth-child(1),
+  .legal-ledger-table thead tr:first-child th:nth-child(2),
+  .legal-ledger-table thead tr:first-child th:nth-child(3),
+  .legal-ledger-table thead tr:nth-child(2) th:nth-child(4),
+  .legal-ledger-table thead tr:nth-child(2) th:nth-child(7),
+  .legal-ledger-table thead tr:nth-child(2) th:nth-child(13),
+  .legal-ledger-table tbody td:nth-child(4),
+  .legal-ledger-table tbody td:nth-child(7),
+  .legal-ledger-table tbody td:nth-child(13){
+    border-right:2px solid #777 !important;
+  }
+}
+
+
+/* =========================================================
+   Waste Mobile UI / 2026-10-13
+   - PC 로직/DB/권한은 그대로 사용
+   - 터치 타깃, 1단 레이아웃, 가로 스크롤 테이블 최적화
+========================================================= */
+html,body{width:100%;min-height:100%;overflow-x:hidden}
+body.mobile-ui{
+  padding:max(6px,env(safe-area-inset-top)) max(6px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left)) !important;
+  background:var(--bg);
+  -webkit-text-size-adjust:100%;
+  touch-action:manipulation;
+}
+body.mobile-ui .page{width:100%!important;max-width:none!important;min-width:0!important;margin:0!important;padding:0!important}
+body.mobile-ui .card{padding:12px!important;margin-bottom:9px!important;border-radius:14px!important;box-shadow:0 3px 12px rgba(15,35,71,.05)!important}
+body.mobile-ui .card-title{font-size:16px!important;line-height:1.3;margin-bottom:10px!important}
+body.mobile-ui .section-head{align-items:flex-start!important;gap:7px!important;margin-bottom:8px!important}
+body.mobile-ui .section-head h2{font-size:15px!important;line-height:1.35}
+body.mobile-ui .hint,body.mobile-ui .muted{font-size:10.5px!important;line-height:1.5}
+body.mobile-ui .grid.two,body.mobile-ui .grid.three{grid-template-columns:1fr!important;gap:9px!important}
+body.mobile-ui .toolbar{
+  width:100%!important;display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;
+  align-items:center!important;gap:6px!important;margin-bottom:8px!important;padding:1px 0 4px!important;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none
+}
+body.mobile-ui .toolbar::-webkit-scrollbar,body.mobile-ui .subtabs::-webkit-scrollbar,body.mobile-ui .editor-toolbar::-webkit-scrollbar,body.mobile-ui .library-sidebar::-webkit-scrollbar{display:none}
+body.mobile-ui .toolbar .spacer{display:none!important}
+body.mobile-ui .toolbar>*{flex:0 0 auto}
+body.mobile-ui .btn{
+  min-height:42px!important;height:auto!important;border-radius:10px!important;padding:9px 12px!important;
+  font-size:12px!important;line-height:1.1!important;white-space:nowrap;-webkit-tap-highlight-color:transparent
+}
+body.mobile-ui .btn.small{min-height:36px!important;padding:7px 10px!important;font-size:11px!important}
+body.mobile-ui .field{gap:5px!important;margin-bottom:10px!important}
+body.mobile-ui .field label{font-size:11.5px!important}
+body.mobile-ui .field input,body.mobile-ui .field select,body.mobile-ui .field textarea,
+body.mobile-ui input,body.mobile-ui select,body.mobile-ui textarea{
+  min-height:44px!important;font-size:16px!important;border-radius:10px!important;padding:9px 10px!important
+}
+body.mobile-ui .field textarea,body.mobile-ui textarea{min-height:96px!important}
+body.mobile-ui .inline{display:grid!important;grid-template-columns:1fr!important;align-items:stretch!important;gap:7px!important}
+body.mobile-ui .subtabs{
+  display:flex!important;gap:6px!important;overflow-x:auto!important;white-space:nowrap!important;margin-bottom:9px!important;
+  padding:1px 0 4px!important;-webkit-overflow-scrolling:touch;scrollbar-width:none
+}
+body.mobile-ui .subtabs button{height:38px!important;min-width:max-content!important;padding:0 12px!important;font-size:11px!important}
+body.mobile-ui .table-wrap{
+  width:100%!important;overflow:auto!important;border-radius:11px!important;-webkit-overflow-scrolling:touch!important;
+  overscroll-behavior-inline:contain;box-shadow:inset -12px 0 12px -14px rgba(15,35,71,.25)
+}
+body.mobile-ui table{width:max-content!important;min-width:720px!important}
+body.mobile-ui th,body.mobile-ui td{padding:8px 9px!important;font-size:11px!important;line-height:1.35!important}
+body.mobile-ui th{position:sticky;top:0;z-index:2}
+body.mobile-ui td.num{font-variant-numeric:tabular-nums}
+body.mobile-ui .row-actions{gap:4px!important}
+body.mobile-ui .notice{position:sticky;top:4px;z-index:80;font-size:11px!important;margin-bottom:7px!important}
+body.mobile-ui .pill{font-size:9.5px!important;padding:4px 7px!important}
+body.mobile-ui .kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;margin-bottom:9px!important}
+body.mobile-ui .kpi{padding:11px!important;border-radius:13px!important}
+body.mobile-ui .kpi .label{font-size:10px!important}
+body.mobile-ui .kpi .value{font-size:19px!important;margin-top:4px!important}
+body.mobile-ui .check-row{gap:12px!important}
+body.mobile-ui .check-option{min-height:40px!important}
+body.mobile-ui .check-option input[type="checkbox"]{width:20px!important;height:20px!important;min-height:20px!important;flex:0 0 20px!important}
+body.mobile-ui .empty{padding:20px 10px!important}
+body.mobile-ui a,body.mobile-ui button{-webkit-tap-highlight-color:transparent}
+
+@media(max-width:390px){
+  body.mobile-ui .kpis{grid-template-columns:1fr!important}
+  body.mobile-ui .card{padding:10px!important}
+  body.mobile-ui .btn{padding-left:10px!important;padding-right:10px!important}
+}
+
+body.mobile-ui .ledger-control-bar{grid-template-columns:1fr!important;gap:8px!important;margin-bottom:8px!important}
+body.mobile-ui .ledger-control-left{gap:6px!important}
+body.mobile-ui .ledger-control-approval{width:100%!important;justify-content:stretch!important;min-height:74px!important}
+body.mobile-ui .approval-panel,body.mobile-ui .ledger-control-approval .approval-panel{width:100%!important;max-width:none!important}
+body.mobile-ui .approval-panel{grid-template-columns:28px repeat(2,minmax(110px,1fr))!important}
+body.mobile-ui .approval-cell{min-height:72px!important}
+body.mobile-ui .approval-role{font-size:9.5px!important}
+body.mobile-ui .approval-person{font-size:9.5px!important}
+body.mobile-ui .approval-date{font-size:8px!important}
+body.mobile-ui .approval-action-button{min-height:28px!important;padding:5px 8px!important;font-size:9px!important}
+body.mobile-ui .ledger-title-row{align-items:flex-start!important;flex-wrap:wrap!important;gap:5px!important}
+body.mobile-ui .legal-ledger-table{min-width:1250px!important}
+body.mobile-ui .facility-ledger-table{min-width:1120px!important}
+body.mobile-ui .ledger-data-table{min-width:980px!important}
+body.mobile-ui .table-wrap{border-radius:10px!important}
