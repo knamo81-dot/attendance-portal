@@ -131,6 +131,52 @@ function itemRow(i=0,data=null){
     </div>`;
 }
 
+function collectionCardsHtml(){
+  if(!collections.length){
+    return `<div class="mobile-empty-card">수거내역이 없습니다.</div>`;
+  }
+
+  return collections.map(r=>{
+    const items=r.waste_collection_items||[];
+    const totalKg=items.reduce((sum,x)=>sum+Number(x.weight_kg||0),0);
+    const first=items[0]||{};
+    const facilityText=r.is_facility_log
+      ? `<span class="pill green">운영일지 반영</span>${r.facility_after_cm?` <span class="muted">후높이 ${esc(r.facility_after_cm)} cm</span>`:''}`
+      : '-';
+    return `
+      <details class="mobile-record-card collection-record">
+        <summary class="mobile-record-summary collection-summary">
+          <span class="mobile-record-date">${r.collection_date||'-'}</span>
+          <span class="mobile-record-value">${esc(r.certificate_no||'확인서 없음')}</span>
+          <span class="mobile-record-value">${totalKg?`${num(totalKg/1000,4)} T`:'중량 -'}</span>
+          <span class="mobile-record-chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div class="mobile-record-detail">
+          <div class="mobile-detail-row"><span>확인서번호</span><b>${esc(r.certificate_no||'-')}</b></div>
+          <div class="mobile-detail-row"><span>운영일지</span><b>${facilityText}</b></div>
+          <div class="mobile-detail-row"><span>처리구분</span><b>${first.treatment_type==='self'?'자가처리':'위탁처리'}</b></div>
+          <div class="mobile-detail-row"><span>운반업체</span><b>${esc(first.transporter?.vendor_name||'-')}</b></div>
+          <div class="mobile-detail-row"><span>처리업소</span><b>${esc(first.processor?.vendor_name||'-')}</b></div>
+          <div class="mobile-detail-row"><span>처리방법</span><b>${esc(first.treatment_method?.method_name||'-')}</b></div>
+          <div class="mobile-detail-section-title">폐기물별 수거량</div>
+          ${items.length?items.map(x=>`
+            <div class="mobile-subitem">
+              <div class="mobile-subitem-title">${esc(typeName(x.waste_types||{}))}</div>
+              <div class="mobile-subitem-grid">
+                <span>수량</span><b>${num(x.quantity,0)}${esc(x.waste_container_units?.quantity_unit||'개')}</b>
+                <span>실제 양</span><b>${x.weight_kg==null?'-':`${num(Number(x.weight_kg)/1000,4)} T`}</b>
+              </div>
+            </div>`).join(''):'<div class="muted">상세내역 없음</div>'}
+          <div class="mobile-detail-row"><span>비고</span><b>${esc(r.note||'-')}</b></div>
+          <div class="mobile-detail-actions">
+            <button class="btn small" data-edit="${r.id}">수정</button>
+            <button class="btn small danger" data-del="${r.id}">삭제</button>
+          </div>
+        </div>
+      </details>`;
+  }).join('');
+}
+
 function render(){
   const editRow=editingId?collections.find(x=>x.id===editingId)||null:null;
   const editItems=editRow?.waste_collection_items||[];
@@ -215,45 +261,8 @@ function render(){
 
       <div class="card">
         <div class="card-title">📋 수거내역</div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>수거일</th>
-                <th>확인서</th>
-                <th>운영일지</th>
-                <th>폐기물</th>
-                <th>처리구분</th>
-                <th>처리방법</th>
-                <th>처리업소</th>
-                <th>운반업체</th>
-                <th>중량</th>
-                <th>관리</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${collections.length?collections.flatMap(r=>{
-                const its=r.waste_collection_items||[];
-                if(!its.length){
-                  return [`<tr><td>${r.collection_date}</td><td>${esc(r.certificate_no||'-')}</td><td>${r.is_facility_log?`<span class="pill green">반영</span><br><span class="muted">${esc(r.facility_after_cm||'-')} cm</span>`:'-'}</td><td colspan="6" class="muted">상세내역 없음</td><td><div class="row-actions"><button class="btn small" data-edit="${r.id}">수정</button><button class="btn small danger" data-del="${r.id}">삭제</button></div></td></tr>`];
-                }
-                return its.map((x,idx)=>`
-                  <tr>
-                    <td>${idx===0?r.collection_date:''}</td>
-                    <td>${idx===0?esc(r.certificate_no||'-'):''}</td>
-                    <td>${idx===0?(r.is_facility_log?`<span class="pill green">반영</span><br><span class="muted">${esc(r.facility_after_cm||'-')}${r.facility_after_cm?' cm':''}</span>`:'-'):''}</td>
-                    <td>${esc(typeName(x.waste_types||{}))}<br><span class="muted">${num(x.quantity,0)}${esc(x.waste_container_units?.quantity_unit||'개')}</span></td>
-                    <td>${x.treatment_type==='self'?'자가처리':'위탁처리'}</td>
-                    <td>${esc(x.treatment_method?.method_name||'-')}</td>
-                    <td>${esc(x.processor?.vendor_name||'-')}</td>
-                    <td>${esc(x.transporter?.vendor_name||'-')}</td>
-                    <td class="num">${x.weight_kg==null?'-':num(Number(x.weight_kg)/1000,4)+' T'}</td>
-                    <td>${idx===0?`<div class="row-actions"><button class="btn small" data-edit="${r.id}">수정</button><button class="btn small danger" data-del="${r.id}">삭제</button></div>`:''}</td>
-                  </tr>`);
-              }).join(''):`<tr><td colspan="10" class="empty">수거내역이 없습니다.</td></tr>`}
-            </tbody>
-          </table>
-        </div>
+        <div class="mobile-list-caption collection-list-caption"><span>수거일</span><span>확인서</span><span>총 중량</span><span></span></div>
+        <div class="mobile-card-list">${collectionCardsHtml()}</div>
       </div>
     </div>`;
 
