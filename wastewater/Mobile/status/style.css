@@ -1,0 +1,300 @@
+:root{--bg:#f4f7fb;--card:#fff;--line:#d9e2ec;--text:#10203c;--muted:#6c7a90;--navy:#0b1f46;--green:#0b8a68;--green2:#effbf7;--danger:#d92d20;--shadow:0 4px 14px rgba(15,35,71,.05);--radius:14px}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Arial,"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text)}body{padding:10px}.page{width:100%;max-width:none}.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:12px}.toolbar .spacer{flex:1}.page-title{font-size:18px;font-weight:900;letter-spacing:-.04em}.hint{font-size:11px;color:var(--muted);line-height:1.55}.card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin-bottom:12px}.card-title{font-size:18px;font-weight:900;letter-spacing:-.04em;display:flex;align-items:center;gap:8px;margin-bottom:14px}.grid{display:grid;gap:12px}.grid.two{grid-template-columns:390px minmax(0,1fr)}.dashboard-grid{grid-template-columns:minmax(0,1.5fr) minmax(330px,.8fr)!important}.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}.kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}.kpi .label{font-size:11px;color:var(--muted);font-weight:800}.kpi .value{font-size:24px;font-weight:900;margin-top:5px}.btn{height:38px;border:1px solid var(--line);border-radius:11px;background:#fff;color:#243a60;font-weight:800;padding:0 14px;cursor:pointer}.btn.primary{background:var(--navy);border-color:var(--navy);color:#fff}.btn.danger{color:var(--danger)}.btn.small{height:30px;padding:0 9px;font-size:11px}.field{display:grid;gap:6px;margin-bottom:12px}.field label{font-size:12px;font-weight:800;color:#263a5f}.field input,.field select,.field textarea{width:100%;min-height:40px;border:1px solid #ccd8e6;border-radius:11px;background:#fff;padding:9px 11px;font-size:13px;color:var(--text);outline:none}.field textarea{min-height:90px;resize:vertical}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(11,138,104,.09)}.subtabs{display:flex;gap:7px;overflow:auto;margin-bottom:12px}.subtab{height:34px;flex:0 0 auto;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:11px;font-weight:900;padding:0 12px;cursor:pointer}.subtab.active{background:var(--green);border-color:var(--green);color:#fff}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:13px}table{width:100%;border-collapse:collapse;background:#fff}th,td{padding:9px 10px;border-bottom:1px solid #e7edf4;font-size:12px;text-align:left;vertical-align:middle}th{background:#f8fafc;color:#53657f;font-weight:900;white-space:nowrap}td.num{text-align:right;font-variant-numeric:tabular-nums}.empty{padding:24px;text-align:center;color:#98a2b3;font-size:12px}.row-actions{display:flex;gap:5px;white-space:nowrap}.inline-actions{display:flex;gap:8px}.hint-box{background:var(--green2);border:1px solid #b7ead8;border-radius:13px;padding:12px;font-size:11px;color:#456372;line-height:1.6;margin:10px 0 12px}.notice{padding:10px 12px;border-radius:11px;font-size:12px;margin-bottom:10px;display:none}.notice.show{display:block}.notice.ok{background:#ecfdf3;color:#067647;border:1px solid #abefc6}.notice.err{background:#fef3f2;color:#b42318;border:1px solid #fecdca}.criteria-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.criteria-grid>div{border:1px solid var(--line);border-radius:12px;padding:13px;background:#f8fafc}.criteria-grid span{display:block;font-size:11px;color:var(--muted);font-weight:800;margin-bottom:6px}.criteria-grid strong{font-size:14px}.bar-row{display:grid;grid-template-columns:45px 1fr 90px;gap:8px;align-items:center;margin:9px 0;font-size:11px}.bar-track{height:13px;background:#edf2f7;border-radius:999px;overflow:hidden;margin-bottom:3px}.bar{height:100%;border-radius:999px;background:var(--green)}.bar.pick{background:var(--navy)}
+@media(max-width:1100px){.grid.two,.dashboard-grid{grid-template-columns:1fr!important}.kpis{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){body{padding:6px}.kpis{grid-template-columns:1fr}.criteria-grid{grid-template-columns:1fr}.inline-actions{flex-direction:column}.btn{min-height:40px}}
+
+
+/* =========================================================
+   폐수현황 - 폐기물현황과 동일 계열 대시보드
+========================================================= */
+.status-toolbar{margin-bottom:12px}
+.year-filter{min-width:96px;text-align:center}
+.kpis-rich{gap:12px}
+.kpi.rich{
+  position:relative;overflow:hidden;border-radius:16px;padding:16px 18px;min-height:104px
+}
+.kpi-main{display:flex;align-items:center;gap:14px}
+.kpi-copy{min-width:0}
+.kpi.rich .label{font-size:12px;font-weight:900;color:#66758b}
+.kpi.rich .value{font-size:22px;line-height:1.2;margin-top:6px;color:#10203c}
+.kpi.rich .meta{margin-top:7px;font-size:11px;font-weight:800;color:#12a36d}
+.kpi-icon,.kpi-side-icon{display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.kpi-icon{width:56px;height:56px;border-radius:50%}
+.kpi-icon svg,.kpi-side-icon svg{width:26px;height:26px}
+.kpi-side-icon{position:absolute;right:16px;top:50%;transform:translateY(-50%);opacity:.8}
+.kpi.water .kpi-icon{background:#e5f6ff;color:#1885d8}
+.kpi.generated .kpi-icon{background:#dff4e8;color:#21a366}
+.kpi.treated .kpi-icon{background:#e7f0ff;color:#2680eb}
+.kpi.storage .kpi-icon{background:#efe6ff;color:#9a54ff}
+.kpi.water .kpi-side-icon{color:#1885d8}
+.kpi.generated .kpi-side-icon{color:#21a366}
+.kpi.treated .kpi-side-icon{color:#2680eb}
+.kpi.storage .kpi-side-icon{color:#9a54ff}
+
+.dashboard-full{padding:14px 16px 16px}
+.preview-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.1fr) minmax(360px,.9fr);
+  gap:12px;margin-bottom:14px
+}
+.chart-card{padding:14px 16px 16px}
+.chart-card-body{height:100%}
+.chart-head-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.chart-head-row .spacer{flex:1}
+.mini-title{font-size:14px;color:#10203c}
+.chart-axis-label{margin:0 0 6px;color:#66758b;font-size:11px;font-weight:800}
+.chart-legend{display:flex;align-items:center;gap:18px;flex-wrap:wrap;font-size:11px;font-weight:800;color:#53657f}
+.chart-legend span{display:inline-flex;align-items:center;gap:7px}
+.legend-swatch{width:14px;height:10px;border-radius:3px;display:inline-block}
+.legend-swatch.gen{background:#35c27d}
+.legend-swatch.col{background:#6ea5ff}
+.legend-line{width:18px;height:3px;border-radius:999px;display:inline-block}
+.legend-line.gen{background:#21b36a}
+.legend-line.col{background:#2f86f6}
+
+.month-chart,.count-chart{
+  position:relative;display:grid;grid-template-columns:repeat(12,minmax(34px,1fr));gap:8px;
+  min-height:190px;padding:14px 6px 0;border-left:1px solid #e3e9f1;border-bottom:1px solid #d4dde8;
+  background:linear-gradient(to bottom,transparent 19%,#eef2f6 20%,transparent 21%,transparent 39%,#eef2f6 40%,transparent 41%,transparent 59%,#eef2f6 60%,transparent 61%,transparent 79%,#eef2f6 80%,transparent 81%)
+}
+.month-col,.count-col{display:grid;grid-template-rows:1fr 24px}
+.month-bars,.count-bar-wrap{display:flex;align-items:flex-end;justify-content:center;gap:6px;min-height:150px}
+.month-bar{width:min(16px,39%);min-width:6px;border-radius:5px 5px 2px 2px}
+.month-bar.gen{background:#35c27d}.month-bar.col{background:#6ea5ff}
+.count-col{grid-template-rows:20px 1fr 24px}
+.count-value{text-align:center;font-size:11px;font-weight:900;color:#4a5670}
+.count-bar{width:min(26px,80%);min-width:10px;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#c7abf1,#b792ed)}
+.month-label{align-self:end;text-align:center;color:#66758b;font-size:10px;font-weight:800}
+.chart-empty-note{
+  position:absolute;z-index:3;left:50%;top:46%;transform:translate(-50%,-50%);
+  padding:8px 12px;border-radius:999px;background:rgba(255,255,255,.93);border:1px solid #dce4ee;
+  color:#98a2b3;font-size:11px;font-weight:800;white-space:nowrap
+}
+.month-chart.is-empty .month-col,.count-chart.is-empty .count-col{opacity:.45}
+
+.line-chart-wrap{position:relative}
+.line-chart{width:100%;height:180px;display:block}
+.line-chart .grid line{stroke:#eef2f6;stroke-width:1}
+.line-chart .line{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.line-chart .line.gen{stroke:#21b36a}.line-chart .line.col{stroke:#2f86f6}
+.line-chart .point.gen{fill:#21b36a}.line-chart .point.col{fill:#2f86f6}
+.line-chart-labels{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));margin-top:4px}
+.line-chart-labels span{text-align:center;color:#66758b;font-size:10px;font-weight:800}
+
+/* 31일/월 누적발생량 */
+.daily-cumulative-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.daily-mini-card{border:1px solid #e1e8f0;border-radius:12px;background:#fbfcfe;padding:10px 11px}
+.daily-mini-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.daily-mini-head strong{font-size:12px;color:#263a5f}
+.daily-mini-head span{font-size:11px;font-weight:900;color:#0b8a68;font-variant-numeric:tabular-nums}
+.daily-mini-svg{width:100%;height:72px;display:block;margin-top:6px}
+.daily-mini-svg .mini-grid{stroke:#e8edf3;stroke-width:1}
+.daily-mini-svg .mini-line{fill:none;stroke:#25ad73;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.daily-mini-days{display:flex;justify-content:space-between;color:#98a2b3;font-size:9px;font-weight:800}
+
+@media(max-width:1200px){
+  .preview-grid{grid-template-columns:1fr}
+  .daily-cumulative-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:900px){
+  .kpi-side-icon{display:none}
+  .daily-cumulative-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:720px){
+  .month-chart,.count-chart{overflow-x:auto;grid-template-columns:repeat(12,48px)}
+  .daily-cumulative-grid{grid-template-columns:1fr}
+}
+
+
+/* =========================================================
+   폐수현황 - 월별 추이 + 해당월 운영일지 누적발생량 가로 배치
+========================================================= */
+.status-top{align-items:stretch}
+.status-top>.chart-card{min-height:310px}
+.current-month-summary{
+  display:flex;align-items:baseline;gap:8px;margin:0 0 4px;
+  color:#66758b;font-size:11px;font-weight:800
+}
+.current-month-summary strong{
+  color:#0b8a68;font-size:18px;font-weight:900;font-variant-numeric:tabular-nums
+}
+.month-ledger-line-wrap{position:relative;min-height:230px}
+.month-ledger-line{display:block;width:100%;height:230px}
+.month-ledger-grid{stroke:#edf1f5;stroke-width:1}
+.month-ledger-zero{stroke:#cfd8e3;stroke-width:1}
+.month-ledger-path{
+  fill:none;stroke:#25ad73;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round
+}
+.month-ledger-point{fill:#25ad73;stroke:#fff;stroke-width:1.4}
+.month-ledger-tick{fill:#66758b;font-size:10px;font-weight:800}
+.month-ledger-line-wrap.is-empty .month-ledger-path,
+.month-ledger-line-wrap.is-empty .month-ledger-point{opacity:.25}
+
+@media(max-width:1200px){
+  .status-top{grid-template-columns:1fr}
+}
+
+
+/* =========================================================
+   폐수현황 - 해당월 현재용량 그래프
+========================================================= */
+.storage-chart-note{
+  display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;
+  margin:2px 0 2px;color:#66758b;font-size:10px;font-weight:800
+}
+.capacity-key{
+  display:inline-block;width:18px;height:0;border-top:2px dashed #8b95a7
+}
+.external-key{
+  display:inline-block;width:9px;height:9px;border-radius:50%;background:#25ad73
+}
+.invalid-key{
+  display:inline-block;width:9px;height:9px;border-radius:50%;background:#d92d20
+}
+.storage-capacity-line{
+  stroke:#8b95a7;stroke-width:1.8;stroke-dasharray:7 6
+}
+.storage-capacity-label{
+  fill:#66758b;font-size:10px;font-weight:900
+}
+.storage-path{
+  stroke:#25ad73
+}
+.storage-point{
+  fill:#25ad73;stroke:#fff;stroke-width:1.4
+}
+.storage-point.external{
+  fill:#25ad73
+}
+.storage-point.invalid{
+  fill:#d92d20;stroke:#fff;stroke-width:1.8
+}
+
+
+/* 폐수발생량 KPI - 산정불가일수 보조표기 */
+.kpi-unverified{
+  margin-left:5px;
+  font-size:9px;
+  font-weight:800;
+  color:#98a2b3;
+  letter-spacing:-0.15px;
+  white-space:nowrap;
+}
+
+
+/* 누적 그래프 - 용수사용량 선 */
+.legend-line.water{
+  background:#18a6b8;
+}
+.line-chart .line.water{
+  stroke:#18a6b8;
+}
+.line-chart .point.water{
+  fill:#18a6b8;
+}
+
+
+
+/* === 폐수 Mobile 6앱 공통: PC 테이블 축소가 아닌 터치 카드형 UI === */
+:root{color-scheme:light}
+html,body{width:100%;max-width:100%;margin:0;overflow-x:clip;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+*,*::before,*::after{box-sizing:border-box}
+body.ww-mobile-app{padding:10px!important;min-width:0!important;background:#f2f6fa!important;font-family:'Noto Sans KR','Malgun Gothic',Arial,sans-serif!important}
+#app,.page,.app-shell,.tab-panel,.main-grid,.card,.library-card,.library-layout,.library-content,.preview-card,.form-card,.ledger-card,.grid,.settings-grid{min-width:0!important;max-width:100%!important}
+#app{width:100%!important}
+img,svg,canvas,video,iframe{max-width:100%}
+input,select,textarea,button,[contenteditable="true"]{font-size:16px!important}
+input:not([type="checkbox"]):not([type="radio"]),select,textarea{width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;border-radius:11px!important}
+input[type="date"],input[type="month"],input[type="datetime-local"]{display:block!important;min-width:0!important;max-width:100%!important;min-height:46px!important;-webkit-appearance:none}
+input[type="checkbox"],input[type="radio"]{width:20px;height:20px;flex:0 0 auto}
+textarea{min-height:95px;resize:vertical}
+button,.btn,.small-btn{min-height:44px!important;max-width:100%;touch-action:manipulation;white-space:normal!important;line-height:1.35!important}
+.field{min-width:0!important;width:100%!important}
+.field label{display:block;margin-bottom:6px;font-weight:800}
+.main-grid,.grid.two,.settings-grid,.library-layout{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:12px!important}
+.card{padding:14px!important;border-radius:16px!important;margin:0 0 12px!important;overflow-wrap:anywhere}
+.form-card,.preview-card,.ledger-card{width:100%!important}
+.preview-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
+.mini-card{min-width:0!important;padding:11px!important}
+.mini-label{font-size:11px!important}
+.mini-value{font-size:16px!important;overflow-wrap:anywhere}
+.toolbar,.toolbar-row,.toolbar-right,.ledger-top,.ledger-control-bar,.section-head,.library-head{display:flex!important;flex-wrap:wrap!important;gap:10px!important;align-items:stretch!important;min-width:0!important}
+.toolbar>* ,.toolbar-row>*,.toolbar-right>*,.ledger-top>* ,.section-head>*{min-width:0!important}
+.toolbar-right{width:100%;flex:1 1 100%}
+.toolbar-right>input,.toolbar-right>select{flex:1 1 145px!important;width:100%!important;min-width:0!important}
+.toolbar-right>button{flex:1 1 135px}
+.section-title{font-size:16px!important;line-height:1.5!important}
+.hint,.msg,.wwm-hint{font-size:12px!important;line-height:1.55!important;color:#66758b!important;overflow-wrap:anywhere}
+.tab-panel{width:100%!important;min-width:0!important}
+.portal-header,.tabs-wrap{display:none!important}
+.wwm-record-list{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;min-width:0;width:100%}
+.wwm-record{background:#fff;border:1px solid #dce5ee;border-radius:15px;padding:14px;min-width:0;box-shadow:0 2px 9px rgba(18,46,75,.035);overflow-wrap:anywhere}
+.wwm-record-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:11px;min-width:0}
+.wwm-record-head strong{font-size:15px;color:#162f4b}
+.wwm-state{font-size:11px!important;line-height:1.3;border-radius:30px;background:#e8f7f1;color:#06785c;padding:5px 9px;font-weight:900;flex:0 0 auto}
+.wwm-record-primary{display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:11px;background:#effaf6;padding:12px;color:#08684f;font-size:13px;font-weight:800;margin-bottom:10px;overflow-wrap:anywhere}
+.wwm-record-primary strong{font-size:18px;text-align:right}
+.wwm-pairs{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+.wwm-pair{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #edf1f6;min-width:0}
+.wwm-pair:last-child{border-bottom:0}
+.wwm-key{font-size:12px;color:#64748b;flex:0 0 40%}
+.wwm-val{font-size:13px;color:#1e3653;font-weight:800;text-align:right;min-width:0;overflow-wrap:anywhere}
+.wwm-details{border-top:1px solid #e8eef5;margin-top:8px;padding-top:8px}
+.wwm-details summary{color:#476582;font-size:12px;font-weight:800;padding:7px 0;cursor:pointer}
+.wwm-record-actions{display:flex;flex-wrap:wrap;gap:7px;justify-content:flex-end;margin-top:12px}
+.wwm-record-actions>*{flex:0 1 auto}
+.wwm-empty{padding:28px 12px;text-align:center;color:#7d8ba0;background:#f8fafc;border-radius:12px;border:1px dashed #dce5ee}
+.wwm-invalid{border-color:#f3b7a0;background:#fffaf7}
+.wwm-invalid .wwm-state{background:#fff0e5;color:#ae451a}
+.wwm-holiday{background:#f7f9fc}
+.wwm-holiday .wwm-state{background:#e9eef6;color:#53647e}
+.wwm-doc-card{padding:15px!important}
+.wwm-document-title{display:block;width:100%;min-height:44px!important;padding:5px 0;text-align:left;border:0;background:none;color:#173b5b;font-size:16px!important;font-weight:900;overflow-wrap:anywhere}
+.wwm-doc-preview{font-size:13px;color:#64748b;line-height:1.55;margin:7px 0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.wwm-doc-meta,.wwm-date{font-size:11px;color:#7b8a9c}
+.wwm-doc-meta{padding:8px 0;border-top:1px solid #edf1f6}
+.wwm-daily-history{grid-column:1/-1}
+/* 모바일에서만 표가 남는 설정·편집 도구는 화면 밖으로 확장되지 않도록 제한 */
+.table-wrap{max-width:100%!important;overflow-x:auto!important;overscroll-behavior-x:contain}
+.rich-toolbar,.editor-toolbar{max-width:100%;display:flex!important;flex-wrap:wrap!important;gap:5px!important}
+.rich-editor,[contenteditable="true"]{min-width:0!important;max-width:100%!important;overflow-wrap:anywhere}
+.writer-actions,.row-actions{display:flex!important;flex-wrap:wrap!important;gap:8px!important}
+.writer-actions>*{flex:1 1 125px}
+.library-sidebar{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;gap:7px!important;width:100%!important;max-width:100%!important;overflow-x:auto!important;overscroll-behavior-x:contain;padding:4px 0 10px!important}
+.library-sidebar>*{flex:0 0 auto!important;white-space:nowrap!important;min-width:0!important}
+.library-content{width:100%!important;min-width:0!important}
+.library-list-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.article-body,.doc-body{overflow-wrap:anywhere}
+.article-body img,.doc-body img{max-width:100%!important;height:auto!important}
+.attachment-item{min-width:0;overflow-wrap:anywhere}
+.attachment-open{overflow-wrap:anywhere;white-space:normal!important;text-align:left}
+@media(min-width:560px){.wwm-record-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media print{.wwm-record{break-inside:avoid}.wwm-record-list{display:block}.wwm-record{margin-bottom:10px}body.ww-mobile-app{background:#fff!important}}
+
+
+.page,.status-page{padding:0!important}.status-toolbar{display:flex!important;gap:9px!important}.status-toolbar select{width:auto!important;flex:1 1 140px}
+.kpi-grid,.stats-grid,.status-kpis{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
+.kpi-card,.stat-card{min-width:0!important;padding:11px!important}.kpi-value,.stat-value{font-size:20px!important;white-space:normal!important}
+.chart-grid,.charts-grid,.chart-layout{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:12px!important}
+.chart-card,.chart-card-body,.month-chart,.line-chart-wrap{min-width:0!important;max-width:100%!important}
+.chart-head-row{display:flex!important;flex-wrap:wrap!important;gap:8px!important}.chart-legend{display:flex!important;flex-wrap:wrap!important;gap:7px!important;font-size:10px!important}
+.line-chart{width:100%!important}.month-chart{overflow:hidden!important}.month-col{min-width:0!important}
+.kpi-unverified{font-size:9px!important;white-space:normal!important}
+.subtabs{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;gap:7px!important;max-width:100%!important}
+.subtabs>*{flex:0 0 auto!important;white-space:nowrap!important}
+.settings-grid>.card{width:100%!important}
+@media(max-width:360px){.kpi-grid,.stats-grid,.status-kpis{grid-template-columns:1fr!important}}
+
+/* 폐수현황 실제 렌더링 클래스 기준 모바일 전용 배치 */
+.kpis.kpis-rich{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
+.kpi.rich{min-width:0!important;padding:11px!important;overflow:hidden!important}
+.kpi.rich .kpi-main{display:flex!important;align-items:flex-start!important;gap:8px!important;min-width:0!important}
+.kpi.rich .kpi-copy{min-width:0!important;overflow-wrap:anywhere!important}
+.kpi.rich .kpi-icon{width:32px!important;height:32px!important;flex:0 0 32px!important}
+.kpi.rich .kpi-side-icon{display:none!important}
+.kpi.rich .value{font-size:20px!important;white-space:normal!important;overflow-wrap:anywhere!important}
+.kpi.rich .label{font-size:11px!important;white-space:normal!important}
+.kpi.rich .meta{font-size:10px!important;white-space:normal!important}
+.dashboard-charts.preview-grid{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:12px!important}
+.dashboard-charts .chart-card{width:100%!important;min-width:0!important;grid-column:1/-1!important}
+.dashboard-charts .chart-card-body{width:100%!important;min-width:0!important}
+@media(max-width:360px){.kpis.kpis-rich{grid-template-columns:1fr!important}}
