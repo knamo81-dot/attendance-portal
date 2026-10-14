@@ -1505,38 +1505,43 @@ function renderPickupCards(rows){
 }
 function renderLedgerCards(rows,compact=false){
   const sorted=[...rows].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.created_at||'').localeCompare(String(a.created_at||'')));
-  if(!sorted.length)return `<div class="wwm-empty">운영일지 데이터가 없습니다.</div>`;
+  if(!sorted.length)return `<div class="wwm-empty">일일입력 기록이 없습니다.</div>`;
   return sorted.map(row=>{
     const holiday=!!row.is_display_holiday,missing=!!row.is_missing_day;
     const storage=row.storage_mode==='volume'&&row.volume_value!==null&&row.volume_value!==undefined
       ?`${formatNum(row.volume_value,(row.volume_unit||facilityVolumeUnit())==='L'?0:2)} ${(row.volume_unit||facilityVolumeUnit())==='L'?'L':'m³'}`
       :row.height===null||row.height===undefined?'-':`${formatNum(row.height,1)} cm`;
-    const status=holiday?'휴일':missing?'미입력':row.is_over?'산정불가':'기록';
-    const reason=escapeHtml(row.final_holiday_reason||row.holiday_reason||row.note||'');
-    return `<article class="wwm-record ${row.is_over?'wwm-invalid':''} ${holiday?'wwm-holiday':''}">
-      <div class="wwm-record-head"><strong>${escapeHtml(row.date||'-')}</strong><span class="wwm-state">${status}</span></div>
-      ${holiday?`<div class="wwm-record-primary">${reason||'휴일'}</div>`:
-        missing?'<div class="wwm-record-primary">평일 운영일지 미입력</div>':`
-        <div class="wwm-record-primary"><span>총 발생량</span><strong>${escapeHtml(row.generated_text||'-')}</strong></div>
+    const state=holiday?'휴일':missing?'미입력':row.is_over?'산정불가':'폐수 운영일지';
+    const value=holiday?(row.final_holiday_reason||row.holiday_reason||'휴일'):
+      missing?'미입력':row.generated_text||'-';
+    return `<details class="wwm-fold-card ${row.is_over?'wwm-invalid':''} ${holiday?'wwm-holiday':''}">
+      <summary class="wwm-fold-summary">
+        <span class="wwm-fold-date">${escapeHtml(row.date||'-')}</span>
+        <span class="wwm-fold-type">${escapeHtml(state)}</span>
+        <span class="wwm-fold-value">${escapeHtml(value)}</span>
+        <span class="wwm-fold-arrow" aria-hidden="true">⌄</span>
+      </summary>
+      <div class="wwm-fold-detail">
         <div class="wwm-pairs">
-          ${wwMobilePair('당일 용수사용량',`${formatNum(row.water_used,2)} m³`)}
-          ${wwMobilePair('용수 금일지침',`${formatNum(row.usage,2)} m³`)}
-          ${wwMobilePair(facilityMode()==='height'?'저장고 높이':'현재 폐수량',escapeHtml(storage))}
-          ${wwMobilePair('외부보관',escapeHtml(row.external_display||'-'))}
-          ${wwMobilePair('총 저장량',escapeHtml(row.guideline_text||'-'))}
-          ${row.pickup?wwMobilePair('수거량',`위탁 ${formatNum(row.pickup.entrusted_amount,2)} m³`):''}
-        </div>`}
-      ${!compact&&!holiday&&!missing?`<details class="wwm-details"><summary>처리업소 · 확인서 · 기타사항</summary><div class="wwm-pairs">
-        ${wwMobilePair('처리업소',escapeHtml(row.pickup?.contractor||'-'))}
-        ${wwMobilePair('확인서번호',escapeHtml(row.pickup?.certificate_no||'-'))}
-        ${row.pickup?wwMobilePair('수거 후',escapeHtml(formatPickupAfter(row.pickup))):''}
-        ${wwMobilePair('기타',escapeHtml(row.note||'-'))}
-      </div></details>`:''}
-      ${row.id&&canDelete()?`<div class="wwm-record-actions"><button type="button" class="small-btn danger" onclick="deleteDailyRow(${Number(row.id)})">삭제</button></div>`:''}
-    </article>`;
+          ${holiday?wwMobilePair('휴일 사유',escapeHtml(row.final_holiday_reason||row.holiday_reason||row.note||'휴일')):
+            missing?wwMobilePair('입력 상태','운영일지 미입력'):`
+            ${wwMobilePair('용수 금일지침',`${formatNum(row.usage,2)} m³`)}
+            ${wwMobilePair('당일 용수사용량',`${formatNum(row.water_used,2)} m³`)}
+            ${wwMobilePair(facilityMode()==='height'?'저장고 높이':'현재 폐수량',escapeHtml(storage))}
+            ${wwMobilePair('외부보관',escapeHtml(row.external_display||'-'))}
+            ${wwMobilePair('금일지침 (총 저장량)',escapeHtml(row.guideline_text||'-'))}
+            ${wwMobilePair('총 발생량',escapeHtml(row.generated_text||'-'))}
+            ${row.pickup?wwMobilePair('수거량',`${formatNum(row.pickup.entrusted_amount,2)} m³`):''}
+            ${wwMobilePair('처리업소',escapeHtml(row.pickup?.contractor||'-'))}
+            ${wwMobilePair('확인서번호',escapeHtml(row.pickup?.certificate_no||'-'))}
+            ${row.pickup?wwMobilePair('수거 후',escapeHtml(formatPickupAfter(row.pickup))):''}
+            ${wwMobilePair('기타사항',escapeHtml(row.note||'-'))}`}
+        </div>
+        ${row.id&&canDelete()?`<div class="wwm-record-actions"><button type="button" class="small-btn danger" onclick="deleteDailyRow(${Number(row.id)})">삭제</button></div>`:''}
+      </div>
+    </details>`;
   }).join('');
 }
-
 function renderPickupRows(rows){
   if(!rows.length) return `<tr><td colspan="7">선택한 조건의 수거 내역이 없습니다.</td></tr>`;
   return rows.map(row=>`<tr><td>${escapeHtml(row.pickup_date)}</td><td>${getPickupTypeBadge(row.pickup_type||'폐수')}</td><td>${escapeHtml(getPickupDetailText(row))}</td><td>${escapeHtml(row.certificate_no||'')}</td><td>${escapeHtml(row.contractor||'')}</td><td>${escapeHtml(row.note||'')}</td><td>${canDelete()?`<button class="small-btn danger" onclick="deletePickupRow(${row.id})">삭제</button>`:'-'}</td></tr>`).join('');
@@ -2881,7 +2886,8 @@ ${canWrite()?`<button class="btn primary block" onclick="saveDailyRow()">💾 �
 </div>
 <div class="card wwm-daily-history">
   <div class="section-title">📋 일일입력현황</div>
-  <div class="wwm-hint">최근 입력된 운영일지를 날짜별 카드로 확인합니다.</div>
+  <div class="wwm-hint">날짜를 누르면 계측값·발생량·수거정보가 펼쳐집니다.</div>
+  <div class="wwm-list-caption"><span>날짜</span><span>구분</span><span>발생량</span><span></span></div>
   <div class="wwm-record-list">${renderLedgerCards(stats.enrichedDaily.filter(r=>r.id).slice(-40),true)}</div>
 </div>
 </div></div>
