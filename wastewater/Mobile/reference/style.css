@@ -523,3 +523,22 @@ button,.btn,.small-btn{min-height:44px!important;max-width:100%;touch-action:man
 .library-layout{grid-template-columns:minmax(0,1fr)!important}
 .library-sidebar{border-right:0!important;border-bottom:1px solid #e5edf5!important}
 .writer-form,.rich-editor-shell{width:100%!important;min-width:0!important}
+
+/* 폐기물 Mobile 관련자료/관련서류와 동일한 제목형 카드 목록 */
+.mobile-library-list{display:grid;grid-template-columns:minmax(0,1fr);gap:11px;min-width:0;width:100%}
+.mobile-library-card{width:100%;min-width:0;padding:14px;border:1px solid #dce5ee;border-radius:14px;background:#fff;box-shadow:0 3px 10px rgba(15,35,71,.045);overflow-wrap:anywhere}
+.mobile-library-card.expired-card{border-color:#fed7aa}
+.mobile-library-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
+.mobile-library-no,.mobile-library-date{font-size:11px;font-weight:900;color:#7a8799}
+.mobile-library-title{display:block;width:100%;min-height:40px;border:0;background:transparent;padding:3px 0 6px;margin:0;color:#0f2347;font-size:16px!important;font-weight:900;line-height:1.45;text-align:left;white-space:normal;overflow-wrap:anywhere;word-break:keep-all}
+.mobile-library-preview{margin-bottom:10px;color:#66758b;font-size:12px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mobile-library-meta{display:grid;grid-template-columns:80px minmax(0,1fr);gap:8px 10px;padding:10px 0;border-top:1px solid #edf1f5;border-bottom:1px solid #edf1f5;font-size:12px}
+.mobile-library-meta span{color:#66758b;font-weight:800}
+.mobile-library-meta b{min-width:0;text-align:right;color:#10203c;overflow-wrap:anywhere}
+.mobile-library-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.mobile-library-actions .btn{min-height:42px;flex:1 1 70px}
+.library-layout{display:block!important;min-width:0!important}
+.library-content{width:100%!important;min-width:0!important;padding-left:0!important;border-left:0!important}
+.library-sidebar{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;gap:7px!important;overflow-x:auto!important;max-width:100%!important;overscroll-behavior-x:contain}
+.library-sidebar>*{flex:0 0 auto!important;white-space:nowrap!important}
+@media(min-width:560px){.mobile-library-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
