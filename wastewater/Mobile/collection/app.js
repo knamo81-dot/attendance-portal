@@ -1471,16 +1471,26 @@ function wwMobilePair(label,value){
 }
 function renderPickupCards(rows){
   if(!rows.length)return `<div class="wwm-empty">선택한 조건의 수거내역이 없습니다.</div>`;
-  return rows.map(row=>`<article class="wwm-record">
-    <div class="wwm-record-head"><strong>${escapeHtml(row.pickup_date||'-')}</strong>${getPickupTypeBadge(row.pickup_type||'폐수')}</div>
-    <div class="wwm-record-primary">${escapeHtml(getPickupDetailText(row)||'-')}</div>
-    <div class="wwm-pairs">
-      ${wwMobilePair('확인서번호',escapeHtml(row.certificate_no||'-'))}
-      ${wwMobilePair('처리업소',escapeHtml(row.contractor||'-'))}
-      ${row.note?wwMobilePair('비고',escapeHtml(row.note)):''}
+  return rows.map(row=>`<details class="wwm-fold-card">
+    <summary class="wwm-fold-summary">
+      <span class="wwm-fold-date">${escapeHtml(row.pickup_date||'-')}</span>
+      <span class="wwm-fold-type">${escapeHtml(row.certificate_no||'확인서 미등록')}</span>
+      <span class="wwm-fold-value">${escapeHtml(getPickupDetailText(row)||'-')}</span>
+      <span class="wwm-fold-arrow" aria-hidden="true">⌄</span>
+    </summary>
+    <div class="wwm-fold-detail">
+      <div class="wwm-pairs">
+        ${wwMobilePair('구분',escapeHtml(row.pickup_type||'폐수'))}
+        ${wwMobilePair('수거일',escapeHtml(row.pickup_date||'-'))}
+        ${wwMobilePair('확인서번호',escapeHtml(row.certificate_no||'-'))}
+        ${wwMobilePair('수거내역',escapeHtml(getPickupDetailText(row)||'-'))}
+        ${wwMobilePair('처리업소',escapeHtml(row.contractor||'-'))}
+        ${row.pickup_type!=='폐기물'?wwMobilePair('수거 후',escapeHtml(formatPickupAfter(row))):''}
+        ${wwMobilePair('비고',escapeHtml(row.note||'-'))}
+      </div>
+      ${canDelete()?`<div class="wwm-record-actions"><button type="button" class="small-btn danger" onclick="deletePickupRow(${Number(row.id)})">삭제</button></div>`:''}
     </div>
-    ${canDelete()?`<div class="wwm-record-actions"><button type="button" class="small-btn danger" onclick="deletePickupRow(${Number(row.id)})">삭제</button></div>`:''}
-  </article>`).join('');
+  </details>`).join('');
 }
 function renderLedgerCards(rows,compact=false){
   const sorted=[...rows].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.created_at||'').localeCompare(String(a.created_at||'')));
@@ -2874,7 +2884,8 @@ ${canWrite()?`<button class="btn primary block" onclick="saveDailyRow()">💾 �
 ${canWrite()?`<button class="btn primary block" onclick="savePickupRow()">💾 수거 등록 저장</button>`:`<div class="msg muted">일반 사용자는 조회만 가능합니다.</div>`}
 <div id="pickup-msg" class="msg muted"></div></div>
 <div class="card preview-card">
-<div class="toolbar-row"><div><div class="section-title">📋 수거내역</div><div class="msg muted">폐수 수거내역을 날짜별 카드로 확인합니다.</div></div><div class="toolbar-right"><select class="select" style="width:140px;margin:0" onchange="changePickupYear(this.value)">${pickupYears.map(y=>`<option value="${y}" ${pickupYearFilter===y?'selected':''}>${y}년</option>`).join('')}</select></div></div>
+<div class="toolbar-row"><div><div class="section-title">📋 수거내역</div><div class="msg muted">수거일을 누르면 확인서·처리업소·수거정보가 펼쳐집니다.</div></div><div class="toolbar-right"><select class="select" style="width:140px;margin:0" onchange="changePickupYear(this.value)">${pickupYears.map(y=>`<option value="${y}" ${pickupYearFilter===y?'selected':''}>${y}년</option>`).join('')}</select></div></div>
+<div class="wwm-list-caption"><span>수거일</span><span>확인서</span><span>수거내역</span><span></span></div>
 <div class="wwm-record-list" id="wwm-pickup-list">${renderPickupCards(filteredPickupRows)}</div>
 </div></div></div>
 
