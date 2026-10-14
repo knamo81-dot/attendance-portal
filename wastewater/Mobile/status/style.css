@@ -298,3 +298,13 @@ button,.btn,.small-btn{min-height:44px!important;max-width:100%;touch-action:man
 .dashboard-charts .chart-card{width:100%!important;min-width:0!important;grid-column:1/-1!important}
 .dashboard-charts .chart-card-body{width:100%!important;min-width:0!important}
 @media(max-width:360px){.kpis.kpis-rich{grid-template-columns:1fr!important}}
+
+
+/* 2026-10-14 iPhone 입력 포커스 확대 방지: viewport 확대 제한 없이 16px 유지 */
+html{-webkit-text-size-adjust:100%!important;text-size-adjust:100%!important}
+input,select,textarea,[contenteditable="true"],.input,.select,.textarea,
+.field input,.field select,.field textarea,.title-field input,
+input[type="date"],input[type="month"],input[type="datetime-local"],input[type="number"],input[type="search"],input[type="text"],input[type="email"],input[type="tel"],input[type="password"]{
+  font-size:16px!important;line-height:1.4!important;
+}
+input,select,textarea{min-width:0!important;max-width:100%!important;box-sizing:border-box!important}
