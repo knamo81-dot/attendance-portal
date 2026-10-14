@@ -2199,3 +2199,27 @@ button,.btn,.small-btn{min-height:44px!important;max-width:100%;touch-action:man
 .tab-panel.active>.main-grid{grid-template-columns:minmax(0,1fr)!important}
 #pickup-date,#pickup-cert,#pickup-contractor,#pickup-amount,#pickup-after-cm,#pickup-after-volume{width:100%!important}
 .form-chip-row{display:flex;flex-wrap:wrap;gap:8px}
+
+/* 폐기물 모바일과 동일한 요약-펼침 카드 (PC 및 데이터 처리 로직 불변) */
+.wwm-record-list{display:grid;grid-template-columns:minmax(0,1fr)!important;gap:10px!important}
+.wwm-fold-card{display:block;min-width:0;max-width:100%;border:1px solid #dce5ee;border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 2px 9px rgba(18,46,75,.035)}
+.wwm-fold-card[open]{border-color:#b8d8d0;box-shadow:0 3px 12px rgba(10,92,72,.08)}
+.wwm-fold-card.wwm-invalid{border-color:#f3b7a0;background:#fffaf7}
+.wwm-fold-card.wwm-holiday{background:#f7f9fc}
+.wwm-fold-summary{display:grid;grid-template-columns:minmax(90px,1.1fr) minmax(0,1.2fr) minmax(0,1fr) 16px;align-items:center;gap:8px;min-height:58px;padding:12px;cursor:pointer;list-style:none;min-width:0}
+.wwm-fold-summary::-webkit-details-marker{display:none}
+.wwm-fold-summary::marker{content:''}
+.wwm-fold-date{font-size:12px;font-weight:900;color:#193957;overflow-wrap:anywhere}
+.wwm-fold-type{font-size:11px;font-weight:800;color:#64748b;min-width:0;overflow-wrap:anywhere}
+.wwm-fold-value{font-size:12px;font-weight:900;color:#0c7a5b;text-align:right;min-width:0;overflow-wrap:anywhere}
+.wwm-fold-arrow{color:#64748b;font-size:18px;text-align:right;transition:transform .15s ease}
+.wwm-fold-card[open] .wwm-fold-arrow{transform:rotate(180deg)}
+.wwm-fold-detail{padding:0 12px 12px;border-top:1px solid #edf1f6}
+.wwm-fold-detail .wwm-pair{padding:10px 0}
+.wwm-fold-detail .wwm-record-actions{padding-top:6px}
+.wwm-list-caption{display:grid;grid-template-columns:minmax(90px,1.1fr) minmax(0,1.2fr) minmax(0,1fr) 16px;gap:8px;padding:0 12px 4px;color:#78879a;font-size:10px;font-weight:900}
+.wwm-fold-card .wwm-record-actions button{min-height:40px}
+@media(max-width:380px){
+ .wwm-fold-summary,.wwm-list-caption{grid-template-columns:minmax(80px,1fr) minmax(0,1fr) 16px}
+ .wwm-fold-value,.wwm-list-caption span:nth-child(3){display:none}
+}
