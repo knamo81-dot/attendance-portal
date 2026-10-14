@@ -542,3 +542,32 @@ button,.btn,.small-btn{min-height:44px!important;max-width:100%;touch-action:man
 .library-sidebar{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;gap:7px!important;overflow-x:auto!important;max-width:100%!important;overscroll-behavior-x:contain}
 .library-sidebar>*{flex:0 0 auto!important;white-space:nowrap!important}
 @media(min-width:560px){.mobile-library-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+/* 2026-10-14 iPhone 입력 포커스 확대 방지: viewport 확대 제한 없이 16px 유지 */
+html{-webkit-text-size-adjust:100%!important;text-size-adjust:100%!important}
+input,select,textarea,[contenteditable="true"],.input,.select,.textarea,
+.field input,.field select,.field textarea,.title-field input,
+input[type="date"],input[type="month"],input[type="datetime-local"],input[type="number"],input[type="search"],input[type="text"],input[type="email"],input[type="tel"],input[type="password"]{
+  font-size:16px!important;line-height:1.4!important;
+}
+input,select,textarea{min-width:0!important;max-width:100%!important;box-sizing:border-box!important}
+
+
+/* 관련자료·관련서류: 폐기물 모바일과 같은 내용 너비의 가로 스와이프 분류 */
+.library-layout,.library-sidebar,.library-content{min-width:0!important;max-width:100%!important}
+.library-sidebar{
+  display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;
+  justify-content:flex-start!important;align-items:stretch!important;
+  width:100%!important;overflow-x:auto!important;overflow-y:hidden!important;
+  gap:7px!important;padding:4px 2px 12px!important;
+  -webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;
+}
+.library-sidebar .library-category,.library-sidebar>button{
+  display:inline-flex!important;flex:0 0 auto!important;width:max-content!important;
+  max-width:calc(100vw - 60px)!important;min-width:0!important;
+  min-height:42px!important;padding:8px 13px!important;
+  justify-content:center!important;gap:9px!important;
+  white-space:nowrap!important;scroll-snap-align:start;
+}
+.library-sidebar .library-category b{flex:0 0 auto!important}
