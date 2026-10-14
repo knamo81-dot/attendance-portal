@@ -586,15 +586,21 @@ function listContent(){
   const cat=selectedCategory();
   const filtered=cat?rows.filter(r=>rowBelongs(r,cat)):[];
   return `<div class="library-list-head"><strong>${cat?esc(cat.category_name):'관련자료'}</strong><span class="hint">${filtered.length}건</span></div>
-    <div class="wwm-record-list">${filtered.map((r,i)=>{
+    <div class="mobile-library-list">${filtered.map((r,i)=>{
       const cnt=rowFiles(r.id).length+legacyAttachments(r).length+(r.file_path?1:0);
       const preview=plainTextFromHtml(r.body||r.content||'');
-      return `<article class="wwm-record wwm-doc-card">
-        <div class="wwm-record-head"><span class="wwm-state">${esc(cat?.category_name||'관련자료')}</span><span class="wwm-date">${formatDate(r.created_at)}</span></div>
-        <button type="button" class="wwm-document-title" data-view="${r.id}">${esc(r.title||'-')}</button>
-        ${preview?`<p class="wwm-doc-preview">${esc(preview.slice(0,135))}${preview.length>135?'…':''}</p>`:''}
-        <div class="wwm-doc-meta">작성자 ${esc(r.created_by||'-')}${cnt?` · 첨부파일 ${cnt}개`:''}</div>
-        <div class="wwm-record-actions"><button class="btn small" data-view="${r.id}">보기</button>${canManageWaste()?`<button class="btn small" data-edit="${r.id}">수정</button><button class="btn small danger" data-del="${r.id}">삭제</button>`:''}</div>
+      return `<article class="mobile-library-card">
+        <div class="mobile-library-top"><span class="mobile-library-no">#${i+1}</span><span class="mobile-library-date">${formatDate(r.created_at)}</span></div>
+        <button type="button" class="mobile-library-title" data-view="${r.id}">${esc(r.title||'-')}</button>
+        ${preview?`<div class="mobile-library-preview">${esc(preview.slice(0,120))}${preview.length>120?'…':''}</div>`:''}
+        <div class="mobile-library-meta">
+          <span>작성자</span><b>${esc(r.created_by||'-')}</b>
+          <span>첨부</span><b>${cnt?`${cnt}개`:'없음'}</b>
+        </div>
+        <div class="mobile-library-actions">
+          <button type="button" class="btn small" data-view="${r.id}">보기</button>
+          ${canManageWaste()?`<button type="button" class="btn small" data-edit="${r.id}">수정</button><button type="button" class="btn small danger" data-del="${r.id}">삭제</button>`:''}
+        </div>
       </article>`;
     }).join('')||'<div class="wwm-empty">등록된 관련자료가 없습니다.</div>'}</div>`;
 }
