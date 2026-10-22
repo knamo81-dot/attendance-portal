@@ -3936,7 +3936,7 @@ body.auth-loading .top-user-bar {
       if (canOperate) return reagentTabs;
 
       const allowedTabs = reagentTabs.filter(function (tab) {
-        return isReagentDashboardTab(tab) || isReagentRequestTab(tab);
+        return isReagentDashboardTab(tab) || isReagentRequestTab(tab) || tab.id === 'order-receipt';
       });
       return allowedTabs.length ? allowedTabs : [
         { id: 'reagent-dashboard', label: '구매현황' },
